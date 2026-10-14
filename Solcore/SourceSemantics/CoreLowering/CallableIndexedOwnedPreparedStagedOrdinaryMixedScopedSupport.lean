@@ -105,6 +105,7 @@ private theorem child_certificate
 include provenance prefixContext receiver wellFormed metadata rows complete signatureMember sourceOwner zero profile in
 private def support_mixed
     (choice : Choice code («stages» := stages))
+    (choiceIssued : choice.Issued code support.caller.named)
     (syntaxTree : GenericImperativeMatch.Syntax function.source (Syntax support.caller)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.NestedBranchingSupport
@@ -129,7 +130,8 @@ private def support_mixed
     code support.body.toContext support.body.frame choice provenance.body_view provenance.scope_declarations
     sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
-    support.body.valid.ledger support.body.projection syntaxTree
+    support.body.valid.ledger support.body.projection
+    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile) syntaxTree
     (certificates := fun context => Certificate headers support.caller bodyRegistry faults context child)
     (fun context fields current fuel id node lowered declarations tree reached found typed accepted _nativeType native => by
       have accepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody (min fuel code.fuel)
@@ -145,11 +147,11 @@ private def support_mixed
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
   rw [(stages).source selected]
   refine ⟨weakened, ?_⟩
-  intro currentRegistry currentFaults
+  intro currentRegistry
   obtain ⟨tree, sites⟩ := CallableLambdaViewMatchRuntimeCertificates.transport_sites_with
     (LocalView.refl function.source) (by intro id member; cases member)
     support.body.unique (fun _ _ _ => True.intro)
-    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry currentFaults)
+    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry)
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
   exact sites
 
@@ -161,9 +163,9 @@ theorem of_actual
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
       CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.NestedBranchingSupport headers keys support stages packet) := by
-  obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose
-    code support.caller.named provenance.policy_recipe.body_recipe support.compilation shape child selected
+  obtain ⟨choice, choiceIssued⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose_issued
+    code support.caller.named provenance.issued_recipe support.compilation shape child selected
   exact ⟨⟨choice.packet, support_mixed stagePrepared code support provenance prefixContext receiver wellFormed metadata
-    rows complete signatureMember sourceOwner zero profile choice syntaxTree⟩⟩
+    rows complete signatureMember sourceOwner zero profile choice choiceIssued syntaxTree⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMixedScopedSupport

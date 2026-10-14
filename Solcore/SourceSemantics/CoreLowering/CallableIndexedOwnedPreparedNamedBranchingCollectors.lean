@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalContextCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingSupport
@@ -28,6 +30,26 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {instantiation : DeclarationInstantiation}
   {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
   (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
+
+include aligned in
+/-- The real named preparation and receiving issuer retain the exact operand diagnostic. -/
+theorem operands_of_diagnostic
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    {site assignment operator rhs}
+    (origin : AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs)
+    (profile : operator = .equal ∨ assignment.target.type = .word) :
+    AssignmentOperandDiagnostics.OperandsLaw
+      (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator) := by
+  obtain ⟨first, assignmentPrepared⟩ := CallableIndexedOwnedPublicDiagnosticReceipts.assignments_at_header
+    prepared diagnostic aligned
+  exact PreparedBranchingAssignmentDiagnostics.operands assignmentPrepared
+    (fun _ _ represented => CallableIndexedOwnedPublicAssignmentDiagnostics.prepared_operands
+      prepared diagnostic receiver represented) origin profile
+
 
 include aligned in
 /-- Child factories receive only original syntax/typing, actual callback
@@ -93,6 +115,12 @@ theorem collected_of_imperative
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     (receipt : Receipt header)
+    {faults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw faults operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
@@ -107,7 +135,7 @@ theorem collected_of_imperative
         RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) header.function.source expressionSyntax
       (TypedCertificate header.function.source certificates) compiled.indexed.layouts.definitions
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
@@ -138,7 +166,7 @@ theorem collected_of_imperative
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_binder prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_allocator prepared aligned)
-    assignments
+    assignments operands
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_match prepared aligned) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.match_allocator prepared aligned)
     (CallableIndexedOwnedPreparedDirectNamedProfileExtraction.hidden_fresh (header := header) wellFormed)
@@ -169,7 +197,13 @@ def of_imperative_compiler
     (zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
-    (receipt : Receipt header) (stages : Staging.Recursive.Registry)
+    (receipt : Receipt header)
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
       header.context (.statements true header.function.body) header.function.resultType)
@@ -190,7 +224,7 @@ def of_imperative_compiler
   refine ⟨complete, zero, wellFormed, ?_⟩
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, collected_of_imperative prepared aligned ready wellFormed member receipt syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, collected_of_imperative prepared aligned ready wellFormed member receipt operands syntaxTree (children child selected)⟩
 
 
 include aligned in
@@ -209,7 +243,13 @@ def of_compiler
     (zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
-    (receipt : Receipt header) (stages : Staging.Recursive.Registry)
+    (receipt : Receipt header)
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericLexicalStatements.Syntax header.function.source expressionSyntax
       header.context true header.function.body header.function.resultType)
@@ -227,7 +267,7 @@ def of_compiler
         header bodyRegistry semanticFaults context child scope id lowered) :
     CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
       headers keys bodyRegistry header stages receipt semanticFaults :=
-  of_imperative_compiler prepared aligned ready wellFormed complete zero member receipt stages
+  of_imperative_compiler prepared aligned ready wellFormed complete zero member receipt operands stages
     (.body syntaxTree) children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors

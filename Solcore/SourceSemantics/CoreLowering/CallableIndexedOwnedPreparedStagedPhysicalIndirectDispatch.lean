@@ -100,9 +100,11 @@ variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgr
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
     (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
 
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
 include physical owners receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations in
+  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations semantic in
 /-- One original Source parent constructs its complete native result or
 retains the authentic named suffix. The concrete call producers reuse the
 literal callee and argument evaluations and their reached pool. -/
@@ -144,7 +146,7 @@ theorem preserves_parent_or_global (budget : Nat)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (functionModel := functions)
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         actualFunctionType observations calleeTrace accepted argumentsTrace called constructedPrefix with user | parent
-    · rcases CallableIndexedOwnedPreparedStagedPhysicalClosureUserDispatch.preserves_closure_or_global
+    · rcases CallableIndexedOwnedPreparedStagedPhysicalClosureUserDispatch.preserves_closure_or_global (semantic := semantic)
           bridge profile physical owners compiler prepared initial sourceParent occurrence stagePrepared receiver
           wellFormed runtime covers locals sourceEq tree unique parentTyped found guardFrame actualFunctionType
           packets supported budget bodyChildren user.1 calleeTrace accepted argumentsTrace called (Nat.le_of_lt strict)
@@ -156,7 +158,7 @@ theorem preserves_parent_or_global (budget : Nat)
 
 include physical owners receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations in
+  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations semantic in
 /-- One original native parent completion either gives full Source parent
 meaning or retains its actual named application prefix. Concrete call branches
 share the same reached state; no caller or argument trace is replayed. -/
@@ -199,7 +201,7 @@ theorem reflects_parent_or_global (budget : Nat)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (functionModel := functions)
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         actualFunctionType observations completed application with user | parent
-    · exact CallableIndexedOwnedPreparedStagedPhysicalClosureUserDispatch.reflects_closure_or_global
+    · exact CallableIndexedOwnedPreparedStagedPhysicalClosureUserDispatch.reflects_closure_or_global (semantic := semantic)
         bridge profile physical owners compiler prepared initial sourceParent occurrence stagePrepared receiver
         wellFormed runtime covers locals sourceEq tree unique parentTyped found actualFunctionType
         packets supported bodyChildren completed user

@@ -24,7 +24,7 @@ structure SelectedBody {compiled : SourceCoreUnifiedCompilation.Compiled}
   readFuel : Nat
   «prefix» : code.compilation.administrativePrefix = 1
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -43,8 +43,8 @@ abbrev SelectedBody.tree {compiled function scope administrative headers code in
 theorem SelectedBody.sites {compiled function scope administrative headers code inputs stages packet semanticFaults}
     (support : @SelectedBody compiled function scope administrative headers code inputs stages packet semanticFaults)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
-    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
-    (support.tree child selected).CatalogSites .reachable registry faults :=
-  (support.collected child selected).sites registry faults
+    (registry : SourceCoreRawMetadata.Registry) :
+    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+  (support.collected child selected).sites registry
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalBranchingClosureStaticSupport

@@ -154,7 +154,7 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
     observed.makeShape.expression.id observed.makeShape.statement observed.makeShape.roots
     observed.makeShape.statementFound observed.makeShape.returnStatement
   obtain ⟨makeSupport⟩ := makeHeader.make_support extra makeStages (headers rows) complete
-    makeTerminal makeDiagnostic makeExpression makePoint (registry := registry)
+    makeTerminal makeDiagnostic makeExpression makePoint receiver (fun _ _ proof => proof) (registry := registry)
     (faults := CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)
   obtain ⟨identityTerminal, _identityExpression, identitySupport⟩ :=
     identityHeader.identity_support observed receiver (actualStagePrepared fixture)

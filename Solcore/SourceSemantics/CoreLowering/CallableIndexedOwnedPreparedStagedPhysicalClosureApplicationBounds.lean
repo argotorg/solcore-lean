@@ -58,7 +58,9 @@ variable (association : Association headers keys bodyRegistry semanticFaults map
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context callerSource)
 
 
-include physical owners supported raw represented heaps stable runtime in
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
+include physical owners supported raw represented heaps stable runtime semantic in
 /-- The actual Association and chosen packet retain the original parameter
 context. Each body branch constructs its application port from the strict Root IH. -/
 theorem application_preserves (budget : Nat)
@@ -132,7 +134,7 @@ theorem application_preserves (budget : Nat)
         rw [supported.prefix]
         exact slots
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           («functions» := functions) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branch) (support := supported)
           (owner := owner) (caller := caller) (capturedSlots := observed) (physical := physical)
@@ -188,7 +190,7 @@ theorem application_preserves (budget : Nat)
         rw [supported.prefix]
         exact slots
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           («functions» := functions) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branch) (support := supported)
           (owner := owner) (caller := caller) (capturedSlots := observed) (physical := physical)
@@ -202,7 +204,7 @@ theorem application_preserves (budget : Nat)
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
 
-include physical owners supported raw represented heaps stable runtime in
+include physical owners supported raw represented heaps stable runtime semantic in
 /-- Reflection uses the packet-selected Source scope. The original parameter
 installation, independent Source grade and literal returned caller are preserved. -/
 theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
@@ -274,7 +276,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         rw [supported.prefix]
         exact slots
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           («functions» := functions) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branch) (support := supported)
           (owner := owner) (caller := caller) (capturedSlots := observed) (physical := physical)
@@ -328,7 +330,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         rw [supported.prefix]
         exact slots
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedPhysicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           («functions» := functions) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branch) (support := supported)
           (owner := owner) (caller := caller) (capturedSlots := observed) (physical := physical)

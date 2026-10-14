@@ -57,7 +57,7 @@ theorem of_expression
       scope
       id lowered) := by
   obtain ⟨produced, view, reason⟩ := CallableIndexedOwnedPreparedNamedLexicalLambdaProducer.of_expression
-    (sourceContext := sourceContext) (evidence := child.evidence) prepared aligned profile
+    (sourceContext := sourceContext) (evidence := child.evidence) prepared aligned profile diagnostic
     found form owner requirements coercions ordinary read accepted nativeTyped
   have actualFound : header.function.source.lookupExpression? id = some produced.site.code.sourceNode := by
     simpa only [closure, produced.identifier, source, ← header.agreement.source] using produced.site.code.sourceFound

@@ -92,6 +92,7 @@ theorem reflects_position {budget : Nat}
     {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry}
     {catalogFaults : FunctionCalls.FaultRep}
     (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (shape : PositionShape invocation.source position)
     (sourceTyped : PositionTyping invocation.source context position)
     (projection : compiled.compatible.checked.catalog.project expected = .ok type) :
@@ -228,7 +229,7 @@ theorem reflects_position {budget : Nat}
   | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection
       intro size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-      obtain ⟨rfl, bare, tailShape⟩ := shape.assign_tail found form
+      obtain ⟨_, bare, tailShape⟩ := shape.assign_tail found form
       have assignmentTyped := ProtectedStateImperativeTypedSourceSites.assignment graph.nodeOccurrencesUnique
         (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
       have typedChildren : ReflectsBelow bridge context model stages invocation
@@ -240,7 +241,7 @@ theorem reflects_position {budget : Nat}
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative) bridge functions extension transport
         head bare environments heaps locals agrees actualTyped initial admitted graph.nodeOccurrencesUnique assignmentTyped
-        budget typedChildren completed within
+        budget typedChildren (fun previous right invalid => semantic _ _ (headErrors.reachable.operands previous right invalid)) completed within
       cases result with
       | fault snapshot trace same matched finalHeaps maps worlds preservation metadata reached related stable =>
           cases same
@@ -248,6 +249,13 @@ theorem reflects_position {budget : Nat}
             .assignBareFault (lookupStatement?_sound found) form snapshot trace, .fault matched,
             finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
           exact fault_post bridge reached stable
+      | operands snapshot trace currentRead rootType initialized path invalid same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+            .assignBareOperands (lookupStatement?_sound found) form snapshot trace currentRead rootType initialized path invalid,
+            .fault matched, finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic (.invalidAssignmentOperands operator)) reached stable
       | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
           have tailTyped := ProtectedStateImperativeStatementSuffixTyping.assignment graph.nodeOccurrencesUnique sourceTyped found form
           obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
@@ -423,7 +431,7 @@ theorem reflects_position {budget : Nat}
           (stages := stages) (invocation := invocation) (faults := faults)
           bridge functions condition context scope post expected type postCode budget :=
         CallableIndexedOwnedAdmittedStagedForHeaderReflection.reflects_at bridge bindings transport functions extension
-          definitions registered producer condition acquire children graph.nodeOccurrencesUnique postTree shape.2.1 postTyped
+          definitions registered producer condition acquire children graph.nodeOccurrencesUnique postTree postErrors semantic shape.2.1 postTyped
       obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
           maps, worlds, preserved, metadata, reached, related, resultPost⟩ :=
         CallableIndexedOwnedAdmittedStagedForHeads.reflects bridge functions condition transport
@@ -541,7 +549,7 @@ theorem reflects_position {budget : Nat}
             reached, callerProtocol.trans expressionRelated tailRelated, post⟩
   | @initializerAssign context scope assignment operator rhs rest body test post statements expected type head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-      obtain ⟨rfl, bare, tailShape⟩ := shape.1.assign_tail
+      obtain ⟨_, bare, tailShape⟩ := shape.1.assign_tail
       have assignmentTyped := (InitializerTyping.assignment sourceTyped).1
       have typedChildren : ReflectsBelow bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults budget := by
@@ -552,7 +560,7 @@ theorem reflects_position {budget : Nat}
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative) bridge functions extension transport
         head bare environments heaps locals agrees actualTyped initial admitted graph.nodeOccurrencesUnique assignmentTyped
-        budget typedChildren completed within
+        budget typedChildren (fun previous right invalid => semantic _ _ (headErrors.reachable.operands previous right invalid)) completed within
       cases result with
       | fault snapshot trace same matched finalHeaps maps worlds preservation metadata reached related stable =>
           cases same
@@ -560,6 +568,13 @@ theorem reflects_position {budget : Nat}
             CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_fault snapshot trace, .fault matched,
             finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
           exact fault_post bridge reached stable
+      | operands snapshot trace currentRead rootType initialized path invalid same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize [_]], _, _, _, _,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_operands snapshot trace currentRead rootType initialized path invalid,
+            .fault matched, finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic (.invalidAssignmentOperands operator)) reached stable
       | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
           have tailTyped := (InitializerTyping.assignment sourceTyped).2
           obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented,
@@ -593,6 +608,7 @@ theorem reflects_at {budget : Nat}
     {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry}
     {catalogFaults : FunctionCalls.FaultRep}
     (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     {mode : Bool} {statements : List StatementId}
     (atStatements : position = .statements mode statements)
     (shape : Shape invocation.source mode statements)
@@ -626,7 +642,7 @@ theorem reflects_at {budget : Nat}
         callerProtocol.Relates initial reached ∧ Post bridge context expected outcome reached := by
   cases atStatements
   exact reflects_position bridge bindings transport functions extension definitions registered producer condition acquire
-    children graph tree catalogSites shape sourceTyped projection within
+    children graph tree catalogSites semantic shape sourceTyped projection within
     environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedImperativeFlow

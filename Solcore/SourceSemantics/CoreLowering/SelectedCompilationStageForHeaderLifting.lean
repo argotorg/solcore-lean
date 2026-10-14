@@ -93,7 +93,7 @@ theorem lifts {budget : Nat}
       (ih shape.discard_tail (CallableIndexedOwnedPreparedStagedForItemsTyping.expression sourceTyped))
   | @assign context scope assignment operator rhs rest body head tail ih =>
     intro shape sourceTyped
-    obtain ⟨rfl, bare, tailShape⟩ := shape.assign_tail
+    obtain ⟨_profile, bare, tailShape⟩ := shape.assign_tail
     have typedChildren (size : Nat) (smaller : size < budget) :
         LiftsAt bridge context model stages invocation (TypedCertificate invocation.source certificates context) size := by
       intro scope id lowered generated node found typed

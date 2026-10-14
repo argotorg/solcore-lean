@@ -134,8 +134,8 @@ theorem ObservedProgram.make_body_shape {fixture : CompiledFixture} (observed : 
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.makeRow.row.function.typedBody true observed.makeShape.body :=
   .initialized observed.makeShape.initializedFound observed.makeShape.initializedForm
     (.whileLoop observed.makeShape.loopFound observed.makeShape.loopForm
-      (.assign observed.makeShape.assignmentFound observed.makeShape.assignmentForm observed.makeShape.targetBare
-        (.assign observed.makeShape.flagAssignmentFound observed.makeShape.flagAssignmentForm observed.makeShape.flagTargetBare .nil))
+      (.assign observed.makeShape.assignmentFound observed.makeShape.assignmentForm (.inl rfl) observed.makeShape.targetBare
+        (.assign observed.makeShape.flagAssignmentFound observed.makeShape.flagAssignmentForm (.inl rfl) observed.makeShape.flagTargetBare .nil))
       (.returnValue [] observed.makeShape.innerReturnFound observed.makeShape.innerReturnForm))
 
 def ObservedProgram.childIds {fixture : CompiledFixture} (observed : ObservedProgram fixture) : List ExpressionId :=

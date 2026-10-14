@@ -179,7 +179,7 @@ theorem Certificate.named_support (input : Input compiled) (packet : Issued inpu
   | scopedFactory admission =>
     obtain ⟨terminal, ⟨supported⟩⟩ := CallableIndexedOwnedPreparedScopedFactoryAdmission.of_actual
       prepared packet.aligned input.prepared.selected input.prepared.same admission ready diagnostic
-      wellFormed certificate.profile entryMember
+      wellFormed certificate.profile entryMember issued (fun _ _ represented => represented)
     exact ⟨⟨CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal terminal,
       .formation terminal supported packet.aligned.globals⟩⟩
   | excluded absent =>

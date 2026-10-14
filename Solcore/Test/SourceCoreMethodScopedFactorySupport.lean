@@ -42,7 +42,12 @@ theorem ActualHeader.factory_support {fixture : CompiledFixture} (observed : Obs
     (nodes : row.row.function.typedBody.nodes = shape.nodeList)
     (extra : ObservedFactory fixture shape) (actual : ActualHeader fixture row.row)
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
-    {stages : Staging.Recursive.Registry} :
+    {stages : Staging.Recursive.Registry}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token,
+      CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics reason token → faults reason token) :
     ∃ terminal : Terminal actual.header,
       Nonempty (CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.Support
         (bodyRegistry := registry) (stages := stages) (semanticFaults := faults) actual.header terminal) := by
@@ -50,7 +55,7 @@ theorem ActualHeader.factory_support {fixture : CompiledFixture} (observed : Obs
     actual.terminal shape.expression.node.id shape.outerReturn shape.roots shape.outerReturnFound shape.outerReturnForm
   refine ⟨terminal, ?_⟩
   apply CallableIndexedOwnedPreparedPhysicalNamedFormationCollectors.of_branching terminal
-    fixture.recipePrepared diagnostic fixture.source_wellFormed observed.profile
+    fixture.recipePrepared diagnostic receiver included fixture.source_wellFormed observed.profile
     observed.wordRow.entryMember (node := shape.expression.node) (reported := extra.reported)
   · rw [actual.source, expression]; exact shape.expression.found
   · exact shape.lambda

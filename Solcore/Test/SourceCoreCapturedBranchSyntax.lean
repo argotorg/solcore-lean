@@ -110,9 +110,9 @@ theorem ObservedFactory.seed_declaration {fixture : CompiledFixture} (observed :
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .conditional observed.shape.branchFound observed.shape.branchForm
-    (.assign observed.shape.assignmentFound observed.shape.assignmentForm observed.shape.targetBare .nil)
+    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
     (.initialized observed.shape.initializedFound observed.shape.initializedForm
-      (.assign observed.shape.elseAssignmentFound observed.shape.elseAssignmentForm observed.shape.elseTargetBare .nil))
+      (.assign observed.shape.elseAssignmentFound observed.shape.elseAssignmentForm (.inl rfl) observed.shape.elseTargetBare .nil))
     (.conditional observed.shape.earlyBranchFound observed.shape.earlyBranchForm
       (.returnValue [] observed.shape.earlyReturnFound observed.shape.earlyReturnForm) .nil
       (.returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm))

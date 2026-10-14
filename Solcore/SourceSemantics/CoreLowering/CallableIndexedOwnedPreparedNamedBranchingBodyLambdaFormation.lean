@@ -31,6 +31,11 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 theorem of_terminal
     (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token,
+      CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics reason token → faults reason token)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
     {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
@@ -60,7 +65,7 @@ theorem of_terminal
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child) := by
   obtain ⟨produced, view, reason⟩ := CallableIndexedOwnedPreparedNamedLambdaProducer.of_terminal terminal
-    prepared profile member found form owner requirements coercions ordinary read
+    prepared profile diagnostic member found form owner requirements coercions ordinary read
   have actualFound : header.function.source.lookupExpression? terminal.expression = some produced.site.code.sourceNode := by
     simpa only [closure, produced.identifier, source, ← header.agreement.source] using produced.site.code.sourceFound
   have sameNode : produced.site.code.sourceNode = node := Option.some.inj (actualFound.symm.trans found)
@@ -128,7 +133,9 @@ theorem of_terminal
       simpa only [function, closure, source, ← header.agreement.source] using bodyTyped
     simpa only [function, closure, source, ← header.agreement.source] using syntaxFor typed
   obtain ⟨body, _sameInputs, syntaxTree⟩ := CallableIndexedOwnedPreparedBranchingLambdaBodySupport.of_branching
-    produced.site.code produced.recipe produced.site.compilation inputs frame ledger profile actualView
+    produced.site.code produced.issuedRecipe
+    (by rw [terminal.aligned.named]; exact terminal.prepared.selected) rfl receiver included
+    produced.site.compilation inputs frame ledger profile actualView
     (by rw [produced.site.compilation]; rfl) produced.site.active produced.site.allocationError
     signatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed) entryDeclarations (by simpa only [function, closure, source, ← header.agreement.source] using shape) syntaxTree

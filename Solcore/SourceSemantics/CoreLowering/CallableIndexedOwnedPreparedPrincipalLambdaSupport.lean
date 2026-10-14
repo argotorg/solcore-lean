@@ -109,6 +109,7 @@ inductive PreparedAt : {function : Dynamic.Closure} → {scope : SourceCoreLocal
         issued.invalidOperand issued.invalidUnary issued.invalidProjection issued.missingDefault)
       (binderPolicy : CallableIndexedOwnedContextualLambdaProvenance.BinderPolicy principal.named site.code)
       (compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained principal.named site.code)
+      (issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained principal.named site.code)
       (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView site.code)
       (environment : Dynamic.Environment) :
       PreparedAt (RecursiveNamedLambdaFormationHeads.recaptureCode
@@ -148,17 +149,17 @@ theorem Support.source_receipt :
 theorem PreparedAt.plain_provenance (prepared : PreparedAt code support) :
     CallableIndexedOwnedContextualLambdaProvenance.PrincipalAt code (support.plain actualSites sites) := by
   cases prepared with
-  | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy bodyView environment =>
+  | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy issuedRecipe bodyView environment =>
     exact .recaptured principal site expressionSyntax certificates
       (bodyWith body actualSites sites) binderPolicy
       (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe principal.cached.compilation body.recipe)
-      compilerPolicy bodyView body.syntaxTree environment
+      compilerPolicy issuedRecipe bodyView body.syntaxTree environment
 
 theorem PreparedAt.projected_bindings (prepared : PreparedAt code support) :
     ∀ binding ∈ code.receipt.loweredParameters,
       compiled.compatible.checked.catalog.project binding.1.scheme.body = .ok binding.2 := by
   cases prepared with
-  | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy bodyView environment =>
+  | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy issuedRecipe bodyView environment =>
     exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings site binderPolicy body.extended
 
 end Projection

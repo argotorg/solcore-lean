@@ -23,6 +23,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 /-- The same-policy certificate chooses one Site, whose genuine dependent
 collector inputs build its joint body. The root policy is never reselected. -/
 theorem lambda_of_accepted_with_inputs
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     {childFuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
     {result : TypeSystem.Ty} {statements : List StatementId} {reported : Ty}
@@ -89,11 +90,16 @@ theorem lambda_of_accepted_with_inputs
       (sameBody.trans root.selected.recipe) _ site.compilation
     rw [samePolicy]
     exact root.compilerPolicy
+  have issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained caller.named site.code := by
+    apply CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained.of_recipes (rootFuel := rootFuel)
+      compilation issued (sameBody.trans root.selected.recipe) _ site.compilation
+    rw [samePolicy]
+    exact root.compilerPolicy
   let produced : Produced (compiled := compiled) caller.named parameters result statements sourceContext evidence scope
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) caller) id lowered :=
     ⟨diagnostics, namedCode, compilation, site, identifier, emitted,
       (congrArg SourceCoreFunctions.Policy.lowerBinder samePolicy).trans root.selected.binder,
-      sameBody.trans root.selected.recipe, compilerPolicy⟩
+      sameBody.trans root.selected.recipe, compilerPolicy, issuedRecipe⟩
   obtain ⟨inputs, chosen⟩ := siteInputs produced rfl rfl (HEq.refl compilation) samePolicy sameBody sameFuel sameView sameReason
   obtain ⟨body, entryEq, readFuelEq⟩ := at_site produced.compilation produced.site produced.recipe
     (Program.ofChecked compiled.sourceProgram) inputs.entry inputs.frame inputs.expressionSyntax inputs.certificates
@@ -116,6 +122,7 @@ theorem lambda_of_accepted_with_inputs
 
 /- The original endpoint forgets only the selected input companion. -/
 theorem lambda_of_accepted
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     {childFuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
     {result : TypeSystem.Ty} {statements : List StatementId} {reported : Ty}
@@ -158,7 +165,7 @@ theorem lambda_of_accepted
         HEq receipt.formation.produced.site.code.receipt certificate := by
   obtain ⟨certificate, receipt, samePolicy, sameBody, sameFuel, sameView, sameReason, sameCertificate,
       _inputs, _chosen⟩ :=
-    lambda_of_accepted_with_inputs root sourceContext evidence profile viewOfSource sourceFound sourceForm
+    lambda_of_accepted_with_inputs root issued sourceContext evidence profile viewOfSource sourceFound sourceForm
       rawType rawOrdinary rawCoercions found form owner requirements coercions ordinary read accepted typed
       (fun _ _ => True) (fun produced diagnosticsEq codeEq compilationEq policyEq bodyEq fuelEq viewEq reasonEq => by
         obtain ⟨inputs⟩ := siteInputs produced diagnosticsEq codeEq compilationEq policyEq bodyEq fuelEq viewEq reasonEq

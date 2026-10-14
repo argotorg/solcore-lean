@@ -151,8 +151,8 @@ theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : Obser
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .initialized observed.shape.initializedFound observed.shape.initializedForm
     (.forLoop observed.shape.loopFound observed.shape.loopForm (.initialized .nil)
-      (.assign observed.shape.postBare .nil)
-      (.assign observed.shape.assignmentFound observed.shape.assignmentForm observed.shape.targetBare .nil)
+      (.assign (.inl rfl) observed.shape.postBare .nil)
+      (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
       (.returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm))
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=

@@ -112,7 +112,7 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
     exact RecursiveNamedPublicDirectClosureApplicationBounds.application_tail completed
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
-    SelectedCompilationPhysicalClosureApplicationBounds.application_reflects
+    SelectedCompilationPhysicalClosureApplicationBounds.application_reflects (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
       support.profile association (support.closurePackets association) (support.closureSupport association)
       caller raw represented heaps physical support.owners stable runtime
       valid size (fun childSize _ => children childSize) evaluation (Nat.le_refl _)
@@ -173,7 +173,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
     argumentsTyped packing parameterEq.symm arity
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
-    SelectedCompilationPhysicalClosureApplicationBounds.application_preserves
+    SelectedCompilationPhysicalClosureApplicationBounds.application_preserves (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
       support.profile association (support.closurePackets association) (support.closureSupport association)
       caller raw represented heaps physical support.owners stable runtime
       sourceSize (fun childSize _ => children childSize) trace (Nat.le_refl _)

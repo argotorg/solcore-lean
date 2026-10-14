@@ -85,6 +85,12 @@ variable (signatures : SignatureCatalogWellFormed compiled.sourceProgram.signatu
 include ready member signatures certified in
 /-- Children retain the complete runtime context fields along actual binders. -/
 theorem collected
+    {faults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw faults operator
+        (invalidOperand principal site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
@@ -99,7 +105,7 @@ theorem collected
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ nativePrefix principal)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts
       principal.named.signature.key [] compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
       (fun error => .sourceAllocation (reprStr error)) (.initial compiled.compatible.checked)
       principal.sourceBody.source expressionSyntax
@@ -122,7 +128,7 @@ theorem collected
       change SourceCoreGeneralFunctions.contextualBinder _ _ _ _ _ _ _ = _
       simp only [SourceCoreGeneralFunctions.contextualBinder, monomorphic, List.isEmpty_nil, ↓reduceIte]
       rfl)
-    rfl (assignments principal) (match_policy principal) rfl rfl rfl
+    rfl (assignments principal) operands (match_policy principal) rfl rfl rfl
     (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     ((CallableIndexedOwnedPublicSignatureCatalog.signatures compiled).symm ▸ signatures)
     packet.sourceAt.valid.ledger
@@ -140,6 +146,11 @@ actual method stage. It contains no execution or body correspondence premise. -/
 theorem of_compiler
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {stages : Staging.Recursive.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
+        (invalidOperand principal site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType)
@@ -158,6 +169,6 @@ theorem of_compiler
   constructor
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, collected principal packet ready member signatures certified syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, collected principal packet ready member signatures certified operands syntaxTree (children child selected)⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationMethodScopedCollectors

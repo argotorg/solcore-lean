@@ -82,6 +82,7 @@ theorem preserves_position {budget : Nat}
     {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry}
     {catalogFaults : FunctionCalls.FaultRep}
     (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (shape : PositionShape invocation.source position)
     (sourceTyped : PositionTyping invocation.source context position)
     (projection : compiled.compatible.checked.catalog.project expected = .ok type) :
@@ -235,7 +236,7 @@ theorem preserves_position {budget : Nat}
   | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection
       intro size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted finalContext outcome after trace
-      obtain ⟨rfl, bare, tailShape⟩ := shape.assign_tail found form
+      obtain ⟨_, bare, tailShape⟩ := shape.assign_tail found form
       have assignmentTyped := ProtectedStateImperativeTypedSourceSites.assignment unique
         (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
@@ -250,6 +251,8 @@ theorem preserves_position {budget : Nat}
         functions extension head bare environments heaps locals agrees
       rcases CallableIndexedOwnedPreparedStagedScopedBareAssignmentSourceInversion.child_and_tail unique found form snapshot trace with
         ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
+        ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, contextEq, outcomeEq, childTrace,
+          currentRead, rootType, initialized, path, invalid⟩ |
         ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
       · subst finalContext
         subst outcome
@@ -265,6 +268,22 @@ theorem preserves_position {budget : Nat}
             (typedChildren childSize childStrict) childTrace body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
           preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge reached stable⟩
+      · subst finalContext
+        subst outcome
+        have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+          rw [sameSize]; simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
+        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, stable⟩ :=
+          CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_operands
+            (compiled := compiled) (values := .initial compiled.compatible.checked)
+            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+            (context := context) (scope := scope) (administrative := administrative)
+            bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+            (typedChildren childSize childStrict) snapshot invalid childTrace body (LocalLoop.controlType type)
+            (fun previous right rejected => semantic _ _ (headErrors.reachable.operands previous right rejected))
+        exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+          preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge
+            (context := context) (expected := expected) (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
       · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
           rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
         have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -450,7 +469,7 @@ theorem preserves_position {budget : Nat}
           (stages := stages) (invocation := invocation) (faults := faults)
           bridge functions condition context scope post expected type postCode budget :=
         CallableIndexedOwnedAdmittedStagedForHeaderPreservation.preserves_at bridge bindings transport functions extension
-          definitions registered producer condition acquire children unique postTree shape.2.1 postTyped
+          definitions registered producer condition acquire children unique postTree postErrors semantic shape.2.1 postTyped
       obtain ⟨loopSize, rawOutcome, sameSize, outcomeEq, loopTrace⟩ :=
         CallableIndexedOwnedAdmittedStagedForInitializerSource.nil trace
       rw [CallableIndexedOwnedAdmittedStagedForSourceBridge.loop_restore loopTrace] at outcomeEq
@@ -593,7 +612,7 @@ theorem preserves_position {budget : Nat}
               firstMetadata.trans metadata, reached, callerProtocol.trans expressionRelated tailRelated, post⟩
   | @initializerAssign context scope assignment operator rhs rest body test post statements expected type head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted outcome after trace
-      obtain ⟨rfl, bare, tailShape⟩ := shape.1.assign_tail
+      obtain ⟨_, bare, tailShape⟩ := shape.1.assign_tail
       have assignmentTyped := (InitializerTyping.assignment sourceTyped).1
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults size := by
@@ -607,6 +626,8 @@ theorem preserves_position {budget : Nat}
         functions extension head bare environments heaps locals agrees
       rcases CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment snapshot trace with
         ⟨childSize, failure, sameSize, outcomeEq, childTrace⟩ |
+        ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, outcomeEq, childTrace,
+          currentRead, rootType, initialized, path, invalid⟩ |
         ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
       · subst outcome
         have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
@@ -621,6 +642,21 @@ theorem preserves_position {budget : Nat}
             (typedChildren childSize childStrict) childTrace body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
           preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge reached stable⟩
+      · subst outcome
+        have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+          rw [sameSize]; simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
+        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, stable⟩ :=
+          CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_operands
+            (compiled := compiled) (values := .initial compiled.compatible.checked)
+            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+            (context := context) (scope := scope) (administrative := administrative)
+            bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+            (typedChildren childSize childStrict) snapshot invalid childTrace body (LocalLoop.controlType type)
+            (fun previous right rejected => semantic _ _ (headErrors.reachable.operands previous right rejected))
+        exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+          preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge
+            (context := context) (expected := expected) (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
       · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
           rw [sameSize]; simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
         have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -664,6 +700,7 @@ theorem preserves_at {budget : Nat}
     {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry}
     {catalogFaults : FunctionCalls.FaultRep}
     (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     {mode : Bool} {statements : List StatementId}
     (atStatements : position = .statements mode statements)
     (shape : Shape invocation.source mode statements)
@@ -698,7 +735,7 @@ theorem preserves_at {budget : Nat}
         callerProtocol.Relates initial reached ∧ Post bridge context expected outcome reached := by
   cases atStatements
   exact preserves_position bridge bindings transport functions extension definitions registered producer condition acquire
-    children unique tree catalogSites shape sourceTyped projection within
+    children unique tree catalogSites semantic shape sourceTyped projection within
     environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedImperativePreservation

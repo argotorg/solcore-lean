@@ -94,9 +94,11 @@ variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgr
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
     (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
 
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
 include receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations in
+  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations semantic in
 /-- One original native completion gives full staged Source parent meaning,
 including the actual named global branch and restored caller post. -/
 theorem reflects_parent
@@ -132,7 +134,7 @@ theorem reflects_parent
     ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore := by
-  rcases CallableIndexedOwnedPreparedStagedMixedIndirectDispatch.reflects_parent_or_global
+  rcases CallableIndexedOwnedPreparedStagedMixedIndirectDispatch.reflects_parent_or_global (semantic := semantic)
       bridge receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations
@@ -145,7 +147,7 @@ theorem reflects_parent
 
 include receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations in
+  sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations semantic in
 /-- One original staged Source parent constructs its native completion and
 full caller post. The authentic named branch uses its actual strict application
 child; Source and native grades remain independent. -/
@@ -179,7 +181,7 @@ theorem preserves_parent (budget : Nat)
     ParentAt (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial size outcome after := by
-  rcases CallableIndexedOwnedPreparedStagedMixedIndirectDispatch.preserves_parent_or_global
+  rcases CallableIndexedOwnedPreparedStagedMixedIndirectDispatch.preserves_parent_or_global (semantic := semantic)
       bridge receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations

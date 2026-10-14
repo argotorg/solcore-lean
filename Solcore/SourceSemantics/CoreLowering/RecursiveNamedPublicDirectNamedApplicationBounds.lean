@@ -141,7 +141,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
         callStages child callFaults size := by
     intro child childSelected
-    apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+    apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
       (namedSupport header member) profile wellFormed childSelected extension
     · intro childSize _smaller childContext childScope current id lowered root
       exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
@@ -262,7 +262,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
         callStages child callFaults sourceSize := by
     intro child childSelected
-    apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+    apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
       (namedSupport header member) profile wellFormed childSelected extension
     · intro childSize _smaller childContext childScope current id lowered root
       exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves

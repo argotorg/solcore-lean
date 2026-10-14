@@ -91,7 +91,7 @@ theorem of_expression
   have viewFound := (provenance.body_view id reached).symm.trans found
   have viewRead := (CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.compatible_read_eq
     code.viewOfSource (provenance.body_view id reached)).symm.trans read
-  obtain ⟨diagnostics, namedCode, compilation, rootFuel, bodyRecipe, recipe, sameCompilation⟩ := provenance.policy_recipe
+  obtain ⟨diagnostics, namedCode, compilation, rootFuel, issued, bodyRecipe, recipe, sameCompilation⟩ := provenance.issued_recipe
   have pointwise := lambda_policy recipe viewFound form requirements coercions ordinary scope code.reasonAt
   have actualAccepted := fuelEq ▸ accepted
   rw [support.compilation] at actualAccepted
@@ -113,9 +113,9 @@ theorem of_expression
       (by rw [← support.source]; exact found) form viewFound rfl recipe.sourceCells
       (by simpa only [support.compilation, support.active, CallableIndexedNamedGeneration.context, CompatibleNamedBody.bodyContext] using code.manifest)
       hook callables recipe.projectType native
-  have policyRecipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained support.caller.named site.code := by
-    apply CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes (rootFuel := rootFuel)
-      compilation (sameBody.trans bodyRecipe) _ site.compilation
+  have issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained support.caller.named site.code := by
+    apply CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained.of_recipes (rootFuel := rootFuel)
+      compilation issued (sameBody.trans bodyRecipe) _ site.compilation
     rw [samePolicy]
     exact recipe
   let produced : Produced (compiled := compiled) support.caller.named parameters result statements sourceContext evidence
@@ -124,8 +124,9 @@ theorem of_expression
     identifier := identifier
     emitted := emitted
     binderPolicy := (congrArg SourceCoreFunctions.Policy.lowerBinder samePolicy).trans provenance.binder_policy
-    recipe := policyRecipe.body_recipe
-    compilerPolicy := policyRecipe }
+    recipe := issuedRecipe.body_recipe
+    compilerPolicy := issuedRecipe.policy_recipe
+    issuedRecipe := issuedRecipe }
   exact ⟨produced, view, reason⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinarySamePolicyLambdaProducer

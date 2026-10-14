@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedBranchingCollectors
@@ -34,7 +36,13 @@ def of_imperative_compiler
     {semanticFaults : FunctionCalls.FaultRep}
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
-    (receipt : Receipt header) (stages : Staging.Recursive.Registry)
+    (receipt : Receipt header)
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
       header.context (.statements true header.function.body) header.function.resultType)
@@ -55,7 +63,7 @@ def of_imperative_compiler
   refine ⟨certified, ?_⟩
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, SelectedCompilationNamedBranchingCollectors.collected_of_imperative prepared aligned ready certified bodies.signatures member receipt syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, SelectedCompilationNamedBranchingCollectors.collected_of_imperative prepared aligned ready certified bodies.signatures member receipt operands syntaxTree (children child selected)⟩
 
 
 include aligned in
@@ -94,7 +102,19 @@ def of_actual_with_catalog
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) header
       (RecursiveNamedPreparedStageScopes.registry actual) receipt
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
-  apply of_imperative_compiler prepared aligned ready bodies certified member receipt
+  have operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw
+        (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator) := by
+    intro site assignment operator rhs origin profile
+    obtain ⟨first, assignmentPrepared⟩ := CallableIndexedOwnedPublicDiagnosticReceipts.assignments_at_header
+      prepared diagnostic aligned
+    exact PreparedBranchingAssignmentDiagnostics.operands assignmentPrepared
+      (fun _ _ represented => CallableIndexedOwnedPublicAssignmentDiagnostics.prepared_operands
+        prepared diagnostic receiver represented) origin profile
+  apply of_imperative_compiler prepared aligned ready bodies certified member receipt operands
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
   have sameSource := (RecursiveNamedPreparedStageScopes.registry actual).source selected

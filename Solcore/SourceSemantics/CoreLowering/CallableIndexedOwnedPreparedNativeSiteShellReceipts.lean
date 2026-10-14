@@ -114,6 +114,9 @@ theorem of_selected
       dsimp only [issued, issued_at_site]
       exact selected.places
     refine ⟨{
+      issuedCompilation := ⟨selected.diagnostics, selected.found, by
+        unfold lowered
+        cases compiled.indexed.base.callableContext <;> rfl⟩
       issued := issued
       diagnosticPolicy := .reachable
       entry := entry

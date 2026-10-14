@@ -60,15 +60,13 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
       | cons head tail =>
         cases head with
         | assignValue assignment =>
-          cases assignment with
-          | wordCompound operator _ _ _ => cases operator
-          | equal place value _ =>
-            obtain ⟨node, contains, same⟩ := value.stored_type
-            exact .assign receipt.declaration targetType receipt.bare
-              (lookupExpression?_complete unique contains)
-              (same.trans (by cases place with | intro _ _ target => exact target.symm))
-              (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Items.children]))
-              (ih closed (fun child member => children child (by simp [Items.children, member]))
-                (fun binding member => bindings binding (by simpa [Items.bindings] using member)) tail)
+          obtain ⟨_, _, value, _⟩ :=
+            ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare assignment
+          obtain ⟨node, contains, same⟩ := value.stored_type
+          exact .assign receipt.declaration targetType receipt.sourceProfile receipt.bare
+            (lookupExpression?_complete unique contains) same
+            (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Items.children]))
+            (ih closed (fun child member => children child (by simp [Items.children, member]))
+              (fun binding member => bindings binding (by simpa only [Items.bindings] using member)) tail)
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow

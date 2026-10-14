@@ -59,12 +59,12 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
       exact ⟨given.makeBoolHeader.header, given.makeBool_member, given.makeBoolSlot.trans same.2.symm,
         given.makeBoolSignature.trans same.1.symm⟩)
   obtain ⟨makeWordTerminal, ⟨makeWordSupport⟩⟩ := ActualHeader.factory_support observed
-    observed.makeWordRow observed.makeWordShape observed.makeWordNodes factories.word given.makeWordHeader
+    observed.makeWordRow observed.makeWordShape observed.makeWordNodes factories.word given.makeWordHeader receiver (fun _ _ represented => represented)
     (registry := completion.result.context.registry)
     (faults := CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)
     (stages := RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture))
   obtain ⟨makeBoolTerminal, ⟨makeBoolSupport⟩⟩ := ActualHeader.factory_support observed
-    observed.makeBoolRow observed.makeBoolShape observed.makeBoolNodes factories.bool given.makeBoolHeader
+    observed.makeBoolRow observed.makeBoolShape observed.makeBoolNodes factories.bool given.makeBoolHeader receiver (fun _ _ represented => represented)
     (registry := completion.result.context.registry)
     (faults := CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)
     (stages := RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture))

@@ -67,7 +67,7 @@ theorem preserves_with_methods
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.preserves
+  exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_methods
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
@@ -80,7 +80,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.reflects
+  exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_methods
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
@@ -93,7 +93,7 @@ theorem preserves_with_bodies
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.preserves
+  exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_bodies
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
@@ -106,7 +106,7 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.reflects
+  exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_bodies
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport

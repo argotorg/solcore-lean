@@ -66,7 +66,7 @@ theorem SelectedRelayShape.compiler_requirements :
 
 theorem SelectedRelayShape.local_assignable :
     Assignable function.typedBody shape.resolution .equal := by
-  refine ⟨rfl, shape.targetBare, ?_⟩
+  refine ⟨.inl rfl, shape.targetBare, ?_⟩
   intro binder found
   rw [shape.targetRoot, shape.local_declaration nodes] at found
   cases Except.ok.inj found
@@ -75,7 +75,7 @@ theorem SelectedRelayShape.local_assignable :
 
 theorem SelectedRelayShape.flag_assignable :
     Assignable function.typedBody shape.flagResolution .equal := by
-  refine ⟨rfl, shape.flagTargetBare, ?_⟩
+  refine ⟨.inl rfl, shape.flagTargetBare, ?_⟩
   intro binder found
   rw [shape.flagTargetRoot, shape.flag_declaration nodes] at found
   cases Except.ok.inj found

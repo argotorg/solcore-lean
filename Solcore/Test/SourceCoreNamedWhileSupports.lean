@@ -67,7 +67,9 @@ theorem ActualHeader.support {fixture : CompiledFixture} {observed : ObservedFac
   apply Nonempty.intro
   apply CallableIndexedOwnedPreparedNamedBranchingCollectors.of_imperative_compiler actual.prepared actual.aligned
     fixture.recipePrepared fixture.source_wellFormed complete (bootstrap_zero fixture.recipe.compiled)
-    observed.entryMember receipt _ actual.syntax
+    observed.entryMember receipt
+    (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic
+      actual.prepared actual.aligned actual.diagnostic receiver) _ actual.syntax
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType _native
   obtain ⟨original, name, localId, lookup, form⟩ := approved
   have same := Option.some.inj (found.symm.trans lookup)

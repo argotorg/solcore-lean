@@ -34,7 +34,7 @@ structure Support
   wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
   tree : ∀ child, stages.Closure header.function child →
     ∃ expressionSyntax : ExpressionId → Prop,
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults)
       header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) child.source expressionSyntax
       (TypedCertificate child.source (fun context => Certificate headers stages semanticFaults context child))

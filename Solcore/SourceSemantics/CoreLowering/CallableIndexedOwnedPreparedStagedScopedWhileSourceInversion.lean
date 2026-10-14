@@ -47,7 +47,7 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _ | letFault actual same _ _
-  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | ifConditionFault actual same _ | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | ifReturned actual same _ _ | ifFault actual same _ _

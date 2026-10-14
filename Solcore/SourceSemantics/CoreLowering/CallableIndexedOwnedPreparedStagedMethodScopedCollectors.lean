@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodScopedStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
@@ -79,11 +81,34 @@ private theorem assignments : CompatibleAssignmentStatements.AssignmentPolicy
   funext expression fuel source scope site assignment operator rhs output next reasonAt
   cases operator <;> rfl
 
+/-- The exact cached method preparation and public issuer supply its operand tokens. -/
+theorem operands_of_diagnostic
+    (diagnostic : CallableIndexedOwnedPreparedStagedMethodTerminalSupport.DiagnosticAt principal.cached)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    {site assignment operator rhs}
+    (origin : AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs)
+    (profile : operator = .equal ∨ assignment.target.type = .word) :
+    AssignmentOperandDiagnostics.OperandsLaw
+      (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
+      (invalidOperand principal site assignment.target.root operator) := by
+  obtain ⟨first, prepared⟩ := CallableIndexedOwnedAssignmentProvenance.method_assignments principal diagnostic
+  exact PreparedBranchingAssignmentDiagnostics.operands prepared
+    (fun _ _ represented => CallableIndexedOwnedAssignmentProvenance.cached_operands
+      principal.cached diagnostic receiver represented) origin profile
+
 variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
 
 include ready member wellFormed in
 /-- Children retain the complete runtime context fields along actual binders. -/
 theorem collected
+    {faults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw faults operator
+        (invalidOperand principal site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
@@ -98,7 +123,7 @@ theorem collected
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ nativePrefix principal)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts
       principal.named.signature.key [] compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
       (fun error => .sourceAllocation (reprStr error)) (.initial compiled.compatible.checked)
       principal.sourceBody.source expressionSyntax
@@ -121,7 +146,7 @@ theorem collected
       change SourceCoreGeneralFunctions.contextualBinder _ _ _ _ _ _ _ = _
       simp only [SourceCoreGeneralFunctions.contextualBinder, monomorphic, List.isEmpty_nil, ↓reduceIte]
       rfl)
-    rfl (assignments principal) (match_policy principal) rfl rfl rfl
+    rfl (assignments principal) operands (match_policy principal) rfl rfl rfl
     (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
     packet.sourceAt.valid.ledger
@@ -139,6 +164,11 @@ actual method stage. It contains no execution or body correspondence premise. -/
 theorem of_compiler
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {stages : Staging.Recursive.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
+        (invalidOperand principal site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType)
@@ -157,6 +187,6 @@ theorem of_compiler
   constructor
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, collected principal packet ready member wellFormed syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, collected principal packet ready member wellFormed operands syntaxTree (children child selected)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodScopedCollectors

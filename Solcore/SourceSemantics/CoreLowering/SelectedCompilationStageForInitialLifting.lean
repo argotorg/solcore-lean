@@ -235,16 +235,16 @@ variable (transport : ProtectedStateTransition.AdministrativeTransport callerPro
   (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
 
 include bridge functions condition transport extension in
-/-- Equal assignment lifts the RHS at the original target snapshot. The
+/-- Value assignment lifts the RHS at the original target snapshot. The
 existing real write producer supplies the next physical state for the suffix. -/
 theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {rest postItems : List ForItemForm} {test : ExpressionId} {statements : List StatementId}
-    {assignment : AssignmentResolution} {rhs : ExpressionId} {certificate : GenericExpressionMeaning.Certificate}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {certificate : GenericExpressionMeaning.Certificate}
     (unique : NodeOccurrencesUnique invocation.source)
     (head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
-      certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment .equal rhs)
+      certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment operator rhs)
     (bare : assignment.target.projections = [])
-    (assignmentTyped : SourceAssignmentHasType invocation.source context assignment .equal rhs)
+    (assignmentTyped : SourceAssignmentHasType invocation.source context assignment operator rhs)
     (children : ∀ childSize, childSize < budget → LiftsAt bridge context model stages invocation certificate childSize)
     (preservation : ∀ childSize, CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesAt
       bridge context model stages invocation certificate faults childSize)
@@ -253,7 +253,7 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
       (context := context) (scope := scope) bridge functions condition rest test postItems statements budget) :
     InitializersLifts (administrative := administrative) (receiving := receiving)
       (frame := frame) (globals := globals) (stages := stages) (invocation := invocation)
-      (context := context) (scope := scope) bridge functions condition (.assignValue assignment .equal rhs :: rest) test postItems statements budget := by
+      (context := context) (scope := scope) bridge functions condition (.assignValue assignment operator rhs :: rest) test postItems statements budget := by
   intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
   obtain ⟨mapping, world, store, environments, heaps, locals, agrees, actualTyped, reference, read, unmapped,
     initial, conditioned, admitted⟩ := ready
@@ -265,6 +265,8 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
     functions extension head bare environments heaps locals agrees
   rcases SelectedCompilationStageForInitialInversion.assign snapshot trace with
     ⟨childSize, reason, strict, rfl, evaluated⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, strict, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, invalid⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, strict, tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
@@ -274,6 +276,18 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
       obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
       exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_fault snapshot measured,
         .completed (.fault reason)⟩
+    | rejected origin call reason reached =>
+      obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+      exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_fault snapshot measured,
+        .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted evaluated
+    cases adapted with
+    | completed =>
+      obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+      exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_operands snapshot measured
+        currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
     | rejected origin call reason reached =>
       obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
       exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_fault snapshot measured,
@@ -334,6 +348,10 @@ theorem done {budget : Nat} {context : SourceSemantics.Context} {scope : SourceC
       invocation.source (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative
       type (TypedForHeader.Fallthrough type) context scope postItems postCode)
+    {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
+    (postErrors : postTree.ErrorsFor diagnosticPolicy catalogRegistry catalogFaults)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (postShape : CallableIndexedOwnedPreparedStagedBranchingTree.ItemShape postItems)
     (postTyped : CallableIndexedOwnedPreparedStagedForItemsTyping.Facts invocation.source control context postItems) :
     InitializersLifts (administrative := administrative) (receiving := receiving) (frame := frame) (globals := globals)
@@ -349,7 +367,7 @@ theorem done {budget : Nat} {context : SourceSemantics.Context} {scope : SourceC
       (stages := stages) (invocation := invocation) (faults := faults)
       bridge functions condition context scope postItems expected type postCode n := by
     exact CallableIndexedOwnedAdmittedStagedForHeaderPreservation.preserves_at bridge bindings transport functions extension
-      definitions registered marked condition markedAcquire (fun c m _ => preservation c m) unique postTree postShape postTyped
+      definitions registered marked condition markedAcquire (fun c m _ => preservation c m) unique postTree postErrors semantic postShape postTyped
   intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
   cases trace with
   | initializerFault initial => cases initial

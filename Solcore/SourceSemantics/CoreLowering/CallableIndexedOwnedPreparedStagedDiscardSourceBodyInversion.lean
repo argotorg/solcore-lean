@@ -99,7 +99,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
-  | assignBareFault actual same _ _ =>
+  | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _ =>
     have impossible := shape actual
     rw [same] at impossible
     cases impossible

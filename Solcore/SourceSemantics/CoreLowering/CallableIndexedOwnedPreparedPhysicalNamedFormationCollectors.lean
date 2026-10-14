@@ -54,6 +54,11 @@ formation support before any closure body runs. -/
 theorem of_branching
     (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token,
+      CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics reason token → faults reason token)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
     {stages : Staging.Recursive.Registry}
@@ -85,7 +90,7 @@ theorem of_branching
   refine ⟨⟨point, ?_⟩⟩
   intro child selected
   have formed := CallableIndexedOwnedPreparedNamedBranchingBodyLambdaFormation.of_terminal (registry := registry) (faults := faults) terminal
-    prepared diagnostic wellFormed profile selected member found form owner requirements coercions ordinary read
+    prepared diagnostic receiver included wellFormed profile selected member found form owner requirements coercions ordinary read
     shape syntaxFor
   simpa only [stages.evidence selected] using formed
 

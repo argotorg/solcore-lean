@@ -82,6 +82,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | stage => trivial
     | semantic => exact StatementsPlain.head_fault (.assignValue contains form
         (.rhs (snapshot.resolves _ _ _ _) child.semanticFault_plain))
+  case assignBareOperands contains form snapshot child currentRead rootType initialValue pathRead invalid _childIH =>
+    exact StatementsPlain.head_fault (.assignValue contains form
+      (.operands (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead invalid))
   case assignBareUnbound contains form _bare missing =>
     exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
   case assignBareDangling contains form _bare lookup missing =>
@@ -204,6 +207,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     cases failure with
     | stage => trivial
     | semantic => exact .head (.assignValue (.rhs (snapshot.resolves _ _ _ _) child.semanticFault_plain))
+  case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid _childIH =>
+    exact .head (.assignValue
+      (.operands (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead invalid))
   case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
   case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
   case testFault test _testIH =>
@@ -335,6 +341,9 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
     cases failure with
     | stage => trivial
     | semantic => exact .head (.assignValue (.rhs (snapshot.resolves _ _ _ _) child.semanticFault_plain))
+  case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid _childIH =>
+    exact .head (.assignValue
+      (.operands (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead invalid))
   case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
   case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
 

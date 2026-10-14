@@ -145,11 +145,11 @@ theorem Association.projected_bindings
   cases association with
   | ordinary _ _ _ _ _ _ prepared _ _ _ _ _ =>
     cases prepared with
-    | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy bodyView bodyReasons declarations environment =>
+    | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy issuedRecipe bodyView bodyReasons declarations environment =>
       exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings site binderPolicy body.extended
   | principal _ _ _ _ _ _ prepared _ _ _ _ _ =>
     cases prepared with
-    | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy bodyView environment =>
+    | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy issuedRecipe bodyView environment =>
       exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings site binderPolicy body.extended
 
 theorem Association.parameter_core

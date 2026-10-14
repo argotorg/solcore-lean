@@ -87,7 +87,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .whileLoop observed.shape.loopFound observed.shape.loopForm
-    (.assign observed.shape.assignmentFound observed.shape.assignmentForm observed.shape.targetBare .nil)
+    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
     (.returnValue [] observed.shape.statementFound observed.shape.statementForm)
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=

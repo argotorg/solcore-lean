@@ -55,7 +55,9 @@ local notation "functions" => CallableIndexedOwnedContextualCellOrigins.function
   bodyRegistry semanticFaults profile
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include support stable beforeTyped argumentsTyped in
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
+include support stable beforeTyped argumentsTyped semantic in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
 theorem source_body_at
@@ -93,7 +95,7 @@ theorem source_body_at
   have conditioned := CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position entry.nextHistory
   obtain ⟨flowValue, bodyStore, finalMap, finalWorld, evaluated, represented, heaps,
       maps, worlds, frame, metadata, returned, related, post⟩ :=
-    CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at
+    CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at (compiled := compiled) (faults := callFaults)
       CallableIndexedOwnedBodyRestorationAdmission.bridge
       (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
       (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
@@ -106,8 +108,7 @@ theorem source_body_at
       (fun context size smaller scope id lowered certified => by
         obtain ⟨root⟩ := certified
         exact children size smaller root ⟨rfl, rfl, rfl⟩)
-      unique tree (support.sites child selected completion.result.context.registry
-        (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) rfl shape originalTyping support.projection within entry.entry.environments entry.entry.heaps
+      unique tree (support.sites child selected completion.result.context.registry) semantic rfl shape originalTyping support.projection within entry.entry.environments entry.entry.heaps
       entry.entry.locals entry.entry.lookups entry.entry.actualTyped entry.entry.reference entry.entry.read
       entry.entry.unmapped reached conditioned admitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
@@ -123,7 +124,7 @@ theorem source_body_at
     maps, worlds, frame, metadata, returned, related, post⟩
   simpa only [packet.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
 
-include support stable beforeTyped argumentsTyped in
+include support stable beforeTyped argumentsTyped semantic in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
 theorem native_body_at
@@ -177,7 +178,7 @@ theorem native_body_at
     CallableIndexedOwnedAdmittedStagedTerminalBody.flow_prefix bodyTrace within
   obtain ⟨sourceSize, finalContext, bodyOutcome, after, finalMap, finalWorld, trace, represented, heaps,
       maps, worlds, frame, metadata, returned, related, post⟩ :=
-    CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at
+    CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at (compiled := compiled) (faults := callFaults)
       CallableIndexedOwnedBodyRestorationAdmission.bridge
       (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
       (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
@@ -190,8 +191,7 @@ theorem native_body_at
       (fun context size smaller scope id lowered certified => by
         obtain ⟨root⟩ := certified
         exact children size smaller root ⟨rfl, rfl, rfl⟩)
-      graph tree (support.sites packet.child packet.selected completion.result.context.registry
-        (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) rfl shape originalTyping support.projection (Nat.le_of_lt strict) entry.environments entry.heaps
+      graph tree (support.sites packet.child packet.selected completion.result.context.registry) semantic rfl shape originalTyping support.projection (Nat.le_of_lt strict) entry.environments entry.heaps
       entry.locals entry.lookups entry.actualTyped entry.reference entry.read entry.unmapped reached
       conditioned admitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post

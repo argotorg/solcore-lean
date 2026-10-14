@@ -22,6 +22,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include semantic in
  theorem packet_of_roots (packet : Packet code stages)
     (support : SelectedCompilationPhysicalClosureStaticSupport.Support (headers := headers) code inputs stages packet semanticFaults)
     (owner : OwnedKey keys)
@@ -38,7 +41,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
       (SelectedCompilationStageClosureBodyLifting.terminal code inputs model stages terminal.child
         support terminal.selected owner ownerPhysical children)
   | branching branching =>
-    exact SelectedCompilationStageClosureScopedLifting.lifts code inputs functions support
+    exact SelectedCompilationStageClosureScopedLifting.lifts (semantic := semantic) code inputs functions support
       branching.selected owner ownerPhysical extension children preservation
 
 section Association
@@ -46,6 +49,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry}
   {mapping : LocationMap} {world : StoreTyping} {native : Value}
   {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
 
+include semantic in
  theorem association_of_roots
     (association : CallableIndexedOwnedContextualTypedClosureReceipts.Association headers keys
       bodyRegistry semanticFaults mapping world function native bindings parameter result)
@@ -60,10 +64,10 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry}
     BelowFor model stages association packet budget := by
   cases association with
   | ordinary owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
-    exact packet_of_roots code body.body.toContext functions packet support owner (owners owner)
+    exact packet_of_roots (semantic := semantic) code body.body.toContext functions packet support owner (owners owner)
       extension children preservation
   | principal owner captured code history body origin globals leading referenceIndex typed provenance =>
-    exact packet_of_roots code body.body.toContext functions packet support owner (owners owner)
+    exact packet_of_roots (semantic := semantic) code body.body.toContext functions packet support owner (owners owner)
       extension children preservation
 end Association
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosurePacketRoots

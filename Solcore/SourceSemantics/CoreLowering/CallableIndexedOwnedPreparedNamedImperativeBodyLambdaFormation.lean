@@ -59,7 +59,7 @@ theorem of_terminal
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child) := by
   obtain ⟨produced, view, reason⟩ := CallableIndexedOwnedPreparedNamedLambdaProducer.of_terminal terminal
-    prepared profile member found form owner requirements coercions ordinary read
+    prepared profile diagnostic member found form owner requirements coercions ordinary read
   have actualFound : header.function.source.lookupExpression? terminal.expression = some produced.site.code.sourceNode := by
     simpa only [closure, produced.identifier, source, ← header.agreement.source] using produced.site.code.sourceFound
   have sameNode : produced.site.code.sourceNode = node := Option.some.inj (actualFound.symm.trans found)

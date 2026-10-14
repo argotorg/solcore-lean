@@ -62,7 +62,9 @@ variable (association : Association headers keys bodyRegistry semanticFaults map
   {context : SourceSemantics.Context} {callerSource : TypedSource}
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context callerSource)
 
-include supported raw represented heaps stable runtime in
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
+include supported raw represented heaps stable runtime semantic in
 /-- The actual Association and chosen packet retain the original parameter
 context. Each body branch constructs its application port from the strict Root IH. -/
 theorem application_preserves (budget : Nat)
@@ -208,7 +210,7 @@ theorem application_preserves (budget : Nat)
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | nestedBranching branching =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (ordinary := support) (origin := origin) (prefixContext := prefixContext)
           (packet := branching) (support := supported)
@@ -229,7 +231,7 @@ theorem application_preserves (budget : Nat)
         rw [supported.prefix]
         exact globals
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -244,7 +246,7 @@ theorem application_preserves (budget : Nat)
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | branching branching =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
@@ -391,7 +393,7 @@ theorem application_preserves (budget : Nat)
         rw [supported.prefix]
         exact globals
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -406,7 +408,7 @@ theorem application_preserves (budget : Nat)
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | branching branching =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
-        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
@@ -435,7 +437,7 @@ theorem application_preserves (budget : Nat)
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
 
-include supported raw represented heaps stable runtime in
+include supported raw represented heaps stable runtime semantic in
 /-- Reflection uses the packet-selected Source scope. The original parameter
 installation, independent Source grade and literal returned caller are preserved. -/
 theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
@@ -579,7 +581,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | nestedBranching branching =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (ordinary := support) (origin := origin) (prefixContext := prefixContext)
           (packet := branching) (support := supported)
@@ -600,7 +602,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         rw [supported.prefix]
         exact globals
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -615,7 +617,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | branching branching =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
@@ -760,7 +762,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         rw [supported.prefix]
         exact globals
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -775,7 +777,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | branching branching =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
-        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)

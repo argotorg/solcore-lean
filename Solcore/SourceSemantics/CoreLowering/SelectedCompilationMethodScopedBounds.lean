@@ -50,6 +50,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (argumentsTyped : Dynamic.ValuesHaveTypes principal.sourceFunction.context before arguments packet.sourceAt.types)
   (stable : CallableIndexedOwnedIndirectExpressionHeads.StableRows caller)
 
+
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 local notation "bodyBridge" => CallableIndexedOwnedNamedCallerProtocol.Carrier.forgetSlots
   (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) 1)
@@ -114,7 +117,7 @@ private theorem prefix_agrees
       simpa [SourceCoreLocalCell.coreContext, nativePrefix, List.getElem?_append, outside, offset,
         last, Value.type] using atType
 
-include support certified selected keyPhysical beforeTyped argumentsTyped stable in
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
 /-- Actual parameter allocation supplies the entire Source body entry. -/
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -186,7 +189,7 @@ theorem source_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      unique collected.tree (collected.sites registry semanticFaults) rfl shape originalTyping packet.sourceAt.projection
+      unique collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt within) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted trace
   have functionPost := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
@@ -207,7 +210,7 @@ theorem source_continuation
     exact SelectedCompilationMethodPostAdmission.preserved principal packet.sourceAt certified
       postTyped.1 postTyped.2.heap metadata
 
-include support certified selected keyPhysical beforeTyped argumentsTyped stable in
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
 /-- Native completion is inverted through the same real flow and footer. -/
 theorem native_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -284,7 +287,7 @@ theorem native_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      graph collected.tree (collected.sites registry semanticFaults) rfl shape originalTyping packet.sourceAt.projection
+      graph collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt strict) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted flowTrace
   have functionPost := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post

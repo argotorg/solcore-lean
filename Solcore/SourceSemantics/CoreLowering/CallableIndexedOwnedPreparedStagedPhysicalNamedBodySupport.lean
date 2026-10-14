@@ -62,7 +62,9 @@ variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)} {
 local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include support profile wellFormed extension selected in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support profile wellFormed extension selected semantic in
 theorem preserves {budget : Nat}
     (children : ∀ size, size < budget →
       CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds.PreservesRootsAt
@@ -77,10 +79,10 @@ theorem preserves {budget : Nat}
     exact CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.preserves
       profile static selected wellFormed globals
   | «scoped» body receipt compilation static =>
-    exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedBounds.preserves
+    exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedBounds.preserves (semantic := semantic)
       static body.aligned.globals functions selected extension body.layouts children
 
-include support profile wellFormed extension selected in
+include support profile wellFormed extension selected semantic in
 theorem reflects {budget : Nat}
     (children : ∀ size, size < budget →
       CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds.ReflectsRootsAt
@@ -95,7 +97,7 @@ theorem reflects {budget : Nat}
     exact CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.reflects
       profile static selected wellFormed globals
   | «scoped» body receipt compilation static =>
-    exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedBounds.reflects
+    exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedBounds.reflects (semantic := semantic)
       static body.aligned.globals functions selected extension body.layouts children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport

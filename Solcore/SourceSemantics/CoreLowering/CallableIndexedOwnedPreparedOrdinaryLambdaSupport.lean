@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaBinderProjections
@@ -31,12 +32,14 @@ structure Produced (named : Named) (parameters : List TypedBinder) (result : Typ
 
   recipe : BodyRecipe compilation site.code
   compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
+  issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named site.code
 
 /-- This calls the original contextual producer once and keeps its exact
 selected Site and policy equation together. -/
 theorem of_contextual
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
     {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
@@ -61,10 +64,10 @@ theorem of_contextual
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (Produced (compiled := compiled) named parameters result body sourceContext evidence
       scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩ := CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe
-    compiled.indexed compilation record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
+  obtain ⟨site, identifier, emitted, binderPolicy, recipe, issuedRecipe, _view, _reason⟩ := CallableIndexedLambdaGeneration.of_contextual_with_issued_recipe_exact
+    compiled.indexed compilation issued record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
     found form owner requirements coercions ordinary read accepted typed
-  exact ⟨⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩⟩
+  exact ⟨⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe, issuedRecipe.policy_recipe, issuedRecipe⟩⟩
 
 
 variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
@@ -165,6 +168,7 @@ inductive PreparedAt : {function : Dynamic.Closure} → {scope : SourceCoreLocal
         diagnosticPolicy issued.invalidOperand issued.invalidUnary issued.invalidProjection issued.missingDefault)
       (binderPolicy : BinderPolicy caller.named site.code)
       (compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code)
+      (issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained caller.named site.code)
       (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView site.code)
       (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons site.code caller.named)
       (declarations : CompatibleExpressionReads.ScopeDeclarations
@@ -179,7 +183,7 @@ theorem PreparedAt.projected_bindings (receipt : PreparedAt code support) :
     ∀ binding ∈ code.receipt.loweredParameters,
       compiled.compatible.checked.catalog.project binding.1.scheme.body = .ok binding.2 := by
   cases receipt with
-  | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy bodyView bodyReasons declarations environment =>
+  | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy issuedRecipe bodyView bodyReasons declarations environment =>
     exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings site binderPolicy body.extended
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaSupport

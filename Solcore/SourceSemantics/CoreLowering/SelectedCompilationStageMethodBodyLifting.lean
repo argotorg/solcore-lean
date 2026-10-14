@@ -42,7 +42,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (stable : CallableIndexedOwnedIndirectExpressionHeads.StableRows caller)
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
-include support certified selected keyPhysical beforeTyped argumentsTyped stable in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -62,7 +64,7 @@ theorem source_continuation
       beforeTyped argumentsTyped stable budget
       children
   | «scoped» packet =>
-    exact SelectedCompilationStageMethodScopedLifting.source_continuation
+    exact SelectedCompilationStageMethodScopedLifting.source_continuation (semantic := semantic)
       principal packet support certified functions selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children preservation
 

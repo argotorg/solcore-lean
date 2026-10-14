@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyCompilerCallbacks
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
@@ -45,15 +47,24 @@ structure Choice where
       (compiled.indexed.layouts.allocatorAt packet.allocationOwner packet.active packet.onError))
   matchLedger : matchCompilation.solvedRequirements = code.compilation.solvedRequirements
 
+/-- The selected token function belongs to the same actual issued compilation. -/
+def Choice.Issued (named : Named) (choice : Choice code (stages := stages)) : Prop :=
+  ∃ (diagnostics : SourceCoreDataPlaceFaultSites.Program) (namedCode : Expr)
+    (compilation : Compilation compiled.indexed named diagnostics namedCode),
+      CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics ∧
+      choice.invalidOperand = GenericAssignmentDiagnostics.token compilation.own.assignments
+
 /-- The actual retained lowerer supplies all allocator and binder callbacks;
 none is inferred from a native result type. -/
-theorem choose (named : Named)
-    (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
+private theorem choose_with_token (named : Named)
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
+    (compilation : Compilation compiled.indexed named diagnostics namedCode)
+    (recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation code)
     (sameCompilation : code.compilation = context compiled.indexed named)
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
-    Nonempty (Choice code (stages := stages)) := by
-  obtain ⟨diagnostics, namedCode, compilation, recipe⟩ := retained
+    ∃ choice : Choice code (stages := stages),
+      choice.invalidOperand = GenericAssignmentDiagnostics.token compilation.own.assignments := by
   let expression := FunctionCode.children code.policy code.lowerBody code.fuel code.compilation
   let policy := loop_policy compiled.indexed named compilation.own.assignments diagnostics expression
   have callback : code.lowerBody expression = SourceCoreLoops.lowerStatementsWithPolicy policy :=
@@ -102,7 +113,7 @@ theorem choose (named : Named)
     matchValues := rfl
     matchDefinitions := rfl
     matchAllocator := rfl
-    matchLedger := by rw [sameCompilation] }⟩
+    matchLedger := by rw [sameCompilation] }, rfl⟩
   · refine ⟨rfl, rfl, ?_⟩
     change some _ = some _
     apply congrArg some
@@ -112,5 +123,50 @@ theorem choose (named : Named)
     change SourceCoreGeneralFunctions.contextualBinder _ _ _ _ _ _ _ = _
     simp only [SourceCoreGeneralFunctions.contextualBinder, mono, List.isEmpty_nil, ↓reduceIte]
     rfl
+
+/-- The original generic receipt still forgets only the actual token identity. -/
+theorem choose (named : Named)
+    (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
+    (sameCompilation : code.compilation = context compiled.indexed named)
+    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
+    Nonempty (Choice code (stages := stages)) := by
+  obtain ⟨diagnostics, namedCode, compilation, recipe⟩ := retained
+  obtain ⟨choice, _⟩ := choose_with_token code named compilation recipe sameCompilation shape child selected
+  exact ⟨choice⟩
+
+/-- Exact retained issuance authenticates the token of the chosen compiler packet. -/
+theorem choose_issued (named : Named)
+    (retained : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named code)
+    (sameCompilation : code.compilation = context compiled.indexed named)
+    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
+    ∃ choice : Choice code (stages := stages), choice.Issued code named := by
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, issued, recipe, _policy, _same⟩ := retained
+  obtain ⟨choice, token⟩ := choose_with_token code named compilation recipe sameCompilation shape child selected
+  exact ⟨choice, diagnostics, namedCode, compilation, issued, token⟩
+
+/-- Actual full-source preparation and receiver issuance interpret each admitted token. -/
+theorem Choice.Issued.operands {named : Named} {choice : Choice code (stages := stages)}
+    (issued : choice.Issued code named) {index : Nat}
+    (selected : compiled.indexed.base.functions[index]? = some named)
+    (sourceEq : function.source = source named)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    (origin : AssignmentDiagnosticOrigins.Occurs function.source site assignment operator rhs)
+    (profile : operator = .equal ∨ assignment.target.type = .word) :
+    AssignmentOperandDiagnostics.OperandsLaw
+      (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
+      (choice.invalidOperand site assignment.target.root operator) := by
+  obtain ⟨diagnostics, namedCode, compilation, actual, token⟩ := issued
+  obtain ⟨first, prepared⟩ := CallableIndexedOwnedIssuedAssignmentRecipes.assignments_prepared selected compilation actual
+  rw [token]
+  rw [sourceEq] at origin
+  exact PreparedBranchingAssignmentDiagnostics.operands prepared
+    (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compilation actual receiver represented)
+    origin profile
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts

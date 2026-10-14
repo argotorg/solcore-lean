@@ -33,7 +33,13 @@ def of_imperative_compiler
     {semanticFaults : FunctionCalls.FaultRep}
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
-    (receipt : Receipt header) (stages : Staging.Recursive.Registry)
+    (receipt : Receipt header)
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
       header.context (.statements true header.function.body) header.function.resultType)
@@ -54,7 +60,7 @@ def of_imperative_compiler
   refine ⟨wellFormed, ?_⟩
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, CallableIndexedOwnedPreparedNamedBranchingCollectors.collected_of_imperative prepared aligned ready wellFormed member receipt syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, CallableIndexedOwnedPreparedNamedBranchingCollectors.collected_of_imperative prepared aligned ready wellFormed member receipt operands syntaxTree (children child selected)⟩
 
 
 include aligned in
@@ -93,6 +99,7 @@ def of_actual_with_catalog
       (RecursiveNamedPreparedStageScopes.registry actual) receipt
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   apply of_imperative_compiler prepared aligned ready wellFormed member receipt
+    (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic prepared aligned diagnostic receiver)
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
   have sameSource := (RecursiveNamedPreparedStageScopes.registry actual).source selected

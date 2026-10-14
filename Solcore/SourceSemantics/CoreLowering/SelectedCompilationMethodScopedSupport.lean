@@ -85,7 +85,7 @@ structure Support (packet : Packet principal)
     (stages : Staging.Recursive.Registry) (semanticFaults : FunctionCalls.FaultRep) : Prop where
   tree : ∀ child, stages.Closure principal.sourceFunction child →
     ∃ expressionSyntax : ExpressionId → Prop,
-      CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts
+      CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts
         principal.named.signature.key [] compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
         (fun error => .sourceAllocation (reprStr error)) (.initial compiled.compatible.checked)
         child.source expressionSyntax

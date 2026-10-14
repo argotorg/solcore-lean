@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedEmptyLambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
@@ -28,7 +30,14 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 /-- Every tree node is recovered from the accepted same-view compiler flow and
 independent Source syntax at the real parameter context. -/
 theorem of_branching
-    (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
+    (retained : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named code)
+    {index : Nat} (selected : compiled.indexed.base.functions[index]? = some named)
+    (source : function.source = CallableIndexedNamedGeneration.source named)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token,
+      CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics reason token → faults reason token)
     (sameCompilation : code.compilation = context compiled.indexed named)
     (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) code)
     (frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
@@ -51,7 +60,7 @@ theorem of_branching
       (Program.ofChecked compiled.sourceProgram) registry faults,
       body.toContext = inputs ∧ GenericImperativeMatch.Syntax function.source (Syntax function.source)
         body.context (.statements true function.body) function.resultType := by
-  obtain ⟨diagnostics, namedCode, compilation, recipe⟩ := retained
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, issued, recipe, _policyRecipe, _sameCompilation⟩ := retained
   let expression := FunctionCode.children code.policy code.lowerBody code.fuel code.compilation
   let policy := loop_policy compiled.indexed named compilation.own.assignments diagnostics expression
   have callback : code.lowerBody expression = SourceCoreLoops.lowerStatementsWithPolicy policy :=
@@ -95,6 +104,18 @@ theorem of_branching
     apply congrArg some
     funext expression fuel source scope site assignment operator rhs output next reasonAt
     cases operator <;> rfl
+  obtain ⟨first, assignmentPrepared⟩ :=
+    CallableIndexedOwnedIssuedAssignmentRecipes.assignments_prepared selected compilation issued
+  rw [← source] at assignmentPrepared
+  have operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw faults operator
+        (if operator = .equal then Word.zero else compilation.own.assignments.reasonAt site assignment.target.root (.value operator)) := by
+    intro site assignment operator rhs occurrence rawProfile
+    exact PreparedBranchingAssignmentDiagnostics.operands assignmentPrepared
+      (fun reason token represented => included reason token
+        (CallableIndexedOwnedIssuedAssignmentRecipes.operands compilation issued receiver represented)) occurrence rawProfile
   let baseMatch : SourceCoreCompatibleDataMatches.Context :=
     ⟨.initial compiled.compatible.checked, (context compiled.indexed named).solvedRequirements,
       some (allocator compiled.indexed named), none⟩
@@ -113,7 +134,7 @@ theorem of_branching
   have matchLedger : inputs.context.solvedRequirements = baseMatch.solvedRequirements := by
     exact (Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended).solvedRequirements.trans
       (sameLedger.trans (by rw [sameCompilation]))
-  let collected : CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts code.compilation.owner code.active
+  let collected : CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts code.compilation.owner code.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length code.allocationError
       (.initial compiled.compatible.checked) function.source (Syntax function.source) (Child 0 function.source)
       compiled.indexed.layouts.definitions administrative inputs.context
@@ -124,7 +145,7 @@ theorem of_branching
       (by intro id member; cases member)
       frame.code.graph.nodeOccurrencesUnique
       (show policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked from rfl)
-      binderPolicy allocationPolicy assignments
+      binderPolicy allocationPolicy assignments operands
       matchPolicy rfl rfl matchAllocator hidden catalog matchLedger
       (certificates := fun _ _ _ _ => True)
       (by intros; exact True.intro)
@@ -132,7 +153,7 @@ theorem of_branching
       runtime.variables_closed runtime.residual_variables_open signatures declarations
       (fun id member => .root (List.mem_map.mpr ⟨id, member, rfl⟩)) projection generatedSource native
   let full := collected.tree
-  have sites : full.CatalogSites .reachable registry faults := collected.sites registry faults
+  have sites : full.CatalogSites .reachable registry faults := collected.sites registry
   let actualTree : GenericImperativeMatch.Tree compiled.indexed.layouts code.compilation.owner code.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length code.allocationError
       (.initial compiled.compatible.checked) code.view (Syntax code.view) (Child 0 code.view)

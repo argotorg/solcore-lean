@@ -157,7 +157,7 @@ theorem reflects_unit {invocation : Staging.Recursive.Scope}
       CallableIndexedLambdaCalls.applyPayload value finalStore := application_tail completed
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
-    CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_reflects
+    CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_reflects (semantic := semantic)
       profile association (chosen association).1 (chosen association).2 caller raw represented heaps stable runtime
       valid size (fun childSize _ => bodies childSize) (fun childSize _ => canonicalBodies childSize) evaluation (Nat.le_refl _)
   rw [← resultEq, ← nativeTypes.2] at representedResult

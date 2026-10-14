@@ -138,8 +138,8 @@ private def checkBoundary (name : String) (acceptedProfile : Bool) : IO Unit := 
         if name == "compound" then
           let some named := cached.indexed.base.functions.head?
             | throw (IO.userError "compound loop cached row missing")
-          require (AcceptedCompilerBodyProfile.validate named.specialized.function.typedBody (fun _ => True)).isNone
-            "compound header profile restriction changed"
+          require (AcceptedCompilerBodyProfile.validate named.specialized.function.typedBody (fun _ => True)).isSome
+            "compound header body profile was not accepted"
 
 private def checkMissingInitializer (fixture : Fixture) : IO Unit := do
   let source := fixture.named.specialized.function.typedBody
@@ -156,7 +156,7 @@ private def checkMissingInitializer (fixture : Fixture) : IO Unit := do
 
 def run : IO Unit := do
   checkBoundary "spin" true
-  checkBoundary "compound" false
+  checkBoundary "compound" true
   let fixture ← fixture
   checkMissingInitializer fixture
   let started ← observeStarted fixture

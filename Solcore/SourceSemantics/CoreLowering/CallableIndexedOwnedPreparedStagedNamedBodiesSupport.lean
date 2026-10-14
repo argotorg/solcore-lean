@@ -58,7 +58,9 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge
   (compiled := compiled) (program := Program.ofChecked compiled.sourceProgram) (headers := headers) (keys := keys)
 
-include static wellFormed selected in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include static wellFormed selected semantic in
 theorem Support.preserves
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
@@ -95,13 +97,13 @@ theorem Support.preserves
       exact CallableIndexedOwnedPreparedStagedNamedLexicalSupport.preserves
         static aligned.globals profile selected layouts children
     | branching receipt =>
-      exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.preserves
+      exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.preserves (semantic := semantic)
         static aligned.globals profile selected extension layouts children
     | canonicalBranching receipt =>
-      exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.preserves
+      exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.preserves (semantic := semantic)
         static aligned.globals profile selected extension layouts children canonicalChildren
 
-include static wellFormed selected in
+include static wellFormed selected semantic in
 theorem Support.reflects
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
@@ -138,10 +140,10 @@ theorem Support.reflects
       exact CallableIndexedOwnedPreparedStagedNamedLexicalSupport.reflects
         static aligned.globals profile selected layouts children
     | branching receipt =>
-      exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.reflects
+      exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.reflects (semantic := semantic)
         static aligned.globals profile selected extension layouts children
     | canonicalBranching receipt =>
-      exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.reflects
+      exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.reflects (semantic := semantic)
         static aligned.globals profile selected extension layouts children canonicalChildren
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport

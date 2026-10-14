@@ -277,7 +277,7 @@ structure BranchingSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
   frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
   projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -293,9 +293,9 @@ abbrev BranchingSupport.tree {compiled function scope administrative code inputs
  theorem BranchingSupport.sites {compiled function scope administrative code inputs stages packet semanticFaults}
     (support : @BranchingSupport compiled function scope administrative code inputs stages packet semanticFaults)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
-    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
-    (support.tree child selected).CatalogSites .reachable registry faults :=
-  (support.collected child selected).sites registry faults
+    (registry : SourceCoreRawMetadata.Registry) :
+    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+  (support.collected child selected).sites registry
 
 /-- The original general expression root keeps the exact retained Code policy,
 compiler context and diagnostic function at every actual lexical child. -/
@@ -313,7 +313,7 @@ structure CanonicalBranchingSupport {compiled : SourceCoreUnifiedCompilation.Com
   readFuel : Nat
   «prefix» : code.compilation.administrativePrefix = 1
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -332,9 +332,9 @@ abbrev CanonicalBranchingSupport.tree {compiled function scope administrative he
 theorem CanonicalBranchingSupport.sites {compiled function scope administrative headers code inputs stages packet semanticFaults}
     (support : @CanonicalBranchingSupport compiled function scope administrative headers code inputs stages packet semanticFaults)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
-    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
-    (support.tree child selected).CatalogSites .reachable registry faults :=
-  (support.collected child selected).sites registry faults
+    (registry : SourceCoreRawMetadata.Registry) :
+    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+  (support.collected child selected).sites registry
 
 /-- Ordinary bodies can mix canonical calls and genuine nested formation.
 The certificate is tied to this actual ordinary support's caller and registry,
@@ -355,7 +355,7 @@ structure NestedBranchingSupport {compiled : SourceCoreUnifiedCompilation.Compil
   zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0
   wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -373,9 +373,9 @@ abbrev NestedBranchingSupport.tree {compiled function scope administrative heade
 theorem NestedBranchingSupport.sites {compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet}
     (support : @NestedBranchingSupport compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
-    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
-    (support.tree child selected).CatalogSites .reachable registry faults :=
-  (support.collected child selected).sites registry faults
+    (registry : SourceCoreRawMetadata.Registry) :
+    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+  (support.collected child selected).sites registry
 
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/

@@ -66,8 +66,10 @@ local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.brid
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
   completion.result.diagnostics
 
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
 include bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique
-  actualFunctionType observations closurePackets closureSupport namedTerminals in
+  actualFunctionType observations closurePackets closureSupport namedTerminals semantic in
 /-- Reuse the original whole-call producer at the supplied genuine Source
 grade. The returned caller state and post are retained literally. -/
 theorem preserves
@@ -113,7 +115,7 @@ theorem preserves
   have occurrence : Staging.Recursive.Occurrence invocation child (.call callee ids (.indirect metadata)) :=
     ⟨compiler.original, lookupExpression?_sound compiler.found, compiler.originalForm,
       port.sourceParent.requirements, port.sourceParent.coercions⟩
-  exact (CallableIndexedOwnedPreparedStagedMixedIndirectCallBounds.preserves_parent
+  exact (CallableIndexedOwnedPreparedStagedMixedIndirectCallBounds.preserves_parent (semantic := semantic)
     bridge receiver compiler port.prepared stagePrepared rfl occurrence initial port.view port.guardFrame
     profile calleeCertified port.calleeFound sourceTyped environments heaps locals agrees actualTyped
     admitted port.caller port.originalUnique port.sourceParent tree unique parentTyped
@@ -124,7 +126,7 @@ theorem preserves
     namedTerminals namedChildren trace (Nat.le_refl _)).2
 
 include bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique
-  actualFunctionType observations closurePackets closureSupport namedTerminals in
+  actualFunctionType observations closurePackets closureSupport namedTerminals semantic in
 /-- The native completion keeps its independent Source grade and exact
 staged fault scope. Only the duplicate native evaluation witness is omitted. -/
 theorem reflects
@@ -181,7 +183,7 @@ theorem reflects
     simpa only [stageEq] using namedChildren
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, _evaluated,
     represented, finalHeaps, maps, worlds, frame, metadataExtended, reached, related, post⟩ :=
-    CallableIndexedOwnedPreparedStagedMixedIndirectCallBounds.reflects_parent
+    CallableIndexedOwnedPreparedStagedMixedIndirectCallBounds.reflects_parent (semantic := semantic)
       bridge receiver compiler port.prepared stagePrepared rfl occurrence initial port.view port.guardFrame
       profile calleeCertified port.calleeFound sourceTyped environments heaps locals agrees actualTyped
       admitted port.caller port.originalUnique port.sourceParent tree unique parentTyped

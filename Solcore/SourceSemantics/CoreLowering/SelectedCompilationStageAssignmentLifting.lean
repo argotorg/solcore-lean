@@ -32,18 +32,18 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 
 include bridge functions condition transport extension in
-/-- Equal assignment lifts the RHS at the original target snapshot. The
+/-- Value assignment lifts the RHS at the original target snapshot. The
 existing real write producer supplies the next physical state for the suffix. -/
 theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
-    {assignment : AssignmentResolution} {rhs : ExpressionId} {certificate : GenericExpressionMeaning.Certificate}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {certificate : GenericExpressionMeaning.Certificate}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some node)
-    (form : node.form = .assignValue assignment .equal rhs)
+    (form : node.form = .assignValue assignment operator rhs)
     (head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
-      certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment .equal rhs)
+      certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment operator rhs)
     (bare : assignment.target.projections = [])
-    (assignmentTyped : SourceAssignmentHasType invocation.source context assignment .equal rhs)
+    (assignmentTyped : SourceAssignmentHasType invocation.source context assignment operator rhs)
     (children : ∀ childSize, childSize < budget → LiftsAt bridge context model stages invocation certificate childSize)
     (preservation : ∀ childSize, CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesAt
       bridge context model stages invocation certificate faults childSize)
@@ -64,6 +64,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     functions extension head bare environments heaps locals agrees
   rcases SelectedCompilationStageAssignmentInversion.child_and_tail unique found form snapshot trace with
     ⟨childSize, reason, strict, rfl, rfl, evaluated⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, strict, rfl, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, invalid⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, strict, tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
@@ -74,6 +76,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     | rejected origin call reason reached =>
       exact ⟨_, _, _, .assignBareFault (lookupStatement?_sound found) form snapshot lifted,
         .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted evaluated
+    cases adapted with
+    | completed => exact ⟨_, _, _, .assignBareOperands (lookupStatement?_sound found) form snapshot lifted
+        currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      exact ⟨_, _, _, .assignBareFault (lookupStatement?_sound found) form snapshot lifted, .rejected origin call reason _ reached⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
         environments heaps locals agrees actualTyped initial admitted evaluated

@@ -59,25 +59,19 @@ private theorem target_fault_excluded {program : Program} {source : TypedSource}
       cases evaluated
       exact nonempty rfl
 
-private theorem equal_valid {left : Option Dynamic.Value} {right : Dynamic.Value}
-    (invalid : Dynamic.AssignmentOperandsInvalid .equal left right) : False := by
-  cases invalid with
-  | uninitialized impossible => exact impossible rfl
-  | compound corresponds _ => cases corresponds
-
 variable {program : Program} {source : TypedSource}
   {context finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {environment : Dynamic.Environment} {before after : Dynamic.Heap}
-  {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution} {rhs : ExpressionId}
+  {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
   {target : Dynamic.ResolvedPlace} {size : Nat} {outcome : Dynamic.ControlOutcome} {reason : Dynamic.SemanticFault}
 
 private theorem statement_value (unique : NodeOccurrencesUnique source)
-    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment .equal rhs)
+    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
     (snapshot : BareTarget environment before assignment.target target)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment before id finalContext outcome after) :
     ∃ child value middle updated, child < size ∧ finalContext = context ∧ outcome = .fallthrough environment ∧
       SourceExecutionSize.ExpressionEvaluates program child context evidence source environment before rhs value middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated after := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
@@ -93,11 +87,17 @@ private theorem statement_value (unique : NodeOccurrencesUnique source)
     omega
 
 private theorem statement_fault (unique : NodeOccurrencesUnique source)
-    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment .equal rhs)
+    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
     (snapshot : BareTarget environment before assignment.target target)
     (trace : SourceExecutionSize.StatementFaults program size context evidence source environment before id reason after) :
-    ∃ child, child < size ∧
-      SourceExecutionSize.ExpressionFaults program child context evidence source environment before rhs reason after := by
+    (∃ child, child < size ∧
+      SourceExecutionSize.ExpressionFaults program child context evidence source environment before rhs reason after) ∨
+    (∃ child right currentCell initial currentSelected, child < size ∧
+      reason = .invalidAssignmentOperands operator ∧
+      SourceExecutionSize.ExpressionEvaluates program child context evidence source environment before rhs right after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
     exact Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
@@ -112,54 +112,72 @@ private theorem statement_fault (unique : NodeOccurrencesUnique source)
   | target failed => exact (target_fault_excluded snapshot failed.sound).elim
   | rhs resolved failed =>
     obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
-    refine ⟨_, ?_, failed⟩
+    refine .inl ⟨_, ?_, failed⟩
     simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]
     omega
-  | operands _ _ _ _ _ _ invalid => exact (equal_valid invalid).elim
+  | operands resolved evaluated currentRead rootType initialValue pathRead invalid =>
+    obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
+    refine .inr ⟨_, ?_, rfl, _, evaluated, _, currentRead, rootType, _, initialValue, ⟨_, pathRead⟩, invalid⟩
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]
+    omega
   | structuralUpdate resolved _ _ _ _ failed =>
     obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
     cases snapshot
     cases failed
 
 /-- The exact pre-expression target determines the ordinary write after the
-right-hand expression. Equal assignment has no operand-rejection branch. -/
+right-hand expression. Operand rejection keeps the successful RHS prefix and
+its exact current-root traversal, without a write or suffix. -/
 theorem child_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {rest : List StatementId}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some node)
-    (form : node.form = .assignValue assignment .equal rhs)
+    (form : node.form = .assignValue assignment operator rhs)
     (snapshot : BareTarget environment before assignment.target target)
     (trace : PlainStatements program mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
     (∃ child reason, child < size ∧ finalContext = context ∧ outcome = .fault reason ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.fault reason) after) ∨
+    (∃ child right currentCell initial currentSelected, child < size ∧ finalContext = context ∧
+      outcome = .fault (.invalidAssignmentOperands operator) ∧
+      RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
+        environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated written ∧
       PlainStatements program mode tailSize invocation context environment written rest finalContext outcome after) := by
   rcases SelectedCompilationStageScopedSourceInversion.head_and_tail unique found
     (by intro expression equal; rw [form] at equal; cases equal) trace with
     ⟨_, reason, strict, equalContext, equalOutcome, failed⟩ | ⟨_, strict, stopped, head⟩ |
     ⟨_, tailSize, middleContext, nextEnvironment, middle, strict, tailStrict, head, tail⟩
-  · obtain ⟨child, childStrict, failed⟩ := statement_fault unique found form snapshot failed
-    exact .inl ⟨child, reason, Nat.lt_trans childStrict strict, equalContext, equalOutcome, .fault failed⟩
+  · rcases statement_fault unique found form snapshot failed with
+      ⟨child, childStrict, failed⟩ |
+      ⟨child, right, currentCell, initial, currentSelected, childStrict, reasonEq, evaluated,
+        currentRead, rootType, initialValue, pathRead, invalid⟩
+    · exact .inl ⟨child, reason, Nat.lt_trans childStrict strict, equalContext, equalOutcome, .fault failed⟩
+    · subst reason
+      exact .inr (.inl ⟨child, right, currentCell, initial, currentSelected, Nat.lt_trans childStrict strict,
+        equalContext, equalOutcome, .value evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
   · obtain ⟨child, value, middle, updated, childStrict, equalContext, equalOutcome, evaluated, written⟩ :=
       statement_value unique found form snapshot head
     subst finalContext
     subst outcome
     rcases stopped with impossible | rfl
     · cases impossible
-    · refine .inr ⟨child, SourceExecutionSize.stepSize [], value, middle, updated, after,
-        Nat.lt_trans childStrict strict, ?_, .value evaluated, written, ?_⟩
+    · refine .inr (.inr ⟨child, SourceExecutionSize.stepSize [], value, middle, updated, after,
+        Nat.lt_trans childStrict strict, ?_, .value evaluated, written, ?_⟩)
       · simp only [SourceExecutionSize.stepSize, List.sum_nil]; omega
       · cases mode <;> exact .control .nil
   · obtain ⟨child, value, expressionHeap, updated, childStrict, equalContext, equalOutcome, evaluated, written⟩ :=
       statement_value unique found form snapshot head
     subst middleContext
     cases equalOutcome
-    exact .inr ⟨child, tailSize, value, expressionHeap, updated, middle,
-      Nat.lt_trans childStrict strict, tailStrict, .value evaluated, written, tail⟩
+    exact .inr (.inr ⟨child, tailSize, value, expressionHeap, updated, middle,
+      Nat.lt_trans childStrict strict, tailStrict, .value evaluated, written, tail⟩)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentInversion

@@ -126,6 +126,9 @@ theorem lambda_read {childFuel : Nat} {id : ExpressionId} {node : ExpressionNode
 /-- Native typing and collector inputs apply only to actual accepted lambda
 children. The genuine Source frame is supplied to the collector internally. -/
 structure LambdaStatic (admitted : ExpressionId → Prop) : Prop where
+  issued : ∀ id node parameters result statements, (admitted) id →
+    (source caller.named).lookupExpression? id = some node → node.form = .lambda parameters result statements →
+    CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics
   native : ∀ childFuel id node parameters result statements lowered, admitted id →
     (source caller.named).lookupExpression? id = some node → node.form = .lambda parameters result statements →
     ExpressionHasType (source caller.named) sourceContext id node.type →
@@ -182,7 +185,7 @@ theorem extra_receipts
       (function := closure caller.named parameters result statements sourceContext evidence [])
       runtime.graph.nodeOccurrencesUnique found form typed coercions
     obtain ⟨certificate, receipt, samePolicy, sameBody, sameFuel, sameView, sameReason, sameCertificate⟩ :=
-      CallableIndexedOwnedSamePolicyCompilerLeafReceipts.lambda_of_accepted root sourceContext evidence profile
+      CallableIndexedOwnedSamePolicyCompilerLeafReceipts.lambda_of_accepted root (static.issued id node parameters result statements allowed found form) sourceContext evidence profile
         (LambdaMetadataViews.MetadataView.refl _) found form facts.sourceType facts.ordinary coercions found rfl
         parentMetadata.owner requirements coercions ordinary read accepted
         (static.native childFuel id node parameters result statements lowered allowed found form typed accepted)

@@ -39,7 +39,7 @@ theorem Items.closed_shape {policy : SourceCoreLoops.Policy} {source : TypedSour
   | initialized _ _ _ _ _ _ ih => exact .initialized (ih closed)
   | discard _ _ _ ih => exact .discard (ih closed)
   | assigning => cases closed
-  | assigned _ receipt _ ih => exact .assign receipt.bare (ih closed)
+  | assigned _ receipt _ ih => exact .assign receipt.sourceProfile receipt.bare (ih closed)
 
 private theorem arm_shapes {compilation : SourceCoreCompatibleDataMatches.Context}
     {source : TypedSource} {id : StatementId} {scope : SourceCoreLocalCell.Scope} {type : TypeSystem.Ty}
@@ -92,7 +92,7 @@ theorem Tree.formed_shape {policy : SourceCoreLoops.Policy} {checked : SourceCor
   | absent read form _ _ _ _ ih =>
     exact .absent (original_read (readPolicy ▸ read)) form (ih formed)
   | assigned read form _ _ receipt _ ih =>
-    exact .assign (original_read (readPolicy ▸ read)) form receipt.bare (ih formed)
+    exact .assign (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.bare (ih formed)
   | discard read form _ _ _ _ ih =>
     exact .discard (original_read (readPolicy ▸ read)) form (.inl rfl) (ih formed)
   | valueDiscard read form _ _ _ _ remaining ih =>

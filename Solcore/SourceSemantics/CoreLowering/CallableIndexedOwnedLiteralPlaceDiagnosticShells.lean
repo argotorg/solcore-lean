@@ -351,6 +351,11 @@ theorem literal_domain {currentContext : SourceSemantics.Context}
     (childScope := currentScope) (reasonAt := rootReasonAt) inputs.expressionFound
     inputs.atomic inputs.ordinaryRequirements inputs.literalCoercions inputs.literalRequirements inputs.initializer
   refine {
+    issued := by
+      intro candidate node parameters result statements allowed found form
+      have atomic := (literal_node produced root inputs allowed found).symm ▸ inputs.atomic
+      rw [form] at atomic
+      cases atomic
     namedLedger := globals.namedLedger
     admission := literal_admission produced root inputs
     coverage := {plan := rfl, ordered := globals.headerOrder, slots := ?_}

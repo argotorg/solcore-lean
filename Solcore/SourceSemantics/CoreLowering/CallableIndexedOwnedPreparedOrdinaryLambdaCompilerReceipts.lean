@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaFormation
 
 /-! One accepted contextual compiler call chooses the ordinary lambda Site.
@@ -138,6 +139,7 @@ then run the existing static collector and canonical transport at that Site. -/
 theorem receipt_of_contextual
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed caller.named diagnostics namedCode)
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan caller.named.signature.key = .ok caller.named.specialized)
     {fuel : Nat} {view : TypedSource} {sourceNode node : ExpressionNode} {reported : Ty}
     {reasonAt : ExpressionId → Word}
@@ -167,12 +169,12 @@ theorem receipt_of_contextual
       produced.diagnostics = diagnostics → produced.namedCode = namedCode → HEq produced.compilation compilation →
       Nonempty (SiteInputs caller produced)) :
     Nonempty (Receipt caller diagnostics namedCode compilation sourceContext evidence scope id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩ := CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe
-    compiled.indexed compilation record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
+  obtain ⟨site, identifier, emitted, binderPolicy, recipe, issuedRecipe, _view, _reason⟩ := CallableIndexedLambdaGeneration.of_contextual_with_issued_recipe_exact
+    compiled.indexed compilation issued record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
     found form owner requirements coercions ordinary read accepted typed
   let produced : Produced (compiled := compiled) caller.named parameters result statements sourceContext evidence scope
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) caller) id lowered :=
-    ⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩
+    ⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe, issuedRecipe.policy_recipe, issuedRecipe⟩
   obtain ⟨inputs⟩ := siteInputs produced rfl rfl (HEq.refl compilation)
   obtain ⟨body, _entry, _readFuel⟩ := at_site produced.compilation produced.site produced.recipe
     (Program.ofChecked compiled.sourceProgram) inputs.entry inputs.frame inputs.expressionSyntax inputs.certificates

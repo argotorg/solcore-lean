@@ -81,13 +81,13 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (assigned : SourceCoreLoops.assignValue policy fuel source scope (.occurrence id.occurrence)
         assignment operator expression (LocalLoop.controlType result) tail reasonAt = .ok code) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
-  | assigned {mode escaped fuel scope id rest node stored assignment expression tail code}
+  | assigned {mode escaped fuel scope id rest node stored assignment operator expression tail code}
       (read : policy.readStatement source id = .ok (node, stored))
-      (form : node.form = .assignValue assignment .equal expression)
+      (form : node.form = .assignValue assignment operator expression)
       (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
       (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail)
       (receipt : AcceptedBareAssignmentReceipt.Receipt policy fuel source scope (.occurrence id.occurrence)
-        assignment expression (LocalLoop.controlType result) tail reasonAt code)
+        assignment operator expression (LocalLoop.controlType result) tail reasonAt code)
       (targetType : receipt.binder.scheme.body = assignment.target.type) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
   | discard {mode escaped fuel scope id rest node stored expression tail}
@@ -453,7 +453,7 @@ def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
   | @Tree.initialized _ _ _ _ _ _ fuel scope _ _ _ _ _ expression _ _ _ _ _ _ _ child generated _ tail _ =>
       ⟨fuel, scope, expression, child, generated⟩ :: tail.children
   | .absent _ _ _ _ tail _ | .assigning _ _ _ tail _ | .matching _ _ _ _ tail => tail.children
-  | @Tree.assigned _ _ _ _ _ _ fuel scope _ _ _ _ _ expression _ _ _ _ _ tail receipt _ =>
+  | @Tree.assigned _ _ _ _ _ _ fuel scope _ _ _ _ _ _ expression _ _ _ _ _ tail receipt _ =>
       ⟨fuel, scope, expression, receipt.child, receipt.generated⟩ :: tail.children
   | @Tree.discard _ _ _ _ _ _ fuel scope _ _ _ _ expression _ _ _ child generated _ tail =>
       ⟨fuel, scope, expression, child, generated⟩ :: tail.children
@@ -540,8 +540,8 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
         read form statementType remaining assigned =>
         obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
         by_cases supported : Assignable source assignment operator
-        · obtain ⟨rfl, bare, target⟩ := supported
-          obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched bare assigned
+        · obtain ⟨profile, bare, target⟩ := supported
+          obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched profile bare assigned
           exact ⟨.assigned read form statementType tail receipt (target receipt.binder receipt.declaration), ready⟩
         · exact ⟨.assigning read form statementType tail assigned, supported, ready⟩
     | assigned read form statementType remaining receipt targetType =>

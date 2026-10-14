@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderFacts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalContextCertificates
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
@@ -96,6 +96,12 @@ theorem collected_of_imperative
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     (receipt : Receipt header)
+    {faults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw faults operator
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
@@ -110,7 +116,7 @@ theorem collected_of_imperative
         RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) header.function.source expressionSyntax
       (TypedCertificate header.function.source certificates) compiled.indexed.layouts.definitions
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
@@ -142,7 +148,7 @@ theorem collected_of_imperative
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_binder prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_allocator prepared aligned)
-    assignments
+    assignments operands
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_match prepared aligned) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.match_allocator prepared aligned)
     (SelectedCompilationHeaderFacts.hidden_fresh certified)

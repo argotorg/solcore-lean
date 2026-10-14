@@ -33,7 +33,9 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "physicalBridge" => CallableIndexedOwnedNamedCallerProtocol.Carrier.forgetSlots
   (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) code.compilation.administrativePrefix)
 
-include support selected ownerPhysical in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support selected ownerPhysical semantic in
 theorem lifts
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
@@ -71,7 +73,7 @@ theorem lifts
     (fun context size scope id lowered certified => by
       obtain ⟨rawType, root⟩ := certified
       exact preservation size (SelectedCompilationMixedRootSupport.RootAt.ofRoot root) owner ownerPhysical ⟨rfl, rfl, rfl⟩)
-    unique tree (support.sites child selected receiving semanticFaults) rfl shape originalTyping support.projection within
+    unique tree (support.sites child selected receiving) semantic rfl shape originalTyping support.projection within
     environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureScopedLifting

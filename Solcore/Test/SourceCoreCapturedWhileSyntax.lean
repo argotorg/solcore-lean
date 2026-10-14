@@ -104,8 +104,8 @@ theorem ObservedFactory.flag_declaration {fixture : CompiledFixture} (observed :
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .whileLoop observed.shape.loopFound observed.shape.loopForm
-    (.assign observed.shape.assignmentFound observed.shape.assignmentForm observed.shape.targetBare
-      (.assign observed.shape.flagAssignmentFound observed.shape.flagAssignmentForm observed.shape.flagTargetBare .nil))
+    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare
+      (.assign observed.shape.flagAssignmentFound observed.shape.flagAssignmentForm (.inl rfl) observed.shape.flagTargetBare .nil))
     (.returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm)
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=

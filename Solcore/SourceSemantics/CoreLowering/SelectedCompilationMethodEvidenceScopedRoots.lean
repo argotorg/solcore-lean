@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodEvidenceScopedRoots
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCatalog
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationSourceSignatureFacts
@@ -184,7 +186,18 @@ theorem of_actual_with_evidence
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
     Support principal packet headers stages
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
-  apply SelectedCompilationMethodScopedCollectors.of_compiler principal packet ready member bodies.signatures certified syntaxTree
+  have operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw
+        (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
+        (GenericAssignmentDiagnostics.token principal.cached.compilation.own.assignments site assignment.target.root operator) := by
+    intro site assignment operator rhs origin profile
+    obtain ⟨first, prepared⟩ := CallableIndexedOwnedAssignmentProvenance.method_assignments principal diagnostic
+    exact PreparedBranchingAssignmentDiagnostics.operands prepared
+      (fun _ _ represented => CallableIndexedOwnedAssignmentProvenance.cached_operands
+        principal.cached diagnostic receiver represented) origin profile
+  apply SelectedCompilationMethodScopedCollectors.of_compiler principal packet ready member bodies.signatures certified operands syntaxTree
   intro child selected context fields scope fuel id node lowered declarations tree found typed accepted _nativeType _native
   exact of_child_with_evidence principal packet diagnostic receiver bodies certified sourceForms supported metadata rows covered resolved selected fields
     declarations tree found typed accepted

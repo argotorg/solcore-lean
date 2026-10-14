@@ -89,6 +89,8 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | assignBareFault actual same _ _ =>
       cases (shape actual).symm.trans same
+  | assignBareOperands actual same _ _ _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
   | assignBareUnbound actual same _ _ =>
       cases (shape actual).symm.trans same
   | assignBareDangling actual same _ _ _ =>
@@ -182,6 +184,8 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
   | assignBare actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBareFault actual same _ _ =>
+      cases (shape actual).symm.trans same
+  | assignBareOperands actual same _ _ _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBareUnbound actual same _ _ =>
       cases (shape actual).symm.trans same

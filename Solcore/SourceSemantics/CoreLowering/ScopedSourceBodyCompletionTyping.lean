@@ -362,7 +362,7 @@ private theorem Scan.control_compatible {source approved expected mode statement
     cases form
     apply prefix_compatible remaining _ (fun _ fallen => (Option.some.inj fallen).symm) (tailIH tail)
     exact ⟨(inner (control := control.enterLoop) (by assumption)).1, by simp⟩
-  | assign found form declaration targetType bare rhsFound rhsType value remaining ih =>
+  | assign found form declaration targetType profile bare rhsFound rhsType value remaining ih =>
     obtain ⟨_, _, _, head, tail, same⟩ := head_tail_control typed
     have original := form_control_at unique found head
     rw [form] at original

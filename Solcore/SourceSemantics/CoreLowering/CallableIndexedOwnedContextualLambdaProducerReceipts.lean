@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedProducer
 
 /-! The accepted original contextual producer chooses one Site and retains
 its actual binder policy and production recipe. Later static body receipts are indexed by that same
@@ -22,6 +22,7 @@ structure Produced (named : Named) (parameters : List TypedBinder) (result : Typ
   binderPolicy : BinderPolicy named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named site.code
   compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
+  issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named site.code
 
 /-- The policy proof is attached to the same already selected producer Site. -/
 structure ProducedWithPolicy (named : Named) (parameters : List TypedBinder) (result : TypeSystem.Ty)
@@ -36,6 +37,7 @@ structure ProducedWithPolicy (named : Named) (parameters : List TypedBinder) (re
 theorem of_contextual_with_policy
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
     {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
@@ -60,9 +62,9 @@ theorem of_contextual_with_policy
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (ProducedWithPolicy (compiled := compiled) named parameters result body sourceContext evidence
       scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy, _bodyRecipe, policyRecipe⟩ :=
-    CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe
-      compiled.indexed compilation record sourceContext evidence [] profile viewOfSource
+  obtain ⟨site, identifier, emitted, binderPolicy, _bodyRecipe, issuedRecipe, _view, _reason⟩ :=
+    CallableIndexedLambdaGeneration.of_contextual_with_issued_recipe_exact
+      compiled.indexed compilation issued record sourceContext evidence [] profile viewOfSource
       sourceFound sourceForm found form owner requirements coercions ordinary read accepted typed
   let produced : Produced (compiled := compiled) named parameters result body sourceContext evidence
       scope administrative id lowered := {
@@ -70,14 +72,16 @@ theorem of_contextual_with_policy
     identifier := identifier
     emitted := emitted
     binderPolicy := binderPolicy
-    recipe := CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.body_recipe policyRecipe
-    compilerPolicy := policyRecipe }
-  exact ⟨{ produced := produced, policyRecipe := policyRecipe }⟩
+    recipe := issuedRecipe.body_recipe
+    compilerPolicy := issuedRecipe.policy_recipe
+    issuedRecipe := issuedRecipe }
+  exact ⟨{ produced := produced, policyRecipe := issuedRecipe.policy_recipe }⟩
 
 /-- The original producer interface now retains its actual expression policy. -/
 theorem of_contextual
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
     {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
@@ -102,7 +106,7 @@ theorem of_contextual
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (Produced (compiled := compiled) named parameters result body sourceContext evidence
       scope administrative id lowered) := by
-  obtain ⟨produced⟩ := of_contextual_with_policy compilation record sourceContext evidence
+  obtain ⟨produced⟩ := of_contextual_with_policy compilation issued record sourceContext evidence
     profile viewOfSource sourceFound sourceForm found form owner requirements coercions
     ordinary read accepted typed
   exact ⟨produced.produced⟩

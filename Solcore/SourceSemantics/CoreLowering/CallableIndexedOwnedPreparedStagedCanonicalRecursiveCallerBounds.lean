@@ -189,7 +189,7 @@ theorem preserves_reached
         current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds.preserves
+    exact CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds.preserves (semantic := semantic)
       bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
       actualFunctionType observations closurePackets closureSupport namedTerminals
       compiler port calleeCertified sequence size childMeaning
@@ -260,7 +260,7 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds.reflects
+    exact CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds.reflects (semantic := semantic)
       bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
       actualFunctionType observations closurePackets closureSupport namedTerminals
       stageEq compiler port calleeCertified sequence size childMeaning

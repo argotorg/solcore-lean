@@ -25,10 +25,10 @@ structure Binding (policy : SourceCoreLoops.Policy) (source : TypedSource) where
   payload : Ty
   projected : policy.lowerBinder source scope binder = .ok payload
 
-/-- Bare equal writes retain the original declaration type as well as native layout. -/
+/-- Bare value writes retain the original declaration type as well as native layout. -/
 def Assignable (source : TypedSource) (assignment : AssignmentResolution)
     (operator : Solcore.Syntax.ValueAssignOp) : Prop :=
-  operator = .equal ∧ assignment.target.projections = [] ∧
+  (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       binder.scheme.body = assignment.target.type
 
@@ -67,12 +67,12 @@ inductive Items (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator expression
         (LocalLoop.controlType result) tail reasonAt = .ok code) :
       Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignValue assignment operator expression :: rest) code
-  | assigned {fuel scope assignment expression rest tail code}
+  | assigned {fuel scope assignment operator expression rest tail code}
       (remaining : Items policy source site result reasonAt next finalScope finish fuel scope rest tail)
-      (receipt : AcceptedBareAssignmentReceipt.Receipt policy fuel source scope site assignment expression
+      (receipt : AcceptedBareAssignmentReceipt.Receipt policy fuel source scope site assignment operator expression
         (LocalLoop.controlType result) tail reasonAt code)
       (targetType : receipt.binder.scheme.body = assignment.target.type) :
-      Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignValue assignment .equal expression :: rest) code
+      Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignValue assignment operator expression :: rest) code
 
 namespace Items
 variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
@@ -157,7 +157,7 @@ def children {fuel scope items code} (tree : Items policy source site result rea
       ⟨fuel, scope, expression, child, generated⟩ :: remaining.children
   | @Items.discard _ _ _ _ _ _ _ _ fuel scope expression _ _ child generated remaining =>
       ⟨fuel, scope, expression, child, generated⟩ :: remaining.children
-  | @Items.assigned _ _ _ _ _ _ _ _ fuel scope _ expression _ _ _ remaining receipt _ =>
+  | @Items.assigned _ _ _ _ _ _ _ _ fuel scope _ _ expression _ _ _ remaining receipt _ =>
       ⟨fuel, scope, expression, receipt.child, receipt.generated⟩ :: remaining.children
 
 def bindings {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : List (Binding policy source) :=
@@ -198,9 +198,8 @@ theorem refine {values : SourceCoreCompatibleValues.Context}
   | @assigning fuel scope assignment operator expression rest tail code remaining assigned ih =>
     obtain ⟨remaining, ready⟩ := ih
     by_cases supported : Assignable source assignment operator
-    · obtain ⟨equal, bare, type⟩ := supported
-      subst operator
-      obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched bare assigned
+    · obtain ⟨profile, bare, type⟩ := supported
+      obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched profile bare assigned
       exact ⟨.assigned remaining receipt (type receipt.binder receipt.declaration), ready⟩
     · exact ⟨.assigning remaining assigned, supported, ready⟩
   | assigned remaining receipt targetType ih =>

@@ -81,7 +81,7 @@ theorem preserves_both (size : Nat) :
         (fun childSize smaller => (ih childSize smaller).1)
         (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
-          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
@@ -96,7 +96,7 @@ theorem preserves_both (size : Nat) :
         (fun childSize smaller => (ih childSize smaller).1)
         (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
-          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
@@ -133,7 +133,7 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
         (fun childSize smaller => (ih childSize smaller).1)
         (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
-          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
@@ -148,7 +148,7 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
         (fun childSize smaller => (ih childSize smaller).1)
         (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
-          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))

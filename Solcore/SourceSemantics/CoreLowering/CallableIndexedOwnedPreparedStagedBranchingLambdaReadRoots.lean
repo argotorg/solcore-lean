@@ -39,6 +39,7 @@ include provenance receiver wellFormed original in
 /-- Every original read is issued at its real lexical context, including the
 RHS and later reads after a genuine assignment or local allocation. -/
 def support_reads
+    (choiceIssued : choice.Issued code support.caller.named)
     (syntaxTree : GenericImperativeMatch.Syntax function.source (Read function.source)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.BranchingSupport
@@ -64,7 +65,8 @@ def support_reads
     code support.body.toContext support.body.frame choice provenance.body_view provenance.scope_declarations
     sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
-    support.body.valid.ledger support.body.projection syntaxTree
+    support.body.valid.ledger support.body.projection
+    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile) syntaxTree
     (certificates := fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered faults))
     (fun context fields current fuel id node lowered declarations read reached found typed accepted _nativeType _native => by
       obtain ⟨readNode, name, binder, readFound, form⟩ := read
@@ -80,11 +82,11 @@ def support_reads
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
   rw [stages.source selected]
   refine ⟨weakened, ?_⟩
-  intro currentRegistry currentFaults
+  intro currentRegistry
   obtain ⟨tree, sites⟩ := CallableLambdaViewMatchRuntimeCertificates.transport_sites_with
     (LocalView.refl function.source) (by intro id member; cases member)
     support.body.unique (fun _ _ _ => True.intro)
-    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry currentFaults)
+    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry)
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
   exact sites
 
@@ -101,9 +103,9 @@ theorem of_reads
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Packet code stages,
       CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Support
         headers code support.body.toContext stages packet faults) := by
-  obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose
-    code support.caller.named provenance.policy_recipe.body_recipe support.compilation shape child selected
+  obtain ⟨choice, choiceIssued⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose_issued
+    code support.caller.named provenance.issued_recipe support.compilation shape child selected
   exact ⟨⟨.branching choice.packet,
-    support_reads code support provenance receiver wellFormed original choice syntaxTree⟩⟩
+    support_reads code support provenance receiver wellFormed original choice choiceIssued syntaxTree⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaReadRoots

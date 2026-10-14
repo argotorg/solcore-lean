@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
 
-/-! A bare equal assignment follows the authenticated compatible callback.
+/-! A bare value assignment follows the authenticated compatible callback.
 Its actual right-hand action, original binder and emitted place code remain
 attached to the same accepted flow action. -/
 set_option autoImplicit false
@@ -12,19 +12,20 @@ open CompatibleAssignmentStatements (AssignmentPolicy)
 
 structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : TypedSource)
     (scope : SourceCoreLocalCell.Scope) (site : SourceCoreElaboration.ErrorSite)
-    (assignment : AssignmentResolution) (rhs : ExpressionId) (output : Ty) (next : Expr)
+    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) (output : Ty) (next : Expr)
     (reasonAt : ExpressionId → Word) (code : Expr) where
   values : SourceCoreCompatibleValues.Context
   invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
   invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Syntax.ValueAssignOp → Word
   missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
   matched : AssignmentPolicy policy values invalidProjection invalidOperand missing
+  sourceProfile : operator = .equal ∨ assignment.target.type = .word
   bare : assignment.target.projections = []
-  accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment .equal rhs
+  accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator rhs
     output next reasonAt = .ok code
   lowered : lower values values.checked.signatures policy.lowerExpression fuel source scope site
-    assignment .equal (some rhs) output next reasonAt
-    (invalidProjection site assignment.target.root) (invalidOperand site assignment.target.root .equal)
+    assignment operator (some rhs) output next reasonAt
+    (invalidProjection site assignment.target.root) (invalidOperand site assignment.target.root operator)
     (missing site assignment.target.root) = .ok code
   binder : TypedBinder
   declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder
@@ -38,9 +39,10 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   layout : CompatibleBareAssignment.Layout values place
   generated : policy.lowerExpression fuel source scope rhs reasonAt = .ok child
   childType : child.type = place.route.leafType
+  operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments []) child.expression
-    next output (binaryOperator (place.route.leafType = .integer) .equal) false
-    (invalidOperand site assignment.target.root .equal)
+    next output (binaryOperator (place.route.leafType = .integer) operator) false
+    (invalidOperand site assignment.target.root operator)
 
 /-- Callback equality comes from the compiler policy, before its accepted
 action is inverted. No right-hand syntax or execution law is an input. -/
@@ -49,22 +51,24 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
     {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Syntax.ValueAssignOp → Word}
     {missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
     {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
-    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution} {rhs : ExpressionId}
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {output : Ty} {next code : Expr} {reasonAt : ExpressionId → Word}
     (matched : AssignmentPolicy policy values invalidProjection invalidOperand missing)
+    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
     (bare : assignment.target.projections = [])
-    (accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment .equal rhs
+    (accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator rhs
       output next reasonAt = .ok code) :
-    Nonempty (Receipt policy fuel source scope site assignment rhs output next reasonAt code) := by
+    Nonempty (Receipt policy fuel source scope site assignment operator rhs output next reasonAt code) := by
   have lowered : lower values values.checked.signatures policy.lowerExpression fuel source scope site
-      assignment .equal (some rhs) output next reasonAt
-      (invalidProjection site assignment.target.root) (invalidOperand site assignment.target.root .equal)
+      assignment operator (some rhs) output next reasonAt
+      (invalidProjection site assignment.target.root) (invalidOperand site assignment.target.root operator)
       (missing site assignment.target.root) = .ok code := by
-    simpa only [SourceCoreLoops.assignValue, matched.equal] using accepted
+    cases operator <;> simpa only [SourceCoreLoops.assignValue, matched.equal, matched.value] using accepted
   obtain ⟨binder, place, index, child, declaration, rootType, rawType, slot, layout,
-      generated, childType, _operator, emitted⟩ := CompatibleBareAssignment.of_lower bare lowered
-  exact ⟨⟨values, invalidProjection, invalidOperand, missing, matched, bare, accepted, lowered,
+      generated, childType, operatorType, emitted⟩ := CompatibleBareAssignment.of_lower bare lowered
+  exact ⟨⟨values, invalidProjection, invalidOperand, missing, matched, sourceProfile, bare, accepted, lowered,
     binder, declaration, place, index, child, rootType, rawType, slot, layout, generated,
-    childType, emitted⟩⟩
+    childType, operatorType, emitted⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt

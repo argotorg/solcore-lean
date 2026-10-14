@@ -75,7 +75,7 @@ theorem provenance
     OrdinaryAt (code produced environment) (ordinary_support produced body environment) :=
   .recaptured caller produced.site expressionSyntax certificates body produced.binder
     (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation produced.recipe)
-    produced.compilerPolicy bodyView bodyReasons declarations syntaxTree environment callerGlobals callerReceipt
+    produced.compilerPolicy produced.issuedRecipe bodyView bodyReasons declarations syntaxTree environment callerGlobals callerReceipt
 
 /-- The retained compiler recipe survives recapture without an equality cast
 between different Codes or an assumption about a BodyWith expression callback. -/

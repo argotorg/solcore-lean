@@ -91,9 +91,11 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
+variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
 include physical owners bridge profile compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   dispatch selected count accepted wellFormed runtime covers locals calleeHeapTyped typing calleeTyped
-  actualFunctionType calleeRelated represented bundle originalResult in
+  actualFunctionType calleeRelated represented bundle originalResult semantic in
 /-- The genuine argument endpoint feeds the actual closure application once.
 Its native suffix and original three binds complete the whole parent. -/
 theorem preserves_parent
@@ -151,7 +153,7 @@ theorem preserves_parent
   obtain ⟨association⟩ := member
   obtain ⟨value, finalStore, finalMap, finalWorld, application, resultRep, finalHeaps,
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
-    CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds.application_preserves
+    CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds.application_preserves (semantic := semantic)
       profile association (packets association) (supported association) (bridge.pool reached)
       raw parameters heaps physical owners admitted.rows runtime budget children called within
   have suffix := CallableIndexedOwnedPreparedStagedIndirectApplicationSuffix.preserves_suffix
@@ -203,7 +205,7 @@ theorem preserves_parent
 
 include physical owners bridge profile compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   dispatch selected count accepted wellFormed runtime covers locals calleeHeapTyped typing calleeTyped
-  actualFunctionType calleeRelated represented bundle originalResult in
+  actualFunctionType calleeRelated represented bundle originalResult semantic in
 /-- The concrete selected closure suffix constructs the original applied
 parent. Both numeric grades and every transient reached effect are retained. -/
 theorem reflects_suffix
@@ -255,7 +257,7 @@ theorem reflects_suffix
       selected dispatch.found count suffix within
   obtain ⟨applicationSourceSize, outcome, after, finalMap, finalWorld, applied, resultRep, finalHeaps,
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
-    CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds.application_reflects
+    CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds.application_reflects (semantic := semantic)
       profile association (packets association) (supported association) (bridge.pool reached)
       raw parameters heaps physical owners admitted.rows runtime valid budget children application (Nat.le_of_lt strict)
   obtain ⟨returned, samePool, callerRelated⟩ := bridge.restore reached ownedReturned

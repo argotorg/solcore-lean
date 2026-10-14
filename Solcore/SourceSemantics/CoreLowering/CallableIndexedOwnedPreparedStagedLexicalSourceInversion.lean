@@ -48,7 +48,7 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | matchBreaking actual same _ | matchContinuing actual same _
-  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -99,7 +99,7 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | matchBreaking actual same _ | matchContinuing actual same _
-  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -143,7 +143,7 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | matchBreaking actual same _ | matchContinuing actual same _
-  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible

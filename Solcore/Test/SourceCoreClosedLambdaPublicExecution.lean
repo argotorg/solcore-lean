@@ -210,6 +210,7 @@ theorem CompiledFixture.source_wellFormed (fixture : CompiledFixture) :
 
 structure ActualHeader (fixture : CompiledFixture) (row : SourceSpecialization.SpecializedFunction) where
   prepared : CoreLowering.RecursiveNamedPublicSpecializationMeaning.Prepared fixture.recipe.compiled row
+  diagnostic : CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared
   header : CoreLowering.CallableIndexedOwnedFunctionValues.Header fixture.recipe.compiled
     (Program.ofChecked fixture.recipe.compiled.sourceProgram)
   aligned : CoreLowering.RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared
@@ -225,6 +226,7 @@ theorem ActualHeader.terminal {fixture : CompiledFixture} {row : SourceSpecializ
     (found : row.function.typedBody.lookupStatement? statement.id = some statement)
     (form : statement.form = .returnStmt (some expression)) :
     ∃ terminal : CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal actual.header,
+      CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared ∧
       terminal.expression = expression ∧ terminal.certificate =
         CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point
           (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
@@ -259,7 +261,7 @@ theorem ActualHeader.terminal {fixture : CompiledFixture} {row : SourceSpecializ
       intro child generated
       have same : child = receipt.child := Except.ok.inj (generated.symm.trans receipt.generated)
       exact ⟨rfl, rfl, same⟩ }
-  exact ⟨terminal, rfl, rfl⟩
+  exact ⟨terminal, actual.diagnostic, rfl, rfl⟩
 
 
 /-- Finite, executable checks of the same actual compiled row. None is an
@@ -471,6 +473,7 @@ theorem ObservedStages.inventory {fixture : CompiledFixture} {observed : Observe
   obtain ⟨packet⟩ := CallableIndexedOwnedPreparedFiniteNamedInventories.issue fixture.source_wellFormed input
   let actual : ActualHeader fixture observed.row := {
     prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued prepared packet.selected
+    diagnostic := ⟨⟨packet.selected.diagnostics, packet.selected.found, rfl⟩⟩
     header := packet.header
     aligned := by simpa only [input, metadata] using packet.aligned }
   exact ⟨input, rfl, packet, actual, rfl⟩
@@ -542,6 +545,7 @@ theorem ActualHeader.source {fixture : CompiledFixture} {row : SourceSpecializat
 theorem ActualHeader.formation {fixture : CompiledFixture} {observed : ObservedFactory fixture}
     (stages : ObservedStages fixture observed) (actual : ActualHeader fixture observed.row)
     (terminal : CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal actual.header)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     (expression : terminal.expression = observed.expression.id)
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} :
     Nonempty (CallableIndexedOwnedContextualLambdaFormationReceipts.OrdinaryFormation
@@ -550,7 +554,7 @@ theorem ActualHeader.formation {fixture : CompiledFixture} {observed : ObservedF
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child) := by
   apply CallableIndexedOwnedPreparedNamedEmptyLambdaFormation.of_terminal terminal
-    fixture.source_wellFormed observed.profile (stages.selected actual)
+    fixture.source_wellFormed observed.profile diagnostic (stages.selected actual)
     observed.entryMember observed.noNativeInputs
     (node := observed.expression) (reported := observed.reported)
   · rw [actual.source, expression]; exact observed.foundExpression
@@ -564,6 +568,7 @@ theorem ActualHeader.formation {fixture : CompiledFixture} {observed : ObservedF
 theorem ActualHeader.support {fixture : CompiledFixture} {observed : ObservedFactory fixture}
     (stages : ObservedStages fixture observed) (actual : ActualHeader fixture observed.row)
     (terminal : CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal actual.header)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     (expression : terminal.expression = observed.expression.id)
     (point : terminal.certificate = CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
@@ -572,7 +577,7 @@ theorem ActualHeader.support {fixture : CompiledFixture} {observed : ObservedFac
     Nonempty (CallableIndexedOwnedPreparedStagedNamedBodySupport.Support
       [actual.header] (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
       registry actual.header stages.registry terminal faults) := by
-  obtain ⟨formation⟩ := actual.formation stages terminal expression
+  obtain ⟨formation⟩ := actual.formation stages terminal diagnostic expression
   exact ⟨.formation (CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.of_actual
     [actual.header] (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
     registry actual.header stages.registry terminal faults point (actual.complete stages)
@@ -742,9 +747,9 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
     fixture.recipe.compiled.indexed.ancestry.graph.inputs.callableSelected
   let registry := receiver.completion.result.context.registry
   let faults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics
-  obtain ⟨terminal, expression, point⟩ := actual.terminal observed.expression.id observed.statement
+  obtain ⟨terminal, diagnostic, expression, point⟩ := actual.terminal observed.expression.id observed.statement
     observed.roots observed.foundStatement observed.returnStatement
-  obtain ⟨support⟩ := actual.support stages terminal expression point (registry := registry) (faults := faults)
+  obtain ⟨support⟩ := actual.support stages terminal diagnostic expression point (registry := registry) (faults := faults)
   let terminals : ∀ header, header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows →
       CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal header := fun header member => by
     have same : header = actual.header := by simpa only [headerList, List.mem_singleton] using member

@@ -167,7 +167,7 @@ theorem preserves_with_methods (size : Nat) :
         CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
           (headers := headers) (keys := keys) header model stages child callFaults size := by
       intro size within header member child selected
-      exact SelectedCompilationPhysicalNamedBodySupport.preserves
+      exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
         (bodySupport header member) profile (certificates header member) extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     cases root.support with
@@ -197,7 +197,7 @@ theorem preserves_with_methods (size : Nat) :
           have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
             simpa only [sourceAtEq] using argumentsTyped
           simpa only [sourceAtEq] using
-            SelectedCompilationMethodBodyBounds.source_continuation
+            SelectedCompilationMethodBodyBounds.source_continuation (semantic := semantic)
               port.principal packet static certified functions selected installed owner keyPhysical caller
               heapTyped packetArguments stable extension size
               (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
@@ -219,7 +219,7 @@ theorem preserves_with_methods (size : Nat) :
             current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
         intro actualScope actualId actualCode point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact SelectedCompilationPhysicalIndirectHeadBounds.preserves
+        exact SelectedCompilationPhysicalIndirectHeadBounds.preserves (semantic := semantic)
           callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
           bodyTyping certificates support.runtime support.unique support.actualFunctionType
           observations closurePackets closureSupport bodies
@@ -234,7 +234,7 @@ theorem preserves_with_methods (size : Nat) :
       have rawMeaning := SelectedCompilationPhysicalCoercedDirectRawBounds.preserves
         support bodyTyping.function_ids owner keyPhysical functions callFaults
         budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
-      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.source_bodies
+      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.source_bodies (semantic := semantic)
         owner keyPhysical functions callFaults extension support.chain support.methods budget ih
       intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -263,7 +263,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
         CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
           (headers := headers) (keys := keys) header model (RecursiveNamedPreparedStageScopes.registry stagePrepared) child callFaults size := by
       intro size within header member child selected
-      exact SelectedCompilationPhysicalNamedBodySupport.reflects
+      exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
         (bodySupport header member) profile (certificates header member) extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     cases root.support with
@@ -294,7 +294,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
           have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
             simpa only [sourceAtEq] using argumentsTyped
           simpa only [sourceAtEq] using
-            SelectedCompilationMethodBodyBounds.native_continuation
+            SelectedCompilationMethodBodyBounds.native_continuation (semantic := semantic)
               port.principal packet static certified functions selected installed owner keyPhysical caller
               heapTyped packetArguments stable extension size
               (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
@@ -316,7 +316,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
             current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
         intro actualScope actualId actualCode point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact SelectedCompilationPhysicalIndirectHeadBounds.reflects
+        exact SelectedCompilationPhysicalIndirectHeadBounds.reflects (semantic := semantic)
           callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
           bodyTyping certificates support.runtime support.unique support.actualFunctionType
           observations closurePackets closureSupport bodies
@@ -333,7 +333,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
         support owner keyPhysical functions callFaults
         stagePrepared rfl descriptor
         budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
-      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.native_bodies
+      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.native_bodies (semantic := semantic)
         owner keyPhysical functions callFaults extension support.chain support.methods budget ih
       intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point

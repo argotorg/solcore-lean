@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeJointBodyCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLambdaBodyNativeInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrincipalCompilerChildren
@@ -108,6 +109,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {named : Named}
 /-- The exact chosen Site carries static Source/issuance inputs. Its body
 native typing is derived from site.code.typed by literal wrapper inversion. -/
 structure SiteShell where
+  issuedCompilation : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics
   issued : IssuedSource compiled site.code.compilation.owner (source named)
   diagnosticPolicy : AssignmentDiagnosticPolicy
   entry : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) site.code

@@ -123,8 +123,8 @@ private theorem header_assigned {source : TypedSource} {context : SourceSemantic
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .forLoop observed.shape.loopFound observed.shape.loopForm (.initialized .nil)
-    (.assign observed.shape.postBare .nil)
-    (.assign observed.shape.assignmentFound observed.shape.assignmentForm observed.shape.targetBare .nil)
+    (.assign (.inl rfl) observed.shape.postBare .nil)
+    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
     (.returnValue [] observed.shape.statementFound observed.shape.statementForm)
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=

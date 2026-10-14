@@ -40,8 +40,11 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (argumentsTyped : Dynamic.ValuesHaveTypes principal.sourceFunction.context before arguments packet.sourceAt.types)
   (stable : CallableIndexedOwnedIndirectExpressionHeads.StableRows caller)
 
+
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
-include support certified selected keyPhysical beforeTyped argumentsTyped stable in
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -61,11 +64,11 @@ theorem source_continuation
         children size smaller
           (SelectedCompilationMixedRootSupport.RootAt.ofMethod root) owner physical)
   | «scoped» packet =>
-    exact SelectedCompilationMethodScopedBounds.source_continuation
+    exact SelectedCompilationMethodScopedBounds.source_continuation (semantic := semantic)
       principal packet support certified functions selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children
 
-include support certified selected keyPhysical beforeTyped argumentsTyped stable in
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
 theorem native_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -85,7 +88,7 @@ theorem native_continuation
         children size smaller
           (SelectedCompilationMixedRootSupport.RootAt.ofMethod root) owner physical)
   | «scoped» packet =>
-    exact SelectedCompilationMethodScopedBounds.native_continuation
+    exact SelectedCompilationMethodScopedBounds.native_continuation (semantic := semantic)
       principal packet support certified functions selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children
 

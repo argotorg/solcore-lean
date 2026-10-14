@@ -40,7 +40,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include keyPhysical extension support in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include keyPhysical extension support semantic in
 theorem lift_bodies (budget : Nat)
     (children : ∀ size, size < budget → LiftsRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults size)
@@ -59,7 +61,7 @@ theorem lift_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [SelectedCompilationMethodBodies.Packet.sourceAt, sourceAt] using
-        SelectedCompilationStageMethodBodyLifting.source_continuation
+        SelectedCompilationStageMethodBodyLifting.source_continuation (semantic := semantic)
           port.principal (.terminal packet) static certified functions selected installed
           owner keyPhysical caller heapTyped packetArguments stable extension budget children preservation
 

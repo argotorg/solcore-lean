@@ -66,7 +66,7 @@ theorem preserves_with_methods
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves (semantic := semantic)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves_with_methods
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
@@ -79,7 +79,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects (semantic := semantic)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects_with_methods
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
@@ -92,7 +92,7 @@ theorem preserves_with_bodies
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves (semantic := semantic)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves_with_bodies
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
@@ -105,7 +105,7 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects (semantic := semantic)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects_with_bodies
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport

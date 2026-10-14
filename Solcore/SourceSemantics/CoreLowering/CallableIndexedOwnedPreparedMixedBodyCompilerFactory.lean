@@ -146,6 +146,9 @@ structure DomainAt (expressionSyntax : TypedSource → ExpressionId → Prop)
     (scope : SourceCoreLocalCell.Scope)
     (headers : RecursiveNamedCatalog.Inventory compiled.indexed.ancestry (.initial compiled.compatible.checked)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions (Program.ofChecked compiled.sourceProgram)) : Prop where
+  issued : ∀ id node parameters result statements, (expressionSyntax (source caller.named)) id →
+    (source caller.named).lookupExpression? id = some node → node.form = .lambda parameters result statements →
+    CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics
   namedLedger : (context compiled.indexed caller.named).solvedRequirements = caller.solved
   admission : AdmissionWith extraForm extraChildren (source caller.named) (expressionSyntax (source caller.named))
   coverage : ReachedCoverage headers (context compiled.indexed caller.named) (source caller.named)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
@@ -83,6 +84,7 @@ structure Produced (compiled : SourceCoreUnifiedCompilation.Compiled)
     compiled.indexed.base.locals named.signature.key []
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation site.code
   compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
+  issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named site.code
   callback : site.code.lowerBody
       (FunctionCode.children site.code.policy site.code.lowerBody site.code.fuel site.code.compilation) =
     SourceCoreLoops.lowerStatementsWithPolicy
@@ -94,6 +96,7 @@ recipe. In particular, the callback field is constructed from compiler success. 
 theorem of_contextual {compiled : SourceCoreUnifiedCompilation.Compiled}
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
     {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
@@ -119,9 +122,9 @@ theorem of_contextual {compiled : SourceCoreUnifiedCompilation.Compiled}
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (Produced compiled named diagnostics namedCode compilation parameters result statements
       sourceContext evidence captured scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binder, recipe, compilerPolicy⟩ :=
-    CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe compiled.indexed
-      compilation record sourceContext evidence captured profile viewOfSource sourceFound sourceForm
+  obtain ⟨site, identifier, emitted, binder, recipe, issuedRecipe, _view, _reason⟩ :=
+    CallableIndexedLambdaGeneration.of_contextual_with_issued_recipe_exact compiled.indexed
+      compilation issued record sourceContext evidence captured profile viewOfSource sourceFound sourceForm
       found form owner requirements coercions ordinary read accepted typed
   refine ⟨{
     site := site
@@ -129,7 +132,8 @@ theorem of_contextual {compiled : SourceCoreUnifiedCompilation.Compiled}
     emitted := emitted
     binder := binder
     recipe := recipe
-    compilerPolicy := compilerPolicy
+    compilerPolicy := issuedRecipe.policy_recipe
+    issuedRecipe := issuedRecipe
     callback := ?_ }⟩
   have applied := congrArg
     (fun body : SourceCoreFunctions.BodyLowerer =>

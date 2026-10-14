@@ -62,6 +62,10 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
   completion.result.diagnostics
 
+variable (semantic : ∀ reason token, semanticFaults reason token →
+  CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
+
 
 variable (sourceParent : CallableIndexedOwnedIndirectSourceAdapters.SourceParent compiler)
   (occurrence : Staging.Recursive.Occurrence invocation id (.call callee ids (.indirect metadata)))
@@ -82,7 +86,7 @@ variable (sourceParent : CallableIndexedOwnedIndirectSourceAdapters.SourceParent
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
 
 include physical owners sourceParent occurrence preparedStages receiver runtime sourceEq tree unique
-  parentTyped calleeFound guardFrame actualFunctionType in
+  parentTyped calleeFound guardFrame actualFunctionType semantic in
 /-- Authentic Source application and prefix witnesses construct the original
 closure parent. Physical count rejection keeps the reached argument heap and
 literal receiving arity word; success preserves the actual selected body once. -/
@@ -160,7 +164,7 @@ theorem preserves_closure_or_global
           change GenericHeap.PayloadModel.Represents model finalMap finalWorld
             (.function rawParameter rawResult) (.closure function) carrier compiler.calleeCode.type
           simpa only [functionType] using calleeRelated
-        exact .inl (SelectedCompilationPhysicalClosureParentBounds.preserves_parent
+        exact .inl (SelectedCompilationPhysicalClosureParentBounds.preserves_parent (semantic := semantic)
           bridge profile compiler prepared sourceParent occurrence initial reached related admitted
           heaps (physical reached) owners maps worlds frame heapMetadata dispatch selected count accepted sourceValuesTyped argumentMetadata runtime rawCallee actualFunctionType relatedCallee
           represented bundle originalResult packets supported budget bodyChildren calleeTrace argumentsTrace called within
@@ -212,7 +216,7 @@ theorem preserves_closure_or_global
           · simpa only [physical, valuesCount] using faultRep
 
 
-include physical owners sourceParent occurrence preparedStages receiver runtime sourceEq tree unique parentTyped calleeFound actualFunctionType in
+include physical owners sourceParent occurrence preparedStages receiver runtime sourceEq tree unique parentTyped calleeFound actualFunctionType semantic in
 /-- User classification and physical arity happen inside the actual retained
 prefix. The closure branch constructs full parent meaning; only the literal
 global application remains for the separate named producer. -/
@@ -280,7 +284,7 @@ theorem reflects_closure_or_global
           simpa only [functionType] using calleeRelated
         obtain ⟨sourceSize, outcome, after, returnedMap, returnedWorld, trace, resultRep, returnedHeaps,
           returnedMaps, returnedWorlds, returnedFrame, returnedMetadata, returned, returnedRelated, returnedPost⟩ :=
-          SelectedCompilationPhysicalClosureParentBounds.reflects_suffix
+          SelectedCompilationPhysicalClosureParentBounds.reflects_suffix (semantic := semantic)
             bridge profile compiler prepared sourceParent occurrence initial reached related admitted
             heaps (physical reached) owners maps worlds frame heapMetadata dispatch selected same accepted sourceValuesTyped argumentMetadata runtime rawCallee actualFunctionType relatedCallee
             represented bundle originalResult packets supported budget bodyChildren calleeTrace argumentsTrace suffix

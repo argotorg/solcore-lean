@@ -20,14 +20,19 @@ theorem ActualHeader.formation {fixture : CompiledFixture} {observed : ObservedF
     (terminal : CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal actual.header)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     (expression : terminal.expression = observed.expression.id)
-    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} :
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token, CallableIndexedOwnedPublicDecodedCallFaults.faults
+      completion.result.diagnostics reason token → faults reason token) :
     Nonempty (CallableIndexedOwnedContextualLambdaFormationReceipts.OrdinaryFormation
       (registry := registry) (faults := faults) actual.header actual.header.context
       actual.header.function.evidence
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child) := by
   apply CallableIndexedOwnedPreparedNamedBranchingBodyLambdaFormation.of_terminal terminal
-    fixture.recipePrepared diagnostic fixture.source_wellFormed observed.profile (stages.selected actual)
+    fixture.recipePrepared diagnostic receiver included fixture.source_wellFormed observed.profile (stages.selected actual)
     observed.entryMember
     (node := observed.expression) (reported := observed.reported)
   · rw [actual.source, expression]; exact observed.foundExpression
@@ -51,11 +56,16 @@ theorem ActualHeader.support {fixture : CompiledFixture} {observed : ObservedFac
     (point : terminal.certificate = CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child)
-    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} :
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token, CallableIndexedOwnedPublicDecodedCallFaults.faults
+      completion.result.diagnostics reason token → faults reason token) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedBodySupport.Support
       [actual.header] (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
       registry actual.header stages.registry terminal faults) := by
-  obtain ⟨formation⟩ := actual.formation stages terminal diagnostic expression
+  obtain ⟨formation⟩ := actual.formation stages terminal diagnostic expression receiver included
   exact ⟨.formation (CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.of_actual
     [actual.header] (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
     registry actual.header stages.registry terminal faults point (actual.complete stages)
@@ -136,7 +146,7 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedFactory 
   let faults := CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
   obtain ⟨terminal, diagnostic, expression, point⟩ := actual.terminal observed.expression.id observed.statement
     observed.roots observed.foundStatement observed.returnStatement
-  obtain ⟨support⟩ := actual.support stages terminal diagnostic expression point (registry := registry) (faults := faults)
+  obtain ⟨support⟩ := actual.support stages terminal diagnostic expression point receiver (fun _ _ proof => proof) (registry := registry) (faults := faults)
   let terminals : ∀ header, header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows →
       CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal header := fun header member => by
     have same : header = actual.header := by simpa only [headerList, List.mem_singleton] using member

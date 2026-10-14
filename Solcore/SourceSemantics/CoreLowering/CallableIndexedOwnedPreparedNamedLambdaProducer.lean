@@ -1,4 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaExactProducer
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProducerReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
 
@@ -55,6 +56,7 @@ The complete compiler policy is retained before any later recapture. -/
 theorem of_terminal
     (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     {node : ExpressionNode} {reported : Ty}
@@ -96,9 +98,9 @@ theorem of_terminal
   have record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan
       terminal.prepared.named.signature.key = .ok terminal.prepared.named.specialized := by
     simpa only [terminal.aligned.named] using CallableIndexedActualNamedSourceReceipts.header_record compiled header
-  obtain ⟨site, identifier, emitted, binderPolicy, _bodyRecipe, policyRecipe, view, reasonAt⟩ :=
-    CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe_exact compiled.indexed
-      terminal.prepared.compilation record header.context header.function.evidence [] profile
+  obtain ⟨site, identifier, emitted, binderPolicy, _bodyRecipe, issuedRecipe, view, reasonAt⟩ :=
+    CallableIndexedLambdaGeneration.of_contextual_with_issued_recipe_exact compiled.indexed
+      terminal.prepared.compilation (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared terminal.prepared diagnostic) record header.context header.function.evidence [] profile
       (by rw [← sourceEq]; exact LambdaMetadataViews.MetadataView.refl _)
       (by simpa only [← sourceEq] using found) form found rfl owner requirements coercions ordinary read
       (by simpa only [fuelEq] using accepted) (native_child terminal prepared member)
@@ -110,8 +112,9 @@ theorem of_terminal
     identifier := identifier
     emitted := emitted
     binderPolicy := binderPolicy
-    recipe := policyRecipe.body_recipe
-    compilerPolicy := policyRecipe }
+    recipe := issuedRecipe.body_recipe
+    compilerPolicy := issuedRecipe.policy_recipe
+    issuedRecipe := issuedRecipe }
   have actual : ∃ produced : Produced (compiled := compiled) terminal.prepared.named parameters result statements header.context header.function.evidence
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)

@@ -89,6 +89,9 @@ local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.brid
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
   completion.result.diagnostics
 
+variable (semantic : ∀ reason token, semanticFaults reason token →
+  CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+
 
 variable (bodyTyping : SelectedCompilationBodyTyping.Bodies compiled)
   (certificates : ∀ header, header ∈ headers → SelectedCompilationNamedSourceTyping.Certified header)
@@ -101,7 +104,7 @@ variable (bodyTyping : SelectedCompilationBodyTyping.Bodies compiled)
 
 include physical owners receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped bodyTyping certificates runtime actualFunctionType observations in
+  sourceParent tree unique parentTyped bodyTyping certificates runtime actualFunctionType observations semantic in
 /-- One original native completion gives full staged Source parent meaning,
 including the actual named global branch and restored caller post. -/
 theorem reflects_parent
@@ -133,7 +136,7 @@ theorem reflects_parent
     ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore := by
-  rcases SelectedCompilationPhysicalIndirectDispatch.reflects_parent_or_global
+  rcases SelectedCompilationPhysicalIndirectDispatch.reflects_parent_or_global (semantic := semantic)
       bridge physical owners receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped runtime actualFunctionType observations
@@ -146,7 +149,7 @@ theorem reflects_parent
 
 include physical owners receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped bodyTyping certificates runtime actualFunctionType observations in
+  sourceParent tree unique parentTyped bodyTyping certificates runtime actualFunctionType observations semantic in
 /-- One original staged Source parent constructs its native completion and
 full caller post. The authentic named branch uses its actual strict application
 child; Source and native grades remain independent. -/
@@ -176,7 +179,7 @@ theorem preserves_parent (budget : Nat)
     ParentAt (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial size outcome after := by
-  rcases SelectedCompilationPhysicalIndirectDispatch.preserves_parent_or_global
+  rcases SelectedCompilationPhysicalIndirectDispatch.preserves_parent_or_global (semantic := semantic)
       bridge physical owners receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped runtime actualFunctionType observations

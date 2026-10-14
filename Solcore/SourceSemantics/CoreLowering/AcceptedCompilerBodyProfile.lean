@@ -65,13 +65,13 @@ private def allProof? {α : Type} (predicate : α → Prop)
 
 def assignment? (source : TypedSource) (assignment : AssignmentResolution)
     (operator : Solcore.Syntax.ValueAssignOp) : Option (PLift (Assignable source assignment operator)) := do
-  if equal : operator = .equal then
+  if profile : operator = .equal ∨ assignment.target.type = .word then
     if bare : assignment.target.projections = [] then
       match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
       | .error _ => none
       | .ok binder =>
         if typed : binder.scheme.body = assignment.target.type then
-          some ⟨⟨equal, bare, by
+          some ⟨⟨profile, bare, by
             intro actual accepted
             cases Except.ok.inj (found.symm.trans accepted)
             exact typed⟩⟩

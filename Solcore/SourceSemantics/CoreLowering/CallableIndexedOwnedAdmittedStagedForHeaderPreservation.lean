@@ -91,6 +91,10 @@ theorem preserves_at {budget : Nat}
       invocation.source (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items code)
+    {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : tree.ErrorsFor diagnosticPolicy catalogRegistry catalogFaults)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (shape : ItemShape items)
     (sourceTyped : CallableIndexedOwnedPreparedStagedForItemsTyping.Facts invocation.source control context items)
     {size : Nat} (within : size ≤ budget)
@@ -120,7 +124,7 @@ theorem preserves_at {budget : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ Post bridge context expected (restoredOutcome environment outcome) reached := by
-  induction tree generalizing size mapping world actualContext environment canonical actual before
+  induction catalogSites generalizing size mapping world actualContext environment canonical actual before
       store ξ contextLocation native finalContext outcome after with
   | @nil context scope code next =>
       obtain ⟨rfl, rfl, rfl⟩ := CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.empty trace
@@ -130,7 +134,7 @@ theorem preserves_at {budget : Nat}
       exact ⟨_, store, mapping, world, LocalLoop.fallthrough_evaluates type actual store,
         .fallthrough environment (.inl rfl), heaps, .refl _, .refl _, .refl _ _, .refl _,
         initial, callerProtocol.refl initial, admitted⟩
-  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same tail ih =>
+  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same tail tailSites ih =>
       have tailShape := shape.let_tail
       obtain ⟨tailSize, location, bound, sameSize, allocated, remainingTrace⟩ :=
         CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.absent extended trace
@@ -157,7 +161,7 @@ theorem preserves_at {budget : Nat}
             (id := binder.id) (type := payload) (value := .cellRef (OptionalCell.cellType payload) (store.length + 2)) tailState)), ?_⟩
       exact post_environment bridge (restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
         (type := payload) (value := .cellRef (OptionalCell.cellType payload) (store.length + 2)) tailState post)
-  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary initialFound sourceType child allocation annotation same remaining ih =>
+  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary initialFound sourceType child allocation annotation same remaining tailSites ih =>
       have tailShape := shape.let_tail
       obtain ⟨typedNode, typedFound, typed, certified⟩ := child
       have nodeEq := Option.some.inj (initialFound.symm.trans typedFound)
@@ -216,7 +220,7 @@ theorem preserves_at {budget : Nat}
                   (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState))), ?_⟩
             exact post_environment bridge (restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
               (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState post)
-  | @discard context scope expression expressionNode rest lowered body expressionFound child remaining ih =>
+  | @discard context scope expression expressionNode rest lowered body expressionFound child remaining tailSites ih =>
       have tailShape := shape.discard_tail
       obtain ⟨typedNode, typedFound, typed, certified⟩ := child
       have same := Option.some.inj (expressionFound.symm.trans typedFound)
@@ -258,8 +262,12 @@ theorem preserves_at {budget : Nat}
             exact ⟨value, finalStore, finalMap, finalWorld, LocalSequence.discard_success _ first second,
               related, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans preservation,
               firstMetadata.trans metadata, reached, callerProtocol.trans expressionRelated tailRelated, post⟩
-  | @assign context scope assignment operator rhs rest body head remaining ih =>
-      obtain ⟨rfl, bare, tailShape⟩ := shape.assign_tail
+  | @assign context scope assignment operator rhs rest body head remaining tailSites headErrors ih =>
+      have invalidToken : AssignmentOperandDiagnostics.OperandsLaw
+          (fun reason token => faults (.semantic reason) token) operator head.invalid := by
+        intro previous right invalid
+        exact semantic _ _ ((GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors).operands previous right invalid)
+      obtain ⟨_profile, bare, tailShape⟩ := shape.assign_tail
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults size := by
@@ -273,6 +281,8 @@ theorem preserves_at {budget : Nat}
         functions extension head bare environments heaps locals agrees
       rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot trace with
         ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
+        ⟨childSize, right, currentCell, initialValue, selected, sameSize, contextEq, outcomeEq,
+          childTrace, _currentRead, _rootType, _initialized, _path, invalidOperands⟩ |
         ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
       · subst finalContext
         subst outcome
@@ -288,6 +298,21 @@ theorem preserves_at {budget : Nat}
             (typedChildren childSize childStrict) childTrace body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
           preservation, metadata, reached, related, fault_post bridge reached stable⟩
+      · subst finalContext
+        subst outcome
+        have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+          rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, stable⟩ :=
+          CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_operands
+            (compiled := compiled) (values := .initial compiled.compatible.checked)
+            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+            (context := context) (scope := scope) (administrative := administrative)
+            bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+            (typedChildren childSize childStrict) snapshot invalidOperands childTrace body (LocalLoop.controlType type) invalidToken
+        exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+          preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
       · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
           rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
         have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -313,6 +338,6 @@ theorem preserves_at {budget : Nat}
         exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
           maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
           last, callerProtocol.trans related lastRelated, post⟩
-  | bitNot head remaining ih => cases shape
+  | bitNot remainingErrors headErrors ih => cases shape
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeaderPreservation

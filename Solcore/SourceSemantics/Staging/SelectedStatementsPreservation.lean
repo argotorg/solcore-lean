@@ -58,7 +58,7 @@ theorem statements_step (size : Nat)
               exact resultEq ▸ post.value_typed _ rfl
   | assignBareUnbound | assignBareDangling => exact fault_statements heap (.refl _)
   | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
-      id rest node assignment rhs value target updated outcome contains form snapshot child write next =>
+      id rest node assignment operator rhs value target updated outcome contains form snapshot child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
@@ -74,7 +74,16 @@ theorem statements_step (size : Nat)
                 cases controlTyped
                 rfl
               exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
-          | wordCompound operator _ _ _ => cases operator
+          | wordCompound kind targetTyped rhsTyped _ =>
+              have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound kind locals heap targetTyped snapshot first write
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono writtenExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
   | @returnFault childSize mode scope context environment before after id rest node expression failure contains form child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -92,7 +101,7 @@ theorem statements_step (size : Nat)
           have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap expressionTyped child
           exact fault_statements post.heap_typed post.heap_extends
-  | @assignBareFault childSize mode scope context environment before after id rest node assignment rhs target failure
+  | @assignBareFault childSize mode scope context environment before after id rest node assignment operator rhs target failure
       contains form _snapshot child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -103,7 +112,21 @@ theorem statements_step (size : Nat)
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
               exact fault_statements post.heap_typed post.heap_extends
-          | wordCompound operator _ _ _ => cases operator
+          | wordCompound _ _ rhsTyped _ =>
+              have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap rhsTyped child
+              exact fault_statements post.heap_typed post.heap_extends
+  | @assignBareOperands childSize mode scope context environment before after id rest node assignment operator rhs
+      target right currentCell initial currentSelected contains form _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, _completeTail, _fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+              have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap rhsTyped child
+              exact fault_statements post.heap_typed post.heap_extends
   | @letFault childSize mode scope context environment before after id rest node binder expression failure
       contains form monomorphic child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed

@@ -110,6 +110,7 @@ theorem ordinary_prepared {headers : List (Header compiled (Program.ofChecked co
           rw [← receipt.policy] at policy
           exact CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes _
             (receipt.lowerBody.trans root.selected.recipe) policy receipt.site.compilation)
+        (receipt.issued_recipe root expressionSyntax certificate)
         (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_eq receipt.view) bodyReasons declarations environment
 
 theorem principal_prepared
@@ -128,6 +129,7 @@ theorem principal_prepared
           rw [← receipt.policy] at policy
           exact CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes _
             (receipt.lowerBody.trans root.selected.recipe) policy receipt.site.compilation)
+        (receipt.issued_recipe root expressionSyntax certificate)
         (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_eq receipt.view) environment
 
 section Occurrence

@@ -36,12 +36,15 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {receiving : SourceCoreRawMetadata.Registry} {faults : RecursiveStageMeaning.FaultRep}
   {invocation : Staging.Recursive.Scope} (selected : stages.Closure header.function invocation)
 
+
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 local notation "physicalBridge" =>
   CallableIndexedOwnedNamedCallerProtocol.Carrier.forgetSlots
     (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) 1)
 
-include support globals selected in
+include support globals selected semantic in
 /-- The original named body enters the same protected lexical engine and
 returns the exact reached pool, including cells captured by its result. -/
 theorem preserves
@@ -88,7 +91,7 @@ theorem preserves
   obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
   rw [layouts] at collected
   have tree := collected.tree
-  have catalogSites := collected.sites receiving semanticFaults
+  have catalogSites := collected.sites receiving
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -126,7 +129,7 @@ theorem preserves
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
       (by rw [stages.source selected]; exact header.unique)
-      tree catalogSites rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
+      tree catalogSites semantic rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function
@@ -148,7 +151,7 @@ theorem preserves
       | semantic => exact ⟨post.rows, post.successful⟩
       | stage => exact post
 
-include support globals selected in
+include support globals selected semantic in
 /-- Native completion is inverted through its real flow prefix and footer;
 no selected final Source context is assumed. -/
 theorem reflects
@@ -195,7 +198,7 @@ theorem reflects
   obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
   rw [layouts] at collected
   have tree := collected.tree
-  have catalogSites := collected.sites receiving semanticFaults
+  have catalogSites := collected.sites receiving
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -240,7 +243,7 @@ theorem reflects
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      graph tree catalogSites rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
+      graph tree catalogSites semantic rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function

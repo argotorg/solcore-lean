@@ -7,7 +7,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 open Core Frontend SourceInference
 
-/-- The staged header fragment uses genuine lexical items and bare plain writes. -/
+/-- The staged header fragment uses genuine lexical items and bare equal or raw Word compound writes. -/
 inductive ItemShape : List ForItemForm → Prop where
   | nil : ItemShape []
   | absent {binder rest} (remaining : ItemShape rest) :
@@ -16,8 +16,9 @@ inductive ItemShape : List ForItemForm → Prop where
       ItemShape (.letDecl binder (some expression) :: rest)
   | discard {expression rest} (remaining : ItemShape rest) :
       ItemShape (.expression expression :: rest)
-  | assign {assignment rhs rest} (bare : assignment.target.projections = [])
-      (remaining : ItemShape rest) : ItemShape (.assignValue assignment .equal rhs :: rest)
+  | assign {assignment operator rhs rest}
+      (profile : operator = .equal ∨ assignment.target.type = .word) (bare : assignment.target.projections = [])
+      (remaining : ItemShape rest) : ItemShape (.assignValue assignment operator rhs :: rest)
 
 theorem ItemShape.let_tail {binder initializer rest}
     (shape : ItemShape (.letDecl binder initializer :: rest)) : ItemShape rest := by
@@ -30,8 +31,8 @@ theorem ItemShape.discard_tail {expression rest}
 
 theorem ItemShape.assign_tail {assignment operator rhs rest}
     (shape : ItemShape (.assignValue assignment operator rhs :: rest)) :
-    operator = .equal ∧ assignment.target.projections = [] ∧ ItemShape rest := by
-  cases shape with | assign bare remaining => exact ⟨rfl, bare, remaining⟩
+    (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧ ItemShape rest := by
+  cases shape with | assign profile bare remaining => exact ⟨profile, bare, remaining⟩
 
 inductive Shape (source : TypedSource) : Bool → List StatementId → Prop where
   | nil {mode} : Shape source mode []
@@ -60,9 +61,10 @@ inductive Shape (source : TypedSource) : Bool → List StatementId → Prop wher
   | initialized {mode id node binder expression rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some expression))
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
-  | assign {mode id node assignment rhs rest}
+  | assign {mode id node assignment operator rhs rest}
       (found : source.lookupStatement? id = some node)
-      (form : node.form = .assignValue assignment .equal rhs)
+      (form : node.form = .assignValue assignment operator rhs)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
   | conditional {mode id node condition thenBody elseBody rest}
@@ -104,7 +106,8 @@ def PositionShape (source : TypedSource) : GenericImperativeMatch.Position → P
 
 def allowedForm : StatementForm → Bool
   | .returnStmt _ | .breakStmt | .continueStmt | .expression _ _ | .letDecl _ _ | .ifThen _ _ _ | .whileLoop _ _ | .block _ | .matchWith _ | .forLoop _ _ _ _ => true
-  | .assignValue assignment .equal _ => assignment.target.projections.isEmpty
+  | .assignValue assignment operator _ =>
+      (operator == .equal || assignment.target.type == .word) && assignment.target.projections.isEmpty
   | _ => false
 
 private theorem node_eq {source : TypedSource} {id : StatementId} {first second : StatementNode}
@@ -122,9 +125,11 @@ theorem Shape.head_allowed {source mode id node rest}
   | matchWith actual form _ _ _ | forLoop actual form _ _ _ _ =>
       cases node_eq found actual
       simp only [form, allowedForm]
-  | assign actual form bare _ =>
+  | assign actual form profile bare _ =>
       cases node_eq found actual
-      simp only [form, allowedForm, bare, List.isEmpty_nil]
+      rcases profile with rfl | word
+      · simp [form, allowedForm, bare]
+      · simp [form, allowedForm, bare, word]
 
 theorem Shape.tail_of_let {source mode id node binder initializer rest}
     (shape : Shape source mode (id :: rest))
@@ -136,7 +141,7 @@ theorem Shape.tail_of_let {source mode id node binder initializer rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | assign actual same _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
+  | discard actual same _ _ | assign actual same _ _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -154,7 +159,7 @@ theorem Shape.discard_tail {source mode id node expression semicolon rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | absent actual same _
-  | initialized actual same _ | assign actual same _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
+  | initialized actual same _ | assign actual same _ _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -172,7 +177,7 @@ theorem Shape.discard_tail {source mode id node expression semicolon rest}
 theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
     (form : node.form = .assignValue assignment operator rhs) :
-    operator = .equal ∧ assignment.target.projections = [] ∧ Shape source mode rest := by
+    (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧ Shape source mode rest := by
   cases shape with
   | forLoop actual same _ _ _ _ =>
       cases node_eq found actual
@@ -184,11 +189,11 @@ theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | assign actual same bare remaining =>
+  | assign actual same profile bare remaining =>
       cases node_eq found actual
       rw [form] at same
       cases same
-      exact ⟨rfl, bare, remaining⟩
+      exact ⟨profile, bare, remaining⟩
 
 theorem Shape.branches {source mode id node condition thenBody elseBody rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
@@ -200,7 +205,7 @@ theorem Shape.branches {source mode id node condition thenBody elseBody rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _
   | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -221,7 +226,7 @@ theorem Shape.loop {source mode id node condition body rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _
   | conditional actual same _ _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -242,7 +247,7 @@ theorem Shape.block_children {source mode id node body rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -265,7 +270,7 @@ theorem Shape.match_children {source mode id node resolution rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -292,7 +297,7 @@ theorem Shape.for_children {source mode id node initializer condition post body 
     ItemShape initializer ∧ ItemShape post ∧ Shape source false body ∧ Shape source mode rest := by
   cases shape with
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _
   | matchWith actual same _ _ _ =>
       cases node_eq found actual
@@ -315,6 +320,6 @@ theorem Shape.of_bare {source statements}
   | discard found form _ ih => exact .discard found form (.inl rfl) ih
   | absent found form _ ih => exact .absent found form ih
   | initialized found form _ ih => exact .initialized found form ih
-  | assign found form bare _ ih => exact .assign found form bare ih
+  | assign found form bare _ ih => exact .assign found form (.inl rfl) bare ih
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree

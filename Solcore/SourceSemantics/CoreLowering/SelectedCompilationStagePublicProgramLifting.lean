@@ -24,7 +24,7 @@ compiler packet and checker-derived typing at the actual public registry. -/
 theorem named_bodies (support : Support compiled (headers rows) (keys compiled) initial) :
     NamedBodies support := by
   intro receiving issued extension header member budget child selected
-  exact SelectedCompilationStageNamedBodyLifting.lifts (support.bodySupport header member)
+  exact SelectedCompilationStageNamedBodyLifting.lifts (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
     support.profile (support.certificates header member) (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected
     (fun size _ => SelectedCompilationStageActualLifting.lifts_roots support issued extension size)
     (fun size => SelectedCompilationStageLiftBounds.preserves_roots support issued extension size)

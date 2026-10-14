@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaCompilerReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedQualifiedFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
@@ -34,6 +35,7 @@ structure ProducedWithPolicy {named : Named}
   binderPolicy : CallableIndexedOwnedContextualLambdaProvenance.BinderPolicy named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation site.code
   policyRecipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
+  issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named site.code
 
 /-- Forward the policy proof without selecting another Site or Compilation. -/
 def ProducedWithPolicy.forget {named : Named}
@@ -56,11 +58,13 @@ def ProducedWithPolicy.forget {named : Named}
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
   compilerPolicy := produced.policyRecipe
+  issuedRecipe := produced.issuedRecipe
 
 /-- Eliminate one accepted outer bind and keep all proofs at its same chosen Site. -/
 theorem ProducedWithPolicy.of_contextual
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics)
     (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
     {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
@@ -85,11 +89,11 @@ theorem ProducedWithPolicy.of_contextual
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (ProducedWithPolicy compilation parameters result body sourceContext evidence
       scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy, recipe, policyRecipe⟩ :=
-    CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe
-      compiled.indexed compilation record sourceContext evidence [] profile viewOfSource
+  obtain ⟨site, identifier, emitted, binderPolicy, recipe, issuedRecipe, _view, _reason⟩ :=
+    CallableIndexedLambdaGeneration.of_contextual_with_issued_recipe_exact
+      compiled.indexed compilation issued record sourceContext evidence [] profile viewOfSource
       sourceFound sourceForm found form owner requirements coercions ordinary read accepted typed
-  exact ⟨⟨site, identifier, emitted, binderPolicy, recipe, policyRecipe⟩⟩
+  exact ⟨⟨site, identifier, emitted, binderPolicy, recipe, issuedRecipe.policy_recipe, issuedRecipe⟩⟩
 
 /-- The existing qualification relation inspects the exact original Support. -/
 def policyFacet (compiled : SourceCoreUnifiedCompilation.Compiled) :
@@ -228,7 +232,7 @@ theorem PrincipalWithPolicy.prepared_at {method : ExecutableImplMethods.CheckedM
     (policyFacet compiled).principal (head.code environment) (head.support environment) := by
   refine ⟨?_, retained_recapture head.produced.policyRecipe environment⟩
   exact .recaptured principal head.produced.site head.expressionSyntax head.certificates
-    head.issued head.diagnosticPolicy head.body head.produced.binderPolicy head.produced.policyRecipe head.bodyView environment
+    head.issued head.diagnosticPolicy head.body head.produced.binderPolicy head.produced.policyRecipe head.produced.issuedRecipe head.bodyView environment
 
 /-- Normalize only the genuine administrative equality; all capture data is copied. -/
 def capture_at {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}

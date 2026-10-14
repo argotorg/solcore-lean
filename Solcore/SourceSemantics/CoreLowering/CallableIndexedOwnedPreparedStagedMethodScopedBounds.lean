@@ -112,7 +112,9 @@ private theorem prefix_agrees
       simpa [SourceCoreLocalCell.coreContext, nativePrefix, List.getElem?_append, outside, offset,
         last, Value.type] using atType
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
 /-- Actual parameter allocation supplies the entire Source body entry. -/
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -168,7 +170,7 @@ theorem source_continuation
   have conditioned := CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history
   obtain ⟨flowValue, bodyStore, finalMap, finalWorld, evaluated, represented, heaps,
       maps, worlds, frame, metadata, returned, related, post⟩ :=
-    CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at
+    CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at (compiled := compiled)
       bodyBridge (CallableIndexedOwnedPhysicalCanonicalState.bindings 1)
       (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport 1)
       functions extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
@@ -184,7 +186,7 @@ theorem source_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      unique collected.tree (collected.sites registry semanticFaults) rfl shape originalTyping packet.sourceAt.projection
+      unique collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt within) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted trace
   have controlClosed := Staging.Recursive.TypedControlBoundary.function
@@ -199,7 +201,7 @@ theorem source_continuation
     maps, worlds, frame, metadata, returned.base.val, related⟩
   simpa only [packet.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable in
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
 /-- Native completion is inverted through the same real flow and footer. -/
 theorem native_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -260,7 +262,7 @@ theorem native_continuation
     CallableIndexedOwnedAdmittedStagedTerminalBody.flow_prefix bodyTrace (Nat.le_of_lt within)
   obtain ⟨sourceSize, finalContext, bodyOutcome, after, finalMap, finalWorld, trace, represented, heaps,
       maps, worlds, frame, metadata, returned, related, post⟩ :=
-    CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at
+    CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at (compiled := compiled)
       bodyBridge (CallableIndexedOwnedPhysicalCanonicalState.bindings 1)
       (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport 1)
       functions extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
@@ -276,7 +278,7 @@ theorem native_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      graph collected.tree (collected.sites registry semanticFaults) rfl shape originalTyping packet.sourceAt.projection
+      graph collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt strict) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted flowTrace
   have controlClosed := Staging.Recursive.TypedControlBoundary.function

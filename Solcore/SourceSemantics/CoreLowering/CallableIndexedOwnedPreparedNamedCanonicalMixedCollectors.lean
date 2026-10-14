@@ -315,6 +315,7 @@ def of_actual
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   apply CallableIndexedOwnedPreparedNamedCanonicalScopedCollectors.of_imperative_compiler
     prepared aligned ready wellFormed complete zero member receipt
+    (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic prepared aligned diagnostic receiver)
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
   obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt

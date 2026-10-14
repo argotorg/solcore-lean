@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedEmptyLambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedTerminalChildReceipts
@@ -49,6 +50,7 @@ private theorem native_child
 theorem of_terminal
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -91,7 +93,8 @@ theorem of_terminal
       terminal.prepared.named.signature.key = .ok terminal.prepared.named.specialized := by
     simpa only [terminal.aligned.named] using CallableIndexedActualNamedSourceReceipts.header_record compiled header
   obtain ⟨rawProduced⟩ := CallableIndexedOwnedContextualLambdaProducerReceipts.of_contextual
-    terminal.prepared.compilation record header.context header.function.evidence profile
+    terminal.prepared.compilation
+    (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared terminal.prepared diagnostic) record header.context header.function.evidence profile
     (by rw [← sourceEq]; exact LambdaMetadataViews.MetadataView.refl _)
     (by simpa only [← sourceEq] using found) form found rfl owner requirements coercions ordinary read
     (by simpa only [fuelEq] using accepted) (native_child terminal member emptyInputs)

@@ -57,7 +57,7 @@ theorem named_support (input : Input compiled) (packet : Issued input) :
   | scopedFactory admission =>
     obtain ⟨terminal, ⟨supported⟩⟩ := SelectedCompilationScopedFactoryAdmission.of_actual
       prepared packet.aligned input.prepared.selected input.prepared.same admission ready diagnostic
-      certified bodies.signatures certificate.profile entryMember
+      certified bodies.signatures certificate.profile entryMember issued (fun _ _ represented => represented)
     exact ⟨⟨CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal terminal,
       .formation terminal supported packet.aligned.globals⟩⟩
   | excluded absent =>

@@ -112,28 +112,41 @@ theorem discard {expression : ExpressionId}
       exact .inr ⟨_, _, _, _, Nat.lt_trans (SourceExecutionSize.child_lt_stepSize (by simp)) childStrict,
         tailStrict, .value evaluated, tail⟩
 
-theorem assign {assignment : AssignmentResolution} {rhs : ExpressionId} {target : Dynamic.ResolvedPlace}
+theorem assign {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {target : Dynamic.ResolvedPlace}
     (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
     (trace : PlainInitial program invocation context environment before
-      (.assignValue assignment .equal rhs :: items) test post body size outcome after) :
+      (.assignValue assignment operator rhs :: items) test post body size outcome after) :
     (∃ child reason, child < size ∧ outcome = .fault reason ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.fault reason) after) ∨
+    (∃ child right currentCell initial currentSelected, child < size ∧
+      outcome = .fault (.invalidAssignmentOperands operator) ∧
+      RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
+        environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated written ∧
       PlainInitial program invocation context environment written items test post body tailSize outcome after) := by
   rcases head trace with ⟨_, reason, strict, same, failed⟩ |
     ⟨_, _, _, _, _, _, childStrict, tailStrict, same, executed, tail⟩
-  · obtain ⟨child, childStrict, failed⟩ := SelectedCompilationStageForItemsAssignmentInversion.item_fault snapshot failed
-    exact .inl ⟨child, reason, Nat.lt_trans childStrict strict, same, .fault failed⟩
+  · rcases SelectedCompilationStageForItemsAssignmentInversion.item_fault snapshot failed with
+      ⟨child, childStrict, failed⟩ |
+      ⟨child, right, currentCell, initial, currentSelected, childStrict, reasonEq, evaluated,
+        currentRead, rootType, initialValue, pathRead, invalid⟩
+    · exact .inl ⟨child, reason, Nat.lt_trans childStrict strict, same, .fault failed⟩
+    · subst reason
+      exact .inr (.inl ⟨child, right, currentCell, initial, currentSelected, Nat.lt_trans childStrict strict,
+        same, .value evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
   · obtain ⟨child, value, middle, updated, strict, rfl, rfl, evaluated, written⟩ :=
       SelectedCompilationStageForItemsAssignmentInversion.item_value snapshot executed
     rw [restored tail] at same
     subst outcome
-    exact .inr ⟨child, _, value, middle, updated, _, Nat.lt_trans strict childStrict, tailStrict,
-      .value evaluated, written, tail⟩
+    exact .inr (.inr ⟨child, _, value, middle, updated, _, Nat.lt_trans strict childStrict, tailStrict,
+      .value evaluated, written, tail⟩)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialInversion

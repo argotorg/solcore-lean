@@ -29,7 +29,9 @@ variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)} {
 local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include support profile certified extension selected in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support profile certified extension selected semantic in
 theorem lifts {budget : Nat}
     (children : ∀ size, size < budget →
       LiftsRootsAt
@@ -44,7 +46,7 @@ theorem lifts {budget : Nat}
   | formation terminal static globals =>
     exact SelectedCompilationStageNamedTerminalLifting.formation selected static
   | «scoped» body receipt compilation static =>
-    exact SelectedCompilationStageNamedScopedLifting.lifts
+    exact SelectedCompilationStageNamedScopedLifting.lifts (semantic := semantic)
       static body.aligned.globals functions selected extension body.layouts children preservation
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedBodyLifting

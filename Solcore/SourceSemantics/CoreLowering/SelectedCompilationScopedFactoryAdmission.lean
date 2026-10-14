@@ -27,7 +27,12 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     {bodyRegistry : SourceCoreRawMetadata.Registry} {stages : Staging.Recursive.Registry}
-    {semanticFaults : FunctionCalls.FaultRep} :
+    {semanticFaults : FunctionCalls.FaultRep}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token,
+      CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics reason token → semanticFaults reason token) :
     ∃ terminal : Terminal header,
       Nonempty (SelectedCompilationPhysicalNamedFormationSupport.Support
         (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) header terminal) := by
@@ -44,7 +49,7 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
       have childEq : child = receipt.child := Except.ok.inj (generated.symm.trans receipt.generated)
       exact ⟨rfl, rfl, childEq⟩ }
   exact ⟨terminal, SelectedCompilationPhysicalNamedFormationCollectors.of_branching terminal
-    ready diagnostic certified catalog profile member source.found source.form source.owner
+    ready diagnostic receiver included certified catalog profile member source.found source.form source.owner
     source.requirements source.coercions source.ordinary source.read source.scan.shape
     (fun typed => source.scan.syntax header.unique rfl typed) rfl⟩
 

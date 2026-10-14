@@ -37,14 +37,19 @@ theorem ActualHeader.make_formation {fixture : CompiledFixture} {observed : Obse
     (terminal : CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal actual.header)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     (expression : terminal.expression = observed.makeShape.expression.id)
-    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} :
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token, CallableIndexedOwnedPublicDecodedCallFaults.faults
+      completion.result.diagnostics reason token → faults reason token) :
     Nonempty (CallableIndexedOwnedContextualLambdaFormationReceipts.OrdinaryFormation
       (registry := registry) (faults := faults) actual.header actual.header.context
       actual.header.function.evidence
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child) := by
   apply CallableIndexedOwnedPreparedNamedBranchingBodyLambdaFormation.of_terminal terminal
-    fixture.recipePrepared diagnostic fixture.source_wellFormed observed.profile (stages.selected actual)
+    fixture.recipePrepared diagnostic receiver included fixture.source_wellFormed observed.profile (stages.selected actual)
     observed.makeRow.entryMember
     (node := observed.makeShape.expression) (reported := extra.reported)
   · rw [actual.source, expression]; exact observed.makeShape.expressionFound
@@ -75,11 +80,16 @@ theorem ActualHeader.make_support {fixture : CompiledFixture} {observed : Observ
     (point : terminal.certificate = CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child)
-    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} :
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (included : ∀ reason token, CallableIndexedOwnedPublicDecodedCallFaults.faults
+      completion.result.diagnostics reason token → faults reason token) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers
       (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
       registry actual.header stages.registry terminal faults) := by
-  obtain ⟨formation⟩ := actual.make_formation extra stages terminal diagnostic expression
+  obtain ⟨formation⟩ := actual.make_formation extra stages terminal diagnostic expression receiver included
   exact ⟨.formation (CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.of_actual headers
     (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
     registry actual.header stages.registry terminal faults point complete

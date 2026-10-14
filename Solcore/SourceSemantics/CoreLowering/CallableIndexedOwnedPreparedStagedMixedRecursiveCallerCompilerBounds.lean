@@ -132,7 +132,7 @@ theorem preserves_compiled
           (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
           (extension := extension) (semantic := semantic) childSize)
       (fun _childSize _within named member {_child} selected =>
-        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
           (namedSupport named member) profile wellFormed selected extension
           (fun smaller _strict => bodies smaller)
           (fun smaller _strict =>
@@ -194,7 +194,7 @@ theorem reflects_compiled
           (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
           (extension := extension) (semantic := semantic) stageEq childSize)
       (fun _childSize _within named member {_child} selected =>
-        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
           (namedSupport named member) profile wellFormed selected extension
           (fun smaller _strict => bodies smaller)
           (fun smaller _strict =>

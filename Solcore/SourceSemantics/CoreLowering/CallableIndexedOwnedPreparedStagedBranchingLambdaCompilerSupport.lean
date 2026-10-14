@@ -34,6 +34,12 @@ theorem collected
     (catalog : SignatureCatalogWellFormed compiled.compatible.checked.signatures)
     (ledger : inputs.context.solvedRequirements = code.compilation.solvedRequirements)
     (projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore)
+    {faults : FunctionCalls.FaultRep}
+    (operands : ∀ {site assignment operator rhs},
+      AssignmentDiagnosticOrigins.Occurs function.source site assignment operator rhs →
+      (operator = .equal ∨ assignment.target.type = .word) →
+      AssignmentOperandDiagnostics.OperandsLaw faults operator
+        (choice.invalidOperand site assignment.target.root operator))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax function.source expressionSyntax
@@ -46,7 +52,7 @@ theorem collected
       choice.packet.policy.lowerExpression fuel code.view scope id choice.packet.reasonAt = .ok lowered →
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         lowered.expression nativeType compiled.indexed.layouts.definitions → certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts choice.packet.allocationOwner choice.packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts choice.packet.allocationOwner choice.packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length choice.packet.onError
       (.initial compiled.compatible.checked) function.source expressionSyntax
       (TypedCertificate function.source certificates) compiled.indexed.layouts.definitions administrative
@@ -60,7 +66,7 @@ theorem collected
   have declarations := CallableIndexedOwnedPreparedLambdaScopeDeclarations.at_parameters (values := .initial compiled.compatible.checked) code inputs frame captured
   exact CallableIndexedOwnedPreparedNativeBranchingCollectors.collected edited
     (CallableIndexedLambdaBodyViewEdits.avoids view) frame.code.graph.nodeOccurrencesUnique
-    choice.readPolicy choice.binderPolicy choice.allocationPolicy choice.assignments
+    choice.readPolicy choice.binderPolicy choice.allocationPolicy choice.assignments operands
     choice.matchPolicy choice.matchValues choice.matchDefinitions choice.matchAllocator hidden catalog
     (ledger.trans choice.matchLedger.symm) children
     syntaxTree rfl choice.packet.shape (.refl _) runtime.variables_closed runtime.residual_variables_open sourceSignatures

@@ -39,7 +39,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (stable : CallableIndexedOwnedIndirectExpressionHeads.StableRows caller)
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -59,11 +61,11 @@ theorem source_continuation
         children size smaller
           (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod root) owner physical)
   | «scoped» packet =>
-    exact CallableIndexedOwnedPreparedStagedMethodScopedBounds.source_continuation
+    exact CallableIndexedOwnedPreparedStagedMethodScopedBounds.source_continuation (semantic := semantic)
       principal packet support wellFormed functions selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable in
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
 theorem native_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -83,7 +85,7 @@ theorem native_continuation
         children size smaller
           (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod root) owner physical)
   | «scoped» packet =>
-    exact CallableIndexedOwnedPreparedStagedMethodScopedBounds.native_continuation
+    exact CallableIndexedOwnedPreparedStagedMethodScopedBounds.native_continuation (semantic := semantic)
       principal packet support wellFormed functions selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children
 

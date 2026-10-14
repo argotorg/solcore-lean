@@ -59,25 +59,19 @@ private theorem target_fault_excluded {program : Program} {source : TypedSource}
       cases evaluated
       exact nonempty rfl
 
-private theorem equal_valid {left : Option Dynamic.Value} {right : Dynamic.Value}
-    (invalid : Dynamic.AssignmentOperandsInvalid .equal left right) : False := by
-  cases invalid with
-  | uninitialized impossible => exact impossible rfl
-  | compound corresponds _ => cases corresponds
-
 variable {program : Program} {invocation : Staging.Recursive.Scope}
   {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
-  {before after : Dynamic.Heap} {assignment : AssignmentResolution} {rhs : ExpressionId}
+  {before after : Dynamic.Heap} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
   {target : Dynamic.ResolvedPlace} {size : Nat} {outcome : Dynamic.ControlOutcome} {reason : Dynamic.SemanticFault}
 
 theorem item_value {nextEnvironment : Dynamic.Environment}
     (snapshot : BareTarget environment before assignment.target target)
     (trace : SourceExecutionSize.ForItemExecutes program size context invocation.evidence invocation.source environment
-      before (.assignValue assignment .equal rhs) finalContext nextEnvironment after) :
+      before (.assignValue assignment operator rhs) finalContext nextEnvironment after) :
     ∃ child value middle updated, child < size ∧ finalContext = context ∧ nextEnvironment = environment ∧
       SourceExecutionSize.ExpressionEvaluates program child context invocation.evidence invocation.source environment
         before rhs value middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated after := by
   cases trace with
   | assignValue assigned =>
@@ -90,19 +84,29 @@ theorem item_value {nextEnvironment : Dynamic.Environment}
 theorem item_fault
     (snapshot : BareTarget environment before assignment.target target)
     (trace : SourceExecutionSize.ForItemFaults program size context invocation.evidence invocation.source environment
-      before (.assignValue assignment .equal rhs) reason after) :
-    ∃ child, child < size ∧
+      before (.assignValue assignment operator rhs) reason after) :
+    (∃ child, child < size ∧
       SourceExecutionSize.ExpressionFaults program child context invocation.evidence invocation.source environment
-        before rhs reason after := by
+        before rhs reason after) ∨
+    (∃ child right currentCell initial currentSelected, child < size ∧
+      reason = .invalidAssignmentOperands operator ∧
+      SourceExecutionSize.ExpressionEvaluates program child context invocation.evidence invocation.source environment
+        before rhs right after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) := by
   cases trace with
   | assignValue failed =>
     cases failed with
     | target failed => exact (target_fault_excluded snapshot failed.sound).elim
     | rhs resolved failed =>
       obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
-      refine ⟨_, ?_, failed⟩
+      refine .inl ⟨_, ?_, failed⟩
       simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
-    | operands _ _ _ _ _ _ invalid => exact (equal_valid invalid).elim
+    | operands resolved evaluated currentRead rootType initialValue pathRead invalid =>
+      obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
+      refine .inr ⟨_, _, _, _, _, ?_, rfl, evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
     | structuralUpdate resolved _ _ _ _ failed =>
       obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
       cases snapshot
@@ -111,14 +115,21 @@ theorem item_fault
 theorem child_and_tail {rest : List ForItemForm}
     (snapshot : BareTarget environment before assignment.target target)
     (trace : PlainItems program size invocation context environment before
-      (.assignValue assignment .equal rhs :: rest) finalContext outcome after) :
+      (.assignValue assignment operator rhs :: rest) finalContext outcome after) :
     (∃ child reason, child < size ∧ finalContext = context ∧ outcome = .fault reason ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.fault reason) after) ∨
+    (∃ child right currentCell initial currentSelected, child < size ∧ finalContext = context ∧
+      outcome = .fault (.invalidAssignmentOperands operator) ∧
+      RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
+        environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated written ∧
       PlainItems program tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
@@ -126,18 +137,25 @@ theorem child_and_tail {rest : List ForItemForm}
     cases trace with
     | cons head tail =>
       obtain ⟨child, value, middle, updated, strict, rfl, rfl, evaluated, written⟩ := item_value snapshot head
-      exact .inr ⟨child, _, value, middle, updated, _,
+      exact .inr (.inr ⟨child, _, value, middle, updated, _,
         Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)),
-        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .done tail⟩
+        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .done tail⟩)
   | fault trace =>
     cases trace with
     | head failed =>
-      obtain ⟨child, strict, failed⟩ := item_fault snapshot failed
-      exact .inl ⟨child, _, Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)), rfl, rfl, .fault failed⟩
+      rcases item_fault snapshot failed with
+        ⟨child, strict, failed⟩ |
+        ⟨child, right, currentCell, initial, currentSelected, strict, reasonEq, evaluated,
+          currentRead, rootType, initialValue, pathRead, invalid⟩
+      · exact .inl ⟨child, _, Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)), rfl, rfl, .fault failed⟩
+      · cases reasonEq
+        exact .inr (.inl ⟨child, right, currentCell, initial, currentSelected,
+          Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)), rfl, rfl,
+          .value evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
     | tail head failed =>
       obtain ⟨child, value, middle, updated, strict, rfl, rfl, evaluated, written⟩ := item_value snapshot head
-      exact .inr ⟨child, _, value, middle, updated, _,
+      exact .inr (.inr ⟨child, _, value, middle, updated, _,
         Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)),
-        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .fault failed⟩
+        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .fault failed⟩)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsAssignmentInversion

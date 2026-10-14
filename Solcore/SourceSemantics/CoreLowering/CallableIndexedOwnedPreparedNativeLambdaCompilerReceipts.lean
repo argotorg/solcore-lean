@@ -61,6 +61,16 @@ structure Receipt where
   sourceFacts : CallableIndexedOwnedOrdinaryLambdaSourceFacts.Facts
     (closure named parameters result statements sourceContext evidence []) id node
 
+/-- The real shell and the actual root policy retain the same compilation. -/
+theorem Receipt.issued_recipe (receipt : Receipt root expressionSyntax certificate
+    (sourceContext := sourceContext) (evidence := evidence)) :
+    CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained named receipt.site.code := by
+  have policy := root.compilerPolicy
+  rw [← receipt.policy] at policy
+  exact CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained.of_recipes
+    compilation receipt.shell.issuedCompilation
+    (receipt.lowerBody.trans root.selected.recipe) policy receipt.site.compilation
+
 /-- The same occurrence builds its literal prefix Site and native JointBody.
 The shell callback supplies only actual Source/issuance/policy metadata for the
 Site just generated. It cannot supply body typing or any execution theorem. -/

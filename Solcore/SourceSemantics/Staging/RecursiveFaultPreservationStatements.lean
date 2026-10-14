@@ -64,7 +64,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       | expressionValue expressionTyped | expressionDiscard expressionTyped =>
           exact expressionIH childSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap expressionTyped child
-  | @assignBareFault childSize mode scope context environment before after id rest node assignment rhs target failure
+  | @assignBareFault childSize mode scope context environment before after id rest node assignment operator rhs target failure
       contains form _snapshot child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -74,10 +74,22 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ =>
               exact expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
-          | wordCompound operator _ _ _ => cases operator
+          | wordCompound _ _ rhsTyped _ =>
+              exact expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap rhsTyped child
+  | @assignBareOperands childSize mode scope context environment before after id rest node assignment operator rhs
+      target right currentCell initial currentSelected contains form _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+              have post := expression_value wellFormed runtime covers locals heap rhsTyped child
+              exact ⟨post.heap_typed, post.heap_extends⟩
   | assignBareUnbound | assignBareDangling => exact ⟨heap, .refl _⟩
   | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
-      id rest node assignment rhs value target updated outcome contains form snapshot child write next =>
+      id rest node assignment operator rhs value target updated outcome contains form snapshot child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
       have execution : StatementExecutes program context scope.evidence scope.source environment before id
           context (.fallthrough environment) written :=
@@ -531,13 +543,13 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         | expression expressionTyped =>
           exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
   | @assignment childSize nextSize scope context finalContext environment before middle written after
-      assignment rhs value target updated rest outcome snapshot child write next =>
+      assignment operator rhs value target updated rest outcome snapshot child write next =>
       cases typed with
       | cons headTyped tailTyped =>
         exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
           runtime covers locals heap headTyped tailTyped
           (.assignValue (.intro (snapshot.resolves _ _ _ _) child.sound.value_plain write)) next
-  | @assignmentFailure childSize scope context environment before after assignment rhs target rest failure snapshot child =>
+  | @assignmentFailure childSize scope context environment before after assignment operator rhs target rest failure snapshot child =>
       cases typed with
       | cons headTyped _ =>
         cases headTyped with
@@ -545,7 +557,18 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
           cases assignmentTyped with
           | equal _ rhsTyped _ =>
             exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
-          | wordCompound operator _ _ _ => cases operator
+          | wordCompound _ _ rhsTyped _ =>
+            exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
+  | @assignmentOperands childSize scope context environment before after assignment operator rhs target right
+      currentCell initial currentSelected rest _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+            have post := expression_value wellFormed runtime covers locals heap rhsTyped child
+            exact ⟨post.heap_typed, post.heap_extends⟩
   | unbound | dangling => exact ⟨heap, .refl _⟩
 
 /-- Finite for faults keep every condition, body, and post-header prefix. -/

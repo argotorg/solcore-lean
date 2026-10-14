@@ -60,9 +60,12 @@ variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)} {
   {faults : RecursiveStageMeaning.FaultRep}
   {child : Staging.Recursive.Scope} (selected : stages.Closure header.function child)
 local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include support profile certified extension selected in
+include support profile certified extension selected semantic in
 theorem preserves {budget : Nat}
     (children : ∀ size, size < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
@@ -77,10 +80,10 @@ theorem preserves {budget : Nat}
     exact SelectedCompilationPhysicalNamedFormationSupport.preserves
       profile static selected certified globals
   | «scoped» body receipt compilation static =>
-    exact SelectedCompilationNamedScopedBounds.preserves
+    exact SelectedCompilationNamedScopedBounds.preserves (semantic := semantic)
       static body.aligned.globals functions selected extension body.layouts children
 
-include support profile certified extension selected in
+include support profile certified extension selected semantic in
 theorem reflects {budget : Nat}
     (children : ∀ size, size < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
@@ -95,7 +98,7 @@ theorem reflects {budget : Nat}
     exact SelectedCompilationPhysicalNamedFormationSupport.reflects
       profile static selected certified globals
   | «scoped» body receipt compilation static =>
-    exact SelectedCompilationNamedScopedBounds.reflects
+    exact SelectedCompilationNamedScopedBounds.reflects (semantic := semantic)
       static body.aligned.globals functions selected extension body.layouts children
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedBodySupport

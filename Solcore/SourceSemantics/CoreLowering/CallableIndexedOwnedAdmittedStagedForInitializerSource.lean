@@ -74,15 +74,15 @@ theorem prepend_expression {id : ExpressionId} {value : Dynamic.Value}
         (Trace.initializerFault (Size.ForItems.expression child initial))
   | loop initial loop => simpa only [grade_prefix] using (Trace.loop (Size.ForItems.expression child initial) loop)
 
-theorem prepend_assignment {assignment : AssignmentResolution} {rhs : ExpressionId}
+theorem prepend_assignment {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {value updated : Dynamic.Value} {target : Dynamic.ResolvedPlace}
     (snapshot : BareTarget environment before assignment.target target)
     (child : Size.Expression program stages childSize invocation context environment before rhs (.value value) middle)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
       middle target updated written)
     (next : Trace program stages invocation context environment written items test post body size outcome after) :
-    Trace program stages invocation context environment before (.assignValue assignment .equal rhs :: items) test post body
+    Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
       (Size.stepSize [childSize, size]) outcome after := by
   cases next with
   | initializerFault initial =>
@@ -103,13 +103,27 @@ theorem expression_fault {id : ExpressionId} {failure : Failure}
       (Size.stepSize [Size.stepSize [childSize]]) (.fault failure) after :=
   .initializerFault (.expressionFailure child)
 
-theorem assignment_fault {assignment : AssignmentResolution} {rhs : ExpressionId}
+theorem assignment_fault {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {target : Dynamic.ResolvedPlace} {failure : Failure}
     (snapshot : BareTarget environment before assignment.target target)
     (child : Size.Expression program stages childSize invocation context environment before rhs (.fault failure) after) :
-    Trace program stages invocation context environment before (.assignValue assignment .equal rhs :: items) test post body
+    Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
       (Size.stepSize [Size.stepSize [childSize]]) (.fault failure) after :=
   .initializerFault (.assignmentFailure snapshot child)
+
+theorem assignment_operands {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {target : Dynamic.ResolvedPlace} {right : Dynamic.Value} {currentCell : Dynamic.Cell}
+    {initial currentSelected : Option Dynamic.Value}
+    (snapshot : BareTarget environment before assignment.target target)
+    (child : Size.Expression program stages childSize invocation context environment before rhs (.value right) after)
+    (currentRead : Dynamic.Heap.Reads after target.location currentCell)
+    (rootType : currentCell.type = target.rootType)
+    (initialValue : Dynamic.RootInitialValue currentCell initial)
+    (pathRead : Dynamic.ProjectionsRead initial target.projections currentSelected)
+    (invalid : Dynamic.AssignmentOperandsInvalid operator target.selected right) :
+    Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
+      (Size.stepSize [Size.stepSize [childSize]]) (.fault (.semantic (.invalidAssignmentOperands operator))) after :=
+  .initializerFault (.assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid)
 
 /-- Empty initialization contributes its genuine empty-items grade. -/
 theorem nil
@@ -197,34 +211,47 @@ theorem expression {id : ExpressionId}
       · obtain ⟨childSize, tailSize, value, middle, rfl, child, next⟩ := continued
         exact .inr ⟨_, _, _, _, grade_prefix _ _ _, child, .loop next loop⟩
 
-theorem assignment {assignment : AssignmentResolution} {rhs : ExpressionId} {target : Dynamic.ResolvedPlace}
+theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {target : Dynamic.ResolvedPlace}
     (snapshot : BareTarget environment before assignment.target target)
-    (trace : Trace program stages invocation context environment before (.assignValue assignment .equal rhs :: items) test post body size outcome after) :
+    (trace : Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body size outcome after) :
     (∃ childSize failure,
       size = Size.stepSize [Size.stepSize [childSize]] ∧ outcome = .fault failure ∧
       Size.Expression program stages childSize invocation context environment before rhs (.fault failure) after) ∨
+    (∃ childSize right currentCell initial currentSelected,
+      size = Size.stepSize [Size.stepSize [childSize]] ∧
+      outcome = .fault (.semantic (.invalidAssignmentOperands operator)) ∧
+      Size.Expression program stages childSize invocation context environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
     (∃ childSize nextSize value middle written updated,
       size = Size.stepSize [childSize, nextSize] ∧
       Size.Expression program stages childSize invocation context environment before rhs (.value value) middle ∧
       Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated written ∧
       Trace program stages invocation context environment written items test post body nextSize outcome after) := by
   cases trace with
   | initializerFault initial =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | invalid | continued
       · obtain ⟨childSize, failure, rfl, _, same, child⟩ := failed
         cases same
         exact .inl ⟨_, _, rfl, rfl, child⟩
+      · obtain ⟨childSize, right, currentCell, initial, currentSelected, rfl, _, same,
+          child, currentRead, rootType, initialValue, pathRead, operands⟩ := invalid
+        cases same
+        exact .inr (.inl ⟨_, _, _, _, _, rfl, rfl, child, currentRead, rootType, initialValue, pathRead, operands⟩)
       · obtain ⟨childSize, tailSize, value, middle, written, updated, rfl, child, write, next⟩ := continued
-        refine .inr ⟨_, _, _, _, _, _, ?_, child, write, .initializerFault next⟩
+        refine .inr (.inr ⟨_, _, _, _, _, _, ?_, child, write, .initializerFault next⟩)
         simp only [Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]
         omega
   | loop initial loop =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | invalid | continued
       · obtain ⟨_, _, _, _, same, _⟩ := failed
         cases same
+      · obtain ⟨_, _, _, _, _, _, _, same, _⟩ := invalid
+        cases same
       · obtain ⟨childSize, tailSize, value, middle, written, updated, rfl, child, write, next⟩ := continued
-        exact .inr ⟨_, _, _, _, _, _, grade_prefix _ _ _, child, write, .loop next loop⟩
+        exact .inr (.inr ⟨_, _, _, _, _, _, grade_prefix _ _ _, child, write, .loop next loop⟩)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerSource

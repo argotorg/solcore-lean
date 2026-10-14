@@ -61,4 +61,37 @@ theorem bare_write
       exact ⟨rhs.heap_typed.write currentRead (.some updatedCell) heapWrite,
         rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
 
+theorem bare_write_compound
+    {source : TypedSource} {context : Context} {environment : Dynamic.Environment}
+    {before middle after : Heap} {place : PlaceResolution} {target : ResolvedPlace}
+    {value updated : Value} {operator : Syntax.ValueAssignOp}
+    (kind : WordCompoundAssignmentOperator operator)
+    (locals : EnvironmentAgrees before context.locals environment)
+    (heap : HeapWellTyped context before)
+    (targetTyped : SourcePlaceHasType source context place .word)
+    (snapshot : BareTarget environment before place target)
+    (rhs : ExpressionEvaluationPreserved context before middle value .word)
+    (write : ResolvedPlaceWrites (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+      middle target updated after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after := by
+  obtain ⟨rootType, targetBefore⟩ := bare_target_typed locals heap targetTyped snapshot
+  have targetMiddle := targetBefore.mono rhs.heap_extends
+  cases write with
+  | intro currentRead rootEq initialValue update heapWrite =>
+      rename_i currentCell initial
+      have initialTyped := initialValue.preserves (rhs.heap_typed _ currentRead.member)
+      have initialRoot : OptionalValueHasType context middle initial rootType := by
+        rw [← targetMiddle.root_type, ← rootEq]
+        exact initialTyped
+      have modification : LeafModificationPreservesType context middle
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement) .word := by
+        intro current replacement _currentTyped applies
+        exact applies.wordCompoundPreserves kind targetMiddle.selected rhs.value_typed
+      have updatedTyped := update.preserves targetMiddle.projections initialRoot modification
+      have updatedCell : ValueHasType context middle updated currentCell.type := by
+        rw [rootEq, targetMiddle.root_type]
+        exact updatedTyped
+      exact ⟨rhs.heap_typed.write currentRead (.some updatedCell) heapWrite,
+        rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
+
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation

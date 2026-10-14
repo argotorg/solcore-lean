@@ -234,7 +234,7 @@ theorem reflects_at {budget : Nat}
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative) bridge functions extension transport
         head bare environments heaps locals agrees actualTyped initial admitted graph.nodeOccurrencesUnique assignmentTyped
-        budget typedChildren completed within
+        budget typedChildren (AssignmentOperandDiagnostics.equal _ _) completed within
       cases result with
       | fault snapshot trace same matched finalHeaps maps worlds preservation metadata reached related stable =>
           cases same
@@ -242,6 +242,8 @@ theorem reflects_at {budget : Nat}
             .assignBareFault (lookupStatement?_sound found) form snapshot trace, .fault matched,
             finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
           exact fault_post bridge reached stable
+      | operands _ _ _ _ _ _ invalid _ _ _ _ _ _ _ _ _ _ =>
+          exact (AssignmentOperandDiagnostics.invalid_not_equal invalid rfl).elim
       | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
           have tailTyped := ProtectedStateImperativeStatementSuffixTyping.assignment graph.nodeOccurrencesUnique sourceTyped found form
           obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,

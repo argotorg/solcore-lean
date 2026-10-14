@@ -189,7 +189,9 @@ theorem reflects_children {budget : Nat}
 
 
 
-include support globals selected in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support globals selected semantic in
 /-- The original named body enters the same protected lexical engine and
 returns the exact reached pool, including cells captured by its result. -/
 theorem preserves
@@ -227,7 +229,7 @@ theorem preserves
   obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
   rw [layouts] at collected
   have tree := collected.tree
-  have catalogSites := collected.sites receiving semanticFaults
+  have catalogSites := collected.sites receiving
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -247,7 +249,7 @@ theorem preserves
   have conditioned := CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position packet.carried
   obtain ⟨flowValue, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
       maps, worlds, frame, metadata, reached, related, post⟩ :=
-    CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at
+    CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at (compiled := compiled)
       (nestedBridge owner) (CallableIndexedOwnedNestedCanonicalState.bindings owner header)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner header)
       functions extension rfl header.registered
@@ -256,7 +258,7 @@ theorem preserves
       (fun _ _ stable => CallableIndexedOwnedNestedCanonicalState.readyAt_of_stableOwner owner header model stable)
       (fun context size within => preserves_children support globals profile selected children canonicalChildren owner context within)
       (by rw [stages.source selected]; exact header.unique)
-      tree catalogSites rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
+      tree catalogSites semantic rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function
@@ -278,7 +280,7 @@ theorem preserves
       | semantic => exact ⟨post.rows, post.successful⟩
       | stage => exact post
 
-include support globals selected in
+include support globals selected semantic in
 /-- Native completion is inverted through its real flow prefix and footer;
 no selected final Source context is assumed. -/
 theorem reflects
@@ -316,7 +318,7 @@ theorem reflects
   obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
   rw [layouts] at collected
   have tree := collected.tree
-  have catalogSites := collected.sites receiving semanticFaults
+  have catalogSites := collected.sites receiving
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -348,7 +350,7 @@ theorem reflects
     CallableIndexedOwnedAdmittedStagedTerminalBody.flow_prefix bodyTrace within
   obtain ⟨sourceSize, finalContext, bodyOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
       maps, worlds, frame, metadata, reached, related, post⟩ :=
-    CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at
+    CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at (compiled := compiled)
       (nestedBridge owner) (CallableIndexedOwnedNestedCanonicalState.bindings owner header)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner header)
       functions extension rfl header.registered
@@ -356,7 +358,7 @@ theorem reflects
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedNestedCanonicalState.readyAt_of_stableOwner owner header model stable)
       (fun context size within => reflects_children support globals profile selected children canonicalChildren owner context within)
-      graph tree catalogSites rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
+      graph tree catalogSites semantic rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function

@@ -94,7 +94,7 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
         (parameterEq ▸ packedTyped) (by simpa only [List.length_map] using actualArity)
       have raw := CallableIndexedOwnedStoredClosureSourceArguments.at_arguments runtime calleeTyped heapTyped
         argumentsTyped packing parameterEq.symm actualArity
-      have bodies := SelectedCompilationStageClosurePacketRoots.association_of_roots
+      have bodies := SelectedCompilationStageClosurePacketRoots.association_of_roots (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
         functions association.original (support.closurePackets association)
         (support.closureSupport association) support.owners
         (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
@@ -158,7 +158,7 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
           (headers := headers) (keys := keys) header
           (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
           callStages (RecursiveStageRegistry.scope sidecar [] header.function) size :=
-        SelectedCompilationStageNamedBodyLifting.lifts (support.bodySupport header association.member)
+        SelectedCompilationStageNamedBodyLifting.lifts (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension) (support.bodySupport header association.member)
         support.profile headerCertified (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
         selected (budget := size)
         (fun childSize _ => SelectedCompilationStageActualLifting.lifts_roots support receiver extension childSize)

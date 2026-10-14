@@ -39,7 +39,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include keyPhysical wellFormed extension support in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include keyPhysical wellFormed extension support semantic in
 theorem source_bodies (budget : Nat)
     (children : ∀ size, size < budget → PreservesRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -56,11 +58,11 @@ theorem source_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [CallableIndexedOwnedPreparedStagedMethodBodies.Packet.sourceAt, sourceAt] using
-        CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation
+        CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation (semantic := semantic)
           port.principal (.terminal packet) static wellFormed functions selected installed
           owner keyPhysical caller heapTyped packetArguments stable extension budget children
 
-include keyPhysical wellFormed extension support in
+include keyPhysical wellFormed extension support semantic in
 theorem native_bodies (budget : Nat)
     (children : ∀ size, size < budget → ReflectsRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -77,7 +79,7 @@ theorem native_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [CallableIndexedOwnedPreparedStagedMethodBodies.Packet.sourceAt, sourceAt] using
-        CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation
+        CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation (semantic := semantic)
           port.principal (.terminal packet) static wellFormed functions selected installed
           owner keyPhysical caller heapTyped packetArguments stable extension budget children
 

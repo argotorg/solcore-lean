@@ -97,7 +97,7 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
       have same := shape actual
       rw [form] at same
       cases same
-    | assignBareFault actual form snapshot child =>
+    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
       cases same
@@ -169,7 +169,7 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
       have same := shape actual
       rw [form] at same
       cases same
-    | assignBareFault actual form snapshot child =>
+    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
       cases same

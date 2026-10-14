@@ -52,7 +52,7 @@ theorem method {budget : Nat}
       have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
         simpa only [sourceAtEq] using argumentsTyped
       simpa only [sourceAtEq] using
-        SelectedCompilationMethodBodyBounds.source_continuation
+        SelectedCompilationMethodBodyBounds.source_continuation (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
           port.principal packet static certified (functions support) selected installed owner keyPhysical caller
           heapTyped packetArguments stable (static_extension support extension) size
           (fun smaller _ => preserves_roots support issued extension smaller)
@@ -75,7 +75,7 @@ theorem method {budget : Nat}
       have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
         simpa only [sourceAtEq] using argumentsTyped
       simpa only [sourceAtEq] using
-        SelectedCompilationStageMethodBodyLifting.source_continuation
+        SelectedCompilationStageMethodBodyLifting.source_continuation (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
           port.principal packet static certified (functions support) selected installed owner keyPhysical caller
           heapTyped packetArguments stable (static_extension support extension) size
           (fun smaller strict => children smaller (Nat.lt_of_lt_of_le strict within))

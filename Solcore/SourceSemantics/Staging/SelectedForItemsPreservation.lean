@@ -88,7 +88,7 @@ theorem for_items_step (size : Nat)
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
               exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
   | @assignment childSize nextSize scope context finalContext environment before middle written after
-      assignment rhs value target updated rest outcome snapshot child write next =>
+      assignment operator rhs value target updated rest outcome snapshot child write next =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with
@@ -100,8 +100,13 @@ theorem for_items_step (size : Nat)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono writtenExtends) writtenTyped tailTyped next
                   exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
-              | wordCompound operator _ _ _ => cases operator
-  | @assignmentFailure childSize scope context environment before after assignment rhs target rest failure snapshot child =>
+              | wordCompound kind targetTyped rhsTyped _ =>
+                  have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound kind locals heap targetTyped snapshot first write
+                  have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                    (locals.mono writtenExtends) writtenTyped tailTyped next
+                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
+  | @assignmentFailure childSize scope context environment before after assignment operator rhs target rest failure snapshot child =>
       cases typed with
       | cons headTyped _ =>
           cases headTyped with
@@ -110,7 +115,19 @@ theorem for_items_step (size : Nat)
               | equal _targetTyped rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
-              | wordCompound operator _ _ _ => cases operator
+              | wordCompound _ _ rhsTyped _ =>
+                  have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
+                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+  | @assignmentOperands childSize scope context environment before after assignment operator rhs target right
+      currentCell initial currentSelected rest _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
+      cases typed with
+      | cons headTyped _ =>
+          cases headTyped with
+          | assignValue assignmentTyped =>
+              cases assignmentTyped with
+              | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+                  have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
+                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
   | unbound | dangling => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation

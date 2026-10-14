@@ -289,9 +289,9 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
   obtain ⟨boolTerminal, _boolExpression, ⟨boolSupport⟩⟩ :=
     boolHeader.bool_support observed rows complete receiver (actualStagePrepared fixture)
   obtain ⟨factoryWordTerminal, _factoryWordExpression, ⟨factoryWordSupport⟩⟩ :=
-    factoryWordHeader.factory_support (observed := observed) observed.factoryWordShape extra.word factoryWordStages (headers rows) complete
+    factoryWordHeader.factory_support (observed := observed) observed.factoryWordShape extra.word factoryWordStages (headers rows) complete receiver (fun _ _ represented => represented)
   obtain ⟨factoryBoolTerminal, _factoryBoolExpression, ⟨factoryBoolSupport⟩⟩ :=
-    factoryBoolHeader.factory_support (observed := observed) observed.factoryBoolShape extra.bool factoryBoolStages (headers rows) complete
+    factoryBoolHeader.factory_support (observed := observed) observed.factoryBoolShape extra.bool factoryBoolStages (headers rows) complete receiver (fun _ _ represented => represented)
   obtain ⟨chooseWordTerminal, _chooseWordExpression, ⟨chooseWordSupport⟩⟩ :=
     chooseWordHeader.chooseWord_support observed receiver (actualStagePrepared fixture)
   obtain ⟨chooseBoolTerminal, _chooseBoolExpression, ⟨chooseBoolSupport⟩⟩ :=

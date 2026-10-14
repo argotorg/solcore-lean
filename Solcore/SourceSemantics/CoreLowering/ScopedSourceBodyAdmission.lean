@@ -93,10 +93,11 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (inner : Scan source approved expected false body)
       (after : ScopedSourceForItemsAdmission.Scan source approved post)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
-  | assign {mode id node assignment rhs rhsNode binder rest}
-      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment .equal rhs)
+  | assign {mode id node assignment operator rhs rhsNode binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
@@ -178,7 +179,7 @@ theorem Scan.shape {source approved expected mode statements}
   | block found form _ _ inner remaining => exact .block found form inner remaining
   | conditional found form _ _ _ _ _ _ _ left right remaining => exact .conditional found form left right remaining
   | whileLoop found form _ _ _ _ _ inner remaining => exact .whileLoop found form inner remaining
-  | assign found form _ _ bare _ _ _ _ ih => exact .assign found form bare ih
+  | assign found form _ _ profile bare _ _ _ _ ih => exact .assign found form profile bare ih
   | matching found form _ _ _ _ _ _ _ arms fallback remaining =>
       exact .matchWith found form arms fallback remaining
   | forLoop found form _ initial _ _ _ _ after _ inner remaining =>
@@ -268,34 +269,20 @@ theorem Scan.syntax {source approved expected mode statements}
       | whileLoop condition actual =>
         exact .whileLoop found form conditionFound conditionType
           (by simpa only [conditionType] using condition) value (inner (control := control.enterLoop) result actual) (remaining result tail)
-  | assign found form declaration targetType bare rhsFound rhsType value _ ih =>
+  | assign found form declaration targetType profile bare rhsFound rhsType value _ ih =>
       obtain ⟨_, _, _, head, tail⟩ := head_tail typed
       have original := form_at unique found head
       rw [form] at original
       cases original with
       | assignValue assignment =>
-        cases assignment with
-        | wordCompound operator _ _ _ => cases operator
-        | equal place rhs _ =>
-          cases place with
-          | intro writable projections target =>
-            apply GenericImperativeMatch.Syntax.assign found form
-            · intro actual actualFound
-              cases Except.ok.inj (declaration.symm.trans actualFound)
-              rw [targetType, bare]
-              exact .nil _
-            · intro actual actualFound
-              cases Except.ok.inj (declaration.symm.trans actualFound)
-              rw [bare] at projections
-              cases projections
-              exact targetType.symm ▸ target.symm ▸ writable
-            · exact target.symm ▸ rhs
-            · exact .inl rfl
-            · intro child member
-              simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
-              subst child
-              exact ⟨value, _, rhsFound, expression_at unique rhsFound rhs⟩
-            · exact ih result tail
+        obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
+          ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare assignment
+        apply GenericImperativeMatch.Syntax.assign found form sourceTyped writable rightTyped numeric
+        · intro child member
+          simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
+          subst child
+          exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+        · exact ih result tail
 
   | matching found form scrutineeFound value hiddenOrdinary armsOrdinary _ _ _ arms fallback remaining =>
       obtain ⟨middle, headFacts, tailFacts, head, tail⟩ := head_tail typed
@@ -463,21 +450,23 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
             let ⟨remaining⟩ ← scan? source expression expected fuel mode rest
             pure ⟨.whileLoop found form conditionFound conditionType approved inner remaining⟩
           else none
-      | .assignValue assignment .equal rhs =>
-        if bare : assignment.target.projections = [] then
-          match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
-          | .error _ => none
-          | .ok binder =>
-            if targetType : binder.scheme.body = assignment.target.type then
-              match rhsFound : source.lookupExpression? rhs with
-              | none => none
-              | some rhsNode =>
-                if rhsType : rhsNode.type = assignment.target.type then do
-                  let ⟨approved⟩ ← expression rhs
-                  let ⟨remaining⟩ ← scan? source expression expected fuel mode rest
-                  pure ⟨.assign found form declaration targetType bare rhsFound rhsType approved remaining⟩
-                else none
-            else none
+      | .assignValue assignment operator rhs =>
+        if profile : operator = .equal ∨ assignment.target.type = .word then
+          if bare : assignment.target.projections = [] then
+            match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+            | .error _ => none
+            | .ok binder =>
+              if targetType : binder.scheme.body = assignment.target.type then
+                match rhsFound : source.lookupExpression? rhs with
+                | none => none
+                | some rhsNode =>
+                  if rhsType : rhsNode.type = assignment.target.type then do
+                    let ⟨approved⟩ ← expression rhs
+                    let ⟨remaining⟩ ← scan? source expression expected fuel mode rest
+                    pure ⟨.assign found form declaration targetType profile bare rhsFound rhsType approved remaining⟩
+                  else none
+              else none
+          else none
         else none
       | _ => none
 

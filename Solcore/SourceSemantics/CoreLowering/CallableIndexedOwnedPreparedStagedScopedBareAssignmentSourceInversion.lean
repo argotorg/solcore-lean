@@ -24,31 +24,38 @@ private theorem target_functional {environment : Dynamic.Environment} {heap : Dy
       cases valueEq
       rfl
 
-/-- The actual Source rule selects either a failed RHS or a successful RHS,
-its write and the remaining statements. The pre-RHS target is unchanged. -/
+/-- The actual Source rule retains RHS failure, operand rejection after a
+successful RHS, or the genuine write and suffix. The target snapshot is fixed. -/
 theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {invocation : Scope}
     {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {id : StatementId} {rest : List StatementId}
-    {node : StatementNode} {assignment : AssignmentResolution} {rhs : ExpressionId}
+    {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {target : Dynamic.ResolvedPlace} {size : Nat} {outcome : BodyOutcome}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some node)
-    (form : node.form = .assignValue assignment .equal rhs)
+    (form : node.form = .assignValue assignment operator rhs)
     (snapshot : BareTarget environment before assignment.target target)
     (trace : Size.StatementsIn program registry mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
     (∃ childSize failure,
       size = Size.stepSize [childSize] ∧ finalContext = context ∧ outcome = .fault failure ∧
       Size.Expression program registry childSize invocation context environment before rhs (.fault failure) after) ∨
+    (∃ childSize right currentCell initial currentSelected,
+      size = Size.stepSize [childSize] ∧ finalContext = context ∧
+      outcome = .fault (.semantic (.invalidAssignmentOperands operator)) ∧
+      Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
       Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies .equal target.selected value replacement)
+        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
         middle target updated written ∧
       Size.StatementsIn program registry mode tailSize invocation context environment written rest finalContext outcome after) := by
   have shape {other : StatementNode} (present : ContainsStatement invocation.source id other) :
-      other.form = .assignValue assignment .equal rhs := by
+      other.form = .assignValue assignment operator rhs := by
     have same := Option.some.inj ((lookupStatement?_complete unique present).symm.trans found)
     cases same
     exact form
@@ -76,7 +83,14 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       cases equal
       have targetEq := target_functional snapshot actualSnapshot
       cases targetEq
-      exact .inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩
+      exact .inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩)
+  | assignBareOperands actual same actualSnapshot child currentRead rootType initialValue pathRead invalid =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      have targetEq := target_functional snapshot actualSnapshot
+      cases targetEq
+      exact .inr (.inl ⟨_, _, _, _, _, rfl, rfl, rfl, child,
+        currentRead, rootType, initialValue, pathRead, invalid⟩)
   | assignBareFault actual same _ child =>
       have equal := (shape actual).symm.trans same
       cases equal

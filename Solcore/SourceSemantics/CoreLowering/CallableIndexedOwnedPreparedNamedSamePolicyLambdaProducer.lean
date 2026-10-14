@@ -33,6 +33,7 @@ include aligned in
 The complete compiler policy is retained before any later recapture. -/
 theorem of_expression
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     {node : ExpressionNode} {reported : Ty}
     {parameters : List TypedBinder} {result : TypeSystem.Ty} {statements : List StatementId}
     (found : header.function.source.lookupExpression? id = some node)
@@ -78,9 +79,9 @@ theorem of_expression
       profile (by rw [← sourceEq]; exact LambdaMetadataViews.MetadataView.refl _)
       (by simpa only [← sourceEq] using found) form found rfl
       root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType native
-  have policyRecipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained prepared.named site.code := by
-    apply CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes (rootFuel := rootFuel)
-      prepared.compilation (sameBody.trans root.selected.recipe) _ site.compilation
+  have issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained prepared.named site.code := by
+    apply CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained.of_recipes (rootFuel := rootFuel)
+      prepared.compilation (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic) (sameBody.trans root.selected.recipe) _ site.compilation
     rw [samePolicy]
     exact root.compilerPolicy
   have binderPolicy : CallableIndexedOwnedContextualLambdaProvenance.BinderPolicy prepared.named site.code :=
@@ -93,8 +94,9 @@ theorem of_expression
     identifier := identifier
     emitted := emitted
     binderPolicy := binderPolicy
-    recipe := policyRecipe.body_recipe
-    compilerPolicy := policyRecipe }
+    recipe := issuedRecipe.body_recipe
+    compilerPolicy := issuedRecipe.policy_recipe
+    issuedRecipe := issuedRecipe }
   have actual : ∃ produced : Produced (compiled := compiled) prepared.named parameters result statements sourceContext evidence
       scope
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)

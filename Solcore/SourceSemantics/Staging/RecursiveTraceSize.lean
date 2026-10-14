@@ -479,32 +479,45 @@ mutual
         StatementsIn program registry mode (stepSize [loopSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
     | assignBare {childSize nextSize : Nat} {mode scope context finalContext environment before middle written after
-          id rest node assignment rhs value target updated outcome}
+          id rest node assignment operator rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
-        (form : node.form = .assignValue assignment .equal rhs)
+        (form : node.form = .assignValue assignment operator rhs)
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry childSize scope context environment before rhs (.value value) middle)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
           middle target updated written)
         (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    | assignBareFault {childSize : Nat} {mode scope context environment before after id rest node assignment rhs target failure}
+    | assignBareFault {childSize : Nat} {mode scope context environment before after id rest node assignment operator rhs target failure}
         (contains : ContainsStatement scope.source id node)
-        (form : node.form = .assignValue assignment .equal rhs)
+        (form : node.form = .assignValue assignment operator rhs)
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry childSize scope context environment before rhs (.fault failure) after) :
         StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
-    | assignBareUnbound {mode scope context environment heap id rest node assignment rhs}
+    | assignBareOperands {childSize : Nat} {mode scope context environment before after id rest node assignment operator rhs
+          target right currentCell initial currentSelected}
         (contains : ContainsStatement scope.source id node)
-        (form : node.form = .assignValue assignment .equal rhs)
+        (form : node.form = .assignValue assignment operator rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry childSize scope context environment before rhs (.value right) after)
+        (currentRead : Heap.Reads after target.location currentCell)
+        (rootType : currentCell.type = target.rootType)
+        (initialValue : RootInitialValue currentCell initial)
+        (pathRead : ProjectionsRead initial target.projections currentSelected)
+        (invalid : AssignmentOperandsInvalid operator target.selected right) :
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context
+          (.fault (.semantic (.invalidAssignmentOperands operator))) after
+    | assignBareUnbound {mode scope context environment heap id rest node assignment operator rhs}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
         (bare : assignment.target.projections = [])
         (missing : environment.Unbound assignment.target.root) :
         StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context
           (.fault (.semantic (.unboundLocal assignment.target.root))) heap
-    | assignBareDangling {mode scope context environment heap id rest node assignment rhs location}
+    | assignBareDangling {mode scope context environment heap id rest node assignment operator rhs location}
         (contains : ContainsStatement scope.source id node)
-        (form : node.form = .assignValue assignment .equal rhs)
+        (form : node.form = .assignValue assignment operator rhs)
         (bare : assignment.target.projections = [])
         (lookup : Environment.LooksUp environment assignment.target.root location)
         (missing : heap.Dangling location) :
@@ -632,28 +645,39 @@ mutual
     | expressionFailure {childSize : Nat} {scope context environment before after expression rest failure}
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
         ForItems program registry (stepSize [childSize]) scope context environment before (.expression expression :: rest) context (.fault failure) after
-    | assignment {childSize nextSize : Nat} {scope context finalContext environment before middle written after assignment rhs value target updated rest outcome}
+    | assignment {childSize nextSize : Nat} {scope context finalContext environment before middle written after assignment operator rhs value target updated rest outcome}
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry childSize scope context environment before rhs (.value value) middle)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
           middle target updated written)
         (next : ForItems program registry nextSize scope context environment written rest finalContext outcome after) :
-        ForItems program registry (stepSize [childSize, nextSize]) scope context environment before (.assignValue assignment .equal rhs :: rest) finalContext outcome after
-    | assignmentFailure {childSize : Nat} {scope context environment before after assignment rhs target rest failure}
+        ForItems program registry (stepSize [childSize, nextSize]) scope context environment before (.assignValue assignment operator rhs :: rest) finalContext outcome after
+    | assignmentFailure {childSize : Nat} {scope context environment before after assignment operator rhs target rest failure}
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry childSize scope context environment before rhs (.fault failure) after) :
-        ForItems program registry (stepSize [childSize]) scope context environment before (.assignValue assignment .equal rhs :: rest) context (.fault failure) after
-    | unbound {scope context environment heap assignment rhs rest}
+        ForItems program registry (stepSize [childSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | assignmentOperands {childSize : Nat} {scope context environment before after assignment operator rhs target right
+          currentCell initial currentSelected rest}
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry childSize scope context environment before rhs (.value right) after)
+        (currentRead : Heap.Reads after target.location currentCell)
+        (rootType : currentCell.type = target.rootType)
+        (initialValue : RootInitialValue currentCell initial)
+        (pathRead : ProjectionsRead initial target.projections currentSelected)
+        (invalid : AssignmentOperandsInvalid operator target.selected right) :
+        ForItems program registry (stepSize [childSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context
+          (.fault (.semantic (.invalidAssignmentOperands operator))) after
+    | unbound {scope context environment heap assignment operator rhs rest}
         (bare : assignment.target.projections = [])
         (missing : environment.Unbound assignment.target.root) :
-        ForItems program registry (stepSize []) scope context environment heap (.assignValue assignment .equal rhs :: rest) context
+        ForItems program registry (stepSize []) scope context environment heap (.assignValue assignment operator rhs :: rest) context
           (.fault (.semantic (.unboundLocal assignment.target.root))) heap
-    | dangling {scope context environment heap assignment rhs rest location}
+    | dangling {scope context environment heap assignment operator rhs rest location}
         (bare : assignment.target.projections = [])
         (lookup : Environment.LooksUp environment assignment.target.root location)
         (missing : heap.Dangling location) :
-        ForItems program registry (stepSize []) scope context environment heap (.assignValue assignment .equal rhs :: rest) context
+        ForItems program registry (stepSize []) scope context environment heap (.assignValue assignment operator rhs :: rest) context
           (.fault (.semantic (.danglingLocation location))) heap
 
   /-- Finite for iteration runs each post header in the original loop scope.
@@ -781,7 +805,7 @@ end
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
-  assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements
@@ -877,6 +901,7 @@ local macro "erase_stage_grade" : tactic =>
     case expressionFault => apply Recursive.StatementsIn.expressionFault <;> assumption
     case assignBare => apply Recursive.StatementsIn.assignBare <;> assumption
     case assignBareFault => apply Recursive.StatementsIn.assignBareFault <;> assumption
+    case assignBareOperands => apply Recursive.StatementsIn.assignBareOperands <;> assumption
     case assignBareUnbound => apply Recursive.StatementsIn.assignBareUnbound <;> assumption
     case assignBareDangling => apply Recursive.StatementsIn.assignBareDangling <;> assumption
     case letUninitialized => apply Recursive.StatementsIn.letUninitialized <;> assumption
@@ -913,6 +938,7 @@ local macro "erase_stage_grade" : tactic =>
     case expressionFailure => apply Recursive.ForItems.expressionFailure <;> assumption
     case assignment => apply Recursive.ForItems.assignment <;> assumption
     case assignmentFailure => apply Recursive.ForItems.assignmentFailure <;> assumption
+    case assignmentOperands => apply Recursive.ForItems.assignmentOperands <;> assumption
     case unbound => apply Recursive.ForItems.unbound <;> assumption
     case dangling => apply Recursive.ForItems.dangling <;> assumption
     case testFault => apply Recursive.ForLoop.testFault <;> assumption
@@ -1208,6 +1234,9 @@ local macro "construct_stage_grade" : tactic =>
     case assignBareFault contains form snapshot child childIH =>
       obtain ⟨childSize, childGraded⟩ := childIH
       exact ⟨_, .assignBareFault contains form snapshot childGraded⟩
+    case assignBareOperands contains form snapshot child currentRead rootType initialValue pathRead invalid childIH =>
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignBareOperands contains form snapshot childGraded currentRead rootType initialValue pathRead invalid⟩
     case assignBareUnbound contains form bare missing =>
       exact ⟨_, .assignBareUnbound contains form bare missing⟩
     case assignBareDangling contains form bare lookup missing =>
@@ -1321,6 +1350,9 @@ local macro "construct_stage_grade" : tactic =>
     case assignmentFailure snapshot child childIH =>
       obtain ⟨childSize, gradedchild⟩ := childIH
       exact ⟨_, .assignmentFailure snapshot gradedchild⟩
+    case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid childIH =>
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignmentOperands snapshot childGraded currentRead rootType initialValue pathRead invalid⟩
     case unbound bare missing =>
       exact ⟨_, .unbound bare missing⟩
     case dangling bare lookup missing =>

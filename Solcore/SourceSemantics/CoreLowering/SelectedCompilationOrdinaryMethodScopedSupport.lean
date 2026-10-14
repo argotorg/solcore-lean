@@ -83,6 +83,7 @@ include provenance receiver bodies certified supported original rows covered che
 /-- Every original expression is issued at its real lexical context, including the
 RHS and later reads after a genuine assignment or local allocation. -/
 def support_general_with_catalog
+    (choiceIssued : choice.Issued code support.caller.named)
     (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType) :
     SelectedCompilationPhysicalBranchingClosureStaticSupport.SelectedBody
@@ -109,7 +110,8 @@ def support_general_with_catalog
     code support.body.toContext support.body.frame choice provenance.body_view provenance.scope_declarations
     sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (by rw [CallableIndexedOwnedPublicSignatureCatalog.signatures compiled]; exact bodies.signatures)
-    support.body.valid.ledger support.body.projection syntaxTree
+    support.body.valid.ledger support.body.projection
+    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile) syntaxTree
     (certificates := fun context scope id lowered => Nonempty (Σ rawType,
       Root compiled headers stages code.policy code.lowerBody code.compilation compiled.indexed.fuel
         context child code.reasonAt scope id lowered rawType faults))
@@ -124,11 +126,11 @@ def support_general_with_catalog
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
   rw [(stages).source selected]
   refine ⟨weakened, ?_⟩
-  intro currentRegistry currentFaults
+  intro currentRegistry
   obtain ⟨tree, sites⟩ := CallableLambdaViewMatchRuntimeCertificates.transport_sites_with
     (LocalView.refl function.source) (by intro id member; cases member)
     support.body.unique (fun _ _ _ => True.intro)
-    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry currentFaults)
+    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry)
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
   exact sites
 
@@ -144,11 +146,11 @@ theorem of_actual_with_catalog
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
       SelectedCompilationPhysicalBranchingClosureStaticSupport.SelectedBody
         headers code support.body.toContext stages packet faults) := by
-  obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose
-    code support.caller.named provenance.policy_recipe.body_recipe support.compilation shape child selected
+  obtain ⟨choice, choiceIssued⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose_issued
+    code support.caller.named provenance.issued_recipe support.compilation shape child selected
   exact ⟨⟨choice.packet,
     support_general_with_catalog stagePrepared code support provenance receiver bodies certified supported original rows covered checked catalog methods
-      signatureMember sourceOwner choice syntaxTree⟩⟩
+      signatureMember sourceOwner choice choiceIssued syntaxTree⟩⟩
 
 end Generic
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationOrdinaryMethodScopedSupport

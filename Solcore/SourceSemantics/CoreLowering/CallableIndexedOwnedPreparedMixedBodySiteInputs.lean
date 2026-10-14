@@ -358,7 +358,7 @@ theorem extra_receipts
       (function := closure caller.named parameters result statements sourceContext evidence [])
       runtime.graph.nodeOccurrencesUnique found form typed coercions
     obtain ⟨certificate, receipt, samePolicy, sameBody, sameFuel, sameView, sameReason, sameCertificate, chosen⟩ :=
-      CallableIndexedOwnedSamePolicyCompilerLeafReceipts.lambda_of_accepted_with_inputs root sourceContext evidence domain.profile
+      CallableIndexedOwnedSamePolicyCompilerLeafReceipts.lambda_of_accepted_with_inputs root (domain.issued id node parameters result statements allowed found form) sourceContext evidence domain.profile
         (LambdaMetadataViews.MetadataView.refl _) found form facts.sourceType facts.ordinary coercions found rfl
         parentMetadata.owner requirements coercions ordinary read accepted
         (domain.native childFuel id node parameters result statements lowered allowed found form typed accepted)

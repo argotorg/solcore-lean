@@ -204,8 +204,8 @@ theorem MethodShape.body_shape :
   .initialized shape.initializedFound shape.initializedForm
     (.initialized shape.flagInitializedFound shape.flagInitializedForm
       (.whileLoop shape.loopFound shape.loopForm
-        (.assign shape.assignmentFound shape.assignmentForm shape.targetBare
-          (.assign shape.flagAssignmentFound shape.flagAssignmentForm shape.flagTargetBare .nil))
+        (.assign shape.assignmentFound shape.assignmentForm (.inl rfl) shape.targetBare
+          (.assign shape.flagAssignmentFound shape.flagAssignmentForm (.inl rfl) shape.flagTargetBare .nil))
         (.returnValue [] shape.statementFound shape.statementForm)))
 
 def MethodShape.childIds : List ExpressionId :=

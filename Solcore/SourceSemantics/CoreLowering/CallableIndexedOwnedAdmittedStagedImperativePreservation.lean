@@ -253,6 +253,8 @@ theorem preserves_at {budget : Nat}
         functions extension head bare environments heaps locals agrees
       rcases CallableIndexedOwnedPreparedStagedBareAssignmentSourceInversion.child_and_tail unique found form snapshot trace with
         ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
+        ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, contextEq, outcomeEq, childTrace,
+          currentRead, rootType, initialized, path, invalid⟩ |
         ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
       · subst finalContext
         subst outcome
@@ -268,6 +270,7 @@ theorem preserves_at {budget : Nat}
             (typedChildren childSize childStrict) childTrace body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
           preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge reached stable⟩
+      · exact (AssignmentOperandDiagnostics.invalid_not_equal invalid rfl).elim
       · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
           rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
         have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by

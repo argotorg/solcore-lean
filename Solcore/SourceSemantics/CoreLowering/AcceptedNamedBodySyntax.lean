@@ -192,15 +192,14 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
       rw [form] at original
       cases original with
       | assignValue assignment =>
-        cases assignment with
-        | wordCompound operator _ _ _ => cases operator
-        | equal place value _ =>
-          obtain ⟨node, contains, same⟩ := value.stored_type
-          exact .assign found form receipt.declaration targetType receipt.bare
-            (lookupExpression?_complete unique contains) (same.trans (by cases place with | intro _ _ target => exact target.symm))
-            (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
-            (ih closed (fun child member => children child (by simp [Tree.children, member]))
-              (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
+        obtain ⟨_, _, value, _⟩ :=
+          ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare assignment
+        obtain ⟨node, contains, same⟩ := value.stored_type
+        exact .assign found form receipt.declaration targetType receipt.sourceProfile receipt.bare
+          (lookupExpression?_complete unique contains) same
+          (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
+          (ih closed (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
   | discard read form child generated statementType remaining ih =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, tail⟩ := head_tail typed

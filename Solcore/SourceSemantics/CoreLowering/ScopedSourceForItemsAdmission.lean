@@ -26,13 +26,14 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (found : source.lookupExpression? expression = some expressionNode)
       (value : approved expression) (remaining : Scan source approved rest) :
       Scan source approved (.expression expression :: rest)
-  | assign {assignment rhs rhsNode binder rest}
+  | assign {assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
-      (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment .equal rhs :: rest)
+      (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
 
 theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop} {items : List ForItemForm}
     (scan : Scan source approved items) (mapped : ∀ id, approved id → other id) : Scan source other items := by
@@ -41,7 +42,7 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
   | absent declaration mono ordinary _ ih => exact .absent declaration mono ordinary ih
   | initialized declaration mono ordinary found type value _ ih => exact .initialized declaration mono ordinary found type (mapped _ value) ih
   | discard found value _ ih => exact .discard found (mapped _ value) ih
-  | assign declaration target bare found type value _ ih => exact .assign declaration target bare found type (mapped _ value) ih
+  | assign declaration target profile bare found type value _ ih => exact .assign declaration target profile bare found type (mapped _ value) ih
 
 theorem Scan.shape {source approved items} (scan : Scan source approved items) :
     CallableIndexedOwnedPreparedStagedBranchingTree.ItemShape items := by
@@ -50,7 +51,7 @@ theorem Scan.shape {source approved items} (scan : Scan source approved items) :
   | absent _ _ _ _ ih => exact .absent ih
   | initialized _ _ _ _ _ _ _ ih => exact .initialized ih
   | discard _ _ _ ih => exact .discard ih
-  | assign _ _ bare _ _ _ _ ih => exact .assign bare ih
+  | assign _ _ profile bare _ _ _ _ ih => exact .assign profile bare ih
 
 private theorem expression_at {source : TypedSource} {context : SourceSemantics.Context}
     {id : ExpressionId} {node : ExpressionNode} {type : TypeSystem.Ty}
@@ -59,6 +60,44 @@ private theorem expression_at {source : TypedSource} {context : SourceSemantics.
   obtain ⟨original, contains, same⟩ := typed.stored_type
   cases Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   exact same ▸ typed
+
+/-- Original assignment typing supplies the actual writable root and raw RHS type.
+The bare path keeps this fact on the declared binder used by the compiler. -/
+theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Context}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp}
+    {rhs : ExpressionId} {binder : TypedBinder}
+    (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+    (targetType : binder.scheme.body = assignment.target.type)
+    (bare : assignment.target.projections = [])
+    (typed : SourceAssignmentHasType source context assignment operator rhs) :
+    (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
+    (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      WritableLocal context assignment.target.root actual.scheme.body) ∧
+    ExpressionHasType source context rhs assignment.target.type ∧
+    (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer) := by
+  have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
+      ExpressionHasType source context rhs type ∧ (operator = .equal ∨ type = .word) := by
+    cases typed with
+    | equal place value _ => exact ⟨_, place, value, .inl rfl⟩
+    | wordCompound _ place value _ => exact ⟨_, place, value, .inr rfl⟩
+  obtain ⟨type, place, value, profile⟩ := original
+  cases place with
+  | intro writable projections target =>
+      refine ⟨?_, ?_, target.symm ▸ value, ?_⟩
+      · intro actual actualFound
+        cases Except.ok.inj (declaration.symm.trans actualFound)
+        rw [targetType, bare]
+        exact .nil _
+      · intro actual actualFound
+        cases Except.ok.inj (declaration.symm.trans actualFound)
+        rw [bare] at projections
+        cases projections
+        exact targetType.symm ▸ target.symm ▸ writable
+      · rcases profile with equal | word
+        · exact .inl equal
+        · exact .inr (.inl (by rw [target, word]; rfl))
 
 theorem Scan.syntax {source approved items} (scan : Scan source approved items)
     (unique : NodeOccurrencesUnique source) {control : ControlContext}
@@ -85,33 +124,20 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
       | cons head tail =>
         cases head with
         | expression actual => exact .discard found (expression_at unique found actual) value (ih tail)
-  | assign declaration targetType bare rhsFound rhsType value remaining ih =>
+  | assign declaration targetType profile bare rhsFound rhsType value remaining ih =>
       cases typed with
       | cons head tail =>
         cases head with
         | assignValue assignment =>
-          cases assignment with
-          | wordCompound operator _ _ _ => cases operator
-          | equal place rhs _ =>
-            cases place with
-            | intro writable projections target =>
-              apply GenericForHeader.Syntax.assign
-              · intro actual actualFound
-                cases Except.ok.inj (declaration.symm.trans actualFound)
-                rw [targetType, bare]
-                exact .nil _
-              · intro actual actualFound
-                cases Except.ok.inj (declaration.symm.trans actualFound)
-                rw [bare] at projections
-                cases projections
-                exact targetType.symm ▸ target.symm ▸ writable
-              · exact target.symm ▸ rhs
-              · exact .inl rfl
-              · intro child member
-                simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
-                subst child
-                exact ⟨value, _, rhsFound, expression_at unique rhsFound rhs⟩
-              · exact ih tail
+          obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
+            assignment_facts declaration targetType bare assignment
+          apply GenericForHeader.Syntax.assign sourceTyped writable rightTyped numeric
+          · intro child member
+            simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
+            subst child
+            exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+          · exact ih tail
+
 
 private theorem binder_final {owner : Resolved.DeclarationId} {context left right : SourceSemantics.Context}
     {binder : TypedBinder} (first : BinderExtends owner context binder left)

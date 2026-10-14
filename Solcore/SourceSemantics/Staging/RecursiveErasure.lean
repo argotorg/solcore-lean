@@ -869,6 +869,9 @@ local macro "erase_recursive_plain" : tactic =>
       | stage => trivial
       | semantic => exact StatementsPlain.head_fault (.assignValue contains form
           (.rhs (snapshot.resolves _ _ _ _) childIH))
+    case assignBareOperands contains form snapshot child currentRead rootType initialValue pathRead invalid childIH =>
+      exact StatementsPlain.head_fault (.assignValue contains form
+        (.operands (snapshot.resolves _ _ _ _) childIH currentRead rootType initialValue pathRead invalid))
     case assignBareUnbound contains form _bare missing =>
       exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
     case assignBareDangling contains form _bare lookup missing =>
@@ -989,6 +992,9 @@ local macro "erase_recursive_plain" : tactic =>
       cases failure with
       | stage => trivial
       | semantic => exact .head (.assignValue (.rhs (snapshot.resolves _ _ _ _) childIH))
+    case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid childIH =>
+      exact .head (.assignValue
+        (.operands (snapshot.resolves _ _ _ _) childIH currentRead rootType initialValue pathRead invalid))
     case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
     case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
     case testFault test testIH =>

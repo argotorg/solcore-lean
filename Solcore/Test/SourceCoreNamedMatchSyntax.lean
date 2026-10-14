@@ -91,7 +91,7 @@ theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : Obser
     have same : arm = observed.shape.arm := by simpa only [observed.shape.arms, List.mem_singleton] using member
     subst arm
     rw [observed.shape.armBody]
-    exact .assign observed.shape.assignmentFound observed.shape.assignmentForm observed.shape.targetBare .nil
+    exact .assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil
   · intro statements present
     simp [observed.shape.noDefault] at present
   · exact .returnValue [] observed.shape.statementFound observed.shape.statementForm

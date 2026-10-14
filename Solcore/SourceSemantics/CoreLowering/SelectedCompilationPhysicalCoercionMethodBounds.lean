@@ -36,9 +36,12 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     source target input steps output calls)
   (support : CoercionMethods headers semanticFaults chain)
 
+
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include keyPhysical extension support in
+include keyPhysical extension support semantic in
 theorem source_bodies (budget : Nat)
     (children : ∀ size, size < budget → PreservesRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -55,11 +58,11 @@ theorem source_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [SelectedCompilationMethodBodies.Packet.sourceAt, sourceAt] using
-        SelectedCompilationMethodBodyBounds.source_continuation
+        SelectedCompilationMethodBodyBounds.source_continuation (semantic := semantic)
           port.principal (.terminal packet) static certified functions selected installed
           owner keyPhysical caller heapTyped packetArguments stable extension budget children
 
-include keyPhysical extension support in
+include keyPhysical extension support semantic in
 theorem native_bodies (budget : Nat)
     (children : ∀ size, size < budget → ReflectsRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -76,7 +79,7 @@ theorem native_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [SelectedCompilationMethodBodies.Packet.sourceAt, sourceAt] using
-        SelectedCompilationMethodBodyBounds.native_continuation
+        SelectedCompilationMethodBodyBounds.native_continuation (semantic := semantic)
           port.principal (.terminal packet) static certified functions selected installed
           owner keyPhysical caller heapTyped packetArguments stable extension budget children
 

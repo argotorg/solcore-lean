@@ -113,7 +113,9 @@ private theorem prefix_agrees
       simpa [SourceCoreLocalCell.coreContext, nativePrefix, List.getElem?_append, outside, offset,
         last, Value.type] using atType
 
-include support certified selected keyPhysical beforeTyped argumentsTyped stable in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
 /-- Actual parameter allocation supplies the entire Source body entry. -/
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -195,7 +197,7 @@ theorem source_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      unique collected.tree (collected.sites registry semanticFaults) rfl shape originalTyping packet.sourceAt.projection
+      unique collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt within) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted trace
 

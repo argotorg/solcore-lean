@@ -39,7 +39,9 @@ local notation "physicalBridge" =>
   CallableIndexedOwnedNamedCallerProtocol.Carrier.forgetSlots
     (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) 1)
 
-include support globals selected in
+variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+
+include support globals selected semantic in
 /-- The original named body starts at its genuine parameter entry. Completed
 bodies retain the exact Source context and heap; stage rejection retains the
 actual earlier prefix and skips the remaining effects. -/
@@ -87,7 +89,7 @@ theorem lifts
   obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
   rw [layouts] at collected
   have tree := collected.tree
-  have catalogSites := collected.sites receiving semanticFaults
+  have catalogSites := collected.sites receiving
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -133,7 +135,7 @@ theorem lifts
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
       (by rw [stages.source selected]; exact header.unique)
-      tree catalogSites rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped
+      tree catalogSites semantic rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped
       reference read unmapped wrapped conditioned nestedAdmitted trace
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedScopedLifting

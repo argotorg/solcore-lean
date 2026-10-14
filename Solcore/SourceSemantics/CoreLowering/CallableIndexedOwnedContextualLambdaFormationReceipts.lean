@@ -24,6 +24,7 @@ structure OrdinaryFormation
   binderPolicy : BinderPolicy caller.named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained caller.named site.code
   compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code
+  issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained caller.named site.code
   bodyView : BodyView site.code
   bodyReasons : BodyReasons site.code caller.named
   declarations : CompatibleExpressionReads.ScopeDeclarations
@@ -42,6 +43,7 @@ structure PrincipalFormation {method : ExecutableImplMethods.CheckedMethod}
   binderPolicy : BinderPolicy principal.named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained principal.named site.code
   compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained principal.named site.code
+  issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained principal.named site.code
   bodyView : BodyView site.code
 
 theorem OrdinaryFormation.at
@@ -53,7 +55,7 @@ theorem OrdinaryFormation.at
     (globals : caller.globals = compiled.indexed.base.globals.length) :
     OrdinaryAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured caller receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment globals receipt.callerReceipt
+    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.issuedRecipe receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment globals receipt.callerReceipt
 
 theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     {principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method}
@@ -63,7 +65,7 @@ theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     (environment : Dynamic.Environment) :
     PrincipalAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured principal receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.syntaxTree environment
+    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.issuedRecipe receipt.bodyView receipt.syntaxTree environment
 
 /-- Actual producer selection and independently accepted same-Site body
 receipts construct the ordinary certificate without choosing another head. -/
@@ -108,6 +110,7 @@ def ordinary_of_producer
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
   compilerPolicy := produced.compilerPolicy
+  issuedRecipe := produced.issuedRecipe
   bodyView := bodyView
   bodyReasons := bodyReasons
   declarations := declarations
@@ -150,6 +153,7 @@ def principal_of_producer {method : ExecutableImplMethods.CheckedMethod}
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
   compilerPolicy := produced.compilerPolicy
+  issuedRecipe := produced.issuedRecipe
   bodyView := bodyView
   syntaxTree := syntaxTree
 

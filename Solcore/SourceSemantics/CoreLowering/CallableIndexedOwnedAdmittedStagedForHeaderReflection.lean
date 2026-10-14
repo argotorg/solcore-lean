@@ -90,6 +90,10 @@ theorem reflects_at {budget : Nat}
       invocation.source (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items code)
+    {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : tree.ErrorsFor diagnosticPolicy catalogRegistry catalogFaults)
+    (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (shape : ItemShape items)
     (sourceTyped : CallableIndexedOwnedPreparedStagedForItemsTyping.Facts invocation.source control context items)
     {size : Nat} (within : size ≤ budget)
@@ -118,7 +122,7 @@ theorem reflects_at {budget : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ Post bridge context expected (restoredOutcome environment outcome) reached := by
-  induction tree generalizing size mapping world actualContext environment canonical actual before
+  induction catalogSites generalizing size mapping world actualContext environment canonical actual before
       store finalStore ξ contextLocation native value with
   | @nil context scope code next =>
       change code = LocalLoop.fallthrough type at next
@@ -128,7 +132,7 @@ theorem reflects_at {budget : Nat}
       exact ⟨_, context, .done environment, before, mapping, world, .empty,
         .fallthrough environment (.inl rfl), heaps, .refl _, .refl _, .refl _ _, .refl _,
         initial, callerProtocol.refl initial, admitted⟩
-  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same tail ih =>
+  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same tail tailSites ih =>
       have tailShape := shape.let_tail
       obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals,
           nextAgrees, nextTyped, nextReference, nextRead, preservation, reached, allocatedRelated, nextAdmitted⟩ :=
@@ -151,7 +155,7 @@ theorem reflects_at {budget : Nat}
         preservation.trans finalFrame, (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append).trans metadata,
         finalState, callerProtocol.trans allocatedRelated (callerProtocol.trans tailRelated (bindings.restore_related (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) (id := binder.id) (type := payload) (value := .cellRef (OptionalCell.cellType payload) (store.length + 2)) tailState)), ?_⟩
       exact post_environment bridge (restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) (type := payload) (value := .cellRef (OptionalCell.cellType payload) (store.length + 2)) tailState post)
-  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary initialFound sourceType child allocation annotation same remaining ih =>
+  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary initialFound sourceType child allocation annotation same remaining tailSites ih =>
       have tailShape := shape.let_tail
       obtain ⟨typedNode, typedFound, typed, certified⟩ := child
       have nodeEq := Option.some.inj (initialFound.symm.trans typedFound)
@@ -198,7 +202,7 @@ theorem reflects_at {budget : Nat}
             finalState, callerProtocol.trans expressionRelated
               (callerProtocol.trans allocationRelated (callerProtocol.trans tailRelated (bindings.restore_related (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) (id := binder.id) (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState))), ?_⟩
           exact post_environment bridge (restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState post)
-  | @discard context scope expression expressionNode rest lowered body expressionFound child remaining ih =>
+  | @discard context scope expression expressionNode rest lowered body expressionFound child remaining tailSites ih =>
       have tailShape := shape.discard_tail
       obtain ⟨typedNode, typedFound, typed, certified⟩ := child
       have same := Option.some.inj (expressionFound.symm.trans typedFound)
@@ -231,8 +235,12 @@ theorem reflects_at {budget : Nat}
             .expression childTrace tailTrace, related, finalHeaps,
             firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans preservation, firstMetadata.trans metadata,
             reached, callerProtocol.trans expressionRelated tailRelated, post⟩
-  | @assign context scope assignment operator rhs rest body head remaining ih =>
-      obtain ⟨rfl, bare, tailShape⟩ := shape.assign_tail
+  | @assign context scope assignment operator rhs rest body head remaining tailSites headErrors ih =>
+      have invalidToken : AssignmentOperandDiagnostics.OperandsLaw
+          (fun reason token => faults (.semantic reason) token) operator head.invalid := by
+        intro previous right invalid
+        exact semantic _ _ ((GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors).operands previous right invalid)
+      obtain ⟨_profile, bare, tailShape⟩ := shape.assign_tail
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
       have typedChildren : ReflectsBelow bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults budget := by
@@ -243,7 +251,7 @@ theorem reflects_at {budget : Nat}
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative) bridge functions extension transport
         head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-        budget typedChildren completed within
+        budget typedChildren invalidToken completed within
       cases result with
       | fault snapshot trace same matched finalHeaps maps worlds preservation metadata reached related stable =>
           cases same
@@ -251,6 +259,13 @@ theorem reflects_at {budget : Nat}
             .assignmentFailure snapshot trace, .fault matched,
             finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
           exact fault_post bridge reached stable
+      | operands snapshot trace currentRead rootType initialized path invalid same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+            .assignmentOperands snapshot trace currentRead rootType initialized path invalid, .fault matched,
+            finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic (.invalidAssignmentOperands operator)) reached stable
       | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
           have tailTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2
           obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
@@ -266,6 +281,6 @@ theorem reflects_at {budget : Nat}
             .assignment snapshot childTrace write trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
-  | bitNot head remaining ih => cases shape
+  | bitNot remainingErrors headErrors ih => cases shape
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeaderReflection
