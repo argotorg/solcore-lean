@@ -75,6 +75,9 @@ private theorem issued_entry {artifact : Artifact} {before after : Session artif
   | physicalNamed prepared inputs rows packet member bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded wellFormed =>
       exact .physicalNamed prepared inputs rows packet member bodyRegistry future faults profile anchor
         issuance atRecipe handleValue encoded wellFormed
+  | physicalNamedSelected prepared inputs rows packet member bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded certified =>
+      exact .physicalNamedSelected prepared inputs rows packet member bodyRegistry future faults profile anchor
+        issuance atRecipe handleValue encoded certified
   | physicalBuiltin prepared headers keys bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded =>
       exact .physicalBuiltin prepared headers keys bodyRegistry future faults profile anchor issuance atRecipe handleValue encoded
 
