@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreCapturedWhileFixture
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLegacyBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
 
 /-! The original typed loop body supplies its condition, two writes and restored
@@ -102,7 +102,7 @@ theorem ObservedFactory.flag_declaration {fixture : CompiledFixture} (observed :
     Ne.symm observed.shape.flagDistinct, observed.shape.argumentFlag, observed.shape.stopFlag, observed.shape.flagRequirements]
 
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
-    CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
+    CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .whileLoop observed.shape.loopFound observed.shape.loopForm
     (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare
       (.assign observed.shape.flagAssignmentFound observed.shape.flagAssignmentForm (.inl rfl) observed.shape.flagTargetBare .nil))

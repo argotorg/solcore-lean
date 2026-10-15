@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedProgramCertificates
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProgramNamedSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProgramClosureSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPrimitiveMethodAdmission
@@ -6,7 +7,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationProgramSupportIssuer
 open Core Frontend SourceInference
-open CallableIndexedOwnedPreparedProgramAdmission (Certificate)
+open SelectedCompilationPreparedProgramCertificates (Certificate)
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
 open CallableIndexedOwnedPreparedNamedSyntaxAdmission (TableAligned)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
@@ -63,7 +64,7 @@ theorem issue_for :
     exact SelectedCompilationProgramNamedSupport.named_support certificate bodyTyping ready checked identity issued entryMember rows aligned input packet
   let namedChoice := fun header member => Classical.choice (named header member)
   let closureChoice := fun {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association (headers rows) (keys compiled)
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association (headers rows) (keys compiled)
       initial.result.context.registry (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       mapping world function native bindings parameter result) =>
     Classical.choice (SelectedCompilationProgramClosureSupport.of_certificate certificate bodyTyping checked identity issued rows aligned association)

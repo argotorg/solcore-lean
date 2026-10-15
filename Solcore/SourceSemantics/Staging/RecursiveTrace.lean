@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
+import Solcore.SourceSemantics.Staging.RecursiveProjectedTarget
 
 /-! A finite recursive staged profile. Every callee, argument and selected body
 uses these same mutually recursive judgments. Staging rejection propagates
@@ -12,7 +12,7 @@ Bodies cover monomorphic lets, bare plain assignments, discards, scoped blocks,
 conditional statements, finite while and for loops, ordered match arms, returns,
 and scoped break and continue transfers.
 Blocks and conditional arms restore lexical bindings while keeping heap effects.
-Projected assignments require further rules. These judgments do not assert coverage of the full current compiler. -/
+Projected value assignments retain ordered keys, their getter snapshot, and the actual final write. These judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive
@@ -526,6 +526,60 @@ mutual
         (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | assignProjected {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          middle target updated written)
+        (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | assignProjectedRootFault {mode scope context environment before assignment operator rhs id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) before
+    | assignProjectedKeysFault {mode scope context environment before after assignment operator rhs id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | assignProjectedGetterFault {mode scope context environment before after assignment operator rhs values id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) after
+    | assignProjectedRhsFault {mode scope context environment before targetHeap after assignment operator rhs values target id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | assignProjectedWriteFault {mode scope context environment before targetHeap after assignment operator rhs values target right id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) after
     | assignBare {mode scope context finalContext environment before middle written after
           id rest node assignment operator rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
@@ -714,6 +768,48 @@ mutual
     | expressionFailure {scope context environment before after expression rest failure}
         (child : Expression program registry scope context environment before expression (.fault failure) after) :
         ForItems program registry scope context environment before (.expression expression :: rest) context (.fault failure) after
+    | projectedAssignment {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          middle target updated written)
+        (next : ForItems program registry scope context environment written rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) finalContext outcome after
+    | projectedAssignmentRootFault {scope context environment before assignment operator rhs rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) before
+    | projectedAssignmentKeysFault {scope context environment before after assignment operator rhs rest failure}
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | projectedAssignmentGetterFault {scope context environment before after assignment operator rhs values rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after
+    | projectedAssignmentRhsFault {scope context environment before targetHeap after assignment operator rhs values target rest failure}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.fault failure) after) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | projectedAssignmentWriteFault {scope context environment before targetHeap after assignment operator rhs values target right rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after
     | assignment {scope context finalContext environment before middle written after assignment operator rhs value target updated rest outcome}
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry scope context environment before rhs (.value value) middle)
@@ -888,6 +984,7 @@ end
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
+  assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)

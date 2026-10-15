@@ -99,16 +99,30 @@ theorem formation {bodyRegistry : SourceCoreRawMetadata.Registry}
   subst finalContext
   subst outcome
   obtain ⟨receipt⟩ := formation.formations child selected
-  have found : child.source.lookupExpression? terminal.expression = some receipt.site.code.sourceNode := by
-    simpa only [stages.source selected, header.agreement.source, receipt.identifier,
-      CallableIndexedLambdaGeneration.closure, CallableIndexedNamedGeneration.source] using receipt.site.code.sourceFound
-  have lifted := Staging.Recursive.Lifting.atomic_nonlocal (registry := stages)
-    unique (lookupExpression?_sound found)
-    (receipt.site.code.sourceForm.symm ▸ Staging.Recursive.AtomicForm.lambda _ _ _)
-    receipt.coercions
-    (by intro name binder same; rw [receipt.site.code.sourceForm] at same; cases same)
-    evaluated.sound
-  exact terminal_expression (terminal.receipt.head child (stages.source selected))
-    (Staging.Recursive.Lifting.ExpressionLift.completed lifted)
+  cases receipt with
+  | inl receipt =>
+    have found : child.source.lookupExpression? terminal.expression = some receipt.site.code.sourceNode := by
+      simpa only [stages.source selected, header.agreement.source, receipt.identifier,
+        CallableIndexedLambdaGeneration.closure, CallableIndexedNamedGeneration.source] using receipt.site.code.sourceFound
+    have lifted := Staging.Recursive.Lifting.atomic_nonlocal (registry := stages)
+      unique (lookupExpression?_sound found)
+      (receipt.site.code.sourceForm.symm ▸ Staging.Recursive.AtomicForm.lambda _ _ _)
+      receipt.coercions
+      (by intro name binder same; rw [receipt.site.code.sourceForm] at same; cases same)
+      evaluated.sound
+    exact terminal_expression (terminal.receipt.head child (stages.source selected))
+      (Staging.Recursive.Lifting.ExpressionLift.completed lifted)
+  | inr receipt =>
+    have found : child.source.lookupExpression? terminal.expression = some receipt.produced.site.code.sourceNode := by
+      simpa only [stages.source selected, header.agreement.source, receipt.produced.identifier,
+        CallableIndexedLambdaGeneration.closure, CallableIndexedNamedGeneration.source] using receipt.produced.site.code.sourceFound
+    have lifted := Staging.Recursive.Lifting.atomic_nonlocal (registry := stages)
+      unique (lookupExpression?_sound found)
+      (receipt.produced.site.code.sourceForm.symm ▸ Staging.Recursive.AtomicForm.lambda _ _ _)
+      receipt.coercions
+      (by intro name binder same; rw [receipt.produced.site.code.sourceForm] at same; cases same)
+      evaluated.sound
+    exact terminal_expression (terminal.receipt.head child (stages.source selected))
+      (Staging.Recursive.Lifting.ExpressionLift.completed lifted)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedTerminalLifting

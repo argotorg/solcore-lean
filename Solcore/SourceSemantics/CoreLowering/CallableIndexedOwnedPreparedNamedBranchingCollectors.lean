@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicAssignmentDiagnostics
@@ -159,7 +160,8 @@ theorem collected_of_imperative
         RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) (faults := faults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) header.function.source expressionSyntax
       (TypedCertificate header.function.source certificates) compiled.indexed.layouts.definitions
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
@@ -218,6 +220,7 @@ consumed by the numeric body theorem. Source and native execution are absent
 from the factory's premises. -/
 def of_imperative_compiler
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -255,7 +258,10 @@ def of_imperative_compiler
         header bodyRegistry semanticFaults context child scope id lowered) :
     CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
       headers keys bodyRegistry header stages receipt semanticFaults := by
-  refine ⟨complete, zero, wellFormed, ?_⟩
+  refine ⟨complete, zero, wellFormed,
+    RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared,
+    RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared,
+    PreparedAssignmentDiagnosticProducers.named prepared diagnostic aligned, ?_⟩
   intro child selected
   rw [stages.source selected]
   exact ⟨expressionSyntax, collected_of_imperative prepared aligned ready wellFormed member receipt operands unary syntaxTree (children child selected)⟩
@@ -267,6 +273,7 @@ consumed by the numeric body theorem. Source and native execution are absent
 from the factory's premises. -/
 def of_compiler
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -304,7 +311,7 @@ def of_compiler
         header bodyRegistry semanticFaults context child scope id lowered) :
     CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
       headers keys bodyRegistry header stages receipt semanticFaults :=
-  of_imperative_compiler prepared aligned ready wellFormed complete zero member receipt operands unary stages
+  of_imperative_compiler prepared aligned ready diagnostic wellFormed complete zero member receipt operands unary stages
     (.body syntaxTree) children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors

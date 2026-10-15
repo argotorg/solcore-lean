@@ -43,6 +43,7 @@ private theorem all (selectedBodies : SelectedBodies program registry) (size : N
           (fun smaller below => (ih smaller below).statements)
         statements := statements_step size
           (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).expressions)
           (fun smaller below => (ih smaller below).statements)
           (fun smaller below => (ih smaller below).whileLoop)
           (fun smaller below => (ih smaller below).matchArms)
@@ -61,6 +62,7 @@ private theorem all (selectedBodies : SelectedBodies program registry) (size : N
           (fun smaller below => (ih smaller below).statements)
         forItems := for_items_step size
           (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).expressions)
           (fun smaller below => (ih smaller below).forItems)
         forLoop := for_loop_step size
           (fun smaller below => (ih smaller below).expression)

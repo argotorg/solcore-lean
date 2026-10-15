@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalIndirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedFormationSupport
@@ -120,7 +122,7 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
   (certificates : ∀ header, header ∈ headers → SelectedCompilationNamedSourceTyping.Certified header)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
   (extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry completion.result.context.registry)
   (semantic : ∀ reason token, semanticFaults reason token →
@@ -138,18 +140,18 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
       (headers := headers) (bodyRegistry := bodyRegistry) (stages := stages)
       (semanticFaults := semanticFaults) header (bodies header member))
   (closurePackets : ∀ {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
       mapping world function native bindings parameter result),
-    SelectedCompilationPhysicalClosureStaticSupport.PacketFor association.original stages)
+    SelectedCompilationPhysicalClosureStaticSupport.PacketFor association stages)
   (closureSupport : ∀ {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
       mapping world function native bindings parameter result),
-    SelectedCompilationPhysicalClosureStaticSupport.SupportFor association.original stages (closurePackets association))
+    SelectedCompilationPhysicalClosureStaticSupport.SupportFor association stages (closurePackets association))
   (owners : ∀ owner : OwnedKey keys, CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
   (methodSupport : MethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
   (mixedMethodSupport : MixedMethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
@@ -168,6 +170,7 @@ theorem preserves_with_methods (size : Nat) :
           (headers := headers) (keys := keys) header model stages child callFaults size := by
       intro size within header member child selected
       exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
         (bodySupport header member) profile (certificates header member) extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     cases root.support with
@@ -198,7 +201,10 @@ theorem preserves_with_methods (size : Nat) :
             simpa only [sourceAtEq] using argumentsTyped
           simpa only [sourceAtEq] using
             SelectedCompilationMethodBodyBounds.source_continuation (semantic := semantic)
-              port.principal packet static certified functions selected installed owner keyPhysical caller
+              (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+              port.principal packet static certified functions
+              (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+              (CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile) selected installed owner keyPhysical caller
               heapTyped packetArguments stable extension size
               (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
         intro actualScope actualId actualCode point actual found typed
@@ -223,7 +229,7 @@ theorem preserves_with_methods (size : Nat) :
           callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
           bodyTyping certificates support.runtime support.unique support.actualFunctionType
           observations closurePackets closureSupport bodies
-          compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
+          (PreparedAssignmentDiagnosticAuthority.interprets receiver) compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
       intro current id code point
       exact SelectedCompilationSharedCallerBounds.preserves_reached_with_functions
         callerBridge.forgetSlots receiver functions support.runtime support.unique
@@ -234,8 +240,8 @@ theorem preserves_with_methods (size : Nat) :
       have rawMeaning := SelectedCompilationPhysicalCoercedDirectRawBounds.preserves
         support bodyTyping.function_ids owner keyPhysical functions callFaults
         budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
-      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.source_bodies (semantic := semantic)
-        owner keyPhysical functions callFaults extension support.chain support.methods budget ih
+      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.source_bodies
+        owner keyPhysical functions callFaults support.chain support.methods budget ih
       intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
       cases Option.some.inj (found.symm.trans support.actual.found)
@@ -264,6 +270,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
           (headers := headers) (keys := keys) header model (RecursiveNamedPreparedStageScopes.registry stagePrepared) child callFaults size := by
       intro size within header member child selected
       exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
         (bodySupport header member) profile (certificates header member) extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     cases root.support with
@@ -295,7 +302,11 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
             simpa only [sourceAtEq] using argumentsTyped
           simpa only [sourceAtEq] using
             SelectedCompilationMethodBodyBounds.native_continuation (semantic := semantic)
-              port.principal packet static certified functions selected installed owner keyPhysical caller
+              (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+              port.principal packet static certified functions
+              (CallableIndexedOwnedPreparedPhysicalCellOrigins.runtime_views profile)
+              (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+              (CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile) selected installed owner keyPhysical caller
               heapTyped packetArguments stable extension size
               (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
         intro actualScope actualId actualCode point actual found typed
@@ -320,7 +331,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
           callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
           bodyTyping certificates support.runtime support.unique support.actualFunctionType
           observations closurePackets closureSupport bodies
-          rfl compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
+          (PreparedAssignmentDiagnosticAuthority.interprets receiver) rfl compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
       intro current id code point
       exact SelectedCompilationSharedCallerBounds.reflects_reached_with_functions
         callerBridge.forgetSlots receiver functions support.runtime support.unique
@@ -333,8 +344,8 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
         support owner keyPhysical functions callFaults
         stagePrepared rfl descriptor
         budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
-      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.native_bodies (semantic := semantic)
-        owner keyPhysical functions callFaults extension support.chain support.methods budget ih
+      have conversionBodies := SelectedCompilationPhysicalCoercionMethodBounds.native_bodies
+        owner keyPhysical functions callFaults support.chain support.methods budget ih
       intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
       cases Option.some.inj (found.symm.trans support.actual.found)

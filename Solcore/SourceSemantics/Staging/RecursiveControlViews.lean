@@ -89,6 +89,18 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | bitNotBareFault actual same _ _ =>
       cases (shape actual).symm.trans same
+  | assignProjected actual same _ _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedRootFault actual same _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedKeysFault actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedGetterFault actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedRhsFault actual same _ _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedWriteFault actual same _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
   | assignBare actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBareFault actual same _ _ =>
@@ -188,6 +200,18 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
   | bitNotBare actual same _ _ _ =>
       cases (shape actual).symm.trans same
   | bitNotBareFault actual same _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjected actual same _ _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedRootFault actual same _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedKeysFault actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedGetterFault actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedRhsFault actual same _ _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignProjectedWriteFault actual same _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBare actual same _ _ _ _ =>
       cases (shape actual).symm.trans same

@@ -6,7 +6,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedInitialForward
 open Core Frontend SourceInference
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open SelectedCompilationStagePublicInputLifting
 open RecursiveNamedPublicScalarResults (ScalarOutput)

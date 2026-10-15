@@ -1,7 +1,8 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationLambdaAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalLambdaFormationHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalNestedCanonicalState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 
@@ -34,7 +35,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (prefixZero : owner.key.capturePrefix = 0)
   (sameSource : invocation.source = CallableIndexedNamedGeneration.source caller.named)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 local notation "bridge" => CallableIndexedOwnedPhysicalNestedCanonicalState.bridge (headers := headers) owner caller
 
@@ -116,7 +117,7 @@ theorem preserves (size : Nat) :
       | stage failedScope call reason =>
         exact False.elim (no_stage unique sourceFound receipt.site.code.sourceForm receipt.coercions trace)
   obtain ⟨rfl, rfl⟩ := changed
-  obtain ⟨payload, native, represented⟩ := CallableIndexedOwnedPreparedStagedPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
+  obtain ⟨payload, native, represented⟩ := SelectedCompilationPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
     prefixZero receipt environments heaps agrees nativeTyped initial.base.property initial.base.val
   refine ⟨.inRight .word payload, store, mapping, world, native, .value represented,
     heaps, .refl _, .refl _, .refl _ _, .refl _, initial, Relates.refl initial.base.val.val, ?_⟩
@@ -139,7 +140,7 @@ theorem reflects (size : Nat) :
     simpa only [sameSource, receipt.identifier, CallableIndexedLambdaGeneration.closure] using receipt.site.code.sourceFound
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  obtain ⟨payload, native, represented⟩ := CallableIndexedOwnedPreparedStagedPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
+  obtain ⟨payload, native, represented⟩ := SelectedCompilationPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
     prefixZero receipt environments heaps agrees nativeTyped initial.base.property initial.base.val
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic native completed.sound
   have sourceTrace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages

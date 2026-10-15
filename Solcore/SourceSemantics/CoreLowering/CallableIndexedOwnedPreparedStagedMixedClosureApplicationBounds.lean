@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds
@@ -64,7 +65,11 @@ variable (association : Association headers keys bodyRegistry semanticFaults map
 
 variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
 
-include supported raw represented heaps stable runtime semantic in
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
+
+include supported raw represented heaps stable runtime semantic assignmentInterpretation in
 /-- The actual Association and chosen packet retain the original parameter
 context. Each body branch constructs its application port from the strict Root IH. -/
 theorem application_preserves (budget : Nat)
@@ -211,6 +216,7 @@ theorem application_preserves (budget : Nat)
     | nestedBranching branching =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
         CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (ordinary := support) (origin := origin) (prefixContext := prefixContext)
           (packet := branching) (support := supported)
@@ -232,6 +238,7 @@ theorem application_preserves (budget : Nat)
         exact globals
       obtain ⟨value, finalStore, evaluated, result⟩ :=
         CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -247,6 +254,7 @@ theorem application_preserves (budget : Nat)
     | branching branching =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
         CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
@@ -394,6 +402,7 @@ theorem application_preserves (budget : Nat)
         exact globals
       obtain ⟨value, finalStore, evaluated, result⟩ :=
         CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -409,6 +418,7 @@ theorem application_preserves (budget : Nat)
     | branching branching =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
         CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
@@ -437,7 +447,7 @@ theorem application_preserves (budget : Nat)
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
 
-include supported raw represented heaps stable runtime semantic in
+include supported raw represented heaps stable runtime semantic assignmentInterpretation in
 /-- Reflection uses the packet-selected Source scope. The original parameter
 installation, independent Source grade and literal returned caller are preserved. -/
 theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
@@ -582,6 +592,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
     | nestedBranching branching =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
         CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (ordinary := support) (origin := origin) (prefixContext := prefixContext)
           (packet := branching) (support := supported)
@@ -603,6 +614,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         exact globals
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
         CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -618,6 +630,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
     | branching branching =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
         CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
@@ -763,6 +776,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         exact globals
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
         CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (observed := observed) (stable := stable)
@@ -778,6 +792,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
     | branching branching =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
         CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)

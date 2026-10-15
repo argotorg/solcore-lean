@@ -41,7 +41,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
 
-include keyPhysical wellFormed extension support semantic in
+include keyPhysical wellFormed support in
 theorem source_bodies (budget : Nat)
     (children : ∀ size, size < budget → PreservesRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -58,11 +58,14 @@ theorem source_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [CallableIndexedOwnedPreparedStagedMethodBodies.Packet.sourceAt, sourceAt] using
-        CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation (semantic := semantic)
-          port.principal (.terminal packet) static wellFormed functions selected installed
-          owner keyPhysical caller heapTyped packetArguments stable extension budget children
+        CallableIndexedOwnedPreparedStagedMethodTerminalBounds.source_continuation
+          port.principal packet static wellFormed functions selected installed
+          owner keyPhysical caller heapTyped packetArguments stable budget
+          (fun size smaller _context _invocation _scope _expression _lowered root owner physical =>
+            children size smaller
+              (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod root) owner physical)
 
-include keyPhysical wellFormed extension support semantic in
+include keyPhysical wellFormed support in
 theorem native_bodies (budget : Nat)
     (children : ∀ size, size < budget → ReflectsRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -79,8 +82,11 @@ theorem native_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [CallableIndexedOwnedPreparedStagedMethodBodies.Packet.sourceAt, sourceAt] using
-        CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation (semantic := semantic)
-          port.principal (.terminal packet) static wellFormed functions selected installed
-          owner keyPhysical caller heapTyped packetArguments stable extension budget children
+        CallableIndexedOwnedPreparedStagedMethodTerminalBounds.native_continuation
+          port.principal packet static wellFormed functions selected installed
+          owner keyPhysical caller heapTyped packetArguments stable budget
+          (fun size smaller _context _invocation _scope _expression _lowered root owner physical =>
+            children size smaller
+              (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod root) owner physical)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds

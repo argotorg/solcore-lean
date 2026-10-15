@@ -17,7 +17,7 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedIndirectSourceAdapters (Prepared)
 open CallableIndexedOwnedContextualDiagnosticSources (SourceView)
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
-open CallableIndexedOwnedPhysicalClosureAssociation (Association)
+open CallableIndexedOwnedPreparedPhysicalClosureAssociation (Association)
 open SelectedCompilationPhysicalClosureStaticSupport (PacketFor SupportFor)
 open SelectedCompilationIndirectBuiltinPreservationDispatch (ParentAt)
 open SelectedCompilationIndirectBuiltinApplicationDispatch (ParentResult)
@@ -72,7 +72,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked completion.result.context.registry
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -86,7 +86,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (unique : NodeOccurrencesUnique invocation.source)
   (parentTyped : ExpressionHasType invocation.source context id compiler.original.type)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
@@ -95,6 +95,9 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 variable (semantic : ∀ reason token, semanticFaults reason token →
   CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
 
 
 
@@ -103,11 +106,11 @@ variable (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourc
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
 
 include physical owners receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped runtime actualFunctionType observations semantic in
+  sourceParent tree unique parentTyped runtime actualFunctionType observations semantic assignmentInterpretation in
 /-- One original Source parent constructs its complete native result or
 retains the authentic named suffix. The concrete call producers reuse the
 literal callee and argument evaluations and their reached pool. -/
@@ -116,10 +119,10 @@ theorem preserves_parent_or_global (budget : Nat)
       bridge context model stages invocation certificate callFaults budget)
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), PacketFor association.original stages)
+        bindings parameterCore resultCore), PacketFor association stages)
     (supported : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), SupportFor association.original stages (packets association))
+        bindings parameterCore resultCore), SupportFor association stages (packets association))
     (bodyChildren : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
         (headers := headers) (keys := keys)
@@ -150,6 +153,7 @@ theorem preserves_parent_or_global (budget : Nat)
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         actualFunctionType observations calleeTrace accepted argumentsTrace called constructedPrefix with user | parent
     · rcases SelectedCompilationPhysicalClosureUserDispatch.preserves_closure_or_global (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           bridge profile physical owners compiler prepared initial sourceParent occurrence stagePrepared receiver
           runtime sourceEq tree unique parentTyped found guardFrame actualFunctionType
           packets supported budget bodyChildren user.1 calleeTrace accepted argumentsTrace called (Nat.le_of_lt strict)
@@ -161,7 +165,7 @@ theorem preserves_parent_or_global (budget : Nat)
 
 include physical owners receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
-  sourceParent tree unique parentTyped runtime actualFunctionType observations semantic in
+  sourceParent tree unique parentTyped runtime actualFunctionType observations semantic assignmentInterpretation in
 /-- One original native parent completion either gives full Source parent
 meaning or retains its actual named application prefix. Concrete call branches
 share the same reached state; no caller or argument trace is replayed. -/
@@ -170,10 +174,10 @@ theorem reflects_parent_or_global (budget : Nat)
       bridge context model stages invocation certificate callFaults budget)
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), PacketFor association.original stages)
+        bindings parameterCore resultCore), PacketFor association stages)
     (supported : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), SupportFor association.original stages (packets association))
+        bindings parameterCore resultCore), SupportFor association stages (packets association))
     (bodyChildren : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
         (headers := headers) (keys := keys)
@@ -205,6 +209,7 @@ theorem reflects_parent_or_global (budget : Nat)
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         actualFunctionType observations completed application with user | parent
     · exact SelectedCompilationPhysicalClosureUserDispatch.reflects_closure_or_global (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
         bridge profile physical owners compiler prepared initial sourceParent occurrence stagePrepared receiver
         runtime sourceEq tree unique parentTyped found actualFunctionType
         packets supported bodyChildren completed user

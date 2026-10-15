@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreCapturedForFixture
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLegacyBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
 /-! Original typed initialization, loop header, post, and restored return supply
 all compiler children for the captured For body. -/
@@ -148,7 +148,7 @@ theorem ObservedFactory.flag_declaration {fixture : CompiledFixture} (observed :
     Ne.symm observed.shape.flagDistinct, Ne.symm observed.shape.flagRunning, Ne.symm observed.shape.flagArgument, Ne.symm observed.shape.flagStop, Ne.symm observed.shape.flagPrevious]
 
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
-    CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
+    CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .initialized observed.shape.initializedFound observed.shape.initializedForm
     (.forLoop observed.shape.loopFound observed.shape.loopForm (.initialized .nil)
       (.assign (.inl rfl) observed.shape.postBare .nil)

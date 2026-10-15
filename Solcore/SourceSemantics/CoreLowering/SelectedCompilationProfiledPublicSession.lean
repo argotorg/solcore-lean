@@ -7,7 +7,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSession
 open Core Frontend SourceInference
-open RecursiveNamedPublicPhysicalSessionState (StartedCall)
+open SelectedCompilationPublicSessionState (StartedCall)
 
 structure Profiled (recipe : SourceCoreIndexedSession.Recipe) extends Issued recipe where
   staticProfile : CompilerProgramStaticProfile.StaticProfile recipe.compiled

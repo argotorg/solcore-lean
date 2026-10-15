@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedLexicalSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
@@ -64,9 +65,13 @@ structure NamedSupport
     (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) headers
   zero : ∀ owner : OwnedKey keys, owner.key.capturePrefix = 0
   wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    header.function.source invalidProjection missingDefault)
   tree : ∀ child, stages.Closure header.function child →
     ∃ expressionSyntax : ExpressionId → Prop,
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected invalidProjection missingDefault (faults := semanticFaults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) child.source expressionSyntax
       (TypedCertificate child.source (fun context => Certificate headers header bodyRegistry semanticFaults context child))
       compiled.indexed.layouts.definitions

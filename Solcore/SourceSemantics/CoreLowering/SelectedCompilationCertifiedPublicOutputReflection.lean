@@ -11,7 +11,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPubli
 open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState (Call SourceCall PlainValue)
+open SelectedCompilationPublicSessionState (Call SourceCall PlainValue)
 open RecursiveNamedPublicFunctionHistory (Entry)
 open SelectedCompilationStageClosedDirectForward.Output (ReturnedValue)
 

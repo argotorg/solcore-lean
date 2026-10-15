@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectNativePrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedCallBoundaryReceipts
@@ -25,7 +26,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
     headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+  [positive : SelectedCompilationCallableOrigins.Origins
     headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context}
   {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
@@ -157,10 +158,11 @@ theorem scoped_boundary {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
   obtain ⟨reached, _related, admitted⟩ := post.2.2.2.2.2.2.2
   have typedSource := CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission.at_value admitted |>.1
   rw [calleeFunction] at typedSource
-  have positive := CallableIndexedOwnedContextualCalleeOriginReadReceipts.callable_at profile (post.2.1.map_functions (CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile)))
-    (value_is_function typedSource)
+  have actualOrigin := SelectedCompilationCallableOrigins.Origins.origin
+    (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry)
+    (faults := semanticFaults) (profile := profile) post.2.1 (value_is_function typedSource)
   exact CallableIndexedOwnedPreparedScopedCallBoundaryReceipts.boundary_at_source_view compiler prepared
-    caller view originalUnique (CallableIndexedOwnedContextualCalleeStageReceipts.callee_origin positive)
+    caller view originalUnique actualOrigin
 
 /-- The stage branch retains its actual invocation and occurrence, exact
 selected original row/metadata and native word. Its diagnostic representation

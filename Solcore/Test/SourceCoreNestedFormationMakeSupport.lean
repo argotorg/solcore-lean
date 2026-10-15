@@ -58,7 +58,9 @@ theorem ActualHeader.make_formation {fixture : CompiledFixture} {observed : Obse
   · exact observed.makeShape.outerCoercions
   · simp only [observed.noLocals, List.find?_nil]
   · rw [actual.source, expression]; exact extra.read
-  · rw [actual.source]; exact observed.outer_body_shape
+  · rw [actual.source]
+    exact .initialized observed.makeShape.initializedFound observed.makeShape.initializedForm
+      (.returnValue [] observed.makeShape.outerReturnFound observed.makeShape.outerReturnForm)
   · intro context final facts typed
     rw [actual.source] at typed ⊢
     exact observed.outer_body_syntax (actual.source ▸ actual.header.unique) True.intro True.intro typed

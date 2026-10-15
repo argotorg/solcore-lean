@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationMixedRootSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
 
@@ -23,8 +24,12 @@ structure SelectedBody {compiled : SourceCoreUnifiedCompilation.Compiled}
   projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
   readFuel : Nat
   «prefix» : code.compilation.administrativePrefix = 1
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    function.source invalidProjection missingDefault)
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected invalidProjection missingDefault (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -44,7 +49,8 @@ theorem SelectedBody.sites {compiled function scope administrative headers code 
     (support : @SelectedBody compiled function scope administrative headers code inputs stages packet semanticFaults)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
     (registry : SourceCoreRawMetadata.Registry) :
-    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+    PreparedBranchingCatalogSites.CatalogSites support.invalidProjection support.missingDefault registry semanticFaults
+      (support.tree child selected) :=
   (support.collected child selected).sites registry
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalBranchingClosureStaticSupport

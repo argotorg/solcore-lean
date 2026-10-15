@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectClosureApplicationBounds
@@ -148,6 +149,7 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_reflects (semantic := semantic)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       profile association (chosen association).1 (chosen association).2 caller raw represented heaps stable runtime
       valid size (fun childSize _ => bodies childSize) (fun childSize _ => canonicalBodies childSize) evaluation (Nat.le_refl _)
   rw [← resultEq, ← nativeTypes.2] at representedResult
@@ -229,6 +231,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_preserves (semantic := semantic)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       profile association (chosen association).1 (chosen association).2 caller raw represented heaps stable runtime
       sourceSize (fun childSize _ => bodies childSize) (fun childSize _ => canonicalBodies childSize) trace (Nat.le_refl _)
   obtain ⟨nativeSize, measured⟩ := evaluation_has_size evaluated

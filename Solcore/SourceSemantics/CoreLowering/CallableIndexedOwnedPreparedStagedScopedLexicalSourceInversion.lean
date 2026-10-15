@@ -47,6 +47,12 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
+  | assignProjected actual same _ _ _ _ _ _
+  | assignProjectedRootFault actual same _ _
+  | assignProjectedKeysFault actual same _ _ _
+  | assignProjectedGetterFault actual same _ _ _
+  | assignProjectedRhsFault actual same _ _ _ _
+  | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -100,6 +106,12 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
+  | assignProjected actual same _ _ _ _ _ _
+  | assignProjectedRootFault actual same _ _
+  | assignProjectedKeysFault actual same _ _ _
+  | assignProjectedGetterFault actual same _ _ _
+  | assignProjectedRhsFault actual same _ _ _ _
+  | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -146,6 +158,12 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
+  | assignProjected actual same _ _ _ _ _ _
+  | assignProjectedRootFault actual same _ _
+  | assignProjectedKeysFault actual same _ _ _
+  | assignProjectedGetterFault actual same _ _ _
+  | assignProjectedRhsFault actual same _ _ _ _
+  | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same

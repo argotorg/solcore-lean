@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationBuiltinFunctionOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationIndirectValuesPrefix
@@ -28,7 +30,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
     headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+  [positive : SelectedCompilationCallableOrigins.Origins
     headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
   {invocation : Staging.Recursive.Scope}
@@ -157,7 +159,7 @@ theorem preserves_builtin_or_user
             (outcome := outcome) (after := after) (calleeStore := calleeStore)
             bridge compiler prepared sourceParent occurrence initial reached related admitted
             finalHeaps maps worlds frame heapMetadata observations receipt count actualFunctionType
-            valueTyped (representedCallee.map_functions (CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile))) representedValues bundle resultType calleeTrace argumentsTrace
+            valueTyped (SelectedCompilationBuiltinFunctionOrigins.ErasesBuiltinsToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile) representedCallee) representedValues bundle resultType calleeTrace argumentsTrace
             called calleePost.1 argumentsNative
         obtain ⟨parentSource, value, native, representation, sameHeap, heaps,
           keptMaps, keptWorlds, keptFrame, keptMetadata, keptRelated, post⟩ := completeParent

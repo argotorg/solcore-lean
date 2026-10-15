@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPackedNamedArguments
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedApplicationBounds
@@ -78,7 +79,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
           outcome after value finalStore finalMap finalWorld callFaults := by
   classical
   obtain ⟨originalType, ⟨association⟩, _rawType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleeRelated function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleeRelated function rfl
   let owner := association.owner
   let header := association.header
   let descriptor := association.descriptor
@@ -182,7 +183,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
         outcome after value finalStore finalMap finalWorld callFaults := by
   classical
   obtain ⟨originalType, ⟨association⟩, _rawType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleeRelated function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleeRelated function rfl
   let owner := association.owner
   let header := association.header
   let descriptor := association.descriptor

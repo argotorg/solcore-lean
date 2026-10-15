@@ -26,6 +26,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (support : Support principal packet headers stages semanticFaults)
   (certified : SelectedCompilationMethodBodySupport.Certified principal packet.sourceAt)
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
   {registry : SourceCoreRawMetadata.Registry} {child : Staging.Recursive.Scope}
   (selected : stages.Closure principal.sourceFunction child)
   {administrative : Core.Context} {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
@@ -43,8 +46,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled registry
+    (fun reason token => faults (.semantic reason) token))
 
-include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic in
+include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -64,8 +69,8 @@ theorem source_continuation
       beforeTyped argumentsTyped stable budget
       children
   | «scoped» packet =>
-    exact SelectedCompilationStageMethodScopedLifting.source_continuation (semantic := semantic)
-      principal packet support certified functions selected installed owner keyPhysical caller
+    exact SelectedCompilationStageMethodScopedLifting.source_continuation (semantic := semantic) (assignmentInterpretation := assignmentInterpretation)
+      principal packet support certified functions faithful observations selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children preservation
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageMethodBodyLifting

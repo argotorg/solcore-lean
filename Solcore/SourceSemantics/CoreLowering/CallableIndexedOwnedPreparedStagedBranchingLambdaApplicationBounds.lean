@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualFunctionViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaBodyBounds
 
@@ -64,7 +65,11 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
 
-include support stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic in
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
+
+include support stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- The genuine Source application chooses its own scope and parameter entry.
 The same internally constructed body port returns through the saved caller. -/
 theorem application_preserves {budget : Nat}
@@ -88,13 +93,16 @@ theorem application_preserves {budget : Nat}
     allowed callerRuntime stable budget
     (fun entry reached childSize strict =>
       CallableIndexedOwnedPreparedStagedBranchingLambdaBodyBounds.source_body_at (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
+        (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+        (observations := CallableIndexedOwnedContextualFunctionViews.observations profile)
         (profile := profile) (captured := captured) (code := code) (history := history)
         (inputs := inputs) (packet := packet) (support := support) (owner := owner) (caller := caller)
         (stable := stable) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped)
         entry reached children (Nat.le_of_lt strict))
     trace within
 
-include support stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic in
+include support stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- Native application selects its real strict body child. The packet's
 chosen Source scope supplies that body and the original returned caller post. -/
 theorem application_reflects
@@ -121,6 +129,10 @@ theorem application_reflects
     allowed callerRuntime stable packet.child packet.selected valid budget
     (fun entry reached childSize strict =>
       CallableIndexedOwnedPreparedStagedBranchingLambdaBodyBounds.native_body_at (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
+        (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+        (observations := CallableIndexedOwnedContextualFunctionViews.observations profile)
+        (functionTypes := CallableIndexedOwnedContextualFunctionViews.runtime_views profile)
         (profile := profile) (captured := captured) (code := code) (history := history)
         (inputs := inputs) (packet := packet) (support := support) (owner := owner) (caller := caller)
         (stable := stable) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped)

@@ -16,7 +16,7 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedFunctionValues (Header)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall Call State SourceCall)
+open SelectedCompilationPublicSessionState (StartedCall Call State SourceCall)
 open SelectedCompilationPublicSessionInitial (Started)
 open SelectedCompilationPhysicalProgramSupport (Support stagePrepared)
 

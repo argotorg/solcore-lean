@@ -34,7 +34,7 @@ private theorem named_bodies {budget : Nat}
     (header : Header compiled (Program.ofChecked compiled.sourceProgram)) (member : header ∈ headers)
     {child : Staging.Recursive.Scope} (selected : (stages compiled).Closure header.function child) :
     NamedLiftsBelow (headers := headers) (keys := keys) header model (stages compiled) child budget := by
-  exact SelectedCompilationStageNamedBodyLifting.lifts (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
+  exact SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
     support.profile (support.certificates header member)
     (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected children
     (preserves_roots support issued extension)
@@ -93,13 +93,11 @@ theorem lifts (budget : Nat)
     exact rawPreservation size (fun child _ => preservation child)
       (fun grade _ {_} selected => SelectedCompilationPhysicalProgramSupport.preserves_bodies
         support issued extension root.port.header root.port.member selected grade) size (Nat.le_refl _)
-  have paths := SelectedCompilationStagePhysicalCoercionMethods.lift_bodies (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
+  have paths := SelectedCompilationStagePhysicalCoercionMethods.lift_bodies
+    owner keyPhysical (functions support)
+    root.chain root.methods budget children
+  have pathsPreserved (size : Nat) := SelectedCompilationPhysicalCoercionMethodBounds.source_bodies
     owner keyPhysical (functions support) faults
-    (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
-    root.chain root.methods budget children preservation
-  have pathsPreserved (size : Nat) := SelectedCompilationPhysicalCoercionMethodBounds.source_bodies (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
-    owner keyPhysical (functions support) faults
-    (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
     root.chain root.methods size (fun child _ => preservation child)
   apply SelectedCompilationStageCoercedExpressionLifting.lifts
     owner root.actual callerBridge (fun state => state.physical) (fun state => state.base.property)

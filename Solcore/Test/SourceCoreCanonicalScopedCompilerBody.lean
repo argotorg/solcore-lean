@@ -33,7 +33,7 @@ private theorem returned_child {policy : SourceCoreLoops.Policy} {checked : Sour
       cases actualForm
       rfl
   | initialized read actualForm | returnUnit read actualForm | absent read actualForm
-  | assigning read actualForm | assigned read actualForm | whileLoop read actualForm
+  | assigning read actualForm | assigned read actualForm | projectedAssigned read actualForm | whileLoop read actualForm
   | bitNotting read actualForm | bitNotted read actualForm
   | discard read actualForm | block read actualForm | conditional read actualForm
   | tailValue read actualForm | valueDiscard read actualForm
@@ -73,7 +73,7 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
       simp only [Tree.closed, Tree.bindings, Tree.children, List.map_cons, tail.1, tail.2.1,
         List.map_nil, children, and_self]
   | returning read form | returnUnit read form | absent read form
-  | assigning read form | assigned read form | whileLoop read form
+  | assigning read form | assigned read form | projectedAssigned read form | whileLoop read form
   | bitNotting read form | bitNotted read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form

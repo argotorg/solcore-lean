@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreRecursiveIndexCertifiedSelection
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionSourceOutcomes
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionSourceOutcomes
 
 /-! The original mapping sequence uses one automatic compiler profile and
 catalog. A missing key retains all five exports, their captures and the reached
@@ -9,11 +9,11 @@ set_option Elab.async false
 set_option maxHeartbeats 5000000
 namespace Tests.SourceCoreRecursiveIndex.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
-open CertifiedPublicSession (Issued)
+open SelectedCompilationCertifiedPublicSession (Profiled)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
 
-structure SequenceMeaning (issued : Issued fixture.recipe)
+structure SequenceMeaning (issued : Profiled fixture.recipe)
     (stages : ObservedStages fixture observed.makeRow)
     (sequence : ObservedSequence fixture observed) where
   first : FirstMeaning issued stages sequence.first
@@ -37,7 +37,7 @@ structure SequenceMeaning (issued : Issued fixture.recipe)
   repeatedRead : InvocationMeaning issued failed.after first.entry sequence.repeatedRead seed
     (RecursiveStageRegistry.scope stages.sidecar [] first.initial.header.function)
 
-variable {issued : Issued fixture.recipe} {stages : ObservedStages fixture observed.makeRow}
+variable {issued : Profiled fixture.recipe} {stages : ObservedStages fixture observed.makeRow}
   {sequence : ObservedSequence fixture observed}
 
 theorem SequenceMeaning.selected_handles (meaning : SequenceMeaning issued stages sequence) :
@@ -56,7 +56,7 @@ theorem SequenceMeaning.original_diagnostic (_meaning : SequenceMeaning issued s
 
 theorem sequence_meaning (profile : Observed fixture)
     (stages : ObservedStages fixture observed.makeRow) (sequence : ObservedSequence fixture observed) :
-    ∃ issued : Issued fixture.recipe, Nonempty (SequenceMeaning issued stages sequence) := by
+    ∃ issued : Profiled fixture.recipe, Nonempty (SequenceMeaning issued stages sequence) := by
   obtain ⟨issued, ⟨first⟩⟩ := first_meaning profile stages sequence.first
   let scope := RecursiveStageRegistry.scope stages.sidecar [] first.initial.header.function
   obtain ⟨second⟩ := make_meaning first.after secondSeed sequence.second scope
@@ -78,13 +78,13 @@ theorem sequence_meaning (profile : Observed fixture)
 /-- Every completed ordinary application keeps the same arguments, callable
 value, full dictionary and heap. A staging rejection keeps its actual guard. -/
 structure PlainMeaning (meaning : SequenceMeaning issued stages sequence) : Prop where
-  first : RecursiveNamedPublicPhysicalSessionState.PlainValue meaning.first.initial.header meaning.first.initial.header
+  first : SelectedCompilationPublicSessionState.PlainValue meaning.first.initial.header meaning.first.initial.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     ⟨[]⟩ [.word seed] meaning.first.entry.source meaning.first.after.heap
-  second : RecursiveNamedPublicPhysicalSessionState.PlainValue meaning.first.initial.header meaning.second.request.header
+  second : SelectedCompilationPublicSessionState.PlainValue meaning.first.initial.header meaning.second.request.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     meaning.first.after.heap [.word secondSeed] meaning.second.entry.source meaning.second.after.heap
-  firstSelect : RecursiveNamedPublicPhysicalSessionState.PlainValue meaning.first.initial.header meaning.firstSelect.request.header
+  firstSelect : SelectedCompilationPublicSessionState.PlainValue meaning.first.initial.header meaning.firstSelect.request.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     meaning.second.after.heap [sourceTable meaning.first.entry meaning.second.entry, .word firstKey]
     meaning.firstSelect.entry.source meaning.firstSelect.after.heap
@@ -94,10 +94,10 @@ structure PlainMeaning (meaning : SequenceMeaning issued stages sequence) : Prop
     (Staging.Recursive.callableEvidence meaning.firstSelect.entry.source)
     meaning.firstSelect.after.heap meaning.firstSelect.entry.source meaning.firstRead.arguments
     (.word seed) meaning.firstRead.after.heap
-  intervening : RecursiveNamedPublicPhysicalSessionState.PlainValue meaning.first.initial.header meaning.intervening.request.header
+  intervening : SelectedCompilationPublicSessionState.PlainValue meaning.first.initial.header meaning.intervening.request.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     meaning.firstRead.after.heap [.word interveningSeed] meaning.intervening.entry.source meaning.intervening.after.heap
-  secondSelect : RecursiveNamedPublicPhysicalSessionState.PlainValue meaning.first.initial.header meaning.secondSelect.request.header
+  secondSelect : SelectedCompilationPublicSessionState.PlainValue meaning.first.initial.header meaning.secondSelect.request.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     meaning.intervening.after.heap [sourceTable meaning.first.entry meaning.second.entry, .word secondKey]
     meaning.secondSelect.entry.source meaning.secondSelect.after.heap
@@ -107,7 +107,7 @@ structure PlainMeaning (meaning : SequenceMeaning issued stages sequence) : Prop
     (Staging.Recursive.callableEvidence meaning.secondSelect.entry.source)
     meaning.secondSelect.after.heap meaning.secondSelect.entry.source meaning.secondRead.arguments
     (.word secondSeed) meaning.secondRead.after.heap
-  failed : RecursiveNamedPublicPhysicalSessionState.FailureProjection
+  failed : SelectedCompilationPublicSessionState.FailureProjection
     meaning.first.initial.header meaning.failed.request.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     meaning.secondRead.after.heap [sourceTable meaning.first.entry meaning.second.entry, .word missingKey]
@@ -126,43 +126,43 @@ theorem SequenceMeaning.plain (meaning : SequenceMeaning issued stages sequence)
     meaning.failed.trace.failure_plain, meaning.repeatedRead.trace.sound.value_plain⟩
 
 structure ForwardMeaning (meaning : SequenceMeaning issued stages sequence) : Prop where
-  first : RecursiveNamedPublicPhysicalSessionInitialForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+  first : SelectedCompilationPublicSessionInitialForward.ForwardAt issued.catalog.rows meaning.first.initial.header
     meaning.first.initial.header issued.support (firstCall sequence.first).toCall.toStartedCall
     meaning.first.entry.source meaning.first.after.heap
-  second : RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt (entries := [meaning.first.entry])
+  second : SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt (entries := [meaning.first.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     sequence.second.toCall.toStartedCall .unit .word meaning.second.entry.source meaning.second.after.heap
-  firstSelect : RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt
+  firstSelect : SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt
     (entries := [meaning.first.entry] ++ [meaning.second.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     sequence.firstSelect.toCall.toStartedCall .unit .word meaning.firstSelect.entry.source meaning.firstSelect.after.heap
   firstRead : ∃ checkpoint, sequence.firstSelect.completion.session.startHandlePacked sequence.firstSelect.handle
       .unit runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+    SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe
       (([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.firstSelect.entry])
       (.word seed) checkpoint meaning.firstRead.after.heap
-  intervening : RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt
+  intervening : SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt
     (entries := ([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.firstSelect.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     sequence.intervening.toCall.toStartedCall .unit .word meaning.intervening.entry.source meaning.intervening.after.heap
-  secondSelect : RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt
+  secondSelect : SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt
     (entries := (([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.firstSelect.entry]) ++ [meaning.intervening.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     sequence.secondSelect.toCall.toStartedCall .unit .word meaning.secondSelect.entry.source meaning.secondSelect.after.heap
   secondRead : ∃ checkpoint, sequence.secondSelect.completion.session.startHandlePacked sequence.secondSelect.handle
       .unit runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+    SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe
       ((([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.firstSelect.entry]) ++ [meaning.intervening.entry] ++ [meaning.secondSelect.entry])
       (.word secondSeed) checkpoint meaning.secondRead.after.heap
-  failed : RecursiveNamedPublicPhysicalSessionFailureForward.FailureForwardAt
+  failed : SelectedCompilationPublicSessionFailureForward.FailureForwardAt
     (entries := ((([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.firstSelect.entry]) ++ [meaning.intervening.entry]) ++ [meaning.secondSelect.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     meaning.failed.failure (failureCall sequence.failed) meaning.failed.after.heap
   repeatedRead : ∃ checkpoint, sequence.failed.returned.startHandlePacked sequence.first.handle
       .unit runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+    SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe
       ((([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.firstSelect.entry]) ++ [meaning.intervening.entry] ++ [meaning.secondSelect.entry])
       (.word seed) checkpoint meaning.repeatedRead.after.heap
@@ -186,7 +186,7 @@ theorem SequenceMeaning.forward (meaning : SequenceMeaning issued stages sequenc
 
 theorem closed_sequence_forward_meaning (profile : Observed fixture)
     (stages : ObservedStages fixture observed.makeRow) (sequence : ObservedSequence fixture observed) :
-    ∃ (issued : Issued fixture.recipe) (meaning : SequenceMeaning issued stages sequence),
+    ∃ (issued : Profiled fixture.recipe) (meaning : SequenceMeaning issued stages sequence),
       meaning.first.entry.handle ≠ meaning.second.entry.handle ∧
       meaning.firstSelect.entry.handle = meaning.first.entry.handle ∧
       meaning.secondSelect.entry.handle = meaning.second.entry.handle ∧

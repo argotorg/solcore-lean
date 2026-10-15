@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalBuiltinOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicCallableArity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
@@ -71,8 +73,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
           invocation context before (.builtin ⟨function⟩) sources outcome after ∧
         ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
           outcome after value finalStore finalMap finalWorld callFaults := by
-  have builtin := CallableIndexedOwnedPreparedStagedBuiltinArgumentRows.builtin_member
-    (CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.forget_contextual support.profile calleeRelated) ⟨function⟩ rfl
+  have builtin := SelectedCompilationPhysicalBuiltinOrigins.builtin_member support.profile calleeRelated ⟨function⟩ rfl
   have nativeType : CallableContract.functionType parameterCore resultCore =
       CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function) := by
     generalize sourceTypeEq : function.type = sourceType at builtin
@@ -137,8 +138,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
       Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
         outcome after value finalStore finalMap finalWorld callFaults := by
-  have builtin := CallableIndexedOwnedPreparedStagedBuiltinArgumentRows.builtin_member
-    (CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.forget_contextual support.profile calleeRelated) ⟨function⟩ rfl
+  have builtin := SelectedCompilationPhysicalBuiltinOrigins.builtin_member support.profile calleeRelated ⟨function⟩ rfl
   have nativeType : CallableContract.functionType parameterCore resultCore =
       CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function) := by
     generalize sourceTypeEq : function.type = sourceType at builtin

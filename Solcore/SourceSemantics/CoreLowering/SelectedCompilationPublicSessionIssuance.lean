@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionState
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicFactoryValues
 
@@ -14,7 +14,7 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory 
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 
 private theorem indexed_artifact_eq
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
@@ -78,7 +78,7 @@ theorem State.remember_named
     handle, native, CallableContract.functionType packet.header.named.signature.parameterType
       packet.header.named.signature.resultType, fuel⟩
   have history := RecursiveNamedPublicFunctionHistory.History.remember_issued state.history.semantic
-    (.physicalNamedSelected prepared inputs rows packet member initial.result.context.registry
+    (.preparedPhysicalNamedSelected prepared inputs rows packet member initial.result.context.registry
       state.receiving.result.context.registry
       (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       profile anchor actualIssuance state.atRecipe actualHandle encoded certified)
@@ -132,7 +132,7 @@ theorem State.remember_builtin
     CallableContract.functionType (SourceCoreInteger.builtinParameter function)
       (SourceCoreInteger.builtinResult function), fuel⟩
   have history := RecursiveNamedPublicFunctionHistory.History.remember_issued state.history.semantic
-    (.physicalBuiltin prepared (headers rows) (keys compiled) initial.result.context.registry
+    (.preparedPhysicalBuiltin prepared (headers rows) (keys compiled) initial.result.context.registry
       state.receiving.result.context.registry
       (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       profile anchor actualIssuance state.atRecipe actualHandle encoded)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
@@ -59,8 +60,10 @@ local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.brid
   (compiled := compiled) (program := Program.ofChecked compiled.sourceProgram) (headers := headers) (keys := keys)
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
-include static wellFormed selected semantic in
+include static wellFormed selected semantic assignmentInterpretation in
 theorem Support.preserves
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
@@ -98,12 +101,14 @@ theorem Support.preserves
         static aligned.globals profile selected layouts children
     | branching receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.preserves (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
         static aligned.globals profile selected extension layouts children
     | canonicalBranching receipt =>
       exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.preserves (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
         static aligned.globals profile selected extension layouts children canonicalChildren
 
-include static wellFormed selected semantic in
+include static wellFormed selected semantic assignmentInterpretation in
 theorem Support.reflects
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
@@ -141,9 +146,11 @@ theorem Support.reflects
         static aligned.globals profile selected layouts children
     | branching receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.reflects (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
         static aligned.globals profile selected extension layouts children
     | canonicalBranching receipt =>
       exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.reflects (semantic := semantic)
+        (assignmentInterpretation := assignmentInterpretation)
         static aligned.globals profile selected extension layouts children canonicalChildren
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport

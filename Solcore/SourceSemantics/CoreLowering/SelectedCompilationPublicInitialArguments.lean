@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBootstrapRootState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstrapInitialization
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDataArgumentReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalBootstrap
 
 /-! Actual bootstrap and original public data encoding construct the positive
@@ -69,7 +69,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 local notation "rootHeaders" => headers rows
 local notation "rootKeys" => keys compiled
 local notation "rootOwner" => owner compiled
-local notation "rootFunctions" => CallableIndexedOwnedPhysicalCellOrigins.functions rootHeaders rootKeys bodyRegistry semanticFaults profile
+local notation "rootFunctions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions rootHeaders rootKeys bodyRegistry semanticFaults profile
 local notation "rootModel" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry rootFunctions
 local notation "rootFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
@@ -97,11 +97,11 @@ theorem initial_data_arguments :
   subst store
   obtain ⟨_result, _storeEq, caller, stable, heaps, globals, heapTyped⟩ :=
     SelectedCompilationPhysicalBootstrap.of_completed bodyTyping inputs rows prepared distinct
-      (CallableIndexedOwnedPhysicalCellOrigins.functions (headers rows) (keys recipe.compiled)
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions (headers rows) (keys recipe.compiled)
         bodyRegistry semanticFaults profile) completion.result.context.registry booted
   obtain ⟨represented, argumentsTyped⟩ :=
     SelectedCompilationPublicDataArgumentReceipts.data_arguments_at_receiving
-      (CallableIndexedOwnedPhysicalCellOrigins.functions (headers rows) (keys recipe.compiled)
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions (headers rows) (keys recipe.compiled)
         bodyRegistry semanticFaults profile) completion.result.context.registry [] ⟨[]⟩
       started selected rfl (SelectedCompilationHeaderCertificates.certified bodyTyping header) metadata inputTypes inputMeanings
   exact ⟨caller, stable, globals header selected.member, heaps,

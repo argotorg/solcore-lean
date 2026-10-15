@@ -38,7 +38,7 @@ theorem named_bodies {budget : Nat}
     (header : Header compiled (Program.ofChecked compiled.sourceProgram)) (member : header ∈ headers)
     {child : Staging.Recursive.Scope} (selected : (stages compiled).Closure header.function child) :
     NamedLiftsBelow (headers := headers) (keys := keys) header model (stages compiled) child budget := by
-  exact SelectedCompilationStageNamedBodyLifting.lifts (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
+  exact SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
     support.profile (support.certificates header member)
     (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected children
     (preserves_roots support issued extension)
@@ -114,7 +114,9 @@ theorem indirect {budget : Nat}
       current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
   constructor
   · intro size childPreservation
-    exact SelectedCompilationPhysicalIndirectHeadBounds.preserves (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
+    exact SelectedCompilationPhysicalIndirectHeadBounds.preserves
+      (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued)
+      (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
       bridge (fun state => state.physical) support.owners issued (stagePrepared compiled) rfl
       support.profile support.bodyTyping support.certificates root.runtime root.unique root.actualFunctionType
       (SelectedCompilationPhysicalProgramSupport.observations support) support.closurePackets support.closureSupport
@@ -128,8 +130,8 @@ theorem indirect {budget : Nat}
       childLift childPreservation
       (fun header member child selected => named_bodies support issued extension
         (fun smaller strict => children smaller (Nat.lt_of_lt_of_le strict within)) header member selected)
-      (fun association => SelectedCompilationStageClosurePacketRoots.association_of_roots (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
-        (functions support) association.original (support.closurePackets association)
+      (fun association => SelectedCompilationStageClosurePacketRoots.association_of_roots (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed) (observations := SelectedCompilationPhysicalProgramSupport.observations support) (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
+        (functions support) association (support.closurePackets association)
         (support.closureSupport association) support.owners
         (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
         (fun smaller strict => children smaller (Nat.lt_of_lt_of_le strict within))

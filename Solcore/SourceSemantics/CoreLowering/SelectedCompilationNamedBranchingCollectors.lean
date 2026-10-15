@@ -119,7 +119,8 @@ theorem collected_of_imperative
         RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) (faults := faults) header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) header.function.source expressionSyntax
       (TypedCertificate header.function.source certificates) compiled.indexed.layouts.definitions
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)

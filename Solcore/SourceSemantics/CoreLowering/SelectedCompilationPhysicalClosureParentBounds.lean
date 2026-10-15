@@ -15,7 +15,7 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CorePr
 open CallableIndexedHistory CallableIndexedLambdaValues CallableIndexedOwnedFunctionState
 open CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
-open CallableIndexedOwnedPhysicalClosureAssociation (Association)
+open CallableIndexedOwnedPreparedPhysicalClosureAssociation (Association)
 open SelectedCompilationPhysicalClosureStaticSupport (PacketFor SupportFor)
 universe u
 
@@ -50,7 +50,7 @@ variable {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records key
   (related : callerProtocol.Relates initial reached)
   (admitted : Admission bridge context reached)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked completion.result.context.registry
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
     argumentMap argumentWorld argumentsHeap argumentsStore)
   (physical : CallableIndexedOwnedPhysicalGlobals.Authority compiled argumentMap argumentsStore)
   (owners : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys,
@@ -77,37 +77,40 @@ variable {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records key
   (typing : ExpressionsHaveTypes invocation.source context ids sourceTypes)
   (calleeTyped : Dynamic.ValueHasType context calleeHeap (.closure function) (.function parameter result))
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-  (calleeRelated : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins
+  (calleeRelated : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins
     headers keys bodyRegistry completion.result.context.registry semanticFaults profile argumentMap argumentWorld
     (.function parameter result) (.closure function) carrier compiler.calleeCode.type)
   (represented : DataExpressionSequence.Values
     (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry
-      (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
     argumentMap argumentWorld sourceTypes (compiler.codes.map (·.type)) sources values)
   (bundle : TypeSystem.Ty.productMany sourceTypes = parameter)
   (originalResult : compiler.original.type = result)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
 variable (semantic : ∀ reason token, semanticFaults reason token →
   CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
 
 
 include physical owners bridge profile compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   dispatch selected count accepted argumentsTyped argumentMetadata runtime calleeTyped
-  actualFunctionType calleeRelated represented bundle originalResult semantic in
+  actualFunctionType calleeRelated represented bundle originalResult semantic assignmentInterpretation in
 /-- The genuine argument endpoint feeds the actual closure application once.
 Its native suffix and original three binds complete the whole parent. -/
 theorem preserves_parent
     (packets : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
-        bindings parameterCore resultCore), PacketFor association.original stages)
+        bindings parameterCore resultCore), PacketFor association stages)
     (supported : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
-        bindings parameterCore resultCore), SupportFor association.original stages (packets association))
+        bindings parameterCore resultCore), SupportFor association stages (packets association))
     (budget : Nat)
     (children : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
@@ -157,6 +160,7 @@ theorem preserves_parent
   obtain ⟨value, finalStore, finalMap, finalWorld, application, resultRep, finalHeaps,
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
     SelectedCompilationPhysicalClosureApplicationBounds.application_preserves (semantic := semantic)
+      (assignmentInterpretation := assignmentInterpretation)
       profile association (packets association) (supported association) (bridge.pool reached)
       raw parameters heaps physical owners admitted.rows runtime budget children called within
   have suffix := CallableIndexedOwnedPreparedStagedIndirectApplicationSuffix.preserves_suffix
@@ -208,16 +212,16 @@ theorem preserves_parent
 
 include physical owners bridge profile compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   dispatch selected count accepted argumentsTyped argumentMetadata runtime calleeTyped
-  actualFunctionType calleeRelated represented bundle originalResult semantic in
+  actualFunctionType calleeRelated represented bundle originalResult semantic assignmentInterpretation in
 /-- The concrete selected closure suffix constructs the original applied
 parent. Both numeric grades and every transient reached effect are retained. -/
 theorem reflects_suffix
     (packets : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
-        bindings parameterCore resultCore), PacketFor association.original stages)
+        bindings parameterCore resultCore), PacketFor association stages)
     (supported : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
-        bindings parameterCore resultCore), SupportFor association.original stages (packets association))
+        bindings parameterCore resultCore), SupportFor association stages (packets association))
     (budget : Nat)
     (children : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
@@ -261,6 +265,7 @@ theorem reflects_suffix
   obtain ⟨applicationSourceSize, outcome, after, finalMap, finalWorld, applied, resultRep, finalHeaps,
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
     SelectedCompilationPhysicalClosureApplicationBounds.application_reflects (semantic := semantic)
+      (assignmentInterpretation := assignmentInterpretation)
       profile association (packets association) (supported association) (bridge.pool reached)
       raw parameters heaps physical owners admitted.rows runtime valid budget children application (Nat.le_of_lt strict)
   obtain ⟨returned, samePool, callerRelated⟩ := bridge.restore reached ownedReturned

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalScopedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaEntries
@@ -84,8 +85,14 @@ private theorem forget_post {index : ProtectedStateTransition.Index}
     | stage origin call reason => exact post
 
 variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (functionTypes : FunctionRuntimeViews (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+      completion.result.diagnostics (.semantic reason) token))
 
-include support observed origin prefixContext stable beforeTyped argumentsTyped semantic in
+include support observed origin prefixContext stable beforeTyped argumentsTyped semantic faithful observations assignmentInterpretation in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
 theorem source_body_at
@@ -143,7 +150,7 @@ theorem source_body_at
       canonicalBridge
       (CallableIndexedOwnedNestedCanonicalState.bindings owner ordinary.caller)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner ordinary.caller)
-      functions completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+      functions faithful observations completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedNestedCanonicalState.markedProducer owner ordinary.caller
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -158,7 +165,11 @@ theorem source_body_at
             intro size smaller context child scope expression lowered root
             exact recursiveChildren size smaller root)
           children owner context smaller)
-      unique tree (support.sites child selected completion.result.context.registry) semantic rfl shape originalTyping ordinary.body.projection within entry.entry.environments entry.entry.heaps
+      unique tree (support.sites child selected completion.result.context.registry) semantic
+      (by
+        rw [stages.source selected]
+        obtain ⟨port⟩ := support.assignmentAuthority
+        exact assignmentInterpretation port functions _) rfl shape originalTyping ordinary.body.projection within entry.entry.environments entry.entry.heaps
       entry.entry.locals entry.entry.lookups entry.entry.actualTyped entry.entry.reference entry.entry.read
       entry.entry.unmapped initial conditioned canonicalAdmitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
@@ -174,7 +185,7 @@ theorem source_body_at
     maps, worlds, frame, metadata, returned.val, related, forget_post (captured := captured) (code := code) ordinary owner returned post⟩
   simpa only [packet.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
 
-include support observed origin prefixContext stable beforeTyped argumentsTyped semantic in
+include support observed origin prefixContext stable beforeTyped argumentsTyped semantic functionTypes faithful observations assignmentInterpretation in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
 theorem native_body_at
@@ -246,7 +257,7 @@ theorem native_body_at
       canonicalBridge
       (CallableIndexedOwnedNestedCanonicalState.bindings owner ordinary.caller)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner ordinary.caller)
-      functions completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+      functions functionTypes faithful observations completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedNestedCanonicalState.markedProducer owner ordinary.caller
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -261,7 +272,11 @@ theorem native_body_at
             intro size smaller context child scope expression lowered root
             exact recursiveChildren size smaller root)
           children owner context smaller)
-      graph tree (support.sites packet.child packet.selected completion.result.context.registry) semantic rfl shape originalTyping ordinary.body.projection (Nat.le_of_lt strict) entry.environments entry.heaps
+      graph tree (support.sites packet.child packet.selected completion.result.context.registry) semantic
+      (by
+        rw [stages.source packet.selected]
+        obtain ⟨port⟩ := support.assignmentAuthority
+        exact assignmentInterpretation port functions _) rfl shape originalTyping ordinary.body.projection (Nat.le_of_lt strict) entry.environments entry.heaps
       entry.locals entry.lookups entry.actualTyped entry.reference entry.read entry.unmapped initial
       conditioned canonicalAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post

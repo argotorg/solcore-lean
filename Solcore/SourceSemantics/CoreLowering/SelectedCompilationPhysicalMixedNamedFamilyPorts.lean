@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalMixedCallerFamily
 
 /-! The closed physical mixed family supplies named body ports for actual
@@ -27,7 +29,7 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
   (certificates : ∀ header, header ∈ headers → SelectedCompilationNamedSourceTyping.Certified header)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
   (extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry completion.result.context.registry)
   (semantic : ∀ reason token, semanticFaults reason token →
@@ -45,18 +47,18 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
       (headers := headers) (bodyRegistry := bodyRegistry) (stages := stages)
       (semanticFaults := semanticFaults) header (bodies header member))
   (closurePackets : ∀ {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
       mapping world function native bindings parameter result),
-    SelectedCompilationPhysicalClosureStaticSupport.PacketFor association.original stages)
+    SelectedCompilationPhysicalClosureStaticSupport.PacketFor association stages)
   (closureSupport : ∀ {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
       mapping world function native bindings parameter result),
-    SelectedCompilationPhysicalClosureStaticSupport.SupportFor association.original stages (closurePackets association))
+    SelectedCompilationPhysicalClosureStaticSupport.SupportFor association stages (closurePackets association))
   (owners : ∀ owner : OwnedKey keys, CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
   (methodSupport : MethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
   (mixedMethodSupport : MixedMethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
@@ -68,6 +70,7 @@ theorem preserves_with_methods
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_methods
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
@@ -81,6 +84,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_methods
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
@@ -94,6 +98,7 @@ theorem preserves_with_bodies
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_bodies
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
@@ -107,6 +112,7 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile (certificates header member) extension selected
     (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_bodies
       receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport

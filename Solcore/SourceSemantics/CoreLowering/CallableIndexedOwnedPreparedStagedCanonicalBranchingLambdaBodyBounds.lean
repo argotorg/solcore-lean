@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCanonicalState
@@ -80,8 +81,14 @@ private theorem forget_post (callerPrefix : Nat) {index : ProtectedStateTransiti
     | stage origin call reason => exact post
 
 variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (functionTypes : FunctionRuntimeViews (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+      completion.result.diagnostics (.semantic reason) token))
 
-include support observed stable beforeTyped argumentsTyped semantic in
+include support observed stable beforeTyped argumentsTyped semantic faithful observations assignmentInterpretation in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
 theorem source_body_at
@@ -128,13 +135,12 @@ theorem source_body_at
   have canonicalAdmitted : CallableIndexedOwnedSourceAdmission.Admission canonicalBridge inputs.context initial :=
     ⟨admitted.heap, admitted.rows⟩
   have conditioned := CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position entry.nextHistory
-  obtain ⟨flowValue, bodyStore, finalMap, finalWorld, evaluated, represented, heaps,
-      maps, worlds, frame, metadata, returned, related, post⟩ :=
+  have flowResult :=
     CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at (compiled := compiled) (faults := callFaults)
       canonicalBridge
       (CallableIndexedOwnedCanonicalState.bindings owner code.compilation.administrativePrefix)
       (CallableIndexedOwnedCanonicalState.administrativeTransport owner code.compilation.administrativePrefix)
-      functions completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+      functions faithful observations completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedCanonicalState.markedProducer owner code.compilation.administrativePrefix
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -146,9 +152,15 @@ theorem source_body_at
           (CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.CanonicalRootAt.ofRoot root) owner
           (CallableIndexedOwnedExpressionHeads.canonicalCaller owner code.compilation.administrativePrefix)
           ⟨rfl, rfl, rfl⟩)
-      unique tree (support.sites child selected completion.result.context.registry) semantic rfl shape originalTyping support.projection within entry.entry.environments entry.entry.heaps
+      unique tree (support.sites child selected completion.result.context.registry) semantic
+      (by
+        rw [stages.source selected]
+        obtain ⟨port⟩ := support.assignmentAuthority
+        exact assignmentInterpretation port functions _) rfl shape originalTyping support.projection within entry.entry.environments entry.entry.heaps
       entry.entry.locals entry.entry.lookups entry.entry.actualTyped entry.entry.reference entry.entry.read
       entry.entry.unmapped initial conditioned canonicalAdmitted trace
+  obtain ⟨flowValue, bodyStore, finalMap, finalWorld, evaluated, represented, heaps,
+      maps, worlds, frame, metadata, returned, related, post⟩ := flowResult
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function
     unique sourceTyped rfl trace.sound
@@ -162,7 +174,7 @@ theorem source_body_at
     maps, worlds, frame, metadata, returned.val, related, forget_post owner code.compilation.administrativePrefix returned post⟩
   simpa only [packet.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
 
-include support observed stable beforeTyped argumentsTyped semantic in
+include support observed stable beforeTyped argumentsTyped semantic functionTypes faithful observations assignmentInterpretation in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
 theorem native_body_at
@@ -230,7 +242,7 @@ theorem native_body_at
       canonicalBridge
       (CallableIndexedOwnedCanonicalState.bindings owner code.compilation.administrativePrefix)
       (CallableIndexedOwnedCanonicalState.administrativeTransport owner code.compilation.administrativePrefix)
-      functions completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+      functions functionTypes faithful observations completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedCanonicalState.markedProducer owner code.compilation.administrativePrefix
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -242,7 +254,11 @@ theorem native_body_at
           (CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.CanonicalRootAt.ofRoot root) owner
           (CallableIndexedOwnedExpressionHeads.canonicalCaller owner code.compilation.administrativePrefix)
           ⟨rfl, rfl, rfl⟩)
-      graph tree (support.sites packet.child packet.selected completion.result.context.registry) semantic rfl shape originalTyping support.projection (Nat.le_of_lt strict) entry.environments entry.heaps
+      graph tree (support.sites packet.child packet.selected completion.result.context.registry) semantic
+      (by
+        rw [stages.source packet.selected]
+        obtain ⟨port⟩ := support.assignmentAuthority
+        exact assignmentInterpretation port functions _) rfl shape originalTyping support.projection (Nat.le_of_lt strict) entry.environments entry.heaps
       entry.locals entry.lookups entry.actualTyped entry.reference entry.read entry.unmapped initial
       conditioned canonicalAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post

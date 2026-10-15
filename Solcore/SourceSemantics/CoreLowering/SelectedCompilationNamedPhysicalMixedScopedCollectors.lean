@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicAssignmentDiagnostics
@@ -31,6 +32,7 @@ consumed by the numeric body theorem. Source and native execution are absent
 from the factory's premises. -/
 def of_imperative_compiler
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     (bodies : SelectedCompilationBodyTyping.Bodies compiled)
     (certified : SelectedCompilationNamedSourceTyping.Certified header)
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -64,7 +66,10 @@ def of_imperative_compiler
         headers stages semanticFaults context child scope id lowered) :
     SelectedCompilationNamedScopedSupport.Support
       headers header stages receipt semanticFaults := by
-  refine ⟨certified, ?_⟩
+  refine ⟨certified,
+    RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared,
+    RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared,
+    PreparedAssignmentDiagnosticProducers.named prepared diagnostic aligned, ?_⟩
   intro child selected
   rw [stages.source selected]
   exact ⟨expressionSyntax, SelectedCompilationNamedBranchingCollectors.collected_of_imperative prepared aligned ready certified bodies.signatures member receipt operands unary syntaxTree (children child selected)⟩
@@ -128,7 +133,7 @@ def of_actual_with_catalog
     exact GenericAssignmentUnaryDiagnostics.prepared_unary_included assignmentPrepared
       (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.prepared_unary
         prepared diagnostic receiver represented) origin rawWord
-  apply of_imperative_compiler prepared aligned ready bodies certified member receipt operands
+  apply of_imperative_compiler prepared aligned ready diagnostic bodies certified member receipt operands
     unary
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native

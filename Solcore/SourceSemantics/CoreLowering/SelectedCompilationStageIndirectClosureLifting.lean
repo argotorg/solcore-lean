@@ -49,12 +49,12 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 include support physical runtime actualFunctionType in
 theorem closure_application (budget : Nat)
     (bodies : ∀ {mapping world function native bindings parameterCore resultCore}
-      (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys
+      (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys
         receiver.result.context.registry
         (CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.result.diagnostics)
         mapping world function native bindings parameterCore resultCore),
       SelectedCompilationStageClosurePacketLifting.BelowFor model (stages compiled)
-        association.original (support.closurePackets association) budget)
+        association (support.closurePackets association) budget)
     {function : Dynamic.Closure} {calleeHeap argumentsHeap after : Dynamic.Heap}
     {sources : List Dynamic.Value} {size argumentsSize : Nat} {callEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome}
@@ -80,7 +80,7 @@ theorem closure_application (budget : Nat)
       _frame, _heapMetadata, argumentsTyped, argumentMetadata, reached, _related, admitted⟩ := prefixResult
     have rawCallee : Dynamic.ValueHasType context calleeHeap (.closure function) (.function parameter result) := by
       simpa only [functionType] using calleeTyped
-    have relatedCallee : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins
+    have relatedCallee : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins
         headers keys receiver.result.context.registry registry
         (CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.result.diagnostics)
         support.profile finalMap finalWorld (.function parameter result) (.closure function)

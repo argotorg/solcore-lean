@@ -55,6 +55,12 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _ | letFault actual same _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
+  | assignProjected actual same _ _ _ _ _ _
+  | assignProjectedRootFault actual same _ _
+  | assignProjectedKeysFault actual same _ _ _
+  | assignProjectedGetterFault actual same _ _ _
+  | assignProjectedRhsFault actual same _ _ _ _
+  | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _

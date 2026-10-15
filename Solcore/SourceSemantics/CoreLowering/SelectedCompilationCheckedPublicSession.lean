@@ -6,7 +6,7 @@ set_option Elab.async false
 
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSession
 open Core Frontend SourceInference
-open RecursiveNamedPublicPhysicalSessionState (StartedCall)
+open SelectedCompilationPublicSessionState (StartedCall)
 
 variable {recipe : SourceCoreIndexedSession.Recipe}
 

@@ -15,7 +15,7 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open RecursiveNamedPublicNestedOutputSelections (Selection Selected)
 
 def SelectedAt (checked : SourceCoreCompatibleCatalog.Checked)

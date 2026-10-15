@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 
@@ -25,7 +26,9 @@ private theorem empty_steps
     rw [bare, List.length_nil] at length
     exact False.elim (layout.nonempty (List.eq_nil_of_length_eq_zero length))
 
-variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+variable {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+  {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+  {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
   {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
@@ -51,9 +54,28 @@ private theorem reachable_bare
   rw [empty] at fault
   cases fault
 
+theorem assignment_site
+    {certificate : GenericExpressionMeaning.Certificate} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {head : GenericAssignmentStatements.Head values source context certificate scope administrative definitions assignment operator rhs}
+    {site : SourceCoreElaboration.ErrorSite} {fuel : Nat}
+    (origin : AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs)
+    (signatures : context.signatures = values.checked.signatures)
+    (retained : head.PreparedAt site fuel (invalidProjection site assignment.target.root)
+      (missingDefault site assignment.target.root))
+    (operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid)
+    (registry : SourceCoreRawMetadata.Registry) :
+    PreparedBranchingCatalogSites.AssignmentSite invalidProjection missingDefault registry faults head := by
+  by_cases bare : assignment.target.projections = []
+  · exact .existing (reachable_bare (empty_steps head.shape bare) operands)
+  · exact .projected origin signatures bare retained operands
+
 /-- The compiler retains the exact tree and its real catalog interpretation.
 Bare routes do not constrain the registry. -/
-structure Collected (faults : FunctionCalls.FaultRep)
+structure Collected
+    (invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word)
+    (missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word)
+    (faults : FunctionCalls.FaultRep)
     (layouts : SourceCoreAllocationLayouts.Prepared) (owner : SourceSpecialization.SpecializationKey)
     (active : TypeSystem.Substitution) (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
     (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
@@ -65,13 +87,13 @@ structure Collected (faults : FunctionCalls.FaultRep)
     (position : GenericImperativeMatch.Position) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop where
   tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
     expressionSyntax certificates definitions administrative context scope position expected type code
-  sites : ∀ registry, tree.CatalogSites .reachable registry faults
+  sites : ∀ registry, PreparedBranchingCatalogSites.CatalogSites invalidProjection missingDefault registry faults tree
 
 namespace Collected
 
  theorem breaking {context scope mode id node rest expected type}
       (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (LocalLoop.breaking type) := by
   refine ⟨.breaking found form, ?_⟩
   intro registry
@@ -79,7 +101,7 @@ namespace Collected
 
  theorem continuing {context scope mode id node rest expected type}
       (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (LocalLoop.continuing type) := by
   refine ⟨.continuing found form, ?_⟩
   intro registry
@@ -88,7 +110,7 @@ namespace Collected
  theorem body {context scope mode statements expected type code}
       (syntaxTree : GenericLexicalStatements.Syntax source expressionSyntax context mode statements expected)
       (body : GenericLexicalStatements.Tree layouts owner active frame globals onError values source certificates context scope mode statements expected type code) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode statements) expected type code := by
   refine ⟨.body syntaxTree body, ?_⟩
   intro registry
@@ -104,9 +126,9 @@ namespace Collected
       (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
         (layouts.allocatorAt owner active onError) (absentRequest source scope binder payload))
       (same : annotation.original = allocation.expression)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         nextContext ((binder.id, payload) :: scope) (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (.letE annotation.expression body) := by
   refine ⟨.uninitialized found form monomorphic extended ordinary projected allocation annotation same remaining.tree, ?_⟩
   intro registry
@@ -124,8 +146,8 @@ namespace Collected
       (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
         (layouts.allocatorAt owner active onError) (initializedRequest source scope binder lowered.type))
       (same : annotation.original = allocation.expression)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative nextContext ((binder.id, lowered.type) :: scope) (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative nextContext ((binder.id, lowered.type) :: scope) (.statements mode rest) expected type body) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (sequence type lowered.expression annotation.expression body) := by
   refine ⟨.initialized found form monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining.tree, ?_⟩
   intro registry
@@ -136,8 +158,8 @@ namespace Collected
       (notTail : (!semicolon && mode && rest.isEmpty) = false)
       (expressionFound : source.lookupExpression? expression = some expressionNode)
       (value : certificates context scope expression lowered)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
         (LocalSequence.discard (LocalLoop.controlType type) lowered.expression body) := by
   refine ⟨.discard found form notTail expressionFound value remaining.tree, ?_⟩
   intro registry
@@ -145,9 +167,9 @@ namespace Collected
 
  theorem block {context scope mode id node statements rest expected type innerCode body}
       (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-      (inner : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type innerCode)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+      (inner : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type innerCode)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
         (LocalLoop.sequence type innerCode body) := by
   refine ⟨.block found form inner.tree remaining.tree, ?_⟩
   intro registry
@@ -158,10 +180,10 @@ namespace Collected
       (conditionFound : source.lookupExpression? condition = some conditionNode)
       (conditionType : conditionNode.type = .bool)
       (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
-      (thenTree : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false thenBody) expected type thenCode)
-      (elseTree : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false (elseBody.getD [])) expected type elseCode)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+      (thenTree : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false thenBody) expected type thenCode)
+      (elseTree : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false (elseBody.getD [])) expected type elseCode)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
         (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) body) := by
   refine ⟨.ifThen found form conditionFound conditionType conditionTree thenTree.tree elseTree.tree remaining.tree, ?_⟩
   intro registry
@@ -172,13 +194,13 @@ namespace Collected
       (conditionFound : source.lookupExpression? condition = some conditionNode)
       (conditionType : conditionNode.type = .bool)
       (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
-      (loopBody : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (loopBody : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements false statements) expected type loopCode)
       (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         (LocalLoop.whileLoop type conditionCode loopCode selfReason) (LocalLoop.resultType type) definitions)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type
         (LocalLoop.sequence type (LocalLoop.whileLoop type conditionCode loopCode selfReason) body) := by
   refine ⟨.whileLoop found form conditionFound conditionType conditionTree loopBody.tree nativeTyped remaining.tree, ?_⟩
@@ -188,23 +210,35 @@ namespace Collected
  theorem assign {context scope mode id node assignment operator rhs rest expected type body}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode rest) expected type body)
     (operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid)
       (bare : assignment.target.projections = []) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type)) := by
   refine ⟨.assign found form head remaining.tree, ?_⟩
   intro registry
-  exact .assign (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) (reachable_bare (empty_steps head.shape bare) operands)
+  exact .assign (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) (.existing (reachable_bare (empty_steps head.shape bare) operands))
+
+ theorem assignPrepared {context scope mode id node assignment operator rhs rest expected type body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode rest) expected type body)
+    (site : ∀ registry, PreparedBranchingCatalogSites.AssignmentSite invalidProjection missingDefault registry faults head) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type)) := by
+  refine ⟨.assign found form head remaining.tree, ?_⟩
+  intro registry
+  exact .assign (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) (site registry)
 
  theorem bitNot {context scope mode id node assignment rest expected type body}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
       (head : CompatibleBitNotStatements.Head context scope assignment)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode rest) expected type body)
     (unary : head.Errors faults) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type)) := by
   refine ⟨.bitNot found form head remaining.tree, ?_⟩
   intro registry
@@ -227,13 +261,13 @@ namespace Collected
       (ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt)
       (children : ∀ request, request ∈ requests → ∀ childContext,
         GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
-        Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
           childContext request.scope (.statements false request.statements) expected type request.code)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode rest) expected type body)
     (catalog : SignatureCatalogWellFormed values.checked.signatures)
     (patternContext : GenericImperativeMatch.Tree.MatchContextFields compilation context) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type matched body) := by
   refine ⟨.matchWith found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary (fun request member childContext related => (children request member childContext related).tree) remaining.tree, ?_⟩
   intro registry
@@ -242,10 +276,10 @@ namespace Collected
  theorem terminalBlock {context scope mode id node statements rest expected type innerCode suffix}
       (unique : NodeOccurrencesUnique source)
       (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-      (inner : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type innerCode)
+      (inner : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type innerCode)
       (stops : GenericLexicalStatements.Stopped source statements)
       (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
         (LocalLoop.sequence type innerCode suffix) := by
   refine ⟨.terminalBlock unique found form inner.tree stops issued, ?_⟩
   intro registry
@@ -257,11 +291,11 @@ namespace Collected
       (conditionFound : source.lookupExpression? condition = some conditionNode)
       (conditionType : conditionNode.type = .bool)
       (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
-      (thenTree : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false thenBody) expected type thenCode)
-      (elseTree : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false elseBody) expected type elseCode)
+      (thenTree : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false thenBody) expected type thenCode)
+      (elseTree : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false elseBody) expected type elseCode)
       (thenStops : GenericLexicalStatements.Stopped source thenBody) (elseStops : GenericLexicalStatements.Stopped source elseBody)
       (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
         (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) suffix) := by
   refine ⟨.terminalIf unique found form conditionFound conditionType conditionTree thenTree.tree elseTree.tree thenStops elseStops issued, ?_⟩
   intro registry
@@ -285,13 +319,13 @@ namespace Collected
       (ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt)
       (children : ∀ request, request ∈ requests → ∀ childContext,
         GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
-        Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
           childContext request.scope (.statements false request.statements) expected type request.code)
       (stops : ReachableMatchContinuations.DefaultStopped source id resolution)
       (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix)
     (catalog : SignatureCatalogWellFormed values.checked.signatures)
     (patternContext : GenericImperativeMatch.Tree.MatchContextFields compilation context) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type matched suffix) := by
   refine ⟨.terminalMatch unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary (fun request member childContext related => (children request member childContext related).tree) stops issued, ?_⟩
   intro registry
@@ -300,9 +334,9 @@ namespace Collected
 
  theorem forLoop {context scope mode id node initializer condition post statements rest expected type initialCode body}
       (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post statements)
-      (initial : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type initialCode body) := by
+      (initial : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type initialCode body) := by
   refine ⟨.forLoop found form initial.tree remaining.tree, ?_⟩
   intro registry
   exact .forLoop (found := found) (form := form) (initial := initial.tree)
@@ -313,13 +347,13 @@ namespace Collected
       (conditionFound : source.lookupExpression? condition = some conditionNode)
       (conditionType : conditionNode.type = .bool)
       (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
-      (loopBody : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type bodyCode)
+      (loopBody : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type bodyCode)
       (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates definitions administrative
         type (TypedForHeader.Fallthrough type) context scope post postCode)
-      (postSites : ∀ registry, postTree.ReachableErrors registry faults)
+      (postSites : ∀ registry, PreparedBranchingCatalogSites.HeaderSites invalidProjection missingDefault registry faults postTree)
       (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         (LocalLoop.iterate type conditionCode bodyCode postCode selfReason) (LocalLoop.resultType type) definitions) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers [] condition post statements) expected type
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers [] condition post statements) expected type
         (LocalLoop.iterate type conditionCode bodyCode postCode selfReason) := by
   refine ⟨.initializersDone conditionFound conditionType conditionTree loopBody.tree postTree nativeTyped, ?_⟩
   intro registry
@@ -337,9 +371,9 @@ namespace Collected
       (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
         (layouts.allocatorAt owner active onError) (absentRequest source scope binder payload))
       (same : annotation.original = allocation.expression)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         nextContext ((binder.id, payload) :: scope) (.initializers rest condition post statements) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers (.letDecl binder none :: rest) condition post statements) expected type (.letE annotation.expression body) := by
   refine ⟨.initializerUninitialized monomorphic extended ordinary projected allocation annotation same remaining.tree, ?_⟩
   intro registry
@@ -359,9 +393,9 @@ namespace Collected
       (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
         (layouts.allocatorAt owner active onError) (initializedRequest source scope binder lowered.type))
       (same : annotation.original = allocation.expression)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         nextContext ((binder.id, lowered.type) :: scope) (.initializers rest condition post statements) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers (.letDecl binder (some initializer) :: rest) condition post statements) expected type (sequence type lowered.expression annotation.expression body) := by
   refine ⟨.initializerInitialized monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining.tree, ?_⟩
   intro registry
@@ -374,9 +408,9 @@ namespace Collected
  theorem initializerDiscard {context scope expression expressionNode rest lowered body condition post statements expected type}
       (found : source.lookupExpression? expression = some expressionNode)
       (value : certificates context scope expression lowered)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers rest condition post statements) expected type body) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers (.expression expression :: rest) condition post statements) expected type (LocalSequence.discard (LocalLoop.controlType type) lowered.expression body) := by
   refine ⟨.initializerDiscard found value remaining.tree, ?_⟩
   intro registry
@@ -386,23 +420,35 @@ namespace Collected
 
  theorem initializerAssign {context scope assignment operator rhs rest body condition post statements expected type}
       (head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers rest condition post statements) expected type body)
       (operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid)
       (bare : assignment.target.projections = []) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type)) := by
   refine ⟨.initializerAssign head remaining.tree, ?_⟩
   intro registry
   exact .initializerAssign (head := head) (remaining := remaining.tree)
     (remaining.sites registry)
-    (reachable_bare (empty_steps head.shape bare) operands)
+    (.existing (reachable_bare (empty_steps head.shape bare) operands))
+ theorem initializerAssignPrepared {context scope assignment operator rhs rest body condition post statements expected type}
+      (head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body)
+      (site : ∀ registry, PreparedBranchingCatalogSites.AssignmentSite invalidProjection missingDefault registry faults head) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type)) := by
+  refine ⟨.initializerAssign head remaining.tree, ?_⟩
+  intro registry
+  exact .initializerAssign (head := head) (remaining := remaining.tree)
+    (remaining.sites registry)
+    (site registry)
  theorem initializerBitNot {context scope assignment rest body condition post statements expected type}
       (head : CompatibleBitNotStatements.Head context scope assignment)
-      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers rest condition post statements) expected type body)
       (unary : head.Errors faults) :
-      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers (.assignBitNot assignment :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type)) := by
   refine ⟨.initializerBitNot head remaining.tree, ?_⟩
   intro registry

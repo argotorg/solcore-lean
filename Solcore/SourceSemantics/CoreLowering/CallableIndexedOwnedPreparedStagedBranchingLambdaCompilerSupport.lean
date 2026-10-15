@@ -55,7 +55,7 @@ theorem collected
       choice.packet.policy.lowerExpression fuel code.view scope id choice.packet.reasonAt = .ok lowered →
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         lowered.expression nativeType compiled.indexed.layouts.definitions → certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts choice.packet.allocationOwner choice.packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected choice.invalidProjection choice.missingDefault (faults := faults) compiled.indexed.layouts choice.packet.allocationOwner choice.packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length choice.packet.onError
       (.initial compiled.compatible.checked) function.source expressionSyntax
       (TypedCertificate function.source certificates) compiled.indexed.layouts.definitions administrative

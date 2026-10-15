@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicClosureHistory
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionState
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicScalarResults
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicBodyInvocationBounds
@@ -17,7 +17,7 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open RecursiveNamedPublicScalarResults (ScalarOutput)
 open SelectedCompilationPhysicalProgramSupport (stagePrepared)
 

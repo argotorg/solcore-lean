@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicInitialArgu
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionInitial
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicClosureHistory
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionState
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicBodyInvocationBounds
@@ -18,7 +18,7 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedFunctionValues (Header)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall FunctionCall State SourceCall)
+open SelectedCompilationPublicSessionState (StartedCall FunctionCall State SourceCall)
 open SelectedCompilationPhysicalProgramSupport (Support stagePrepared)
 
 abbrev Started := @RecursiveNamedPublicPhysicalSessionInitial.Started

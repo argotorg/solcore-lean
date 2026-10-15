@@ -70,7 +70,7 @@ theorem ActualHeader.factory_formation (actual : ActualHeader fixture row.row)
   · exact shape.coercions
   · simp only [observed.noLocals, List.find?_nil]
   · rw [actual.source, expression]; exact extra.read
-  · rw [actual.source]; exact shape.body_shape
+  · rw [actual.source]; exact .returnValue [] shape.statementFound shape.statementForm
   · intro context final facts typed
     rw [actual.source] at typed ⊢
     exact shape.body_syntax (actual.source ▸ actual.header.unique) True.intro typed

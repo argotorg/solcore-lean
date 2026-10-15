@@ -89,9 +89,13 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 variable (semantic : ∀ reason token, semanticFaults reason token → CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
 
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
+
 include bridge profile compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   dispatch selected count accepted wellFormed runtime covers locals calleeHeapTyped typing calleeTyped
-  actualFunctionType calleeRelated represented bundle originalResult semantic in
+  actualFunctionType calleeRelated represented bundle originalResult semantic assignmentInterpretation in
 /-- The genuine argument endpoint feeds the actual closure application once.
 Its native suffix and original three binds complete the whole parent. -/
 theorem preserves_parent
@@ -154,6 +158,7 @@ theorem preserves_parent
   obtain ⟨value, finalStore, finalMap, finalWorld, application, resultRep, finalHeaps,
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_preserves (semantic := semantic)
+      (assignmentInterpretation := assignmentInterpretation)
       profile association (packets association) (supported association) (bridge.pool reached)
       raw parameters heaps admitted.rows runtime budget children canonicalChildren called within
   have suffix := CallableIndexedOwnedPreparedStagedIndirectApplicationSuffix.preserves_suffix
@@ -205,7 +210,7 @@ theorem preserves_parent
 
 include bridge profile compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   dispatch selected count accepted wellFormed runtime covers locals calleeHeapTyped typing calleeTyped
-  actualFunctionType calleeRelated represented bundle originalResult semantic in
+  actualFunctionType calleeRelated represented bundle originalResult semantic assignmentInterpretation in
 /-- The concrete selected closure suffix constructs the original applied
 parent. Both numeric grades and every transient reached effect are retained. -/
 theorem reflects_suffix
@@ -262,6 +267,7 @@ theorem reflects_suffix
   obtain ⟨applicationSourceSize, outcome, after, finalMap, finalWorld, applied, resultRep, finalHeaps,
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_reflects (semantic := semantic)
+      (assignmentInterpretation := assignmentInterpretation)
       profile association (packets association) (supported association) (bridge.pool reached)
       raw parameters heaps admitted.rows runtime valid budget children canonicalChildren application (Nat.le_of_lt strict)
   obtain ⟨returned, samePool, callerRelated⟩ := bridge.restore reached ownedReturned

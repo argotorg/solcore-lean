@@ -1,7 +1,7 @@
 import Solcore.Test.SourceCoreConstructorCallsCertifiedMeaning
 import Solcore.Test.SourceCoreConstructorCallsCollection
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectWordForward
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectOutputForward
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectWordForward
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectOutputForward
 
 /-! The complete automatic catalog follows the original packed constructor
 call, its ordered selected handles, and every subsequent retained invocation. -/
@@ -12,7 +12,7 @@ namespace Tests.SourceCoreConstructorCalls.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open CertifiedPublicSession (Issued)
+open SelectedCompilationCertifiedPublicSession (Issued)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
   {issued : Issued fixture.recipe}
@@ -64,7 +64,7 @@ theorem construction_meaning (before : issued.State anchor session entries)
   have returned : call.completion.value = outputValue observed call.newOutput call.priorOutput call.factoryOutput call.builtinOutput := by
     simpa only [observed.readShape.instantiationEq, outputValue, outputMetadata] using call.returned
   obtain ⟨arguments, packing, arity, source, added, after, size, trace, _handles, selected⟩ :=
-    RecursiveNamedPublicPhysicalSessionDirectOutputCollection.State.collect issued.support issued.prepared
+    SelectedCompilationPublicSessionDirectOutputCollection.State.collect issued.support issued.prepared
       before pack packMember packType input (by simpa only [packHandle] using call.executed)
       (returned.symm ▸ outputSelection observed call.newOutput call.priorOutput call.factoryOutput call.builtinOutput) scope
   obtain ⟨_artifact, _actual, _native, _type, _atCompletion, selected⟩ := selected
@@ -105,7 +105,7 @@ theorem word_meaning (before : issued.State anchor session entries)
     {word : Core.Word} (returned : call.completion.value = .word word) (scope : Staging.Recursive.Scope) :
     Nonempty (WordMeaning issued before entry parameter packed call word scope) := by
   obtain ⟨arguments, packing, arity, after, size, trace⟩ :=
-    RecursiveNamedPublicPhysicalSessionDirectScalarStep.State.invoke_scalar issued.support issued.prepared
+    SelectedCompilationPublicSessionDirectScalarStep.State.invoke_scalar issued.support issued.prepared
       before entry member (.word word) entryType (handleEq ▸ handleType) input
       (by simpa only [handleEq] using call.executed) returned scope
   exact ⟨⟨member, entryType, handleEq, input, arguments, packing, arity, after, size, trace⟩⟩
@@ -142,7 +142,7 @@ theorem success_meaning (before : issued.State anchor session entries)
     (call : ObservedInvocation session handle argument) (scope : Staging.Recursive.Scope) :
     Nonempty (SuccessMeaning issued before entry parameter result packed call scope) := by
   obtain ⟨arguments, packing, arity, source, after, size, trace⟩ :=
-    RecursiveNamedPublicPhysicalSessionDirectSuccessStep.State.invoke_success issued.support issued.prepared
+    SelectedCompilationPublicSessionDirectSuccessStep.State.invoke_success issued.support issued.prepared
       before entry member entryType input (by simpa only [handleEq] using call.executed) scope
   exact ⟨⟨member, entryType, handleEq, input, arguments, packing, arity, source, after, size, trace⟩⟩
 
@@ -154,12 +154,12 @@ theorem ConstructionMeaning.forward
     (meaning : ConstructionMeaning issued before pack factory prior convert call scope)
     (ready : session.ExportsReady) :
     ∃ checkpoint, session.startHandlePacked handle (packedArgument f p c) runOptions.inputValidationFuel = .ok checkpoint ∧
-      RecursiveNamedPublicPhysicalSessionDirectOutputForward.ForwardAt issued.catalog.rows anchor
+      SelectedCompilationPublicSessionDirectOutputForward.ForwardAt issued.catalog.rows anchor
         issued.initial issued.support.profile fixture.recipe entries (containerType fixture.dataType)
         checkpoint meaning.source meaning.after.heap := by
   obtain ⟨checkpoint, accepted, _resumed⟩ := call.executed
   refine ⟨checkpoint, accepted, ?_⟩
-  exact RecursiveNamedPublicPhysicalSessionDirectOutputForward.forward_call issued.support issued.prepared
+  exact SelectedCompilationPublicSessionDirectOutputForward.forward_call issued.support issued.prepared
     before pack meaning.member meaning.packType meaning.input
     (by simpa only [meaning.handleEq] using accepted) ready meaning.packing meaning.trace
 
@@ -169,11 +169,11 @@ theorem WordMeaning.forward {before : issued.State anchor session entries} {entr
     {word : Core.Word} {scope : Staging.Recursive.Scope}
     (meaning : WordMeaning issued before entry parameter packed call word scope) :
     ∃ checkpoint, session.startHandlePacked handle argument runOptions.inputValidationFuel = .ok checkpoint ∧
-      RecursiveNamedPublicPhysicalSessionDirectWordForward.ForwardAt issued.catalog.rows anchor
+      SelectedCompilationPublicSessionDirectWordForward.ForwardAt issued.catalog.rows anchor
         issued.initial issued.support.profile fixture.recipe entries word checkpoint meaning.after.heap := by
   obtain ⟨checkpoint, accepted, _resumed⟩ := call.executed
   refine ⟨checkpoint, accepted, ?_⟩
-  exact RecursiveNamedPublicPhysicalSessionDirectWordForward.forward_call issued.support issued.prepared
+  exact SelectedCompilationPublicSessionDirectWordForward.forward_call issued.support issued.prepared
     before entry meaning.member word meaning.entryType meaning.input
     (by simpa only [meaning.handleEq] using accepted) meaning.packing meaning.trace
 
@@ -183,11 +183,11 @@ theorem SuccessMeaning.forward {before : issued.State anchor session entries} {e
     (meaning : SuccessMeaning issued before entry parameter result packed call scope)
     (ready : session.ExportsReady) :
     ∃ checkpoint, session.startHandlePacked handle argument runOptions.inputValidationFuel = .ok checkpoint ∧
-      RecursiveNamedPublicPhysicalSessionDirectOutputForward.ForwardAt issued.catalog.rows anchor
+      SelectedCompilationPublicSessionDirectOutputForward.ForwardAt issued.catalog.rows anchor
         issued.initial issued.support.profile fixture.recipe entries result checkpoint meaning.source meaning.after.heap := by
   obtain ⟨checkpoint, accepted, _resumed⟩ := call.executed
   refine ⟨checkpoint, accepted, ?_⟩
-  exact RecursiveNamedPublicPhysicalSessionDirectOutputForward.forward_call issued.support issued.prepared
+  exact SelectedCompilationPublicSessionDirectOutputForward.forward_call issued.support issued.prepared
     before entry meaning.member meaning.entryType meaning.input
     (by simpa only [meaning.handleEq] using accepted) ready meaning.packing meaning.trace
 

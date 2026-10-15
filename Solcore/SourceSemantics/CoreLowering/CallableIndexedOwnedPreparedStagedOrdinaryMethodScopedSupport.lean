@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogTransport
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
@@ -102,7 +103,9 @@ def support_general_with_catalog
     change LocalIdentityOwnership support.caller.named.specialized.function.typedBody
     rw [← support.caller.agreement.source, support.caller.frame.source]
     exact certificate.local_identity_ownership
-  refine ⟨support.body.frame, support.body.projection, compiled.indexed.fuel, ?_, ?_⟩
+  refine ⟨support.body.frame, support.body.projection, compiled.indexed.fuel, ?_,
+    choice.invalidProjection, choice.missingDefault,
+    choiceIssued.assignmentAuthority code support.caller.selected support.source support.body.unique, ?_⟩
   · rw [support.compilation]; rfl
   intro child selected
   have actual := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerSupport.collected
@@ -127,11 +130,8 @@ def support_general_with_catalog
   rw [(stages).source selected]
   refine ⟨weakened, ?_⟩
   intro currentRegistry
-  obtain ⟨tree, sites⟩ := CallableLambdaViewMatchRuntimeCertificates.transport_sites_with
-    (LocalView.refl function.source) (by intro id member; cases member)
-    support.body.unique (fun _ _ _ => True.intro)
-    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry)
-    (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
+  obtain ⟨tree, sites⟩ := PreparedBranchingCatalogTransport.weaken support.body.unique
+    (actual.sites currentRegistry)
   exact sites
 
 include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in

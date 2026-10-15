@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSourceTyping
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationMixedRootSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
@@ -33,9 +34,13 @@ structure Support
     (stages : Staging.Recursive.Registry) (receipt : Receipt header)
     (semanticFaults : FunctionCalls.FaultRep) : Type where
   certified : SelectedCompilationNamedSourceTyping.Certified header
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    header.function.source invalidProjection missingDefault)
   tree : ∀ child, stages.Closure header.function child →
     ∃ expressionSyntax : ExpressionId → Prop,
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults)
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected invalidProjection missingDefault (faults := semanticFaults)
       header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) child.source expressionSyntax
       (TypedCertificate child.source (fun context => Certificate headers stages semanticFaults context child))

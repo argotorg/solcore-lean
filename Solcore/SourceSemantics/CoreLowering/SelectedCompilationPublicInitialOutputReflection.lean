@@ -16,7 +16,7 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers
 open CallableIndexedOwnedFunctionValues (Header)
 open SelectedCompilationStageClosedDirectForward.Output (ReturnedValue)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall Call State SourceCall PlainValue)
+open SelectedCompilationPublicSessionState (StartedCall Call State SourceCall PlainValue)
 open SelectedCompilationPublicSessionInitial (Started)
 open SelectedCompilationPhysicalProgramSupport (Support stagePrepared)
 

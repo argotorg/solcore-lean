@@ -865,6 +865,25 @@ local macro "erase_recursive_plain" : tactic =>
         (.assignBitNot contains form (.intro (snapshot.resolves _ _ _ _) write)) nextIH
     case bitNotBareFault contains form _bare failed =>
       exact StatementsPlain.head_fault (.assignBitNot contains form failed)
+    case assignProjected contains form _projected keys snapshot child write _next keysIH childIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form])
+        (.assignValue contains form (.intro (snapshot.resolves keysIH) childIH write)) nextIH
+    case assignProjectedRootFault contains form _projected failed =>
+      exact StatementsPlain.head_fault (.assignValue contains form (.target failed.source))
+    case assignProjectedKeysFault contains form _projected ready keys keysIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.target (ready.key_fault keysIH)))
+    case assignProjectedGetterFault contains form _projected keys failed keysIH =>
+      exact StatementsPlain.head_fault (.assignValue contains form (.target (failed.source keysIH)))
+    case assignProjectedRhsFault contains form _projected keys snapshot child keysIH childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.rhs (snapshot.resolves keysIH) childIH))
+    case assignProjectedWriteFault contains form _projected keys snapshot child failed keysIH childIH =>
+      exact StatementsPlain.head_fault (.assignValue contains form (failed.source (snapshot.resolves keysIH) childIH))
     case assignBare contains form snapshot child write _next childIH nextIH =>
       exact StatementsPlain.prepend contains (by intro expression; simp [form])
         (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
@@ -993,6 +1012,24 @@ local macro "erase_recursive_plain" : tactic =>
     case bitNot snapshot write _next nextIH =>
       exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
     case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+    case projectedAssignment _projected keys snapshot child write _next keysIH childIH nextIH =>
+      exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keysIH) childIH write)) nextIH
+    case projectedAssignmentRootFault _projected failed =>
+      exact .head (.assignValue (.target failed.source))
+    case projectedAssignmentKeysFault _projected ready keys keysIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignValue (.target (ready.key_fault keysIH)))
+    case projectedAssignmentGetterFault _projected keys failed keysIH =>
+      exact .head (.assignValue (.target (failed.source keysIH)))
+    case projectedAssignmentRhsFault _projected keys snapshot child keysIH childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignValue (.rhs (snapshot.resolves keysIH) childIH))
+    case projectedAssignmentWriteFault _projected keys snapshot child failed keysIH childIH =>
+      exact .head (.assignValue (failed.source (snapshot.resolves keysIH) childIH))
     case assignment snapshot child write next childIH nextIH =>
       exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
     case assignmentFailure snapshot child childIH =>
@@ -1154,5 +1191,48 @@ theorem Expression.semanticFault_plain {program : Program} {registry : Registry}
     {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {reason : SemanticFault}
     (trace : Expression program registry scope context environment before id (.fault (.semantic reason)) after) :
     ExpressionFaults program context scope.evidence scope.source environment before id reason after := projection trace
+
+/-- A key row erases in its original order and at the same reached heap. -/
+theorem Expressions.plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap}
+    {ids : List ExpressionId} {outcome : ValuesOutcome}
+    (trace : Expressions program registry scope context environment before ids outcome after) :
+    ExpressionsPlain program scope context environment before ids outcome after := by
+  induction trace using Expressions.rec
+    (motive_1 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_4 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_5 := fun _ _ _ _ _ _ _ _ _ => True)
+    (motive_6 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_7 := fun _ _ _ _ _ _ _ _ _ => True)
+    (motive_8 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_10 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ _ _ _ => True)
+  all_goals try exact True.intro
+  case nil => exact .nil
+  case cons head _tail _headIH tailIH => exact .cons head.value_plain tailIH
+  case headFault head _headIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head head.semanticFault_plain
+  case tailFault head _tail _headIH tailIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .tail head.value_plain tailIH
+
+theorem Expressions.values_plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap}
+    {ids : List ExpressionId} {values : List Value}
+    (trace : Expressions program registry scope context environment before ids (.values values) after) :
+    ExpressionsEvaluate program context scope.evidence scope.source environment before ids values after := trace.plain
+
+theorem Expressions.semanticFault_plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap}
+    {ids : List ExpressionId} {reason : SemanticFault}
+    (trace : Expressions program registry scope context environment before ids (.fault (.semantic reason)) after) :
+    ExpressionsFault program context scope.evidence scope.source environment before ids reason after := trace.plain
 
 end Solcore.SourceSemantics.Staging.Recursive

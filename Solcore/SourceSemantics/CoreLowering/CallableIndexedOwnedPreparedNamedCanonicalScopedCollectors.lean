@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedCanonicalScopedRoots
 
@@ -25,6 +26,7 @@ consumed by the numeric body theorem. Source and native execution are absent
 from the factory's premises. -/
 def of_imperative_compiler
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -62,7 +64,10 @@ def of_imperative_compiler
         headers header bodyRegistry semanticFaults context child scope id lowered) :
     CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport.NamedSupport
       headers keys bodyRegistry header stages receipt semanticFaults := by
-  refine ⟨complete, zero, wellFormed, ?_⟩
+  refine ⟨complete, zero, wellFormed,
+    RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared,
+    RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared,
+    PreparedAssignmentDiagnosticProducers.named prepared diagnostic aligned, ?_⟩
   intro child selected
   rw [stages.source selected]
   exact ⟨expressionSyntax, CallableIndexedOwnedPreparedNamedBranchingCollectors.collected_of_imperative prepared aligned ready wellFormed member receipt operands unary syntaxTree (children child selected)⟩
@@ -99,7 +104,7 @@ def of_actual
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) keys bodyRegistry header
       (RecursiveNamedPreparedStageScopes.registry actual) receipt
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
-  apply of_imperative_compiler prepared aligned ready wellFormed complete zero member receipt
+  apply of_imperative_compiler prepared aligned ready diagnostic wellFormed complete zero member receipt
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic prepared aligned diagnostic receiver)
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.unary_of_diagnostic prepared aligned diagnostic receiver)
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree

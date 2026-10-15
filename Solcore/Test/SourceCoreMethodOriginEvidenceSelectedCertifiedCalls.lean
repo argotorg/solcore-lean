@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreMethodOriginEvidenceSelectedCertifiedMeaning
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationLegacyProgramCertificates
 
 /-! Actual public start receipts choose each complete cached row. Reflection
 and sufficient-fuel preservation use the single automatic catalog throughout. -/
@@ -24,7 +25,7 @@ theorem first_meaning
   obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_initial_row
     (by rw [fixture.sameProgram]; exact fixture.checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
-    fixture.issued admission.certificate (SelectedCompilationBodyTyping.Bodies.of_program fixture.source_wellFormed) first.opened
+    fixture.issued admission.certificate.to_prepared (SelectedCompilationBodyTyping.Bodies.of_program fixture.source_wellFormed) first.opened
     first.as_function_call.toCall.toStartedCall first.bootstrap first.fresh first.authority
     (show first.bootstrap.ReadyAt 102400 first.session from .single first.ready)
     (selected_row observed.wordRow.toObservedRow)

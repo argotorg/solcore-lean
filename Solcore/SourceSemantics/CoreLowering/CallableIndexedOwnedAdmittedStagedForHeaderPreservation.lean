@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedAssignmentPreservation
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
+import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareBitNotHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForPostContracts
@@ -15,7 +18,7 @@ set_option Elab.async false
 set_option maxHeartbeats 4000000
 set_option maxRecDepth 8192
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeaderPreservation
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CompatibleEquality CoreProof
 open CallableIndexedHistory CallableIndexedAllocationCompletion
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
@@ -49,6 +52,9 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations compiled.compatible.checked.catalog functions identities)
   {receiving : SourceCoreRawMetadata.Registry}
   (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
   (definitions : layouts.definitions = (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
@@ -61,6 +67,10 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
   {faults : RecursiveStageMeaning.FaultRep}
+  {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+  {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+  (diagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked) functions callerProtocol invocation.source
+    invalidProjection missingDefault receiving (fun reason token => faults (.semantic reason) token))
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
@@ -77,7 +87,7 @@ private theorem post_environment {context expected outcome first second index}
     Post bridge context expected (restoredOutcome second outcome) reached := by
   cases outcome <;> exact post
 
-include bridge bindings definitions registered producer acquire transport extension in
+include bridge bindings definitions registered producer acquire transport extension faithful observations diagnostics in
 /-- Preservation follows the original staged Source children and allocation.
 Lexical restoration preserves the returned value's captured cells and the
 same native store; it changes only the caller's lexical observations. -/
@@ -92,9 +102,8 @@ theorem preserves_at {budget : Nat}
       invocation.source (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items code)
-    {diagnosticPolicy : AssignmentDiagnosticPolicy}
-    {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
-    (catalogSites : tree.ErrorsFor diagnosticPolicy catalogRegistry catalogFaults)
+    {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : PreparedBranchingCatalogSites.HeaderSites invalidProjection missingDefault receiving catalogFaults tree)
     (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (shape : ItemShape items)
     (sourceTyped : CallableIndexedOwnedPreparedStagedForItemsTyping.Facts invocation.source control context items)
@@ -265,80 +274,162 @@ theorem preserves_at {budget : Nat}
               firstMetadata.trans metadata, reached, callerProtocol.trans expressionRelated tailRelated, post⟩
   | @assign context scope assignment operator rhs rest body head remaining tailSites headErrors ih =>
       have invalidToken : AssignmentOperandDiagnostics.OperandsLaw
-          (fun reason token => faults (.semantic reason) token) operator head.invalid := by
-        intro previous right invalid
-        exact semantic _ _ ((GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors).operands previous right invalid)
-      obtain ⟨_profile, bare, tailShape⟩ := shape.assign_tail
+          (fun reason token => faults (.semantic reason) token) operator head.invalid := PreparedAssignmentReachedDiagnostics.operands headErrors semantic
+      obtain ⟨_profile, tailShape⟩ := shape.assignment_tail
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults size := by
         intro scope id lowered generated node found typed
         obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
         exact children context size smaller certified found typed
-      obtain ⟨target, snapshot⟩ := CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.target_snapshot
-        (values := .initial compiled.compatible.checked)
-        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
-        (context := context) (scope := scope) (administrative := administrative)
-        functions extension head bare environments heaps locals agrees
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot trace with
-        ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
-        ⟨childSize, right, currentCell, initialValue, selected, sameSize, contextEq, outcomeEq,
-          childTrace, _currentRead, _rootType, _initialized, _path, invalidOperands⟩ |
-        ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
-      · subst finalContext
-        subst outcome
-        have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
-          rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
-        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
-            preservation, metadata, reached, related, stable⟩ :=
-          CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_fault
-            (compiled := compiled) (values := .initial compiled.compatible.checked)
-            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
-            (context := context) (scope := scope) (administrative := administrative)
-            bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-            (typedChildren childSize childStrict) childTrace body (LocalLoop.controlType type)
-        exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
-          preservation, metadata, reached, related, fault_post bridge reached stable⟩
-      · subst finalContext
-        subst outcome
-        have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
-          rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
-        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
-            preservation, metadata, reached, related, stable⟩ :=
-          CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_operands
-            (compiled := compiled) (values := .initial compiled.compatible.checked)
-            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
-            (context := context) (scope := scope) (administrative := administrative)
-            bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-            (typedChildren childSize childStrict) snapshot invalidOperands childTrace body (LocalLoop.controlType type) invalidToken
-        exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
-          preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected)
-            (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
-      · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
-          rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
-        have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
-          rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp))) within
-        obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
-            count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
-          CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_value
-            (compiled := compiled) (values := .initial compiled.compatible.checked)
-            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
-            (context := context) (scope := scope) (administrative := administrative)
-            bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-            (typedChildren childSize childStrict) snapshot childTrace write
-        obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
-            finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
-          ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2 tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
-            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-            reached conditioned nextAdmitted remainingTrace
-        have native := (continuation body (LocalLoop.controlType type)).wrap (by
-          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
-            SourceCoreDataPlaces.shift] using evaluated)
-        exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
-          maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
-          last, callerProtocol.trans related lastRelated, post⟩
+      by_cases bare : assignment.target.projections = []
+      · obtain ⟨target, snapshot⟩ := CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.target_snapshot
+          (values := .initial compiled.compatible.checked)
+          (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+          (context := context) (scope := scope) (administrative := administrative)
+          functions extension head bare environments heaps locals agrees
+        rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot trace with
+          ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
+          ⟨childSize, right, currentCell, initialValue, selected, sameSize, contextEq, outcomeEq,
+            childTrace, _currentRead, _rootType, _initialized, _path, invalidOperands⟩ |
+          ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
+        · subst finalContext
+          subst outcome
+          have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+            rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              (typedChildren childSize childStrict) childTrace body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge reached stable⟩
+        · subst finalContext
+          subst outcome
+          have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+            rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_operands
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              (typedChildren childSize childStrict) snapshot invalidOperands childTrace body (LocalLoop.controlType type) invalidToken
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected)
+              (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
+        · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+            rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+          have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
+            rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp))) within
+          obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
+              count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
+            CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_value
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              (typedChildren childSize childStrict) snapshot childTrace write
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2 tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted remainingTrace
+          have native := (continuation body (LocalLoop.controlType type)).wrap (by
+            simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
+              SourceCoreDataPlaces.shift] using evaluated)
+          exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
+            maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
+            last, callerProtocol.trans related lastRelated, post⟩
+      · have errors := PreparedAssignmentReachedDiagnostics.shape_errors (environment := environment) headErrors semantic diagnostics assignmentTyped initial
+        cases trace with
+        | assignment snapshot _ _ _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
+        | assignmentFailure snapshot _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
+        | assignmentOperands snapshot _ _ _ _ _ _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
+        | unbound empty _ => exact (bare empty).elim
+        | dangling empty _ _ => exact (bare empty).elim
+        | projectedAssignmentRootFault _ failed => exact (failed.excluded head.writable locals).elim
+        | projectedAssignmentKeysFault _ ready keysTrace =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_key_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren ready keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge reached stable⟩
+        | projectedAssignmentGetterFault _ keysTrace failed =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_getter_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren errors keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              failed body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+        | projectedAssignmentRhsFault _ keysTrace snapshot childTrace =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge reached stable⟩
+        | projectedAssignmentWriteFault _ keysTrace snapshot childTrace failed =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_write_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren errors keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              failed body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+        | projectedAssignment _ keysTrace snapshot childTrace write remainingTrace =>
+          obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
+              count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_value
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega) write
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2
+              (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted remainingTrace
+          have native := (continuation body (LocalLoop.controlType type)).wrap (by
+            simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
+              SourceCoreDataPlaces.shift] using evaluated)
+          exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
+            maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
+            last, callerProtocol.trans related lastRelated, post⟩
   | @bitNot context scope assignment rest body head remaining tailSites headErrors ih =>
       obtain ⟨_word, _bare, tailShape⟩ := shape.bitNot_tail
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1

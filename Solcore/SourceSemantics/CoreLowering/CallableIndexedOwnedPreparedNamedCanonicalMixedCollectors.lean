@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedCanonicalScopedCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentChildren
@@ -314,7 +315,7 @@ def of_actual
       (RecursiveNamedPreparedStageScopes.registry actual) receipt
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   apply CallableIndexedOwnedPreparedNamedCanonicalScopedCollectors.of_imperative_compiler
-    prepared aligned ready wellFormed complete zero member receipt
+    prepared aligned ready diagnostic wellFormed complete zero member receipt
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic prepared aligned diagnostic receiver)
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.unary_of_diagnostic prepared aligned diagnostic receiver)
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree

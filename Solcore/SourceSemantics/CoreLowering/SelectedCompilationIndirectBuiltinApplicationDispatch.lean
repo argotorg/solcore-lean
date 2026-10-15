@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationBuiltinFunctionOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationIndirectRetainedCalleeArgumentPrefix
@@ -29,7 +31,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
     headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+  [positive : SelectedCompilationCallableOrigins.Origins
     headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
   {invocation : Staging.Recursive.Scope}
@@ -183,7 +185,7 @@ theorem reflects_builtin_or_user {budget size : Nat} {value : Value} {finalStore
         CallableIndexedOwnedPreparedStagedBuiltinParentBounds.reflects_suffix
           bridge compiler prepared sourceParent occurrence initial reached related admitted
           finalHeaps maps worlds frame heapMetadata observations receipt count actualFunctionType
-          valueTyped (representedCallee.map_functions (CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile))) representedValues bundle resultType child arguments suffix (Nat.le_of_lt strict)
+          valueTyped (SelectedCompilationBuiltinFunctionOrigins.ErasesBuiltinsToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile) representedCallee) representedValues bundle resultType child arguments suffix (Nat.le_of_lt strict)
       cases sameStore
       exact .inr ⟨Staging.Recursive.Size.stepSize [calleeSize, argumentsSize, Staging.Recursive.Size.stepSize []],
         .value sourceResult, argumentsHeap, finalMap, finalWorld, parentTrace, completed.sound, resultRep,

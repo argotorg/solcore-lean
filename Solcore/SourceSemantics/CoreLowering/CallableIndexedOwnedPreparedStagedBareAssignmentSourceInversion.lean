@@ -78,6 +78,15 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
+  | assignProjected actual same projected _ _ _ _ _
+  | assignProjectedRootFault actual same projected _
+  | assignProjectedKeysFault actual same projected _ _
+  | assignProjectedGetterFault actual same projected _ _
+  | assignProjectedRhsFault actual same projected _ _ _
+  | assignProjectedWriteFault actual same projected _ _ _ _ =>
+      cases (shape actual).symm.trans same
+      have empty : assignment.target.projections = [] := by cases snapshot; assumption
+      exact (projected empty).elim
   | assignBare actual same actualSnapshot child write remaining =>
       have equal := (shape actual).symm.trans same
       cases equal

@@ -97,6 +97,12 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
     rw [same] at impossible
     cases impossible
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
+  | assignProjected actual same _ _ _ _ _ _
+  | assignProjectedRootFault actual same _ _
+  | assignProjectedKeysFault actual same _ _ _
+  | assignProjectedGetterFault actual same _ _ _
+  | assignProjectedRhsFault actual same _ _ _ _
+  | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ =>
     have impossible := shape actual
     rw [same] at impossible

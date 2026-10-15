@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualFunctionViews
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport
@@ -190,8 +192,10 @@ theorem reflects_children {budget : Nat}
 
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
-include support globals selected semantic in
+include support globals selected semantic assignmentInterpretation in
 /-- The original named body enters the same protected lexical engine and
 returns the exact reached pool, including cells captured by its result. -/
 theorem preserves
@@ -230,6 +234,13 @@ theorem preserves
   rw [layouts] at collected
   have tree := collected.tree
   have catalogSites := collected.sites receiving
+  obtain ⟨assignmentAuthority⟩ := support.assignmentAuthority
+  have assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready
+      (values := .initial compiled.compatible.checked) functions (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner header)
+      header.function.source support.invalidProjection support.missingDefault receiving
+      (fun reason token => faults (.semantic reason) token) :=
+    assignmentInterpretation assignmentAuthority functions (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner header)
+  rw [← stages.source selected] at assignmentDiagnostics
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -252,13 +263,14 @@ theorem preserves
     CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at (compiled := compiled)
       (nestedBridge owner) (CallableIndexedOwnedNestedCanonicalState.bindings owner header)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner header)
-      functions extension rfl header.registered
+      functions (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+      (CallableIndexedOwnedContextualFunctionViews.observations profile) extension rfl header.registered
       (CallableIndexedOwnedNestedCanonicalState.markedProducer owner header model)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedNestedCanonicalState.readyAt_of_stableOwner owner header model stable)
       (fun context size within => preserves_children support globals profile selected children canonicalChildren owner context within)
       (by rw [stages.source selected]; exact header.unique)
-      tree catalogSites semantic rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
+      tree catalogSites semantic assignmentDiagnostics rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function
@@ -280,7 +292,7 @@ theorem preserves
       | semantic => exact ⟨post.rows, post.successful⟩
       | stage => exact post
 
-include support globals selected semantic in
+include support globals selected semantic assignmentInterpretation in
 /-- Native completion is inverted through its real flow prefix and footer;
 no selected final Source context is assumed. -/
 theorem reflects
@@ -319,6 +331,13 @@ theorem reflects
   rw [layouts] at collected
   have tree := collected.tree
   have catalogSites := collected.sites receiving
+  obtain ⟨assignmentAuthority⟩ := support.assignmentAuthority
+  have assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready
+      (values := .initial compiled.compatible.checked) functions (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner header)
+      header.function.source support.invalidProjection support.missingDefault receiving
+      (fun reason token => faults (.semantic reason) token) :=
+    assignmentInterpretation assignmentAuthority functions (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner header)
+  rw [← stages.source selected] at assignmentDiagnostics
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -353,12 +372,14 @@ theorem reflects
     CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at (compiled := compiled)
       (nestedBridge owner) (CallableIndexedOwnedNestedCanonicalState.bindings owner header)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner header)
-      functions extension rfl header.registered
+      functions (CallableIndexedOwnedContextualFunctionViews.runtime_views profile)
+      (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+      (CallableIndexedOwnedContextualFunctionViews.observations profile) extension rfl header.registered
       (CallableIndexedOwnedNestedCanonicalState.markedProducer owner header model)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedNestedCanonicalState.readyAt_of_stableOwner owner header model stable)
       (fun context size within => reflects_children support globals profile selected children canonicalChildren owner context within)
-      graph tree catalogSites semantic rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
+      graph tree catalogSites semantic assignmentDiagnostics rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have controlClosed := Staging.Recursive.TypedControlBoundary.function

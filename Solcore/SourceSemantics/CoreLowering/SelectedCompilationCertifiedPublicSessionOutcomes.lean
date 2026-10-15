@@ -9,7 +9,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPubli
 open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall Call SourceCall)
+open SelectedCompilationPublicSessionState (StartedCall Call SourceCall)
 open RecursiveNamedPublicScalarResults (ScalarOutput)
 
 variable {recipe : SourceCoreIndexedSession.Recipe} {issued : Issued recipe}

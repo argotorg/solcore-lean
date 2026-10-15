@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport
@@ -63,8 +64,10 @@ local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
-include support profile wellFormed extension selected semantic in
+include support profile wellFormed extension selected semantic assignmentInterpretation in
 theorem preserves {budget : Nat}
     (children : ∀ size, size < budget →
       CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds.PreservesRootsAt
@@ -80,9 +83,12 @@ theorem preserves {budget : Nat}
       profile static selected wellFormed globals
   | «scoped» body receipt compilation static =>
     exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedBounds.preserves (semantic := semantic)
-      static body.aligned.globals functions selected extension body.layouts children
+      (assignmentInterpretation := assignmentInterpretation)
+      static body.aligned.globals functions
+      (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+      (CallableIndexedOwnedPhysicalFunctionViews.observations profile) selected extension body.layouts children
 
-include support profile wellFormed extension selected semantic in
+include support profile wellFormed extension selected semantic assignmentInterpretation in
 theorem reflects {budget : Nat}
     (children : ∀ size, size < budget →
       CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds.ReflectsRootsAt
@@ -98,6 +104,10 @@ theorem reflects {budget : Nat}
       profile static selected wellFormed globals
   | «scoped» body receipt compilation static =>
     exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedBounds.reflects (semantic := semantic)
-      static body.aligned.globals functions selected extension body.layouts children
+      (assignmentInterpretation := assignmentInterpretation)
+      static body.aligned.globals functions
+      (CallableIndexedOwnedPhysicalFunctionViews.runtime_views profile)
+      (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+      (CallableIndexedOwnedPhysicalFunctionViews.observations profile) selected extension body.layouts children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport

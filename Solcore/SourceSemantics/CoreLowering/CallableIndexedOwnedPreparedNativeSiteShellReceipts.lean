@@ -116,7 +116,7 @@ theorem of_selected
     refine ⟨{
       issuedCompilation := ⟨selected.diagnostics, selected.found, by
         unfold lowered
-        cases compiled.indexed.base.callableContext <;> rfl⟩
+        cases compiled.indexed.base.callableContext <;> exact ⟨rfl, rfl⟩⟩
       issued := issued
       diagnosticPolicy := .reachable
       entry := entry

@@ -1,6 +1,7 @@
 import Solcore.Test.SourceCoreRecursiveIndexSelection
 import Solcore.Test.SourceCoreRecursiveIndexRuntime
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionSteps
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionSteps
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProfiledPublicSession
 
 /-! The original physical cache slot identifies each automatic catalog Header.
 The original public observations retain their complete execution receipts. -/
@@ -9,7 +10,7 @@ set_option Elab.async false
 namespace Tests.SourceCoreRecursiveIndex.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
-open CertifiedPublicSession (EligibleRow Issued Initial)
+open SelectedCompilationCertifiedPublicSession (EligibleRow Profiled Initial)
 
 variable {fixture : CompiledFixture} {signature : ProgramFunctionSignature}
 
@@ -54,19 +55,19 @@ theorem header_of_member (row : ObservedRow fixture signature)
   exact ⟨sameRow ▸ actual, transported _ _ sameRow actual⟩
 
 def firstCall {row : ObservedRow fixture signature} (first : ObservedPublicRun fixture row) :
-    RecursiveNamedPublicPhysicalSessionState.FunctionCall first.session row.row.key [.word seed] runOptions :=
+    SelectedCompilationPublicSessionState.FunctionCall first.session row.row.key [.word seed] runOptions :=
   ⟨⟨⟨first.checkpoint, first.started⟩, first.completion, first.executed⟩, first.handle, first.returned⟩
 
 def functionCall {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {key : SourceCoreIndexedSession.Key} {arguments : List SourceCorePublicValues.Value}
     (call : ObservedFunctionCall session key arguments) :
-    RecursiveNamedPublicPhysicalSessionState.FunctionCall session key arguments runOptions :=
+    SelectedCompilationPublicSessionState.FunctionCall session key arguments runOptions :=
   ⟨⟨⟨call.checkpoint, call.started⟩, call.completion, call.executed⟩, call.handle, call.returned⟩
 
 /-- The first successful export keeps the actual requested raw function type. -/
-theorem initial_handle_type {issued : Issued fixture.recipe}
+theorem initial_handle_type {issued : Profiled fixture.recipe}
     {row : ObservedRow fixture signature} {first : ObservedPublicRun fixture row}
-    (initial : Initial issued (firstCall first).toCall.toStartedCall) :
+    (initial : Initial issued.toIssued (firstCall first).toCall.toStartedCall) :
     first.handle.sourceType = initial.header.function.resultType := by
   obtain ⟨checkpoint, started, resumed⟩ := first.executed
   have same : checkpoint = first.checkpoint := Except.ok.inj (started.symm.trans first.started)

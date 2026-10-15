@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalClosureAssociation
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationMixedRootSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalBranchingClosureStaticSupport
@@ -71,7 +72,7 @@ def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
   | .branching branching => SelectedCompilationPhysicalBranchingClosureStaticSupport.SelectedBody
       headers code inputs stages branching semanticFaults
 
-def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
+def LegacyPacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
     {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
@@ -85,7 +86,7 @@ def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
   | .ordinary _ _ code _ _ _ _ _ _ _ _ => Packet code stages
   | .principal _ _ code _ _ _ _ _ _ _ _ => Packet code stages
 
-def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
+def LegacySupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
     {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
@@ -95,11 +96,41 @@ def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     (association : CallableIndexedOwnedContextualTypedClosureReceipts.Association
       headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore) (stages : Staging.Recursive.Registry)
-    (packet : PacketFor association stages) : Type :=
+    (packet : LegacyPacketFor association stages) : Type :=
   match association with
   | .ordinary _ _ code _ support _ _ _ _ _ _ =>
       Support (headers := headers) code support.body.toContext stages packet semanticFaults
   | .principal _ _ code _ support _ _ _ _ _ _ =>
+      Support (headers := headers) code support.body.toContext stages packet semanticFaults
+
+def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+    {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    {mapping : LocationMap} {world : StoreTyping} {function : Dynamic.Closure}
+    {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding}
+    {parameterCore resultCore : Ty}
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association
+      headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore) (stages : Staging.Recursive.Registry) : Type :=
+  match association with
+  | .legacy original => LegacyPacketFor original.original stages
+  | .preparedOrdinary _ _ code _ _ _ _ _ _ _ _ _ _ => Packet code stages
+
+def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+    {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    {mapping : LocationMap} {world : StoreTyping} {function : Dynamic.Closure}
+    {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding}
+    {parameterCore resultCore : Ty}
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association
+      headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore) (stages : Staging.Recursive.Registry)
+    (packet : PacketFor association stages) : Type :=
+  match association with
+  | .legacy original => LegacySupportFor original.original stages packet
+  | .preparedOrdinary _ _ code _ support _ _ _ _ _ _ _ _ =>
       Support (headers := headers) code support.body.toContext stages packet semanticFaults
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalClosureStaticSupport

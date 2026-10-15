@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicClosureHistory
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionFunctionStep
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistry
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionRegistry
 
 set_option autoImplicit false
 set_option Elab.async false
@@ -11,7 +11,7 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open RecursiveNamedPublicScalarResults (ScalarOutput)
 open SelectedCompilationPhysicalProgramSupport (stagePrepared)
 

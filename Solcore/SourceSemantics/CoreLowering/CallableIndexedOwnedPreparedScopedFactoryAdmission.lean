@@ -40,6 +40,17 @@ abbrev Certificate (compiled : SourceCoreUnifiedCompilation.Compiled)
   SourceCertificate compiled named named.specialized.function.typedBody
     (statements named.specialized.function.typedBody)
 
+/-- The original uniform-error API retains its original bare assignment shape. -/
+structure LegacySourceCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (body : List StatementId) extends SourceCertificate compiled named source body where
+  shape : CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape source true statements
+
+abbrev LegacyCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) :=
+  LegacySourceCertificate compiled named named.specialized.function.typedBody
+    (statements named.specialized.function.typedBody)
+
 /-- Actual cached identity transports the source certificate to the exact
 Header and its compiled statement roots. -/
 def at_header {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -56,6 +67,20 @@ def at_header {compiled : SourceCoreUnifiedCompilation.Compiled}
   rw [source, body, cached_named prepared selected same]
   exact certificate
 
+def legacy_at_header {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {row : SourceSpecialization.SpecializedFunction}
+    (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row)
+    {instantiation : DeclarationInstantiation}
+    {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
+    {index : Nat} {named : SourceCoreGeneralFunctions.Function}
+    (selected : compiled.indexed.base.functions[index]? = some named)
+    (same : named.specialized = row) (certificate : LegacyCertificate compiled named) :
+    LegacySourceCertificate compiled prepared.named header.function.source header.function.body := by
+  obtain ⟨source, body, _result⟩ := header_data prepared aligned
+  rw [source, body, cached_named prepared selected same]
+  exact certificate
+
 /-- The terminal compiler receipt and its Point are constructed here. No
 caller supplies expression syntax, metadata or a closure execution premise. -/
 theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -66,7 +91,7 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
     (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
     {index : Nat} {named : SourceCoreGeneralFunctions.Function}
     (selected : compiled.indexed.base.functions[index]? = some named)
-    (same : named.specialized = row) (certificate : Certificate compiled named)
+    (same : named.specialized = row) (certificate : LegacyCertificate compiled named)
     {recipe : SourceCoreIndexedSession.Recipe}
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
@@ -84,7 +109,7 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
     ∃ terminal : Terminal header,
       Nonempty (CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.Support
         (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) header terminal) := by
-  let source := at_header prepared aligned selected same certificate
+  let source := legacy_at_header prepared aligned selected same certificate
   obtain ⟨receipt⟩ := CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.of_accepted
     (by rw [aligned.policy]; rfl) source.terminal aligned.accepted
   let terminal : Terminal header := {
@@ -98,7 +123,7 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
       exact ⟨rfl, rfl, childEq⟩ }
   exact ⟨terminal, CallableIndexedOwnedPreparedPhysicalNamedFormationCollectors.of_branching terminal
     ready diagnostic receiver included wellFormed profile member source.found source.form source.owner
-    source.requirements source.coercions source.ordinary source.read source.scan.shape
+    source.requirements source.coercions source.ordinary source.read source.shape
     (fun typed => source.scan.syntax header.unique rfl typed) rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedFactoryAdmission

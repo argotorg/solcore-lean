@@ -80,6 +80,11 @@ private theorem issued_entry {artifact : Artifact} {before after : Session artif
         issuance atRecipe handleValue encoded certified
   | physicalBuiltin prepared headers keys bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded =>
       exact .physicalBuiltin prepared headers keys bodyRegistry future faults profile anchor issuance atRecipe handleValue encoded
+  | preparedPhysicalNamedSelected prepared inputs rows packet member bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded certified =>
+      exact .preparedPhysicalNamedSelected prepared inputs rows packet member bodyRegistry future faults profile anchor
+        issuance atRecipe handleValue encoded certified
+  | preparedPhysicalBuiltin prepared headers keys bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded =>
+      exact .preparedPhysicalBuiltin prepared headers keys bodyRegistry future faults profile anchor issuance atRecipe handleValue encoded
 
 /-- Only a forward extension of the actual metadata table is used. Every
 historical result, including a failed call, keeps its original state and order. -/

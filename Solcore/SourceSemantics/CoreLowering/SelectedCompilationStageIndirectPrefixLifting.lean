@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageIndirectCalleeLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageIndirectSourceTrace
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationIndirectValuesPrefix
@@ -25,7 +26,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {functions : CallableIndexedOwnedPositiveFunctionModels.Receiving headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual headers keys bodyRegistry semanticFaults profile functions]
+  [positive : SelectedCompilationCallableOrigins.Origins headers keys bodyRegistry semanticFaults profile functions]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}

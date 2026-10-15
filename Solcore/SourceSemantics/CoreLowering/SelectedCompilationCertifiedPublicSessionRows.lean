@@ -9,7 +9,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPubli
 open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedPreparedOrdinaryCatalogReceipts (Catalog Eligible)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall)
+open SelectedCompilationPublicSessionState (StartedCall)
 
 abbrev EligibleRow := CertifiedPublicSession.EligibleRow
 

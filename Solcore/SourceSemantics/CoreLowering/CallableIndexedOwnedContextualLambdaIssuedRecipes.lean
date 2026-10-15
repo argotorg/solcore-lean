@@ -18,7 +18,8 @@ existing optional callable root-table replacement preserves this identity. -/
 def IssuedAt (prepared : CallableIndexedNamedGeneration.Prepared checked)
     (diagnostics : SourceCoreDataPlaceFaultSites.Program) : Prop :=
   ∃ issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial checked),
-    prepared.base.diagnostics = some issued ∧ diagnostics.base = issued.program.base
+    prepared.base.diagnostics = some issued ∧ diagnostics.base = issued.program.base ∧
+      diagnostics.places = issued.program.places
 
 /-- One actual compilation supplies the body, the full root policy, and the
 issued assignment inventory. Nested lambdas keep that same witness. -/

@@ -478,6 +478,60 @@ mutual
         (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [loopSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | assignProjected {keysSize childSize nextSize : Nat} {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          middle target updated written)
+        (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [keysSize, childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | assignProjectedRootFault {mode scope context environment before assignment operator rhs id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        StatementsIn program registry mode (stepSize []) scope context environment before (id :: rest) context (.fault (.semantic reason)) before
+    | assignProjectedKeysFault {keysSize : Nat} {mode scope context environment before after assignment operator rhs id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | assignProjectedGetterFault {keysSize : Nat} {mode scope context environment before after assignment operator rhs values id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context (.fault (.semantic reason)) after
+    | assignProjectedRhsFault {keysSize childSize : Nat} {mode scope context environment before targetHeap after assignment operator rhs values target id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [keysSize, childSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | assignProjectedWriteFault {keysSize childSize : Nat} {mode scope context environment before targetHeap after assignment operator rhs values target right id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        StatementsIn program registry mode (stepSize [keysSize, childSize]) scope context environment before (id :: rest) context (.fault (.semantic reason)) after
     | assignBare {childSize nextSize : Nat} {mode scope context finalContext environment before middle written after
           id rest node assignment operator rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
@@ -664,6 +718,48 @@ mutual
     | expressionFailure {childSize : Nat} {scope context environment before after expression rest failure}
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
         ForItems program registry (stepSize [childSize]) scope context environment before (.expression expression :: rest) context (.fault failure) after
+    | projectedAssignment {keysSize childSize nextSize : Nat} {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          middle target updated written)
+        (next : ForItems program registry nextSize scope context environment written rest finalContext outcome after) :
+        ForItems program registry (stepSize [keysSize, childSize, nextSize]) scope context environment before (.assignValue assignment operator rhs :: rest) finalContext outcome after
+    | projectedAssignmentRootFault {scope context environment before assignment operator rhs rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        ForItems program registry (stepSize []) scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) before
+    | projectedAssignmentKeysFault {keysSize : Nat} {scope context environment before after assignment operator rhs rest failure}
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        ForItems program registry (stepSize [keysSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | projectedAssignmentGetterFault {keysSize : Nat} {scope context environment before after assignment operator rhs values rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        ForItems program registry (stepSize [keysSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after
+    | projectedAssignmentRhsFault {keysSize childSize : Nat} {scope context environment before targetHeap after assignment operator rhs values target rest failure}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.fault failure) after) :
+        ForItems program registry (stepSize [keysSize, childSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | projectedAssignmentWriteFault {keysSize childSize : Nat} {scope context environment before targetHeap after assignment operator rhs values target right rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        ForItems program registry (stepSize [keysSize, childSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after
     | assignment {childSize nextSize : Nat} {scope context finalContext environment before middle written after assignment operator rhs value target updated rest outcome}
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry childSize scope context environment before rhs (.value value) middle)
@@ -837,6 +933,7 @@ end
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
+  assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
@@ -935,6 +1032,18 @@ local macro "erase_stage_grade" : tactic =>
     case bitNotBareFault => apply Recursive.StatementsIn.bitNotBareFault <;> assumption
     case bitNot => apply Recursive.ForItems.bitNot <;> assumption
     case bitNotFault => apply Recursive.ForItems.bitNotFault <;> assumption
+    case assignProjected => apply Recursive.StatementsIn.assignProjected <;> assumption
+    case assignProjectedRootFault => apply Recursive.StatementsIn.assignProjectedRootFault <;> assumption
+    case assignProjectedKeysFault => apply Recursive.StatementsIn.assignProjectedKeysFault <;> assumption
+    case assignProjectedGetterFault => apply Recursive.StatementsIn.assignProjectedGetterFault <;> assumption
+    case assignProjectedRhsFault => apply Recursive.StatementsIn.assignProjectedRhsFault <;> assumption
+    case assignProjectedWriteFault => apply Recursive.StatementsIn.assignProjectedWriteFault <;> assumption
+    case projectedAssignment => apply Recursive.ForItems.projectedAssignment <;> assumption
+    case projectedAssignmentRootFault => apply Recursive.ForItems.projectedAssignmentRootFault <;> assumption
+    case projectedAssignmentKeysFault => apply Recursive.ForItems.projectedAssignmentKeysFault <;> assumption
+    case projectedAssignmentGetterFault => apply Recursive.ForItems.projectedAssignmentGetterFault <;> assumption
+    case projectedAssignmentRhsFault => apply Recursive.ForItems.projectedAssignmentRhsFault <;> assumption
+    case projectedAssignmentWriteFault => apply Recursive.ForItems.projectedAssignmentWriteFault <;> assumption
     case assignBare => apply Recursive.StatementsIn.assignBare <;> assumption
     case assignBareFault => apply Recursive.StatementsIn.assignBareFault <;> assumption
     case assignBareOperands => apply Recursive.StatementsIn.assignBareOperands <;> assumption
@@ -1272,6 +1381,27 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨nextSize, gradedNext⟩ := nextIH
       exact ⟨_, .bitNot snapshot write gradedNext⟩
     case bitNotFault bare failed => exact ⟨_, .bitNotFault bare failed⟩
+    case assignProjected contains form projected keys snapshot child write next keysIH childIH nextIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨childSize, childGraded⟩ := childIH
+      obtain ⟨nextSize, nextGraded⟩ := nextIH
+      exact ⟨_, .assignProjected contains form projected keysGraded snapshot childGraded write nextGraded⟩
+    case assignProjectedRootFault contains form projected failed =>
+      exact ⟨_, .assignProjectedRootFault contains form projected failed⟩
+    case assignProjectedKeysFault contains form projected ready keys keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .assignProjectedKeysFault contains form projected ready keysGraded⟩
+    case assignProjectedGetterFault contains form projected keys failed keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .assignProjectedGetterFault contains form projected keysGraded failed⟩
+    case assignProjectedRhsFault contains form projected keys snapshot child keysIH childIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignProjectedRhsFault contains form projected keysGraded snapshot childGraded⟩
+    case assignProjectedWriteFault contains form projected keys snapshot child failed keysIH childIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignProjectedWriteFault contains form projected keysGraded snapshot childGraded failed⟩
     case assignBare contains form snapshot child write next childIH nextIH =>
       obtain ⟨childSize, childGraded⟩ := childIH
       obtain ⟨nextSize, nextGraded⟩ := nextIH
@@ -1388,6 +1518,27 @@ local macro "construct_stage_grade" : tactic =>
     case expressionFailure child childIH =>
       obtain ⟨childSize, gradedchild⟩ := childIH
       exact ⟨_, .expressionFailure gradedchild⟩
+    case projectedAssignment projected keys snapshot child write next keysIH childIH nextIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨childSize, childGraded⟩ := childIH
+      obtain ⟨nextSize, nextGraded⟩ := nextIH
+      exact ⟨_, .projectedAssignment projected keysGraded snapshot childGraded write nextGraded⟩
+    case projectedAssignmentRootFault projected failed =>
+      exact ⟨_, .projectedAssignmentRootFault projected failed⟩
+    case projectedAssignmentKeysFault projected ready keys keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .projectedAssignmentKeysFault projected ready keysGraded⟩
+    case projectedAssignmentGetterFault projected keys failed keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .projectedAssignmentGetterFault projected keysGraded failed⟩
+    case projectedAssignmentRhsFault projected keys snapshot child keysIH childIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .projectedAssignmentRhsFault projected keysGraded snapshot childGraded⟩
+    case projectedAssignmentWriteFault projected keys snapshot child failed keysIH childIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .projectedAssignmentWriteFault projected keysGraded snapshot childGraded failed⟩
     case assignment snapshot child write next childIH nextIH =>
       obtain ⟨childSize, gradedchild⟩ := childIH
       obtain ⟨nextSize, gradednext⟩ := nextIH

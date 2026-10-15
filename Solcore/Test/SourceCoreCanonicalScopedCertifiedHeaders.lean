@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreCanonicalScopedTypes
 import Solcore.Test.SourceCoreCanonicalScopedRuntime
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionSteps
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionSteps
 
 /-! The original physical cache slot identifies each automatic catalog Header.
 The original public observations retain their complete execution receipts. -/
@@ -9,7 +9,7 @@ set_option Elab.async false
 namespace Tests.SourceCoreCanonicalScoped.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
-open CertifiedPublicSession (EligibleRow Issued Initial)
+open SelectedCompilationCertifiedPublicSession (EligibleRow Issued Initial)
 
 variable {fixture : CompiledFixture} {signature : ProgramFunctionSignature}
 
@@ -54,13 +54,13 @@ theorem header_of_member (row : ObservedRow fixture signature)
   exact ⟨sameRow ▸ actual, transported _ _ sameRow actual⟩
 
 def firstCall {row : ObservedRow fixture signature} (first : ObservedPublicRun fixture row) :
-    RecursiveNamedPublicPhysicalSessionState.FunctionCall first.session row.row.key [.word seed] runOptions :=
+    SelectedCompilationPublicSessionState.FunctionCall first.session row.row.key [.word seed] runOptions :=
   ⟨⟨⟨first.checkpoint, first.started⟩, first.completion, first.executed⟩, first.handle, first.returned⟩
 
 def functionCall {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {key : SourceCoreIndexedSession.Key} {arguments : List SourceCorePublicValues.Value}
     (call : ObservedFunctionCall session key arguments) :
-    RecursiveNamedPublicPhysicalSessionState.FunctionCall session key arguments runOptions :=
+    SelectedCompilationPublicSessionState.FunctionCall session key arguments runOptions :=
   ⟨⟨⟨call.checkpoint, call.started⟩, call.completion, call.executed⟩, call.handle, call.returned⟩
 
 /-- The first successful export keeps the actual requested raw function type. -/

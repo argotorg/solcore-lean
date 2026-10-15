@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProgramSupportIssuer
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCatalogFrontdoor
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedProgramCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalogPublicAdmission
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistry
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionRegistry
 
 /-! A checked program certificate issues one automatic catalog and its complete
 physical support. Later public starts retain the same Source heap and history. -/
@@ -13,7 +13,7 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall)
+open SelectedCompilationPublicSessionState (StartedCall)
 
 structure Issued (recipe : SourceCoreIndexedSession.Recipe) where
   prepared : SourceCoreIndexedSession.Recipe.prepare recipe.compiled = .ok recipe
@@ -27,7 +27,7 @@ variable {recipe : SourceCoreIndexedSession.Recipe}
 /-- The authentic selected public entry supplies the diagnostic receiver. The
 checker receipt keeps its original budget when the support is issued. -/
 theorem of_checked
-    (certificate : CallableIndexedOwnedPreparedProgramAdmission.Certificate recipe.compiled)
+    (certificate : SelectedCompilationPreparedProgramCertificates.Certificate recipe.compiled)
     (bodies : SelectedCompilationBodyTyping.Bodies recipe.compiled)
     (prepared : SourceCoreIndexedSession.Recipe.prepare recipe.compiled = .ok recipe)
     {entry : SourceCoreCallableIndexedPrograms.Entry recipe.compiled.indexed.layouts}
@@ -45,7 +45,7 @@ abbrev Issued.State (issued : Issued recipe)
     (anchor : Header recipe.compiled (Program.ofChecked recipe.compiled.sourceProgram))
     {artifact : SourceCoreExecution.Artifact} (session : SourceCoreExecution.Session artifact)
     (entries : List RecursiveNamedPublicFunctionHistory.Entry) :=
-  RecursiveNamedPublicPhysicalSessionState.State issued.catalog.rows anchor issued.initial
+  SelectedCompilationPublicSessionState.State issued.catalog.rows anchor issued.initial
     issued.support.profile recipe session entries
 
 /-- The real current history supplies the native state used by the front door.

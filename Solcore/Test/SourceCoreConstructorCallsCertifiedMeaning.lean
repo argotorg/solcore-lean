@@ -1,8 +1,8 @@
 import Solcore.Test.SourceCoreConstructorCallsCertifiedHeaders
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionIssuance
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionIssuance
 import Solcore.SourceSemantics.CoreLowering.CompilerCertifiedPublicSession
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarStep
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarForward
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectScalarStep
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectScalarForward
 
 /-! The original indexed closures are retained in one physical public session.
 Each Source trace uses the actual selected Header and the reached Source heap. -/
@@ -14,8 +14,8 @@ open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open RecursiveNamedPublicPhysicalSessionState (SourceCall)
-open CertifiedPublicSession (Issued Initial)
+open SelectedCompilationPublicSessionState (SourceCall)
+open SelectedCompilationCertifiedPublicSession (Issued Initial)
 
 structure Observed (fixture : CompiledFixture) where
   value : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled
@@ -40,7 +40,7 @@ structure FirstMeaning (issued : Issued fixture.recipe)
   handleEq : entry.handle = first.handle
   handleType : first.handle.sourceType = closureType
   after : issued.State initial.header first.completion.session [entry]
-  trace : RecursiveNamedPublicPhysicalSessionState.SourceCall initial.header initial.header
+  trace : SelectedCompilationPublicSessionState.SourceCall initial.header initial.header
     (RecursiveStageRegistry.scope stages.sidecar [] initial.header.function)
     ⟨[]⟩ [.word seed] (.value entry.source) after.heap
 
@@ -54,12 +54,13 @@ theorem first_meaning (profile : Observed fixture)
     (first : ObservedPublicRun fixture observed.makeRow) :
     ∃ issued : Issued fixture.recipe, Nonempty (FirstMeaning issued stages first) := by
   obtain ⟨row, rowEq⟩ := selected_row observed.makeRow
-  obtain ⟨issued, initial, namedEq⟩ := CertifiedPublicSession.from_profile_initial_row
+  obtain ⟨profiled, initial, namedEq⟩ := CertifiedPublicSession.from_profile_initial_row
     (by rw [fixture.sameProgram]; exact fixture.checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
     fixture.issued profile.value fixture.source_wellFormed first.opened
     (firstCall first).toCall.toStartedCall first.bootstrap first.fresh first.authority
     (show first.bootstrap.ReadyAt 100000 first.session from .single first.ready) row
+  let issued := profiled.toIssued
   obtain ⟨actual, actualEq⟩ := header_of_member observed.makeRow issued.catalog.rows
     initial.start.selected.member ((congrArg (·.specialized) namedEq).trans rowEq)
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
@@ -78,7 +79,7 @@ theorem first_meaning (profile : Observed fixture)
 
 theorem FirstMeaning.forward {stages : ObservedStages fixture observed.makeRow}
     {first : ObservedPublicRun fixture observed.makeRow} (meaning : FirstMeaning issued stages first) :
-    RecursiveNamedPublicPhysicalSessionInitialForward.ForwardAt issued.catalog.rows meaning.initial.header
+    SelectedCompilationPublicSessionInitialForward.ForwardAt issued.catalog.rows meaning.initial.header
       meaning.initial.header issued.support (firstCall first).toCall.toStartedCall meaning.entry.source meaning.after.heap := by
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
       meaning.initial.header.function.context [.word seed] meaning.initial.header.types := by
@@ -115,7 +116,7 @@ theorem named_meaning (before : issued.State anchor session entries)
     rw [← selected.headerEq, selected.actual.key]
     exact call.issued
   obtain ⟨entry, type, source, handle, handleType, after, heap⟩ :=
-    RecursiveNamedPublicPhysicalSessionIssuance.State.remember_named issued.support issued.prepared
+    SelectedCompilationPublicSessionIssuance.State.remember_named issued.support issued.prepared
       before selected.packet selected.member issuance call.returned
   exact ⟨⟨selected, entry, type, source, handle, handleType, after, heap⟩⟩
 
@@ -135,7 +136,7 @@ structure BuiltinMeaning (issued : Issued fixture.recipe)
 theorem builtin_meaning (before : issued.State anchor session entries)
     (call : ObservedBuiltin session) : Nonempty (BuiltinMeaning issued before call) := by
   obtain ⟨entry, type, source, handle, handleType, after, heap⟩ :=
-    RecursiveNamedPublicPhysicalSessionIssuance.State.remember_builtin issued.prepared before
+    SelectedCompilationPublicSessionIssuance.State.remember_builtin issued.prepared before
       .wordFromInteger call.issued call.returned
   exact ⟨⟨entry, type, source, handle, handleType, after, heap⟩⟩
 

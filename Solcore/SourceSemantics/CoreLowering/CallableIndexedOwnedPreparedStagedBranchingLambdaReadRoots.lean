@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogTransport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -59,7 +60,8 @@ def support_reads
     change LocalIdentityOwnership support.caller.named.specialized.function.typedBody
     rw [← support.caller.agreement.source, support.caller.frame.source]
     exact certificate.local_identity_ownership
-  refine ⟨support.body.frame, support.body.projection, ?_⟩
+  refine ⟨support.body.frame, support.body.projection, choice.invalidProjection, choice.missingDefault,
+    choiceIssued.assignmentAuthority code support.caller.selected support.source support.body.unique, ?_⟩
   intro child selected
   have actual := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerSupport.collected
     code support.body.toContext support.body.frame choice provenance.body_view provenance.scope_declarations
@@ -84,11 +86,8 @@ def support_reads
   rw [stages.source selected]
   refine ⟨weakened, ?_⟩
   intro currentRegistry
-  obtain ⟨tree, sites⟩ := CallableLambdaViewMatchRuntimeCertificates.transport_sites_with
-    (LocalView.refl function.source) (by intro id member; cases member)
-    support.body.unique (fun _ _ _ => True.intro)
-    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry)
-    (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
+  obtain ⟨tree, sites⟩ := PreparedBranchingCatalogTransport.weaken support.body.unique
+    (actual.sites currentRegistry)
   exact sites
 
 include provenance receiver wellFormed original in

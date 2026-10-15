@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreCapturedBranchFixture
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLegacyBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
 
 /-! The original typed branch body supplies scoped arms and its restored
@@ -108,7 +108,7 @@ theorem ObservedFactory.seed_declaration {fixture : CompiledFixture} (observed :
     observed.shape.binderRequirements]
 
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
-    CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
+    CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .conditional observed.shape.branchFound observed.shape.branchForm
     (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
     (.initialized observed.shape.initializedFound observed.shape.initializedForm

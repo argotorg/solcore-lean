@@ -62,7 +62,13 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
       cases same
       rw [form] at original
       cases original
-      exact False.elim (ready.1 assignable)
+      exact False.elim (ready.1 (.inl assignable))
+  | projectedAssigned read original _ remaining receipt route =>
+      have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
+      cases same
+      rw [form] at original
+      cases original
+      exact False.elim (receipt.projected assignable.2.1)
   | assigned read original _ remaining receipt targetType =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -106,7 +112,7 @@ private theorem returning_children {policy : SourceCoreLoops.Policy}
       cases original
       rfl
   | initialized read original | absent read original | returnUnit read original
-  | whileLoop read original | assigning read original | assigned read original
+  | whileLoop read original | assigning read original | assigned read original | projectedAssigned read original
   | discard read original | block read original | conditional read original
   | tailValue read original | valueDiscard read original
   | matching read original | matched read original
@@ -150,7 +156,7 @@ private theorem loop_details {policy : SourceCoreLoops.Policy}
         inside.2.1, tail.2.1, List.nil_append, Tree.children, List.map_cons, List.map_append,
         inside.2.2, tailChildren, List.cons_append, List.nil_append, and_self]
   | initialized read form | absent read form | returning read form | returnUnit read form
-  | assigning read form | assigned read form
+  | assigning read form | assigned read form | projectedAssigned read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form
   | matching read form | matched read form
@@ -192,7 +198,7 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
           simp only [Tree.closed, Tree.bindings, List.map_cons, tail.1, tail.2.1,
             List.map_nil, Tree.children, tail.2.2, MethodShape.childIds, and_self]
       | absent read form | returning read form | returnUnit read form
-      | assigning read form | assigned read form | whileLoop read form
+      | assigning read form | assigned read form | projectedAssigned read form | whileLoop read form
       | discard read form | block read form | conditional read form
       | valueDiscard read form
       | matching read form | matched read form
@@ -208,7 +214,7 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
           simp only [shape.flagInitializedForm, expanded] at outside
           cases outside
   | absent read form | returning read form | returnUnit read form
-  | assigning read form | assigned read form | whileLoop read form
+  | assigning read form | assigned read form | projectedAssigned read form | whileLoop read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form
   | matching read form | matched read form

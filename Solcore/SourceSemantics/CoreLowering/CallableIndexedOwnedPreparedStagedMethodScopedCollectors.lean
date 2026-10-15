@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentProvenance
@@ -150,7 +151,7 @@ theorem collected
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ nativePrefix principal)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (invalidProjection principal) (missingDefault principal) (faults := faults) compiled.indexed.layouts
       principal.named.signature.key [] compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
       (fun error => .sourceAllocation (reprStr error)) (.initial compiled.compatible.checked)
       principal.sourceBody.source expressionSyntax
@@ -189,6 +190,7 @@ include ready member wellFormed in
 /-- The static family is issued from the original compiler callback at each
 actual method stage. It contains no execution or body correspondence premise. -/
 theorem of_compiler
+    (diagnostic : CallableIndexedOwnedPreparedStagedMethodTerminalSupport.DiagnosticAt principal.cached)
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {stages : Staging.Recursive.Registry} {semanticFaults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
@@ -214,7 +216,8 @@ theorem of_compiler
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       Certificate headers stages semanticFaults context child scope id lowered) :
     Support principal packet headers stages semanticFaults := by
-  constructor
+  refine ⟨PreparedAssignmentDiagnosticProducers.cached principal.cached diagnostic
+    principal.source_eq.symm packet.sourceAt.unique, ?_⟩
   intro child selected
   rw [stages.source selected]
   exact ⟨expressionSyntax, collected principal packet ready member wellFormed operands unary syntaxTree (children child selected)⟩

@@ -10,8 +10,8 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosurePa
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableIndexedHistory CallableIndexedLambdaValues CallableIndexedOwnedFunctionState
 open CallableIndexedOwnedSourceAdmission
-open CallableIndexedOwnedPhysicalClosureAssociation (Association)
-open SelectedCompilationPhysicalClosureStaticSupport (Packet PacketFor SupportFor)
+open CallableIndexedOwnedPreparedPhysicalClosureAssociation (Association)
+open SelectedCompilationPhysicalClosureStaticSupport (Packet PacketFor SupportFor LegacyPacketFor LegacySupportFor)
 open SelectedCompilationStageClosureEntryLifting (EntryLiftsBelow)
 
 section Schema
@@ -34,14 +34,22 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   {mapping : LocationMap} {world : StoreTyping} {native : Value}
   {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
 
-def BelowFor
+def LegacyBelowFor
     (association : CallableIndexedOwnedContextualTypedClosureReceipts.Association headers keys
       bodyRegistry semanticFaults mapping world function native bindings parameter result)
-    (packet : PacketFor association stages) (budget : Nat) : Prop :=
+    (packet : LegacyPacketFor association stages) (budget : Nat) : Prop :=
   match association with
   | .ordinary _ _ code _ support _ _ _ _ _ _ =>
     PacketBelow (headers := headers) (keys := keys) code support.body.toContext model stages packet budget
   | .principal _ _ code _ support _ _ _ _ _ _ =>
+    PacketBelow (headers := headers) (keys := keys) code support.body.toContext model stages packet budget
+def BelowFor
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys
+      bodyRegistry semanticFaults mapping world function native bindings parameter result)
+    (packet : PacketFor association stages) (budget : Nat) : Prop :=
+  match association with
+  | .legacy original => LegacyBelowFor model stages original.original packet budget
+  | .preparedOrdinary _ _ code _ support _ _ _ _ _ _ _ _ =>
     PacketBelow (headers := headers) (keys := keys) code support.body.toContext model stages packet budget
 end Schema
 
@@ -55,28 +63,28 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding}
   {parameterCore resultCore : Ty}
   (association : Association headers keys bodyRegistry semanticFaults mapping world function native bindings parameterCore resultCore)
-  (packet : PacketFor association.original stages)
-  (supported : SupportFor association.original stages packet)
+  (packet : PacketFor association stages)
+  (supported : SupportFor association stages packet)
   {before : Dynamic.Heap} {store : Store} {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
   (caller : State headers keys ⟨scope, mapping, world, before, store, canonical⟩)
   {sources : List Dynamic.Value} {values : List Value}
   (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before sources)
   (represented : CallableIndexedParameterMeaning.Arguments
     (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-      (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
     mapping world bindings sources values)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
     mapping world before store)
   (physical : CallableIndexedOwnedPhysicalGlobals.Authority compiled mapping store)
   (stable : CallableIndexedOwnedIndirectExpressionHeads.StableRows caller)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 include physical supported raw represented heaps stable in
 theorem application_lifts (budget : Nat)
-    (bodies : BelowFor model stages association.original packet budget)
+    (bodies : BelowFor model stages association packet budget)
     {invocation : Staging.Recursive.Scope} {context : SourceSemantics.Context}
     {callerEvidence callEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -85,30 +93,53 @@ theorem application_lifts (budget : Nat)
     (within : size ≤ budget) :
     Staging.Recursive.Lifting.ApplicationLift (Program.ofChecked compiled.sourceProgram) stages invocation context
       before (.closure function) sources outcome after := by
-  rcases association with ⟨original, slots⟩
-  cases original with
-  | ordinary owner captured code history support _origin _prefixContext globals referenceIndex _typed _provenance =>
-    rename_i capturedScope capturedActual
-    have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
-      simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
-    obtain ⟨_metadata, carried⟩ := stable owner.position
-    have reference : captured.canonical[code.referenceIndex]? =
-        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
-      rw [referenceIndex]
-      exact globals.reference
-    have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
-        code.compilation.administrativePrefix capturedScope captured.canonical := by
-      cases packet <;> rw [supported.prefix] <;> exact slots
-    obtain ⟨child, selected, body⟩ : ∃ child, stages.Closure function child ∧
-        EntryLiftsBelow (headers := headers) (keys := keys) code support.body.toContext model stages child budget := by
-      cases packet with
-      | terminal terminal => exact ⟨terminal.child, terminal.selected, bodies⟩
-      | branching branching => exact ⟨branching.child, branching.selected, bodies⟩
-    exact SelectedCompilationStageClosureEntryApplicationLifting.lifts_application
-      captured code history support.body.toContext functions represented owner caller heaps raw.captures reference
-      carried (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) observed physical stable raw.heaps typed
-      selected budget body called within
-  | principal owner captured code history support _origin globals _leading referenceIndex _typed _provenance =>
+  cases association with
+  | legacy original =>
+    rcases original with ⟨original, slots⟩
+    cases original with
+    | ordinary owner captured code history support _origin _prefixContext globals referenceIndex _typed _provenance =>
+      rename_i capturedScope capturedActual
+      have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
+        simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
+      obtain ⟨_metadata, carried⟩ := stable owner.position
+      have reference : captured.canonical[code.referenceIndex]? =
+          some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
+        rw [referenceIndex]
+        exact globals.reference
+      have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+          code.compilation.administrativePrefix capturedScope captured.canonical := by
+        cases packet <;> rw [supported.prefix] <;> exact slots
+      obtain ⟨child, selected, body⟩ : ∃ child, stages.Closure function child ∧
+          EntryLiftsBelow (headers := headers) (keys := keys) code support.body.toContext model stages child budget := by
+        cases packet with
+        | terminal terminal => exact ⟨terminal.child, terminal.selected, bodies⟩
+        | branching branching => exact ⟨branching.child, branching.selected, bodies⟩
+      exact SelectedCompilationStageClosureEntryApplicationLifting.lifts_application
+        captured code history support.body.toContext functions represented owner caller heaps raw.captures reference
+        carried (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) observed physical stable raw.heaps typed
+        selected budget body called within
+    | principal owner captured code history support _origin globals _leading referenceIndex _typed _provenance =>
+      rename_i capturedScope capturedActual
+      have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
+        simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
+      obtain ⟨_metadata, carried⟩ := stable owner.position
+      have reference : captured.canonical[code.referenceIndex]? =
+          some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
+        rw [referenceIndex]
+        exact globals.reference
+      have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+          code.compilation.administrativePrefix capturedScope captured.canonical := by
+        cases packet <;> rw [supported.prefix] <;> exact slots
+      obtain ⟨child, selected, body⟩ : ∃ child, stages.Closure function child ∧
+          EntryLiftsBelow (headers := headers) (keys := keys) code support.body.toContext model stages child budget := by
+        cases packet with
+        | terminal terminal => exact ⟨terminal.child, terminal.selected, bodies⟩
+        | branching branching => exact ⟨branching.child, branching.selected, bodies⟩
+      exact SelectedCompilationStageClosureEntryApplicationLifting.lifts_application
+        captured code history support.body.toContext functions represented owner caller heaps raw.captures reference
+        carried (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) observed physical stable raw.heaps typed
+        selected budget body called within
+  | preparedOrdinary owner captured code history support _origin _prefixContext globals referenceIndex _typed _prepared slots _callerReceipt =>
     rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments

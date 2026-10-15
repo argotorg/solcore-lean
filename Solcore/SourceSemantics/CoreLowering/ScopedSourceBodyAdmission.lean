@@ -103,6 +103,17 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
 
+  | assignProjected {mode id node assignment operator rhs rhsNode binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
+
   | bitNot {mode id node assignment binder rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -188,6 +199,7 @@ theorem Scan.shape {source approved expected mode statements}
   | conditional found form _ _ _ _ _ _ _ left right remaining => exact .conditional found form left right remaining
   | whileLoop found form _ _ _ _ _ inner remaining => exact .whileLoop found form inner remaining
   | assign found form _ _ profile bare _ _ _ _ ih => exact .assign found form profile bare ih
+  | assignProjected found form _ _ profile projected _ _ _ _ _ ih => exact .assignProjected found form profile projected ih
   | bitNot found form _ _ profile bare _ ih => exact .bitNot found form profile bare ih
   | matching found form _ _ _ _ _ _ _ arms fallback remaining =>
       exact .matchWith found form arms fallback remaining
@@ -291,6 +303,23 @@ theorem Scan.syntax {source approved expected mode statements}
           simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
           subst child
           exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+        · exact ih result tail
+
+  | assignProjected found form declaration route profile projected keys rhsFound rhsType value _ ih =>
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | assignValue assignment =>
+        obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
+          ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route assignment
+        apply GenericImperativeMatch.Syntax.assign found form sourceTyped writable rightTyped numeric
+        · intro child member
+          rcases List.mem_cons.mp member with equal | member
+          · subst child
+            exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+          · obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
+            exact ⟨keys child member, node, found, typed⟩
         · exact ih result tail
 
   | bitNot found form declaration targetType profile bare _ ih =>

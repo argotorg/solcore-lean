@@ -7,7 +7,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.AcceptedCompilerProgramAdmission
 open Core Frontend SourceInference
 open CompilerProgramStaticProfile
-open CallableIndexedOwnedPreparedProgramAdmission (Certificate)
+open SelectedCompilationPreparedProgramCertificates (Certificate)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 

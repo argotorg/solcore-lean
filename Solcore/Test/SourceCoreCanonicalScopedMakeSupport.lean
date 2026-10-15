@@ -59,7 +59,12 @@ theorem ActualHeader.make_formation {fixture : CompiledFixture} {observed : Obse
   · exact observed.makeShape.coercions
   · simp only [observed.noLocals, List.find?_nil]
   · rw [actual.source, expression]; exact extra.read
-  · rw [actual.source]; exact observed.make_body_shape
+  · rw [actual.source]
+    exact .initialized observed.makeShape.initializedFound observed.makeShape.initializedForm
+      (.whileLoop observed.makeShape.loopFound observed.makeShape.loopForm
+        (.assign observed.makeShape.assignmentFound observed.makeShape.assignmentForm (.inl rfl) observed.makeShape.targetBare
+          (.assign observed.makeShape.flagAssignmentFound observed.makeShape.flagAssignmentForm (.inl rfl) observed.makeShape.flagTargetBare .nil))
+        (.returnValue [] observed.makeShape.innerReturnFound observed.makeShape.innerReturnForm))
   · intro context final facts typed
     rw [actual.source] at typed ⊢
     exact observed.make_body_syntax extra.binderScheme (actual.source ▸ actual.header.unique)

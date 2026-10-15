@@ -41,7 +41,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include keyPhysical extension support semantic in
+include keyPhysical support in
 theorem source_bodies (budget : Nat)
     (children : ∀ size, size < budget → PreservesRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -58,11 +58,14 @@ theorem source_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [SelectedCompilationMethodBodies.Packet.sourceAt, sourceAt] using
-        SelectedCompilationMethodBodyBounds.source_continuation (semantic := semantic)
-          port.principal (.terminal packet) static certified functions selected installed
-          owner keyPhysical caller heapTyped packetArguments stable extension budget children
+        SelectedCompilationMethodTerminalBounds.source_continuation
+          port.principal packet static certified functions selected installed
+          owner keyPhysical caller heapTyped packetArguments stable budget
+          (fun size smaller _context _invocation _scope _expression _lowered root owner physical =>
+            children size smaller
+              (SelectedCompilationMixedRootSupport.RootAt.ofMethod root) owner physical)
 
-include keyPhysical extension support semantic in
+include keyPhysical support in
 theorem native_bodies (budget : Nat)
     (children : ∀ size, size < budget → ReflectsRootsAt (headers := headers) (keys := keys)
       model stages semanticFaults faults size) :
@@ -79,8 +82,11 @@ theorem native_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [SelectedCompilationMethodBodies.Packet.sourceAt, sourceAt] using
-        SelectedCompilationMethodBodyBounds.native_continuation (semantic := semantic)
-          port.principal (.terminal packet) static certified functions selected installed
-          owner keyPhysical caller heapTyped packetArguments stable extension budget children
+        SelectedCompilationMethodTerminalBounds.native_continuation
+          port.principal packet static certified functions selected installed
+          owner keyPhysical caller heapTyped packetArguments stable budget
+          (fun size smaller _context _invocation _scope _expression _lowered root owner physical =>
+            children size smaller
+              (SelectedCompilationMixedRootSupport.RootAt.ofMethod root) owner physical)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalCoercionMethodBounds

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalMixedNamedTerminalSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedFormationSupport
@@ -59,13 +60,15 @@ variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)} {
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
   {faults : RecursiveStageMeaning.FaultRep}
   {child : Staging.Recursive.Scope} (selected : stages.Closure header.function child)
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-include support profile certified extension selected semantic in
+include support profile certified extension selected semantic assignmentInterpretation in
 theorem preserves {budget : Nat}
     (children : ∀ size, size < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
@@ -81,9 +84,12 @@ theorem preserves {budget : Nat}
       profile static selected certified globals
   | «scoped» body receipt compilation static =>
     exact SelectedCompilationNamedScopedBounds.preserves (semantic := semantic)
-      static body.aligned.globals functions selected extension body.layouts children
+      (assignmentInterpretation := assignmentInterpretation)
+      static body.aligned.globals functions
+      (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile) selected extension body.layouts children
 
-include support profile certified extension selected semantic in
+include support profile certified extension selected semantic assignmentInterpretation in
 theorem reflects {budget : Nat}
     (children : ∀ size, size < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
@@ -99,6 +105,10 @@ theorem reflects {budget : Nat}
       profile static selected certified globals
   | «scoped» body receipt compilation static =>
     exact SelectedCompilationNamedScopedBounds.reflects (semantic := semantic)
-      static body.aligned.globals functions selected extension body.layouts children
+      (assignmentInterpretation := assignmentInterpretation)
+      static body.aligned.globals functions
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.runtime_views profile)
+      (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+      (CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile) selected extension body.layouts children
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedBodySupport

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily
 
 /-! The closed physical mixed family supplies named body ports for actual
@@ -67,6 +69,7 @@ theorem preserves_with_methods
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves_with_methods
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
@@ -80,6 +83,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects_with_methods
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
@@ -93,6 +97,7 @@ theorem preserves_with_bodies
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves_with_bodies
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
@@ -106,6 +111,7 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
   exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
     (bodySupport header member) profile wellFormed extension selected
     (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects_with_bodies
       receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport

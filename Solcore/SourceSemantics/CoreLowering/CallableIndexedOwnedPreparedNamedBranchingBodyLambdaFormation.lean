@@ -54,7 +54,7 @@ theorem of_terminal
         binding.initializer = terminal.expression)) = none)
     (read : SourceCoreCompatibleDataExpressions.readExpression compiled.compatible.checked
       header.function.source terminal.expression = .ok (node, reported))
-    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape header.function.source true statements)
+    (shape : CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape header.function.source true statements)
     (syntaxFor : ∀ {context final bodyFacts},
       StatementsHaveType header.function.source {returnType := result} context statements final bodyFacts →
       GenericImperativeMatch.Syntax header.function.source

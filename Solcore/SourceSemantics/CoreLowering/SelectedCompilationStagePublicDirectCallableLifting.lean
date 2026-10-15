@@ -72,19 +72,19 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
   cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
   | closure function =>
       obtain ⟨bindings, actualParameter, actualResult, ⟨association⟩, nativeType⟩ :=
-        CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.closure_member support.profile calleeRelated function rfl
+        CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.closure_member support.profile calleeRelated function rfl
       obtain ⟨parameterEq, _resultEq, _signatures, _code, _covers, _captures⟩ := calleeTyped.closure_function_inv
       have sourceBundle : parameter = TypeSystem.Ty.productMany
           (bindings.map (fun binding => binding.1.scheme.body)) := by
-        rw [association.original.source_binders]
+        rw [association.source_binders]
         exact parameterEq
       have packed := packedRelated
       rw [sourceBundle] at packed
       obtain ⟨decodedSources, values, decodedPacking, _nativeEq, represented⟩ :=
-        RecursivePublicPackedArguments.arguments bindings association.original.projected_bindings packed
+        RecursivePublicPackedArguments.arguments bindings association.projected_bindings packed
       have actualArity : sources.length = function.parameters.length := arity.closure_count.symm
       have binderLength : bindings.length = function.parameters.length := by
-        simpa only [List.length_map] using congrArg List.length association.original.source_binders
+        simpa only [List.length_map] using congrArg List.length association.source_binders
       have decodedArity : decodedSources.length = function.parameters.length :=
         represented.length.1.symm.trans binderLength
       have sameSources : decodedSources = sources :=
@@ -94,8 +94,8 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
         (parameterEq ▸ packedTyped) (by simpa only [List.length_map] using actualArity)
       have raw := CallableIndexedOwnedStoredClosureSourceArguments.at_arguments runtime calleeTyped heapTyped
         argumentsTyped packing parameterEq.symm actualArity
-      have bodies := SelectedCompilationStageClosurePacketRoots.association_of_roots (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
-        functions association.original (support.closurePackets association)
+      have bodies := SelectedCompilationStageClosurePacketRoots.association_of_roots (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed) (observations := SelectedCompilationPhysicalProgramSupport.observations support) (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) receiver) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
+        functions association (support.closurePackets association)
         (support.closureSupport association) support.owners
         (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
         (budget := size)
@@ -106,7 +106,7 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
         stable size bodies measured (Nat.le_refl _)
   | global function =>
       obtain ⟨_originalType, ⟨association⟩, _rawType⟩ :=
-        CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleeRelated function rfl
+        CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleeRelated function rfl
       let header := association.header
       let sourceAt := association.sourceAt
       let packet := support.bodies header association.member
@@ -158,7 +158,7 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
           (headers := headers) (keys := keys) header
           (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
           callStages (RecursiveStageRegistry.scope sidecar [] header.function) size :=
-        SelectedCompilationStageNamedBodyLifting.lifts (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension) (support.bodySupport header association.member)
+        SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) receiver) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension) (support.bodySupport header association.member)
         support.profile headerCertified (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
         selected (budget := size)
         (fun childSize _ => SelectedCompilationStageActualLifting.lifts_roots support receiver extension childSize)

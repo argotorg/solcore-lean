@@ -207,7 +207,7 @@ theorem of_actual_with_evidence
     exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
       (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.cached_unary
         principal.cached diagnostic receiver represented) origin rawWord
-  apply SelectedCompilationMethodScopedCollectors.of_compiler principal packet ready member bodies.signatures certified operands unary syntaxTree
+  apply SelectedCompilationMethodScopedCollectors.of_compiler principal packet ready member bodies.signatures certified diagnostic operands unary syntaxTree
   intro child selected context fields scope fuel id node lowered declarations tree found typed accepted _nativeType _native
   exact of_child_with_evidence principal packet diagnostic receiver bodies certified sourceForms supported metadata rows covered resolved selected fields
     declarations tree found typed accepted

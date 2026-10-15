@@ -31,7 +31,7 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
       simp only [Tree.closed, Tree.bindings, List.map_cons, tail.1, tail.2.1, List.map_nil,
         and_self]
   | returning read form | returnUnit read form | absent read form
-  | assigning read form | assigned read form | whileLoop read form
+  | assigning read form | assigned read form | projectedAssigned read form | whileLoop read form
   | bitNotting read form | bitNotted read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form

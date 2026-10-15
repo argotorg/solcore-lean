@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingLegacyCatalogSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
@@ -53,7 +54,7 @@ theorem of_branching
     (catalog : SignatureCatalogWellFormed compiled.compatible.checked.signatures)
     (declarations : CompatibleExpressionReads.ScopeDeclarations function.source
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) inputs.context)
-    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
+    (shape : CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape function.source true function.body)
     (syntaxTree : GenericImperativeMatch.Syntax function.source (Syntax function.source)
       inputs.context (.statements true function.body) function.resultType) :
     ∃ body : CallableIndexedLambdaStaticBodySupport.BodyWith
@@ -147,7 +148,9 @@ theorem of_branching
   have matchLedger : inputs.context.solvedRequirements = baseMatch.solvedRequirements := by
     exact (Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended).solvedRequirements.trans
       (sameLedger.trans (by rw [sameCompilation]))
-  let collected : CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := faults) compiled.indexed.layouts code.compilation.owner code.active
+  let collected : CallableIndexedOwnedPreparedBranchingCatalogSites.Collected
+      (fun site root => diagnostics.placeReason named.signature.key site root none)
+      (fun site root raw => diagnostics.placeReason named.signature.key site root (some raw)) (faults := faults) compiled.indexed.layouts code.compilation.owner code.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length code.allocationError
       (.initial compiled.compatible.checked) function.source (Syntax function.source) (Child 0 function.source)
       compiled.indexed.layouts.definitions administrative inputs.context
@@ -162,11 +165,11 @@ theorem of_branching
       matchPolicy rfl rfl matchAllocator hidden catalog matchLedger
       (certificates := fun _ _ _ _ => True)
       (by intros; exact True.intro)
-      syntaxTree rfl shape (Dynamic.RuntimeContextFields.refl _)
+      syntaxTree rfl shape.forget (Dynamic.RuntimeContextFields.refl _)
       runtime.variables_closed runtime.residual_variables_open signatures declarations
       (fun id member => .root (List.mem_map.mpr ⟨id, member, rfl⟩)) projection generatedSource native
   let full := collected.tree
-  have sites : full.CatalogSites .reachable registry faults := collected.sites registry
+  have sites : full.CatalogSites .reachable registry faults := PreparedBranchingLegacyCatalogSites.body (collected.sites registry) shape
   let actualTree : GenericImperativeMatch.Tree compiled.indexed.layouts code.compilation.owner code.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length code.allocationError
       (.initial compiled.compatible.checked) code.view (Syntax code.view) (Child 0 code.view)

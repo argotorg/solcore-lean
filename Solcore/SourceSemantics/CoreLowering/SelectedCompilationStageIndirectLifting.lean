@@ -58,17 +58,17 @@ theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : Rec
       (stages compiled).Closure header.function child →
       NamedLiftsBelow (headers := headers) (keys := keys) header model (stages compiled) child budget)
     (closureBodies : ∀ {mapping world function native bindings parameterCore resultCore}
-      (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys
+      (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys
         receiver.result.context.registry
         (CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.result.diagnostics)
         mapping world function native bindings parameterCore resultCore),
       SelectedCompilationStageClosurePacketLifting.BelowFor model (stages compiled)
-        association.original (support.closurePackets association) budget) :
+        association (support.closurePackets association) budget) :
     SelectedCompilationStageLiftBounds.LiftsAt bridge context model (stages compiled) invocation
       (CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds.Point scope id lowered) budget := by
-  letI : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual headers keys receiver.result.context.registry
+  letI : SelectedCompilationCallableOrigins.Origins headers keys receiver.result.context.registry
       (CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.result.diagnostics) support.profile (functions support) :=
-    CallableIndexedOwnedPositiveFunctionModels.physical support.profile
+    SelectedCompilationCallableOrigins.prepared support.profile
   intro current expression code point actualNode found parentTyped
     mapping world administrative environment canonical actual actualContext before store ξ outcome after
     environments heaps locals agrees typed initial admitted execution

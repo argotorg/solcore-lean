@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationBuiltinFunctionOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectFaultDispatch
@@ -51,7 +53,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
     headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+  [positive : SelectedCompilationCallableOrigins.Origins
     headers keys bodyRegistry semanticFaults profile functionModel]
   {certificate : GenericExpressionMeaning.Certificate}
   (certified : certificate scope callee compiler.calleeCode)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix
@@ -136,7 +137,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
     headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+  [positive : SelectedCompilationCallableOrigins.Origins
     headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
   {invocation : Staging.Recursive.Scope}

@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreRecursiveIndexCertifiedMeaning
 import Solcore.Test.SourceCoreRecursiveIndexFailureStep
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionOutcomes
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProfiledPublicSessionFailures
 
 /-! Mapping inputs refer to the actual retained handles. Successful selections
 append their real exports; a failed selection retains every prior entry and its
@@ -13,15 +13,15 @@ open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open CertifiedPublicSession (Issued)
+open SelectedCompilationCertifiedPublicSession (Profiled)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
-  {issued : Issued fixture.recipe}
+  {issued : Profiled fixture.recipe}
   {anchor : Header fixture.recipe.compiled (Program.ofChecked fixture.recipe.compiled.sourceProgram)}
   {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
   {entries : List Entry}
 
-theorem select_meaning (before : issued.State anchor session entries)
+theorem select_meaning (before : issued.toIssued.State anchor session entries)
     (first second : Entry) (firstMember : first ∈ entries) (secondMember : second ∈ entries)
     (firstType : first.sourceType = closureType) (secondType : second.sourceType = closureType)
     {firstHandle secondHandle : SourceCorePublicValues.Handle}
@@ -31,7 +31,7 @@ theorem select_meaning (before : issued.State anchor session entries)
     (scope : Staging.Recursive.Scope) :
     Nonempty (FunctionMeaning issued before observed.selectRow call [sourceTable first second, .word key] scope) := by
   obtain ⟨row, rowEq⟩ := selected_row observed.selectRow
-  obtain ⟨request, namedEq⟩ := issued.recover_start_row before call.toCall.toStartedCall row
+  obtain ⟨request, namedEq⟩ := issued.toIssued.recover_start_row before call.toCall.toStartedCall row
   obtain ⟨actual, actualEq⟩ := header_of_member observed.selectRow issued.catalog.rows
     request.selected.member ((congrArg (·.specialized) namedEq).trans rowEq)
   have inputs : RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context
@@ -41,18 +41,18 @@ theorem select_meaning (before : issued.State anchor session entries)
     exact select_inputs first second firstMember secondMember firstType secondType firstHandleEq secondHandleEq key
   have raw : request.header.function.resultType = closureType := by
     rw [← actualEq]; exact actual.select_result_type
-  obtain ⟨entry, type, handle, handleType, after, trace⟩ := issued.reflect_function before call request inputs scope
+  obtain ⟨entry, type, handle, handleType, after, trace⟩ := issued.toIssued.reflect_function before call request inputs scope
   exact ⟨⟨request, actual, actualEq.symm, inputs, raw, entry, type.trans raw, handle, handleType.trans raw, after, trace⟩⟩
 
 def failureCall {key : SourceCoreIndexedSession.Key} {arguments : List SourceCorePublicValues.Value}
     (call : ObservedFailure session key arguments) :
-    RecursiveNamedPublicPhysicalSessionState.StartedCall session key arguments runOptions :=
+    SelectedCompilationPublicSessionState.StartedCall session key arguments runOptions :=
   ⟨call.checkpoint, call.started⟩
 
-structure FailureMeaning (issued : Issued fixture.recipe)
+structure FailureMeaning (issued : Profiled fixture.recipe)
     {anchor : Header fixture.recipe.compiled (Program.ofChecked fixture.recipe.compiled.sourceProgram)}
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
-    {entries : List Entry} (before : issued.State anchor session entries)
+    {entries : List Entry} (before : issued.toIssued.State anchor session entries)
     {publicArguments : List SourceCorePublicValues.Value}
     (call : ObservedFailure session observed.selectRow.row.key publicArguments)
     (arguments : List Dynamic.Value) (scope : Staging.Recursive.Scope) where
@@ -63,13 +63,13 @@ structure FailureMeaning (issued : Issued fixture.recipe)
   inputs : RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context
     (request.header.bindings.map (fun binding => binding.1.scheme.body)) publicArguments arguments
   failure : Staging.Recursive.Failure
-  after : issued.State anchor call.returned entries
-  trace : RecursiveNamedPublicPhysicalSessionState.SourceCall anchor request.header scope
+  after : issued.toIssued.State anchor call.returned entries
+  trace : SelectedCompilationPublicSessionState.SourceCall anchor request.header scope
     before.heap arguments (.fault failure) after.heap
   diagnostic : CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
     after.receiving.result.diagnostics failure call.reason
 
-theorem failure_meaning (before : issued.State anchor session entries)
+theorem failure_meaning (before : issued.toIssued.State anchor session entries)
     (first second : Entry) (firstMember : first ∈ entries) (secondMember : second ∈ entries)
     (firstType : first.sourceType = closureType) (secondType : second.sourceType = closureType)
     {firstHandle secondHandle : SourceCorePublicValues.Handle}
@@ -79,7 +79,7 @@ theorem failure_meaning (before : issued.State anchor session entries)
     (scope : Staging.Recursive.Scope) :
     Nonempty (FailureMeaning issued before call [sourceTable first second, .word key] scope) := by
   obtain ⟨row, rowEq⟩ := selected_row observed.selectRow
-  obtain ⟨request, namedEq⟩ := issued.recover_start_row before (failureCall call) row
+  obtain ⟨request, namedEq⟩ := issued.toIssued.recover_start_row before (failureCall call) row
   obtain ⟨actual, actualEq⟩ := header_of_member observed.selectRow issued.catalog.rows
     request.selected.member ((congrArg (·.specialized) namedEq).trans rowEq)
   have inputs : RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context
@@ -91,12 +91,12 @@ theorem failure_meaning (before : issued.State anchor session entries)
     call.returned call.reason call.executed request inputs scope
   exact ⟨⟨request, actual, actualEq.symm, inputs, failure, after, trace, diagnostic⟩⟩
 
-theorem FailureMeaning.forward {before : issued.State anchor session entries}
+theorem FailureMeaning.forward {before : issued.toIssued.State anchor session entries}
     {publicArguments : List SourceCorePublicValues.Value}
     {call : ObservedFailure session observed.selectRow.row.key publicArguments}
     {arguments : List Dynamic.Value} {scope : Staging.Recursive.Scope}
     (meaning : FailureMeaning issued before call arguments scope) (ready : session.ExportsReady) :
-    RecursiveNamedPublicPhysicalSessionFailureForward.FailureForwardAt (entries := entries)
+    SelectedCompilationPublicSessionFailureForward.FailureForwardAt (entries := entries)
       issued.catalog.rows anchor issued.initial issued.support.profile fixture.recipe
       meaning.failure (failureCall call) meaning.after.heap :=
   issued.forward_failure before (failureCall call) meaning.request meaning.inputs ready meaning.trace

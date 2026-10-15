@@ -1,7 +1,7 @@
 import Solcore.Test.SourceCoreCanonicalScopedCertifiedHeaders
 import Solcore.SourceSemantics.CoreLowering.CompilerCertifiedPublicSession
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarStep
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarForward
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectScalarStep
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectScalarForward
 
 /-! The original scoped closures are retained in one physical public session.
 Each Source trace uses the actual selected Header and the reached Source heap. -/
@@ -13,8 +13,8 @@ open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open RecursiveNamedPublicPhysicalSessionState (SourceCall)
-open CertifiedPublicSession (Issued Initial)
+open SelectedCompilationPublicSessionState (SourceCall)
+open SelectedCompilationCertifiedPublicSession (Issued Initial)
 
 structure Observed (fixture : CompiledFixture) where
   value : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled
@@ -112,12 +112,13 @@ theorem first_meaning (profile : Observed fixture)
     (first : ObservedPublicRun fixture observed.makeRow) :
     ∃ issued : Issued fixture.recipe, Nonempty (FirstMeaning issued stages first) := by
   obtain ⟨row, rowEq⟩ := selected_row observed.makeRow
-  obtain ⟨issued, initial, namedEq⟩ := CertifiedPublicSession.from_profile_initial_row
+  obtain ⟨profiled, initial, namedEq⟩ := CertifiedPublicSession.from_profile_initial_row
     (by rw [fixture.sameProgram]; exact fixture.checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
     fixture.issued profile.value fixture.source_wellFormed first.opened
     (firstCall first).toCall.toStartedCall first.bootstrap first.fresh first.authority
     (show first.bootstrap.ReadyAt 100000 first.session from .single first.ready) row
+  let issued := profiled.toIssued
   obtain ⟨actual, actualEq⟩ := header_of_member observed.makeRow issued.catalog.rows
     initial.start.selected.member ((congrArg (·.specialized) namedEq).trans rowEq)
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
@@ -161,7 +162,7 @@ theorem invocation_meaning (before : issued.State anchor session entries)
     (word : Core.Word) (returned : call.completion.value = .word word) (scope : Staging.Recursive.Scope) :
     Nonempty (InvocationMeaning issued before entry next flag stop call word scope) := by
   obtain ⟨arguments, packing, arity, after, size, trace⟩ :=
-    RecursiveNamedPublicPhysicalSessionDirectScalarStep.State.invoke_scalar issued.support issued.prepared
+    SelectedCompilationPublicSessionDirectScalarStep.State.invoke_scalar issued.support issued.prepared
       before entry member (.word word) entryType (handleEq ▸ handleType)
       (packed_input entries anchor.function.context next flag stop)
       (by simpa only [handleEq] using call.executed) returned scope
@@ -169,7 +170,7 @@ theorem invocation_meaning (before : issued.State anchor session entries)
 
 theorem FirstMeaning.forward {stages : ObservedStages fixture observed.makeRow}
     {first : ObservedPublicRun fixture observed.makeRow} (meaning : FirstMeaning issued stages first) :
-    RecursiveNamedPublicPhysicalSessionInitialForward.ForwardAt issued.catalog.rows meaning.initial.header
+    SelectedCompilationPublicSessionInitialForward.ForwardAt issued.catalog.rows meaning.initial.header
       meaning.initial.header issued.support (firstCall first).toCall.toStartedCall meaning.entry.source meaning.after.heap := by
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
       meaning.initial.header.function.context [.word seed] meaning.initial.header.types := by
@@ -185,7 +186,7 @@ theorem FunctionMeaning.forward {before : issued.State anchor session entries}
     {stages : ObservedStages fixture observed.makeRow} {value : Core.Word}
     {call : ObservedFunctionCall session observed.makeRow.row.key [.word value]}
     (meaning : FunctionMeaning issued before stages value call) (ready : session.ExportsReady) :
-    RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt (entries := entries)
+    SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt (entries := entries)
       issued.catalog.rows anchor issued.initial issued.support.profile fixture.recipe
       (functionCall call).toCall.toStartedCall parameterType .word meaning.entry.source meaning.after.heap :=
   issued.forward_function before (functionCall call).toCall.toStartedCall meaning.request meaning.inputs meaning.rawType ready meaning.trace
@@ -196,11 +197,11 @@ theorem InvocationMeaning.forward {before : issued.State anchor session entries}
     (meaning : InvocationMeaning issued before entry next flag stop call word scope)
     (ready : session.ExportsReady) :
     ∃ checkpoint, session.startHandlePacked handle (packed next flag stop) runOptions.inputValidationFuel = .ok checkpoint ∧
-      RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows anchor
+      SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows anchor
         issued.initial issued.support.profile fixture.recipe entries (.word word) checkpoint meaning.after.heap := by
   obtain ⟨checkpoint, accepted, _resumed⟩ := call.executed
   refine ⟨checkpoint, accepted, ?_⟩
-  exact RecursiveNamedPublicPhysicalSessionDirectScalarForward.forward_call issued.support issued.prepared
+  exact SelectedCompilationPublicSessionDirectScalarForward.forward_call issued.support issued.prepared
     before entry meaning.member (.word word) meaning.entryType (meaning.handleEq ▸ meaning.handleType)
     (packed_input entries anchor.function.context next flag stop)
     (by simpa only [meaning.handleEq] using accepted) ready meaning.packing meaning.trace

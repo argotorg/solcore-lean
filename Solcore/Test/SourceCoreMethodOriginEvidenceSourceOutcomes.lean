@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreMethodOriginEvidenceCompilerProfile
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionSourceOutcomes
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionSourceOutcomes
 
 /-! The actual seven-call compiler-profile session has independent Dynamic
 outcomes at the same retained functions, dictionaries and reached heaps.
@@ -9,9 +9,9 @@ set_option Elab.async false
 set_option maxHeartbeats 5000000
 namespace Tests.SourceCoreMethodOriginEvidence.SourceOutcomes
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
-open Certified
-open CertifiedPublicSession (Issued)
-open RecursiveNamedPublicPhysicalSessionState (PlainValue)
+open SelectedCertified
+open SelectedCompilationCertifiedPublicSession (Issued)
+open SelectedCompilationPublicSessionState (PlainValue)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
   {issued : Issued fixture.recipe}
@@ -65,7 +65,7 @@ theorem closed_outcomes
     (sequence : ObservedSequence fixture observed) :
     ∃ (issued : Issued fixture.recipe)
       (meaning : SequenceMeaning issued wordStages boolStages useWordStages useBoolStages sequence),
-      DynamicMeaning meaning ∧ Certified.ForwardMeaning meaning ∧
+      DynamicMeaning meaning ∧ SelectedCertified.ForwardMeaning meaning ∧
       meaning.first.entry.handle ≠ meaning.second.entry.handle ∧
       meaning.first.entry.handle ≠ meaning.third.entry.handle ∧
       meaning.second.entry.handle ≠ meaning.third.entry.handle := by

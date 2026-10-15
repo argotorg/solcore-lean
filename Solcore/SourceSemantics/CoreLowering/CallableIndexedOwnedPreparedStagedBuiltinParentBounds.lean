@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinArgumentRows
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectApplicationSuffix
@@ -20,7 +21,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {profile : compiled.compatible.checked.catalog.callableContracts = true}
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
     headers keys bodyRegistry semanticFaults profile}
-  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+  [positive : SelectedCompilationCallableOrigins.Origins
     headers keys bodyRegistry semanticFaults profile functionModel]
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)

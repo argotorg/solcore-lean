@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedAssignmentLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialProjectedLifting
 import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalTreeLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentLifting
@@ -14,7 +16,7 @@ set_option Elab.async false
 set_option maxHeartbeats 4000000
 set_option maxRecDepth 8192
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageImperativeLifting
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CompatibleEquality CoreProof
 open CallableIndexedHistory CallableIndexedAllocationCompletion
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
@@ -38,6 +40,9 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations compiled.compatible.checked.catalog functions identities)
   {receiving : SourceCoreRawMetadata.Registry}
   (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
   (definitions : layouts.definitions = (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
@@ -67,7 +72,7 @@ def PositionLifts {administrative : Core.Context} (context : SourceSemantics.Con
       (frame := frame) (globals := globals) (stages := stages) (invocation := invocation)
       (context := context) (scope := scope) bridge functions condition items test post statements budget
 
-include bridge bindings definitions registered producer acquire transport extension in
+include bridge bindings definitions registered producer acquire transport extension faithful observations in
 theorem preserves_position
     (preservation : ∀ context size, PreservesAt bridge context model stages invocation (certificates context) faults size)
     (unique : NodeOccurrencesUnique invocation.source)
@@ -77,9 +82,14 @@ theorem preserves_position
     (tree : Tree layouts owner active frame globals onError (.initial compiled.compatible.checked)
       invocation.source expressionSyntax (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative context scope position expected type code)
-    {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
-    (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+    {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : PreparedBranchingCatalogSites.CatalogSites invalidProjection missingDefault receiving catalogFaults tree)
     (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
+    (assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked)
+      functions callerProtocol invocation.source invalidProjection missingDefault receiving
+      (fun reason token => faults (.semantic reason) token))
     (shape : PositionShape invocation.source position)
     (sourceTyped : PositionTyping invocation.source context position)
     (projection : compiled.compatible.checked.catalog.project expected = .ok type) :
@@ -88,11 +98,11 @@ theorem preserves_position
       (stages := stages) (invocation := invocation) (faults := faults)
       bridge functions condition context scope position expected type code budget := by
   intro budget
-  exact CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_position (semantic := semantic) bridge bindings transport
-    functions extension definitions registered producer condition acquire (fun context size _ => preservation context size)
+  exact CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport
+    functions faithful observations extension definitions registered producer condition acquire (fun context size _ => preservation context size)
     unique tree catalogSites shape sourceTyped projection
 
-include bridge bindings definitions registered producer acquire transport extension in
+include bridge bindings definitions registered producer acquire transport extension faithful observations in
 theorem lifts_position {budget : Nat}
     (children : ∀ context childSize, childSize < budget → LiftsAt bridge context model stages invocation (certificates context) childSize)
     (preservation : ∀ context size, PreservesAt bridge context model stages invocation (certificates context) faults size)
@@ -103,9 +113,14 @@ theorem lifts_position {budget : Nat}
     (tree : Tree layouts owner active frame globals onError (.initial compiled.compatible.checked)
       invocation.source expressionSyntax (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative context scope position expected type code)
-    {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
-    (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+    {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : PreparedBranchingCatalogSites.CatalogSites invalidProjection missingDefault receiving catalogFaults tree)
     (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
+    (assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked)
+      functions callerProtocol invocation.source invalidProjection missingDefault receiving
+      (fun reason token => faults (.semantic reason) token))
     (shape : PositionShape invocation.source position)
     (sourceTyped : PositionTyping invocation.source context position)
     (projection : compiled.compatible.checked.catalog.project expected = .ok type) :
@@ -159,12 +174,16 @@ theorem lifts_position {budget : Nat}
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
       contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
       finalContext outcome after trace
-    obtain ⟨_profile, bare, tailShape⟩ := shape.assign_tail found form
+    obtain ⟨_profile, tailShape⟩ := shape.assignment_tail found form
     have assignmentTyped := ProtectedStateImperativeTypedSourceSites.assignment unique
       (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
-    exact SelectedCompilationStageAssignmentLifting.lifts bridge functions transport extension condition unique found form head bare assignmentTyped
-      (typedChildren context) (typedPreservation context)
-      (ih tailShape (ProtectedStateImperativeStatementSuffixTyping.assignment unique sourceTyped found form) projection) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
+    by_cases bare : assignment.target.projections = []
+    · exact SelectedCompilationStageAssignmentLifting.lifts bridge functions transport extension condition unique found form head bare assignmentTyped
+        (typedChildren context) (typedPreservation context)
+        (ih tailShape (ProtectedStateImperativeStatementSuffixTyping.assignment unique sourceTyped found form) projection) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
+    · exact SelectedCompilationStageProjectedAssignmentLifting.lifts bridge functions faithful observations transport extension condition unique found form head bare assignmentTyped
+        (typedChildren context) (typedPreservation context)
+        (ih tailShape (ProtectedStateImperativeStatementSuffixTyping.assignment unique sourceTyped found form) projection) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerIH remainingIH =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
       contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
@@ -174,7 +193,7 @@ theorem lifts_position {budget : Nat}
     have restTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.suffix unique sourceTyped found form
     exact SelectedCompilationStageBlockLifting.lifts bridge functions condition unique found form
       (innerIH innerShape innerTyped projection)
-      (preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire
+      (preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire
         preservation unique inner innerErrors innerShape innerTyped projection)
       (.inl (remainingIH restShape restTyped projection)) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @ifThen context scope mode id node conditionId conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenTreeErrors elseTreeErrors remainingErrors thenIH elseIH remainingIH =>
@@ -195,8 +214,8 @@ theorem lifts_position {budget : Nat}
       · exact elseIH rightShape rightTyped projection
       · exact thenIH leftShape leftTyped projection
     · intro truth; cases truth
-      · exact preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire preservation unique elseTree elseTreeErrors rightShape rightTyped projection
-      · exact preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire preservation unique thenTree thenTreeErrors leftShape leftTyped projection
+      · exact preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire preservation unique elseTree elseTreeErrors rightShape rightTyped projection
+      · exact preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire preservation unique thenTree thenTreeErrors leftShape leftTyped projection
     · exact .inl (remainingIH restShape (CallableIndexedOwnedPreparedStagedScopedBranchSourceTyping.suffix unique sourceTyped found form) projection)
   | @terminalBlock context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerErrors ih =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
@@ -206,7 +225,7 @@ theorem lifts_position {budget : Nat}
     have innerTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.inner unique sourceTyped found form
     exact SelectedCompilationStageBlockLifting.lifts bridge functions condition unique found form
       (ih innerShape innerTyped projection)
-      (preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire preservation unique inner innerErrors innerShape innerTyped projection)
+      (preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire preservation unique inner innerErrors innerShape innerTyped projection)
       (.inr stops) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @terminalIf context scope mode id node conditionId conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
@@ -224,8 +243,8 @@ theorem lifts_position {budget : Nat}
       · exact elseIH rightShape rightTyped projection
       · exact thenIH leftShape leftTyped projection
     · intro truth; cases truth
-      · exact preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire preservation unique elseTree elseErrors rightShape rightTyped projection
-      · exact preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire preservation unique thenTree thenErrors leftShape leftTyped projection
+      · exact preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire preservation unique elseTree elseErrors rightShape rightTyped projection
+      · exact preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire preservation unique thenTree thenErrors leftShape leftTyped projection
     · exact .inr ⟨thenStops, elseStops⟩
   | @whileLoop context scope mode id node conditionId conditionNode statements rest expected type conditionCode loopCode body selfReason found form conditionFound conditionType conditionTree loopTree nativeTyped remaining loopBodyErrors remainingErrors loopIH remainingIH =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
@@ -239,7 +258,7 @@ theorem lifts_position {budget : Nat}
     exact SelectedCompilationStageWhileSequenceLifting.lifts bridge functions condition transport
       (children _) (preservation _) conditionFound conditionType typed certified nativeTyped
       (loopIH loopShape loopTyped projection)
-      (preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire preservation unique loopTree loopBodyErrors loopShape loopTyped projection)
+      (preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire preservation unique loopTree loopBodyErrors loopShape loopTyped projection)
       unique found form (remainingIH restShape restTyped projection) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary matchChildren remaining catalog patternContext childErrors remainingErrors matchIH remainingIH =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
@@ -267,7 +286,7 @@ theorem lifts_position {budget : Nat}
           patternContext.signatures catalog scrutineeFound scrutineeTyped casesTyped defaultTyped
           n condition producer bindings acquire unique (fun childSize _ => typedPreservation context childSize)
           (fun request member childContext selectedContext bodyTyped =>
-            preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire
+            preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire
               preservation unique (matchChildren request member childContext selectedContext)
               (childErrors request member childContext selectedContext)
               (shape.match_request found form selectedContext.forget) bodyTyped projection n)
@@ -300,7 +319,7 @@ theorem lifts_position {budget : Nat}
           patternContext.signatures catalog scrutineeFound scrutineeTyped casesTyped defaultTyped
           n condition producer bindings acquire unique (fun childSize _ => typedPreservation context childSize)
           (fun request member childContext selectedContext bodyTyped =>
-            preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire
+            preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire
               preservation unique (matchChildren request member childContext selectedContext)
               (childErrors request member childContext selectedContext)
               (shape.match_request found form selectedContext.forget) bodyTyped projection n)
@@ -344,7 +363,7 @@ theorem lifts_position {budget : Nat}
     have tailTyped := CallableIndexedOwnedPreparedStagedScopedForSourceTyping.suffix unique sourceTyped found form
     exact SelectedCompilationStageForSequenceLifting.lifts bridge functions condition
       (initialIH ⟨initialShape, postShape, loopShape⟩ initialTyped projection)
-      (preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire
+      (preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire
         preservation unique initialTree initialErrors ⟨initialShape, postShape, loopShape⟩ initialTyped projection)
       unique found form (remainingIH restShape tailTyped projection) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @initializersDone context scope test node post statements expected type testCode bodyCode postCode selfReason found nodeType certified bodyTree postTree nativeTyped bodyErrors postErrors bodyIH =>
@@ -353,10 +372,10 @@ theorem lifts_position {budget : Nat}
     obtain ⟨typedNode, typedFound, typed, generated⟩ := certified
     cases Option.some.inj (found.symm.trans typedFound)
     intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
-    exact SelectedCompilationStageForInitialLifting.done bridge functions definitions registered condition transport extension
+    exact SelectedCompilationStageForInitialLifting.done bridge functions definitions registered condition transport extension faithful observations assignmentDiagnostics
       bindings producer acquire children preservation unique found typed generated
       (bodyIH shape.2.2 bodyTyped projection)
-      (preserves_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire
+      (preserves_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire
         preservation unique bodyTree bodyErrors shape.2.2 bodyTyped projection)
       postTree postErrors semantic shape.2.1 postTyped within ready trace
   | @initializerUninitialized context nextContext scope binder rest body payload test post statements expected type mono extended ordinary projected allocation annotation same tail remainingErrors ih =>
@@ -383,11 +402,15 @@ theorem lifts_position {budget : Nat}
       (ih ⟨shape.1.discard_tail, shape.2⟩ (InitializerTyping.expression sourceTyped) projection) within ready trace
   | @initializerAssign context scope assignment operator rhs rest body test post statements expected type head remaining remainingErrors headErrors ih =>
     intro shape sourceTyped projection
-    obtain ⟨_profile, bare, tailShape⟩ := shape.1.assign_tail
+    obtain ⟨_profile, tailShape⟩ := shape.1.assignment_tail
     intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
-    exact SelectedCompilationStageForInitialLifting.assign bridge functions condition transport extension unique head bare
-      (InitializerTyping.assignment sourceTyped).1 (typedChildren context) (typedPreservation context)
-      (ih ⟨tailShape, shape.2⟩ (InitializerTyping.assignment sourceTyped).2 projection) within ready trace
+    by_cases bare : assignment.target.projections = []
+    · exact SelectedCompilationStageForInitialLifting.assign bridge functions condition transport extension unique head bare
+        (InitializerTyping.assignment sourceTyped).1 (typedChildren context) (typedPreservation context)
+        (ih ⟨tailShape, shape.2⟩ (InitializerTyping.assignment sourceTyped).2 projection) within ready trace
+    · exact SelectedCompilationStageForInitialLifting.assignProjected bridge functions faithful observations transport extension condition unique head bare
+        (InitializerTyping.assignment sourceTyped).1 (typedChildren context) (typedPreservation context)
+        (ih ⟨tailShape, shape.2⟩ (InitializerTyping.assignment sourceTyped).2 projection) within ready trace
   | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
     intro shape sourceTyped projection
     obtain ⟨_rawWord, _bare, tailShape⟩ := shape.1.bitNot_tail
@@ -396,7 +419,7 @@ theorem lifts_position {budget : Nat}
       (InitializerTyping.bitNot sourceTyped).1
       (ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2 projection) within ready trace
 
-include bridge bindings definitions registered producer acquire transport extension in
+include bridge bindings definitions registered producer acquire transport extension faithful observations in
 theorem lifts_at {budget : Nat}
     (children : ∀ context childSize, childSize < budget → LiftsAt bridge context model stages invocation (certificates context) childSize)
     (preservation : ∀ context size, PreservesAt bridge context model stages invocation (certificates context) faults size)
@@ -407,9 +430,14 @@ theorem lifts_at {budget : Nat}
     (tree : Tree layouts owner active frame globals onError (.initial compiled.compatible.checked)
       invocation.source expressionSyntax (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative context scope position expected type code)
-    {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
-    (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
+    {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+    {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : PreparedBranchingCatalogSites.CatalogSites invalidProjection missingDefault receiving catalogFaults tree)
     (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
+    (assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked)
+      functions callerProtocol invocation.source invalidProjection missingDefault receiving
+      (fun reason token => faults (.semantic reason) token))
     {mode : Bool} {statements : List StatementId}
     (atStatements : position = .statements mode statements)
     (shape : Shape invocation.source mode statements)
@@ -418,7 +446,7 @@ theorem lifts_at {budget : Nat}
     FlowLifts (administrative := administrative) (receiving := receiving) (frame := frame) (globals := globals)
       (stages := stages) (invocation := invocation) bridge functions condition context scope mode statements budget := by
   cases atStatements
-  exact lifts_position (semantic := semantic) bridge bindings transport functions extension definitions registered producer condition acquire
+  exact lifts_position (semantic := semantic) (assignmentDiagnostics := assignmentDiagnostics) bridge bindings transport functions faithful observations extension definitions registered producer condition acquire
     children preservation unique tree catalogSites shape sourceTyped projection
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageImperativeLifting

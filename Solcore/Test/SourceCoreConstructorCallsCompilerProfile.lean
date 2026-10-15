@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreConstructorCallsCertifiedCalls
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionSourceOutcomes
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionSourceOutcomes
 
 /-! One checked compiler profile supplies the complete catalog and physical
 support for the original nine constructor operations and their nested exports. -/
@@ -10,7 +10,7 @@ namespace Tests.SourceCoreConstructorCalls.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open CertifiedPublicSession (Issued)
+open SelectedCompilationCertifiedPublicSession (Issued)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
 
@@ -105,7 +105,7 @@ theorem SequenceMeaning.selected_handles (meaning : SequenceMeaning issued stage
 /-- Six executions have ordinary Dynamic meanings. The three intervening
 issuances retain their exact Source callable identities and unchanged heaps. -/
 structure PlainMeaning (meaning : SequenceMeaning issued stages sequence) : Prop where
-  first : RecursiveNamedPublicPhysicalSessionState.PlainValue meaning.first.initial.header meaning.first.initial.header
+  first : SelectedCompilationPublicSessionState.PlainValue meaning.first.initial.header meaning.first.initial.header
     (RecursiveStageRegistry.scope stages.sidecar [] meaning.first.initial.header.function)
     ⟨[]⟩ [.word seed] meaning.first.entry.source meaning.first.after.heap
   construction : Dynamic.CallableApplies (Program.ofChecked fixture.recipe.compiled.sourceProgram)
@@ -153,18 +153,18 @@ def OutputForward (_before : issued.State anchor session entries)
     (_call : ObservedInvocation session handle argument) (result : TypeSystem.Ty)
     (source : Dynamic.Value) (after : Dynamic.Heap) : Prop :=
   ∃ checkpoint, session.startHandlePacked handle argument runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectOutputForward.ForwardAt issued.catalog.rows anchor
+    SelectedCompilationPublicSessionDirectOutputForward.ForwardAt issued.catalog.rows anchor
       issued.initial issued.support.profile fixture.recipe entries result checkpoint source after
 
 def WordForward (_before : issued.State anchor session entries)
     (_call : ObservedInvocation session handle argument) (word : Core.Word) (after : Dynamic.Heap) : Prop :=
   ∃ checkpoint, session.startHandlePacked handle argument runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectWordForward.ForwardAt issued.catalog.rows anchor
+    SelectedCompilationPublicSessionDirectWordForward.ForwardAt issued.catalog.rows anchor
       issued.initial issued.support.profile fixture.recipe entries word checkpoint after
 end Forward
 
 structure ForwardMeaning (meaning : SequenceMeaning issued stages sequence) : Prop where
-  first : RecursiveNamedPublicPhysicalSessionInitialForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+  first : SelectedCompilationPublicSessionInitialForward.ForwardAt issued.catalog.rows meaning.first.initial.header
     meaning.first.initial.header issued.support (firstCall sequence.first).toCall.toStartedCall
     meaning.first.entry.source meaning.first.after.heap
   construction : OutputForward meaning.named.after sequence.construction.toObservedInvocation

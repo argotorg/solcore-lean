@@ -31,6 +31,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (support : Support headers header stages receipt semanticFaults)
   (globals : header.globals = compiled.indexed.base.globals.length)
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
   {receiving : SourceCoreRawMetadata.Registry} {faults : RecursiveStageMeaning.FaultRep}
   {invocation : Staging.Recursive.Scope} (selected : stages.Closure header.function invocation)
 
@@ -40,8 +43,10 @@ local notation "physicalBridge" =>
     (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) 1)
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
-include support globals selected semantic in
+include support globals selected semantic faithful observations assignmentInterpretation in
 /-- The original named body starts at its genuine parameter entry. Completed
 bodies retain the exact Source context and heap; stage rejection retains the
 actual earlier prefix and skips the remaining effects. -/
@@ -90,6 +95,14 @@ theorem lifts
   rw [layouts] at collected
   have tree := collected.tree
   have catalogSites := collected.sites receiving
+  obtain ⟨assignmentAuthority⟩ := support.assignmentAuthority
+  have assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked)
+      functions (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1)
+      header.function.source support.invalidProjection support.missingDefault receiving
+      (fun reason token => faults (.semantic reason) token) :=
+    assignmentInterpretation assignmentAuthority functions
+      (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1)
+  rw [← stages.source selected] at assignmentDiagnostics
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -110,7 +123,7 @@ theorem lifts
   exact SelectedCompilationStageImperativeLifting.lifts_at
       physicalBridge (CallableIndexedOwnedPhysicalCanonicalState.bindings 1)
       (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport 1)
-      functions extension rfl header.registered
+      functions faithful observations extension rfl header.registered
       (CallableIndexedOwnedPhysicalCanonicalState.markedProducer model 1)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedPhysicalCanonicalState.readyAt_of_stableOwner (headers := headers) model 1 stable)
@@ -135,7 +148,7 @@ theorem lifts
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
       (by rw [stages.source selected]; exact header.unique)
-      tree catalogSites semantic rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped
+      tree catalogSites semantic assignmentDiagnostics rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped
       reference read unmapped wrapped conditioned nestedAdmitted trace
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedScopedLifting

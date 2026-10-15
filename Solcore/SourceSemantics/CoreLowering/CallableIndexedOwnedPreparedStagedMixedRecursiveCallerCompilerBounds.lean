@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
@@ -133,6 +134,7 @@ theorem preserves_compiled
           (extension := extension) (semantic := semantic) childSize)
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
           (namedSupport named member) profile wellFormed selected extension
           (fun smaller _strict => bodies smaller)
           (fun smaller _strict =>
@@ -195,6 +197,7 @@ theorem reflects_compiled
           (extension := extension) (semantic := semantic) stageEq childSize)
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
           (namedSupport named member) profile wellFormed selected extension
           (fun smaller _strict => bodies smaller)
           (fun smaller _strict =>

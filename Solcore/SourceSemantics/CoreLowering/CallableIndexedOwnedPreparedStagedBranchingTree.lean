@@ -7,7 +7,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 open Core Frontend SourceInference
 
-/-- The staged header fragment uses genuine lexical items and bare equal or raw Word compound writes. -/
+/-- The staged header fragment uses genuine lexical items and equal or raw Word compound writes. -/
 inductive ItemShape : List ForItemForm → Prop where
   | nil : ItemShape []
   | absent {binder rest} (remaining : ItemShape rest) :
@@ -18,6 +18,9 @@ inductive ItemShape : List ForItemForm → Prop where
       ItemShape (.expression expression :: rest)
   | assign {assignment operator rhs rest}
       (profile : operator = .equal ∨ assignment.target.type = .word) (bare : assignment.target.projections = [])
+      (remaining : ItemShape rest) : ItemShape (.assignValue assignment operator rhs :: rest)
+  | assignProjected {assignment operator rhs rest}
+      (profile : operator = .equal ∨ assignment.target.type = .word) (projected : assignment.target.projections ≠ [])
       (remaining : ItemShape rest) : ItemShape (.assignValue assignment operator rhs :: rest)
   | bitNot {assignment rest}
       (profile : assignment.target.type = .word) (bare : assignment.target.projections = [])
@@ -32,10 +35,17 @@ theorem ItemShape.discard_tail {expression rest}
     (shape : ItemShape (.expression expression :: rest)) : ItemShape rest := by
   cases shape with | discard remaining => exact remaining
 
-theorem ItemShape.assign_tail {assignment operator rhs rest}
+theorem ItemShape.assignment_tail {assignment operator rhs rest}
     (shape : ItemShape (.assignValue assignment operator rhs :: rest)) :
-    (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧ ItemShape rest := by
-  cases shape with | assign profile bare remaining => exact ⟨profile, bare, remaining⟩
+    (operator = .equal ∨ assignment.target.type = .word) ∧ ItemShape rest := by
+  cases shape with
+  | assign profile _ remaining | assignProjected profile _ remaining => exact ⟨profile, remaining⟩
+
+theorem ItemShape.assign_tail {assignment operator rhs rest}
+    (shape : ItemShape (.assignValue assignment operator rhs :: rest))
+    (bare : assignment.target.projections = []) :
+    (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧ ItemShape rest :=
+  ⟨shape.assignment_tail.1, bare, shape.assignment_tail.2⟩
 
 theorem ItemShape.bitNot_tail {assignment rest}
     (shape : ItemShape (.assignBitNot assignment :: rest)) :
@@ -74,6 +84,12 @@ inductive Shape (source : TypedSource) : Bool → List StatementId → Prop wher
       (form : node.form = .assignValue assignment operator rhs)
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
+      (remaining : Shape source mode rest) : Shape source mode (id :: rest)
+  | assignProjected {mode id node assignment operator rhs rest}
+      (found : source.lookupStatement? id = some node)
+      (form : node.form = .assignValue assignment operator rhs)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
   | bitNot {mode id node assignment rest}
       (found : source.lookupStatement? id = some node)
@@ -121,7 +137,7 @@ def PositionShape (source : TypedSource) : GenericImperativeMatch.Position → P
 def allowedForm : StatementForm → Bool
   | .returnStmt _ | .breakStmt | .continueStmt | .expression _ _ | .letDecl _ _ | .ifThen _ _ _ | .whileLoop _ _ | .block _ | .matchWith _ | .forLoop _ _ _ _ => true
   | .assignValue assignment operator _ =>
-      (operator == .equal || assignment.target.type == .word) && assignment.target.projections.isEmpty
+      operator == .equal || assignment.target.type == .word
   | .assignBitNot assignment =>
       assignment.target.type == .word && assignment.target.projections.isEmpty
 
@@ -140,11 +156,11 @@ theorem Shape.head_allowed {source mode id node rest}
   | matchWith actual form _ _ _ | forLoop actual form _ _ _ _ =>
       cases node_eq found actual
       simp only [form, allowedForm]
-  | assign actual form profile bare _ =>
+  | assign actual form profile _ _ | assignProjected actual form profile _ _ =>
       cases node_eq found actual
       rcases profile with rfl | word
-      · simp [form, allowedForm, bare]
-      · simp [form, allowedForm, bare, word]
+      · simp [form, allowedForm]
+      · simp [form, allowedForm, word]
   | bitNot actual form profile bare _ =>
       cases node_eq found actual
       simp [form, allowedForm, bare, profile]
@@ -159,7 +175,7 @@ theorem Shape.tail_of_let {source mode id node binder initializer rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | assign actual same _ _ _ | bitNot actual same _ _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
+  | discard actual same _ _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -177,7 +193,7 @@ theorem Shape.discard_tail {source mode id node expression semicolon rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | absent actual same _
-  | initialized actual same _ | assign actual same _ _ _ | bitNot actual same _ _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
+  | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -192,10 +208,10 @@ theorem Shape.discard_tail {source mode id node expression semicolon rest}
       cases same
       exact ⟨continuing, remaining⟩
 
-theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
+theorem Shape.assignment_tail {source mode id node assignment operator rhs rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
     (form : node.form = .assignValue assignment operator rhs) :
-    (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧ Shape source mode rest := by
+    (operator = .equal ∨ assignment.target.type = .word) ∧ Shape source mode rest := by
   cases shape with
   | forLoop actual same _ _ _ _ =>
       cases node_eq found actual
@@ -207,11 +223,17 @@ theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | assign actual same profile bare remaining =>
+  | assign actual same profile _ remaining | assignProjected actual same profile _ remaining =>
       cases node_eq found actual
       rw [form] at same
       cases same
-      exact ⟨profile, bare, remaining⟩
+      exact ⟨profile, remaining⟩
+
+theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
+    (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
+    (form : node.form = .assignValue assignment operator rhs) (bare : assignment.target.projections = []) :
+    (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧ Shape source mode rest :=
+  ⟨(shape.assignment_tail found form).1, bare, (shape.assignment_tail found form).2⟩
 
 theorem Shape.bitNot_tail {source mode id node assignment rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
@@ -223,7 +245,7 @@ theorem Shape.bitNot_tail {source mode id node assignment rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -244,7 +266,7 @@ theorem Shape.branches {source mode id node condition thenBody elseBody rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | bitNot actual same _ _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _
   | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -265,7 +287,7 @@ theorem Shape.loop {source mode id node condition body rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | bitNot actual same _ _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _
   | conditional actual same _ _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -286,7 +308,7 @@ theorem Shape.block_children {source mode id node body rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | bitNot actual same _ _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -309,7 +331,7 @@ theorem Shape.match_children {source mode id node resolution rest}
       rw [form] at same
       cases same
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | bitNot actual same _ _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -336,7 +358,7 @@ theorem Shape.for_children {source mode id node initializer condition post body 
     ItemShape initializer ∧ ItemShape post ∧ Shape source false body ∧ Shape source mode rest := by
   cases shape with
   | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | bitNot actual same _ _ _
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ _ | assignProjected actual same _ _ _ | bitNot actual same _ _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _
   | matchWith actual same _ _ _ =>
       cases node_eq found actual

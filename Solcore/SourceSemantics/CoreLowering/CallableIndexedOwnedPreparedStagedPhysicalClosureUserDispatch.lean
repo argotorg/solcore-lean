@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalClosureParentBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalIndirectGlobalPrefixes
@@ -162,6 +163,7 @@ theorem preserves_closure_or_global
             (.function rawParameter rawResult) (.closure function) carrier compiler.calleeCode.type
           simpa only [functionType] using calleeRelated
         exact .inl (CallableIndexedOwnedPreparedStagedPhysicalClosureParentBounds.preserves_parent (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
           bridge profile compiler prepared sourceParent occurrence initial reached related admitted
           heaps (physical reached) owners maps worlds frame heapMetadata dispatch selected count accepted wellFormed runtime covers
           (locals.mono calleeMetadata) calleeHeapTyped typing rawCallee actualFunctionType relatedCallee
@@ -283,6 +285,7 @@ theorem reflects_closure_or_global
         obtain ⟨sourceSize, outcome, after, returnedMap, returnedWorld, trace, resultRep, returnedHeaps,
           returnedMaps, returnedWorlds, returnedFrame, returnedMetadata, returned, returnedRelated, returnedPost⟩ :=
           CallableIndexedOwnedPreparedStagedPhysicalClosureParentBounds.reflects_suffix (semantic := semantic)
+            (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
             bridge profile compiler prepared sourceParent occurrence initial reached related admitted
             heaps (physical reached) owners maps worlds frame heapMetadata dispatch selected same accepted wellFormed runtime covers
             (locals.mono calleeMetadata) calleeHeapTyped typing rawCallee actualFunctionType relatedCallee

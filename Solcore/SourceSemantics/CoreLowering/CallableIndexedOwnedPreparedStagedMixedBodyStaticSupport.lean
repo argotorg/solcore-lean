@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -276,8 +277,12 @@ structure BranchingSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
     (semanticFaults : FunctionCalls.FaultRep) : Type where
   frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
   projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    function.source invalidProjection missingDefault)
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected invalidProjection missingDefault (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -294,7 +299,8 @@ abbrev BranchingSupport.tree {compiled function scope administrative code inputs
     (support : @BranchingSupport compiled function scope administrative code inputs stages packet semanticFaults)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
     (registry : SourceCoreRawMetadata.Registry) :
-    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+    PreparedBranchingCatalogSites.CatalogSites support.invalidProjection support.missingDefault registry semanticFaults
+      (support.tree child selected) :=
   (support.collected child selected).sites registry
 
 /-- The original general expression root keeps the exact retained Code policy,
@@ -312,8 +318,12 @@ structure CanonicalBranchingSupport {compiled : SourceCoreUnifiedCompilation.Com
   projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
   readFuel : Nat
   «prefix» : code.compilation.administrativePrefix = 1
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    function.source invalidProjection missingDefault)
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected invalidProjection missingDefault (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -333,7 +343,8 @@ theorem CanonicalBranchingSupport.sites {compiled function scope administrative 
     (support : @CanonicalBranchingSupport compiled function scope administrative headers code inputs stages packet semanticFaults)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
     (registry : SourceCoreRawMetadata.Registry) :
-    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+    PreparedBranchingCatalogSites.CatalogSites support.invalidProjection support.missingDefault registry semanticFaults
+      (support.tree child selected) :=
   (support.collected child selected).sites registry
 
 /-- Ordinary bodies can mix canonical calls and genuine nested formation.
@@ -354,8 +365,12 @@ structure NestedBranchingSupport {compiled : SourceCoreUnifiedCompilation.Compil
     (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) headers
   zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0
   wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    function.source invalidProjection missingDefault)
   collected : ∀ child, stages.Closure function child →
-    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected invalidProjection missingDefault (faults := semanticFaults) compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
@@ -374,7 +389,8 @@ theorem NestedBranchingSupport.sites {compiled function scope administrative hea
     (support : @NestedBranchingSupport compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
     (registry : SourceCoreRawMetadata.Registry) :
-    (support.tree child selected).CatalogSites .reachable registry semanticFaults :=
+    PreparedBranchingCatalogSites.CatalogSites support.invalidProjection support.missingDefault registry semanticFaults
+      (support.tree child selected) :=
   (support.collected child selected).sites registry
 
 /-- The chosen static support is indexed by the authentic packet and input

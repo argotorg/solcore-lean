@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservationSupport
+import Solcore.SourceSemantics.Staging.SelectedProjectedWritePreservation
 
 /-! Faulting statement sequences preserve the heap of every executed prefix.
 Typed successful initializers and real allocations precede the strict faulting
@@ -11,6 +12,28 @@ open Frontend SourceInference TypeSystem
 open Solcore.SourceSemantics.Dynamic
 
 variable {program : Program} {registry : Registry}
+
+private theorem expressions_fault_below (wellFormed : ProgramWellFormed program) (budget : Nat)
+    (expressionIH : ∀ smaller, smaller < budget → ExpressionAt program registry smaller)
+    {size : Nat} (smaller : size < budget) : ExpressionsAt program registry size := by
+  intro scope context environment before after ids failure types runtime covers locals heap typed trace
+  cases trace with
+  | @headFault headSize scope context environment before after id ids failure head =>
+      cases typed with
+      | cons headTyped _ =>
+          exact expressionIH headSize (Nat.lt_trans (Size.child_lt_stepSize (by simp)) smaller)
+            runtime covers locals heap headTyped head
+  | @tailFault headSize tailSize scope context environment before middle after id ids value failure head tail =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          obtain ⟨_valueTyped, middleTyped, headExtends⟩ := expression_value wellFormed
+            runtime covers locals heap headTyped head
+          obtain ⟨afterTyped, tailExtends⟩ := expressions_fault_below wellFormed budget expressionIH
+            (Nat.lt_trans (Size.child_lt_stepSize (by simp)) smaller)
+            runtime covers (locals.mono headExtends) middleTyped tailTyped tail
+          exact ⟨afterTyped, headExtends.trans tailExtends⟩
+  termination_by size
+  decreasing_by simp_all [Size.stepSize] <;> omega
 
 private theorem statement_head_tail
     {source : TypedSource} {control : ControlContext} {context final : Context}
@@ -119,6 +142,72 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
         runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
       exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+  | @assignProjected keysSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome
+      contains form _projected keys snapshot child write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) written :=
+        .assignValue contains form (.intro (snapshot.resolves keys.sound.values_plain) child.sound.value_plain write)
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before written [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+  | assignProjectedRootFault => exact ⟨heap, .refl _⟩
+  | @assignProjectedKeysFault keysSize mode scope context environment before after assignment operator rhs id rest node failure
+      contains form _projected _ready keys =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              exact expressions_fault_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+  | @assignProjectedGetterFault keysSize mode scope context environment before after assignment operator rhs values id rest node reason
+      contains form _projected keys _failed =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
+                runtime covers locals heap keyTyped keys
+              exact ⟨keyHeap, keyExtends⟩
+  | @assignProjectedRhsFault keysSize childSize mode scope context environment before targetHeap after assignment operator rhs values target id rest node failure
+      contains form _projected keys _snapshot child =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
+                runtime covers locals heap keyTyped keys
+              obtain ⟨afterTyped, rhsExtends⟩ := expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers (locals.mono keyExtends) keyHeap rhsTyped child
+              exact ⟨afterTyped, keyExtends.trans rhsExtends⟩
+  | @assignProjectedWriteFault keysSize childSize mode scope context environment before targetHeap after assignment operator rhs values target right id rest node reason
+      contains form _projected keys _snapshot child _failed =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
+                runtime covers locals heap keyTyped keys
+              have post := expression_value wellFormed runtime covers (locals.mono keyExtends) keyHeap rhsTyped child
+              exact ⟨post.heap_typed, keyExtends.trans post.heap_extends⟩
   | @letFault childSize mode scope context environment before after id rest node binder expression failure
       contains form monomorphic child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
@@ -585,6 +674,64 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
             have post := expression_value wellFormed runtime covers locals heap rhsTyped child
             exact ⟨post.heap_typed, post.heap_extends⟩
+  | @projectedAssignment keysSize childSize nextSize scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome
+      _projected keys snapshot child write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.assignValue (.intro (snapshot.resolves keys.sound.values_plain) child.sound.value_plain write)) next
+  | projectedAssignmentRootFault => exact ⟨heap, .refl _⟩
+  | @projectedAssignmentKeysFault keysSize scope context environment before after assignment operator rhs rest failure
+      _projected _ready keys =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              exact expressions_fault_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+  | @projectedAssignmentGetterFault keysSize scope context environment before after assignment operator rhs values rest reason
+      _projected keys _failed =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
+                runtime covers locals heap keyTyped keys
+              exact ⟨keyHeap, keyExtends⟩
+  | @projectedAssignmentRhsFault keysSize childSize scope context environment before targetHeap after assignment operator rhs values target rest failure
+      _projected keys _snapshot child =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
+                runtime covers locals heap keyTyped keys
+              obtain ⟨afterTyped, rhsExtends⟩ := expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers (locals.mono keyExtends) keyHeap rhsTyped child
+              exact ⟨afterTyped, keyExtends.trans rhsExtends⟩
+  | @projectedAssignmentWriteFault keysSize childSize scope context environment before targetHeap after assignment operator rhs values target right rest reason
+      _projected keys _snapshot child _failed =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
+              obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
+                runtime covers locals heap keyTyped keys
+              have post := expression_value wellFormed runtime covers (locals.mono keyExtends) keyHeap rhsTyped child
+              exact ⟨post.heap_typed, keyExtends.trans post.heap_extends⟩
   | bitNotFault => exact ⟨heap, .refl _⟩
   | @bitNot nextSize scope context finalContext environment before written after assignment target updated rest outcome
       snapshot write next =>

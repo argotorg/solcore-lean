@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedProgramCertificates
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationAcceptedCoercedFactories
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedScopedFactoryAdmission
 import Solcore.SourceSemantics.CoreLowering.CompilerProgramStaticProfile
@@ -19,7 +20,7 @@ open Core Frontend SourceInference
 open CompilerProgramStaticProfile
 open CallableIndexedOwnedPreparedNamedSourceAdmissionTransport (statements)
 open CallableIndexedOwnedPreparedOrdinarySyntaxTable (Table)
-open CallableIndexedOwnedPreparedProgramAdmission (RootCertificate RowCertificate Certificate)
+open SelectedCompilationPreparedProgramCertificates (RootCertificate RowCertificate Certificate)
 open CallableIndexedOwnedPreparedNamedSyntaxAdmission (DirectSite)
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Supported)
 

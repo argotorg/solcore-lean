@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.Staging.SelectedBranchPreservation
 import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
+import Solcore.SourceSemantics.Staging.SelectedProjectedWritePreservation
 import Solcore.SourceSemantics.Staging.SelectedMatchControlPreservation
 set_option autoImplicit false
 set_option Elab.async false
@@ -11,6 +12,7 @@ variable {program : Program} {registry : Registry}
 
 theorem statements_step (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
+    (expressionsIH : ∀ smaller, smaller < size → ExpressionsAt program registry smaller)
     (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
     (whileIH : ∀ smaller, smaller < size → WhileAt program registry smaller)
     (matchIH : ∀ smaller, smaller < size → MatchAt program registry smaller)
@@ -71,6 +73,100 @@ theorem statements_step (size : Nat)
             cases controlTyped
             rfl
           exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+  | @assignProjected keysSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome
+      contains form _projected keys snapshot child write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
+                locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+              have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_equal savedTyped first write
+              have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono totalExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+          | wordCompound kind targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
+                locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+              have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound kind savedTyped first write
+              have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono totalExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+  | assignProjectedRootFault => exact fault_statements heap (.refl _)
+  | @assignProjectedKeysFault keysSize mode scope context environment before after assignment operator rhs id rest node failure
+      contains form _projected _ready keys =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              exact fault_statements keyPost.heap_typed keyPost.heap_extends
+  | @assignProjectedGetterFault keysSize mode scope context environment before after assignment operator rhs values id rest node reason
+      contains form _projected keys _failed =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              exact fault_statements keyPost.heap_typed keyPost.heap_extends
+  | @assignProjectedRhsFault keysSize childSize mode scope context environment before targetHeap after assignment operator rhs values target id rest node failure
+      contains form _projected keys _snapshot child =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
+              exact fault_statements post.heap_typed (keyPost.heap_extends.trans post.heap_extends)
+  | @assignProjectedWriteFault keysSize childSize mode scope context environment before targetHeap after assignment operator rhs values target right id rest node reason
+      contains form _projected keys _snapshot child _failed =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
+              exact fault_statements post.heap_typed (keyPost.heap_extends.trans post.heap_extends)
   | assignBareUnbound | assignBareDangling => exact fault_statements heap (.refl _)
   | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
       id rest node assignment operator rhs value target updated outcome contains form snapshot child write next =>

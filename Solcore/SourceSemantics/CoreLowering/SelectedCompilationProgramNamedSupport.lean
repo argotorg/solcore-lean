@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedProgramCertificates
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedScopedAdmission
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedFactoryAdmission
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationScopedFactoryAdmission
@@ -7,7 +7,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationProgramNamedSupport
 open Core Frontend SourceInference
-open CallableIndexedOwnedPreparedProgramAdmission (Certificate)
+open SelectedCompilationPreparedProgramCertificates (Certificate)
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
 open CallableIndexedOwnedPreparedNamedSyntaxAdmission (TableAligned)
 open SelectedCompilationPhysicalProgramSupport (stagePrepared stages)

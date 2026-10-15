@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentRoute
 
 /-! Original for-item certificates thread the exact lexical context recovered
 from genuine Source typing. The accepted compiler supplies these finite receipts. -/
@@ -34,6 +35,15 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
+  | assignProjected {assignment operator rhs rhsNode binder rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
   | bitNot {assignment binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
@@ -50,6 +60,8 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
   | discard found value _ ih => exact .discard found (mapped _ value) ih
   | assign declaration target profile bare found type value _ ih => exact .assign declaration target profile bare found type (mapped _ value) ih
 
+  | assignProjected declaration route profile projected keys found type value _ ih =>
+      exact .assignProjected declaration route profile projected (fun key member => mapped key (keys key member)) found type (mapped _ value) ih
   | bitNot declaration target profile bare _ ih => exact .bitNot declaration target profile bare ih
 
 theorem Scan.shape {source approved items} (scan : Scan source approved items) :
@@ -61,6 +73,7 @@ theorem Scan.shape {source approved items} (scan : Scan source approved items) :
   | discard _ _ _ ih => exact .discard ih
   | assign _ _ profile bare _ _ _ _ ih => exact .assign profile bare ih
 
+  | assignProjected _ _ profile projected _ _ _ _ _ ih => exact .assignProjected profile projected ih
   | bitNot _ _ profile bare _ ih => exact .bitNot profile bare ih
 
 private theorem expression_at {source : TypedSource} {context : SourceSemantics.Context}
@@ -105,6 +118,42 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
         rw [bare] at projections
         cases projections
         exact targetType.symm ▸ target.symm ▸ writable
+      · rcases profile with equal | word
+        · exact .inl equal
+        · exact .inr (.inl (by rw [target, word]; rfl))
+
+/-- Mapping paths derive the writable declaration from the original key types. -/
+theorem projected_assignment_facts {source : TypedSource} {context : SourceSemantics.Context}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp}
+    {rhs : ExpressionId} {binder : TypedBinder}
+    (unique : NodeOccurrencesUnique source)
+    (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+    (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+    (typed : SourceAssignmentHasType source context assignment operator rhs) :
+    (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
+    (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      WritableLocal context assignment.target.root actual.scheme.body) ∧
+    ExpressionHasType source context rhs assignment.target.type ∧
+    (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer) := by
+  have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
+      ExpressionHasType source context rhs type ∧ (operator = .equal ∨ type = .word) := by
+    cases typed with
+    | equal place value _ => exact ⟨_, place, value, .inl rfl⟩
+    | wordCompound _ place value _ => exact ⟨_, place, value, .inr rfl⟩
+  obtain ⟨type, place, value, profile⟩ := original
+  cases place with
+  | intro writable projections target =>
+      have atLeaf := target.symm ▸ projections
+      have same := route.root_type unique atLeaf
+      refine ⟨?_, ?_, target.symm ▸ value, ?_⟩
+      · intro actual actualFound
+        cases Except.ok.inj (declaration.symm.trans actualFound)
+        exact same ▸ atLeaf
+      · intro actual actualFound
+        cases Except.ok.inj (declaration.symm.trans actualFound)
+        exact same ▸ writable
       · rcases profile with equal | word
         · exact .inl equal
         · exact .inr (.inl (by rw [target, word]; rfl))
@@ -165,6 +214,22 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
             subst child
             exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+          · exact ih tail
+
+  | assignProjected declaration route profile projected keys rhsFound rhsType value remaining ih =>
+      cases typed with
+      | cons head tail =>
+        cases head with
+        | assignValue assignment =>
+          obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
+            projected_assignment_facts unique declaration route assignment
+          apply GenericForHeader.Syntax.assign sourceTyped writable rightTyped numeric
+          · intro child member
+            rcases List.mem_cons.mp member with equal | member
+            · subst child
+              exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+            · obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
+              exact ⟨keys child member, node, found, typed⟩
           · exact ih tail
 
   | bitNot declaration targetType profile bare remaining ih =>

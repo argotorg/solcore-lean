@@ -179,7 +179,7 @@ theorem of_actual_with_evidence
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
     Support principal packet headers stages
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
-  apply CallableIndexedOwnedPreparedStagedMethodScopedCollectors.of_compiler principal packet ready member wellFormed
+  apply CallableIndexedOwnedPreparedStagedMethodScopedCollectors.of_compiler principal packet ready member wellFormed diagnostic
     (CallableIndexedOwnedPreparedStagedMethodScopedCollectors.operands_of_diagnostic principal diagnostic receiver)
     (CallableIndexedOwnedPreparedStagedMethodScopedCollectors.unary_of_diagnostic principal diagnostic receiver) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations tree found typed accepted _nativeType _native

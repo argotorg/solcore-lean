@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsProjectedAssignmentLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsLexicalLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsDiscardLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsAssignmentLifting
@@ -8,7 +9,7 @@ set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 3000000
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForHeaderLifting
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CompatibleEquality CoreProof
 open CallableIndexedHistory CallableIndexedAllocationCompletion
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open SelectedCompilationStageLiftBounds (LiftsAt)
@@ -28,6 +29,9 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations compiled.compatible.checked.catalog functions identities)
   {receiving : SourceCoreRawMetadata.Registry}
   (definitions : layouts.definitions = (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
   (registered : frame.Registered (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
@@ -46,7 +50,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 variable (transport : ProtectedStateTransition.AdministrativeTransport callerProtocol)
   (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
 
-include bridge functions definitions registered producer acquire transport extension in
+include bridge functions faithful observations definitions registered producer acquire transport extension in
 /-- Every actual post-header item preserves its ordered allocation, evaluation
 and write. The loop caller restores its bindings only after this vector ends. -/
 theorem lifts {budget : Nat}
@@ -94,7 +98,7 @@ theorem lifts {budget : Nat}
       (ih shape.discard_tail (CallableIndexedOwnedPreparedStagedForItemsTyping.expression sourceTyped))
   | @assign context scope assignment operator rhs rest body head tail ih =>
     intro shape sourceTyped
-    obtain ⟨_profile, bare, tailShape⟩ := shape.assign_tail
+    obtain ⟨_profile, tailShape⟩ := shape.assignment_tail
     have typedChildren (size : Nat) (smaller : size < budget) :
         LiftsAt bridge context model stages invocation (TypedCertificate invocation.source certificates context) size := by
       intro scope id lowered generated node found typed
@@ -107,10 +111,15 @@ theorem lifts {budget : Nat}
       obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
       exact preservation context size certified found typed
     intro size within
-    exact SelectedCompilationStageForItemsAssignmentLifting.lifts bridge functions transport extension condition
-      unique head bare (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
-      typedChildren typedPreservation
-      (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2) within
+    by_cases bare : assignment.target.projections = []
+    · exact SelectedCompilationStageForItemsAssignmentLifting.lifts bridge functions transport extension condition
+        unique head bare (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
+        typedChildren typedPreservation
+        (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2) within
+    · exact SelectedCompilationStageForItemsProjectedAssignmentLifting.lifts bridge functions faithful observations transport extension condition
+        unique head bare (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
+        typedChildren typedPreservation
+        (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2) within
   | @bitNot context scope assignment rest body head tail ih =>
     intro shape sourceTyped
     obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail

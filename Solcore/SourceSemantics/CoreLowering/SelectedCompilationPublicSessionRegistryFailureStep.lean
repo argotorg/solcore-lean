@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicClosureHist
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicHistorySourceInputs
 import Solcore.SourceSemantics.Staging.SelectedRecursivePreservation
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionFailureStep
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistry
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionRegistry
 
 set_option autoImplicit false
 set_option Elab.async false
@@ -13,7 +13,7 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open SelectedCompilationPhysicalProgramSupport (stagePrepared)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}

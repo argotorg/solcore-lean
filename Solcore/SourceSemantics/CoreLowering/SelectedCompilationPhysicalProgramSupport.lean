@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalMixedNamedFamilyPorts
 import Solcore.SourceSemantics.CoreLowering.CompatibleRegistryDiagnosticExtension
 
@@ -41,17 +43,17 @@ structure Support (compiled : SourceCoreUnifiedCompilation.Compiled)
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       header (bodies header member)
   closurePackets : ∀ {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys
       initial.result.context.registry
       (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       mapping world function native bindings parameter result),
-    SelectedCompilationPhysicalClosureStaticSupport.PacketFor association.original (stages compiled)
+    SelectedCompilationPhysicalClosureStaticSupport.PacketFor association (stages compiled)
   closureSupport : ∀ {mapping world function native bindings parameter result}
-    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys
+    (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys
       initial.result.context.registry
       (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       mapping world function native bindings parameter result),
-    SelectedCompilationPhysicalClosureStaticSupport.SupportFor association.original
+    SelectedCompilationPhysicalClosureStaticSupport.SupportFor association
       (stages compiled) (closurePackets association)
   owners : ∀ owner : OwnedKey keys, CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers
   methods : SelectedCompilationPhysicalMixedCallerFamily.MixedMethodSupports
@@ -64,17 +66,13 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {initial : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
 
 def functions (support : Support compiled headers keys initial) :=
-  CallableIndexedOwnedPhysicalCellOrigins.functions headers keys initial.result.context.registry
+  CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys initial.result.context.registry
     (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics) support.profile
 
 theorem observations (support : Support compiled headers keys initial) :
     CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-      (functions support) (CallableIndexedLambdaValues.Identity compiled.indexed) := by
-  intro metadata mapping world sourceType source native type origin
-  exact CallableIndexedOwnedGeneralLambdaValues.observations _ initial.result.context.registry
-    (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
-    support.profile (registry := metadata)
-    (CallableIndexedOwnedPhysicalCellOrigins.functions_include_general support.profile origin)
+      (functions support) (CallableIndexedLambdaValues.Identity compiled.indexed) :=
+  CallableIndexedOwnedPreparedPhysicalCellOrigins.observations support.profile
 
 variable {receiving : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (support : Support compiled headers keys initial)
@@ -124,5 +122,13 @@ theorem reflects_bodies (header) (member : header ∈ headers)
     (static_extension support extension) (semantic_extension support issued extension)
     support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
     rfl header member selected budget
+
+include issued in
+/-- The actual issued receiver interprets each retained assignment origin. -/
+theorem assignment_interpretation :
+    PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving.result.context.registry
+      (fun reason token => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+        receiving.result.diagnostics (.semantic reason) token) :=
+  PreparedAssignmentDiagnosticAuthority.interprets issued
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport

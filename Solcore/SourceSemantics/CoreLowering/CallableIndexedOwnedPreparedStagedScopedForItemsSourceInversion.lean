@@ -108,6 +108,14 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
         middle target updated written ∧
       Size.ForItems program registry tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
+  | projectedAssignment projected _ _ _ _ _
+  | projectedAssignmentRootFault projected _
+  | projectedAssignmentKeysFault projected _ _
+  | projectedAssignmentGetterFault projected _ _
+  | projectedAssignmentRhsFault projected _ _ _
+  | projectedAssignmentWriteFault projected _ _ _ _ =>
+      have empty : assignment.target.projections = [] := by cases snapshot; assumption
+      exact (projected empty).elim
   | assignment actualSnapshot child write remaining =>
       have targets := target_functional snapshot actualSnapshot
       cases targets

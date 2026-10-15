@@ -64,7 +64,12 @@ theorem ActualHeader.factory_support {fixture : CompiledFixture} (observed : Obs
   · exact shape.expression.coercions
   · simp only [observed.noLocals, List.find?_nil]
   · rw [actual.source, expression]; exact extra.read
-  · rw [actual.source]; exact shape.body_shape
+  · rw [actual.source]
+    exact .initialized shape.initializedFound shape.initializedForm
+      (.whileLoop shape.loopFound shape.loopForm
+        (.assign shape.assignmentFound shape.assignmentForm (.inl rfl) shape.targetBare
+          (.assign shape.flagAssignmentFound shape.flagAssignmentForm (.inl rfl) shape.flagTargetBare .nil))
+        (.returnValue [] shape.statementFound shape.statementForm))
   · intro context final bodyFacts typed
     rw [actual.source] at typed ⊢
     have unique : NodeOccurrencesUnique row.row.function.typedBody := by

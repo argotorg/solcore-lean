@@ -23,6 +23,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (support : Support principal packet headers stages semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  (functionTypes : FunctionRuntimeViews functions)
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
   {registry : SourceCoreRawMetadata.Registry} {child : Staging.Recursive.Scope}
   (selected : stages.Closure principal.sourceFunction child)
   {administrative : Core.Context} {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
@@ -40,8 +43,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled registry
+    (fun reason token => faults (.semantic reason) token))
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -62,10 +67,11 @@ theorem source_continuation
           (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod root) owner physical)
   | «scoped» packet =>
     exact CallableIndexedOwnedPreparedStagedMethodScopedBounds.source_continuation (semantic := semantic)
-      principal packet support wellFormed functions selected installed owner keyPhysical caller
+      (assignmentInterpretation := assignmentInterpretation)
+      principal packet support wellFormed functions faithful observations selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic functionTypes faithful observations assignmentInterpretation in
 theorem native_continuation
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
@@ -86,7 +92,8 @@ theorem native_continuation
           (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod root) owner physical)
   | «scoped» packet =>
     exact CallableIndexedOwnedPreparedStagedMethodScopedBounds.native_continuation (semantic := semantic)
-      principal packet support wellFormed functions selected installed owner keyPhysical caller
+      (assignmentInterpretation := assignmentInterpretation)
+      principal packet support wellFormed functions functionTypes faithful observations selected installed owner keyPhysical caller
       beforeTyped argumentsTyped stable extension budget children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodBodyBounds

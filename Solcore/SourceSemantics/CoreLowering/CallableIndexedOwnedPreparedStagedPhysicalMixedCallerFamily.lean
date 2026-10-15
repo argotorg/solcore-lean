@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport
@@ -161,6 +163,7 @@ theorem preserves_with_methods (size : Nat) :
           (headers := headers) (keys := keys) header model stages child callFaults size := by
       intro size within header member child selected
       exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
         (bodySupport header member) profile wellFormed extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     cases root.support with
@@ -190,7 +193,10 @@ theorem preserves_with_methods (size : Nat) :
             simpa only [sourceAtEq] using argumentsTyped
           simpa only [sourceAtEq] using
             CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation (semantic := semantic)
-              port.principal packet static wellFormed functions selected installed owner keyPhysical caller
+              (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+              port.principal packet static wellFormed functions
+              (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+              (CallableIndexedOwnedPhysicalFunctionViews.observations profile) selected installed owner keyPhysical caller
               heapTyped packetArguments stable extension size
               (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
         intro actualScope actualId actualCode point actual found typed
@@ -226,8 +232,8 @@ theorem preserves_with_methods (size : Nat) :
       have rawMeaning := CallableIndexedOwnedPreparedStagedPhysicalCoercedDirectRawBounds.preserves
         support owner keyPhysical functions callFaults
         budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
-      have conversionBodies := CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds.source_bodies (semantic := semantic)
-        owner keyPhysical functions callFaults wellFormed extension support.chain support.methods budget ih
+      have conversionBodies := CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds.source_bodies
+        owner keyPhysical functions callFaults wellFormed support.chain support.methods budget ih
       intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
       cases Option.some.inj (found.symm.trans support.actual.found)
@@ -256,6 +262,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
           (headers := headers) (keys := keys) header model (RecursiveNamedPreparedStageScopes.registry stagePrepared) child callFaults size := by
       intro size within header member child selected
       exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects (semantic := semantic)
+        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
         (bodySupport header member) profile wellFormed extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     cases root.support with
@@ -286,7 +293,11 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
             simpa only [sourceAtEq] using argumentsTyped
           simpa only [sourceAtEq] using
             CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation (semantic := semantic)
-              port.principal packet static wellFormed functions selected installed owner keyPhysical caller
+              (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+              port.principal packet static wellFormed functions
+              (CallableIndexedOwnedPhysicalFunctionViews.runtime_views profile)
+              (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+              (CallableIndexedOwnedPhysicalFunctionViews.observations profile) selected installed owner keyPhysical caller
               heapTyped packetArguments stable extension size
               (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
         intro actualScope actualId actualCode point actual found typed
@@ -324,8 +335,8 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
         support owner keyPhysical functions callFaults
         stagePrepared rfl descriptor
         budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
-      have conversionBodies := CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds.native_bodies (semantic := semantic)
-        owner keyPhysical functions callFaults wellFormed extension support.chain support.methods budget ih
+      have conversionBodies := CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds.native_bodies
+        owner keyPhysical functions callFaults wellFormed support.chain support.methods budget ih
       intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
       cases Option.some.inj (found.symm.trans support.actual.found)

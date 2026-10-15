@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreCanonicalScopedCompilerProfile
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionSourceOutcomes
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionSourceOutcomes
 
 /-! Independent Dynamic outcomes for the original six-call scoped closure
 session, including all three packed calls on retained captured closures. -/
@@ -9,8 +9,8 @@ set_option maxHeartbeats 5000000
 namespace Tests.SourceCoreCanonicalScoped.SourceOutcomes
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CompilerProfile
-open CertifiedPublicSession (Issued)
-open RecursiveNamedPublicPhysicalSessionState (PlainValue)
+open SelectedCompilationCertifiedPublicSession (Issued)
+open SelectedCompilationPublicSessionState (PlainValue)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
   {issued : Issued fixture.recipe}

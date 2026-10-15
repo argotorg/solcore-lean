@@ -26,12 +26,14 @@ variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)} {
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
   {faults : RecursiveStageMeaning.FaultRep}
   {child : Staging.Recursive.Scope} (selected : stages.Closure header.function child)
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
-include support profile certified extension selected semantic in
+include support profile certified extension selected semantic assignmentInterpretation in
 theorem lifts {budget : Nat}
     (children : ∀ size, size < budget →
       LiftsRootsAt
@@ -46,7 +48,8 @@ theorem lifts {budget : Nat}
   | formation terminal static globals =>
     exact SelectedCompilationStageNamedTerminalLifting.formation selected static
   | «scoped» body receipt compilation static =>
-    exact SelectedCompilationStageNamedScopedLifting.lifts (semantic := semantic)
-      static body.aligned.globals functions selected extension body.layouts children preservation
+    exact SelectedCompilationStageNamedScopedLifting.lifts (semantic := semantic) (assignmentInterpretation := assignmentInterpretation)
+      static body.aligned.globals functions (CallableIndexedLambdaValues.identity_faithful compiled.indexed) (CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile)
+      selected extension body.layouts children preservation
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedBodyLifting

@@ -29,9 +29,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
   (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
-  {receiving : SourceCoreRawMetadata.Registry} (faults : RecursiveStageMeaning.FaultRep)
-  (extension : SourceCoreRawMetadata.Extends
-    (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
+  {receiving : SourceCoreRawMetadata.Registry}
   {source target : TypeSystem.Ty} {input output : SourceCoreBasic.LoweredExpr}
   {steps : List CoercionStep} {calls : List CallableCoercionSpine.Call}
   (chain : Chain compiled project compilation caller available scope node policy context invocation stages
@@ -40,14 +38,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
-variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
-
-include keyPhysical extension support semantic in
+include keyPhysical support in
 theorem lift_bodies (budget : Nat)
     (children : ∀ size, size < budget → LiftsRootsAt (headers := headers) (keys := keys)
-      model stages semanticFaults size)
-    (preservation : ∀ size, PreservesRootsAt (headers := headers) (keys := keys)
-      model stages semanticFaults faults size) :
+      model stages semanticFaults size) :
     SelectedCompilationStageCoercionPathLifting.LiftBodies
       (headers := headers) (receiving := receiving) owner functions chain budget := by
   induction chain with
@@ -61,9 +55,9 @@ theorem lift_bodies (budget : Nat)
           arguments packet.sourceAt.types := by
         simpa only [sourceAt] using argumentsTyped
       simpa only [SelectedCompilationMethodBodies.Packet.sourceAt, sourceAt] using
-        SelectedCompilationStageMethodBodyLifting.source_continuation (semantic := semantic)
-          port.principal (.terminal packet) static certified functions selected installed
-          owner keyPhysical caller heapTyped packetArguments stable extension budget children preservation
+        SelectedCompilationStageMethodTerminalLifting.source_continuation
+          port.principal packet static certified functions selected installed
+          owner keyPhysical caller heapTyped packetArguments stable budget children
 
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStagePhysicalCoercionMethods

@@ -17,7 +17,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalClosur
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedPreparedStagedIndirectNativePrefix (CalleePost)
-open CallableIndexedOwnedPhysicalClosureAssociation (Association)
+open CallableIndexedOwnedPreparedPhysicalClosureAssociation (Association)
 open SelectedCompilationPhysicalClosureStaticSupport (PacketFor SupportFor)
 open SelectedCompilationIndirectBuiltinPreservationDispatch (ParentAt)
 open SelectedCompilationIndirectBuiltinApplicationDispatch (UserApplicationPrefix ParentResult)
@@ -55,7 +55,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {sourceTypes : List TypeSystem.Ty} {calleeNode : ExpressionNode}
   {sidecar : SourceCoreStageContracts.Sidecar}
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
@@ -64,6 +64,9 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 variable (semantic : ∀ reason token, semanticFaults reason token →
   CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
 
 
 
@@ -86,17 +89,17 @@ variable (sourceParent : CallableIndexedOwnedIndirectSourceAdapters.SourceParent
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
 
 include physical owners sourceParent occurrence preparedStages receiver runtime sourceEq tree unique
-  parentTyped calleeFound guardFrame actualFunctionType semantic in
+  parentTyped calleeFound guardFrame actualFunctionType semantic assignmentInterpretation in
 /-- Authentic Source application and prefix witnesses construct the original
 closure parent. Physical count rejection keeps the reached argument heap and
 literal receiving arity word; success preserves the actual selected body once. -/
 theorem preserves_closure_or_global
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), PacketFor association.original stages)
+        bindings parameterCore resultCore), PacketFor association stages)
     (supported : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), SupportFor association.original stages (packets association))
+        bindings parameterCore resultCore), SupportFor association stages (packets association))
     (budget : Nat)
     (bodyChildren : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
@@ -158,13 +161,14 @@ theorem preserves_closure_or_global
         have rawCallee : Dynamic.ValueHasType context calleeHeap (.closure function)
             (.function rawParameter rawResult) := by
           simpa only [functionType] using calleeTyped
-        have relatedCallee : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins
+        have relatedCallee : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins
             headers keys bodyRegistry completion.result.context.registry semanticFaults profile finalMap finalWorld
             (.function rawParameter rawResult) (.closure function) carrier compiler.calleeCode.type := by
           change GenericHeap.PayloadModel.Represents model finalMap finalWorld
             (.function rawParameter rawResult) (.closure function) carrier compiler.calleeCode.type
           simpa only [functionType] using calleeRelated
         exact .inl (SelectedCompilationPhysicalClosureParentBounds.preserves_parent (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
           bridge profile compiler prepared sourceParent occurrence initial reached related admitted
           heaps (physical reached) owners maps worlds frame heapMetadata dispatch selected count accepted sourceValuesTyped argumentMetadata runtime rawCallee actualFunctionType relatedCallee
           represented bundle originalResult packets supported budget bodyChildren calleeTrace argumentsTrace called within
@@ -216,17 +220,17 @@ theorem preserves_closure_or_global
           · simpa only [physical, valuesCount] using faultRep
 
 
-include physical owners sourceParent occurrence preparedStages receiver runtime sourceEq tree unique parentTyped calleeFound actualFunctionType semantic in
+include physical owners sourceParent occurrence preparedStages receiver runtime sourceEq tree unique parentTyped calleeFound actualFunctionType semantic assignmentInterpretation in
 /-- User classification and physical arity happen inside the actual retained
 prefix. The closure branch constructs full parent meaning; only the literal
 global application remains for the separate named producer. -/
 theorem reflects_closure_or_global
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), PacketFor association.original stages)
+        bindings parameterCore resultCore), PacketFor association stages)
     (supported : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-        bindings parameterCore resultCore), SupportFor association.original stages (packets association))
+        bindings parameterCore resultCore), SupportFor association stages (packets association))
     {budget size : Nat} {value : Value} {finalStore : Store}
     (bodyChildren : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
@@ -276,7 +280,7 @@ theorem reflects_closure_or_global
         have rawCallee : Dynamic.ValueHasType context calleeHeap (.closure function)
             (.function rawParameter rawResult) := by
           simpa only [functionType] using calleeTyped
-        have relatedCallee : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins
+        have relatedCallee : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins
             headers keys bodyRegistry completion.result.context.registry semanticFaults profile finalMap finalWorld
             (.function rawParameter rawResult) (.closure function) carrier compiler.calleeCode.type := by
           change GenericHeap.PayloadModel.Represents model finalMap finalWorld
@@ -285,6 +289,7 @@ theorem reflects_closure_or_global
         obtain ⟨sourceSize, outcome, after, returnedMap, returnedWorld, trace, resultRep, returnedHeaps,
           returnedMaps, returnedWorlds, returnedFrame, returnedMetadata, returned, returnedRelated, returnedPost⟩ :=
           SelectedCompilationPhysicalClosureParentBounds.reflects_suffix (semantic := semantic)
+            (assignmentInterpretation := assignmentInterpretation)
             bridge profile compiler prepared sourceParent occurrence initial reached related admitted
             heaps (physical reached) owners maps worlds frame heapMetadata dispatch selected same accepted sourceValuesTyped argumentMetadata runtime rawCallee actualFunctionType relatedCallee
             represented bundle originalResult packets supported budget bodyChildren calleeTrace argumentsTrace suffix

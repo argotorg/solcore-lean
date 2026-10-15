@@ -105,7 +105,13 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
       cases same
       rw [form] at original
       cases original
-      exact False.elim (ready.1 assignable)
+      exact False.elim (ready.1 (.inl assignable))
+  | projectedAssigned read original _ remaining receipt route =>
+      have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
+      cases same
+      rw [form] at original
+      cases original
+      exact False.elim (receipt.projected assignable.2.1)
   | assigned read original _ remaining receipt targetType =>
       exact tail remaining ready
   | initialized read original | absent read original | returning read original
@@ -148,7 +154,7 @@ private theorem loop_details {policy : SourceCoreLoops.Policy}
       simp only [Tree.closed, inside.1, tail.1, Bool.and_self, Tree.bindings,
         inside.2, tail.2.1, List.nil_append, and_self]
   | initialized read form | absent read form | returning read form | returnUnit read form
-  | assigning read form | assigned read form
+  | assigning read form | assigned read form | projectedAssigned read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form
   | matching read form | matched read form
@@ -183,7 +189,7 @@ theorem SelectedRelayShape.compiler_details {policy : SourceCoreLoops.Policy}
       simp only [Tree.closed, Tree.bindings, List.map_cons, tail.1, tail.2,
         List.map_nil, and_self]
   | absent read form | returning read form | returnUnit read form
-  | assigning read form | assigned read form | whileLoop read form
+  | assigning read form | assigned read form | projectedAssigned read form | whileLoop read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form
   | matching read form | matched read form

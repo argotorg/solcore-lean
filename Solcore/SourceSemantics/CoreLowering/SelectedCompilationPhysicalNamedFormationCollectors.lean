@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedReturnLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedFormationSupport
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedBranchingBodyLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedPreparedBranchingLambdaFormation
 
 /-! Original named compilation and observed lambda nodes produce physical
 formation support. No execution law or full ordinary-header inventory is used. -/
@@ -48,7 +48,8 @@ theorem of_actual
   have formed := SelectedCompilationNamedReturnLambdaFormation.of_terminal_parameters (registry := registry) (faults := faults) terminal
     prepared diagnostic certified profile selected member found form owner requirements coercions ordinary read
     returnFound returnForm returnType
-  simpa only [stages.evidence selected] using formed
+  obtain ⟨formed⟩ := formed
+  exact ⟨.inl (by simpa only [stages.evidence selected] using formed)⟩
 
 /-- Original scoped body syntax and the accepted lambda compiler supply full
 formation support before any closure body runs. -/
@@ -56,12 +57,12 @@ theorem of_branching
     (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
-    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    (_receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
-    (included : ∀ reason token,
+    (_included : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics reason token → faults reason token)
     (certified : SelectedCompilationNamedSourceTyping.Certified header)
-    (catalog : SignatureCatalogWellFormed compiled.sourceProgram.signatures)
+    (_catalog : SignatureCatalogWellFormed compiled.sourceProgram.signatures)
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
     {stages : Staging.Recursive.Registry}
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -78,7 +79,7 @@ theorem of_branching
         binding.initializer = terminal.expression)) = none)
     (read : SourceCoreCompatibleDataExpressions.readExpression compiled.compatible.checked
       header.function.source terminal.expression = .ok (node, reported))
-    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape header.function.source true statements)
+    (_shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape header.function.source true statements)
     (syntaxFor : ∀ {context final bodyFacts},
       StatementsHaveType header.function.source {returnType := result} context statements final bodyFacts →
       GenericImperativeMatch.Syntax header.function.source
@@ -91,9 +92,10 @@ theorem of_branching
       (bodyRegistry := registry) (stages := stages) (semanticFaults := faults) header terminal) := by
   refine ⟨⟨point, ?_⟩⟩
   intro child selected
-  have formed := SelectedCompilationNamedBranchingBodyLambdaFormation.of_terminal (registry := registry) (faults := faults) terminal
-    prepared diagnostic receiver included certified catalog profile selected member found form owner requirements coercions ordinary read
-    shape syntaxFor
-  simpa only [stages.evidence selected] using formed
+  have formed := SelectedCompilationNamedPreparedBranchingLambdaFormation.of_terminal terminal
+    prepared diagnostic certified profile selected member found form owner requirements coercions ordinary read
+    syntaxFor
+  obtain ⟨formed⟩ := formed
+  exact ⟨.inr (by simpa only [stages.evidence selected] using formed)⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedFormationCollectors

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedDirect
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicClosureHistory
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionFunctionForward
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistry
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionRegistry
 
 set_option autoImplicit false
 set_option Elab.async false
@@ -16,7 +16,7 @@ open SelectedCompilationPublicSessionDirectOutputCollection (selected_of_cast)
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open RecursiveNamedPublicScalarResults (ScalarOutput)
 open SelectedCompilationPhysicalProgramSupport (stagePrepared)
 

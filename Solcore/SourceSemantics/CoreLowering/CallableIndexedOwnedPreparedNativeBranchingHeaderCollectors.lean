@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPlaceLowering
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors
@@ -63,7 +64,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
 
 theorem collected
-    (edited : LocalView source view changed) (_avoids : Avoids source roots changed)
+    (edited : LocalView source view changed) (avoids : Avoids source roots changed)
     (unique : NodeOccurrencesUnique source)
     (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
       policy.lowerBinder view scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked view scope binder)
@@ -94,12 +95,14 @@ theorem collected
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand parentSite assignment.target.root operator))
     (unary : ∀ {assignment}, .assignBitNot assignment ∈ items → assignment.target.type = .word →
       faults (.invalidUnaryOperand .bitNot) (invalidUnary parentSite assignment.target.root))
+    (origins : ∀ {assignment operator rhs}, .assignValue assignment operator rhs ∈ items →
+      AssignmentDiagnosticOrigins.Occurs source parentSite assignment operator rhs)
     (accepted : SourceCoreLoops.lowerForItems policy parentSite fuel view scope items type reasonAt
       (fun _ => pure (LocalLoop.fallthrough type)) = .ok code)
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
     ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source
       (TypedCertificate source certificates) definitions administrative type (TypedForHeader.Fallthrough type)
-      context scope items code, ∀ registry, tree.ReachableErrors registry faults := by
+      context scope items code, ∀ registry, PreparedBranchingCatalogSites.HeaderSites invalidProjection missingDefault registry faults tree := by
   induction syntaxTree generalizing scope fuel code nativeType with
   | nil =>
     have same : code = LocalLoop.fallthrough type := by cases fuel <;> exact (Except.ok.inj accepted).symm
@@ -126,6 +129,7 @@ theorem collected
         (fun child member => reached child (by simpa [ForItemForm.references] using member))
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
+        (fun member => origins (List.mem_cons_of_mem _ member))
         generated (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
       rw [← identical]
       refine ⟨.uninitialized mono extended ordinary (binder_projected (binderPolicy scope binder mono ▸ projected))
@@ -167,6 +171,7 @@ theorem collected
         (fun child member => reached child (by simp [ForItemForm.references, member]))
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
+        (fun member => origins (List.mem_cons_of_mem _ member))
         generatedBody (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
       rw [← identical]
       refine ⟨.initialized mono extended ordinary initializerFound sourceType value originalAllocation originalAnnotation
@@ -191,7 +196,8 @@ theorem collected
       obtain ⟨tail, tailSites⟩ := ih shape.discard_tail fields closed residual sourceSignatures declarations
         (fun child member => reached child (by simp [ForItemForm.references, member]))
         (fun member => operands (List.mem_cons_of_mem _ member))
-        (fun member => unary (List.mem_cons_of_mem _ member)) generatedBody tailTyped
+        (fun member => unary (List.mem_cons_of_mem _ member))
+        (fun member => origins (List.mem_cons_of_mem _ member)) generatedBody tailTyped
       refine ⟨.discard found
         ⟨expressionNode, found, typed, children context fields declarations syntaxValue accessible found typed generated childTyped⟩
         tail, ?_⟩
@@ -200,7 +206,7 @@ theorem collected
         (value := ⟨expressionNode, found, typed, children context fields declarations syntaxValue accessible found typed generated childTyped⟩)
         (remaining := tail) (tailSites registry)
   | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile childSyntax remaining ih =>
-    obtain ⟨_sourceProfile, bare, restShape⟩ := shape.assign_tail
+    obtain ⟨sourceProfile, restShape⟩ := shape.assignment_tail
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -212,50 +218,39 @@ theorem collected
           (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      have accessible : Reaches source roots (.expression rhs) := reached _ (by simp [ForItemForm.references])
-      obtain ⟨rhsSyntax, rhsNode, rhsFound, rhsTyped⟩ := childSyntax rhs (by simp)
-      obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot, _layout, generated, _sameType, _profile, codeEq⟩ :=
-        CompatibleBareAssignment.of_lower bare compiled
-      have rhsNative := CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs
-        (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
-        (rhs := value.expression) (next := body) (output := LocalLoop.controlType type) (result := nativeType)
-        (operator := operator) (codeEq ▸ nativeTyped)
-      have rhsType : rhsNode.type = assignment.target.type := by
-        obtain ⟨actualNode, contains, actualType⟩ := rightTyped.stored_type
-        have sameNode := Option.some.inj (rhsFound.symm.trans (lookupExpression?_complete unique contains))
-        exact sameNode ▸ actualType
-      let originalHead : GenericAssignmentStatements.Head values source context
-          (TypedCertificate source certificates context) scope administrative definitions assignment operator rhs := {
-        prepared := prepared
-        index := index
-        codes := []
-        leaf := prepared.route.rootSourceType
-        lowered := value
-        node := rhsNode
-        invalid := invalidOperand parentSite assignment.target.root operator
-        shape := .bare bare _layout
-        slot := _slot
-        writable := _rootType ▸ writable binder ((rootBinder edited.metadata _).trans _binding)
-        found := rhsFound
-        right := ⟨rhsNode, rhsFound, rhsTyped, children context fields declarations rhsSyntax accessible rhsFound rhsTyped generated rhsNative⟩
-        rightView := by simpa only [rhsType] using _rawView
-        rightType := _sameType
-        profile := by rw [_rawView]; exact profile }
-      have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
+      have accessible : ∀ child ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+          Reaches source roots (.expression child) := by
+        intro child member
+        have edge : .expression child ∈ assignment.references ++ [.expression rhs] := by
+          rcases List.mem_cons.mp member with equal | member
+          · subst child; simp
+          · exact List.mem_append_left _ (CallableLambdaViewPlaceLowering.key_reference member)
+        exact reached _ (by simp only [List.flatMap_cons, ForItemForm.references]; exact List.mem_append_left _ edge)
+      have compiledOriginal := (CallableLambdaViewPlaceLowering.lower
+        (expression := policy.lowerExpression) (fuel := fuel) edited.metadata
+        (fun child member => expression_lookup edited avoids (accessible child (List.mem_cons_of_mem _ member)))).trans compiled
+      obtain ⟨originalHead, emittedOriginal, sameToken, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable rightTyped profile
+          (certificate := TypedCertificate source certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨approved, node, found, typed⟩ := childSyntax child member
+            obtain ⟨_, native⟩ := raw
+            exact ⟨node, found, node, found, typed,
+              children context fields declarations approved (accessible child member) found typed generated native⟩)
+          compiledOriginal nativeTyped
       rw [emittedOriginal]
       obtain ⟨tail, tailSites⟩ := ih restShape fields closed residual sourceSignatures declarations
         (fun child member => reached child (by simp [ForItemForm.references, member]))
         (fun member => operands (List.mem_cons_of_mem _ member))
-        (fun member => unary (List.mem_cons_of_mem _ member)) generatedBody
+        (fun member => unary (List.mem_cons_of_mem _ member))
+        (fun member => origins (List.mem_cons_of_mem _ member)) generatedBody
         (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))
       refine ⟨.assign originalHead tail, ?_⟩
       intro registry
-      refine .assign (head := originalHead) (remaining := tail) (tailSites registry) ⟨?_, ?_, operands (List.mem_cons_self) _sourceProfile⟩
-      · intro root resolved reason token count fault
-        have empty : originalHead.prepared.steps = [] := _layout.steps
-        rw [empty] at fault
-        cases fault
-      · exact fun nonempty => False.elim (nonempty _layout.steps)
+      exact .assign (head := originalHead) (remaining := tail) (tailSites registry)
+        (CallableIndexedOwnedPreparedBranchingCatalogSites.assignment_site
+          (origins List.mem_cons_self) sourceSignatures preparedAt (sameToken.symm ▸ operands List.mem_cons_self sourceProfile) registry)
   | @bitNot context assignment rest writable bare profile remaining ih =>
     obtain ⟨rawWord, _, restShape⟩ := shape.bitNot_tail
     cases fuel with
@@ -270,7 +265,8 @@ theorem collected
       obtain ⟨tail, tailSites⟩ := ih restShape fields closed residual sourceSignatures declarations
         (fun child member => reached child (by simp only [List.flatMap_cons]; exact List.mem_append_right _ member))
         (fun member => operands (List.mem_cons_of_mem _ member))
-        (fun member => unary (List.mem_cons_of_mem _ member)) generatedBody
+        (fun member => unary (List.mem_cons_of_mem _ member))
+        (fun member => origins (List.mem_cons_of_mem _ member)) generatedBody
         (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped))
       refine ⟨.bitNot head tail, fun registry => .bitNot (tailSites registry) ?_⟩
       simpa only [CompatibleBitNotStatements.Head.Errors, token] using unary List.mem_cons_self rawWord

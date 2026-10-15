@@ -10,7 +10,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedPub
 open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 open SelectedCompilationCertifiedPublicSession (Profiled)
 open SelectedCompilationStagePublicInputLifting
 open RecursiveNamedPublicScalarResults (ScalarOutput)

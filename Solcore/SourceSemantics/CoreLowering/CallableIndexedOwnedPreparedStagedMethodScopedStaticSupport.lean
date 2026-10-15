@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
@@ -83,9 +84,12 @@ abbrev Certificate
 structure Support (packet : Packet principal)
     (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)))
     (stages : Staging.Recursive.Registry) (semanticFaults : FunctionCalls.FaultRep) : Prop where
+  assignmentAuthority : Nonempty (PreparedAssignmentDiagnosticAuthority.SourcePort compiled
+    principal.sourceBody.source (fun site root => principal.cached.diagnostics.placeReason principal.named.signature.key site root none) (fun site root raw => principal.cached.diagnostics.placeReason principal.named.signature.key site root (some raw)))
   tree : ∀ child, stages.Closure principal.sourceFunction child →
     ∃ expressionSyntax : ExpressionId → Prop,
-      CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (faults := semanticFaults) compiled.indexed.layouts
+      CallableIndexedOwnedPreparedBranchingCatalogSites.Collected (fun site root => principal.cached.diagnostics.placeReason principal.named.signature.key site root none)
+        (fun site root raw => principal.cached.diagnostics.placeReason principal.named.signature.key site root (some raw)) (faults := semanticFaults) compiled.indexed.layouts
         principal.named.signature.key [] compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
         (fun error => .sourceAllocation (reprStr error)) (.initial compiled.compatible.checked)
         child.source expressionSyntax

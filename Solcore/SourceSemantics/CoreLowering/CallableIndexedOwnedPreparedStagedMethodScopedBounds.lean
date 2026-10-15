@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodScopedStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds
@@ -33,6 +34,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (support : Support principal packet headers stages semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  (functionTypes : FunctionRuntimeViews functions)
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
   {registry : SourceCoreRawMetadata.Registry} {child : Staging.Recursive.Scope}
   (selected : stages.Closure principal.sourceFunction child)
   {administrative : Core.Context} {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
@@ -113,8 +117,10 @@ private theorem prefix_agrees
         last, Value.type] using atType
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled registry
+    (fun reason token => faults (.semantic reason) token))
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
 /-- Actual parameter allocation supplies the entire Source body entry. -/
 theorem source_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -167,13 +173,21 @@ theorem source_continuation
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape child.source true
       principal.cached.compilation.statements := sourceEq ▸ packet.shape
   obtain ⟨expressionSyntax, collected⟩ := support.tree child selected
+  obtain ⟨assignmentAuthority⟩ := support.assignmentAuthority
+  have assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready
+      (values := .initial compiled.compatible.checked) functions (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1)
+      principal.sourceBody.source (fun site root => principal.cached.diagnostics.placeReason principal.named.signature.key site root none)
+      (fun site root raw => principal.cached.diagnostics.placeReason principal.named.signature.key site root (some raw)) registry
+      (fun reason token => faults (.semantic reason) token) :=
+    assignmentInterpretation assignmentAuthority functions (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1)
+  rw [← sourceEq] at assignmentDiagnostics
   have conditioned := CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history
   obtain ⟨flowValue, bodyStore, finalMap, finalWorld, evaluated, represented, heaps,
       maps, worlds, frame, metadata, returned, related, post⟩ :=
     CallableIndexedOwnedAdmittedStagedScopedImperativePreservation.preserves_at (compiled := compiled)
       bodyBridge (CallableIndexedOwnedPhysicalCanonicalState.bindings 1)
       (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport 1)
-      functions extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+      functions faithful observations extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedPhysicalCanonicalState.markedProducer model 1)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedPhysicalCanonicalState.readyAt_of_stableOwner (headers := headers) model 1 stable)
@@ -186,7 +200,7 @@ theorem source_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      unique collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
+      unique collected.tree (collected.sites registry) semantic assignmentDiagnostics rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt within) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted trace
   have controlClosed := Staging.Recursive.TypedControlBoundary.function
@@ -201,7 +215,7 @@ theorem source_continuation
     maps, worlds, frame, metadata, returned.base.val, related⟩
   simpa only [packet.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
 
-include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic in
+include support wellFormed selected keyPhysical beforeTyped argumentsTyped stable semantic functionTypes faithful observations assignmentInterpretation in
 /-- Native completion is inverted through the same real flow and footer. -/
 theorem native_continuation
     (extension : SourceCoreRawMetadata.Extends
@@ -255,6 +269,14 @@ theorem native_continuation
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape child.source true
       principal.cached.compilation.statements := sourceEq ▸ packet.shape
   obtain ⟨expressionSyntax, collected⟩ := support.tree child selected
+  obtain ⟨assignmentAuthority⟩ := support.assignmentAuthority
+  have assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready
+      (values := .initial compiled.compatible.checked) functions (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1)
+      principal.sourceBody.source (fun site root => principal.cached.diagnostics.placeReason principal.named.signature.key site root none)
+      (fun site root raw => principal.cached.diagnostics.placeReason principal.named.signature.key site root (some raw)) registry
+      (fun reason token => faults (.semantic reason) token) :=
+    assignmentInterpretation assignmentAuthority functions (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1)
+  rw [← sourceEq] at assignmentDiagnostics
   have conditioned := CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history
   have bodyTrace := entry.completed
   simp only [packet.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] at bodyTrace
@@ -265,7 +287,7 @@ theorem native_continuation
     CallableIndexedOwnedAdmittedStagedScopedImperativeFlow.reflects_at (compiled := compiled)
       bodyBridge (CallableIndexedOwnedPhysicalCanonicalState.bindings 1)
       (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport 1)
-      functions extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+      functions functionTypes faithful observations extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedPhysicalCanonicalState.markedProducer model 1)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedPhysicalCanonicalState.readyAt_of_stableOwner (headers := headers) model 1 stable)
@@ -278,7 +300,7 @@ theorem native_continuation
         rw [samePrefix] at meaning
         intro node
         exact meaning ⟨rfl, rfl, rfl⟩ (node := node))
-      graph collected.tree (collected.sites registry) semantic rfl shape originalTyping packet.sourceAt.projection
+      graph collected.tree (collected.sites registry) semantic assignmentDiagnostics rfl shape originalTyping packet.sourceAt.projection
       (Nat.le_of_lt strict) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted flowTrace
   have controlClosed := Staging.Recursive.TypedControlBoundary.function

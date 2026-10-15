@@ -40,6 +40,7 @@ theorem Items.closed_shape {policy : SourceCoreLoops.Policy} {source : TypedSour
   | discard _ _ _ ih => exact .discard (ih closed)
   | assigning | bitNotting => cases closed
   | assigned _ receipt _ ih => exact .assign receipt.sourceProfile receipt.bare (ih closed)
+  | projectedAssigned _ receipt _ ih => exact .assignProjected receipt.sourceProfile receipt.projected (ih closed)
   | bitNotted _ receipt _ ih => exact .bitNot receipt.sourceProfile receipt.bare (ih closed)
 
 private theorem arm_shapes {compilation : SourceCoreCompatibleDataMatches.Context}
@@ -94,6 +95,8 @@ theorem Tree.formed_shape {policy : SourceCoreLoops.Policy} {checked : SourceCor
     exact .absent (original_read (readPolicy ▸ read)) form (ih formed)
   | assigned read form _ _ receipt _ ih =>
     exact .assign (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.bare (ih formed)
+  | projectedAssigned read form _ _ receipt _ ih =>
+    exact .assignProjected (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.projected (ih formed)
   | bitNotted read form _ _ receipt _ ih =>
     exact .bitNot (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.bare (ih formed)
   | discard read form _ _ _ _ ih =>

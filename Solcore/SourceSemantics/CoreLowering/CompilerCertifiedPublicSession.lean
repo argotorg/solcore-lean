@@ -1,9 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerProgramAdmission
-import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionInitial
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProfiledPublicSession
 
 /-! Finite checks of the complete compiled cache supply the program certificate
 used by authentic public initialization. Each compiler receipt is reconstructed
-inside the producer; callers retain the original checking and startup receipts. -/
+inside the producer; callers retain the original checking and startup receipts.
+Whole-program profiles retain their actual checker and static profile in the
+prepared physical session model, including the evidence used on failures. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CertifiedPublicSession
@@ -22,10 +24,12 @@ theorem of_profile
     (member : entry ∈ recipe.compiled.indexed.entries)
     {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
     (checked : checkProgram raw checkingFuel = .ok recipe.compiled.sourceProgram) :
-    Nonempty (Issued recipe) := by
+    Nonempty (SelectedCompilationCertifiedPublicSession.Profiled recipe) := by
   obtain ⟨certificate⟩ := AcceptedCompilerProgramAdmission.of_profile
     (CallableMethodBodyCoherence.of_checked checked) wellFormed profile
-  exact of_checked certificate wellFormed prepared member checked
+  obtain ⟨issued⟩ := SelectedCompilationCertifiedPublicSession.of_checked certificate
+    (SelectedCompilationBodyTyping.Bodies.of_program wellFormed) prepared member checked
+  exact ⟨⟨issued, profile, ⟨raw, checkingFuel, checked⟩⟩⟩
 
 /-- Real bootstrap and startup select the original entry in the automatically
 issued catalog. Static profile checks replace a supplied program certificate. -/
@@ -50,12 +54,15 @@ theorem from_profile_initial_start
     (valid : Dynamic.ProgramEntryValid (Program.ofChecked recipe.compiled.sourceProgram) entry ⟨[]⟩ body)
     (ordinaryReturn : entry.instantiation.returnComptime = false)
     (ordinaryParameters : ∀ flag ∈ entry.instantiation.parameterComptime, flag = false) :
-    ∃ issued : Issued recipe, ∃ initial : Initial issued call,
+    ∃ issued : SelectedCompilationCertifiedPublicSession.Profiled recipe,
+      ∃ initial : SelectedCompilationCertifiedPublicSession.Initial issued.toIssued call,
       CallableNamedMetadata.Matches initial.header.named.specialized entry.instantiation := by
   obtain ⟨certificate⟩ := AcceptedCompilerProgramAdmission.of_profile
     (CallableMethodBodyCoherence.of_checked checked) wellFormed profile
-  exact from_initial_start checked compiled selected certificate wellFormed opened call
-    bootstrap fresh authority ready target valid ordinaryReturn ordinaryParameters
+  obtain ⟨issued, initial, matched⟩ := SelectedCompilationCertifiedPublicSession.from_initial_start
+    checked compiled selected certificate (SelectedCompilationBodyTyping.Bodies.of_program wellFormed)
+    opened call bootstrap fresh authority ready target valid ordinaryReturn ordinaryParameters
+  exact ⟨⟨issued, profile, ⟨raw, checkingFuel, checked⟩⟩, initial, matched⟩
 
 /-- A complete eligible cached row identifies the actual first root while the
 same compiler-derived certificate supplies its physical program support. -/
@@ -76,11 +83,14 @@ theorem from_profile_initial_row
     (fresh : bootstrap.FreshAt) (authority : bootstrap.ExportAuthorityAt)
     (ready : bootstrap.ReadyAt bootstrapFuel session)
     (row : EligibleRow recipe.compiled key) :
-    ∃ issued : Issued recipe, ∃ initial : Initial issued call,
+    ∃ issued : SelectedCompilationCertifiedPublicSession.Profiled recipe,
+      ∃ initial : SelectedCompilationCertifiedPublicSession.Initial issued.toIssued call,
       initial.header.named = row.named := by
   obtain ⟨certificate⟩ := AcceptedCompilerProgramAdmission.of_profile
     (CallableMethodBodyCoherence.of_checked checked) wellFormed profile
-  exact from_initial_row checked compiled selected certificate wellFormed opened call
-    bootstrap fresh authority ready row
+  obtain ⟨issued, initial, matched⟩ := SelectedCompilationCertifiedPublicSession.from_initial_row
+    checked compiled selected certificate (SelectedCompilationBodyTyping.Bodies.of_program wellFormed)
+    opened call bootstrap fresh authority ready row
+  exact ⟨⟨issued, profile, ⟨raw, checkingFuel, checked⟩⟩, initial, matched⟩
 
 end Solcore.SourceSemantics.CoreLowering.CertifiedPublicSession

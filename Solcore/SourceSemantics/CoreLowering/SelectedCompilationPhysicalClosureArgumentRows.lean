@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSuccessfulArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredNativePackReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredArgumentAlignment
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCallBounds
 
@@ -43,7 +43,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     sidecar site callee ids originalMetadata originalNode dispatch.row)
   (count : dispatch.row.entry.parameterCount = ids.length)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
@@ -73,7 +73,7 @@ theorem at_arguments
     (bundle : TypeSystem.Ty.productMany sourceTypes = parameter)
     (admitted : Admission bridge context reached)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (calleeRelated : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins
+    (calleeRelated : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins
       headers keys bodyRegistry registry semanticFaults profile index.mapping index.world
       (.function parameter result) (.closure function) carrier compiler.calleeCode.type)
     (represented : DataExpressionSequence.Values model index.mapping index.world
@@ -84,7 +84,7 @@ theorem at_arguments
     CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function index.heap sources ∧
     Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function ∧
     ∃ bindings parameterCore resultCore,
-      CallableIndexedOwnedPhysicalClosureAssociation.StaticMember headers keys bodyRegistry semanticFaults
+      CallableIndexedOwnedPreparedPhysicalClosureAssociation.StaticMember headers keys bodyRegistry semanticFaults
         index.mapping index.world function carrier bindings parameterCore resultCore ∧
       compiler.parameterType = parameterCore ∧ compiler.resultType = resultCore ∧
       CallableIndexedParameterMeaning.Arguments model index.mapping index.world bindings sources values := by
@@ -96,21 +96,21 @@ theorem at_arguments
   have valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function :=
     ⟨signatures.trans runtime.signatures, code.owner, code, code.requirement_ledger.idsUnique, evidence⟩
   obtain ⟨bindings, parameterCore, resultCore, member, nativeType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.closure_member profile calleeRelated function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.closure_member profile calleeRelated function rfl
   have sameTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters
     ((actualFunctionType ▸ compiler.callableType).trans nativeType)
   have nativeBundle : SourceCoreCompatibleCatalog.packTypes (compiler.codes.map (·.type)) =
       SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) :=
     (CompatibleExpressionConstructorNativeTyping.packed_type compiler.codes).symm.trans
-      (compiler.packedType.symm.trans (sameTypes.1.trans (member.forget.parameter_core profile)))
+      (compiler.packedType.symm.trans (sameTypes.1.trans (member.parameter_core profile)))
   obtain ⟨parameters, _result, _signatures, _code, _evidence, _captures⟩ := calleeTyped.closure_function_inv
   have sourceBundle : TypeSystem.Ty.productMany sourceTypes =
       TypeSystem.Ty.productMany (bindings.map (fun binding => binding.1.scheme.body)) := by
-    rw [member.forget.source_binders]
+    rw [member.source_binders]
     exact bundle.trans parameters
   have bindingArity : sources.length = bindings.length := by
     have retainedBinders : bindings.length = function.parameters.length := by
-      simpa only [List.length_map] using congrArg List.length member.forget.source_binders
+      simpa only [List.length_map] using congrArg List.length member.source_binders
     exact arity.trans retainedBinders.symm
   exact ⟨raw, valid, bindings, parameterCore, resultCore, member, sameTypes.1, sameTypes.2,
     CallableIndexedOwnedStoredArgumentAlignment.arguments_of_bundles bindings represented

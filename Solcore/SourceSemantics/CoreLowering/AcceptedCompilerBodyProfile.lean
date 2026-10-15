@@ -19,7 +19,8 @@ def HasReturn (source : TypedSource) (statements : List StatementId) : Prop :=
 def HeaderReady (source : TypedSource) (reached : ExpressionId → Prop) : ForItemForm → Prop
   | .letDecl binder initializer => binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
   | .expression expression => reached expression
-  | .assignValue assignment operator expression => Assignable source assignment operator ∧ reached expression
+  | .assignValue assignment operator expression => ValueAssignable source assignment operator ∧
+      ∀ child ∈ expression :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, reached child
   | .assignBitNot assignment => BitNotAssignable source assignment
 
 theorem header_forms {source reached items}
@@ -33,7 +34,8 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .returnStmt (some expression) => reached expression
   | .letDecl binder initializer =>
       binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
-  | .assignValue assignment operator expression => Assignable source assignment operator ∧ reached expression
+  | .assignValue assignment operator expression => ValueAssignable source assignment operator ∧
+      ∀ child ∈ expression :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, reached child
   | .expression expression _ => reached expression
   | .block _ => True
   | .ifThen condition _ _ => reached condition
@@ -76,6 +78,29 @@ def assignment? (source : TypedSource) (assignment : AssignmentResolution)
     else none
   else none
 
+def projectedAssignment? (source : TypedSource) (assignment : AssignmentResolution)
+    (operator : Solcore.Syntax.ValueAssignOp) : Option (PLift (ProjectedAssignable source assignment operator)) := do
+  if profile : operator = .equal ∨ assignment.target.type = .word then
+    if projected : assignment.target.projections ≠ [] then
+      match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+      | .error _ => none
+      | .ok binder => do
+        let ⟨route⟩ ← AcceptedProjectedAssignmentRoute.check source binder.scheme.body assignment.target.projections assignment.target.type
+        pure ⟨⟨profile, projected, by
+          intro actual accepted
+          cases Except.ok.inj (found.symm.trans accepted)
+          exact route⟩⟩
+    else none
+  else none
+
+def valueAssignment? (source : TypedSource) (assignment : AssignmentResolution)
+    (operator : Solcore.Syntax.ValueAssignOp) : Option (PLift (ValueAssignable source assignment operator)) :=
+  match assignment? source assignment operator with
+  | some ⟨bare⟩ => some ⟨.inl bare⟩
+  | none => do
+      let ⟨projected⟩ ← projectedAssignment? source assignment operator
+      pure ⟨.inr projected⟩
+
 def bitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
     : Option (PLift (BitNotAssignable source assignment)) := do
   if profile : assignment.target.type = .word then
@@ -104,8 +129,11 @@ def header? (source : TypedSource) (reached : ExpressionId → Prop) [DecidableP
   | expression expression => exact if present : reached expression then some ⟨present⟩ else none
   | assignValue assignment operator expression =>
     exact do
-      let ⟨target⟩ ← assignment? source assignment operator
-      if present : reached expression then pure ⟨⟨target, present⟩⟩ else none
+      let ⟨target⟩ ← valueAssignment? source assignment operator
+      let ⟨children⟩ ← allProof? reached (fun expression =>
+        if present : reached expression then some ⟨present⟩ else none)
+        (expression :: DataPlaceKeyOrder.sourceKeys assignment.target.projections)
+      pure ⟨⟨target, children⟩⟩
   | assignBitNot assignment => exact bitNotAssignment? source assignment
 
 def statement? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
@@ -126,10 +154,11 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
     else none
   case assignValue assignment operator expression =>
     exact do
-      let ⟨target⟩ ← assignment? source assignment operator
-      if present : reached expression then
-        pure ⟨by simpa only [StatementReady, form] using And.intro target present⟩
-      else none
+      let ⟨target⟩ ← valueAssignment? source assignment operator
+      let ⟨children⟩ ← allProof? reached (fun expression =>
+        if present : reached expression then some ⟨present⟩ else none)
+        (expression :: DataPlaceKeyOrder.sourceKeys assignment.target.projections)
+      pure ⟨by simpa only [StatementReady, form] using And.intro target children⟩
   case assignBitNot assignment =>
     exact do
       let ⟨target⟩ ← bitNotAssignment? source assignment
@@ -248,8 +277,22 @@ theorem header_facts {policy : SourceCoreLoops.Policy} {source : TypedSource}
     refine ⟨tail.1, tail.2.1, ?_⟩
     intro actual member
     rcases List.mem_cons.mp member with rfl | member
-    · exact head.2
+    · exact head.2 _ List.mem_cons_self
     · exact tail.2.2 actual member
+
+  | projectedAssigned remaining receipt route ih =>
+    have head := profile _ List.mem_cons_self
+    have tail := ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
+    refine ⟨tail.1, tail.2.1, ?_⟩
+    intro actual member
+    rcases List.mem_append.mp member with key | member
+    · apply head.2 actual.expression
+      apply List.mem_cons_of_mem
+      rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated]
+      exact List.mem_map.mpr ⟨actual, key, rfl⟩
+    · rcases List.mem_cons.mp member with rfl | member
+      · exact head.2 _ List.mem_cons_self
+      · exact tail.2.2 actual member
 
   | bitNotting remaining accepted ih =>
     exact False.elim (ready.1 (profile _ List.mem_cons_self))
@@ -332,8 +375,23 @@ theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompa
       refine ⟨next.1, next.2.1, ?_⟩
       intro actual member
       rcases List.mem_cons.mp member with rfl | member
-      · exact original.2
+      · exact original.2 _ List.mem_cons_self
       · exact next.2.2 actual member
+  | projectedAssigned read form statementType remaining receipt route ih =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have next := ih ready (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_append.mp member with key | member
+      · apply original.2 actual.expression
+        apply List.mem_cons_of_mem
+        rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated]
+        exact List.mem_map.mpr ⟨actual, key, rfl⟩
+      · rcases List.mem_cons.mp member with rfl | member
+        · exact original.2 _ List.mem_cons_self
+        · exact next.2.2 actual member
   | bitNotted read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       exact ih ready (finish.tail found (by simp [form, stopsHere]))

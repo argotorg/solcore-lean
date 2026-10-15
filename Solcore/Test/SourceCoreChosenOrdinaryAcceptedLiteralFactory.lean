@@ -109,7 +109,7 @@ theorem chosen_at_root
       inputs, property, syntaxEq, certificatesEq, readFuelEq, entryEq⟩ :=
     CallableIndexedOwnedSamePolicyCompilerLeafReceipts.lambda_of_accepted_with_inputs root.root
       ⟨fixture.packet.diagnostics, fixture.packet.diagnosticsFound,
-        by unfold effectiveDiagnostics; split <;> rfl⟩
+        by unfold effectiveDiagnostics; split <;> exact ⟨rfl, rfl⟩⟩
       (runtimeContext fixture.packet) [] inventory.contracts (LambdaMetadataViews.MetadataView.refl _)
       found fixture.graph.lambdaForm rawType rawOrdinary fixture.graph.lambdaCoercions found rfl
       readMetadata.owner fixture.graph.lambdaRequirements fixture.graph.lambdaCoercions ordinary read accepted

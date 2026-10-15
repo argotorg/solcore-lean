@@ -6,7 +6,7 @@ set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialLifting
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CompatibleEquality CoreProof
 open CallableIndexedHistory CallableIndexedAllocationCompletion
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open SelectedCompilationStageLiftBounds (LiftsAt)
@@ -320,7 +320,15 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
       exact ⟨_, result, finalHeap,
         CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_assignment snapshot measured write restTrace, restAdapted⟩
 
-include definitions registered transport extension in
+variable {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations compiled.compatible.checked.catalog functions identities)
+  {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+  {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+  (diagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked) functions callerProtocol invocation.source
+    invalidProjection missingDefault receiving (fun reason token => faults (.semantic reason) token))
+
+include definitions registered transport extension faithful observations diagnostics in
 /-- Empty initialization enters the same finite loop. Its post-header lifting
 is built from the actual compiler tree, including all original allocations. -/
 theorem done {budget : Nat} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
@@ -348,9 +356,8 @@ theorem done {budget : Nat} {context : SourceSemantics.Context} {scope : SourceC
       invocation.source (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative
       type (TypedForHeader.Fallthrough type) context scope postItems postCode)
-    {diagnosticPolicy : AssignmentDiagnosticPolicy}
-    {catalogRegistry : SourceCoreRawMetadata.Registry} {catalogFaults : FunctionCalls.FaultRep}
-    (postErrors : postTree.ErrorsFor diagnosticPolicy catalogRegistry catalogFaults)
+    {catalogFaults : FunctionCalls.FaultRep}
+    (postErrors : PreparedBranchingCatalogSites.HeaderSites invalidProjection missingDefault receiving catalogFaults postTree)
     (semantic : ∀ reason token, catalogFaults reason token → faults (.semantic reason) token)
     (postShape : CallableIndexedOwnedPreparedStagedBranchingTree.ItemShape postItems)
     (postTyped : CallableIndexedOwnedPreparedStagedForItemsTyping.Facts invocation.source control context postItems) :
@@ -360,14 +367,14 @@ theorem done {budget : Nat} {context : SourceSemantics.Context} {scope : SourceC
   have postLift : ItemsLifts (administrative := administrative) (receiving := receiving) (frame := frame) (globals := globals)
       (stages := stages) (invocation := invocation) (context := context) (scope := scope)
       bridge functions condition postItems budget :=
-    SelectedCompilationStageForHeaderLifting.lifts bridge functions definitions registered marked.toOrdinary
+    SelectedCompilationStageForHeaderLifting.lifts bridge functions faithful observations definitions registered marked.toOrdinary
       condition markedAcquire transport extension children preservation unique postTree postShape postTyped
   have postPreservation (n : Nat) : CallableIndexedOwnedAdmittedStagedForPostContracts.Preserves
       (administrative := administrative) (receiving := receiving) (frame := frame) (globals := globals)
       (stages := stages) (invocation := invocation) (faults := faults)
       bridge functions condition context scope postItems expected type postCode n := by
-    exact CallableIndexedOwnedAdmittedStagedForHeaderPreservation.preserves_at bridge bindings transport functions extension
-      definitions registered marked condition markedAcquire (fun c m _ => preservation c m) unique postTree postErrors semantic postShape postTyped
+    exact CallableIndexedOwnedAdmittedStagedForHeaderPreservation.preserves_at bridge bindings transport functions faithful observations extension
+      definitions registered marked condition markedAcquire diagnostics (fun c m _ => preservation c m) unique postTree postErrors semantic postShape postTyped
   intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
   cases trace with
   | initializerFault initial => cases initial

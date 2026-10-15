@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedParentBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationGlobalCallPrefixes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
@@ -73,7 +74,7 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
   (calleeFound : source.lookupExpression? callee = some calleeNode)
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
@@ -106,12 +107,12 @@ theorem reflects_global
     calleePost, calleeTyped, calleeTrace, accepted, argumentsTrace, represented, calleeRelated,
     _callView, boundary, heaps, maps, worlds, frame, heapMetadata, argumentsTyped, argumentMetadata, ⟨reached, related, admitted⟩,
     suffixSize, suffix, strict⟩ := global
-  have origin : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins headers keys bodyRegistry
+  have origin : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins headers keys bodyRegistry
       completion.result.context.registry semanticFaults profile finalMap finalWorld
       calleeNode.type (.global function) carrier compiler.calleeCode.type := by
     exact calleeRelated
   obtain ⟨originalType, ⟨association⟩, _runtimeType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.named_member profile origin function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.named_member profile origin function rfl
   let owner := association.owner
   let header := association.header
   let identity := association.identity
@@ -222,12 +223,12 @@ theorem preserves_global
     originalNode, originalMetadata, calleePost, calleeTyped, firstGate, argumentsNative,
     represented, calleeRelated, _callView, boundary, heaps, maps, worlds,
     frame, heapMetadata, argumentsTyped, argumentMetadata, reached, related, admitted⟩ := prefixResult
-  have origin : CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins headers keys bodyRegistry
+  have origin : CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins headers keys bodyRegistry
       completion.result.context.registry semanticFaults profile finalMap finalWorld
       calleeNode.type (.global function) carrier compiler.calleeCode.type := by
     exact calleeRelated
   obtain ⟨originalType, ⟨association⟩, _runtimeType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.named_member profile origin function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.named_member profile origin function rfl
   let owner := association.owner
   let header := association.header
   let identity := association.identity

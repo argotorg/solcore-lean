@@ -100,7 +100,7 @@ theorem Tree.complete_of_formed {policy : SourceCoreLoops.Policy}
     have next := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form] at next
     exact ih formed next
-  | assigned read form _ _ _ _ ih =>
+  | assigned read form _ _ _ _ ih | projectedAssigned read form _ _ _ _ ih =>
     have next := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form] at next
     exact ih formed next

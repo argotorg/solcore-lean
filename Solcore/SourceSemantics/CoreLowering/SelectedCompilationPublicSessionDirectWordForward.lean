@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicClosureHistory
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionState
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicScalarResults
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicDirectCallableHistory
@@ -20,7 +20,7 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers
 open CallableIndexedOwnedPreparedBootstrapRootState (keys)
 open CallableIndexedOwnedFunctionValues (Header)
 open RecursiveNamedPublicFunctionHistory (Entry)
-open RecursiveNamedPublicPhysicalSessionState
+open SelectedCompilationPublicSessionState
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {inputs : List (Input compiled)} {rows : Inventory inputs}

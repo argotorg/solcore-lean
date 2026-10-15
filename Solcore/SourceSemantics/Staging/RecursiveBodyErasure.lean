@@ -78,6 +78,25 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
       (.assignBitNot contains form (.intro (snapshot.resolves _ _ _ _) write)) nextIH
   case bitNotBareFault contains form _bare failed =>
     exact StatementsPlain.head_fault (.assignBitNot contains form failed)
+  case assignProjected contains form _projected keys snapshot child write _next _keysIH _childIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
+      (.assignValue contains form (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH
+  case assignProjectedRootFault contains form _projected failed =>
+    exact StatementsPlain.head_fault (.assignValue contains form (.target failed.source))
+  case assignProjectedKeysFault contains form _projected ready keys _keysIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.target (ready.key_fault keys.semanticFault_plain)))
+  case assignProjectedGetterFault contains form _projected keys failed _keysIH =>
+    exact StatementsPlain.head_fault (.assignValue contains form (.target (failed.source keys.values_plain)))
+  case assignProjectedRhsFault contains form _projected keys snapshot child _keysIH _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.rhs (snapshot.resolves keys.values_plain) child.semanticFault_plain))
+  case assignProjectedWriteFault contains form _projected keys snapshot child failed _keysIH _childIH =>
+    exact StatementsPlain.head_fault (.assignValue contains form (failed.source (snapshot.resolves keys.values_plain) child.value_plain))
   case assignBare contains form snapshot child write _next _childIH nextIH =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
@@ -208,6 +227,24 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case bitNot snapshot write _next nextIH =>
     exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
   case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+  case projectedAssignment _projected keys snapshot child write _next _keysIH _childIH nextIH =>
+    exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH
+  case projectedAssignmentRootFault _projected failed =>
+    exact .head (.assignValue (.target failed.source))
+  case projectedAssignmentKeysFault _projected ready keys _keysIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.target (ready.key_fault keys.semanticFault_plain)))
+  case projectedAssignmentGetterFault _projected keys failed _keysIH =>
+    exact .head (.assignValue (.target (failed.source keys.values_plain)))
+  case projectedAssignmentRhsFault _projected keys snapshot child _keysIH _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.rhs (snapshot.resolves keys.values_plain) child.semanticFault_plain))
+  case projectedAssignmentWriteFault _projected keys snapshot child failed _keysIH _childIH =>
+    exact .head (.assignValue (failed.source (snapshot.resolves keys.values_plain) child.value_plain))
   case assignment snapshot child write next _childIH nextIH =>
     exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
   case assignmentFailure snapshot child _childIH =>
@@ -345,6 +382,24 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
   case bitNot snapshot write _next nextIH =>
     exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
   case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+  case projectedAssignment _projected keys snapshot child write _next _keysIH _childIH nextIH =>
+    exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH
+  case projectedAssignmentRootFault _projected failed =>
+    exact .head (.assignValue (.target failed.source))
+  case projectedAssignmentKeysFault _projected ready keys _keysIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.target (ready.key_fault keys.semanticFault_plain)))
+  case projectedAssignmentGetterFault _projected keys failed _keysIH =>
+    exact .head (.assignValue (.target (failed.source keys.values_plain)))
+  case projectedAssignmentRhsFault _projected keys snapshot child _keysIH _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.rhs (snapshot.resolves keys.values_plain) child.semanticFault_plain))
+  case projectedAssignmentWriteFault _projected keys snapshot child failed _keysIH _childIH =>
+    exact .head (.assignValue (failed.source (snapshot.resolves keys.values_plain) child.value_plain))
   case assignment snapshot child write next _childIH nextIH =>
     exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
   case assignmentFailure snapshot child _childIH =>

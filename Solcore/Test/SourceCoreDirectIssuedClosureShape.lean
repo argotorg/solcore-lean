@@ -74,6 +74,7 @@ private theorem returned_expression
     rw [form] at impossible
     cases impossible
   | assignBare contains otherForm _ _ _ _
+  | assignProjected contains otherForm _ _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible

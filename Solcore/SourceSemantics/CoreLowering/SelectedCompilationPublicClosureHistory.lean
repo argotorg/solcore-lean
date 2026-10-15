@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalHistory
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicHistoryArgumentsReceiving
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 
 /-! Public history is instantiated directly with positive physical closure
 origins. Original export and reimport receipts preserve those origins through
@@ -21,7 +21,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {profile : compiled.compatible.checked.catalog.callableContracts = true}
   {anchor : Header compiled (Program.ofChecked compiled.sourceProgram)}
 
-local notation "rootFunctions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile
+local notation "rootFunctions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile
 
 abbrev History {artifact : Artifact} (session : Session artifact)
     (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (store : Store)

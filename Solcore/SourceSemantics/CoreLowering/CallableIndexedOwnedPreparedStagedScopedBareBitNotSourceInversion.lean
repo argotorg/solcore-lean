@@ -51,6 +51,12 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | ifReturned actual same _ _ | ifFault actual same _ _ | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | letFault actual same _ _
+  | assignProjected actual same _ _ _ _ _ _
+  | assignProjectedRootFault actual same _ _
+  | assignProjectedKeysFault actual same _ _ _
+  | assignProjectedGetterFault actual same _ _ _
+  | assignProjectedRhsFault actual same _ _ _ _
+  | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _
   | assignBareFault actual same _ _ | assignBareUnbound actual same _ _
   | assignBareDangling actual same _ _ _ =>

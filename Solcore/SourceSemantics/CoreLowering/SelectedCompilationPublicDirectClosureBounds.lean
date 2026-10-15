@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalClosureApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -86,19 +87,19 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
       (SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension) support.bodies support.bodySupport
       support.closurePackets support.closureSupport support.owners support.methods rfl
   obtain ⟨bindings, actualParameter, actualResult, ⟨association⟩, nativeType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.closure_member support.profile calleeRelated function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.closure_member support.profile calleeRelated function rfl
   have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters nativeType
   obtain ⟨parameterEq, resultEq, signatures, code, covers, _captures⟩ := calleeTyped.closure_function_inv
   have sourceBundle : parameter = TypeSystem.Ty.productMany
       (bindings.map (fun binding => binding.1.scheme.body)) := by
-    rw [association.original.source_binders]
+    rw [association.source_binders]
     exact parameterEq
   have packed := packedRelated
   rw [sourceBundle] at packed
   obtain ⟨sources, values, packing, nativeEq, represented⟩ :=
-    RecursivePublicPackedArguments.arguments bindings association.original.projected_bindings packed
+    RecursivePublicPackedArguments.arguments bindings association.projected_bindings packed
   have binderLength : bindings.length = function.parameters.length := by
-    simpa only [List.length_map] using congrArg List.length association.original.source_binders
+    simpa only [List.length_map] using congrArg List.length association.source_binders
   have arity : sources.length = function.parameters.length := represented.length.1.symm.trans binderLength
   have argumentsTyped := packing.unpackTypes
     (parameterEq ▸ packedTyped) (by simpa only [List.length_map] using arity)
@@ -112,7 +113,8 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
     exact RecursiveNamedPublicDirectClosureApplicationBounds.application_tail completed
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
-    SelectedCompilationPhysicalClosureApplicationBounds.application_reflects (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
+    SelectedCompilationPhysicalClosureApplicationBounds.application_reflects
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
       support.profile association (support.closurePackets association) (support.closureSupport association)
       caller raw represented heaps physical support.owners stable runtime
       valid size (fun childSize _ => children childSize) evaluation (Nat.le_refl _)
@@ -148,20 +150,20 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
       (SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension) support.bodies support.bodySupport
       support.closurePackets support.closureSupport support.owners support.methods
   obtain ⟨bindings, actualParameter, actualResult, ⟨association⟩, nativeType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.closure_member support.profile calleeRelated function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.closure_member support.profile calleeRelated function rfl
   have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters nativeType
   obtain ⟨parameterEq, resultEq, signatures, code, covers, _captures⟩ := calleeTyped.closure_function_inv
   have sourceBundle : parameter = TypeSystem.Ty.productMany
       (bindings.map (fun binding => binding.1.scheme.body)) := by
-    rw [association.original.source_binders]
+    rw [association.source_binders]
     exact parameterEq
   have packed := packedRelated
   rw [sourceBundle] at packed
 
   obtain ⟨decodedSources, values, decodedPacking, nativeEq, represented⟩ :=
-    RecursivePublicPackedArguments.arguments bindings association.original.projected_bindings packed
+    RecursivePublicPackedArguments.arguments bindings association.projected_bindings packed
   have binderLength : bindings.length = function.parameters.length := by
-    simpa only [List.length_map] using congrArg List.length association.original.source_binders
+    simpa only [List.length_map] using congrArg List.length association.source_binders
   have decodedArity : decodedSources.length = function.parameters.length :=
     represented.length.1.symm.trans binderLength
   have sameSources : decodedSources = sources :=
@@ -173,7 +175,8 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
     argumentsTyped packing parameterEq.symm arity
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
-    SelectedCompilationPhysicalClosureApplicationBounds.application_preserves (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
+    SelectedCompilationPhysicalClosureApplicationBounds.application_preserves
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support receiver extension)
       support.profile association (support.closurePackets association) (support.closureSupport association)
       caller raw represented heaps physical support.owners stable runtime
       sourceSize (fun childSize _ => children childSize) trace (Nat.le_refl _)

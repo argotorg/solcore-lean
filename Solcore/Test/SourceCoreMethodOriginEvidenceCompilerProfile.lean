@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreMethodOriginEvidenceCertifiedSequence
+import Solcore.Test.SourceCoreMethodOriginEvidenceSelectedCertifiedSequence
 import Solcore.Test.SourceCoreMethodOriginEvidenceFuelFixture
 import Solcore.SourceSemantics.CoreLowering.CompilerCertifiedPublicSession
 
@@ -10,8 +10,9 @@ set_option Elab.async false
 set_option maxHeartbeats 5000000
 namespace Tests.SourceCoreMethodOriginEvidence.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
-open Certified
-open CertifiedPublicSession (Issued)
+open SelectedCertified
+open Tests.SourceCoreMethodOriginEvidence.Certified (selected_row header_of_member)
+open SelectedCompilationCertifiedPublicSession (Issued)
 
 structure Observed (fixture : CompiledFixture) where
   value : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled
@@ -31,13 +32,14 @@ theorem first_meaning
     (stages : ObservedStages fixture observed.wordRow.toObservedRow)
     (first : ObservedPublicRun fixture observed.wordRow.toObservedRow) :
     ∃ issued : Issued fixture.recipe, Nonempty (FirstMeaning issued stages first) := by
-  obtain ⟨issued, initial, namedEq⟩ := CertifiedPublicSession.from_profile_initial_row
+  obtain ⟨profiled, initial, namedEq⟩ := CertifiedPublicSession.from_profile_initial_row
     (by rw [fixture.sameProgram]; exact checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
     fixture.issued profile.value fixture.source_wellFormed first.opened
     first.as_function_call.toCall.toStartedCall first.bootstrap first.fresh first.authority
     (show first.bootstrap.ReadyAt 102400 first.session from .single first.ready)
     (selected_row observed.wordRow.toObservedRow)
+  let issued := profiled.toIssued
   obtain ⟨actual, actualEq⟩ := header_of_member observed.wordRow.toObservedRow issued.catalog.rows
     initial.start.selected.member namedEq
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
@@ -96,7 +98,7 @@ theorem closed_sequence_forward_meaning
     (sequence : ObservedSequence fixture observed) :
     ∃ (issued : Issued fixture.recipe)
       (meaning : SequenceMeaning issued wordStages boolStages useWordStages useBoolStages sequence),
-      Certified.ForwardMeaning meaning := by
+      SelectedCertified.ForwardMeaning meaning := by
   obtain ⟨issued, ⟨meaning⟩⟩ := sequence_meaning wordStages boolStages useWordStages useBoolStages profile checked sequence
   exact ⟨issued, meaning, meaning.forward⟩
 

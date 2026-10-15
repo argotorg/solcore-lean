@@ -67,7 +67,7 @@ theorem ActualHeader.support {fixture : CompiledFixture} {observed : ObservedFac
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) := by
   apply Nonempty.intro
   apply CallableIndexedOwnedPreparedNamedBranchingCollectors.of_imperative_compiler actual.prepared actual.aligned
-    fixture.recipePrepared fixture.source_wellFormed complete (bootstrap_zero fixture.recipe.compiled)
+    fixture.recipePrepared actual.diagnostic fixture.source_wellFormed complete (bootstrap_zero fixture.recipe.compiled)
     observed.entryMember receipt
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic
       actual.prepared actual.aligned actual.diagnostic receiver)

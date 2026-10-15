@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedInvocationPreservation
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedScopeCoherence
@@ -460,6 +461,7 @@ theorem preserves_root
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child rootFaults size := by
     intro child childSelected
     exact CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       (namedSupport header selected.member) profile wellFormed childSelected extension
       (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
         (profile := profile) (closurePackets := fun association => (chosen association).1)
@@ -555,6 +557,7 @@ theorem reflects_root
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child rootFaults size := by
     intro child childSelected
     exact CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       (namedSupport header selected.member) profile wellFormed childSelected extension
       (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
         (profile := profile) (closurePackets := fun association => (chosen association).1)

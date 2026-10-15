@@ -15,7 +15,7 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedIndirectSourceAdapters (Prepared SourceParent)
 open CallableIndexedOwnedContextualDiagnosticSources (SourceView)
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
-open CallableIndexedOwnedPhysicalClosureAssociation (Association)
+open CallableIndexedOwnedPreparedPhysicalClosureAssociation (Association)
 open SelectedCompilationPhysicalClosureStaticSupport (PacketFor SupportFor)
 open CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds (Point Port)
 open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
@@ -54,16 +54,16 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
   (closurePackets : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-      bindings parameterCore resultCore), PacketFor association.original stages)
+      bindings parameterCore resultCore), PacketFor association stages)
   (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-      bindings parameterCore resultCore), SupportFor association.original stages (closurePackets association))
+      bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
   (namedTerminals : ∀ header, header ∈ headers → Body header)
 
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
@@ -73,9 +73,12 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 variable (semantic : ∀ reason token, semanticFaults reason token →
   CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled
+    completion.result.context.registry (fun reason token =>
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token))
 
 include physical owners bridge receiver stagePrepared sourceEq profile bodyTyping certificates runtime unique
-  actualFunctionType observations closurePackets closureSupport namedTerminals semantic in
+  actualFunctionType observations closurePackets closureSupport namedTerminals semantic assignmentInterpretation in
 /-- Reuse the original whole-call producer at the supplied genuine Source
 grade. The returned caller state and post are retained literally. -/
 theorem preserves
@@ -118,6 +121,7 @@ theorem preserves
     ⟨compiler.original, lookupExpression?_sound compiler.found, compiler.originalForm,
       port.sourceParent.requirements, port.sourceParent.coercions⟩
   exact (SelectedCompilationPhysicalIndirectCallBounds.preserves_parent (semantic := semantic)
+    (assignmentInterpretation := assignmentInterpretation)
     bridge physical owners receiver compiler port.prepared stagePrepared rfl occurrence initial port.view port.guardFrame
     profile calleeCertified port.calleeFound sourceTyped environments heaps locals agrees actualTyped
     admitted port.caller port.originalUnique port.sourceParent tree unique parentTyped
@@ -127,7 +131,7 @@ theorem preserves
     namedTerminals namedChildren trace (Nat.le_refl _)).2
 
 include physical owners bridge receiver stagePrepared sourceEq profile bodyTyping certificates runtime unique
-  actualFunctionType observations closurePackets closureSupport namedTerminals semantic in
+  actualFunctionType observations closurePackets closureSupport namedTerminals semantic assignmentInterpretation in
 /-- The native completion keeps its independent Source grade and exact
 staged fault scope. Only the duplicate native evaluation witness is omitted. -/
 theorem reflects
@@ -181,6 +185,7 @@ theorem reflects
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, _evaluated,
     represented, finalHeaps, maps, worlds, frame, metadataExtended, reached, related, post⟩ :=
     SelectedCompilationPhysicalIndirectCallBounds.reflects_parent (semantic := semantic)
+      (assignmentInterpretation := assignmentInterpretation)
       bridge physical owners receiver compiler port.prepared stagePrepared rfl occurrence initial port.view port.guardFrame
       profile calleeCertified port.calleeFound sourceTyped environments heaps locals agrees actualTyped
       admitted port.caller port.originalUnique port.sourceParent tree unique parentTyped

@@ -21,7 +21,7 @@ theorem of_prepared {row : SourceSpecialization.SpecializedFunction}
   obtain ⟨issued, present, lowered⟩ := receipt.actual
   refine ⟨issued, present, ?_⟩
   rw [lowered]
-  cases compiled.indexed.base.callableContext <;> rfl
+  cases compiled.indexed.base.callableContext <;> exact ⟨rfl, rfl⟩
 
 /-- Actual method cache issuance has the same complete table provenance. -/
 theorem of_cached {row : SourceSpecialization.SpecializedFunction}
@@ -31,7 +31,7 @@ theorem of_cached {row : SourceSpecialization.SpecializedFunction}
   obtain ⟨issued, present, lowered⟩ := receipt.actual
   refine ⟨issued, present, ?_⟩
   rw [lowered]
-  cases compiled.indexed.base.callableContext <;> rfl
+  cases compiled.indexed.base.callableContext <;> exact ⟨rfl, rfl⟩
 
 /-- The exact same retained compilation selects its actual own table. -/
 theorem compilation_member (compilation : Compilation compiled.indexed named diagnostics namedCode)
@@ -39,7 +39,7 @@ theorem compilation_member (compilation : Compilation compiled.indexed named dia
     ∃ issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked),
       compiled.indexed.base.diagnostics = some issued ∧
       compilation.own ∈ issued.program.base.functions := by
-  obtain ⟨issued, present, sameBase⟩ := receipt
+  obtain ⟨issued, present, sameBase, _samePlaces⟩ := receipt
   have selected := compilation.diagnostic
   rw [sameBase] at selected
   exact ⟨issued, present, List.mem_of_find?_eq_some selected⟩
@@ -51,7 +51,7 @@ theorem assignments_prepared {index : Nat}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
     (receipt : IssuedAt compiled.indexed diagnostics) :
     ∃ first, SourceCoreAssignmentFaultSites.prepare (source named) first = .ok compilation.own.assignments := by
-  obtain ⟨issued, present, sameBase⟩ := receipt
+  obtain ⟨issued, present, sameBase, _samePlaces⟩ := receipt
   obtain ⟨root, sources, accepted⟩ := CallableIndexedOwnedPublicDiagnosticReceipts.compiled_diagnostics compiled present
   have found := compilation.diagnostic
   rw [sameBase] at found

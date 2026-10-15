@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedPhysicalLambdaFormationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalLambdaFormationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedReturnLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts
@@ -25,7 +27,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {receiving bodyRegistry : SourceCoreRawMetadata.Registry}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
   {faults : RecursiveStageMeaning.FaultRep}
-local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
 structure Support (header : Header compiled (Program.ofChecked compiled.sourceProgram))
@@ -34,10 +36,15 @@ structure Support (header : Header compiled (Program.ofChecked compiled.sourcePr
     (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
     terminal.expression terminal.receipt.child
   formations : ∀ child, stages.Closure header.function child →
-    Nonempty (OrdinaryFormation (registry := bodyRegistry) (faults := semanticFaults)
-      header header.context child.evidence
-      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
-      terminal.expression terminal.receipt.child)
+    Nonempty (Sum
+      (OrdinaryFormation (registry := bodyRegistry) (faults := semanticFaults)
+        header header.context child.evidence
+        (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+        terminal.expression terminal.receipt.child)
+      (PreparedBranchingLambdaFormation.Formation
+        header header.context child.evidence
+        (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+        terminal.expression terminal.receipt.child))
 
 variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
   {terminal : Terminal header}
@@ -71,12 +78,21 @@ theorem preserves {budget : Nat} :
     rw [static.point] at point
     obtain ⟨rfl, rfl, rfl⟩ := point
     obtain ⟨formation⟩ := static.formations child selected
-    exact SelectedCompilationPhysicalLambdaFormationBounds.preserves
-      header owner header.context child profile globals
-      (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
-      (by rw [stages.source selected]; exact header.agreement.source)
-      (by rw [stages.source selected]; exact header.unique)
-      runtime covers faults childSize ⟨formation⟩
+    cases formation with
+    | inl formation =>
+      exact SelectedCompilationPhysicalLambdaFormationBounds.preserves
+        header owner header.context child profile globals
+        (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+        (by rw [stages.source selected]; exact header.agreement.source)
+        (by rw [stages.source selected]; exact header.unique)
+        runtime covers faults childSize ⟨formation⟩
+    | inr formation =>
+      exact SelectedCompilationPreparedPhysicalLambdaFormationBounds.preserves
+        header owner header.context child profile globals
+        (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+        (by rw [stages.source selected]; exact header.agreement.source)
+        (by rw [stages.source selected]; exact header.unique)
+        runtime covers faults childSize ⟨formation⟩
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps,
     maps, worlds, frame, metadata, reached, related, post⟩ :=
     SelectedCompilationNamedTerminalBounds.preserves_body
@@ -114,11 +130,19 @@ theorem reflects {budget : Nat} :
     rw [static.point] at point
     obtain ⟨rfl, rfl, rfl⟩ := point
     obtain ⟨formation⟩ := static.formations child selected
-    exact SelectedCompilationPhysicalLambdaFormationBounds.reflects
-      header owner header.context child profile globals
-      (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
-      (by rw [stages.source selected]; exact header.agreement.source)
-      runtime covers faults childSize ⟨formation⟩
+    cases formation with
+    | inl formation =>
+      exact SelectedCompilationPhysicalLambdaFormationBounds.reflects
+        header owner header.context child profile globals
+        (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+        (by rw [stages.source selected]; exact header.agreement.source)
+        runtime covers faults childSize ⟨formation⟩
+    | inr formation =>
+      exact SelectedCompilationPreparedPhysicalLambdaFormationBounds.reflects
+        header owner header.context child profile globals
+        (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+        (by rw [stages.source selected]; exact header.agreement.source)
+        runtime covers faults childSize ⟨formation⟩
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, matched, result, finalHeaps,
     maps, worlds, frame, metadata, reached, related, post⟩ :=
     SelectedCompilationNamedTerminalBounds.reflects_body

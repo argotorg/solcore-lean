@@ -73,7 +73,7 @@ theorem named_application (budget : Nat)
     represented, calleePayload, _callView, boundary, heaps, _maps, _worlds,
     _frame, _heapMetadata, argumentsTyped, argumentMetadata, reached, _related, admitted⟩ := prefixResult
   obtain ⟨rawType, ⟨association⟩, _nativeType⟩ :=
-    CallableIndexedOwnedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleePayload function rfl
+    CallableIndexedOwnedPreparedPhysicalCellOrigins.PayloadOrigins.named_member support.profile calleePayload function rfl
   let header := association.header
   let packet := support.bodies header association.member
   have certified := support.certificates header association.member

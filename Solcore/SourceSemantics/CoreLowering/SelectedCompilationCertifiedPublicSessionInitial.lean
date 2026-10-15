@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedProgramCertificates
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionRows
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionInitialForward
 
@@ -9,7 +10,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPubli
 open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedFunctionValues (Header)
-open RecursiveNamedPublicPhysicalSessionState (StartedCall FunctionCall SourceCall)
+open SelectedCompilationPublicSessionState (StartedCall FunctionCall SourceCall)
 
 variable {recipe : SourceCoreIndexedSession.Recipe}
 
@@ -36,7 +37,7 @@ theorem from_initial_start
     {publicCompiled : SourceCoreExecution.Compiled}
     (compiled : SourceCoreExecution.compileChecked recipe.compiled.sourceProgram seeds compileOptions = .ok publicCompiled)
     (selected : RecursiveNamedPreparedStageContracts.PublicRecipe publicCompiled recipe)
-    (certificate : CallableIndexedOwnedPreparedProgramAdmission.Certificate recipe.compiled)
+    (certificate : SelectedCompilationPreparedProgramCertificates.Certificate recipe.compiled)
     (bodies : SelectedCompilationBodyTyping.Bodies recipe.compiled)
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     (opened : artifact.CompiledAt publicCompiled)
@@ -82,7 +83,7 @@ theorem from_initial_row
     {publicCompiled : SourceCoreExecution.Compiled}
     (compiled : SourceCoreExecution.compileChecked recipe.compiled.sourceProgram seeds compileOptions = .ok publicCompiled)
     (selected : RecursiveNamedPreparedStageContracts.PublicRecipe publicCompiled recipe)
-    (certificate : CallableIndexedOwnedPreparedProgramAdmission.Certificate recipe.compiled)
+    (certificate : SelectedCompilationPreparedProgramCertificates.Certificate recipe.compiled)
     (bodies : SelectedCompilationBodyTyping.Bodies recipe.compiled)
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     (opened : artifact.CompiledAt publicCompiled)

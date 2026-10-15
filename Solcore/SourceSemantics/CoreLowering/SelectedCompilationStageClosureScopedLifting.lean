@@ -21,6 +21,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (code : Code compiled.indexed function scope administrative)
   (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) code)
   (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
   {receiving : SourceCoreRawMetadata.Registry}
   {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
   {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
@@ -34,8 +37,10 @@ local notation "physicalBridge" => CallableIndexedOwnedNamedCallerProtocol.Carri
   (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) code.compilation.administrativePrefix)
 
 variable (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
+  (assignmentInterpretation : PreparedAssignmentDiagnosticAuthority.Interprets compiled receiving
+    (fun reason token => faults (.semantic reason) token))
 
-include support selected ownerPhysical semantic in
+include support selected ownerPhysical semantic faithful observations assignmentInterpretation in
 theorem lifts
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
@@ -52,6 +57,14 @@ theorem lifts
   have originalTyping : ProtectedStateImperativeTypedSourceSites.Statements child.source inputs.context function.body :=
     ⟨_, _, _, sourceTyped⟩
   have tree := support.tree child selected
+  obtain ⟨assignmentAuthority⟩ := support.assignmentAuthority
+  have assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked)
+      functions (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys code.compilation.administrativePrefix)
+      function.source support.invalidProjection support.missingDefault receiving
+      (fun reason token => faults (.semantic reason) token) :=
+    assignmentInterpretation assignmentAuthority functions
+      (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys code.compilation.administrativePrefix)
+  rw [← stages.source selected] at assignmentDiagnostics
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape child.source true function.body := by
     rw [stages.source selected]
     exact packet.shape
@@ -62,7 +75,7 @@ theorem lifts
     physicalBridge
     (CallableIndexedOwnedPhysicalCanonicalState.bindings code.compilation.administrativePrefix)
     (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport code.compilation.administrativePrefix)
-    functions extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
+    functions faithful observations extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
     (CallableIndexedOwnedPhysicalCanonicalState.markedProducer model code.compilation.administrativePrefix)
     (CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (fun _ _ stable => CallableIndexedOwnedPhysicalCanonicalState.readyAt_of_stableOwner
@@ -73,7 +86,7 @@ theorem lifts
     (fun context size scope id lowered certified => by
       obtain ⟨rawType, root⟩ := certified
       exact preservation size (SelectedCompilationMixedRootSupport.RootAt.ofRoot root) owner ownerPhysical ⟨rfl, rfl, rfl⟩)
-    unique tree (support.sites child selected receiving) semantic rfl shape originalTyping support.projection within
+    unique tree (support.sites child selected receiving) semantic assignmentDiagnostics rfl shape originalTyping support.projection within
     environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureScopedLifting

@@ -1,7 +1,7 @@
 import Solcore.Test.SourceCoreCapturedMatchFixture
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternSourceBinders
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLegacyBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
 set_option autoImplicit false
 set_option Elab.async false
@@ -102,11 +102,11 @@ theorem ObservedFactory.seed_declaration {fixture : CompiledFixture} (observed :
     observed.shape.binderRequirements, observed.shape.localSeed]
 
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
-    CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true
+    CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true
       [observed.shape.initialized.id, observed.shape.matchNode.id, observed.shape.innerReturn.id] := by
-  apply CallableIndexedOwnedPreparedStagedBranchingTree.Shape.initialized
+  apply CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape.initialized
     observed.shape.initializedFound observed.shape.initializedForm
-  apply CallableIndexedOwnedPreparedStagedBranchingTree.Shape.matchWith observed.shape.matchFound observed.shape.matchForm
+  apply CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape.matchWith observed.shape.matchFound observed.shape.matchForm
   · intro arm member
     have same : arm = observed.shape.arm := by simpa only [observed.shape.arms, List.mem_singleton] using member
     subst arm

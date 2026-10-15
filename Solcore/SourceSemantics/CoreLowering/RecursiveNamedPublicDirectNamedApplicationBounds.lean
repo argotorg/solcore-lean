@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicCallableArity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
@@ -142,6 +143,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
         callStages child callFaults size := by
     intro child childSelected
     apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects (semantic := semantic)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       (namedSupport header member) profile wellFormed childSelected extension
     · intro childSize _smaller childContext childScope current id lowered root
       exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
@@ -263,6 +265,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
         callStages child callFaults sourceSize := by
     intro child childSelected
     apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves (semantic := semantic)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       (namedSupport header member) profile wellFormed childSelected extension
     · intro childSize _smaller childContext childScope current id lowered root
       exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -113,6 +114,7 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
     CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds.application_reflects (semantic := CallableIndexedOwnedPreparedPhysicalProgramSupport.semantic_extension support receiver extension)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       support.profile association (support.closurePackets association) (support.closureSupport association)
       caller raw represented heaps physical support.owners stable runtime
       valid size (fun childSize _ => children childSize) evaluation (Nat.le_refl _)
@@ -174,6 +176,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult, finalHeaps,
     maps, worlds, frame, metadata, returned, related, post⟩ :=
     CallableIndexedOwnedPreparedStagedPhysicalClosureApplicationBounds.application_preserves (semantic := CallableIndexedOwnedPreparedPhysicalProgramSupport.semantic_extension support receiver extension)
+      (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
       support.profile association (support.closurePackets association) (support.closureSupport association)
       caller raw represented heaps physical support.owners stable runtime
       sourceSize (fun childSize _ => children childSize) trace (Nat.le_refl _)

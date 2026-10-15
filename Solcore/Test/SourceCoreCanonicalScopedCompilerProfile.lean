@@ -7,7 +7,7 @@ set_option Elab.async false
 set_option maxHeartbeats 5000000
 namespace Tests.SourceCoreCanonicalScoped.CompilerProfile
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
-open CertifiedPublicSession (Issued)
+open SelectedCompilationCertifiedPublicSession (Issued)
 
 variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
 
@@ -48,29 +48,29 @@ theorem sequence_meaning (profile : Observed fixture)
   exact ⟨issued, ⟨⟨first, second, firstRead, intervening, secondRead, repeatedRead⟩⟩⟩
 
 structure ForwardMeaning (meaning : SequenceMeaning issued stages sequence) : Prop where
-  first : RecursiveNamedPublicPhysicalSessionInitialForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+  first : SelectedCompilationPublicSessionInitialForward.ForwardAt issued.catalog.rows meaning.first.initial.header
     meaning.first.initial.header issued.support (firstCall sequence.first).toCall.toStartedCall
     meaning.first.entry.source meaning.first.after.heap
-  second : RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt (entries := [meaning.first.entry])
+  second : SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt (entries := [meaning.first.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     (functionCall sequence.second).toCall.toStartedCall parameterType .word meaning.second.entry.source meaning.second.after.heap
   firstRead : ∃ checkpoint, sequence.second.completion.session.startHandlePacked sequence.first.handle
       (packed firstNext true false) runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+    SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe ([meaning.first.entry] ++ [meaning.second.entry])
       (.word seed) checkpoint meaning.firstRead.after.heap
-  intervening : RecursiveNamedPublicPhysicalSessionFunctionForward.FunctionForwardAt
+  intervening : SelectedCompilationPublicSessionFunctionForward.FunctionForwardAt
     (entries := [meaning.first.entry] ++ [meaning.second.entry])
     issued.catalog.rows meaning.first.initial.header issued.initial issued.support.profile fixture.recipe
     (functionCall sequence.intervening).toCall.toStartedCall parameterType .word meaning.intervening.entry.source meaning.intervening.after.heap
   secondRead : ∃ checkpoint, sequence.intervening.completion.session.startHandlePacked sequence.second.handle
       (packed secondNext true false) runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+    SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe (([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.intervening.entry])
       (.word secondSeed) checkpoint meaning.secondRead.after.heap
   repeatedRead : ∃ checkpoint, sequence.secondRead.completion.session.startHandlePacked sequence.first.handle
       (packed repeatedNext false false) runOptions.inputValidationFuel = .ok checkpoint ∧
-    RecursiveNamedPublicPhysicalSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
+    SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe (([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.intervening.entry])
       (.word firstNext) checkpoint meaning.repeatedRead.after.heap
 

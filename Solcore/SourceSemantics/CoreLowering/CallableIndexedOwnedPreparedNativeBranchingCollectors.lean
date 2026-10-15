@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPlaceLowering
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentUnaryDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors
@@ -267,7 +268,7 @@ theorem collected_at
     (projection : values.checked.catalog.project expected = .ok type)
     (accepted : CompilerAccepted policy fuel source view scope position type reasonAt selfReason code)
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
-    Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax
+    Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax
       (TypedCertificate source certificates) definitions administrative context scope
       position expected type code := by
   induction syntaxTree generalizing scope fuel code nativeType with
@@ -388,7 +389,7 @@ theorem collected_at
         (ih restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
   | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile childSyntax remaining ih =>
-    obtain ⟨sourceProfile, bare, restShape⟩ := shape.assign_tail found form
+    obtain ⟨sourceProfile, restShape⟩ := shape.assignment_tail found form
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -406,42 +407,33 @@ theorem collected_at
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      have accessible : Reaches source roots (.expression rhs) :=
-        .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-      obtain ⟨rhsSyntax, rhsNode, rhsFound, rhsTyped⟩ := childSyntax rhs (by simp)
-      obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot, _layout, generated, _sameType, _profile, codeEq⟩ :=
-        CompatibleBareAssignment.of_lower bare compiled
-      have rhsNative := CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs
-        (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
-        (rhs := value.expression) (next := body) (output := LocalLoop.controlType type) (result := nativeType)
-        (operator := operator) (codeEq ▸ nativeTyped)
-      have rhsType : rhsNode.type = assignment.target.type := by
-        obtain ⟨actualNode, contains, actualType⟩ := rightTyped.stored_type
-        have sameNode := Option.some.inj (rhsFound.symm.trans (lookupExpression?_complete unique contains))
-        exact sameNode ▸ actualType
-      let originalHead : GenericAssignmentStatements.Head values source context
-          (TypedCertificate source certificates context) scope administrative definitions assignment operator rhs := {
-        prepared := prepared
-        index := index
-        codes := []
-        leaf := prepared.route.rootSourceType
-        lowered := value
-        node := rhsNode
-        invalid := invalidOperand (.occurrence id.occurrence) assignment.target.root operator
-        shape := .bare bare _layout
-        slot := _slot
-        writable := _rootType ▸ writable binder ((rootBinder edited.metadata _).trans _binding)
-        found := rhsFound
-        right := ⟨rhsNode, rhsFound, rhsTyped, children context fields declarations rhsSyntax accessible rhsFound rhsTyped generated rhsNative⟩
-        rightView := by simpa only [rhsType] using _rawView
-        rightType := _sameType
-        profile := by rw [_rawView]; exact profile }
-      have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
+      have accessible : ∀ child ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+          Reaches source roots (.expression child) := by
+        intro child member
+        have edge : .expression child ∈ assignment.references ++ [.expression rhs] := by
+          rcases List.mem_cons.mp member with equal | member
+          · subst child; simp
+          · exact List.mem_append_left _ (CallableLambdaViewPlaceLowering.key_reference member)
+        exact .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using edge)
+      have compiledOriginal := (CallableLambdaViewPlaceLowering.lower
+        (expression := policy.lowerExpression) (fuel := fuel) edited.metadata
+        (fun child member => expression_lookup edited avoids (accessible child (List.mem_cons_of_mem _ member)))).trans compiled
+      obtain ⟨originalHead, emittedOriginal, sameToken, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable rightTyped profile
+          (certificate := TypedCertificate source certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨approved, node, found, typed⟩ := childSyntax child member
+            obtain ⟨_, native⟩ := raw
+            exact ⟨node, found, node, found, typed,
+              children context fields declarations approved (accessible child member) found typed generated native⟩)
+          compiledOriginal nativeTyped
       rw [emittedOriginal]
-      exact .assign found form originalHead
+      exact .assignPrepared found form originalHead
         (ih restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
-          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) (operands (.statement found form) sourceProfile) bare
+          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) (fun registry => CallableIndexedOwnedPreparedBranchingCatalogSites.assignment_site (.statement found form) sourceSignatures preparedAt
+            (sameToken.symm ▸ operands (.statement found form) sourceProfile) registry)
   | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH
   | @scopedBlock context mode id node statements rest expected found form inner remaining innerIH restIH =>
     obtain ⟨innerShape, restShape⟩ := shape.block_children found form
@@ -855,6 +847,7 @@ theorem collected_at
         (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member) profile)
       (fun member rawWord => unary (header_unary
         (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member) rawWord)
+      (fun member => header_operand (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member)
       postGenerated postTyped
     refine Collected.initializersDone conditionFound conditionType
       ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax accessible conditionFound typed conditionGenerated conditionNative⟩
@@ -937,7 +930,7 @@ theorem collected_at
         (ih ⟨shape.1.discard_tail, shape.2⟩ fields closed residual sourceSignatures declarations
           (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member))) projection ⟨headerFuel, parentSite, next, AssignmentDiagnosticOrigins.ForOriginFor.tail (tracked := true) origin, generatedBody, nextReceipt⟩ tailTyped)
   | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile childSyntax remaining ih =>
-    obtain ⟨sourceProfile, bare, restShape⟩ := shape.1.assign_tail
+    obtain ⟨sourceProfile, restShape⟩ := shape.1.assignment_tail
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -950,41 +943,34 @@ theorem collected_at
           (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      have accessible : Reaches source roots (.expression rhs) := reached _ (by simp [ForItemForm.references])
-      obtain ⟨rhsSyntax, rhsNode, rhsFound, rhsTyped⟩ := childSyntax rhs (by simp)
-      obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot, _layout, generated, _sameType, _profile, codeEq⟩ :=
-        CompatibleBareAssignment.of_lower bare compiled
-      have rhsNative := CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs
-        (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
-        (rhs := value.expression) (next := body) (output := LocalLoop.controlType type) (result := nativeType)
-        (operator := operator) (codeEq ▸ nativeTyped)
-      have rhsType : rhsNode.type = assignment.target.type := by
-        obtain ⟨actualNode, contains, actualType⟩ := rightTyped.stored_type
-        have sameNode := Option.some.inj (rhsFound.symm.trans (lookupExpression?_complete unique contains))
-        exact sameNode ▸ actualType
-      let originalHead : GenericAssignmentStatements.Head values source context
-          (TypedCertificate source certificates context) scope administrative definitions assignment operator rhs := {
-        prepared := prepared
-        index := index
-        codes := []
-        leaf := prepared.route.rootSourceType
-        lowered := value
-        node := rhsNode
-        invalid := invalidOperand parentSite assignment.target.root operator
-        shape := .bare bare _layout
-        slot := _slot
-        writable := _rootType ▸ writable binder ((rootBinder edited.metadata _).trans _binding)
-        found := rhsFound
-        right := ⟨rhsNode, rhsFound, rhsTyped, children context fields declarations rhsSyntax accessible rhsFound rhsTyped generated rhsNative⟩
-        rightView := by simpa only [rhsType] using _rawView
-        rightType := _sameType
-        profile := by rw [_rawView]; exact profile }
-      have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
+      have accessible : ∀ child ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+          Reaches source roots (.expression child) := by
+        intro child member
+        have edge : .expression child ∈ assignment.references ++ [.expression rhs] := by
+          rcases List.mem_cons.mp member with equal | member
+          · subst child; simp
+          · exact List.mem_append_left _ (CallableLambdaViewPlaceLowering.key_reference member)
+        exact reached _ (by simp only [List.flatMap_cons, ForItemForm.references, List.mem_append]; exact Or.inl (Or.inl (Or.inl (Or.inl (List.mem_append.mp edge)))))
+      have compiledOriginal := (CallableLambdaViewPlaceLowering.lower
+        (expression := policy.lowerExpression) (fuel := headerFuel) edited.metadata
+        (fun child member => expression_lookup edited avoids (accessible child (List.mem_cons_of_mem _ member)))).trans compiled
+      obtain ⟨originalHead, emittedOriginal, sameToken, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable rightTyped profile
+          (certificate := TypedCertificate source certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨approved, node, found, typed⟩ := childSyntax child member
+            obtain ⟨_, native⟩ := raw
+            exact ⟨node, found, node, found, typed,
+              children context fields declarations approved (accessible child member) found typed generated native⟩)
+          compiledOriginal nativeTyped
       rw [emittedOriginal]
-      exact .initializerAssign originalHead
+      exact .initializerAssignPrepared originalHead
         (ih ⟨restShape, shape.2⟩ fields closed residual sourceSignatures declarations
           (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member))) projection ⟨headerFuel, parentSite, next, AssignmentDiagnosticOrigins.ForOriginFor.tail (tracked := true) origin, generatedBody, nextReceipt⟩
-          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) (operands (AssignmentDiagnosticOrigins.HeaderOriginFor.operand (tracked := true) (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceProfile) bare
+          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) (fun registry => CallableIndexedOwnedPreparedBranchingCatalogSites.assignment_site
+            (AssignmentDiagnosticOrigins.HeaderOriginFor.operand (tracked := true) (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceSignatures preparedAt
+            (sameToken.symm ▸ operands (AssignmentDiagnosticOrigins.HeaderOriginFor.operand (tracked := true) (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceProfile) registry)
   | @initializerBitNot context assignment rest condition post statements expected writable bare profile remaining ih =>
     obtain ⟨rawWord, _, restShape⟩ := shape.1.bitNot_tail
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
@@ -1055,7 +1041,7 @@ theorem collected
     (projection : values.checked.catalog.project expected = .ok type)
     (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel view scope statements type reasonAt mode selfReason = .ok code)
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
-    Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax
+    Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax
       (TypedCertificate source certificates) definitions administrative context scope
       (.statements mode statements) expected type code := by
   cases atStatements
