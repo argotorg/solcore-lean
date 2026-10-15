@@ -1,8 +1,20 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-14.
+Last updated: 2026-10-15.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
+
+## Prepared mapping writes and callable origins (2026-10-15)
+
+The projected-assignment compiler receipt keeps the exact prepared key path and original RHS child. `CallableIndexedOwnedAdmittedStagedTypedExpressionSequence` carries ordered key values and their original Source types through the reached heap. `CallableIndexedOwnedAdmittedStagedProjectedAssignmentPreservation` exposes the successful getter prefix, write and genuine failure paths; reflection consumes the same actual native receipts.
+
+`PreparedAssignmentDiagnosticAuthority.SourcePort` ties the original source to its selected compiled row, preparation and actual diagnostic issuer. `PreparedAssignmentDiagnosticAuthorityReception` derives its receiving-table interpretation internally. Prepared closure packets retain the same code and genuine caller provenance through formation, export, reimport and direct invocation. `SelectedCompilationCallableOrigins.Origins` supplies actual stage origins and builtin-only contextual projection, without requiring a prepared closure body to inhabit the older uniform diagnostic model.
+
+The selected public wrappers use `SelectedCompilationPublicSessionState.State` and the receiving-table transport in `SelectedCompilationPublicSessionRegistry`. Their physical history admits the prepared closure model; `RecursiveNamedPublicPhysicalSessionState` remains the legacy model. The additive `SelectedCompilationLegacyProgramCertificates` module provides `CallableIndexedOwnedPreparedProgramAdmission.Certificate.to_prepared`, which preserves the original table, selected rows, profile and diagnostics when converting an existing certificate to the prepared selected certificate.
+
+The automatic whole-program facade `AcceptedCompilerProgramAdmission.of_profile` now returns the prepared certificate. `CertifiedPublicSession.of_profile`, `from_profile_initial_start` and `from_profile_initial_row` return selected `Profiled`, retaining the actual checker receipt and static profile alongside the issued session. Success-only callers can use `.toIssued`; failure and reuse paths retain `Profiled` so their registry preservation comes from that same checked program and profile. Manual legacy certificate and session constructors remain available with their existing model.
+
+`SourceCoreSelectedProjectedAssignmentSourceFirst` exposes `initial_from_source`, `initial_then_add`, `update_from_source`, `missing_from_source`, `missing_then_reuse`, `nested_from_source` and `initializer_from_source`. Initial scalar startup supplies the authentic same-issued state for the later mapping-aware input path. The final profile consumer retains all fifteen original cache rows and exercises the captured mapping handle twice. The closed public APIs retain their existing startup, input and history premises; no new semantic callback is required.
 
 ## Unary assignment and original diagnostic provenance (2026-10-14)
 

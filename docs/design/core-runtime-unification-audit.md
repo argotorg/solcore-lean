@@ -1,12 +1,26 @@
 # Core unification: T0 audit of features, semantics, and proof boundaries
 
-Initial audit: 2026-09-30. Last updated: 2026-10-14.
+Initial audit: 2026-09-30. Last updated: 2026-10-15.
 
 This document preserves the initial audit for the [implementation design](core-runtime-unification.md) and subsequent dated investigations. Sections 1–9 record the state on 2026-09-30; later sections record the state on their respective dates. References to the "current" implementation, "unfinished" work, "next steps," or old API names describe that historical state.
 
 Runtime Core unification was completed in `a3168382`. See the [API migration record](core-runtime-unification-api.md) for the current public entry points. The [implementation record](core-runtime-unification-progress.md) and the latest dated audit section describe the latest commits, validation, and uncommitted work.
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
+
+## Projected mapping assignment audit (2026-10-15)
+
+The completed concrete unit uses original raw Word mapping leaves. Key evaluation is ordered and occurs before target resolution and the RHS. The primitive operation uses the saved target snapshot; the write traverses the actual latest root at the reached RHS heap. Successful typed key rows, RHS admission and the authentic write supply deep Source heap typing. Key, getter, RHS and write failures keep their genuine prefix heaps and diagnostic relation.
+
+Actual compiler actions determine the prepared key path, leaf/root distinction, operator and RHS. The selected receiver obtains diagnostic correspondence from the same issued compilation. The prepared closure branch carries its real caller receipt and code; it is not converted to an unsupported old uniform-body package. Stage-origin projection inspects actual callable leaves, while builtin execution uses its narrower representation projection.
+
+The fixed fifteen-function program retains all original declarations, cache rows and table rows. Independent Source proofs cover equal/compound writes, Word division by zero, an uninitialized RHS, nested keys and for initialization. Initial helper forwarding supplies the next real same-issued state before mapping addition. Failure/reuse is separately proved for actual histories. Runtime companions additionally exercise key/RHS effects, header control and repeated captured mapping mutation. The fixture's `missing` function is an uninitialized RHS read; the generic missing-default diagnostic proof is separate coverage.
+
+Native heap sizes: 16 / 22 / 40 / 58 / 76 / 97 / 133 / 163 / 182 / 198 / 205 / 223 / 250 / 262 / 280 / 283 / 298 / 313
+
+Validation: 359 changed or new modules checked in a coherent graph of 7,880 modules. Every one of the 2,604 transitively affected modules was freshly elaborated from source. All 16 focused runtime markers and 2,797 endpoint audits pass. Full build (7,920 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+Cache reuse is checked against complete recursive import-environment fingerprints. Every transitively affected module is freshly elaborated for the final integration. The selected supported-profile boundary remains explicit; this unit does not assert full compiler-form coverage or a complete theorem for all actual passes.
 
 ## Bare unary assignment audit (2026-10-14)
 

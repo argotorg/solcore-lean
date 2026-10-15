@@ -2,7 +2,7 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-14.
+Created: 2026-09-30. Updated: 2026-10-15.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
@@ -36,7 +36,9 @@ Bare compound assignments on original Word targets now use the same automatic pr
 
 Bare bit-not assignment on an original raw Word target now uses the same automatic profile in statements and for-loop headers. The operation has no RHS: successful execution complements the selected Word and writes to the exact reached heap; an uninitialized target reports the authentic unary diagnostic without a write. Independent original Source traces reach initial and later closed public forwarding, including failure followed by reuse of the same issued state. The unchanged eight-function runtime corpus also exercises header control and repeated captured-cell invocation.
 
-Projected assignments, other raw bit-not target types, generalized locals and broader factory/coercion shapes remain unfinished. The coercion factory profile still requires leaf direct-call arguments and closed implementation parameters and assumptions. All nine tested nonfinal bare surface-expression forms are rejected with `expressionRequiresSemicolon` before checking or compilation. The remaining question is which corresponding typed forms are actually reachable through the checker and compiler; parser-rejected syntax is not an established accepted-program proof obligation.
+Mapping element assignments now follow the actual ordered compiler path through Source lifting, physical preservation/reflection and the selected public session. The proof preserves the pre-RHS target snapshot and commits through the latest root at the reached heap. Actual same-compilation diagnostic provenance also supports prepared captured closures. Independent Source traces cover writes, nested keys, a for initializer and failure/reuse; the unchanged fifteen-function runtime corpus additionally exercises header control and repeated captured mapping mutation.
+
+Other projected place forms, other raw bit-not target types, generalized locals and broader factory/coercion shapes remain unfinished. The coercion factory profile still requires leaf direct-call arguments and closed implementation parameters and assumptions. All nine tested nonfinal bare surface-expression forms are rejected with `expressionRequiresSemicolon` before checking or compilation. The remaining question is which corresponding typed forms are actually reachable through the checker and compiler; parser-rejected syntax is not an established accepted-program proof obligation.
 
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
@@ -833,11 +835,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | Removal of direct runtime evaluation | Complete: 100%. Public execution uses the common Core artifact, Value, Session and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | In progress: roughly 80% by amount of work. The older 70% estimate is historical. Supported-profile restrictions and the complete actual-pass theorem remain substantial work. |
 | Overall estimate | Roughly 90% if the two goals have equal weight. These estimates are not feature counts or estimates of remaining time. |
-| Latest verified implementation | Bare original Word bit-not in statements and for initializer/post items, through actual compilation, Source lifting, preservation/reflection and the checked public session. |
-| Latest completed verification | Full build (7,852 jobs), registered tests and kernel policy pass; 173 changed/new modules in the 7,812-module coherent graph, all 2,830 transitively affected modules freshly elaborated from source, and 2,256 endpoint audits. |
-| Connected public path | Actual checking supplies selected body validity; the supported compiler profile supplies static support. Ordinary Source calls reach closed public forwarding or authentic earlier stage rejection. Completed public execution has corresponding Source meaning. Retained handles, structured output and failure continuations preserve their actual histories and heaps. |
-| Latest concrete coverage | The complete unchanged eight-function bit-not program passes the profile with cache8/table8. Independent Source proofs cover complement and unary failure/reuse; header controls and repeated captured-handle calls are runtime companions. |
-| Current implementation priority | Projected assignments, generalized locals, broader function-value/coercion forms and complete compiler-form/actual-pass composition. Preserve the existing selected compilation boundary while closing those gaps. |
+| Latest verified implementation | Original raw Word mapping element assignments in statements and for headers, with prepared captured closures and actual receiver diagnostics on the selected public path. |
+| Latest completed verification | 359 changed or new modules checked in a coherent graph of 7,880 modules. Every one of the 2,604 transitively affected modules was freshly elaborated from source. All 16 focused runtime markers and 2,797 endpoint audits pass. Full build (7,920 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded. |
+| Connected public path | Actual checking supplies selected body validity; the supported compiler profile supplies static support. Independent ordinary Source calls reach closed public forwarding or authentic earlier stage rejection. Completed public execution has corresponding Source meaning. Retained handles, structured output and failure continuations preserve their actual histories and heaps. |
+| Latest concrete coverage | The complete unchanged fifteen-function mapping-write program retains cache15/table15. Independent Source proofs cover initial-to-later writes, nested keys, initializer and failure/reuse. Header control and captured-handle repetition also have runtime coverage. |
+| Current implementation priority | Other projected place forms, generalized locals, broader function-value/coercion forms and complete compiler-form/actual-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

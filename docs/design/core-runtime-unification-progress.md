@@ -1,10 +1,24 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-14
+Updated: 2026-10-15
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
+
+## Mapping element assignment reaches the public proof (2026-10-15)
+
+The automatic profile connects original mapping element assignments to the same selected public session. The complete compiler receipt keeps the original root binder, ordered key expressions, selected leaf type, operator and RHS. Ordinary Source lifting and physical preservation/reflection retain key evaluation, target resolution, the pre-RHS snapshot and the exact post-RHS write. For-loop initializer and post items use the same assignment path.
+
+The diagnostic producer derives getter, missing-default and uninitialized-read tokens from the actual prepared source and receiving compilation. Prepared closure associations retain their real body code, caller receipt, captures and same-compilation diagnostic provenance. Indirect calls project genuine callable origins for stage gates; only actual builtin leaves need the contextual builtin representation. Public constructors gain no diagnostic, body-execution or recursive lifting callback.
+
+`SourceCoreSelectedProjectedAssignmentSource` constructs independent original Source traces for equal and compound Word writes, successful division by zero, an uninitialized RHS, two ordered nested keys and a for initializer. The public consumer first derives the scalar helper's initial Source trace. Its successful continuation supplies the real state for a mapping addition in the same issued session. Separate universal theorems cover the other writes, nested assignment, initializer and failure followed by same-issued reuse. These proofs retain authentic earlier stage rejection and do not take the current public completion as a premise.
+
+The unchanged fifteen-function program is checked and compiled with fuel 1000 and specialization budget 128. All fifteen original declarations and cache rows remain present, and the automatic profile has fifteen table rows. Runtime companions check first-match duplicate-key updates, insertion order, nested writes, key/RHS call order, genuine key and RHS read failures, reuse after failure, continue executing the for post, break skipping it, and two updates through the same captured mapping handle. A missing Word key supplies zero; no artificial operand fault is asserted. Captured-handle and additional control cases are runtime companions, not independent Source derivations. Zero execution fuel suspends and resumes. Native heap sizes: 16 / 22 / 40 / 58 / 76 / 97 / 133 / 163 / 182 / 198 / 205 / 223 / 250 / 262 / 280 / 283 / 298 / 313
+
+Validation: 359 changed or new modules checked in a coherent graph of 7,880 modules. Every one of the 2,604 transitively affected modules was freshly elaborated from source. All 16 focused runtime markers and 2,797 endpoint audits pass. Full build (7,920 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+Other projected place forms, generalized local declarations, broader function-value/coercion profiles and complete actual-pass composition remain open. A successful supported profile is still required. Runtime instructions and public execution behavior are unchanged.
 
 ## Bare Word bit-not reaches the public proof (2026-10-14)
 
