@@ -1,8 +1,14 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-19.
+Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
+
+## Retained builtin handle invocation (2026-10-20)
+
+`CellAwareBuiltinPackedApplication` proves primitive preservation and reflection with the exact unchanged mixed heap. `CellAwarePublicBuiltinHandleMeaning` derives its callable and typed arguments from the actual exported entry, current history and packed start receipt. `source_has_sufficient_fuel` consumes independent ordinary Source success; `completed_reflects_at_arity` recovers the ordered Source arguments and result from actual native completion.
+
+`CellAwarePublicBuiltinHandleForward.source_success` connects that result to public output and retained history. `SourceCoreMixedBuiltinHandleRuntime` constructs independent Source plans before factory creation, direct invocation, an intervening factory call and reuse of the original handle. The runtime API is unchanged.
 
 ## Builtin values in mixed bodies (2026-10-19)
 

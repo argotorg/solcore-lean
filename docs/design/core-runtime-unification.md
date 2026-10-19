@@ -2,9 +2,11 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-19.
+Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
+
+Retained builtin handles in mixed sessions now connect actual exported entries and packed inputs to independent ordinary Source success, sufficient public execution/output, and native reflection. The full original fixture proves each call before execution, including reuse of the same handle after an intervening factory call. Mixed for headers, projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain open; the second goal is not complete. See the latest implementation checkpoint for validation.
 
 The semantic-preservation target is the entry selected for compilation, its dependencies, and the callable handles admitted to its public session. Body validity is required for the original definitions in that compilation scope. Signature formation and identity uniqueness remain program-wide. All statements still use the complete original checked program, including its declaration IDs, substitutions, dictionaries and Source semantics.
 

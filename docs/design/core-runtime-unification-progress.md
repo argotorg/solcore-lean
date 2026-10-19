@@ -1,10 +1,20 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-19
+Updated: 2026-10-20
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
+
+## Retained builtin handles reach Source and public execution (2026-10-20)
+
+A genuine exported builtin entry and the actual packed-input receipt now supply the callee and ordered arguments in the mixed heap. Independent ordinary Source success derives sufficient Core execution and public output budgets. Native completion reflects to the same primitive Source result. These proofs derive builtin behavior from its compiler identity and descriptor; callers supply no builtin body law.
+
+The unchanged complete original fixture now proves a Source plan before every public resume: factory with `true`, returned builtin on Word `17`, factory with `false`, then the original handle on Word `23`. Results are integers `17` and `23`; native heap sizes are `2 / 11 / 11 / 20 / 20`. The intervening call retains the original exported entry and its full history.
+
+Validation: 10 changed modules in a coherent graph of 8,410 modules, 38 focused runtime invocations and 4,927 endpoint audits. Full build (8,450 jobs), registered tests, kernel policy and canonical endpoint audit pass. Only `propext`, `Classical.choice` and `Quot.sound` occur in audited proofs. The 12 unrelated workspace changes remain excluded.
+
+Mixed for headers, projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
 
 ## Builtin function values reach mixed public execution (2026-10-19)
 
