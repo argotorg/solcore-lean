@@ -119,6 +119,7 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | assignBareDangling actual same _ _ _ =>
       cases (shape actual).symm.trans same
+  | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
   | letInitialized actual same _ _ _ _ _ =>
@@ -239,6 +240,7 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
       cases (shape actual).symm.trans same
   | assignBareDangling actual same _ _ _ =>
       cases (shape actual).symm.trans same
+  | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
   | letInitialized actual same _ _ _ _ _ =>

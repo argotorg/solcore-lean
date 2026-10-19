@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized local traces preserve independent Source outcomes (2026-10-19)
+
+Recursive staged traces now represent actual generalized declarations, specialized local reads, requirement failures and generalized for-loop initializers. Declaration traces retain the captured descriptor and its actual allocation; they do not evaluate a generalized initializer as an ordinary expression. Erasure and exact trace-size conversion preserve those original Source rules. Deep heap preservation includes successful prefixes and failed coercion paths.
+
+Existing compiler-specific inversions now discharge the new alternatives using their actual expression form, monomorphic binder, or selected cell descriptor. Original named, method, closure and public-session proofs retain their previous applicability. The complete checked program, cache and runtime implementation are unchanged.
+
+Validation covers 79 changed modules in a coherent graph of 7,956, including all 1,966 affected modules, the 18 existing focused runtime suites and 3,576 endpoint audits. Recursive dependency fingerprints bind every reused object to its exact source and imported environments. The full build (7,996 jobs), registered tests, kernel policy and canonical endpoint audit also pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+This completes the trace infrastructure needed for generalized local execution. The new mixed-cell compiler profile, materialized local-function calls and their public-session connection are still being implemented separately. These declarations are not yet covered by the closed public preservation theorem. The second goal remains incomplete.
+
 ## General mapping keys reach selected public execution (2026-10-19)
 
 Accepted mapping indices now retain their original key node and raw type without the previous scalar restriction. The existing general comparator supplies first-match lookup and defaults. Actual compiler receipts preserve base-before-key order, the original diagnostic issuer and both reached heaps. The physical caller model derives function identity observations and runtime views internally; the public proof requires no new semantic callback.

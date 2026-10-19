@@ -153,7 +153,7 @@ theorem preserves_position {budget : Nat}
       have nodeEq := Option.some.inj (initialFound.symm.trans typedFound)
       cases nodeEq
       rw [sequence_rename]
-      rcases CallableIndexedOwnedPreparedStagedScopedLexicalSourceInversion.initialized unique found form extended trace with
+      rcases CallableIndexedOwnedPreparedStagedScopedLexicalSourceInversion.initialized unique found form mono extended trace with
         ⟨initialSize, failure, sameSize, contextEq, outcomeEq, initialTrace⟩ |
         ⟨initialSize, tailSize, sourceValue, location, middle, bound, sameSize, initialTrace, allocated, remainingTrace⟩
       · subst finalContext
@@ -721,7 +721,7 @@ theorem preserves_position {budget : Nat}
       have nodeEq := Option.some.inj (initialFound.symm.trans typedFound)
       cases nodeEq
       rw [sequence_rename]
-      rcases CallableIndexedOwnedAdmittedStagedForInitializerSource.initialized extended trace with
+      rcases CallableIndexedOwnedAdmittedStagedForInitializerSource.initialized mono extended trace with
         ⟨initialSize, failure, sameSize, outcomeEq, initialTrace⟩ |
         ⟨initialSize, tailSize, sourceValue, location, middle, bound, nextOutcome, sameSize, outcomeEq, initialTrace, allocated, remainingTrace⟩
       · subst outcome

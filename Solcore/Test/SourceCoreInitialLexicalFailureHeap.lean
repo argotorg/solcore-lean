@@ -25,6 +25,17 @@ private theorem local_fault {program : Program} {registry : Staging.Recursive.Re
   have same {other : ExpressionNode} (contains : ContainsExpression scope.source id other) : other = node :=
     Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   cases trace with
+  | generalizedLocal contains otherForm _ actualLookup actualRead descriptor _ _ _
+  | generalizedLocalRequirement contains otherForm _ actualLookup actualRead descriptor _ _ _ =>
+    have nodeEq := same contains
+    cases nodeEq
+    rw [form] at otherForm
+    cases otherForm
+    have sameLocation := actualLookup.functional lookup
+    subst_vars
+    have sameCell := actualRead.functional read
+    cases sameCell
+    cases descriptor
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | atomicFault contains atomic uncoerced raw =>
@@ -98,6 +109,7 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
+  | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
@@ -164,6 +176,7 @@ theorem ActualHeader.failed_heap
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
+  | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [observed.failedShape.declaredForm] at impossible
@@ -231,6 +244,7 @@ private theorem returned_expression
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
+  | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible

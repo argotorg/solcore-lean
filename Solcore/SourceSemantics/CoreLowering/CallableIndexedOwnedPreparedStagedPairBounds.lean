@@ -108,6 +108,11 @@ private theorem source_children
       have actualForm := (congrArg ExpressionNode.form (same_node contains)).trans form
       rw [actualForm] at atomic
       cases atomic
+  | generalizedLocal contains localForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains localForm _ _ _ _ _ _ _ =>
+      cases same_node contains
+      rw [form] at localForm
+      cases localForm
   | pair occurrence first second =>
       have ids := ExpressionForm.tuple.inj (occurrence_form occurrence)
       cases List.cons.inj ids with | intro leftEq rest =>

@@ -34,6 +34,7 @@ theorem absent {binder : TypedBinder}
       exact ⟨_, _, _, rfl, allocated, remaining⟩
 
 theorem initialized {binder : TypedBinder} {initializer : ExpressionId}
+    (monomorphic : binder.scheme.quantified = [])
     (extended : BinderExtends invocation.source.owner context binder nextContext)
     (trace : Size.ForItems program registry size invocation context environment before
       (.letDecl binder (some initializer) :: rest) finalContext outcome after) :
@@ -49,6 +50,7 @@ theorem initialized {binder : TypedBinder} {initializer : ExpressionId}
       Size.ForItems program registry tailSize invocation nextContext
         ((binder.id, location) :: environment) bound rest finalContext outcome after) := by
   cases trace with
+  | initializedGeneralized _ polymorphic _ _ _ => exact False.elim (polymorphic monomorphic)
   | initialized _ actualExtended child allocated remaining =>
       cases extended
       cases actualExtended

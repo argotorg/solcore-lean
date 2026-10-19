@@ -83,6 +83,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
     have equal := (shape actual).symm.trans same
     cases equal
     exact .inl ⟨_, _, rfl, rfl, rfl, child⟩
+  | letGeneralized actual same _ _ _ _ _ =>
+    have impossible := shape actual
+    rw [same] at impossible
+    cases impossible
   | letUninitialized actual same monomorphic extension allocation remaining =>
     have impossible := shape actual
     rw [same] at impossible

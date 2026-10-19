@@ -131,6 +131,20 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
     ExpressionAt program registry size := by
   intro scope context environment before after id failure type runtime covers locals heap typed trace
   cases trace with
+  | generalizedLocalRequirement => exact ⟨heap, .refl _⟩
+  | @generalizedLocal pathSize scope context environment before after id node name binder owned location cell function
+      substitution produced outcome contains form layout lookup read descriptor contextFields instantiation coercions =>
+      cases typed with
+      | @intro _ _ actual rawType plan typedContains typedForm rawTypeEq _ _ valid =>
+          have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+            (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+          subst actual
+          have functionTyped := ((heap cell read.member).generalized_inv descriptor).2
+          have catalog : SignatureCatalogWellFormed function.definitionContext.signatures := by
+            simpa only [functionTyped.same_signatures, runtime.signatures] using wellFormed.signatures
+          have rawTyped := functionTyped.instantiateHasType catalog contextFields covers instantiation
+          rw [rawTypeEq] at rawTyped
+          exact pathIH pathSize (Size.child_lt_stepSize (by simp)) runtime heap rawTyped valid.outputPath coercions
   | @coercedFault rawSize scope context environment before after id node failure contains _nonempty raw =>
       cases typed with
       | @intro _ _ actual rawType plan typedContains typedForm rawTypeEq _ _ valid =>

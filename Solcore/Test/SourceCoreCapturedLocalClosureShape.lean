@@ -67,6 +67,7 @@ private theorem returned_expression
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
+  | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
@@ -247,6 +248,12 @@ theorem ActualHeader.returned_capture
       have impossible := (same contains) ▸ otherForm
       rw [observed.shape.initializedForm] at impossible
       cases impossible
+    | letGeneralized contains form _captures polymorphic _extended _allocated _next =>
+      have nodeEq := same contains
+      cases nodeEq
+      rw [observed.shape.initializedForm] at form
+      cases form
+      exact False.elim (polymorphic (by simp [observed.localScheme, TypeSystem.Scheme.mono]))
     | letInitialized contains form initializer _mono extended allocated next =>
       rename_i localLocation
       have nodeEq := same contains

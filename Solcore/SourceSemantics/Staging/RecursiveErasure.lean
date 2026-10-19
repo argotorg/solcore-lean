@@ -570,6 +570,20 @@ private theorem builtin_fault_evidence {program : Program} {context : Context}
 
 local macro "erase_recursive_plain" : tactic =>
   `(tactic| (
+    case generalizedLocal contains form layout lookup read descriptor contextFields instantiation coercions pathIH =>
+      rename_i outcome
+      cases outcome with
+      | value => exact .generalizedLocal contains form layout lookup read descriptor contextFields instantiation pathIH
+      | fault failure => cases failure with
+        | semantic => exact .generalizedLocalCoercion contains form layout lookup read descriptor contextFields instantiation pathIH
+        | stage => trivial
+    case generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault =>
+      exact .generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault
+    case letGeneralized contains form captures polymorphic extension allocated next nextIH =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form])
+        (.letInitializedGeneralized contains form captures polymorphic extension allocated) nextIH
+    case initializedGeneralized captures polymorphic extension allocated next nextIH =>
+      exact ForItemsPlain.prepend (.letInitializedGeneralized captures polymorphic extension allocated) nextIH
     case coercedValue contains _nonempty raw path rawIH pathIH =>
       rename_i outcome
       cases outcome with

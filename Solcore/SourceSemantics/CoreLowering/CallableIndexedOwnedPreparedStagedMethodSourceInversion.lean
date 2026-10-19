@@ -97,6 +97,12 @@ theorem unary {operator : Syntax.UnaryOp} {operand : ExpressionId}
   have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .unary operator operand :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
@@ -127,6 +133,12 @@ theorem binary {left right : ExpressionId} {operator : Syntax.BinaryOp}
   have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .binary left operator right :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw

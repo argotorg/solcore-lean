@@ -79,6 +79,10 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
       have same := shape actual
       rw [form] at same
       cases same
+    | letGeneralized actual form _ _ _ _ _ =>
+      have same := shape actual
+      rw [form] at same
+      cases same
     | letUninitialized actual form mono extension allocated next =>
       have same := shape actual
       rw [form] at same
@@ -167,6 +171,10 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
       rw [form] at same
       cases same
       exact ⟨_, _, rfl, rfl, rfl, child⟩
+    | letGeneralized actual form _ _ _ _ _ =>
+      have same := shape actual
+      rw [form] at same
+      cases same
     | letUninitialized actual form mono extension allocated next =>
       have same := shape actual
       rw [form] at same

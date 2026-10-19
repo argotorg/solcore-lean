@@ -46,6 +46,12 @@ theorem children
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       rw [same, form] at atomic
       cases atomic
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | constructorValue occurrence _valid children =>
       obtain ⟨rfl, rfl⟩ := ExpressionForm.constructor.inj (actual occurrence)
       exact .inl ⟨_, _, rfl, rfl, children⟩

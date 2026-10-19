@@ -67,6 +67,7 @@ private theorem returned_expression
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
+  | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible

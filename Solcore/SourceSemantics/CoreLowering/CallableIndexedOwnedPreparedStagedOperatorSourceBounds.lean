@@ -120,6 +120,12 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
   cases trace with
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic
@@ -151,6 +157,12 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
   cases trace with
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic
@@ -191,6 +203,12 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
   cases trace with
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic

@@ -8,11 +8,12 @@ The profile covers atomic forms, groups, ordered tuples, nominal constructor
 payloads, mapping indices, primitive and evidence-selected operators,
 conditionals, direct declarations, indirect calls and builtins. Output coercion
 paths on atomic forms and direct calls retain their original source metadata.
-Bodies cover monomorphic lets, bare plain assignments, discards, scoped blocks,
+Bodies cover ordinary and generalized lets, bare plain assignments, discards, scoped blocks,
 conditional statements, finite while and for loops, ordered match arms, returns,
 and scoped break and continue transfers.
 Blocks and conditional arms restore lexical bindings while keeping heap effects.
-Projected value assignments retain ordered keys, their getter snapshot, and the actual final write. These judgments do not assert coverage of the full current compiler. -/
+Projected value assignments retain ordered keys, their getter snapshot, and the actual final write.
+Generalized reads retain the actual dictionary instantiation and recursively staged output coercions. These judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive
@@ -94,6 +95,35 @@ mutual
         (faultRule : ExpressionFormFaults program context scope.evidence scope.source environment before
           node.form node.requirements [] reason after) :
         Expression program registry scope context environment before id (.fault (.semantic reason)) after
+    | generalizedLocal {scope context environment before after id node name binder owned
+          location cell function substitution produced outcome}
+        (contains : ContainsExpression scope.source id node)
+        (form : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads before location cell)
+        (descriptor : cell.generalized = some function)
+        (contextFields : RuntimeContextFields function.definitionContext context)
+        (instantiation : LocalSchemeRuntimeInstantiation context scope.evidence
+          function.binder node.rawType owned substitution produced)
+        (coercions : CoercionPath program registry scope context before node.coercions
+          (.closure (function.instantiate substitution
+            (produced ++ scope.evidence.applySubstitution substitution))) outcome after) :
+        Expression program registry scope context environment before id outcome after
+    | generalizedLocalRequirement {scope context environment heap id node name binder owned
+          location cell function substitution failed}
+        (contains : ContainsExpression scope.source id node)
+        (form : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads heap location cell)
+        (descriptor : cell.generalized = some function)
+        (contextFields : RuntimeContextFields function.definitionContext context)
+        (selection : LocalSchemeRuntimeSelection context function.binder node.rawType owned substitution)
+        (fault : RequirementsFault context scope.evidence owned
+          (instantiateLocalSchemePredicates substitution function.binder) failed) :
+        Expression program registry scope context environment heap id
+          (.fault (.semantic (.unsatisfiedRequirement failed))) heap
     | group {scope context environment before after id inner outcome}
         (occurrence : Occurrence scope id (.group inner))
         (child : Expression program registry scope context environment before inner outcome after) :
@@ -693,6 +723,17 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : StatementsIn program registry mode scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | letGeneralized {mode scope context middleContext finalContext environment before bound after
+          id rest node binder initializer function location outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .letDecl binder (some initializer))
+        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (extension : BinderExtends scope.source.owner context binder middleContext)
+        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (next : StatementsIn program registry mode scope middleContext
+          ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     | letFault {mode scope context environment before after id rest node binder expression failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder (some expression))
         (monomorphic : binder.scheme.quantified = [])
@@ -791,6 +832,16 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : ForItems program registry scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         ForItems program registry scope context environment before (.letDecl binder (some initializer) :: rest) finalContext outcome after
+    | initializedGeneralized {scope context middleContext finalContext environment before bound after
+          binder initializer rest function location outcome}
+        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (extension : BinderExtends scope.source.owner context binder middleContext)
+        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (next : ForItems program registry scope middleContext
+          ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        ForItems program registry scope context environment before
+          (.letDecl binder (some initializer) :: rest) finalContext outcome after
     | initializerFault {scope context environment before after binder initializer rest failure}
         (monomorphic : binder.scheme.quantified = [])
         (child : Expression program registry scope context environment before initializer (.fault failure) after) :
@@ -1046,7 +1097,7 @@ namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
-  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements

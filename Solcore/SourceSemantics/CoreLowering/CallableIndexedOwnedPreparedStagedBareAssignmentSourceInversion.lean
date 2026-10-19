@@ -73,6 +73,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _
+  | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | bitNotProjected actual same _ _ _ _ _
   | bitNotProjectedRootFault actual same _ _

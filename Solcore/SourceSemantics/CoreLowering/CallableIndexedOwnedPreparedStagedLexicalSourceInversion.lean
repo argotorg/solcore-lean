@@ -44,6 +44,9 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
         ((binder.id, location) :: environment) bound rest finalContext outcome after := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | letGeneralized actual same _ _ _ _ _ =>
+      have impossible := (shape actual).symm.trans same
+      cases impossible
   | breaking actual same | continuing actual same
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
@@ -90,6 +93,7 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some node)
     (form : node.form = .letDecl binder (some initializer))
+    (monomorphic : binder.scheme.quantified = [])
     (extended : BinderExtends invocation.source.owner context binder nextContext)
     (trace : Size.Statements program registry size invocation context environment before
       (id :: rest) finalContext outcome after) :
@@ -106,6 +110,10 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
         ((binder.id, location) :: environment) bound rest finalContext outcome after) := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | letGeneralized actual same _ polymorphic _ _ _ =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact False.elim (polymorphic monomorphic)
   | breaking actual same | continuing actual same
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
@@ -161,6 +169,9 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
     finalContext = context ∧ outcome = .returned .unit ∧ after = before := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | letGeneralized actual same _ _ _ _ _ =>
+      have impossible := (shape actual).symm.trans same
+      cases impossible
   | breaking actual same | continuing actual same
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _

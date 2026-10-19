@@ -156,6 +156,7 @@ theorem absent {binder : TypedBinder}
       exact ⟨_, location, bound, _, grade_absent _ _, (restore_twice _ _ _).symm, allocated, .loop next loop⟩
 
 theorem initialized {binder : TypedBinder} {initializer : ExpressionId}
+    (monomorphic : binder.scheme.quantified = [])
     (extended : BinderExtends invocation.source.owner context binder nextContext)
     (trace : Trace program stages invocation context environment before (.letDecl binder (some initializer) :: items) test post body size outcome after) :
     (∃ childSize failure,
@@ -169,7 +170,7 @@ theorem initialized {binder : TypedBinder} {initializer : ExpressionId}
         items test post body nextSize nextOutcome after) := by
   cases trace with
   | initializerFault initial =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.initialized extended initial with failed | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.initialized monomorphic extended initial with failed | continued
       · obtain ⟨childSize, failure, rfl, _, same, child⟩ := failed
         cases same
         exact .inl ⟨_, _, rfl, rfl, child⟩
@@ -178,7 +179,7 @@ theorem initialized {binder : TypedBinder} {initializer : ExpressionId}
         simp only [Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]
         omega
   | loop initial loop =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.initialized extended initial with failed | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.initialized monomorphic extended initial with failed | continued
       · obtain ⟨_, _, _, _, same, _⟩ := failed
         cases same
       · obtain ⟨childSize, tailSize, value, location, middle, bound, rfl, child, allocated, next⟩ := continued

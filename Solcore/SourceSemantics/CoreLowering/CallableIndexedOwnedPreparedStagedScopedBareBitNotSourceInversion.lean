@@ -56,6 +56,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | ifReturned actual same _ _ | ifFault actual same _ _ | ifFallthrough actual same _ _ _
+  | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | letFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _

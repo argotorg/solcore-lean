@@ -138,7 +138,7 @@ theorem preserves_at {budget : Nat}
       have nodeEq := Option.some.inj (initialFound.symm.trans typedFound)
       cases nodeEq
       rw [sequence_rename]
-      rcases CallableIndexedOwnedPreparedStagedLexicalSourceInversion.initialized unique found form extended trace with
+      rcases CallableIndexedOwnedPreparedStagedLexicalSourceInversion.initialized unique found form mono extended trace with
         ⟨initialSize, failure, sameSize, contextEq, outcomeEq, initialTrace⟩ |
         ⟨initialSize, tailSize, sourceValue, location, middle, bound, sameSize, initialTrace, allocated, remainingTrace⟩
       · subst finalContext

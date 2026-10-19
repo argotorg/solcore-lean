@@ -29,6 +29,11 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [coercions] at path
+      cases path
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | group occurrence _

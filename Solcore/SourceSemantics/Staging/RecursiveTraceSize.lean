@@ -46,6 +46,35 @@ mutual
         (faultRule : ExpressionFormFaults program context scope.evidence scope.source environment before
           node.form node.requirements [] reason after) :
         Expression program registry (stepSize []) scope context environment before id (.fault (.semantic reason)) after
+    | generalizedLocal {pathSize : Nat} {scope context environment before after id node name binder owned
+          location cell function substitution produced outcome}
+        (contains : ContainsExpression scope.source id node)
+        (form : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads before location cell)
+        (descriptor : cell.generalized = some function)
+        (contextFields : RuntimeContextFields function.definitionContext context)
+        (instantiation : LocalSchemeRuntimeInstantiation context scope.evidence
+          function.binder node.rawType owned substitution produced)
+        (coercions : CoercionPath program registry pathSize scope context before node.coercions
+          (.closure (function.instantiate substitution
+            (produced ++ scope.evidence.applySubstitution substitution))) outcome after) :
+        Expression program registry (stepSize [pathSize]) scope context environment before id outcome after
+    | generalizedLocalRequirement {scope context environment heap id node name binder owned
+          location cell function substitution failed}
+        (contains : ContainsExpression scope.source id node)
+        (form : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads heap location cell)
+        (descriptor : cell.generalized = some function)
+        (contextFields : RuntimeContextFields function.definitionContext context)
+        (selection : LocalSchemeRuntimeSelection context function.binder node.rawType owned substitution)
+        (fault : RequirementsFault context scope.evidence owned
+          (instantiateLocalSchemePredicates substitution function.binder) failed) :
+        Expression program registry (stepSize []) scope context environment heap id
+          (.fault (.semantic (.unsatisfiedRequirement failed))) heap
     | group {childSize : Nat} {scope context environment before after id inner outcome}
         (occurrence : Occurrence scope id (.group inner))
         (child : Expression program registry childSize scope context environment before inner outcome after) :
@@ -645,6 +674,17 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : StatementsIn program registry mode nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | letGeneralized {nextSize : Nat} {mode scope context middleContext finalContext environment before bound after
+          id rest node binder initializer function location outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .letDecl binder (some initializer))
+        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (extension : BinderExtends scope.source.owner context binder middleContext)
+        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (next : StatementsIn program registry mode nextSize scope middleContext
+          ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [nextSize]) scope context environment before (id :: rest) finalContext outcome after
     | letFault {childSize : Nat} {mode scope context environment before after id rest node binder expression failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder (some expression))
         (monomorphic : binder.scheme.quantified = [])
@@ -741,6 +781,16 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : ForItems program registry nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         ForItems program registry (stepSize [childSize, nextSize]) scope context environment before (.letDecl binder (some initializer) :: rest) finalContext outcome after
+    | initializedGeneralized {nextSize : Nat} {scope context middleContext finalContext environment before bound after
+          binder initializer rest function location outcome}
+        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (extension : BinderExtends scope.source.owner context binder middleContext)
+        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (next : ForItems program registry nextSize scope middleContext
+          ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        ForItems program registry (stepSize [nextSize]) scope context environment before
+          (.letDecl binder (some initializer) :: rest) finalContext outcome after
     | initializerFault {childSize : Nat} {scope context environment before after binder initializer rest failure}
         (monomorphic : binder.scheme.quantified = [])
         (child : Expression program registry childSize scope context environment before initializer (.fault failure) after) :
@@ -995,7 +1045,7 @@ namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
-  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements
@@ -1030,6 +1080,10 @@ local macro "erase_stage_grade" : tactic =>
     case coercionsNil => apply Recursive.CoercionPath.coercionsNil <;> assumption
     case coercionsCons => apply Recursive.CoercionPath.coercionsCons <;> assumption
     case coercionsFault => apply Recursive.CoercionPath.coercionsFault <;> assumption
+    case generalizedLocal => apply Recursive.Expression.generalizedLocal <;> assumption
+    case generalizedLocalRequirement => apply Recursive.Expression.generalizedLocalRequirement <;> assumption
+    case letGeneralized => apply Recursive.StatementsIn.letGeneralized <;> assumption
+    case initializedGeneralized => apply Recursive.ForItems.initializedGeneralized <;> assumption
     case atomicValue => apply Recursive.Expression.atomicValue <;> assumption
     case atomicFault => apply Recursive.Expression.atomicFault <;> assumption
     case group => apply Recursive.Expression.group <;> assumption
@@ -1249,6 +1303,17 @@ local macro "construct_stage_grade" : tactic =>
     case coercionsFault head headIH =>
       obtain ⟨_, graded_head⟩ := headIH
       exact ⟨_, .coercionsFault graded_head⟩
+    case generalizedLocal contains form layout lookup read descriptor contextFields instantiation coercions pathIH =>
+      obtain ⟨size, graded⟩ := pathIH
+      exact ⟨_, .generalizedLocal contains form layout lookup read descriptor contextFields instantiation graded⟩
+    case generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault =>
+      exact ⟨_, .generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault⟩
+    case letGeneralized contains form captures polymorphic extension allocated next nextIH =>
+      obtain ⟨size, graded⟩ := nextIH
+      exact ⟨_, .letGeneralized contains form captures polymorphic extension allocated graded⟩
+    case initializedGeneralized captures polymorphic extension allocated next nextIH =>
+      obtain ⟨size, graded⟩ := nextIH
+      exact ⟨_, .initializedGeneralized captures polymorphic extension allocated graded⟩
     case atomicValue contains atomic uncoerced valueRule =>
       exact ⟨_, .atomicValue contains atomic uncoerced valueRule⟩
     case atomicFault contains atomic uncoerced faultRule =>

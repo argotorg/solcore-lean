@@ -68,6 +68,14 @@ theorem initial_context {program : Program} {registry : Registry} {invocation : 
           cases Dynamic.BinderExtends.functional extended staticExtended
           exact ih _ (Size.child_lt_stepSize (by simp)) tail next
         | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
+    | initializedGeneralized _ poly extended allocated next =>
+      cases typed with
+      | cons head tail =>
+        cases head with
+        | letInitialized _ mono _ _ => exact (poly mono).elim
+        | letInitializedGeneralized _ _ _ _ staticExtended =>
+          cases Dynamic.BinderExtends.functional extended staticExtended
+          exact ih _ (Size.child_lt_stepSize (by simp)) tail next
     | expression child next | assignment _ child _ next | bitNot _ _ next
     | projectedAssignment _ _ _ child _ next | projectedBitNot _ child _ _ next =>
       cases typed with

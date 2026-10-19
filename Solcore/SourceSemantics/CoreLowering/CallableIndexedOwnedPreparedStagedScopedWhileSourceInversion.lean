@@ -46,6 +46,7 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
+  | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _ | letFault actual same _ _
   | bitNotProjected actual same _ _ _ _ _
   | bitNotProjectedRootFault actual same _ _

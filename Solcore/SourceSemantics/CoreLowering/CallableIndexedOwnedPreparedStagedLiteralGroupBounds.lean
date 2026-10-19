@@ -205,6 +205,10 @@ private theorem no_stage
     rw [← sameForm]
     exact (literal_atomic literal)
   cases trace with
+  | generalizedLocal contains localForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      exact False.elim (atomic_not_local (literal_atomic literal) _ _ localForm)
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found (literal_coercions literal) contains))
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _

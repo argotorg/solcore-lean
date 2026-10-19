@@ -103,6 +103,11 @@ private theorem source_group_inv
       have actualForm := (congrArg ExpressionNode.form (same_node contains)).trans form
       rw [actualForm] at atomic
       cases atomic
+  | generalizedLocal contains localForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains localForm _ _ _ _ _ _ _ =>
+      cases same_node contains
+      rw [form] at localForm
+      cases localForm
   | group occurrence child =>
       cases ExpressionForm.group.inj (occurrence_form occurrence)
       exact ⟨_, rfl, child⟩

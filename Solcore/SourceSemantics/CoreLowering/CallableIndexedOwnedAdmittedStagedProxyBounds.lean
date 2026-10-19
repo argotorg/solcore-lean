@@ -31,6 +31,11 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found empty contains)
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _

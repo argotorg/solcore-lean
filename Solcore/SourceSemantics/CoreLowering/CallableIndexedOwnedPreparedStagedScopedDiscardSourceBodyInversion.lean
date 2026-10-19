@@ -84,6 +84,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
     have equal := (shape actual).symm.trans same
     cases equal
     exact .inl ⟨_, _, rfl, rfl, rfl, child⟩
+  | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same monomorphic extension allocation remaining =>
     have impossible := shape actual
     rw [same] at impossible

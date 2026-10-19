@@ -65,6 +65,34 @@ theorem for_items_step (size : Nat)
                 (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
                 childPost.heap_extends.trans (allocationExtends.trans post.heap_extends), post.done⟩
           | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
+  | @initializedGeneralized nextSize scope context middleContext finalContext environment before bound after
+      binder initializer rest function location outcome captures polymorphic extended allocated next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | letInitialized _ monomorphic _ _ => exact (polymorphic monomorphic).elim
+          | letInitializedGeneralized staticPolymorphic requirements generalizes initializerTyped staticExtended =>
+              have same := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extended staticExtended
+              cases same
+              have functionTyped := captures.wellTyped runtime locals staticPolymorphic requirements generalizes initializerTyped staticExtended
+              have allocationExtends := HeapTypesExtend.of_generalized_allocation allocated
+              have boundTyped := heap.allocateGeneralized functionTyped allocated
+              have boundLocals : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
+                cases extended
+                exact .cons allocated.reads_new
+                  (congrArg (fun retained : TypedBinder => retained.scheme.body) captures.binder_eq)
+                  (.generalized rfl (congrArg TypedBinder.id captures.binder_eq)
+                    (congrArg TypedBinder.scheme captures.binder_eq))
+                  (locals.mono allocationExtends)
+              have fields := RuntimeContextFields.ofBinderExtends extended
+              have closed := fields.targetClosed runtime.closed
+              have boundAtMiddle := boundTyped.transportClosed fields.signatures runtime.closed closed
+                runtime.variables_closed (fields.targetResidualVariablesOpen runtime.residual_variables_open)
+              have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) (runtime.transport fields)
+                (fields.covers covers) boundLocals boundAtMiddle tailTyped next
+              exact ⟨post.heap_typed.transportClosed fields.signatures.symm closed runtime.closed
+                (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+                allocationExtends.trans post.heap_extends, post.done⟩
   | @initializerFault childSize scope context environment before after binder initializer rest failure mono child =>
       cases typed with
       | cons headTyped _ =>

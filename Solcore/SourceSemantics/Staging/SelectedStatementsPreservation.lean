@@ -366,6 +366,36 @@ theorem statements_step (size : Nat)
             cases controlTyped
             rfl
           exact ((continue_tail headFalls completeTail fallthroughWhole next post).transportEntry runtime fields).prepend (allocationExtends)
+  | @letGeneralized nextSize mode scope context middleContext finalContext environment before bound after
+      id rest node binder initializer function location outcome contains form captures polymorphic extension allocate next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | letInitialized _ monomorphic _ => exact (polymorphic monomorphic).elim
+      | letInitializedGeneralized staticPolymorphic requirements generalizes initializerTyped staticExtension =>
+          have sameContext := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension staticExtension
+          subst staticMiddle
+          have functionTyped := captures.wellTyped runtime locals staticPolymorphic requirements generalizes initializerTyped staticExtension
+          have allocationExtends := HeapTypesExtend.of_generalized_allocation allocate
+          have boundTyped := heap.allocateGeneralized functionTyped allocate
+          have boundEnvironment : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
+            cases extension
+            exact .cons allocate.reads_new
+              (congrArg (fun retained : TypedBinder => retained.scheme.body) captures.binder_eq)
+              (.generalized rfl (congrArg TypedBinder.id captures.binder_eq)
+                (congrArg TypedBinder.scheme captures.binder_eq))
+              (locals.mono allocationExtends)
+          have fields := RuntimeContextFields.ofBinderExtends extension
+          have middleClosed := fields.targetClosed runtime.closed
+          have boundAtMiddle := boundTyped.transportClosed fields.signatures runtime.closed middleClosed
+            runtime.variables_closed (fields.targetResidualVariablesOpen runtime.residual_variables_open)
+          have post := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+            (runtime.transport fields) (fields.covers covers) boundEnvironment boundAtMiddle tailTyped next
+          have headFalls : headFacts.control.canFallthrough = true := by
+            have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+            cases controlTyped
+            rfl
+          exact ((continue_tail headFalls completeTail fallthroughWhole next post).transportEntry runtime fields).prepend allocationExtends
   | @letInitialized childSize nextSize mode scope context middleContext finalContext environment before middle bound after
       id rest node binder expression value location outcome contains form child monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed

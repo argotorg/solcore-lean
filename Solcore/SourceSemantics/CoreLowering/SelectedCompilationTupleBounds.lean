@@ -69,6 +69,12 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
       rw [form] at atomic raw
       cases atomic
       cases raw with | tuple _ children => cases children
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
+      cases same
+      rw [form] at actualForm
+      cases actualForm
   | pair owned first second =>
       have same := ExpressionForm.tuple.inj (form.symm.trans (occurrence_form unique metadata.found owned))
       subst ids

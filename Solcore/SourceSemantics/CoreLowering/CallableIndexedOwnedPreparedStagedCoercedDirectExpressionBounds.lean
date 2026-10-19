@@ -79,7 +79,8 @@ theorem preserves (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ PostAdmission callerBridge.forgetSlots context node.type outcome reached := by
-  rcases CallableIndexedOwnedPreparedStagedCoercedExpressionSource.branches receipt.found unique nonempty trace with
+  rcases CallableIndexedOwnedPreparedStagedCoercedExpressionSource.ordinary_branches receipt.found unique nonempty
+      (by intro name binder impossible; rw [receipt.form] at impossible; cases impossible) trace with
     ⟨rawSize, pathSize, source, middle, sameSize, rawTrace, pathTrace⟩ |
     ⟨rawSize, failure, sameSize, outcomeEq, rawTrace⟩
   · have rawLess : rawSize < size := by

@@ -99,6 +99,11 @@ private theorem source_prefix
       have actualForm := (congrArg ExpressionNode.form (same_node contains)).trans form
       rw [actualForm] at atomic
       cases atomic
+  | generalizedLocal contains actualForm _ _ _ _ _ _ _
+  | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
+      cases same_node contains
+      rw [form] at actualForm
+      cases actualForm
   | calleeFault occurrence child =>
       cases occurrence_form occurrence
       exact .calleeFault child

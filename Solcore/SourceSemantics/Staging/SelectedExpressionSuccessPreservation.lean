@@ -75,6 +75,23 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           have post := pathIH pathSize (Size.child_lt_stepSize (by simp))
             runtime rawPost.heap_typed (rawPost.value_typed _ rfl) valid.outputPath path
           exact ⟨post.value_typed _ rfl, post.heap_typed, rawPost.heap_extends.trans post.heap_extends⟩
+  | @generalizedLocal pathSize scope context environment before after id node name binder owned
+      location cell function substitution produced outcome contains _form _layout _lookup read descriptor contextFields instantiation path =>
+      cases typed with
+      | @intro _ _ actual rawType plan typedContains _typedForm rawTypeEq _ _ valid =>
+          have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+            (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+          subst actual
+          have cellTyped := heap cell read.member
+          have functionTyped := (cellTyped.generalized_inv descriptor).2
+          have definitionCatalog : SignatureCatalogWellFormed function.definitionContext.signatures := by
+            rw [← contextFields.signatures, runtime.signatures]
+            exact selectedBodies.signatures
+          have rawTyped := functionTyped.instantiateHasType definitionCatalog contextFields covers instantiation
+          rw [rawTypeEq] at rawTyped
+          have post := pathIH pathSize (Size.child_lt_stepSize (by simp))
+            runtime heap rawTyped valid.outputPath path
+          exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends⟩
   | @group childSize scope context environment before after id inner outcome occurrence child =>
       obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with

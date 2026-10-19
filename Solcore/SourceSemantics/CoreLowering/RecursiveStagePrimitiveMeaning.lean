@@ -685,6 +685,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
   induction free generalizing before after with
   | atomic found empty atomic =>
     cases trace with
+    | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [empty] at path
+      cases path
     | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -757,6 +762,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases atomic
   | group found empty form child ih =>
     cases trace with
+    | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [empty] at path
+      cases path
     | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -829,6 +839,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | pair found empty form first second firstIH secondIH =>
     cases trace with
+    | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [empty] at path
+      cases path
     | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -908,6 +923,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | unary found empty form requirements child ih =>
     cases trace with
+    | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [empty] at path
+      cases path
     | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -982,6 +1002,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | binary found empty form requirements first second firstIH secondIH =>
     cases trace with
+    | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [empty] at path
+      cases path
     | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same

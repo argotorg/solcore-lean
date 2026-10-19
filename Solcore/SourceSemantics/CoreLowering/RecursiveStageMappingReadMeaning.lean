@@ -161,6 +161,11 @@ private theorem reference_no_stage {invocation : Staging.Recursive.Scope} {id : 
   cases trace with
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
+  | generalizedLocal contains _ _ _ _ _ _ _ path =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      rw [coercions] at path
+      cases path
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
   | constructorFault owned children | tupleFault owned children =>
     have same := occurrence_form unique found owned

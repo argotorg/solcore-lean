@@ -423,6 +423,32 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           exact ⟨afterTyped.transportClosed fields.signatures.symm middleClosed runtime.closed
             (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             allocationExtends.trans tailExtends⟩
+  | @letGeneralized nextSize mode scope context middleContext finalContext environment before bound after
+      id rest node binder initializer function location outcome contains form captures polymorphic extension allocated next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | letInitialized _ monomorphic _ => exact (polymorphic monomorphic).elim
+      | letInitializedGeneralized _ requirements generalizes initializerTyped staticExtension =>
+          have sameContext := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension staticExtension
+          subst staticMiddle
+          have functionTyped := captures.wellTyped runtime locals polymorphic requirements generalizes initializerTyped extension
+          have allocationExtends := HeapTypesExtend.of_generalized_allocation allocated
+          have boundTyped := heap.allocateGeneralized functionTyped allocated
+          have boundEnvironment : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
+            cases extension
+            exact .cons allocated.reads_new (congrArg (fun retained : TypedBinder => retained.scheme.body) captures.binder_eq)
+              (.generalized rfl (congrArg TypedBinder.id captures.binder_eq) (congrArg TypedBinder.scheme captures.binder_eq))
+              (locals.mono allocationExtends)
+          have fields := RuntimeContextFields.ofBinderExtends extension
+          have middleClosed := fields.targetClosed runtime.closed
+          have boundAtMiddle := boundTyped.transportClosed fields.signatures runtime.closed middleClosed
+            runtime.variables_closed (fields.targetResidualVariablesOpen runtime.residual_variables_open)
+          obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+            (runtime.transport fields) (fields.covers covers) boundEnvironment boundAtMiddle tailTyped next
+          exact ⟨afterTyped.transportClosed fields.signatures.symm middleClosed runtime.closed
+            (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+            allocationExtends.trans tailExtends⟩
   | @letInitialized childSize nextSize mode scope context middleContext finalContext environment before middle bound after
       id rest node binder expression value location outcome contains form child monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
@@ -661,6 +687,13 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
       | cons headTyped tailTyped =>
         exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
           runtime covers locals heap headTyped tailTyped (.letUninitialized mono extended allocated) next
+  | @initializedGeneralized nextSize scope context middleContext finalContext environment before bound after
+      binder initializer rest function location outcome captures polymorphic extended allocated next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.letInitializedGeneralized captures polymorphic extended allocated) next
   | @initialized childSize nextSize scope context middleContext finalContext environment before middle bound after
       binder initializer rest value location outcome mono extended child allocated next =>
       cases typed with

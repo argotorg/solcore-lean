@@ -4,6 +4,12 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized local trace rules (2026-10-19)
+
+`Staging.Recursive.Expression` and its graded version include generalized local reads and their requirement failures. `StatementsIn` and for-loop traces include actual generalized descriptor allocation. `RecursiveErasure`, `RecursiveBodyErasure`, `RecursiveTraceSize` and recursive fault preservation retain the independent Source outcome, allocation and reached heap.
+
+Compiler-specific proof inversions exclude these alternatives only when an actual form, monomorphic binder or selected cell proves them impossible. Public runtime signatures and execution behavior are unchanged. The compiler-to-public connection for generalized local functions remains unfinished; the new trace rules alone do not establish that connection.
+
 ## General mapping keys in selected public execution (2026-10-19)
 
 `AcceptedIndexExpressionReceipt` and the general expression syntax now retain the actual key node and type without a scalar-key restriction. Compiler acceptance, metadata, child order and authentic diagnostic ports remain required. Existing scalar leaf APIs keep their prior scope.
