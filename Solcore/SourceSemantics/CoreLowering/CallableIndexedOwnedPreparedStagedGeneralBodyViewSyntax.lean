@@ -32,6 +32,9 @@ theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id directSi
       intro reached
       exact .leaf (CallableIndexedOwnedPreparedStagedFiniteClosureStaticTransport.finite_syntax
         edited avoids finite reached)
+  | proxy found form =>
+      intro reached
+      exact .proxy ((expression_lookup edited avoids reached).symm.trans found) form
   | @group id node inner found form child ih =>
       intro reached
       have innerReached : Reaches source roots (.expression inner) :=

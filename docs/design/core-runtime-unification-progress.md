@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Proxy values reach selected public execution (2026-10-19)
+
+Accepted compiler actions now produce proxy certificates with the original inner type, registry entry and emitted ordinary Core constructor. Static metadata checks retain the proxy node. The general compiler tree, body transport and physical caller folds carry this certificate to preservation, reflection and ordinary Source lifting. The old scalar leaf syntax and public session signatures remain unchanged.
+
+Independent Source traces cover `return @Word`, `return @Bool` and an identity function over `@Word`. They connect actual initial compilation, bootstrap and fresh input encoding to whole-output forwarding before public completion is observed. The complete original program has three declarations, three compiled rows and three profile rows. Runtime tests retain literal heaps `4 / 4 / 4 / 4` and initial/reused input heaps `4 / 7 / 10`; wrong-inner inputs are rejected and valid reuse still succeeds. Zero fuel suspends as expected.
+
+Validation: 31 changed or new modules in a coherent graph of 7,950. The 1,420 affected modules were checked with recursively authenticated source/object environments; 951 were freshly elaborated in the frozen graph. All 17 focused runtime suites and 3,457 endpoint audits pass, together with the full build, registered tests, kernel policy and canonical endpoint audits. Only `propext`, `Classical.choice` and `Quot.sound` occur in audited proof dependencies. The 12 unrelated workspace changes remain excluded.
+
+General mapping-key profiles, generalized local descriptors, general function-value expressions, broader factory/coercion cases and complete actual-pass composition remain open. This checkpoint extends the closed public connection and does not complete the second goal.
+
 ## Captured mapping mutation and fresh data inputs reach one public session (2026-10-19)
 
 `1d04ac040` connects the complete original thirteen-entry projected-bit-not compilation to the automatic selected proof profile. Prepared closure support retains the actual emitted body, original Source view, captures, caller history, native typing and diagnostic issuer. The stronger physical association supplies formation, staged lifting and public invocation; its raw callable projection is used only where raw origins suffice. Existing ordinary closure interfaces remain available.
@@ -16,7 +26,7 @@ Initial public calls now derive the receiving registry from real bootstrap and i
 
 The fresh captured sequence has native heap sizes `14 / 17 / 32 / 47`. Separate fresh mapping inputs cover complement, default-zero insertion, an uninitialized key fault and subsequent same-session reuse, with sizes `13 / 28`, `13 / 28` and `13 / 22 / 37`. The twelve-entry companion and the original complete thirteen-entry runtime sequence retain their previous results and heap sizes.
 
-Validation: 58 changed or new modules in a coherent graph of 7,943 modules. The 1,468 affected modules were checked against exact recursively authenticated source and object environments; 950 were freshly checked in the frozen graph. All 17 focused runtime suites, the complete-profile and new heap assertions, and 3,207 endpoint audits pass. Full build (7,983 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+Validation: 58 changed or new modules in a coherent graph of 7,943 modules. The 1,468 affected modules were checked against exact recursively authenticated source and object environments; 950 were freshly checked in the frozen graph. All 16 focused runtime suites, the complete-profile and new heap assertions, and 3,207 endpoint audits pass. Full build (7,983 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
 
 Complete compiler coverage remains unfinished. Generalized local descriptors need a relation to the compiler's heterogeneous instance bundle; expression producers still need proxy and general function-value forms, broader mapping keys and factory/coercion cases. Unsupported typed forms must be tied to actual checker/compiler reachability. Runtime unification remains complete; this checkpoint does not complete the second goal.
 

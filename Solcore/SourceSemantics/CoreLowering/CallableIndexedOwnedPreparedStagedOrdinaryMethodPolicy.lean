@@ -110,7 +110,7 @@ theorem special_none_on
   cases supported with
   | literal atomic => cases atomic <;> rfl
   | read name binder => simp only [metadata.localRead id permitted tree node found name binder form, Bool.false_eq_true, ↓reduceIte]
-  | index | unary | binary | conditional | group | constructor | direct | builtin => rfl
+  | proxy | index | unary | binary | conditional | group | constructor | direct | builtin => rfl
   | tuple => rfl
   | call => rfl
 

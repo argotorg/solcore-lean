@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProxyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -119,6 +120,11 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   induction root with
+  | proxy receipt =>
+      intro _noMethods _noDirect _noIndexes _ports size current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedAdmittedStagedProxyBounds.preserves
+        functions extension bridge unique callFaults size (.proxy receipt)
   | leaf tree =>
       intro _noMethods _noDirect _noIndexes _ports size current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -364,6 +370,11 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   induction root with
+  | proxy receipt =>
+      intro _noMethods _noDirect _noIndexes _ports size current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedAdmittedStagedProxyBounds.reflects
+        functions extension bridge callFaults size (.proxy receipt)
   | leaf tree =>
       intro _noMethods _noDirect _noIndexes _ports size current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point

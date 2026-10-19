@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProxyLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageCallerHeadHandlers
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationSharedCallerBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageReadProductLifting
@@ -129,6 +130,14 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
     Laws (context := context) (invocation := invocation) bridge model stages callFaults budget (Point rootScope rootId rootCode) := by
   revert reached
   induction root with
+  | proxy receipt =>
+      intro reached directHeads methodHeads indexReady indirectHeads
+      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+        sameLedger runtimeLedger uninitializedOn (.proxy receipt) reached
+        directHeads methodHeads indexReady indirectHeads, ?_⟩
+      intro size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact SelectedCompilationStageProxyLifting.lifts bridge functions unique size (.proxy receipt)
   | leaf tree =>
       intro reached directHeads methodHeads indexReady indirectHeads
       refine ⟨preserves bridge receiver functions runtime unique observations extension semantic

@@ -15,7 +15,8 @@ open CallableIndexedOwnedPreparedNamedSyntaxAdmission (DirectSite MetadataTest m
 open CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles (MetadataFor)
 
 /-- The restricted lane is used by existing direct/read method and closure
-producers. The general lane additionally accepts indirect and method calls. -/
+producers. The general lane additionally accepts indirect and method calls,
+composite data, and proxy values with their original metadata. -/
 private def legacySupportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false) : ExpressionForm → Bool
   | .reference _ (.local _) | .reference _ (.builtinBoolean _)
     | .literal _ | .integerLiteral _ _ | .tuple []
@@ -29,6 +30,10 @@ def compositeForm : ExpressionForm → Bool
   | .group _ | .tuple (_ :: _) | .conditional _ _ _ => true
   | _ => false
 
+def proxyForm : ExpressionForm → Bool
+  | .proxy _ => true
+  | _ => false
+
 private def compositeSupportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false)
     (form : ExpressionForm) : Bool :=
   legacySupportedForm directOnly allowIndices allowConstructors form || (!directOnly && compositeForm form)
@@ -39,7 +44,7 @@ def builtinForm : ExpressionForm → Bool
 
 def supportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false)
     (form : ExpressionForm) : Bool :=
-  compositeSupportedForm directOnly allowIndices allowConstructors form || (!directOnly && builtinForm form)
+  compositeSupportedForm directOnly allowIndices allowConstructors form || (!directOnly && (builtinForm form || proxyForm form))
 
 /-- Every child is listed in actual compiler order, including both compiled branches. -/
 def operands : ExpressionForm → List ExpressionId
@@ -144,25 +149,34 @@ private theorem form_of_compositeSupported {directOnly allowIndices allowConstru
   · obtain ⟨general, form⟩ := Bool.and_eq_true_iff.mp composite
     exact .inr ⟨by cases directOnly <;> simp_all, composite_of_true form⟩
 
+private theorem builtin_of_true {form : ExpressionForm} (yes : builtinForm form = true) :
+    BuiltinForm form := by
+  cases form <;> simp_all [builtinForm, BuiltinForm, AcceptedOrdinaryExpressionReceipt.BuiltinForm]
+  case call callee ids resolution =>
+    cases resolution <;> simp_all
+
+private theorem proxy_of_true {form : ExpressionForm} (yes : proxyForm form = true) :
+    ProxyForm form := by
+  cases form <;> simp_all [proxyForm, ProxyForm]
+
 private theorem form_of_supported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
     (supported : supportedForm directOnly allowIndices allowConstructors form = true) :
     ((((LeafForm form ∨ DirectForm form ∨ (directOnly = false ∧ (IndirectForm form ∨ MethodForm form))) ∨
       (allowIndices = true ∧ directOnly = false ∧ IndexForm form)) ∨
       (allowConstructors = true ∧ directOnly = false ∧ ConstructorForm form)) ∨
-      (directOnly = false ∧ CompositeForm form)) ∨ (directOnly = false ∧ BuiltinForm form) := by
+      (directOnly = false ∧ CompositeForm form)) ∨ (directOnly = false ∧ (BuiltinForm form ∨ ProxyForm form)) := by
   rcases Bool.or_eq_true_iff.mp supported with composite | builtin
   · exact .inl (form_of_compositeSupported composite)
   · obtain ⟨general, isBuiltin⟩ := Bool.and_eq_true_iff.mp builtin
     refine .inr ⟨by cases directOnly <;> simp_all, ?_⟩
-    cases form <;> try cases isBuiltin
-    case call callee ids resolution =>
-      cases resolution <;> try cases isBuiltin
-      case builtinFunction function => exact ⟨callee, ids, function, rfl⟩
+    rcases Bool.or_eq_true_iff.mp isBuiltin with isBuiltin | isProxy
+    · exact .inl (builtin_of_true isBuiltin)
+    · exact .inr (proxy_of_true isProxy)
 
 private theorem policy_supported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
     (supported : supportedForm directOnly allowIndices allowConstructors form = true) :
     CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.SupportedForm form := by
-  rcases form_of_supported supported with ((((leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩) | ⟨_, _, instantiation, ids, rfl⟩) | ⟨_, composite⟩) | ⟨_, callee, ids, function, rfl⟩
+  rcases form_of_supported supported with ((((leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩) | ⟨_, _, instantiation, ids, rfl⟩) | ⟨_, composite⟩) | ⟨_, (⟨callee, ids, function, rfl⟩ | ⟨inner, rfl⟩)⟩
   · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
     · exact .literal atomic
     · exact .read name binder
@@ -183,6 +197,8 @@ private theorem policy_supported {directOnly allowIndices allowConstructors : Bo
     · exact .conditional _ _ _
 
   · exact .builtin callee ids function
+
+  · exact .proxy inner
 
 def SiteReady (rows : List SourceSpecialization.SpecializedFunction) (node : ExpressionNode) : Prop :=
   match node.form with

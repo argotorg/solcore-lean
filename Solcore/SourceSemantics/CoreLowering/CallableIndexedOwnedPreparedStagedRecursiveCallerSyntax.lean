@@ -154,6 +154,7 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
   | leaf tree =>
     obtain ⟨product, _literalSites⟩ := tree
     exact .leaf (product_syntax product)
+  | proxy receipt => exact .proxy receipt.metadata.found receipt.form
   | group metadata form _found _sourceType _child ih =>
     exact .group metadata.found form ih
   | @tuple id node ids types codes header sequence children ih =>

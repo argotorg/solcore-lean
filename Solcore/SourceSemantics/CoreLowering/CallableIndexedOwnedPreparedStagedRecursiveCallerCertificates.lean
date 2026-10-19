@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedReadProductTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
@@ -79,6 +80,8 @@ theorem PolicyFor.on {policy : SourceCoreFunctions.Policy} {compilation : Source
 
 inductive GeneralSyntaxFor (directSites : DeclarationInstantiation → Prop) (source : TypedSource) : ExpressionId → Prop where
   | leaf {id} (tree : CompatibleExpressionProducts.Syntax source id) : GeneralSyntaxFor directSites source id
+  | proxy {id node inner} (found : source.lookupExpression? id = some node)
+      (form : node.form = .proxy inner) : GeneralSyntaxFor directSites source id
   | group {id node inner} (found : source.lookupExpression? id = some node)
       (form : node.form = .group inner) (child : GeneralSyntaxFor directSites source inner) : GeneralSyntaxFor directSites source id
   | tuple {id node ids} (found : source.lookupExpression? id = some node)
@@ -120,7 +123,7 @@ abbrev GeneralSyntax (source : TypedSource) (id : ExpressionId)
   GeneralSyntaxFor directSites source id
 
 namespace GeneralSyntax
-export GeneralSyntaxFor (leaf group tuple constructor builtin direct call unary binary conditional index)
+export GeneralSyntaxFor (leaf proxy group tuple constructor builtin direct call unary binary conditional index)
 /-- Only actual evaluated subexpressions are recursive child obligations. -/
 def RuntimeChild (form : ExpressionForm) (id : ExpressionId) : Prop :=
   match form with
@@ -136,6 +139,7 @@ theorem syntax_found {directSites : DeclarationInstantiation → Prop} {source :
     (tree : GeneralSyntax source id directSites) : ∃ node, source.lookupExpression? id = some node := by
   cases tree with
   | leaf finite => cases finite <;> exact ⟨_, ‹source.lookupExpression? id = some _›⟩
+  | proxy found _ => exact ⟨_, found⟩
   | group found _ _ => exact ⟨_, found⟩
   | tuple found _ _ => exact ⟨_, found⟩
   | constructor found _ _ _ => exact ⟨_, found⟩
@@ -172,6 +176,9 @@ theorem syntax_child {directSites : DeclarationInstantiation → Prop} {source :
           rcases member with same | same
           · exact same.symm ▸ GeneralSyntax.leaf first
           · exact same.symm ▸ GeneralSyntax.leaf second
+  | proxy selected form =>
+      cases Option.some.inj (selected.symm.trans found)
+      simp [form, RuntimeChild, ExpressionForm.references] at edge
   | @group _ _ inner selected form innerTree =>
       cases Option.some.inj (selected.symm.trans found)
       have same : child = inner := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
@@ -240,6 +247,7 @@ theorem direct_site {directSites : DeclarationInstantiation → Prop}
     cases Option.some.inj (selected.symm.trans found)
     cases actual.symm.trans form
     exact site
+  | proxy selected actual
   | group selected actual _ | tuple selected actual _ | constructor selected actual _ _
   | builtin selected actual _ | call selected actual _ _ | unary selected actual _
   | binary selected actual _ _ | conditional selected actual _ _ _
@@ -474,6 +482,10 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
       (tree : CallableIndexedOwnedPreparedStagedReadProductTreeBounds.Certificate readFuel values
         source context compilation.solvedRequirements reasonAt scope id code) :
       Certificate policy body compilation readFuel values source context reasonAt scope id code
+  | proxy {id node inner owner header}
+      (receipt : CompatibleExpressionProxies.Header values source id node inner owner header) :
+      Certificate policy body compilation readFuel values source context reasonAt scope id
+        ⟨.namedData owner, LanguageResult.success (.construct ⟨owner, 0⟩ (.word header))⟩
   | group {id node inner innerNode code}
       (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node code.type)
       (form : node.form = .group inner)
@@ -1758,6 +1770,21 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
       unique declarations (method_step_product_policy_on policyFor) closed
       (fun id node allowed tree found => coercions id node allowed (.leaf tree) found) tree admitted found typed accepted
     exact ⟨.leaf ⟨tree, sites⟩, (CompatibleExpressionPrimitives.Tree.product tree).projected found⟩
+  | proxy originalFound form =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    have certificate := CompatibleExpressionProxies.certificate_of_functions originalFound form
+      (policyFor.special _ admitted (.proxy originalFound form)
+        (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form])
+        (by intro actual same; cases Option.some.inj (originalFound.symm.trans same); simp [form, OperatorForm]))
+      (policyFor.read _ admitted (.proxy originalFound form)
+        (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form]))
+      policyFor.leaf accepted
+    cases certificate with
+    | proxy receipt =>
+      have same := Option.some.inj (receipt.metadata.found.symm.trans originalFound)
+      exact ⟨.proxy receipt, by simpa only [same] using receipt.metadata.projected⟩
   | group originalFound form child ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)

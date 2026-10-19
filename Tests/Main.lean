@@ -5,6 +5,7 @@ import Solcore.Test.SourceCoreSelectedCompoundProfile
 import Solcore.Test.SourceCoreSelectedBitNotProfile
 import Solcore.Test.SourceCoreSelectedProjectedAssignmentProfile
 import Solcore.Test.SourceCoreSelectedProjectedBitNotProfile
+import Solcore.Test.SourceCoreSelectedProxyProfile
 import Solcore.Test.SourceCoreSelectedCompletionProfile
 import Solcore.Test.SourceCoreSelectedPrimitiveProfile
 import Solcore.Test.SourceCoreSelectedBodyControlRuntime
@@ -3756,6 +3757,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedBitNot.run
   Tests.SourceCoreSelectedProjectedAssignment.run
   Tests.SourceCoreSelectedProjectedBitNot.run
+  Tests.SourceCoreSelectedProxy.run
   Tests.SourceCoreSelectedCapturedDirect.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run

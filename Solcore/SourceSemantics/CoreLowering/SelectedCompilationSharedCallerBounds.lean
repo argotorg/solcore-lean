@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProxyBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationReadProductBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationIndexBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority
@@ -112,6 +113,11 @@ theorem preserves_reached_with_functions
         (Point rootScope rootId rootCode) callFaults size := by
   revert reached
   induction root with
+  | proxy receipt =>
+      intro _reached _directHeads _methodHeads _indexReady _indirectHeads size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedAdmittedStagedProxyBounds.preserves
+        functions extension bridge unique callFaults size (.proxy receipt)
   | leaf tree =>
       intro reached _directHeads _methodHeads _indexReady _indirectHeads size _within current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -494,6 +500,11 @@ theorem reflects_reached_with_functions
         (Point rootScope rootId rootCode) callFaults size := by
   revert reached
   induction root with
+  | proxy receipt =>
+      intro _reached _directHeads _methodHeads _indexReady _indirectHeads size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedAdmittedStagedProxyBounds.reflects
+        functions extension bridge callFaults size (.proxy receipt)
   | leaf tree =>
       intro reached _directHeads _methodHeads _indexReady _indirectHeads size _within current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point

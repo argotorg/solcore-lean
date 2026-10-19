@@ -30,7 +30,7 @@ theorem at_of_accepted {checked : SourceCoreCompatibleCatalog.Checked}
       generalize shape : node.form = original at supported ⊢
       cases supported with
       | literal atomic => cases atomic <;> rfl
-      | read | unary | binary | index | conditional | group | tuple | constructor | builtin | direct | call => rfl)
+      | proxy | read | unary | binary | index | conditional | group | tuple | constructor | builtin | direct | call => rfl)
 
 
 theorem indirect_of_accepted {checked : SourceCoreCompatibleCatalog.Checked}

@@ -189,7 +189,7 @@ private instance metadataTestDecidable {checked : SourceCoreCompatibleCatalog.Ch
   case call callee ids resolution => cases resolution <;> infer_instance
 
 private def relevantForm : ExpressionForm → Bool
-  | .reference _ (.local _) | .reference _ (.builtinBoolean _) | .literal _ | .integerLiteral _ _
+  | .proxy _ | .reference _ (.local _) | .reference _ (.builtinBoolean _) | .literal _ | .integerLiteral _ _
     | .unary _ _ | .binary _ _ _ | .index _ _ | .conditional _ _ _ | .group _ | .tuple _
     | .constructor _ _ | .call _ _ (.builtinFunction _) | .call _ _ (.declaration _)
     | .call _ _ (.indirect _) => true
@@ -200,7 +200,7 @@ private theorem relevant_of_supported {form : ExpressionForm}
     relevantForm form = true := by
   cases supported with
   | literal atomic => cases atomic <;> rfl
-  | read | unary | binary | index | conditional | group | tuple | constructor | builtin | direct | call => rfl
+  | proxy | read | unary | binary | index | conditional | group | tuple | constructor | builtin | direct | call => rfl
 
 private def nodeMetadata? {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : CallableIndexedNamedGeneration.Prepared checked)

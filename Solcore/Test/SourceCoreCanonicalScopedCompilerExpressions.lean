@@ -104,6 +104,7 @@ private theorem children_reached {fuel : Nat} {scope : SourceCoreLocalCell.Scope
     (member : entry ∈ step.children) : RelayReached observed entry.1 := by
   cases step with
   | leaf => cases member
+  | proxy => cases member
   | boundary => cases member
   | ordinary head _ receipt =>
       have args := actual.relay_reached_arguments reached receipt.metadata.found receipt.form

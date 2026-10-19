@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProxyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -143,6 +144,11 @@ theorem preserves_reached
         (Point rootScope rootId rootCode) callFaults size := by
   revert reached
   induction root with
+  | proxy receipt =>
+      intro _reached _noMethods _noDirect _noIndexes _ports size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedAdmittedStagedProxyBounds.preserves
+        functions extension bridge unique callFaults size (.proxy receipt)
   | leaf tree =>
       intro reached _noMethods _noDirect _noIndexes _ports size _within current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -441,6 +447,11 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         (Point rootScope rootId rootCode) callFaults size := by
   revert reached
   induction root with
+  | proxy receipt =>
+      intro _reached _noMethods _noDirect _noIndexes _ports size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedAdmittedStagedProxyBounds.reflects
+        functions extension bridge callFaults size (.proxy receipt)
   | leaf tree =>
       intro reached _noMethods _noDirect _noIndexes _ports size _within current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point

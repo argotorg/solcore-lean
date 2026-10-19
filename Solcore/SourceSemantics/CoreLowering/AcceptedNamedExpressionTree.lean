@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AcceptedProxyExpressionReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompositeExpressionReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedOrdinaryExpressionReceipt
@@ -32,6 +33,8 @@ theorem LeafForm.view {form : ExpressionForm} (leaf : LeafForm form) :
 
 def DirectForm (form : ExpressionForm) : Prop :=
   ∃ callee arguments instantiation, form = .call callee arguments (.declaration instantiation)
+
+def ProxyForm (form : ExpressionForm) : Prop := ∃ inner, form = .proxy inner
 
 def IndexForm (form : ExpressionForm) : Prop := ∃ base key, form = .index base key
 
@@ -72,6 +75,7 @@ inductive Cause {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell
       (notIndirect : ¬ IndirectForm head.node.form) (notMethod : ¬ MethodForm head.node.form)
       (notIndex : ¬ IndexForm head.node.form) (notConstructor : ¬ ConstructorForm head.node.form)
       (notComposite : ¬ CompositeForm head.node.form) (notBuiltin : ¬ BuiltinForm head.node.form)
+      (notProxy : ¬ ProxyForm head.node.form)
   | constructorRange (selected : head.special = none) {instantiation : DataConstructorInstantiation} {ids : List ExpressionId}
       (form : head.node.form = .constructor instantiation ids)
       (missing : ¬ CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
@@ -86,6 +90,9 @@ inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
     (lowered : SourceCoreBasic.LoweredExpr) where
   | leaf (head : Head policy body fuel current source scope id reasonAt lowered)
       (plain : head.special = none) (form : LeafForm head.node.form)
+  | proxy (head : Head policy body fuel current source scope id reasonAt lowered)
+      (plain : head.special = none)
+      (receipt : CompatibleExpressionProxies.Certificate valueContext source scope id lowered)
   | ordinary (head : Head policy body fuel current source scope id reasonAt lowered)
       (plain : head.special = none) {callee : ExpressionId} {arguments : List ExpressionId}
       {instantiation : DeclarationInstantiation}
@@ -145,7 +152,7 @@ def evidenceChildren {callee : ExpressionId} {arguments : List ExpressionId}
 
 def Step.children : Step root source scope reasonAt fuel id lowered →
     List (ExpressionId × SourceCoreBasic.LoweredExpr)
-  | .leaf .. | .boundary .. => []
+  | .leaf .. | .proxy .. | .boundary .. => []
   | .ordinary _ _ receipt => ordinaryChildren receipt
   | .evidence _ _ receipt => evidenceChildren receipt
   | .indirect _ _ receipt => receipt.entries
@@ -219,7 +226,7 @@ theorem Step.child_accepted (actual : Step root source scope reasonAt fuel id lo
     (entry : ExpressionId × SourceCoreBasic.LoweredExpr) (member : entry ∈ actual.children) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel current source scope entry.1 reasonAt = .ok entry.2 := by
   cases actual with
-  | leaf => cases member
+  | leaf | proxy => cases member
   | boundary => cases member
   | ordinary head plain receipt => exact (mapM_receipt receipt.generated).2.1 entry member
   | evidence head selected receipt =>
@@ -322,7 +329,10 @@ theorem Step.of_head
                   · obtain ⟨callee, ids, function, form⟩ := builtin
                     obtain ⟨receipt⟩ := AcceptedOrdinaryExpressionReceipt.builtin_of_head root head selected form
                     exact ⟨.builtin head selected receipt⟩
-                  · exact ⟨.boundary head (.form selected leaf direct indirect method index constructor composite builtin)⟩
+                  · by_cases proxy : ProxyForm head.node.form
+                    · obtain ⟨inner, form⟩ := proxy
+                      exact ⟨.proxy head selected (AcceptedProxyExpressionReceipt.of_head root head selected form)⟩
+                    · exact ⟨.boundary head (.form selected leaf direct indirect method index constructor composite builtin proxy)⟩
         | some output =>
           have same := head.result output selected
           have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)

@@ -30,6 +30,7 @@ private theorem mapM_eq_of_members {α β ε : Type} {items : List α}
 
 private inductive FormInFragment : ExpressionForm → Prop where
   | atomic {form} (leaf : CompatibleExpressionLiterals.Atomic form) : FormInFragment form
+  | proxy {inner} : FormInFragment (.proxy inner)
   | read {name binder} : FormInFragment (.reference name (.local binder))
   | group {inner} : FormInFragment (.group inner)
   | tuple {ids} : FormInFragment (.tuple ids)
@@ -60,6 +61,9 @@ private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : E
       | pair selected form _ _ =>
           cases Option.some.inj (selected.symm.trans found)
           exact form.symm ▸ FormInFragment.tuple
+  | proxy selected form =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact form.symm ▸ FormInFragment.proxy
   | group selected form _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.group
@@ -269,6 +273,10 @@ theorem compiler_step_eq_of_hook (fuel : Nat) {id : ExpressionId} {node : Expres
                   simp only [formEq, atomicForm, viewReading, sourceProfile.leaf,
                     SourceCoreCompatibleDataExpressions.leafLowerer, compatibleReading, viewCompatibleReading, bind, Except.bind, atomicBasic]
               | integer literal resolution => rfl
+          | proxy =>
+              simp only [formEq, viewReading, sourceProfile.leaf,
+                SourceCoreCompatibleDataExpressions.leafLowerer, compatibleReading, viewCompatibleReading,
+                SourceCoreCompatibleDataExpressions.lowerWithReasons, bind, Except.bind, pure, Except.pure]
           | read =>
               simp only [formEq, viewReading, sourceProfile.lower, readLower]
           | @group inner =>

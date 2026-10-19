@@ -39,6 +39,9 @@ theorem Trace.syntax_or_boundary
         rcases form.view with atomic | ⟨name, binder, localForm⟩
         · exact .inl (.leaf (.literal head.found atomic))
         · exact .inl (.leaf (.read head.found localForm))
+      | proxy head plain receipt =>
+        cases receipt with
+        | proxy header => exact .inl (.proxy header.metadata.found header.form)
       | boundary head cause => exact .inr ⟨.here head cause children⟩
       | ordinary head plain receipt =>
         refine .inl (.direct receipt.metadata.found receipt.form

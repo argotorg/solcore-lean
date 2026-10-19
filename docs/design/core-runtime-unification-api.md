@@ -4,6 +4,14 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Proxy expressions and initial public inputs (2026-10-19)
+
+`AcceptedProxyExpressionReceipt.of_head` derives the original proxy header from an accepted selected compiler action and its actual policy. `GeneralSyntaxFor.proxy` identifies the original node; `Certificate.proxy` retains its raw inner type, registry entry and emitted constructor. The legacy scalar leaf syntax remains unchanged.
+
+`CallableIndexedOwnedAdmittedStagedProxyBounds.{preserves,reflects}` carries that value through the actual caller state with an unchanged heap. `SelectedCompilationStageProxyLifting.lifts` connects the independent ordinary Source outcome, including authentic earlier stage rejection. The shared compiler and body folds construct these leaves internally; public checked-session APIs gain no semantic callback.
+
+`SourceCoreSelectedProxySourceFirst.{literal_from_source,echo_from_source}` connects original Source traces to initial whole-output forwarding. Actual bootstrap and encoded input supply the receiving registry through `SelectedCompilationCertifiedPublicInitialData`. The complete three-entry fixture keeps all original declarations and cache rows; its runtime companion checks distinct raw proxy identities, zero-fuel suspension, reuse and wrong-inner rejection followed by valid reuse.
+
 ## Prepared closures and initial data inputs (2026-10-19)
 
 `PreparedLambdaBodySupport` and its formation producer retain the actual compiled closure code, original Source view, exact captures, caller history and same-compilation diagnostic receipt. `CallableIndexedOwnedPreparedPhysicalClosureAssociation.preparedBranching` carries this support through the selected physical model. Formation, staged lifting and public closure application dispatch consume that positive association. `functions_include_raw` supplies only the raw callable projection; it replaces the former `functions_include_prepared` accessor without replacing the stronger association used by execution proofs.

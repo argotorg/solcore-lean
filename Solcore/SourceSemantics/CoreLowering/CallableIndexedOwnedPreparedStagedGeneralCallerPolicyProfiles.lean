@@ -18,6 +18,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : CallableInd
 
 inductive SupportedForm : ExpressionForm → Prop where
   | literal {form} (atomic : CompatibleExpressionLiterals.Atomic form) : SupportedForm form
+  | proxy (inner : TypeSystem.Ty) : SupportedForm (.proxy inner)
   | read (name : String) (binder : Resolved.LocalId) : SupportedForm (.reference name (.local binder))
   | unary (operator : Solcore.Syntax.UnaryOp) (operand : ExpressionId) : SupportedForm (.unary operator operand)
   | binary (left : ExpressionId) (operator : Solcore.Syntax.BinaryOp) (right : ExpressionId) : SupportedForm (.binary left operator right)
@@ -53,6 +54,10 @@ theorem syntax_node {id : ExpressionId}
       refine ⟨_, found, ?_⟩
       rw [form]
       exact .tuple _
+  | proxy found form =>
+    refine ⟨_, found, ?_⟩
+    rw [form]
+    exact .proxy _
   | group found form _child =>
     refine ⟨_, found, ?_⟩
     rw [form]
@@ -231,7 +236,7 @@ theorem contextual_same {id : ExpressionId} {node : ExpressionNode}
     dsimp only
     rw [ordinary name binder form]
     rfl
-  | index | unary | binary | conditional | group | constructor | direct | builtin => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
+  | proxy | index | unary | binary | conditional | group | constructor | direct | builtin => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
   | tuple => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
   | call => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
 
@@ -262,7 +267,7 @@ theorem evidence_none
         simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
     | read =>
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
-    | index | unary | binary | conditional | group | constructor | builtin =>
+    | proxy | index | unary | binary | conditional | group | constructor | builtin =>
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
     | tuple =>
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
@@ -306,7 +311,7 @@ private theorem special_none
   cases supported with
   | literal atomic => cases atomic <;> rfl
   | read name binder => simp only [metadata.localRead id tree node found name binder form, Bool.false_eq_true, ↓reduceIte]
-  | index | unary | binary | conditional | group | constructor | direct | builtin => rfl
+  | proxy | index | unary | binary | conditional | group | constructor | direct | builtin => rfl
   | tuple => rfl
   | call => rfl
 
@@ -398,7 +403,7 @@ private theorem special_none_on
   cases supported with
   | literal atomic => cases atomic <;> rfl
   | read name binder => simp only [metadata.localRead id admitted tree node found name binder form, Bool.false_eq_true, ↓reduceIte]
-  | index | unary | binary | conditional | group | constructor | direct | builtin => rfl
+  | proxy | index | unary | binary | conditional | group | constructor | direct | builtin => rfl
   | tuple => rfl
   | call => rfl
 
