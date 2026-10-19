@@ -114,7 +114,6 @@ inductive GeneralSyntaxFor (directSites : DeclarationInstantiation → Prop) (so
 
   | index {id node base key keyNode} (found : source.lookupExpression? id = some node)
       (form : node.form = .index base key) (keyFound : source.lookupExpression? key = some keyNode)
-      (scalar : CompatibleExpressionIndices.SourceScalar keyNode.type)
       (first : GeneralSyntaxFor directSites source base) (second : GeneralSyntaxFor directSites source key) : GeneralSyntaxFor directSites source id
 
 /-- The established syntax remains the monomorphic specialization of one grammar. -/
@@ -148,7 +147,7 @@ theorem syntax_found {directSites : DeclarationInstantiation → Prop} {source :
   | call found _ _ _ => exact ⟨_, found⟩
   | unary found _ _ => exact ⟨_, found⟩
   | binary found _ _ _ => exact ⟨_, found⟩
-  | index found _ _ _ _ _ => exact ⟨_, found⟩
+  | index found _ _ _ _ => exact ⟨_, found⟩
   | conditional found _ _ _ _ => exact ⟨_, found⟩
 
 theorem syntax_child {directSites : DeclarationInstantiation → Prop} {source : TypedSource} {id child : ExpressionId}
@@ -212,7 +211,7 @@ theorem syntax_child {directSites : DeclarationInstantiation → Prop} {source :
       rcases member with same | same
       · exact same.symm ▸ first
       · exact same.symm ▸ second
-  | @index _ _ base key _ selected form _keyFound _scalar first second =>
+  | @index _ _ base key _ selected form _keyFound first second =>
       cases Option.some.inj (selected.symm.trans found)
       have member : child = base ∨ child = key := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
       rcases member with same | same
@@ -251,7 +250,7 @@ theorem direct_site {directSites : DeclarationInstantiation → Prop}
   | group selected actual _ | tuple selected actual _ | constructor selected actual _ _
   | builtin selected actual _ | call selected actual _ _ | unary selected actual _
   | binary selected actual _ _ | conditional selected actual _ _ _
-  | index selected actual _ _ _ _ =>
+  | index selected actual _ _ _ =>
     cases Option.some.inj (selected.symm.trans found)
     simp [form] at actual
 
@@ -595,7 +594,6 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
       (keyFound : source.lookupExpression? key = some keyNode)
       (form : node.form = .index base key)
       (sourceType : baseNode.type = .mapping keyNode.type node.type)
-      (scalar : CompatibleExpressionIndices.SourceScalar keyNode.type)
       (firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first)
       (secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second) :
       Certificate policy body compilation readFuel values source context reasonAt scope id
@@ -752,21 +750,19 @@ inductive Calls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
       (inside : Calls compiler firstTree) :
-      Calls compiler (.index header keyFound form sourceType scalar firstTree secondTree)
+      Calls compiler (.index header keyFound form sourceType firstTree secondTree)
   | index_key {scope id node base key baseNode keyNode layout comparison first second}
       {header : CompatibleExpressionIndices.Header values source id base node baseNode layout comparison first second}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
       (inside : Calls compiler secondTree) :
-      Calls compiler (.index header keyFound form sourceType scalar firstTree secondTree)
+      Calls compiler (.index header keyFound form sourceType firstTree secondTree)
   | method_child {scope id otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt policy body otherFuel compilation
         values source scope id reasonAt code}
@@ -926,21 +922,19 @@ inductive DirectCalls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
       (inside : DirectCalls compiler firstTree) :
-      DirectCalls compiler (.index header keyFound form sourceType scalar firstTree secondTree)
+      DirectCalls compiler (.index header keyFound form sourceType firstTree secondTree)
   | index_key {scope id node base key baseNode keyNode layout comparison first second}
       {header : CompatibleExpressionIndices.Header values source id base node baseNode layout comparison first second}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
       (inside : DirectCalls compiler secondTree) :
-      DirectCalls compiler (.index header keyFound form sourceType scalar firstTree secondTree)
+      DirectCalls compiler (.index header keyFound form sourceType firstTree secondTree)
   | method_child {scope id otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt policy body otherFuel compilation
         values source scope id reasonAt code}
@@ -1098,21 +1092,19 @@ inductive MethodCalls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
       (inside : MethodCalls compiler firstTree) :
-      MethodCalls compiler (.index header keyFound form sourceType scalar firstTree secondTree)
+      MethodCalls compiler (.index header keyFound form sourceType firstTree secondTree)
   | index_key {scope id node base key baseNode keyNode layout comparison first second}
       {header : CompatibleExpressionIndices.Header values source id base node baseNode layout comparison first second}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
       (inside : MethodCalls compiler secondTree) :
-      MethodCalls compiler (.index header keyFound form sourceType scalar firstTree secondTree)
+      MethodCalls compiler (.index header keyFound form sourceType firstTree secondTree)
   | method_child {scope id otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt policy body otherFuel compilation
         values source scope id reasonAt code}
@@ -1152,21 +1144,20 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
     (indexed : CompatibleExpressionIndices.Header values source indexId base node baseNode layout comparison indexFirst indexSecond)
     (indexKeyFound : source.lookupExpression? key = some keyNode)
     (indexForm : node.form = .index base key)
-    (indexSourceType : baseNode.type = .mapping keyNode.type node.type)
-    (indexScalar : CompatibleExpressionIndices.SourceScalar keyNode.type) :
+    (indexSourceType : baseNode.type = .mapping keyNode.type node.type) :
     {scope : SourceCoreLocalCell.Scope} → {id : ExpressionId} → {code : SourceCoreBasic.LoweredExpr} →
       Certificate policy body compilation readFuel values source context reasonAt scope id code → Prop where
   | here
       (firstTree : Certificate policy body compilation readFuel values source context reasonAt indexScope base indexFirst)
       (secondTree : Certificate policy body compilation readFuel values source context reasonAt indexScope key indexSecond) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar
-        (.index indexed indexKeyFound indexForm indexSourceType indexScalar firstTree secondTree)
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType
+        (.index indexed indexKeyFound indexForm indexSourceType firstTree secondTree)
   | group {scope id node inner innerNode code}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node code.type}
       {form : node.form = .group inner} {found : source.lookupExpression? inner = some innerNode}
       {type : node.type = innerNode.type}
       {child : Certificate policy body compilation readFuel values source context reasonAt scope inner code}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar child) : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.group actual form found type child)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType child) : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.group actual form found type child)
   | tuple_child {scope id node tupleIds types codes}
       {header : CompatibleExpressionTuples.Header values source id node tupleIds types codes}
       {sequence : DataExpressionSequence.Tree source
@@ -1174,8 +1165,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {children : ∀ child code, (child, code) ∈ tupleIds.zip codes →
         Certificate policy body compilation readFuel values source context reasonAt scope child code}
       {child childCode} (member : (child, childCode) ∈ tupleIds.zip codes)
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (children child childCode member)) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.tuple header sequence children)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (children child childCode member)) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.tuple header sequence children)
   | constructor_child {scope id node instantiation constructorIds tag headerWord codes}
       {header : CompatibleExpressionConstructors.Header values source id node instantiation tag headerWord codes}
       {form : node.form = .constructor instantiation constructorIds}
@@ -1188,8 +1179,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {children : ∀ child code, (child, code) ∈ constructorIds.zip codes →
         Certificate policy body compilation readFuel values source context reasonAt scope child code}
       {child childCode} (member : (child, childCode) ∈ constructorIds.zip codes)
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (children child childCode member)) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.constructor header form admissible ranges count nodes sequence children)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (children child childCode member)) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.constructor header form admissible ranges count nodes sequence children)
   | builtin_child {scope id otherCallee otherIds function otherFuel code}
       {outer : CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt policy body otherFuel compilation
         values source scope id otherCallee otherIds function reasonAt code}
@@ -1201,8 +1192,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {children : ∀ child childCode, (child, childCode) ∈ otherIds.zip outer.codes →
         Certificate policy body compilation readFuel values source context reasonAt scope child childCode}
       {child childCode} (member : (child, childCode) ∈ otherIds.zip outer.codes)
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (children child childCode member)) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.builtin outer calleeTyped sourceType nativeTypes sequence children)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (children child childCode member)) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.builtin outer calleeTyped sourceType nativeTypes sequence children)
   | direct_child {scope id otherCallee otherIds instantiation otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt policy body otherFuel compilation
         values source scope id otherCallee otherIds instantiation reasonAt code}
@@ -1213,8 +1204,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {children : ∀ child childCode, (child, childCode) ∈ otherIds.zip outer.codes →
         Certificate policy body compilation readFuel values source context reasonAt scope child childCode}
       {child childCode} (member : (child, childCode) ∈ otherIds.zip outer.codes)
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (children child childCode member)) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.direct outer calleeTyped application sequence children)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (children child childCode member)) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.direct outer calleeTyped application sequence children)
   | call_child {scope id otherCallee otherIds otherMetadata otherFuel code types}
       {outer : CallableIndirectCallCertificates.Receipt policy body otherFuel compilation source scope
         id otherCallee otherIds otherMetadata reasonAt code}
@@ -1223,8 +1214,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {children : ∀ child childCode, (child, childCode) ∈ outer.entries →
         Certificate policy body compilation readFuel values source context reasonAt scope child childCode}
       {child childCode} (member : (child, childCode) ∈ outer.entries)
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (children child childCode member)) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.call outer sequence children)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (children child childCode member)) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.call outer sequence children)
 
   | unary_child {scope id node operand childNode operator operandType resultType core childCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node core.resultType}
@@ -1232,8 +1223,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {inputType : childNode.type = operandType} {outputType : node.type = resultType}
       {profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core}
       {child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar child) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.unary actual form found inputType outputType profile child)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType child) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.unary actual form found inputType outputType profile child)
   | binary_left {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
@@ -1242,8 +1233,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar first) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType first) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
   | binary_right {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
@@ -1252,8 +1243,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar second) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType second) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
   | conditional_condition {scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node type}
       {form : node.form = .conditional condition thenId elseId}
@@ -1262,8 +1253,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {conditionType : conditionNode.type = .bool} {thenType : thenNode.type = node.type} {elseType : elseNode.type = node.type}
       {conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩}
       {thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩} {elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar conditionTree) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType conditionTree) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
   | conditional_then {scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node type}
       {form : node.form = .conditional condition thenId elseId}
@@ -1272,8 +1263,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {conditionType : conditionNode.type = .bool} {thenType : thenNode.type = node.type} {elseType : elseNode.type = node.type}
       {conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩}
       {thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩} {elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar thenTree) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType thenTree) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
   | conditional_else {scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node type}
       {form : node.form = .conditional condition thenId elseId}
@@ -1282,8 +1273,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {conditionType : conditionNode.type = .bool} {thenType : thenNode.type = node.type} {elseType : elseNode.type = node.type}
       {conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩}
       {thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩} {elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar elseTree) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType elseTree) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
 
 
   | index_base {scope id node base key baseNode keyNode layout comparison first second}
@@ -1291,21 +1282,19 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar firstTree) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.index header keyFound form sourceType scalar firstTree secondTree)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType firstTree) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.index header keyFound form sourceType firstTree secondTree)
   | index_key {scope id node base key baseNode keyNode layout comparison first second}
       {header : CompatibleExpressionIndices.Header values source id base node baseNode layout comparison first second}
       {keyFound : source.lookupExpression? key = some keyNode}
       {form : node.form = .index base key}
       {sourceType : baseNode.type = .mapping keyNode.type node.type}
-      {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
       {firstTree : Certificate policy body compilation readFuel values source context reasonAt scope base first}
       {secondTree : Certificate policy body compilation readFuel values source context reasonAt scope key second}
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar secondTree) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.index header keyFound form sourceType scalar firstTree secondTree)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType secondTree) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.index header keyFound form sourceType firstTree secondTree)
   | method_child {scope id otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt policy body otherFuel compilation
         values source scope id reasonAt code}
@@ -1315,8 +1304,8 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {children : ∀ child childCode, (child, childCode) ∈ outer.arguments.zip outer.codes →
         Certificate policy body compilation readFuel values source context reasonAt scope child childCode}
       {child childCode} (member : (child, childCode) ∈ outer.arguments.zip outer.codes)
-      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (children child childCode member)) :
-      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType indexScalar (.method outer sequence children)
+      (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (children child childCode member)) :
+      Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.method outer sequence children)
 
 
 /-- The legacy grammar excludes mapping access without a runtime assumption. -/
@@ -1327,9 +1316,8 @@ def NoIndexes {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     (indexed : CompatibleExpressionIndices.Header values source indexId base node baseNode layout comparison first second)
     (keyFound : source.lookupExpression? key = some keyNode)
     (form : node.form = .index base key)
-    (sourceType : baseNode.type = .mapping keyNode.type node.type)
-    (scalar : CompatibleExpressionIndices.SourceScalar keyNode.type),
-    Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root → False
+    (sourceType : baseNode.type = .mapping keyNode.type node.type),
+    Indexes (indexScope := indexScope) indexed keyFound form sourceType root → False
 
 private theorem product_policy_on {scope : SourceCoreLocalCell.Scope} {allowed : ExpressionId → Prop}
     (policyFor : PolicyOn policy compilation readFuel values source scope reasonAt allowed) :
@@ -2047,14 +2035,14 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
       | unary otherForm _ _ _ | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ => simp [form] at otherForm
 
 
-  | @index id original base key keyNode originalFound form keyFound scalar firstSyntax secondSyntax firstIH secondIH =>
+  | @index id original base key keyNode originalFound form keyFound firstSyntax secondSyntax firstIH secondIH =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
-      have syntaxTree : GeneralSyntax source id directSites := .index originalFound form keyFound scalar firstSyntax secondSyntax
+      have syntaxTree : GeneralSyntax source id directSites := .index originalFound form keyFound firstSyntax secondSyntax
       obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types unique originalFound form
         (coercions _ _ admitted syntaxTree originalFound) typed
       obtain ⟨baseNode, baseContains, baseType⟩ := baseTyped.stored_type
@@ -2067,7 +2055,7 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
       obtain ⟨layout, comparison, first, second, rfl, header, firstGenerated, secondGenerated⟩ :=
         CompatibleExpressionIndices.index_of_functions originalFound baseFound form
           (policyFor.special _ admitted syntaxTree (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form]) (by intro actual same; cases Option.some.inj (originalFound.symm.trans same); simp [form, OperatorForm])) (policyFor.read _ admitted syntaxTree (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form])) policyFor.leaf accepted
-      exact ⟨.index header keyFound form baseType scalar
+      exact ⟨.index header keyFound form baseType
         (firstIH baseFound baseTyped firstGenerated
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))).1
         (secondIH keyFound keyTyped secondGenerated

@@ -183,7 +183,7 @@ theorem of_read_child
       have impossible := compiler.form
       simp [form] at impossible
     indexReady := by
-      intro indexScope indexId base key node baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _scalar _path
+      intro indexScope indexId base key node baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _path
       obtain ⟨name, binder, readForm⟩ := childReads indexId node indexed.metadata.found
       simp [readForm] at form
     methodReady := by

@@ -78,9 +78,7 @@ theorem ActualHeader.select_syntax {fixture : CompiledFixture}
     GeneralSyntax actual.header.function.source observed.selectShape.value.node.id := by
   rw [actual.source]
   refine .index observed.selectShape.value.found observed.selectShape.form
-    observed.selectShape.lookup.value.found ?_ ?_ ?_
-  · rw [observed.selectShape.lookup.value.type]
-    exact .word
+    observed.selectShape.lookup.value.found ?_ ?_
   · refine .direct observed.selectShape.base.value.found observed.selectShape.base.form ?_ ?_
     · rw [observed.selectShape.base.exact]; exact ⟨rfl, rfl⟩
     · intro child member

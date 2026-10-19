@@ -61,6 +61,9 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   (unique : NodeOccurrencesUnique invocation.source)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
+  (functionTypes : FunctionRuntimeViews functions)
+  (indexObservations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions
+    (CallableIndexedLambdaValues.Identity compiled.indexed))
   (extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry
     completion.result.context.registry)
@@ -92,7 +95,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
   completion.result.diagnostics
 
 include callerBridge receiver functions runtime unique
-  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+  observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 private theorem preserves {budget rootScope rootId rootCode}
     (root : Certificate policy body compilation readFuel
       (.initial compiled.compatible.checked) invocation.source context reasonAt rootScope rootId rootCode)
@@ -105,7 +108,7 @@ private theorem preserves {budget rootScope rootId rootCode}
       (Point rootScope rootId rootCode) callFaults size := by
   intro size
   exact SelectedCompilationSharedCallerBounds.preserves_reached_with_functions
-    bridge receiver functions runtime unique observations extension semantic
+    bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
     sameLedger runtimeLedger uninitializedOn size root reached
     (fun compiler path callee application sequence childSize _within =>
       (directHeads compiler path callee application sequence).1 childSize)
@@ -117,7 +120,7 @@ private theorem preserves {budget rootScope rootId rootCode}
     size (Nat.le_refl _)
 
 include callerBridge receiver functions runtime unique
-  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+  observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Finite compiler structure supplies every ordered child lift. Call heads
 are indexed by their actual compiler receipt and path in this same tree. -/
 theorem laws (budget : Nat) {rootScope rootId rootCode}
@@ -132,7 +135,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
   induction root with
   | proxy receipt =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.proxy receipt) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       intro size _within current child code point
@@ -140,7 +143,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
       exact SelectedCompilationStageProxyLifting.lifts bridge functions unique size (.proxy receipt)
   | leaf tree =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.leaf tree) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       intro size _within current child code point
@@ -149,7 +152,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         sameLedger runtimeLedger unique size tree
   | @unary id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType unaryProfile child ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.unary metadata form found inputType outputType unaryProfile child) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression operand) :=
@@ -163,7 +166,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         obtain ⟨rfl, rfl⟩ := pair
         exact ih reached0 (fun compiler inside => directHeads compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => methodHeads compiler (.unary_child
-            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => indirectHeads compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside))
       intro size within
@@ -171,10 +174,10 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (childCode := ⟨core.operandType, childCode⟩) metadata form unique found
         (children := RecursiveStageTupleMeaning.Entries rootScope [(operand, ⟨core.operandType, childCode⟩)])
         ⟨rfl, by simp⟩ (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within))
-  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree ihFirst ihSecond =>
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
-        sameLedger runtimeLedger uninitializedOn (.index header keyFound form sourceType scalar firstTree secondTree) reached
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
+        sameLedger runtimeLedger uninitializedOn (.index header keyFound form sourceType firstTree secondTree) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression base) :=
         .expression reached header.metadata.found (by simp [form, ExpressionForm.references])
@@ -191,30 +194,30 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
           exact ihFirst reached0
             (fun compiler inside => directHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_base
+              (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
-            (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.index_base
+              (firstTree := firstTree) (secondTree := secondTree) inside))
+            (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             (fun compiler inside => indirectHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
 
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           exact ihSecond reached1
             (fun compiler inside => directHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_key
+              (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
-            (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.index_key
+              (firstTree := firstTree) (secondTree := secondTree) inside))
+            (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             (fun compiler inside => indirectHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
 
       intro size within
       exact SelectedCompilationStageIndexLifting.index bridge header keyFound form unique
@@ -223,7 +226,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.binary metadata form leftFound rightFound leftType rightType outputType binaryProfile first second) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
@@ -242,7 +245,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => methodHeads compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
-            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.binary_left
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => indirectHeads compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -253,7 +256,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => methodHeads compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
-            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.binary_right
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => indirectHeads compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -267,7 +270,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree ihCondition ihThen ihElse =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression condition) :=
@@ -290,7 +293,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_condition
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_condition
@@ -305,7 +308,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_then
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_then
@@ -320,7 +323,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_else
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_else
@@ -336,7 +339,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.group metadata form innerFound sourceType child) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
@@ -345,7 +348,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
           (Point rootScope inner code) := by
         exact ih innerReached (fun compiler inside => directHeads compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => methodHeads compiler
-          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => indirectHeads compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside))
       intro size within current child actual point
@@ -355,7 +358,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @tuple id node ids types codes header sequence children ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.tuple header sequence children) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
@@ -370,7 +373,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         exact ih child code member (childReached child code member)
           (fun compiler inside => directHeads compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => methodHeads compiler
-          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => indirectHeads compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside))
       intro size within
@@ -378,7 +381,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.constructor header form admissible ranges count nodes sequence children) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
@@ -397,7 +400,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
               (sequence := sequence) (children := children) member inside)) (fun compiler inside => methodHeads compiler
             (.constructor_child (header := header) (form := form) (admissible := admissible)
               (ranges := ranges) (count := count) (nodes := nodes)
-              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.constructor_child (header := header) (form := form) (admissible := admissible)
               (ranges := ranges) (count := count) (nodes := nodes)
               (sequence := sequence) (children := children) member inside)) (fun compiler inside => indirectHeads compiler
@@ -411,7 +414,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.builtin compiler calleeTyped sourceType nativeTypes sequence children) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have childReached : ∀ child code, (child, code) ∈ ids.zip compiler.codes →
@@ -430,7 +433,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
             (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
-            (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+            (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
             (sequence := sequence) (children := children) member inside)) (fun nested inside => indirectHeads nested
@@ -444,7 +447,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.direct compiler calleeTyped application sequence children) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have childReached : ∀ child code, (child, code) ∈ ids.zip compiler.codes →
@@ -461,7 +464,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
               (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
-              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
               (sequence := sequence) (children := children) member inside))
           (fun nested inside => indirectHeads nested
@@ -474,7 +477,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @method id fuel lowered types compiler sequence children ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.method compiler sequence children) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have childReached : ∀ child code, (child, code) ∈ compiler.arguments.zip compiler.codes →
@@ -491,7 +494,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
             (sequence := sequence) (children := children) member inside))
           (fun nested inside => methodHeads nested (.method_child (outer := compiler)
             (sequence := sequence) (children := children) member inside))
-          (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.method_child (outer := compiler) (sequence := sequence) (children := children) member inside))
           (fun nested inside => indirectHeads nested (.method_child (outer := compiler)
             (sequence := sequence) (children := children) member inside))
@@ -501,7 +504,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
       intro reached directHeads methodHeads indexReady indirectHeads
-      refine ⟨preserves bridge receiver functions runtime unique observations extension semantic
+      refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.call compiler sequence children) reached
         directHeads methodHeads indexReady indirectHeads, ?_⟩
       have childReached : ∀ child code, (child, code) ∈ compiler.entries →
@@ -520,7 +523,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         exact ih child code member (childReached child code member)
           (fun nested inside => directHeads nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
-          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => indirectHeads nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside))
       intro size within
@@ -528,7 +531,7 @@ theorem laws (budget : Nat) {rootScope rootId rootCode}
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
 
 include callerBridge receiver functions runtime unique
-  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+  observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Projection consumed by the ordinary-trace induction. All child laws are
 constructed by the finite certificate recursion above. -/
 theorem lifts_reached_with_functions (budget : Nat) {rootScope rootId rootCode}
@@ -541,7 +544,7 @@ theorem lifts_reached_with_functions (budget : Nat) {rootScope rootId rootCode}
     (indirectHeads : Indirect bridge model stages callFaults budget root)
     (size : Nat) (within : size ≤ budget) :
     LiftsAt bridge context model stages invocation (Point rootScope rootId rootCode) size := by
-  exact (laws bridge receiver functions runtime unique observations extension semantic
+  exact (laws bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
     sameLedger runtimeLedger uninitializedOn budget root reached
     directHeads methodHeads indexReady indirectHeads).2 size within
 

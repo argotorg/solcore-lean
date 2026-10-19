@@ -77,14 +77,14 @@ theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id directSi
       exact .binary ((expression_lookup edited avoids reached).symm.trans found) form
         (firstIH (.expression reached found (by simp [form, ExpressionForm.references])))
         (secondIH (.expression reached found (by simp [form, ExpressionForm.references])))
-  | @index id node base key keyNode found form keyFound scalar first second firstIH secondIH =>
+  | @index id node base key keyNode found form keyFound first second firstIH secondIH =>
       intro reached
       have baseReached : Reaches source roots (.expression base) :=
         .expression reached found (by simp [form, ExpressionForm.references])
       have keyReached : Reaches source roots (.expression key) :=
         .expression reached found (by simp [form, ExpressionForm.references])
       exact .index ((expression_lookup edited avoids reached).symm.trans found) form
-        ((expression_lookup edited avoids keyReached).symm.trans keyFound) scalar
+        ((expression_lookup edited avoids keyReached).symm.trans keyFound)
         (firstIH baseReached) (secondIH keyReached)
   | @conditional id node condition yes no found form test thenBranch elseBranch testIH thenIH elseIH =>
       intro reached

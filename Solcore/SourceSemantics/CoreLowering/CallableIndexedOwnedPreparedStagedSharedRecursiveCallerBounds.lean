@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProxyBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexHeadBounds
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationGeneralIndexBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCallerHeadHandlers
@@ -65,6 +65,9 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   (unique : NodeOccurrencesUnique invocation.source)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
+  (functionTypes : FunctionRuntimeViews functions)
+  (indexObservations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions
+    (CallableIndexedLambdaValues.Identity compiled.indexed))
   (extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry
     completion.result.context.registry)
@@ -96,7 +99,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
   completion.result.diagnostics
 
 include callerBridge receiver functions wellFormed runtime covers unique
-  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+  observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
@@ -139,7 +142,7 @@ theorem preserves_reached_with_functions
         intro node
         exact ih reached0 (fun compiler inside => directHeads compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => methodHeads compiler (.unary_child
-            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => indirectHeads compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -147,7 +150,7 @@ theorem preserves_reached_with_functions
       apply CallableIndexedOwnedPreparedStagedOperatorBounds.preserves_at
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
-  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree ihFirst ihSecond =>
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression base) :=
         .expression reached header.metadata.found (by simp [form, ExpressionForm.references])
@@ -165,15 +168,15 @@ theorem preserves_reached_with_functions
           exact ihFirst reached0
             (fun compiler inside => directHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_base
+              (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
-            (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.index_base
+              (firstTree := firstTree) (secondTree := secondTree) inside))
+            (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             (fun compiler inside => indirectHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
@@ -181,21 +184,22 @@ theorem preserves_reached_with_functions
           exact ihSecond reached1
             (fun compiler inside => directHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_key
+              (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
-            (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.index_key
+              (firstTree := firstTree) (secondTree := secondTree) inside))
+            (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             (fun compiler inside => indirectHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
-      obtain ⟨port⟩ := indexReady header keyFound form sourceType scalar (.here firstTree secondTree)
+      obtain ⟨port⟩ := indexReady header keyFound form sourceType (.here firstTree secondTree)
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedIndexHeadBounds.preserves
-        bridge functions callFaults unique wellFormed runtime covers header keyFound form sourceType scalar
+      exact SelectedCompilationGeneralIndexBounds.preserves
+        bridge functions callFaults unique header keyFound form sourceType
+        (CallableIndexedLambdaValues.identity_faithful compiled.indexed) indexObservations functionTypes
         (children := RecursiveStageTupleMeaning.Entries current [(base, first), (key, second)])
         ⟨rfl, by simp⟩ ⟨rfl, by simp⟩ (port.missing receiver functions keyFound form)
         size childMeaning ⟨rfl, rfl, rfl⟩
@@ -218,7 +222,7 @@ theorem preserves_reached_with_functions
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => methodHeads compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
-            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.binary_left
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => indirectHeads compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -230,7 +234,7 @@ theorem preserves_reached_with_functions
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => methodHeads compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
-            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.binary_right
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => indirectHeads compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -263,7 +267,7 @@ theorem preserves_reached_with_functions
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_condition
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_condition
@@ -279,7 +283,7 @@ theorem preserves_reached_with_functions
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_then
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_then
@@ -295,7 +299,7 @@ theorem preserves_reached_with_functions
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_else
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_else
@@ -317,7 +321,7 @@ theorem preserves_reached_with_functions
         obtain ⟨rfl, rfl, rfl⟩ := point
         exact ih innerReached (fun compiler inside => directHeads compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => methodHeads compiler
-          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => indirectHeads compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child actual point
@@ -338,7 +342,7 @@ theorem preserves_reached_with_functions
         exact ih child code member (childReached child code member)
           (fun compiler inside => directHeads compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => methodHeads compiler
-          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => indirectHeads compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -364,7 +368,7 @@ theorem preserves_reached_with_functions
               (sequence := sequence) (children := children) member inside)) (fun compiler inside => methodHeads compiler
             (.constructor_child (header := header) (form := form) (admissible := admissible)
               (ranges := ranges) (count := count) (nodes := nodes)
-              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.constructor_child (header := header) (form := form) (admissible := admissible)
               (ranges := ranges) (count := count) (nodes := nodes)
               (sequence := sequence) (children := children) member inside)) (fun compiler inside => indirectHeads compiler
@@ -395,7 +399,7 @@ theorem preserves_reached_with_functions
             (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
             (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
-            (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+            (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
             (sequence := sequence) (children := children) member inside)) (fun nested inside => indirectHeads nested
@@ -425,7 +429,7 @@ theorem preserves_reached_with_functions
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
               (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
-              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
               (sequence := sequence) (children := children) member inside))
           (fun nested inside => indirectHeads nested
@@ -451,7 +455,7 @@ theorem preserves_reached_with_functions
             (sequence := sequence) (children := children) member inside))
           (fun nested inside => methodHeads nested (.method_child (outer := compiler)
             (sequence := sequence) (children := children) member inside))
-          (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.method_child (outer := compiler) (sequence := sequence) (children := children) member inside))
           (fun nested inside => indirectHeads nested (.method_child (outer := compiler)
             (sequence := sequence) (children := children) member inside))
@@ -476,14 +480,14 @@ theorem preserves_reached_with_functions
         exact ih child code member (childReached child code member)
           (fun nested inside => directHeads nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
-          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => indirectHeads nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       exact indirectHeads compiler (.here sequence children) sequence size within childMeaning point
 
 include callerBridge receiver functions wellFormed runtime covers unique
-  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+  observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
 theorem reflects_reached_with_functions
@@ -526,7 +530,7 @@ theorem reflects_reached_with_functions
         intro node
         exact ih reached0 (fun compiler inside => directHeads compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => methodHeads compiler (.unary_child
-            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => indirectHeads compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -534,7 +538,7 @@ theorem reflects_reached_with_functions
       apply CallableIndexedOwnedPreparedStagedOperatorBounds.reflects_at
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
-  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree ihFirst ihSecond =>
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression base) :=
         .expression reached header.metadata.found (by simp [form, ExpressionForm.references])
@@ -552,15 +556,15 @@ theorem reflects_reached_with_functions
           exact ihFirst reached0
             (fun compiler inside => directHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_base
+              (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
-            (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.index_base
+              (firstTree := firstTree) (secondTree := secondTree) inside))
+            (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             (fun compiler inside => indirectHeads compiler (.index_base
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
@@ -568,21 +572,22 @@ theorem reflects_reached_with_functions
           exact ihSecond reached1
             (fun compiler inside => directHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_key
+              (firstTree := firstTree) (secondTree := secondTree) inside)) (fun compiler inside => methodHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
-            (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.index_key
+              (firstTree := firstTree) (secondTree := secondTree) inside))
+            (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             (fun compiler inside => indirectHeads compiler (.index_key
               (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType)
-              (scalar := scalar) (firstTree := firstTree) (secondTree := secondTree) inside))
+              (firstTree := firstTree) (secondTree := secondTree) inside))
             childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
-      obtain ⟨port⟩ := indexReady header keyFound form sourceType scalar (.here firstTree secondTree)
+      obtain ⟨port⟩ := indexReady header keyFound form sourceType (.here firstTree secondTree)
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedIndexHeadBounds.reflects
-        bridge functions callFaults unique wellFormed runtime covers header keyFound form sourceType scalar
+      exact SelectedCompilationGeneralIndexBounds.reflects
+        bridge functions callFaults unique header keyFound form sourceType
+        (CallableIndexedLambdaValues.identity_faithful compiled.indexed) indexObservations functionTypes
         (children := RecursiveStageTupleMeaning.Entries current [(base, first), (key, second)])
         ⟨rfl, by simp⟩ ⟨rfl, by simp⟩ (port.missing receiver functions keyFound form)
         size childMeaning ⟨rfl, rfl, rfl⟩
@@ -605,7 +610,7 @@ theorem reflects_reached_with_functions
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => methodHeads compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
-            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.binary_left
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => indirectHeads compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -617,7 +622,7 @@ theorem reflects_reached_with_functions
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => methodHeads compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
-            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.binary_right
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => indirectHeads compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -650,7 +655,7 @@ theorem reflects_reached_with_functions
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_condition
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_condition
@@ -666,7 +671,7 @@ theorem reflects_reached_with_functions
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_then
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_then
@@ -682,7 +687,7 @@ theorem reflects_reached_with_functions
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => methodHeads compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
-            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar (.conditional_else
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => indirectHeads compiler (.conditional_else
@@ -704,7 +709,7 @@ theorem reflects_reached_with_functions
         obtain ⟨rfl, rfl, rfl⟩ := point
         exact ih innerReached (fun compiler inside => directHeads compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => methodHeads compiler
-          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => indirectHeads compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) size within ⟨rfl, rfl, rfl⟩
       intro current child actual point
@@ -725,7 +730,7 @@ theorem reflects_reached_with_functions
         exact ih child code member (childReached child code member)
           (fun compiler inside => directHeads compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => methodHeads compiler
-          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => indirectHeads compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt_succ _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -751,7 +756,7 @@ theorem reflects_reached_with_functions
               (sequence := sequence) (children := children) member inside)) (fun compiler inside => methodHeads compiler
             (.constructor_child (header := header) (form := form) (admissible := admissible)
               (ranges := ranges) (count := count) (nodes := nodes)
-              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.constructor_child (header := header) (form := form) (admissible := admissible)
               (ranges := ranges) (count := count) (nodes := nodes)
               (sequence := sequence) (children := children) member inside)) (fun compiler inside => indirectHeads compiler
@@ -782,7 +787,7 @@ theorem reflects_reached_with_functions
             (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
             (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
-            (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+            (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
             (sequence := sequence) (children := children) member inside)) (fun nested inside => indirectHeads nested
@@ -812,7 +817,7 @@ theorem reflects_reached_with_functions
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
               (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
-              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+              (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.direct_child (outer := compiler) (calleeTyped := calleeTyped) (application := application)
               (sequence := sequence) (children := children) member inside))
           (fun nested inside => indirectHeads nested
@@ -838,7 +843,7 @@ theorem reflects_reached_with_functions
             (sequence := sequence) (children := children) member inside))
           (fun nested inside => methodHeads nested (.method_child (outer := compiler)
             (sequence := sequence) (children := children) member inside))
-          (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
             (.method_child (outer := compiler) (sequence := sequence) (children := children) member inside))
           (fun nested inside => indirectHeads nested (.method_child (outer := compiler)
             (sequence := sequence) (children := children) member inside))
@@ -863,7 +868,7 @@ theorem reflects_reached_with_functions
         exact ih child code member (childReached child code member)
           (fun nested inside => directHeads nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => methodHeads nested
-          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => indexReady indexed indexFound indexForm indexType indexScalar
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType inside => indexReady indexed indexFound indexForm indexType
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => indirectHeads nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -950,7 +955,8 @@ theorem preserves_reached
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   exact preserves_reached_with_functions callerBridge.forgetSlots receiver functions wellFormed runtime covers unique
-    observations extension semantic sameLedger runtimeLedger uninitializedOn budget root reached
+    observations (CallableIndexedOwnedContextualFunctionViews.runtime_views profile)
+    (CallableIndexedOwnedContextualFunctionViews.observations profile) extension semantic sameLedger runtimeLedger uninitializedOn budget root reached
 
 include callerBridge receiver profile wellFormed runtime covers unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
@@ -968,7 +974,8 @@ theorem reflects_reached
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   exact reflects_reached_with_functions callerBridge.forgetSlots receiver functions wellFormed runtime covers unique
-    observations extension semantic sameLedger runtimeLedger uninitializedOn budget root reached
+    observations (CallableIndexedOwnedContextualFunctionViews.runtime_views profile)
+    (CallableIndexedOwnedContextualFunctionViews.observations profile) extension semantic sameLedger runtimeLedger uninitializedOn budget root reached
 
 end Compatibility
 

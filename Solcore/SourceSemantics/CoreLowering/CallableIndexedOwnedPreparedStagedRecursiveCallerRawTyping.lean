@@ -158,12 +158,12 @@ theorem parent_typed
         metadata.coercions originalTyped
     exact ih elseTyped
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
     exact ih baseTyped
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
@@ -286,12 +286,12 @@ theorem direct_parent_typed
         metadata.coercions originalTyped
     exact ih elseTyped
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
     exact ih baseTyped
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
@@ -305,7 +305,6 @@ variable {indexScope : SourceCoreLocalCell.Scope} {indexId base key : Expression
   {keyFound : source.lookupExpression? key = some keyNode}
   {form : node.form = .index base key}
   {sourceType : baseNode.type = .mapping keyNode.type node.type}
-  {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
 
 /-- One original root typing derivation gives the exact raw parent typing of
 any call reached by the stored finite path. Indirect child inversion retains
@@ -319,7 +318,7 @@ theorem index_parent_typed
     {type : TypeSystem.Ty}
     (unique : NodeOccurrencesUnique source)
     (typed : ExpressionHasType source context rootId type)
-    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root) :
+    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType root) :
     ExpressionHasType source context indexId node.type := by
   induction path generalizing type with
   | here firstTree secondTree =>
@@ -419,12 +418,12 @@ theorem index_parent_typed
         metadata.coercions originalTyped
     exact ih elseTyped
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
     exact ih baseTyped
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
@@ -538,12 +537,12 @@ theorem method_parent_typed
         metadata.coercions originalTyped
     exact ih elseTyped
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
     exact ih baseTyped
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
@@ -557,7 +556,6 @@ variable {indexScope : SourceCoreLocalCell.Scope} {indexId base key : Expression
   {keyFound : source.lookupExpression? key = some keyNode}
   {form : node.form = .index base key}
   {sourceType : baseNode.type = .mapping keyNode.type node.type}
-  {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
 
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerRawTyping

@@ -57,9 +57,9 @@ private theorem method_calls_legacy_syntax {callFuel : Nat} {callScope : SourceC
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
-    exact False.elim (no_indexes_of_syntax _ tree header keyFound form sourceType scalar (.here firstTree secondTree))
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
+    exact False.elim (no_indexes_of_syntax _ tree header keyFound form sourceType (.here firstTree secondTree))
 
 
 theorem no_methods_of_policy_on {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}

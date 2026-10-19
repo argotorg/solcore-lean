@@ -137,16 +137,10 @@ def expression?
           | .index base key =>
               match keyFound : source.lookupExpression? key with
               | none => none
-              | some keyNode => do
-                  let scalar : Option (PLift (CompatibleExpressionIndices.SourceScalar keyNode.type)) :=
-                    if same : keyNode.type = .bool then some ⟨same ▸ .bool⟩
-                    else if same : keyNode.type = .word then some ⟨same ▸ .word⟩
-                    else if same : keyNode.type = .integer then some ⟨same ▸ .integer⟩
-                    else none
-                  let ⟨scalar⟩ ← scalar
+              | some _keyNode => do
                   let ⟨container⟩ ← expression? inputs source fuel base
                   let ⟨lookup⟩ ← expression? inputs source fuel key
-                  pure ⟨.index found form keyFound scalar container lookup⟩
+                  pure ⟨.index found form keyFound container lookup⟩
           | .constructor instantiation ids => do
               let ⟨ranges⟩ ← closedRange? instantiation.parameterSubstitution
               let ⟨children⟩ ← allProof? (fun child => GeneralSyntax source child (DirectSite inputs))

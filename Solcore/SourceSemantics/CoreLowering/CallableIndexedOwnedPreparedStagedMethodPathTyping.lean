@@ -149,12 +149,12 @@ theorem parent_typed
         metadata.coercions originalTyped
     exact ih elseTyped
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped
     exact ih baseTyped
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     have originalTyped := typed_at_lookup unique header.metadata.found typed
     obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
       unique header.metadata.found form header.metadata.coercions originalTyped

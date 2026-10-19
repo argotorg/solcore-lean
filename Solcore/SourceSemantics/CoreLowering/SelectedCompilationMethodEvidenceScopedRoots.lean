@@ -162,7 +162,7 @@ theorem of_child_with_evidence
           SelectedCompilationCatalog.certificates bodies rows port.header port.member,
           SelectedCompilationSourceSignatureFacts.Shape.of_inventory bodies rows port.header port.member⟩⟩
     indexReady := by
-      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _scalar _path
+      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _path
       rcases sourceForms indexId actual (by simpa only [sourceEq] using indexed.metadata.found) with
         ⟨name, resolution, nodeForm⟩ | ⟨callee, arguments, instantiation, nodeForm⟩ <;> simp [nodeForm] at form
     methodReady := by

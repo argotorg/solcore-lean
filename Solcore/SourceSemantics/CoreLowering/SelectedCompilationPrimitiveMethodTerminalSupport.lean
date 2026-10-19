@@ -94,7 +94,7 @@ theorem of_child
         ⟨name, resolution, form⟩ | ⟨spelling, resolution, form⟩ | ⟨condition, first, second, form⟩ <;>
         have impossible := compiler.form <;> simp [form] at impossible
     indexReady := by
-      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _scalar _path
+      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _path
       rcases forms indexId actual (by simpa only [sourceEq] using indexed.metadata.found) with
         ⟨name, resolution, nodeForm⟩ | ⟨spelling, resolution, nodeForm⟩ | ⟨condition, first, second, nodeForm⟩ <;>
         simp [nodeForm] at form

@@ -58,7 +58,7 @@ theorem named_ready {row : SourceSpecialization.SpecializedFunction}
     {rootId : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel (.initial compiled.compatible.checked)
       source context header.reasonAt scope rootId lowered) : IndexReady root := by
-  intro _ _ _ _ _ _ _ _ _ _ _ indexed _ _ _ _ _
+  intro _ _ _ _ _ _ _ _ _ _ _ indexed _ _ _ _
   exact of_prepared prepared diagnostic aligned sameSource indexed
 
 /-- A reached ordinary lambda occurrence retains its original named issuer. -/
@@ -99,7 +99,7 @@ theorem ordinary_ready {function : Dynamic.Closure} {scope : SourceCoreLocalCell
       (function.body.map NodeId.statement) (.expression rootId))
     (root : Certificate policy body compilation readFuel (.initial compiled.compatible.checked)
       source context code.reasonAt rootScope rootId lowered) : IndexReady root := by
-  intro _ _ _ _ _ _ _ _ _ _ _ indexed _ _ _ _ path
+  intro _ _ _ _ _ _ _ _ _ _ _ indexed _ _ _ path
   have actualReached := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.indexes_reached
     path (sameSource ▸ reached)
   exact of_ordinary support reasons sameSource (sameSource ▸ actualReached) indexed

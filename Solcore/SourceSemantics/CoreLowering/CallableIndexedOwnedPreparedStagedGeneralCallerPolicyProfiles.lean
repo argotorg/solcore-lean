@@ -91,7 +91,7 @@ theorem syntax_node {id : ExpressionId}
     refine ⟨_, found, ?_⟩
     rw [form]
     exact .binary _ _ _
-  | index found form _keyFound _scalar _first _second =>
+  | index found form _keyFound _first _second =>
     refine ⟨_, found, ?_⟩
     rw [form]
     exact .index _ _

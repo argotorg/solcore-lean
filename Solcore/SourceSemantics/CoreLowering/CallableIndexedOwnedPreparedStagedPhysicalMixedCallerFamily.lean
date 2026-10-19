@@ -225,7 +225,8 @@ theorem preserves_with_methods (size : Nat) :
       intro current id code point
       exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.preserves_reached_with_functions
         callerBridge.forgetSlots receiver functions wellFormed support.runtime support.covers support.unique
-        observations extension semantic support.sameLedger support.runtimeLedger support.uninitialized
+        observations (CallableIndexedOwnedPhysicalFunctionViews.runtime_views profile)
+        (CallableIndexedOwnedPhysicalFunctionViews.observations profile) extension semantic support.sameLedger support.runtimeLedger support.uninitialized
         budget support.certificate (.root (by simp)) directHeads methodHeads support.indexReady indirectHeads
         budget (Nat.le_refl _) point
     | coercedDirect support =>
@@ -326,7 +327,8 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
       intro current id code point
       exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.reflects_reached_with_functions
         callerBridge.forgetSlots receiver functions wellFormed support.runtime support.covers support.unique
-        observations extension semantic support.sameLedger support.runtimeLedger support.uninitialized
+        observations (CallableIndexedOwnedPhysicalFunctionViews.runtime_views profile)
+        (CallableIndexedOwnedPhysicalFunctionViews.observations profile) extension semantic support.sameLedger support.runtimeLedger support.uninitialized
         budget support.certificate (.root (by simp)) directHeads methodHeads support.indexReady indirectHeads
         budget (Nat.le_refl _) point
     | coercedDirect support =>

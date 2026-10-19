@@ -312,8 +312,8 @@ theorem Step.of_head
           · by_cases index : IndexForm head.node.form
             · obtain ⟨base, key, form⟩ := index
               by_cases operands : AcceptedIndexExpressionReceipt.Operands source base key
-              · obtain ⟨baseNode, keyNode, baseFound, keyFound, scalar⟩ := operands
-                obtain ⟨receipt⟩ := AcceptedIndexExpressionReceipt.of_head root head selected form baseFound keyFound scalar
+              · obtain ⟨baseNode, keyNode, baseFound, keyFound⟩ := operands
+                obtain ⟨receipt⟩ := AcceptedIndexExpressionReceipt.of_head root head selected form baseFound keyFound
                 exact ⟨.index head selected receipt⟩
               · exact ⟨.boundary head (.indexOperands selected form operands)⟩
             · by_cases constructor : ConstructorForm head.node.form

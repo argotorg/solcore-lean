@@ -41,6 +41,7 @@ theorem lifts (budget : Nat)
   intro current id code point
   exact SelectedCompilationStageSharedCallerLifting.lifts_reached_with_functions
     callerBridge.forgetSlots issued (functions support) root.runtime root.unique
+    (observations support) (CallableIndexedOwnedPreparedPhysicalCellOrigins.runtime_views support.profile)
     (observations support) (static_extension support extension) (semantic_extension support issued extension)
     root.sameLedger root.runtimeLedger root.uninitialized budget root.certificate (.root (by simp))
     (SelectedCompilationStageCallHandlers.direct support issued extension root owner keyPhysical children)

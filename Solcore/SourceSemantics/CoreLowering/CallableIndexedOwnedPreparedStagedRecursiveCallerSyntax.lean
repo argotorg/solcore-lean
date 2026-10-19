@@ -194,8 +194,8 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
   | conditional metadata form _conditionFound _thenFound _elseFound _conditionType _thenType _elseType _test _yes _no testIH yesIH noIH =>
     exact .conditional metadata.found form testIH yesIH noIH
 
-  | index header keyFound form _sourceType scalar _first _second firstIH secondIH =>
-    exact .index header.metadata.found form keyFound scalar firstIH secondIH
+  | index header keyFound form _sourceType _first _second firstIH secondIH =>
+    exact .index header.metadata.found form keyFound firstIH secondIH
 
   | @method id fuel lowered types compiler sequence children ih =>
     have childrenSyntax : ∀ child, child ∈ compiler.arguments → SupportedSyntax compilation.plan source child := by
@@ -339,8 +339,8 @@ theorem no_direct_of_syntax
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact syntax_not_index tree header.metadata.found form
 
 /-- Every stored index path contradicts authentic legacy syntax at its
@@ -349,7 +349,7 @@ theorem no_indexes_of_syntax
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel values source context reasonAt scope id lowered)
     (tree : Syntax source id) : NoIndexes root := by
-  intro indexScope indexId base key node baseNode keyNode layout comparison first second indexed keyFound form sourceType scalar path
+  intro indexScope indexId base key node baseNode keyNode layout comparison first second indexed keyFound form sourceType path
   induction path with
   | here firstTree secondTree =>
     exact syntax_not_index tree indexed.metadata.found form
@@ -388,8 +388,8 @@ theorem no_indexes_of_syntax
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact syntax_not_index tree header.metadata.found form
 
 
@@ -403,13 +403,12 @@ theorem indexes_syntax
     {keyFound : source.lookupExpression? key = some keyNode}
     {form : node.form = .index base key}
     {sourceType : baseNode.type = .mapping keyNode.type node.type}
-    {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId} {rootCode : SourceCoreBasic.LoweredExpr}
     {root : Certificate policy body compilation readFuel values source context reasonAt rootScope rootId rootCode}
-    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root) :
+    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType root) :
     SupportedSyntax compilation.plan source indexId := by
   induction path with
-  | here firstTree secondTree => exact certificate_syntax (.index indexed keyFound form sourceType scalar firstTree secondTree)
+  | here firstTree secondTree => exact certificate_syntax (.index indexed keyFound form sourceType firstTree secondTree)
   | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
   | tuple_child _member _inside ih | constructor_child _member _inside ih
   | direct_child _member _inside ih | builtin_child _member _inside ih | method_child _member _inside ih | call_child _member _inside ih => exact ih
@@ -426,10 +425,9 @@ theorem indexes_reached
     {keyFound : source.lookupExpression? key = some keyNode}
     {form : node.form = .index base key}
     {sourceType : baseNode.type = .mapping keyNode.type node.type}
-    {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId} {rootCode : SourceCoreBasic.LoweredExpr}
     {root : Certificate policy body compilation readFuel values source context reasonAt rootScope rootId rootCode}
-    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root)
+    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType root)
     {roots : List NodeId}
     (reached : CallableLambdaBodyReachability.Reaches source roots (.expression rootId)) :
     CallableLambdaBodyReachability.Reaches source roots (.expression indexId) := by
@@ -471,8 +469,8 @@ theorem indexes_reached
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact ih (.expression reached header.metadata.found (by simp [form, ExpressionForm.references]))
 
 theorem calls_syntax_of {directSites : DeclarationInstantiation → Prop} {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
@@ -527,8 +525,8 @@ theorem calls_syntax_of {directSites : DeclarationInstantiation → Prop} {callF
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree header.metadata.found (by
       simp [form, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, ExpressionForm.references]))
 
@@ -596,8 +594,8 @@ theorem direct_calls_syntax_of {directSites : DeclarationInstantiation → Prop}
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree header.metadata.found (by
       simp [form, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, ExpressionForm.references]))
 
@@ -664,8 +662,8 @@ theorem method_calls_syntax_of {directSites : DeclarationInstantiation → Prop}
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree header.metadata.found (by
       simp [form, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, ExpressionForm.references]))
 
@@ -717,8 +715,8 @@ theorem method_calls_reached {callFuel : Nat} {callScope : SourceCoreLocalCell.S
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
 
-  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
-  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree inside ih =>
     exact ih (.expression reached header.metadata.found (by simp [form, ExpressionForm.references]))
 
 theorem no_methods_of_steps {directSites : DeclarationInstantiation → Prop}

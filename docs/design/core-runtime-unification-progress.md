@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## General mapping keys reach selected public execution (2026-10-19)
+
+Accepted mapping indices now retain their original key node and raw type without the previous scalar restriction. The existing general comparator supplies first-match lookup and defaults. Actual compiler receipts preserve base-before-key order, the original diagnostic issuer and both reached heaps. The physical caller model derives function identity observations and runtime views internally; the public proof requires no new semantic callback.
+
+Independent Source traces cover pair, proxy and nominal reads, plus compound writes through pair and proxy keys. All five connect actual initial bootstrap and fresh data encoding to closed whole-output forwarding. The unchanged original program has five functions, five cache rows and five profile rows. Runtime read heaps are `6 / 15 / 6 / 15 / 6 / 15`; repeated writes and readback retain `6 / 27 / 48 / 57 / 6 / 27 / 48 / 57`. Duplicate keys keep first-match precedence, including after repeated updates.
+
+Validation: 43 changed or new modules in a coherent graph of 7,956. All 1,425 affected modules use exact recursively authenticated source/object environments; 951 were freshly elaborated in the frozen graph. All 18 focused runtime suites and 3,521 endpoint audits pass, along with the full build, registered tests, kernel policy and canonical endpoint audits. Audited proof dependencies contain only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Generalized local descriptors, general function-value expressions, broader factory/coercion cases and complete actual-pass composition remain open. Work on generalized cells is separate from this verified checkpoint and must still reach the public session. The second goal remains incomplete.
+
 ## Proxy values reach selected public execution (2026-10-19)
 
 Accepted compiler actions now produce proxy certificates with the original inner type, registry entry and emitted ordinary Core constructor. Static metadata checks retain the proxy node. The general compiler tree, body transport and physical caller folds carry this certificate to preservation, reflection and ordinary Source lifting. The old scalar leaf syntax and public session signatures remain unchanged.

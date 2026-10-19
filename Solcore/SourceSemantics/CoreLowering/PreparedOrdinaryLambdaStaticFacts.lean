@@ -139,7 +139,7 @@ theorem prepared_ordinary_ready {function : Dynamic.Closure} {scope : SourceCore
       (function.body.map NodeId.statement) (.expression rootId))
     (root : Certificate policy body compilation readFuel (.initial compiled.compatible.checked)
       source context code.reasonAt rootScope rootId lowered) : IndexReady root := by
-  intro _ _ _ _ _ _ _ _ _ _ _ indexed _ _ _ _ path
+  intro _ _ _ _ _ _ _ _ _ _ _ indexed _ _ _ path
   have actualReached := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.indexes_reached
     path (sameSource ▸ reached)
   exact of_prepared_ordinary support reasons sameSource (sameSource ▸ actualReached) indexed

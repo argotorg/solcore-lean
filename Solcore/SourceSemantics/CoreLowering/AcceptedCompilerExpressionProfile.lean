@@ -230,15 +230,9 @@ private def index? (source : TypedSource) (node : ExpressionNode) : Option (PLif
         match keyFound : source.lookupExpression? key with
         | none => none
         | some keyNode =>
-          if scalar : keyNode.type = .bool ∨ keyNode.type = .word ∨ keyNode.type = .integer then
-            pure ⟨by
-              simp only [IndexReady, form]
-              refine ⟨baseNode, keyNode, baseFound, keyFound, ?_⟩
-              rcases scalar with same | same | same
-              · exact same ▸ CompatibleExpressionIndices.SourceScalar.bool
-              · exact same ▸ CompatibleExpressionIndices.SourceScalar.word
-              · exact same ▸ CompatibleExpressionIndices.SourceScalar.integer⟩
-          else none
+          pure ⟨by
+            simp only [IndexReady, form]
+            exact ⟨baseNode, keyNode, baseFound, keyFound⟩⟩
   all_goals exact some ⟨by simp only [IndexReady, form]⟩
 
 def ConstructorReady (node : ExpressionNode) : Prop :=

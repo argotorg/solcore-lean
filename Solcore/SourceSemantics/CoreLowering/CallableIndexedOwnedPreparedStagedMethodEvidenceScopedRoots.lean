@@ -154,7 +154,7 @@ theorem of_child_with_evidence
         exact ⟨⟨port, CallableIndexedOwnedPreparedStagedDirectCallAuthority.authenticated_evidence_of_resolved
           compiler port actual caller.resolved caller.signatures caller.ledger caller.assumptions caller.unique⟩⟩
     indexReady := by
-      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _scalar _path
+      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _path
       rcases sourceForms indexId actual (by simpa only [sourceEq] using indexed.metadata.found) with
         ⟨name, resolution, nodeForm⟩ | ⟨callee, arguments, instantiation, nodeForm⟩ <;> simp [nodeForm] at form
     methodReady := by

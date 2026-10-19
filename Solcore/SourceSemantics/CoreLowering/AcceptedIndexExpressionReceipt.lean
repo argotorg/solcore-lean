@@ -17,7 +17,7 @@ open AcceptedNamedExpressionFlow (Head specialAction)
 
 def Operands (source : TypedSource) (base key : ExpressionId) : Prop :=
   ∃ baseNode keyNode, source.lookupExpression? base = some baseNode ∧
-    source.lookupExpression? key = some keyNode ∧ CompatibleExpressionIndices.SourceScalar keyNode.type
+    source.lookupExpression? key = some keyNode
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
@@ -42,7 +42,6 @@ structure Receipt (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
   form : node.form = .index base key
   baseFound : source.lookupExpression? base = some baseNode
   keyFound : source.lookupExpression? key = some keyNode
-  scalar : CompatibleExpressionIndices.SourceScalar keyNode.type
   layout : Core.OrderedMapping.Layout
   comparison : SourceCoreCompatibleDataEquality.Prepared compiled.compatible.checked
   first : SourceCoreBasic.LoweredExpr
@@ -101,8 +100,7 @@ theorem of_head
     (plain : head.special = none) (form : head.node.form = .index base key)
     {baseNode keyNode : ExpressionNode}
     (baseFound : source.lookupExpression? base = some baseNode)
-    (keyFound : source.lookupExpression? key = some keyNode)
-    (scalar : CompatibleExpressionIndices.SourceScalar keyNode.type) :
+    (keyFound : source.lookupExpression? key = some keyNode) :
     Nonempty (Receipt root source scope reasonAt fuel id base key lowered) := by
   have accepted := head.accepted
   have bypass := head.selected
@@ -131,7 +129,7 @@ theorem of_head
       simp only [actualRead', bind, Except.bind, form] at accepted
       obtain ⟨layout, comparison, first, second, output, header, firstAccepted, secondAccepted⟩ :=
         CompatibleExpressionIndices.index_of_lower head.found baseFound form accepted
-      exact ⟨⟨head.node, baseNode, keyNode, head.found, form, baseFound, keyFound, scalar,
+      exact ⟨⟨head.node, baseNode, keyNode, head.found, form, baseFound, keyFound,
         layout, comparison, first, second, output, header,
         by simpa only [Nat.min_self] using firstAccepted,
         by simpa only [Nat.min_self] using secondAccepted⟩⟩

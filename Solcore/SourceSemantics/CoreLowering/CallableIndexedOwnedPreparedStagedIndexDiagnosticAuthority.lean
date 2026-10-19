@@ -86,9 +86,8 @@ def IndexReady {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions
       source indexId base node baseNode layout comparison first second)
     (keyFound : source.lookupExpression? key = some keyNode)
     (form : node.form = .index base key)
-    (sourceType : baseNode.type = .mapping keyNode.type node.type)
-    (scalar : CompatibleExpressionIndices.SourceScalar keyNode.type),
-    Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root →
+    (sourceType : baseNode.type = .mapping keyNode.type node.type),
+    Indexes (indexScope := indexScope) indexed keyFound form sourceType root →
     Nonempty (Port compiled indexed (reasonAt indexId))
 
 /-- A legacy tree needs no new diagnostic evidence. -/
@@ -98,7 +97,7 @@ theorem IndexReady.of_no_indexes {policy : SourceCoreFunctions.Policy} {body : S
     {scope : SourceCoreLocalCell.Scope} {rootId : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     {root : Certificate policy body compilation readFuel (.initial compiled.compatible.checked)
       source context reasonAt scope rootId lowered} (none : NoIndexes root) : IndexReady root := by
-  intro _ _ _ _ _ _ _ _ _ _ _ indexed found form sourceType scalar path
-  exact False.elim (none indexed found form sourceType scalar path)
+  intro _ _ _ _ _ _ _ _ _ _ _ indexed found form sourceType path
+  exact False.elim (none indexed found form sourceType path)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority

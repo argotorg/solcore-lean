@@ -68,7 +68,7 @@ theorem Trace.syntax_or_boundary
         obtain ⟨code, present⟩ := (mapM_receipt (receipt.generated root)).2.2 argument member
         exact all (argument, code) present
       | index head plain receipt =>
-        exact .inl (.index receipt.found receipt.form receipt.keyFound receipt.scalar
+        exact .inl (.index receipt.found receipt.form receipt.keyFound
           (all (_, receipt.first) (by simp only [Step.children, List.mem_cons_self]))
           (all (_, receipt.second) (by simp [Step.children])))
       | primitive head plain receipt =>

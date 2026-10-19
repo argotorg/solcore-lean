@@ -111,7 +111,7 @@ theorem of_child
         ⟨name, binder, form⟩ | ⟨name, value, form⟩ <;>
         have impossible := compiler.form <;> simp [form] at impossible
     indexReady := by
-      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _scalar _path
+      intro indexScope indexId base key actual baseNode keyNode layout comparison first second indexed _keyFound form _sourceType _path
       rcases leaves indexId actual (by simpa only [sourceEq] using indexed.metadata.found) with
         ⟨name, binder, readForm⟩ | ⟨name, value, readForm⟩ <;> simp [readForm] at form
     methodReady := by

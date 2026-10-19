@@ -88,7 +88,7 @@ private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : E
   | binary selected form _ _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.binary
-  | index selected form _ _ _ _ =>
+  | index selected form _ _ _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.index
   | conditional selected form _ _ _ =>

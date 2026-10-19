@@ -4,6 +4,14 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## General mapping keys in selected public execution (2026-10-19)
+
+`AcceptedIndexExpressionReceipt` and the general expression syntax now retain the actual key node and type without a scalar-key restriction. Compiler acceptance, metadata, child order and authentic diagnostic ports remain required. Existing scalar leaf APIs keep their prior scope.
+
+`SelectedCompilationGeneralIndexBounds.{preserves,reflects}` uses the existing general comparator, indexed function identity observations and runtime views. The physical caller factories derive those facts from their real function model. The shared caller folds and `SelectedCompilationStageIndexLifting` carry the same original Source outcomes and heaps to checked public execution.
+
+`SourceCoreSelectedGeneralKeySourceFirst` connects independent pair/proxy/nominal reads and pair/proxy compound writes to initial whole-output forwarding through `SelectedCompilationCertifiedPublicInitialData`. The original five functions, cache rows and profile rows are retained. Runtime reuse checks the first duplicate entry, repeated updates and later reads. The public checked-session signatures gain no semantic callback.
+
 ## Proxy expressions and initial public inputs (2026-10-19)
 
 `AcceptedProxyExpressionReceipt.of_head` derives the original proxy header from an accepted selected compiler action and its actual policy. `GeneralSyntaxFor.proxy` identifies the original node; `Certificate.proxy` retains its raw inner type, registry entry and emitted constructor. The legacy scalar leaf syntax remains unchanged.
