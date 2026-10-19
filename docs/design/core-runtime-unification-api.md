@@ -4,6 +4,14 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized local compiler and public proofs (2026-10-19)
+
+`GenericHeap.CellHeapRepresents` relates ordinary cells and actual generalized descriptors without weakening ordinary-cell representation. `GeneralizedLocalMaterializedAssociation` keeps the actual instance, captured environment, read wrapper and owning frame. `GeneralizedLocalApplicationMeaning` and `CellAwareNamedInvocation` prove both directions of execution for the supported bodies.
+
+`CellAwareNamedSourceInvocation` and its lexical companion construct staged execution from independent ordinary Source traces. `CellAwarePublicInitialStart.{from_call,of_started}` derive the native checkpoint, receiver, mixed heap and input representation from real public startup. `CellAwarePublicNamedForward.first_value` and `CellAwarePublicLexicalForward.first_value` reach successful public export and returned history, or an actual earlier stage rejection with its native result and reached heap. The latter branch is not yet a public failed-outcome endpoint in this checkpoint.
+
+The generalized and interleaved fixtures construct original declarative typing and Source execution before target resume. They retain the complete original program and cache. These bounded observations do not replace the unfinished general checker-to-semantics theorem. Public runtime signatures remain unchanged.
+
 ## Generalized local trace rules (2026-10-19)
 
 `Staging.Recursive.Expression` and its graded version include generalized local reads and their requirement failures. `StatementsIn` and for-loop traces include actual generalized descriptor allocation. `RecursiveErasure`, `RecursiveBodyErasure`, `RecursiveTraceSize` and recursive fault preservation retain the independent Source outcome, allocation and reached heap.

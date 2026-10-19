@@ -1,3 +1,5 @@
+import Solcore.Test.SourceCoreSelectedGeneralizedLocalProfile
+import Solcore.Test.SourceCoreSelectedInterleavedLocalPublic
 import Solcore.Test.SourceCoreSelectedCoercedDirectRuntime
 import Solcore.Test.SourceCoreSelectedLoopProfile
 import Solcore.Test.SourceCoreSelectedMatchProfile
@@ -3760,6 +3762,11 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedProjectedBitNot.run
   Tests.SourceCoreSelectedProxy.run
   Tests.SourceCoreSelectedGeneralKey.run
+  Tests.SourceCoreSelectedGeneralizedLocal.typingProbe
+  Tests.SourceCoreSelectedGeneralizedLocal.run
+  Tests.SourceCoreSelectedInterleavedLocal.typingProbe
+  Tests.SourceCoreSelectedInterleavedLocal.publicProbe
+  Tests.SourceCoreSelectedInterleavedLocal.probe
   Tests.SourceCoreSelectedCapturedDirect.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run

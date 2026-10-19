@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized local calls reach the public session (2026-10-19)
+
+Generalized declarations now keep their captured Source descriptor alongside ordinary cells in one heap relation. The compiler certificate retains each actual instance bundle, ordered read, instantiated body and read-time caller. Local application preserves and reflects execution through real parameter allocation, the terminal body and caller restoration. Ordinary-cell proofs retain their previous meaning.
+
+Independent ordinary Source traces now drive the supported named and lexical bodies through the same compiled entry. The child proofs, diagnostic issuers and scope receipts are constructed internally. Actual public compilation, bootstrap and input encoding supply the initial receiver, physical cache, heap relation and argument representation. Successful output obtains its own sufficient validation budget and returns a reusable mixed-heap history.
+
+Two unchanged original programs exercise this connection. The first generalizes an identity lambda and calls it at Word and Bool. The second stores the first call in an ordinary local before making the second call. Each retains its complete original function, cache row and profile row. Proof-producing observations construct declarative typing for each original body; independent Source execution and the public forward theorem are established before target resume. Runtime companions check exact results, zero-fuel suspension, input rejection and reuse. Their repeated native heap sizes are `2 / 14 / 26 / 38` and `2 / 17 / 32 / 47`.
+
+Validation: 236 changed modules in a coherent graph of 8,190, with exact source, object and recursive dependency fingerprints. All 20 focused runtime suites and 4,253 endpoint audits pass. The full build (8,230 jobs), registered tests, kernel policy and canonical endpoint audit also pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Scope remains explicit. The original typing observers cover these concrete programs; they do not prove soundness of the general checker for generalized locals. Supported local instance bodies are terminal ordinary reads, and the mixed body grammar is limited. Source forwarding permits an actual earlier stage rejection; at this checkpoint that branch reaches the native failure and heap, while public failed-outcome forwarding is subsequent work. Independent proofs for repeated public calls, returned generalized handles, wider compiler forms and complete specialization/evidence/comptime composition remain open. The second goal is incomplete.
+
 ## Generalized local traces preserve independent Source outcomes (2026-10-19)
 
 Recursive staged traces now represent actual generalized declarations, specialized local reads, requirement failures and generalized for-loop initializers. Declaration traces retain the captured descriptor and its actual allocation; they do not evaluate a generalized initializer as an ordinary expression. Erasure and exact trace-size conversion preserve those original Source rules. Deep heap preservation includes successful prefixes and failed coercion paths.
