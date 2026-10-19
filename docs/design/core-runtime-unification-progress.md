@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Returned generalized closures survive public reuse (2026-10-19)
+
+The materialized output proof now retains each actual generalized closure association, captured environment and owning frame through returned functions and pairs. The static body producer follows the real compiler action and closes its expression and body obligations. Selected public output leaves carry these associations into a heterogeneous retained history; callers do not reconstruct them from Source types or handle names.
+
+Direct handle starts recover the actual checkpoint, current decoding registry and typed input from the public request. Independent Source calls then reach successful or failed public outcomes with the exact reached heap. Reflection recovers Source outcomes from actual public completion. The history can keep closures from separate factories while later named and handle calls extend the heap.
+
+The unchanged three-function program exports Word and Bool instances of one generalized identity, then exports another generalized closure capturing a Word seed. An intervening named call precedes calls through both identity handles and the captured handle; the first identity handle is reused afterward. Every target resume follows an independent Source plan built at its actual preceding heap. All three original functions, cache rows, declarative typings and compiler profiles remain present. The seven-call chain has native heap sizes `4 / 10 / 16 / 19 / 22 / 25 / 28 / 31` and preserves the captured value `29`.
+
+Validation: 64 changed modules in a coherent graph of 8,302 modules. All 25 focused runtime suites and 4,572 endpoint audits pass, together with the full build (8,342 jobs), registered tests, kernel policy and canonical endpoint audit. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+This connects returned generalized handles for the supported materialized output and invocation bodies. Broader mixed statement bodies, function-value expressions, the general checker bridge and complete compiler-pass coverage remain unfinished. The three original typing observers certify this complete fixture; they do not establish general checker soundness. The second goal remains incomplete.
+
 ## Generalized execution retains failed public outcomes (2026-10-19)
 
 Supported mixed-cell bodies now connect independent ordinary Source faults to actual public failed sessions. The proof retains the exact fault token, reached heap, caller state, decoding registry and reusable physical history. Reflection starts from an actual failed resume and recovers either the original semantic fault or the authentic earlier stage rejection.

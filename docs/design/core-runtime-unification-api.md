@@ -4,11 +4,21 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Returned generalized handles (2026-10-19)
+
+`CellAwareMaterializedOutput.ValueAt` preserves the actual compiled closure association and owner frame through generalized reads and paired outputs. The materialized expression and named-body producers derive this stronger result from authentic compiler receipts. `CellAwareMaterializedRetainedEntries` stores separate owners in one public history and transports them as the heap grows.
+
+`CellAwarePublicInitialSelectedStart.from_selected_call` retains the actual requested root in the full original inventory. `CellAwarePublicNamedObservedCollection` retains the exact selected output leaves. `CellAwarePublicHandleStart.{from_call,of_started}` derives later packed checkpoints, input types and the receiving registry from real public calls.
+
+`CellAwarePublicRetainedMaterializedForward.{source_success,source_failure}` connects ordinary Source applications to public outcomes and exact reached histories. `CellAwarePublicRetainedMaterializedReflection.{succeeded,failed}` recovers Source outcomes from actual public resumes, retaining genuine stage rejection. `CellAwarePublicRetainedMaterializedHandle.source_frame` derives the actual Source call frame from typed retained history.
+
+`SourceCoreGeneralizedExportRuntime` runs the complete three-function fixture through two factories, an intervening named call and four retained-handle calls. Independent Source plans precede every resume; observed native completion supplies the exact session for the next plan. This extension changes proof consumers and retains the existing public runtime API. General checker soundness and complete compiler coverage remain open.
+
 ## Generalized public failures (2026-10-19)
 
 `CellAwarePublicNamedFailure` connects native fault completion to an actual public failed session, exact reached heap and reusable physical history. Named and lexical failure-forward and continuation APIs consume independent Source outcomes, retaining semantic faults and genuine earlier stage rejections. Their reflection companions recover those outcomes from actual public failed resumes.
 
-The absent-cell compiler profile and `CellAwareAbsentLocalStatements` follow ordinary declarations with no initializer through the mixed Source and native body proofs. The public negative fixture constructs its Source fault before resuming the actual compiled entry; no assumed failed execution supplies the proof. Runtime signatures and Core instructions remain unchanged.
+The absent-cell compiler profile and `CellAwareAbsentAllocation` follow ordinary declarations with no initializer through the mixed Source and native body proofs. The public negative fixture constructs its Source fault before resuming the actual compiled entry; no assumed failed execution supplies the proof. Runtime signatures and Core instructions remain unchanged.
 
 ## Repeated generalized public calls (2026-10-19)
 

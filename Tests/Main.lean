@@ -1,3 +1,5 @@
+import Solcore.Test.SourceCoreGeneralizedExportProbe
+import Solcore.Test.SourceCoreGeneralizedExportRuntime
 import Solcore.Test.SourceCoreSelectedGeneralizedLocalProfile
 import Solcore.Test.SourceCoreSelectedInterleavedLocalPublic
 import Solcore.Test.SourceCoreSelectedCoercedDirectRuntime
@@ -3778,6 +3780,8 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedOperatorAlias.run
   Tests.SourceCoreSelectedCompilationProfile.run
   Tests.SourceCoreMethodOriginEvidence.SelectedSourceOutcomes.run
+  Tests.SourceCoreGeneralizedExport.probe
+  Tests.SourceCoreGeneralizedExport.SourcePublicRuntime.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"
