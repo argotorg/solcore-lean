@@ -1993,6 +1993,7 @@ import Solcore.Test.SourceCoreAcceptedBodyBindings
 import Solcore.Test.SourceCoreMethodOwnEvidenceSequenceForward
 import Solcore.Test.SourceCoreMethodGenericSubstitutionSequenceForward
 import Solcore.Test.SourceCoreMethodDirectEvidenceSequenceForward
+import Solcore.Test.SourceCoreSelectedGeneralizedLocalObservedRuntime
 set_option autoImplicit false
 
 open Solcore
@@ -3764,6 +3765,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedGeneralKey.run
   Tests.SourceCoreSelectedGeneralizedLocal.typingProbe
   Tests.SourceCoreSelectedGeneralizedLocal.run
+  Tests.SourceCoreSelectedGeneralizedLocal.ObservedRuntime.run
   Tests.SourceCoreSelectedInterleavedLocal.typingProbe
   Tests.SourceCoreSelectedInterleavedLocal.publicProbe
   Tests.SourceCoreSelectedInterleavedLocal.probe

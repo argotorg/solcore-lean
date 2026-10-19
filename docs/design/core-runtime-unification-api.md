@@ -4,6 +4,14 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Repeated generalized public calls (2026-10-19)
+
+`CellAwarePublicNextStart.{from_call,of_started}` constructs the actual later checkpoint, receiver, argument representation and current mixed history. It preserves the original function model while transporting the current decoding registry.
+
+`CellAwarePublicNamedObservedOutput.{actual_result,first_success,after_success}` consumes a genuine successful public resume together with the independently derived native completion. Uniqueness of a completed native path establishes the same result and store across different fuel budgets. Callers need no assumed numerical fuel bound.
+
+The generalized continuation fixture derives each later ordinary Source body before target resume. Its observed receipt supplies the exact certified session for the next call. This extension changes proof consumers; public runtime signatures remain unchanged.
+
 ## Generalized local compiler and public proofs (2026-10-19)
 
 `GenericHeap.CellHeapRepresents` relates ordinary cells and actual generalized descriptors without weakening ordinary-cell representation. `GeneralizedLocalMaterializedAssociation` keeps the actual instance, captured environment, read wrapper and owning frame. `GeneralizedLocalApplicationMeaning` and `CellAwareNamedInvocation` prove both directions of execution for the supported bodies.

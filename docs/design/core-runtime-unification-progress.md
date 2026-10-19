@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Repeated generalized calls retain their Source proofs (2026-10-19)
+
+The next public call now starts from the exact session, heap, receiver and handle history returned by its predecessor. `CellAwarePublicNextStart` derives the new argument representation and registry transport from that real request. The independent Source body is reconstructed at the retained heap before each target resume.
+
+An actual successful resume can consume this proof without assuming a known numerical fuel bound. `CellAwarePublicNamedObservedOutput` compares its completed native path with the Source-derived path, proving equality of both value and store. The resulting history retains the actual public session and captured cells. Successful observations also rule out an earlier stage rejection in the same computation.
+
+The unchanged one-function program now runs three successive calls with an independent Source proof before every resume. Each genuine resume receipt supplies the next certified session; the final native heap sizes are `2 / 14 / 26 / 38`. The original program, complete cache and declarative typing remain intact. This closes the previous runtime-only continuation gap for that supported body. Returned generalized handles, broader bodies, the general checker bridge and the complete compiler theorem remain open.
+
+Validation: seven changed modules in a coherent graph of 8,195 modules. All 21 focused runtime suites and 4,267 endpoint audits pass. The full build (8,235 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
 ## Generalized local calls reach the public session (2026-10-19)
 
 Generalized declarations now keep their captured Source descriptor alongside ordinary cells in one heap relation. The compiler certificate retains each actual instance bundle, ordered read, instantiated body and read-time caller. Local application preserves and reflects execution through real parameter allocation, the terminal body and caller restoration. Ordinary-cell proofs retain their previous meaning.
