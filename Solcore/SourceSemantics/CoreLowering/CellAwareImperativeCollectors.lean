@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderCollectors
+import Solcore.SourceSemantics.CoreLowering.TypedImperativeForNative
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentChildren
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTree
@@ -51,6 +53,23 @@ private theorem computation_child {definitions : DataEnvironment}
 private theorem while_condition {definitions : DataEnvironment} {context : Core.Context}
     {type result : Ty} {condition body : Expr} {reason : Word}
     (typed : HasType context (LocalLoop.whileLoop type condition body reason) result definitions) :
+    ∃ childType, HasType context condition childType definitions := by
+  cases typed with
+  | letE allocation installed =>
+    cases installed with
+    | letE written invoked =>
+      cases written with
+      | storeCell reference closure =>
+        cases closure with
+        | inRight unitWF raw =>
+          cases raw with
+          | lambda parameterWF resultWF loop =>
+            obtain ⟨_, shifted⟩ := computation_child loop
+            exact ⟨_, TypedLexicalWhile.Native.remove_front (TypedLexicalWhile.Native.remove_front shifted)⟩
+
+private theorem for_condition {definitions : DataEnvironment} {context : Core.Context}
+    {type result : Ty} {condition body post : Expr} {reason : Word}
+    (typed : HasType context (LocalLoop.iterate type condition body post reason) result definitions) :
     ∃ childType, HasType context condition childType definitions := by
   cases typed with
   | letE allocation installed =>
@@ -392,6 +411,64 @@ theorem collected
         (loopIH declarations generatedLoop loopBodyTyped)
         loopTyped
         (restIH declarations generatedBody tailTyped)
+
+  | @forLoop sourceContext loopContext postContext mode id node initialItems condition conditionNode postItems statements rest
+      found form initialSyntax conditionFound conditionType typed conditionSyntax loopSyntax postSyntax loopSourceTyped postSourceTyped remaining loopIH restIH =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checkedType, _, accepted⟩ := bind_ok accepted
+      cases checkedType
+      obtain ⟨initialCode, generatedInitial, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, initialTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      let nextReceipt : SourceCoreLocalCell.Scope → Expr → Prop := fun loopScope terminal =>
+        ∃ conditionCode loopCode postCode postScope,
+          terminal = LocalLoop.iterate type conditionCode loopCode postCode escaped ∧
+          certificates loopContext loopScope condition ⟨.bool, conditionCode⟩ ∧
+          CellAwareImperativeTree.Tree prepared named compiled certificates administrative reasonAt
+            loopContext loopScope false statements expected type loopCode ∧
+          CellAwareForHeaderTree.Tree prepared named compiled certificates administrative type
+            postContext postScope (LocalLoop.fallthrough type) loopContext loopScope postItems postCode ∧
+          HasType (SourceCoreLocalCell.coreContext loopScope ++ administrative)
+            (LocalLoop.iterate type conditionCode loopCode postCode escaped)
+            (LanguageResult.resultType (LocalLoop.controlType type)) prepared.layouts.definitions
+      have origin := AssignmentDiagnosticOrigins.ForOriginFor.start (tracked := true) found form
+      obtain ⟨loopScope, terminal, completed, initialTree⟩ := CellAwareForHeaderCollectors.collected compiled
+        unique assignmentsPrepared assignmentPolicy binderPolicy allocationPolicy children
+        (continuation := nextReceipt)
+        (fun loopScope terminal loopDeclarations accepted _nativeType nativeTyped => by
+          obtain ⟨conditionCode, generatedCondition, accepted⟩ := bind_ok accepted
+          obtain ⟨checkedType, checkedCondition, accepted⟩ := bind_ok accepted
+          cases checkedType
+          have sameType := ensure_same checkedCondition
+          rcases conditionCode with ⟨native, code⟩
+          dsimp only at sameType
+          subst native
+          obtain ⟨loopCode, generatedLoop, accepted⟩ := bind_ok accepted
+          obtain ⟨postCode, generatedPost, accepted⟩ := bind_ok accepted
+          cases accepted
+          obtain ⟨_, conditionNative⟩ := for_condition nativeTyped
+          obtain ⟨⟨_, loopNative⟩, ⟨_, postNative⟩, loopTyped⟩ := TypedImperativeFor.Native.iterate_children nativeTyped
+          obtain ⟨postScope, postTerminal, postSame, postTree⟩ := CellAwareForHeaderCollectors.collected compiled
+            unique assignmentsPrepared assignmentPolicy binderPolicy allocationPolicy children
+            (continuation := fun _ terminal => terminal = LocalLoop.fallthrough type)
+            (fun _ _ _ accepted _ _ => Except.ok.inj accepted.symm)
+            postSyntax loopDeclarations origin.post_origin generatedPost postNative
+          subst postTerminal
+          exact ⟨code, loopCode, postCode, postScope, rfl,
+            children loopContext loopDeclarations conditionSyntax conditionFound typed generatedCondition conditionNative,
+            loopIH loopDeclarations generatedLoop loopNative, postTree, loopTyped⟩)
+        initialSyntax declarations origin.header generatedInitial initialTyped
+      obtain ⟨conditionCode, loopCode, postCode, postScope, rfl, conditionCertificate, loopTree, postTree, loopTyped⟩ := completed
+      exact .forLoop found form initialTree conditionFound conditionType typed conditionCertificate
+        loopTree postTree loopSourceTyped postSourceTyped loopTyped (restIH declarations generatedBody tailTyped)
 
   | @assign sourceContext mode id node assignment operator rhs rhsNode binder rest found form declaration targetType profile bare rhsFound rhsType assignmentTyped value remaining ih =>
     cases fuel with

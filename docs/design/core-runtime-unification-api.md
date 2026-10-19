@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Mixed for loops reach retained public execution (2026-10-20)
+
+`CellAwareImperativeNamedProgramProfiles` now accepts for headers through the actual common body tree. The header and loop certificates retain the original `BinderExtends` scope, actual compiled children and continue/break behavior. `SourceCoreMixedFor` connects complete original typing and independent Source traces to initial and retained public execution.
+
+Mixed conditional expressions and projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
 ## Actual inference and final prepared call edges (2026-10-20)
 
 `LocalReadEvents`, `LocalReadOriginsProgress` and `LocalReadOriginsInference` record real local lookups and the operational requirement batches issued by inference. `SourceCompiledLocalReadEvents.compile_local_obligations` connects successful selected compilation to these events and to validated local template ownership.

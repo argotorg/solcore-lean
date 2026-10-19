@@ -1,3 +1,7 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForSequenceLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForInitialTreeLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForInitialTerminal
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForHeaderLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceTransferLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceWhileSequenceLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowAssignmentLifting
@@ -149,6 +153,54 @@ theorem lifts
       (fun size => CellAwareImperativeTreeBounds.preserves bridge bindings transport functions extension compiled record producer registered operandIncluded
         booleans unitValue (fun context runtime covers sameLedger childSize _ =>
           preservation context runtime covers sameLedger childSize) sourceEq loopTree issuer size (Nat.le_refl _)) remainingIH
+  | @forLoop context loopContext postContext scope loopScope postScope mode id node initialItems condition conditionNode postItems statements rest expected type conditionCode loopCode postCode initialCode body escaped
+      found form initialTree conditionFound conditionType conditionTyped conditionCertificate loopTree postTree loopSourceTyped postSourceTyped nativeTyped remaining loopIH remainingIH =>
+    have loopMeaning : ∀ size, CellAwareScopeFlowBounds.PreservesAt bridge loopContext
+        (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+        administrative loopScope false statements expected type loopCode size :=
+      fun size => CellAwareImperativeTreeBounds.preserves bridge bindings transport functions extension compiled record producer registered operandIncluded
+        booleans unitValue (fun context runtime covers sameLedger childSize _ =>
+          preservation context runtime covers sameLedger childSize) sourceEq loopTree issuer size (Nat.le_refl _)
+    have postMeaning : ∀ size, CellAwareScopeForPostBounds.PreservesAt bridge loopContext
+        (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+        administrative loopScope postItems expected type postCode size :=
+      fun size => CellAwareForPostTreeBounds.preserves bridge bindings transport functions extension compiled producer registered operandIncluded
+        (fun context runtime covers sameLedger childSize _ => preservation context runtime covers sameLedger childSize)
+        sourceEq postTree size (Nat.le_refl _)
+    have terminalMeaning : ∀ size, CellAwareScopeForInitialBounds.PreservesAt bridge loopContext
+        (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+        administrative loopScope [] condition postItems statements expected type
+        (LocalLoop.iterate type conditionCode loopCode postCode escaped) size := by
+      intro terminalSize mapping world actualContext environment canonical actual before store embedding
+        environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready outcome after trace
+      exact CellAwareForInitialTerminal.preserves bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions)
+        producer transport booleans (fun n _ => preservation loopContext runtime covers sameLedger n)
+        (by simpa only [sourceEq] using conditionFound) conditionType
+        (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped
+        (fun n _ => loopMeaning n) (fun n _ => postMeaning n)
+        loopSourceTyped postSourceTyped terminalSize (Nat.le_refl _)
+        environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready trace
+    have initialMeaning : ∀ size, CellAwareScopeForInitialBounds.PreservesAt bridge context
+        (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+        administrative scope initialItems condition postItems statements expected type initialCode size :=
+      fun size => CellAwareForInitialTreeBounds.preserves bridge bindings transport functions extension compiled producer registered operandIncluded
+        (fun context runtime covers sameLedger childSize _ => preservation context runtime covers sameLedger childSize)
+        sourceEq initialTree (fun n _ => terminalMeaning n) size (Nat.le_refl _)
+    have postLift : CellAwareSourceForLiftBounds.ItemsLifts (named := named) (administrative := administrative)
+        (context := loopContext) (scope := loopScope) (registry := registry) (invocation := invocation) bridge producer postItems := CellAwareSourceForHeaderLifting.lifts bridge transport functions extension compiled producer registered
+      children preservation sourceEq postTree
+    have terminalLift : CellAwareSourceForInitialBounds.InitializersLifts (named := named) (administrative := administrative)
+        (context := loopContext) (scope := loopScope) (registry := registry) (invocation := invocation) bridge producer [] condition postItems statements := CellAwareSourceForInitialTerminal.lifts bridge producer
+      (children loopContext) (preservation loopContext) booleans
+      (by simpa only [sourceEq] using conditionFound) conditionType
+      (by simpa only [sourceEq] using conditionTyped) conditionCertificate loopIH loopMeaning loopSourceTyped
+      postLift postMeaning postSourceTyped
+    have initialLift : CellAwareSourceForInitialBounds.InitializersLifts (named := named) (administrative := administrative)
+        (context := context) (scope := scope) (registry := registry) (invocation := invocation) bridge producer initialItems condition postItems statements := CellAwareSourceForInitialTreeLifting.lifts bridge transport functions extension compiled producer registered
+      children preservation sourceEq initialTree terminalLift
+    intro size mapping world actualContext environment canonical actual before store embedding
+    exact CellAwareSourceForSequenceLifting.lifts bridge producer sourceEq initialLift initialMeaning
+      (by simpa only [sourceEq] using found) form remainingIH
   | @assign context scope mode id node assignment operator rhs rest expected type body
       found form head bare _rightTyped _operands remaining remainingIH =>
     cases invocation with

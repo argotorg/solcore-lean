@@ -1,3 +1,6 @@
+import Solcore.Test.SourceCoreMixedForRuntime
+import Solcore.Test.SourceCoreMixedForProbe
+import Solcore.Test.SourceCoreMixedForWellFormed
 import Solcore.Test.SourceCoreMixedBuiltinHandleRuntime
 import Solcore.Test.SourceCoreMixedBuiltinValueRuntime
 import Solcore.Test.SourceCoreMixedBuiltinValueProbe
@@ -3802,6 +3805,9 @@ def main : IO UInt32 := do
   Tests.SourceCoreMixedBuiltinValue.probe
   Tests.SourceCoreMixedBuiltinValue.ObservedRuntime.run
   Tests.SourceCoreMixedBuiltinValue.HandleRuntime.run
+  Tests.SourceCoreMixedFor.typingProbe
+  Tests.SourceCoreMixedFor.probe
+  Tests.SourceCoreMixedFor.ObservedRuntime.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"

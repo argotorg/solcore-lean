@@ -6,6 +6,8 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The common mixed body producer now follows actual for-loop compilation, including initializer scope, the loop condition and post items. Source lifting and Core preservation/reflection retain generalized closures, ordinary cells and the actual reached heap. Continue executes the post before the next condition; break skips it. Mixed conditional expressions and projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
 Successful selected compilation now derives local lookup and requirement events, validated local template ownership, and the origins and coverage of every final prepared open-call edge from its actual computation. This includes rows appended by operator and coercion selection. The general selected checker theorem still needs to connect these facts to full original declarative typing; generalization timing, reference containment and complete compiler-pass semantics remain open.
 
 Retained builtin handles in mixed sessions now connect actual exported entries and packed inputs to independent ordinary Source success, sufficient public execution/output, and native reflection. The full original fixture proves each call before execution, including reuse of the same handle after an intervening factory call. Mixed for headers, projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain open; the second goal is not complete. See the latest implementation checkpoint for validation.

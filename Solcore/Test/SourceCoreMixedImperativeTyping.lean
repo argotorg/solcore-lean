@@ -195,6 +195,14 @@ mutual
           let ⟨typed⟩ ← expression fuel source context value child.type
           let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed discard type"
           return ⟨context,localFacts,.expressionDiscard (lookupStatement?_sound found) form typed typeEq⟩
+        | .forLoop initial condition post body =>
+          let ⟨loopContext,⟨initialTyped⟩⟩ ← forItems fuel source control context initial
+          let ⟨conditionTyped⟩ ← expression fuel source loopContext condition .bool
+          let bodyTyped ← statements fuel source control.enterLoop loopContext body
+          let ⟨_,⟨postTyped⟩⟩ ← forItems fuel source control.enterLoop loopContext post
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed for type"
+          return ⟨context,⟨.unit,false,false,.loop bodyTyped.facts.control⟩,
+            .forLoop (lookupStatement?_sound found) form initialTyped conditionTyped bodyTyped.typed postTyped typeEq⟩
         | .whileLoop condition body =>
           let ⟨conditionTyped⟩ ← expression fuel source context condition .bool
           let bodyTyped ← statements fuel source control.enterLoop context body
@@ -240,6 +248,51 @@ mutual
           return ⟨context,⟨type,returns,returns,yesTyped.facts.control.branches noTyped.facts.control⟩,
             .ifWithElse (lookupStatement?_sound found) form conditionTyped yesTyped.typed noTyped.typed typeEq⟩
         | _ => throw (IO.userError "unsupported original mixed statement")
+
+  def forItems : (fuel : Nat) → (source : TypedSource) → (control : ControlContext) →
+      (context : SourceSemantics.Context) → (items : List ForItemForm) →
+      IO ((final : SourceSemantics.Context) × PLift (ForItemsHaveType source control context items final))
+    | 0, _, _, _, _ => throw (IO.userError "mixed typing for header bound")
+    | _ + 1, _, control, context, [] => pure ⟨context,⟨.nil control context⟩⟩
+    | fuel + 1, source, control, context, item :: rest => do
+      let ⟨middle,⟨head⟩⟩ ← (show IO ((middle : SourceSemantics.Context) ×
+          PLift (ForItemHasType source control context item middle)) from do
+        match itemEq : item with
+        | .letDecl value initializer =>
+          let ⟨mono⟩ ← observe (value.scheme.quantified = []) "mixed for ordinary binder"
+          let ⟨extended⟩ ← binder context source.owner value
+          let final := context.withLocal value.id value.scheme value.schemeRequirements
+          match accepted : validateSchemeGeneralizes context value.scheme with
+          | .error _ => throw (IO.userError "mixed for ordinary generalization")
+          | .ok () =>
+            let generalized := validateSchemeGeneralizes_success accepted
+            match initialEq : initializer with
+            | none => return ⟨final,⟨by rw [itemEq,initialEq]; exact .letUninitialized mono generalized extended⟩⟩
+            | some id =>
+              let ⟨typed⟩ ← expression fuel source context id value.scheme.body
+              return ⟨final,⟨by rw [itemEq,initialEq]; exact .letInitialized typed mono generalized extended⟩⟩
+        | .expression id =>
+          let some node := source.lookupExpression? id | throw (IO.userError "mixed for expression")
+          let ⟨typed⟩ ← expression fuel source context id node.type
+          return ⟨context,⟨itemEq.symm ▸ .expression typed⟩⟩
+        | .assignValue assignment operator rhs =>
+          let ⟨bare⟩ ← observe (assignment.target.projections = []) "mixed for bare assignment"
+          let ⟨rootTyped⟩ ← writable context assignment.target.root assignment.target.type
+          let targetTyped : SourcePlaceHasType source context assignment.target assignment.target.type :=
+            .intro rootTyped (bare.symm ▸ .nil _) rfl
+          let ⟨rhsTyped⟩ ← expression fuel source context rhs assignment.target.type
+          let ⟨requirements⟩ ← observe (assignment.requirements = []) "mixed for assignment requirements"
+          let ⟨assignmentTyped⟩ ← (show IO (PLift (SourceAssignmentHasType source context assignment operator rhs)) from do
+            if equal : operator = .equal then
+              return ⟨equal.symm ▸ .equal targetTyped rhsTyped requirements⟩
+            else
+              let ⟨kind⟩ ← compound operator
+              let ⟨word⟩ ← observe (assignment.target.type = .word) "mixed for compound Word target"
+              return ⟨.wordCompound kind (word ▸ targetTyped) (word ▸ rhsTyped) requirements⟩)
+          return ⟨context,⟨itemEq.symm ▸ .assignValue assignmentTyped⟩⟩
+        | .assignBitNot _ => throw (IO.userError "unsupported original mixed for unary assignment"))
+      let ⟨final,⟨tail⟩⟩ ← forItems fuel source control middle rest
+      return ⟨final,⟨.cons head tail⟩⟩
 
   def statements : (fuel : Nat) → (source : TypedSource) → (control : ControlContext) →
       (context : SourceSemantics.Context) → (ids : List StatementId) → IO (Statements source control context ids)

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderTree
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNativeBodyTree
@@ -173,6 +175,29 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
         sourceContext scope mode rest expected type body) :
       Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
         expected type (LocalLoop.sequence type (LocalLoop.whileLoop type conditionCode loopCode escaped) body)
+  | forLoop {sourceContext loopContext postContext scope loopScope postScope mode id node initialItems condition conditionNode postItems statements rest expected type conditionCode loopCode postCode initialCode body escaped}
+      (found : (source named).lookupStatement? id = some node)
+      (form : node.form = .forLoop initialItems condition postItems statements)
+      (initialTree : CellAwareForHeaderTree.Tree prepared named compiled certificates administrative type
+        loopContext loopScope (LocalLoop.iterate type conditionCode loopCode postCode escaped)
+        sourceContext scope initialItems initialCode)
+      (conditionFound : (source named).lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTyped : ExpressionHasType (source named) loopContext condition conditionNode.type)
+      (conditionCertificate : certificates loopContext loopScope condition ⟨.bool, conditionCode⟩)
+      (loopTree : Tree prepared named compiled certificates administrative reasonAt
+        loopContext loopScope false statements expected type loopCode)
+      (postTree : CellAwareForHeaderTree.Tree prepared named compiled certificates administrative type
+        postContext postScope (LocalLoop.fallthrough type) loopContext loopScope postItems postCode)
+      (loopSourceTyped : ProtectedStateImperativeTypedSourceSites.Statements (source named) loopContext statements)
+      (postSourceTyped : ∃ control final, ForItemsHaveType (source named) control loopContext postItems final)
+      (nativeTyped : HasType (SourceCoreLocalCell.coreContext loopScope ++ administrative)
+        (LocalLoop.iterate type conditionCode loopCode postCode escaped)
+        (LanguageResult.resultType (LocalLoop.controlType type)) prepared.layouts.definitions)
+      (remaining : Tree prepared named compiled certificates administrative reasonAt
+        sourceContext scope mode rest expected type body) :
+      Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
+        expected type (LocalLoop.sequence type initialCode body)
   | assign {sourceContext scope mode id node assignment operator expression rest expected type body}
       (found : (source named).lookupStatement? id = some node)
       (form : node.form = .assignValue assignment operator expression)

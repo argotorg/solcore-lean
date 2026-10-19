@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderAdmission
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingSourceBodyAdmission
 
@@ -99,6 +101,15 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (loopTree : Scan locals caller active source approved expected false statements)
       (remaining : Scan locals caller active source approved expected mode rest) :
       Scan locals caller active source approved expected mode (id :: rest)
+  | forLoop {mode id node initialItems condition conditionNode postItems statements rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initialItems condition postItems statements)
+      (initialTree : CellAwareForHeaderAdmission.Scan source approved initialItems)
+      (conditionFound : source.lookupExpression? condition = some conditionNode) (conditionType : conditionNode.type = .bool)
+      (conditionSyntax : approved condition)
+      (loopTree : Scan locals caller active source approved expected false statements)
+      (postTree : CellAwareForHeaderAdmission.Scan source approved postItems)
+      (remaining : Scan locals caller active source approved expected mode rest) :
+      Scan locals caller active source approved expected mode (id :: rest)
   | assign {mode id node assignment operator rhs rhsNode binder rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -192,6 +203,18 @@ def scan? (locals : Catalog) (caller : Key) (active : Substitution)
             let ⟨loopTree⟩ ← scan? locals caller active source expression expected fuel false statements
             let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
             pure ⟨.whileLoop found form conditionFound conditionType conditionSyntax loopTree remaining⟩
+          else none
+      | .forLoop initialItems condition postItems statements =>
+        match conditionFound : source.lookupExpression? condition with
+        | none => none
+        | some conditionNode =>
+          if conditionType : conditionNode.type = .bool then do
+            let ⟨initialTree⟩ ← CellAwareForHeaderAdmission.scan? source expression initialItems
+            let ⟨conditionSyntax⟩ ← expression condition
+            let ⟨loopTree⟩ ← scan? locals caller active source expression expected fuel false statements
+            let ⟨postTree⟩ ← CellAwareForHeaderAdmission.scan? source expression postItems
+            let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
+            pure ⟨.forLoop found form initialTree conditionFound conditionType conditionSyntax loopTree postTree remaining⟩
           else none
       | .assignValue assignment operator rhs =>
         match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
@@ -343,6 +366,18 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (loopTree : Syntax locals caller active source approved expected context false statements)
       (remaining : Syntax locals caller active source approved expected context mode rest) :
       Syntax locals caller active source approved expected context mode (id :: rest)
+  | forLoop {context loopContext postContext mode id node initialItems condition conditionNode postItems statements rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initialItems condition postItems statements)
+      (initialTree : CellAwareForHeaderAdmission.Syntax source approved context initialItems loopContext)
+      (conditionFound : source.lookupExpression? condition = some conditionNode) (conditionType : conditionNode.type = .bool)
+      (conditionTyped : ExpressionHasType source loopContext condition conditionNode.type)
+      (conditionSyntax : approved condition)
+      (loopTree : Syntax locals caller active source approved expected loopContext false statements)
+      (postTree : CellAwareForHeaderAdmission.Syntax source approved loopContext postItems postContext)
+      (loopSourceTyped : ProtectedStateImperativeTypedSourceSites.Statements source loopContext statements)
+      (postSourceTyped : ∃ control final, ForItemsHaveType source control loopContext postItems final)
+      (remaining : Syntax locals caller active source approved expected context mode rest) :
+      Syntax locals caller active source approved expected context mode (id :: rest)
   | assign {context mode id node assignment operator rhs rhsNode binder rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -484,6 +519,16 @@ theorem Scan.syntax {locals caller active source approved expected mode statemen
       exact .whileLoop found form conditionFound conditionType
         (expression_at unique conditionFound condition) conditionSyntax
         (loopIH (control := control.enterLoop) result loopTyped) (remainingIH result tail)
+  | forLoop found form initialTree conditionFound conditionType conditionSyntax _ postTree _ loopIH remainingIH =>
+    obtain ⟨_,_,_,head,tail⟩ := head_tail typed
+    have original := form_at unique found head
+    rw [form] at original
+    cases original with
+    | forLoop initialTyped conditionTyped bodyTyped postTyped =>
+      exact .forLoop found form (initialTree.syntax unique initialTyped) conditionFound conditionType
+        (expression_at unique conditionFound conditionTyped) conditionSyntax
+        (loopIH (control := control.enterLoop) result bodyTyped) (postTree.syntax unique postTyped)
+        ⟨control.enterLoop, _, _, bodyTyped⟩ ⟨control.enterLoop, _, postTyped⟩ (remainingIH result tail)
   | assign found form declaration targetType profile bare rhsFound rhsType value _ remainingIH =>
     obtain ⟨_, _, _, head, tail⟩ := head_tail typed
     have original := form_at unique found head

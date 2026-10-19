@@ -1,3 +1,7 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareForSequences
+import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialTreeBounds
+import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialTerminal
+import Solcore.SourceSemantics.CoreLowering.CellAwareForPostTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeTransferFlow
 import Solcore.SourceSemantics.CoreLowering.CellAwareLoopSequences
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBareAssignmentFlow
@@ -335,6 +339,33 @@ theorem preserves {budget : Nat}
       (by simpa only [sourceEq] using found) form remainingIH within
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready trace
+  | @forLoop context loopContext postContext scope loopScope postScope mode id node initialItems condition conditionNode postItems statements rest expected type conditionCode loopCode postCode initialCode body escaped
+      found form initialTree conditionFound conditionType conditionTyped conditionCertificate loopTree postTree loopSourceTyped postSourceTyped nativeTyped remaining loopIH remainingIH =>
+    have postMeaning := CellAwareForPostTreeBounds.preserves (expected := expected) bridge bindings transport functions extension compiled producer registered operandIncluded
+      children sourceEq postTree
+    have terminalMeaning : CellAwareScopeForInitialBounds.PreservesAtMost bridge loopContext
+        (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+        administrative loopScope [] condition postItems statements expected type
+        (LocalLoop.iterate type conditionCode loopCode postCode escaped) budget := by
+      intro terminalSize within mapping world actualContext environment canonical actual before store embedding
+        environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready outcome after trace
+      exact CellAwareForInitialTerminal.preserves bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions)
+        producer transport booleans (children loopContext runtime covers sameLedger)
+        (by simpa only [sourceEq] using conditionFound) conditionType
+        (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH postMeaning
+        loopSourceTyped postSourceTyped terminalSize within
+        environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready trace
+    have initialMeaning := CellAwareForInitialTreeBounds.preserves bridge bindings transport functions extension compiled producer registered operandIncluded
+      children sourceEq initialTree terminalMeaning
+    intro size within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+    exact CellAwareForSequences.preserves bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) producer sourceEq
+      initialMeaning
+      (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
+      (by simpa only [sourceEq] using found) form remainingIH within
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready trace
   | @assign context scope mode id node assignment operator rhs rest expected type body
       found form head bare _rightTyped operands remaining remainingIH =>
     intro size within mapping world actualContext environment canonical actual before store embedding
@@ -625,6 +656,32 @@ theorem reflects {budget : Nat}
       (children context runtime covers sameLedger)
       (by simpa only [sourceEq] using conditionFound) conditionType
       (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH
+      (by simpa only [sourceEq] using found) form remainingIH within
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+  | @forLoop context loopContext postContext scope loopScope postScope mode id node initialItems condition conditionNode postItems statements rest expected type conditionCode loopCode postCode initialCode body escaped
+      found form initialTree conditionFound conditionType conditionTyped conditionCertificate loopTree postTree loopSourceTyped postSourceTyped nativeTyped remaining loopIH remainingIH =>
+    have postMeaning := CellAwareForPostTreeBounds.reflects (expected := expected) bridge bindings transport functions extension compiled producer registered operandIncluded
+      children sourceEq postTree
+    have terminalMeaning : CellAwareScopeForInitialBounds.ReflectsAtMost bridge loopContext
+        (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+        administrative loopScope [] condition postItems statements expected type
+        (LocalLoop.iterate type conditionCode loopCode postCode escaped) budget := by
+      intro terminalSize within mapping world actualContext environment canonical actual before store embedding value finalStore
+        environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready completed
+      exact CellAwareForInitialTerminal.reflects bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions)
+        producer transport booleans (children loopContext runtime covers sameLedger)
+        (by simpa only [sourceEq] using conditionFound) conditionType
+        (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH postMeaning
+        loopSourceTyped postSourceTyped terminalSize within
+        environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready completed
+    have initialMeaning := CellAwareForInitialTreeBounds.reflects bridge bindings transport functions extension compiled producer registered operandIncluded
+      children sourceEq initialTree terminalMeaning
+    intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+    exact CellAwareForSequences.reflects bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) producer sourceEq
+      initialMeaning
       (by simpa only [sourceEq] using found) form remainingIH within
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready completed
