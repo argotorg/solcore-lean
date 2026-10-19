@@ -1994,6 +1994,8 @@ import Solcore.Test.SourceCoreMethodOwnEvidenceSequenceForward
 import Solcore.Test.SourceCoreMethodGenericSubstitutionSequenceForward
 import Solcore.Test.SourceCoreMethodDirectEvidenceSequenceForward
 import Solcore.Test.SourceCoreSelectedGeneralizedLocalObservedRuntime
+import Solcore.Test.SourceCoreSelectedInterleavedLocalCompleteOutcome
+import Solcore.Test.SourceCoreSelectedFaultingLocalPublic
 set_option autoImplicit false
 
 open Solcore
@@ -3766,6 +3768,8 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedGeneralizedLocal.typingProbe
   Tests.SourceCoreSelectedGeneralizedLocal.run
   Tests.SourceCoreSelectedGeneralizedLocal.ObservedRuntime.run
+  Tests.SourceCoreSelectedInterleavedLocal.FailureBridge.publicProbe
+  Tests.SourceCoreSelectedFaultingLocal.FailureBridge.publicProbe
   Tests.SourceCoreSelectedInterleavedLocal.typingProbe
   Tests.SourceCoreSelectedInterleavedLocal.publicProbe
   Tests.SourceCoreSelectedInterleavedLocal.probe

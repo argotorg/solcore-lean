@@ -4,6 +4,12 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized public failures (2026-10-19)
+
+`CellAwarePublicNamedFailure` connects native fault completion to an actual public failed session, exact reached heap and reusable physical history. Named and lexical failure-forward and continuation APIs consume independent Source outcomes, retaining semantic faults and genuine earlier stage rejections. Their reflection companions recover those outcomes from actual public failed resumes.
+
+The absent-cell compiler profile and `CellAwareAbsentLocalStatements` follow ordinary declarations with no initializer through the mixed Source and native body proofs. The public negative fixture constructs its Source fault before resuming the actual compiled entry; no assumed failed execution supplies the proof. Runtime signatures and Core instructions remain unchanged.
+
 ## Repeated generalized public calls (2026-10-19)
 
 `CellAwarePublicNextStart.{from_call,of_started}` constructs the actual later checkpoint, receiver, argument representation and current mixed history. It preserves the original function model while transporting the current decoding registry.

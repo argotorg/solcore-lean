@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized execution retains failed public outcomes (2026-10-19)
+
+Supported mixed-cell bodies now connect independent ordinary Source faults to actual public failed sessions. The proof retains the exact fault token, reached heap, caller state, decoding registry and reusable physical history. Reflection starts from an actual failed resume and recovers either the original semantic fault or the authentic earlier stage rejection.
+
+The compiler profile also accepts an ordinary uninitialized local between generalized execution and the terminal read. Its certificate follows the actual absent-cell allocation and emits no initializer evaluation. The unchanged failure fixture first constructs and invokes a generalized identity closure, stores an ordinary result, allocates an absent Word cell and reads that cell. Independent Source failure proofs precede two fresh public calls with opposite Boolean inputs; both return token `3` at native heap size `17`. The successful interleaved fixture still reaches its complete public outcome through the same APIs.
+
+Validation: 47 changed modules in a coherent graph of 8,240 modules. All 23 focused runtime suites and 4,372 endpoint audits pass, together with the full build (8,280 jobs), registered tests, kernel policy and canonical endpoint audit. Only `propext`, `Classical.choice` and `Quot.sound` occur in audited proof dependencies. The 12 unrelated workspace changes remain excluded.
+
+The new negative public fixture proves its initial calls. A separate runtime regression reuses the failed session, but a Source proof before each such continuation is still needed. Returned generalized handles, broader bodies, the general checker bridge and complete compiler-pass coverage remain unfinished.
+
 ## Repeated generalized calls retain their Source proofs (2026-10-19)
 
 The next public call now starts from the exact session, heap, receiver and handle history returned by its predecessor. `CellAwarePublicNextStart` derives the new argument representation and registry transport from that real request. The independent Source body is reconstructed at the retained heap before each target resume.
