@@ -45,6 +45,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   (selected : (SelectedCompilationPhysicalProgramSupport.stages whole).Closure header.function invocation)
   (authority : CellAwareNamedCallPorts.Authority (compiled := whole) header.named invocation)
   (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed header.named (diagnostics.reasonAt header.named.signature.key))
+  (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics)
   (body : CellAwareImperativeBodyProducer.Body generation (CellAwareImperativeBodyProducer.Certificate generation)
     (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.administrative)
     header.context header.function.resultType)
@@ -75,7 +76,7 @@ private theorem statements : generation.statements = header.function.body := by
     (header.agreement.source ▸ header.agreement.roots)
   exact (List.map_inj_right (fun _ _ same => NodeId.statement.inj same)).mp same
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer projection wellFormed in
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
 /-- The Source allocation and body trace are independent inputs. Every native
 entry, body step and saved-caller restoration is constructed from the compiler. -/
 theorem preserves
@@ -134,8 +135,9 @@ theorem preserves
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
   have meaning := CellAwareImperativeNamedBodyMeaning.preserves bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+    (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
     generation record profile receiver extension authority wellFormed producer
-    (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body functionTyped rfl projection issuer (Nat.le_refl size)
+    (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body functionTyped rfl projection issuer issued (Nat.le_refl size)
     (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
     (before := entryHeap) (store := entryStore) (embedding := entryEmbedding)
@@ -161,7 +163,7 @@ theorem preserves
   exact ⟨by simpa only [header.resultType] using result, restoredHeaps, fullEffect.maps, fullEffect.worlds,
     restoredFrame, fullEffect.metadata, returned, restoredRelated, post⟩
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer projection wellFormed in
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
 /-- Actual native completion is unwrapped through the same named entry. Its
 independent Source grade and concrete saved-caller post are returned together. -/
 theorem reflects
@@ -224,8 +226,9 @@ theorem reflects
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
   have meaning := CellAwareImperativeNamedBodyMeaning.reflects bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+    (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
     generation record profile receiver extension authority wellFormed producer
-    (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body functionTyped rfl projection issuer (Nat.le_refl nativeSize)
+    (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body functionTyped rfl projection issuer issued (Nat.le_refl nativeSize)
     (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
     (before := entryHeap) (store := entryStore) (embedding := entryEmbedding)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentChildren
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTree
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNativeBodyCollectors
@@ -47,6 +48,23 @@ private theorem computation_child {definitions : DataEnvironment}
   cases typed with | caseE child _ _ => exact ⟨_, child⟩
 
 
+private theorem while_condition {definitions : DataEnvironment} {context : Core.Context}
+    {type result : Ty} {condition body : Expr} {reason : Word}
+    (typed : HasType context (LocalLoop.whileLoop type condition body reason) result definitions) :
+    ∃ childType, HasType context condition childType definitions := by
+  cases typed with
+  | letE allocation installed =>
+    cases installed with
+    | letE written invoked =>
+      cases written with
+      | storeCell reference closure =>
+        cases closure with
+        | inRight unitWF raw =>
+          cases raw with
+          | lambda parameterWF resultWF loop =>
+            obtain ⟨_, shifted⟩ := computation_child loop
+            exact ⟨_, TypedLexicalWhile.Native.remove_front (TypedLexicalWhile.Native.remove_front shifted)⟩
+
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
   (compiled : Compilation prepared named diagnostics namedCode)
@@ -58,6 +76,15 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared ch
 compiler actions and native child typing are recovered from the accepted body. -/
 theorem collected
     (record : SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key = .ok named.specialized)
+    (unique : NodeOccurrencesUnique (source named))
+    (assignmentsPrepared : ∃ first, SourceCoreAssignmentFaultSites.prepare (source named) first = .ok compiled.own.assignments)
+    (assignmentPolicy : ∀ fuel scope site assignment operator rhs output next reasonAt,
+      SourceCoreLoops.assignValue policy fuel (source named) scope site assignment operator rhs output next reasonAt =
+      SourceCoreCompatibleDataPlaces.lower (.initial checked) checked.signatures policy.lowerExpression
+        fuel (source named) scope site assignment operator (some rhs) output next reasonAt
+        (diagnostics.placeReason named.signature.key site assignment.target.root none)
+        (GenericAssignmentDiagnostics.token compiled.own.assignments site assignment.target.root operator)
+        (fun type => diagnostics.placeReason named.signature.key site assignment.target.root (some type)))
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement checked)
     (expressionPolicy : policy.lowerExpression =
       SourceCoreGeneralFunctions.lowerContextualExpression prepared.base.sourceProgram
@@ -335,5 +362,101 @@ theorem collected
         exact .ifThen found form conditionFound conditionType typed
           (children sourceContext declarations conditionSyntax conditionFound typed generatedCondition childTyped)
           (thenIH declarations generatedThen thenTyped) (elseIH declarations generatedElse elseTyped) (restIH declarations generatedBody tailTyped)
+
+  | @whileLoop sourceContext mode id node condition conditionNode statements rest found form conditionFound conditionType typed conditionSyntax loopSyntax remaining loopIH restIH =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      obtain ⟨conditionCode, generatedCondition, accepted⟩ := bind_ok accepted
+      obtain ⟨checked, checkedCondition, accepted⟩ := bind_ok accepted
+      cases checked
+      have sameType := ensure_same checkedCondition
+      rcases conditionCode with ⟨native, code⟩
+      dsimp only at sameType
+      subst native
+      obtain ⟨loopCode, generatedLoop, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, loopTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      obtain ⟨_, childTyped⟩ := while_condition loopTyped
+      obtain ⟨⟨_, loopBodyTyped⟩, loopTyped⟩ := TypedLexicalWhile.Native.while_body loopTyped
+      exact .whileLoop found form conditionFound conditionType typed
+        (children sourceContext declarations conditionSyntax conditionFound typed generatedCondition childTyped)
+        (loopIH declarations generatedLoop loopBodyTyped)
+        loopTyped
+        (restIH declarations generatedBody tailTyped)
+
+  | @assign sourceContext mode id node assignment operator rhs rhsNode binder rest found form declaration targetType profile bare rhsFound rhsType assignmentTyped value remaining ih =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checkedType, _, accepted⟩ := bind_ok accepted
+      cases checkedType
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      rw [assignmentPolicy] at accepted
+      obtain ⟨_projections, writable, rightTyped, runtimeProfile⟩ :=
+        ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare assignmentTyped
+      obtain ⟨actualBinder, preparedPlace, index, lowered, _binding, _rootType, _rawView, _slot,
+        _layout, generated, _sameType, _profile, codeEq⟩ := CompatibleBareAssignment.of_lower bare accepted
+      obtain ⟨_, rhsNative⟩ := (CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_children
+        (codeEq ▸ nativeTyped)).1
+      have child : certificates sourceContext scope rhs lowered :=
+        children sourceContext declarations value rhsFound (rhsType.symm ▸ rightTyped) generated rhsNative
+      obtain ⟨head, emitted, token⟩ := GenericAssignmentStatements.Head.of_lower_bare_with_token
+        (administrative := administrative) (definitions := prepared.layouts.definitions)
+        bare unique writable rightTyped runtimeProfile (fun actual acceptedRight => by
+          have same : actual = lowered := Except.ok.inj (acceptedRight.symm.trans generated)
+          subst actual
+          exact ⟨rhsNode, rhsFound, child⟩) accepted
+      have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
+      obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
+      have rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer := by
+        rcases profile with equal | word
+        · exact .inl equal
+        · exact .inr (.inl word)
+      have operands := GenericAssignmentDiagnostics.prepared_operands tablePrepared
+        (lookupStatement?_sound found).1 (.statement form) rawProfile
+      rw [(lookupStatement?_sound found).2, ← token] at operands
+      rw [emitted]
+      exact .assign found form head bare rightTyped operands (ih declarations generatedBody tailTyped)
+
+  | breaking rest found form =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checkedType, _, accepted⟩ := bind_ok accepted
+      cases checkedType
+      cases accepted
+      exact .breaking rest found form
+  | continuing rest found form =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checkedType, _, accepted⟩ := bind_ok accepted
+      cases checkedType
+      cases accepted
+      exact .continuing rest found form
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeCollectors

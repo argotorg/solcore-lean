@@ -52,6 +52,7 @@ structure Body (certificates : SourceSemantics.Context → GenericExpressionMean
 body typing; terminal certificates remain static compiler receipts. -/
 theorem of_static_compilation
     (record : SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key = .ok named.specialized)
+    (assignmentsPrepared : ∃ first, SourceCoreAssignmentFaultSites.prepare (source named) first = .ok compiled.own.assignments)
     {approved : ExpressionId → Prop} {expected : TypeSystem.Ty}
     (profile : StaticProfile prepared named compiled.statements approved expected)
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
@@ -81,7 +82,9 @@ theorem of_static_compilation
       compiled.own.fellThroughReason compiled.own.table.escapedReason := (Except.ok.inj emitted).symm
   rw [emitted] at nativeTyped
   obtain ⟨_, flowTyped⟩ := TypedLexicalWhile.Native.finished_flow nativeTyped
-  have tree := CellAwareImperativeCollectors.collected compiled record rfl rfl (by
+  have tree := CellAwareImperativeCollectors.collected compiled record unique assignmentsPrepared (by
+    intro fuel scope site assignment operator rhs output next reasonAt
+    cases operator <;> rfl) rfl rfl (by
     intro scope binder mono
     simp only [policy, AcceptedNamedBodyFlow.namedPolicy, SourceCoreGeneralFunctions.contextualBinder,
       mono, List.isEmpty_nil, ↓reduceIte]
@@ -109,6 +112,7 @@ abbrev Certificate (compiled : Compilation prepared named diagnostics code)
 common mixed body. Only the original static typing and accepted body remain. -/
 theorem of_compilation
     (record : SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key = .ok named.specialized)
+    (assignmentsPrepared : ∃ first, SourceCoreAssignmentFaultSites.prepare (source named) first = .ok compiled.own.assignments)
     {expected : TypeSystem.Ty} (profile : Profile prepared named compiled.statements expected)
     (unique : NodeOccurrencesUnique (source named))
     {control : ControlContext} (result : control.returnType = expected)
@@ -119,7 +123,7 @@ theorem of_compilation
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext (scope named) ++ administrative)
       compiled.body nativeType prepared.layouts.definitions) :
     Nonempty (Body compiled (Certificate compiled) administrative sourceContext expected) := by
-  apply of_static_compilation compiled record profile ?_ unique result typed declarations nativeTyped
+  apply of_static_compilation compiled record assignmentsPrepared profile ?_ unique result typed declarations nativeTyped
   intro childContext childScope fuel id node lowered childDeclarations syntaxTree found childTyped accepted _ _
   exact CellAwareNamedBodyProducer.expression compiled record syntaxTree unique childDeclarations found childTyped accepted
 

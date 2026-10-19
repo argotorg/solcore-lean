@@ -52,6 +52,8 @@ Broader generalized-local bodies, general function-value expression producers an
 
 The common mixed-cell body tree now also connects generalized and ordinary declarations, discarded expressions, lexical blocks, conditionals and terminal outcomes. Actual compiler actions produce the tree; independent Source lifting, Core preservation/reflection and the public session retain its allocation frames and instance bundles. The unchanged complete one-function fixture supplies independent Source proofs before three public calls covering both branches and reuse, with native heap sizes `2 / 32 / 53 / 83`. Mixed-cell loops and writes, broader materialized bodies and the general selected checker bridge remain open.
 
+The mixed-cell tree also covers finite while loops, bare equal and Word compound assignments, break and continue. The actual loop closure and administrative allocation preserve captured descriptors through repeated iterations and the reached suffix. Assignment retains the pre-RHS snapshot and post-RHS write; its operand interpretation comes from the actual issued diagnostic table and public receiver. The complete unchanged loop fixture has independent Source proofs before two, zero and two iterations across three public calls, retaining native heap sizes `2 / 24 / 46 / 68`. Mixed for headers, projected writes and the general selected checker bridge remain open.
+
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)

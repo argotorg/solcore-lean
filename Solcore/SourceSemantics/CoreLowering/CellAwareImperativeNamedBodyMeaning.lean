@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeFlowFinish
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTreeBounds
@@ -21,6 +22,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
   (bindings : ProtectedStateTransition.Bindings protocol)
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
   (compiled : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics namedCode)
   (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key = .ok named.specialized)
@@ -51,7 +53,7 @@ variable
       (GeneralizedLocalInstanceValues.model whole.indexed)))
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
 
-include bindings record receiver extension authority wellFormed registered in
+include bindings transport record receiver extension authority wellFormed registered in
 theorem preserves {budget : Nat}
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context}
@@ -63,7 +65,8 @@ theorem preserves {budget : Nat}
     (sourceTyped : StatementsHaveType (source named) control context compiled.statements staticFinal facts)
     (depth : control.loopDepth = 0)
     (projection : whole.compatible.checked.catalog.project expected = .ok named.signature.resultType)
-    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key)) :
+    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key))
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics) :
     ∀ {size}, size ≤ budget →
     ∀ {mapping world actualContext environment canonical actual before store embedding},
     DataHeap.EnvRepresents (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
@@ -107,7 +110,8 @@ theorem preserves {budget : Nat}
     finalContext outcome after trace
   rw [body.emitted]
   apply CellAwareScopeFlowFinish.preserves bridge producer
-    (CellAwareImperativeTreeBounds.preserves bridge bindings compiled record producer registered
+    (CellAwareImperativeTreeBounds.preserves bridge bindings transport functions extension compiled record producer registered
+      (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compiled issued receiver represented)
       (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
       (fun _ _ => CompatiblePayload.ValueRep.unit)
       (fun childContext childRuntime childCovers childLedger childSize _ =>
@@ -117,7 +121,7 @@ theorem preserves {budget : Nat}
     sourceEq sourceTyped depth projection _ _ within environments heaps locals agrees actualTyped runtime covers sameLedger typed
     initial admitted lexical physical owner sameLocation ready trace
 
-include bindings record receiver extension authority wellFormed registered in
+include bindings transport record receiver extension authority wellFormed registered in
 theorem reflects {budget : Nat}
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context}
@@ -129,7 +133,8 @@ theorem reflects {budget : Nat}
     (sourceTyped : StatementsHaveType (source named) control context compiled.statements staticFinal facts)
     (depth : control.loopDepth = 0)
     (projection : whole.compatible.checked.catalog.project expected = .ok named.signature.resultType)
-    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key)) :
+    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key))
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics) :
     ∀ {size}, size ≤ budget →
     ∀ {mapping world actualContext environment canonical actual before store embedding},
     DataHeap.EnvRepresents (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
@@ -173,7 +178,8 @@ theorem reflects {budget : Nat}
     value finalStore completed
   rw [body.emitted] at completed
   apply CellAwareScopeFlowFinish.reflects bridge producer
-    (CellAwareImperativeTreeBounds.reflects bridge bindings compiled record producer registered
+    (CellAwareImperativeTreeBounds.reflects bridge bindings transport functions extension compiled record producer registered
+      (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compiled issued receiver represented)
       (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
       (fun _ _ => CompatiblePayload.ValueRep.unit)
       (fun childContext childRuntime childCovers childLedger childSize _ =>

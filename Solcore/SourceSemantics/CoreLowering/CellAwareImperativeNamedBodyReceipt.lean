@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSourceTyping
@@ -23,6 +24,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
 include aligned in
 theorem of_header
     (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     (certified : SelectedCompilationNamedSourceTyping.Certified header)
     {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
     (member : entry ∈ whole.indexed.entries)
@@ -51,6 +53,8 @@ theorem of_header
   obtain ⟨final, facts, typed, _⟩ := certified.statements
   rw [sourceEq, statementsEq] at typed
   apply CellAwareImperativeBodyProducer.of_compilation prepared.compilation record
+    (CallableIndexedOwnedIssuedAssignmentRecipes.assignments_prepared prepared.selected prepared.compilation
+      (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic))
     (by simpa only [resultEq] using profile) (sourceEq ▸ header.unique) rfl typed
   · simpa only [sourceEq, RecursiveNamedCatalogNativeContexts.bodyScope, aligned.bindings,
       CellAwareImperativeBodyProducer.scope] using declarations
@@ -61,6 +65,7 @@ include aligned in
 /-- Whole-program typing is one way to supply the actual selected certificate. -/
 theorem of_program
     (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
     (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
     {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
     (member : entry ∈ whole.indexed.entries)
@@ -70,6 +75,6 @@ theorem of_program
       (CellAwareImperativeBodyProducer.Certificate prepared.compilation)
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial whole.compatible.checked) header)
       header.context header.function.resultType) :=
-  of_header prepared aligned ready (RecursiveNamedHeaderSourceTyping.certificate header wellFormed) member profile
+  of_header prepared aligned ready diagnostic (RecursiveNamedHeaderSourceTyping.certificate header wellFormed) member profile
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeNamedBodyReceipt

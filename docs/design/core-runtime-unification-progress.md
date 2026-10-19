@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Mixed loops and variable writes reach public reuse (2026-10-19)
+
+The same compiler tree now accepts while loops, bare variable assignments, break and continue alongside generalized declarations. Loop installation retains the actual recursive closure and its administrative cell. Finite iterations preserve the mixed heap, captured descriptors and caller state through repeated tests, control transfers, returns and faults. Assignment preserves the snapshot taken before the RHS and writes through the actual reached heap. Operand failures use the diagnostic table issued by that compilation.
+
+The unchanged one-function fixture creates a generalized identity, updates ordinary Word and Bool cells inside a loop, then calls the identity at both types. Independent Source proofs precede three public resumes: two iterations, zero iterations, then two iterations again. Results are `(2, true)`, `(0, false)` and `(2, true)`; native heap sizes are `2 / 24 / 46 / 68`. The complete original function, cache and compiler profile remain present. The shared bounded typing observer now covers these loops and writes.
+
+Validation: 50 changed modules in a coherent graph of 8,386 modules. All 34 focused runtime invocations and 4,827 endpoint audits pass, together with the full build (8,426 jobs), registered tests, kernel policy and canonical endpoint audit. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Mixed for-loop headers and projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. The fixture's original typing proof does not establish general checker soundness. The second goal remains incomplete.
+
 ## Mixed declaration and branch bodies reach public reuse (2026-10-19)
 
 One compiler tree now covers generalized declarations, ordinary initialized and absent locals, discarded expressions, lexical blocks, conditionals and terminal outcomes. Its producer follows actual compiler actions and retains the original statement roots, allocation frames and generalized instance bundles. Independent Source lifting and Core preservation/reflection share this tree and the exact reached state. Original function typing rules out escaped control at the public boundary.

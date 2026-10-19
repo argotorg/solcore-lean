@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingSourceBodyAdmission
 
 /-! The common mixed body profile follows original lexical statement nodes.
@@ -91,6 +92,31 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (remaining : Scan locals caller active source approved expected mode rest) :
       Scan locals caller active source approved expected mode (id :: rest)
 
+  | whileLoop {mode id node condition conditionNode statements rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+      (conditionFound : source.lookupExpression? condition = some conditionNode) (conditionType : conditionNode.type = .bool)
+      (conditionSyntax : approved condition)
+      (loopTree : Scan locals caller active source approved expected false statements)
+      (remaining : Scan locals caller active source approved expected mode rest) :
+      Scan locals caller active source approved expected mode (id :: rest)
+  | assign {mode id node assignment operator rhs rhsNode binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (targetType : binder.scheme.body = assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (bare : assignment.target.projections = [])
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (remaining : Scan locals caller active source approved expected mode rest) :
+      Scan locals caller active source approved expected mode (id :: rest)
+
+  | breaking {mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
+      Scan locals caller active source approved expected mode (id :: rest)
+  | continuing {mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
+      Scan locals caller active source approved expected mode (id :: rest)
+
 def scan? (locals : Catalog) (caller : Key) (active : Substitution)
     (source : TypedSource) {approved : ExpressionId → Prop}
     (expression : (id : ExpressionId) → Option (PLift (approved id))) (expected : TypeSystem.Ty) :
@@ -154,6 +180,36 @@ def scan? (locals : Catalog) (caller : Key) (active : Substitution)
             let ⟨elseTree⟩ ← scan? locals caller active source expression expected fuel false (elseBody.getD [])
             let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
             pure ⟨.ifThen found form conditionFound conditionType conditionSyntax thenTree elseTree remaining⟩
+          else none
+      | .breakStmt => some ⟨.breaking rest found form⟩
+      | .continueStmt => some ⟨.continuing rest found form⟩
+      | .whileLoop condition statements =>
+        match conditionFound : source.lookupExpression? condition with
+        | none => none
+        | some conditionNode =>
+          if conditionType : conditionNode.type = .bool then do
+            let ⟨conditionSyntax⟩ ← expression condition
+            let ⟨loopTree⟩ ← scan? locals caller active source expression expected fuel false statements
+            let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
+            pure ⟨.whileLoop found form conditionFound conditionType conditionSyntax loopTree remaining⟩
+          else none
+      | .assignValue assignment operator rhs =>
+        match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+        | .error _ => none
+        | .ok binder =>
+          if targetType : binder.scheme.body = assignment.target.type then
+            if profile : operator = .equal ∨ assignment.target.type = .word then
+              if bare : assignment.target.projections = [] then
+                match rhsFound : source.lookupExpression? rhs with
+                | none => none
+                | some rhsNode =>
+                  if rhsType : rhsNode.type = assignment.target.type then do
+                    let ⟨value⟩ ← expression rhs
+                    let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
+                    pure ⟨.assign found form declaration targetType profile bare rhsFound rhsType value remaining⟩
+                  else none
+              else none
+            else none
           else none
       | .letDecl binder (some initializer) =>
         if sourceType : node.type = .unit then
@@ -279,6 +335,33 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (remaining : Syntax locals caller active source approved expected context mode rest) :
       Syntax locals caller active source approved expected context mode (id :: rest)
 
+  | whileLoop {context mode id node condition conditionNode statements rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+      (conditionFound : source.lookupExpression? condition = some conditionNode) (conditionType : conditionNode.type = .bool)
+      (conditionTyped : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : approved condition)
+      (loopTree : Syntax locals caller active source approved expected context false statements)
+      (remaining : Syntax locals caller active source approved expected context mode rest) :
+      Syntax locals caller active source approved expected context mode (id :: rest)
+  | assign {context mode id node assignment operator rhs rhsNode binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (targetType : binder.scheme.body = assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (bare : assignment.target.projections = [])
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type)
+      (typed : SourceAssignmentHasType source context assignment operator rhs) (value : approved rhs)
+      (remaining : Syntax locals caller active source approved expected context mode rest) :
+      Syntax locals caller active source approved expected context mode (id :: rest)
+
+  | breaking {context mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
+      Syntax locals caller active source approved expected context mode (id :: rest)
+  | continuing {context mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
+      Syntax locals caller active source approved expected context mode (id :: rest)
+
 private theorem head_tail {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
     (typed : StatementsHaveType source control context (id :: rest) final facts) :
@@ -315,6 +398,8 @@ theorem Scan.syntax {locals caller active source approved expected mode statemen
     Syntax locals caller active source approved expected context mode statements := by
   induction scan generalizing control context final facts with
   | nil allowed => exact .nil allowed
+  | breaking rest found form => exact .breaking rest found form
+  | continuing rest found form => exact .continuing rest found form
   | returnUnit rest found form _ unit => exact .returnUnit rest found form unit
   | returning rest found form _ expressionFound valueType value =>
     obtain ⟨_, _, _, head, _⟩ := head_tail typed
@@ -389,5 +474,23 @@ theorem Scan.syntax {locals caller active source approved expected mode statemen
       exact .ifThen found form conditionFound conditionType
         (expression_at unique conditionFound condition) conditionSyntax
         (thenIH result thenTyped) (elseIH result elseTyped) (remainingIH result tail)
+
+  | whileLoop found form conditionFound conditionType conditionSyntax _ _ loopIH remainingIH =>
+    obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+    have original := form_at unique found head
+    rw [form] at original
+    cases original with
+    | whileLoop condition loopTyped =>
+      exact .whileLoop found form conditionFound conditionType
+        (expression_at unique conditionFound condition) conditionSyntax
+        (loopIH (control := control.enterLoop) result loopTyped) (remainingIH result tail)
+  | assign found form declaration targetType profile bare rhsFound rhsType value _ remainingIH =>
+    obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+    have original := form_at unique found head
+    rw [form] at original
+    cases original with
+    | assignValue assignment =>
+      exact .assign found form declaration targetType profile bare rhsFound rhsType assignment value
+        (remainingIH result tail)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceBodyAdmission

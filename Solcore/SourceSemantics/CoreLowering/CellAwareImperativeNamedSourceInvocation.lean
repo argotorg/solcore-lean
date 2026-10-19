@@ -42,6 +42,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   (selected : (SelectedCompilationPhysicalProgramSupport.stages whole).Closure header.function invocation)
   (authority : CellAwareNamedCallPorts.Authority (compiled := whole) header.named invocation)
   (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed header.named (diagnostics.reasonAt header.named.signature.key))
+  (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics)
   (body : CellAwareImperativeBodyProducer.Body generation (CellAwareNamedBodyProducer.Certificate generation)
     (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.administrative)
     header.context header.function.resultType)
@@ -73,7 +74,7 @@ private theorem statements : generation.statements = header.function.body := by
   exact (List.map_inj_right (fun _ _ same => NodeId.statement.inj same)).mp same
 
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameSolved selected authority issuer wellFormed in
+include body record receiver extension sameLayouts sameGlobals sameBindings sameSolved selected authority issuer issued wellFormed in
 theorem lift
     (stable : StableRows caller)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
@@ -125,8 +126,9 @@ theorem lift
     intro index state read
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
-  have meaning := CellAwareImperativeNamedSourceBodyLifting.lifts bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys) generation record profile receiver extension authority
-    wellFormed producer (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body issuer
+  have meaning := CellAwareImperativeNamedSourceBodyLifting.lifts bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+    (CallableIndexedOwnedFunctionState.administrativeTransport headers keys) generation record profile receiver extension authority
+    wellFormed producer (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body issuer issued
     (size := size) (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
     (before := entryHeap) (store := entryStore) (embedding := entryEmbedding)
@@ -140,7 +142,7 @@ theorem lift
   obtain ⟨stagedSize, measured⟩ := Staging.Recursive.Size.Statements.of_trace actual
   exact ⟨stagedSize, stagedContext, stagedOutcome, reachedHeap, measured, adapted⟩
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer projection wellFormed in
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
 theorem preserves
     (stable : StableRows caller)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
@@ -160,10 +162,10 @@ theorem preserves
       CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld reached finalStore := by
   obtain ⟨stageSize, stagedContext, stagedOutcome, reached, measured, adapted⟩ :=
     lift profile receiver extension owner caller header capture generation record sameLayouts sameGlobals sameBindings
-      sameSolved selected authority issuer body wellFormed stable heapTyped argumentsTyped represented heaps allocated trace
+      sameSolved selected authority issuer issued body wellFormed stable heapTyped argumentsTyped represented heaps allocated trace
   obtain ⟨value, finalStore, finalMap, finalWorld, result, effect⟩ :=
     CellAwareImperativeNamedInvocation.preserves profile receiver extension owner caller header capture generation record sameLayouts
-      sameGlobals sameBindings sameBody sameSolved selected authority issuer body projection wellFormed stable heapTyped argumentsTyped
+      sameGlobals sameBindings sameBody sameSolved selected authority issuer issued body projection wellFormed stable heapTyped argumentsTyped
       represented heaps allocated measured
   exact ⟨stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld, adapted, result, effect⟩
 

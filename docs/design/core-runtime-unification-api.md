@@ -4,6 +4,14 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Mixed loops and variable writes (2026-10-19)
+
+`CellAwareImperativeTree` and its scanner, collector and producer now include while loops, bare assignments, break and continue. `CellAwareLoopState` retains the actual recursive closure, administrative cell, captured descriptors and physical caller. `CellAwareLoopSequences` proves preservation and reflection through the reached suffix; `CellAwareSourceWhileSequenceLifting` starts with independent Source execution.
+
+`CellAwareScopeBareAssignmentFlow` preserves the original target snapshot, RHS order and actual post-RHS write. The compiler tree retains the operand relation to its own prepared diagnostic table. The named receipt obtains that table from authentic `IssuedAt` provenance, and `CallableIndexedOwnedIssuedAssignmentRecipes.operands` supplies its interpretation in the actual public receiver. Public callers provide no assignment law.
+
+The existing first-call and continuation endpoints carry these bodies through retained sessions. `SourceCoreMixedWhileRuntime` constructs independent Source proofs before each resume and covers two, zero and two iterations in the same session. Public runtime signatures are unchanged. Mixed for headers, projected writes and the general selected checker bridge remain open.
+
 ## Mixed declaration and branch bodies (2026-10-19)
 
 `CellAwareImperativeTree` is the common certificate for actual compilation of generalized and ordinary declarations, discarded expressions, lexical blocks, conditionals and terminal outcomes. `CellAwareImperativeBodyProducer` constructs it from accepted original statement roots. `CellAwareImperativeTreeBounds` proves preservation and reflection, while `CellAwareImperativeSourceTreeLifting` lifts independent Source execution and retains authentic earlier stage rejection.

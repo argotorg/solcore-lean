@@ -103,7 +103,7 @@ theorem preserves_root
   obtain ⟨value, finalStore, finalMap, finalWorld, result, _effect⟩ :=
     CellAwareImperativeNamedInvocation.preserves callableProfile receiver extension owner caller header capture.named
       packet.generation record aligned.layouts aligned.globals sameBindings packet.emitted sameSolved bodySelected
-      (CellAwareNamedCallAuthority.of_header header sidecarIssued) packet.issuer packet.body packet.projection wellFormed
+      (CellAwareNamedCallAuthority.of_header header sidecarIssued) packet.issuer packet.issued packet.body packet.projection wellFormed
       stable heapTyped argumentsTyped represented heaps allocated trace
   have argumentsEvaluated := selected.arguments_evaluate represented store
   have actualReference :
@@ -166,7 +166,7 @@ theorem reflects_root
       allocated, trace, matched, result, _effect⟩ :=
     CellAwareImperativeNamedInvocation.reflects callableProfile receiver extension owner caller header capture.named
       packet.generation record aligned.layouts aligned.globals sameBindings packet.emitted sameSolved bodySelected
-      (CellAwareNamedCallAuthority.of_header header sidecarIssued) packet.issuer packet.body packet.projection wellFormed
+      (CellAwareNamedCallAuthority.of_header header sidecarIssued) packet.issuer packet.issued packet.body packet.projection wellFormed
       stable heapTyped argumentsTyped represented heaps bodyEvaluation.sound
   exact ⟨capture.named, size, environment, bound, finalContext, outcome, after, finalMap, finalWorld,
     allocated, trace, matched, result⟩

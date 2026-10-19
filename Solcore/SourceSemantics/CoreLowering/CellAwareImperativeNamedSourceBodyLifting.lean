@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceTreeLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionSourceLifting
@@ -18,6 +19,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
   (bindings : ProtectedStateTransition.Bindings protocol)
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
   (compiled : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics namedCode)
   (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key = .ok named.specialized)
@@ -49,17 +51,19 @@ variable
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
 
 
-include bindings record receiver extension authority wellFormed registered in
+include bindings transport record receiver extension authority wellFormed registered in
 theorem lifts
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context} {context : SourceSemantics.Context} {expected : TypeSystem.Ty}
     (body : CellAwareImperativeBodyProducer.Body compiled (CellAwareNamedBodyProducer.Certificate compiled)
       administrative context expected)
-    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key)) :
+    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key))
+    (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics) :
     CellAwareSourceFlowLiftBounds.Lifts (named := named) (administrative := administrative)
       (registry := stages) (invocation := invocation) bridge producer context
       (CellAwareImperativeBodyProducer.scope named) true compiled.statements := by
-  exact CellAwareImperativeSourceTreeLifting.lifts bridge bindings compiled record producer registered
+  exact CellAwareImperativeSourceTreeLifting.lifts bridge bindings transport functions extension compiled record producer registered
+    (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compiled issued receiver represented)
     (fun related => CompatibleExpressionPrimitives.bool_fields related) (fun _ _ => .unit)
     (fun childContext childRuntime childCovers childLedger size =>
       CellAwareNamedExpressionSourceLifting.lifts compiled bridge profile receiver extension authority sourceEq issuer

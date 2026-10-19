@@ -3,7 +3,7 @@ import Solcore.Test.SourceCoreSelectedGeneralizedLocalTypingValidation
 import Solcore.Test.SourceCoreGeneralizedExportTyping
 
 /-! A bounded observer constructs declarative typing for the complete original
-mixed body, including both branches and all nested lexical scopes. It accepts
+mixed body, including branches, lexical scopes, loops and bare variable writes. It accepts
 only the expression and statement forms used by this regression. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -46,6 +46,27 @@ private def reference {source : TypedSource} (context : SourceSemantics.Context)
       type := rfl, requirements := empty, coercions := coercions }
     read shape context (Resolved.LocalScope.lookup?_iff.mp schemeFound)
       (Resolved.LocalScope.lookup?_iff.mp requirements)
+
+private def writable (context : SourceSemantics.Context) (id : Resolved.LocalId) (type : TypeSystem.Ty) :
+    IO (PLift (WritableLocal context id type)) := do
+  match found : Resolved.LocalScope.lookup? context.locals id with
+  | none => throw (IO.userError "mixed assignment root")
+  | some actual =>
+    let ⟨formed⟩ ← scheme context actual
+    let ⟨mono⟩ ← observe (actual.quantified = []) "mixed writable monomorphic root"
+    let ⟨same⟩ ← observe (actual.body = type) "mixed writable root type"
+    return ⟨.intro (Resolved.LocalScope.lookup?_iff.mp found) formed mono same⟩
+
+private def compound : (operator : Syntax.ValueAssignOp) → IO (PLift (WordCompoundAssignmentOperator operator))
+  | .equal => throw (IO.userError "mixed compound operator")
+  | .add => pure ⟨.add⟩
+  | .subtract => pure ⟨.subtract⟩
+  | .multiply => pure ⟨.multiply⟩
+  | .divide => pure ⟨.divide⟩
+  | .modulo => pure ⟨.modulo⟩
+  | .bitAnd => pure ⟨.bitAnd⟩
+  | .bitXor => pure ⟨.bitXor⟩
+  | .bitOr => pure ⟨.bitOr⟩
 
 structure Statement (source : TypedSource) (control : ControlContext)
     (context : SourceSemantics.Context) (id : StatementId) where
@@ -170,6 +191,36 @@ mutual
           let ⟨typed⟩ ← expression fuel source context value child.type
           let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed discard type"
           return ⟨context,localFacts,.expressionDiscard (lookupStatement?_sound found) form typed typeEq⟩
+        | .whileLoop condition body =>
+          let ⟨conditionTyped⟩ ← expression fuel source context condition .bool
+          let bodyTyped ← statements fuel source control.enterLoop context body
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed while type"
+          return ⟨context,⟨.unit,false,false,.loop bodyTyped.facts.control⟩,
+            .whileLoop (lookupStatement?_sound found) form conditionTyped bodyTyped.typed typeEq⟩
+        | .assignValue assignment operator rhs =>
+          let ⟨bare⟩ ← observe (assignment.target.projections = []) "mixed bare assignment"
+          let ⟨rootTyped⟩ ← writable context assignment.target.root assignment.target.type
+          let targetTyped : SourcePlaceHasType source context assignment.target assignment.target.type :=
+            .intro rootTyped (bare.symm ▸ .nil _) rfl
+          let ⟨rhsTyped⟩ ← expression fuel source context rhs assignment.target.type
+          let ⟨requirements⟩ ← observe (assignment.requirements = []) "mixed assignment requirements"
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed assignment statement type"
+          let ⟨assignmentTyped⟩ ← (show IO (PLift (SourceAssignmentHasType source context assignment operator rhs)) from do
+            if equal : operator = .equal then
+              return ⟨equal.symm ▸ .equal targetTyped rhsTyped requirements⟩
+            else
+              let ⟨kind⟩ ← compound operator
+              let ⟨word⟩ ← observe (assignment.target.type = .word) "mixed compound Word target"
+              return ⟨.wordCompound kind (word ▸ targetTyped) (word ▸ rhsTyped) requirements⟩)
+          return ⟨context,localFacts,.assignValue (lookupStatement?_sound found) form assignmentTyped typeEq⟩
+        | .breakStmt =>
+          let ⟨allowed⟩ ← observe (0 < control.loopDepth) "mixed break inside loop"
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed break type"
+          return ⟨context,⟨.unit,false,false,.breaking⟩,.breakStmt (lookupStatement?_sound found) form allowed typeEq⟩
+        | .continueStmt =>
+          let ⟨allowed⟩ ← observe (0 < control.loopDepth) "mixed continue inside loop"
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed continue type"
+          return ⟨context,⟨.unit,false,false,.continuing⟩,.continueStmt (lookupStatement?_sound found) form allowed typeEq⟩
         | .block body =>
           let child ← statements fuel source control context body
           let ⟨typeEq⟩ ← observe (node.type = child.facts.type) "mixed block type"

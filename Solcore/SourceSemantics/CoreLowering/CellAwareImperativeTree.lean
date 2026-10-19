@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNativeBodyTree
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInitializerPackets
@@ -155,5 +156,46 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
         sourceContext scope mode rest expected type body) :
       Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
         expected type (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) body)
+
+  | whileLoop {sourceContext scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body escaped}
+      (found : (source named).lookupStatement? id = some node)
+      (form : node.form = .whileLoop condition statements)
+      (conditionFound : (source named).lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTyped : ExpressionHasType (source named) sourceContext condition conditionNode.type)
+      (conditionCertificate : certificates sourceContext scope condition ⟨.bool, conditionCode⟩)
+      (loopTree : Tree prepared named compiled certificates administrative reasonAt
+        sourceContext scope false statements expected type loopCode)
+      (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+        (LocalLoop.whileLoop type conditionCode loopCode escaped)
+        (LanguageResult.resultType (LocalLoop.controlType type)) prepared.layouts.definitions)
+      (remaining : Tree prepared named compiled certificates administrative reasonAt
+        sourceContext scope mode rest expected type body) :
+      Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
+        expected type (LocalLoop.sequence type (LocalLoop.whileLoop type conditionCode loopCode escaped) body)
+  | assign {sourceContext scope mode id node assignment operator expression rest expected type body}
+      (found : (source named).lookupStatement? id = some node)
+      (form : node.form = .assignValue assignment operator expression)
+      (head : GenericAssignmentStatements.Head (.initial checked) (source named) sourceContext
+        (certificates sourceContext) scope administrative prepared.layouts.definitions assignment operator expression)
+      (bare : assignment.target.projections = [])
+      (rightTyped : ExpressionHasType (source named) sourceContext expression assignment.target.type)
+      (operands : AssignmentOperandDiagnostics.OperandsLaw
+        (GenericAssignmentDiagnostics.OperandRep compiled.own.assignments) operator head.invalid)
+      (remaining : Tree prepared named compiled certificates administrative reasonAt
+        sourceContext scope mode rest expected type body) :
+      Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
+        expected type (head.emit body (LocalLoop.controlType type))
+
+  | breaking {sourceContext scope mode id node expected type} (rest : List StatementId)
+      (found : (source named).lookupStatement? id = some node)
+      (form : node.form = .breakStmt) :
+      Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
+        expected type (LocalLoop.breaking type)
+  | continuing {sourceContext scope mode id node expected type} (rest : List StatementId)
+      (found : (source named).lookupStatement? id = some node)
+      (form : node.form = .continueStmt) :
+      Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
+        expected type (LocalLoop.continuing type)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTree

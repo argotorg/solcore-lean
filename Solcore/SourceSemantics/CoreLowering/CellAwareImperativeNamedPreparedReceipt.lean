@@ -44,6 +44,7 @@ structure Receipt where
   projection : whole.compatible.checked.catalog.project header.function.resultType = .ok header.named.signature.resultType
   issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed header.named
     (prepared.diagnostics.reasonAt header.named.signature.key)
+  issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed prepared.diagnostics
 
 include aligned in
 theorem of_header {recipe : SourceCoreIndexedSession.Recipe}
@@ -55,7 +56,7 @@ theorem of_header {recipe : SourceCoreIndexedSession.Recipe}
     (profile : CellAwareImperativeBodyProducer.Profile whole.indexed prepared.named prepared.compilation.statements
       prepared.named.specialized.function.inferredBodyType) :
     Nonempty (Receipt prepared capture) := by
-  obtain ⟨body⟩ := CellAwareImperativeNamedBodyReceipt.of_program prepared aligned ready wellFormed member profile
+  obtain ⟨body⟩ := CellAwareImperativeNamedBodyReceipt.of_program prepared aligned ready diagnostic wellFormed member profile
   let generation := cast_generation aligned.named.symm prepared.compilation
   have actual := cast_body aligned.named.symm prepared.compilation body
   have prefixEq : RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial whole.compatible.checked) header =
@@ -67,6 +68,6 @@ theorem of_header {recipe : SourceCoreIndexedSession.Recipe}
       (prepared.diagnostics.reasonAt header.named.signature.key) := by
     simpa only [aligned.named] using issuer
   exact ⟨⟨generation, aligned.body.trans (cast_generation_body aligned.named.symm prepared.compilation).symm,
-    prefixEq ▸ actual, (by simpa only [← header.resultType] using aligned.projection), issuerAt⟩⟩
+    prefixEq ▸ actual, (by simpa only [← header.resultType] using aligned.projection), issuerAt, CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeNamedPreparedReceipt

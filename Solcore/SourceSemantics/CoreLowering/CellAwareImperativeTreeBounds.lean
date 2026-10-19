@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeTransferFlow
+import Solcore.SourceSemantics.CoreLowering.CellAwareLoopSequences
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBareAssignmentFlow
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTree
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeEmptyFlow
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeDiscardFlow
@@ -36,19 +39,23 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
   (bindings : ProtectedStateTransition.Bindings protocol)
-  {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
-    (CompatibleHeap.projects whole.compatible.checked.catalog) whole.indexed.layouts.definitions}
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+  (functions : FunctionModel whole.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions whole.indexed))
+  {receiving : SourceCoreRawMetadata.Registry}
+  (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
   (compiled : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics namedCode)
   (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key = .ok named.specialized)
   (producer : ProtectedStateTransition.CellAllocation.Producer
     (catalog := CompatibleEquality.storageCatalog whole.compatible.checked.catalog) protocol whole.indexed.layouts
     whole.indexed.ancestry.layout.frame
-    (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalInstanceValues.model whole.indexed)))
+    (GeneralizedLocalDescriptorHeap.cellModel (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) (GeneralizedLocalInstanceValues.model whole.indexed)))
+  {faults : RecursiveStageMeaning.FaultRep}
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
+  (operandIncluded : ∀ reason token,
+    GenericAssignmentDiagnostics.OperandRep compiled.own.assignments reason token → faults (.semantic reason) token)
   {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
-  {faults : RecursiveStageMeaning.FaultRep}
 
 private theorem head_typed {context : SourceSemantics.Context} {id : StatementId} {rest : List StatementId}
     (typed : ProtectedStateImperativeTypedSourceSites.Statements (source named) context (id :: rest)) :
@@ -60,16 +67,16 @@ private theorem head_typed {context : SourceSemantics.Context} {id : StatementId
 
 variable
   (booleans : ∀ {mapping world sourceValue nativeValue},
-    model.Represents mapping world .bool sourceValue nativeValue .bool →
+    (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions).Represents mapping world .bool sourceValue nativeValue .bool →
     ∃ truth, sourceValue = .bool truth ∧ nativeValue = .bool truth)
-  (unitValue : ∀ mapping world, model.Represents mapping world .unit .unit .unit .unit)
+  (unitValue : ∀ mapping world, (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions).Represents mapping world .unit .unit .unit .unit)
 
-include record bindings registered booleans unitValue in
+include record bindings transport extension registered operandIncluded booleans unitValue in
 theorem preserves {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
-      CellAwareScopeExpressionBounds.PreservesBelow bridge context model named registry invocation
+      CellAwareScopeExpressionBounds.PreservesBelow bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named registry invocation
       (certificates context) faults budget)
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context} {reasonAt : ExpressionId → Word}
@@ -78,7 +85,7 @@ theorem preserves {budget : Nat}
     (tree : CellAwareImperativeTree.Tree whole.indexed named compiled certificates administrative reasonAt
       context scope mode statements expected type code)
     (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named reasonAt) :
-    CellAwareScopeFlowBounds.PreservesAtMost bridge context model named producer registry invocation faults
+    CellAwareScopeFlowBounds.PreservesAtMost bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode statements expected type code budget := by
   induction tree with
   | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody rest expected type lowered body childFuel
@@ -240,7 +247,7 @@ theorem preserves {budget : Nat}
           (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState tailPost
   | @nil context scope mode expected type allowed =>
     intro size _within
-    exact CellAwareScopeEmptyFlow.preserves bridge context model named producer registry invocation faults
+    exact CellAwareScopeEmptyFlow.preserves bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode expected type allowed size
   | @returnUnit context scope mode id node rest found form =>
     intro size within mapping world actualContext environment canonical actual before store embedding
@@ -283,7 +290,7 @@ theorem preserves {budget : Nat}
     intro size within mapping world actualContext environment canonical actual before store embedding
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready finalContext outcome after trace
-    exact CellAwareScopeDiscardFlow.preserves bridge context model named producer registry invocation faults
+    exact CellAwareScopeDiscardFlow.preserves bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode expected type sourceEq
       (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
       (by simpa only [sourceEq] using found) form continuing
@@ -295,7 +302,7 @@ theorem preserves {budget : Nat}
     intro size within mapping world actualContext environment canonical actual before store embedding
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready finalContext outcome after trace
-    exact CellAwareScopeBlockFlow.preserves bridge context model named producer registry invocation faults
+    exact CellAwareScopeBlockFlow.preserves bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode expected type sourceEq
       (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
       (by simpa only [sourceEq] using found) form budget innerIH remainingIH size within
@@ -306,7 +313,7 @@ theorem preserves {budget : Nat}
     intro size within mapping world actualContext environment canonical actual before store embedding
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready finalContext outcome after trace
-    exact CellAwareScopeConditionalFlow.preserves bridge context model named producer registry invocation faults
+    exact CellAwareScopeConditionalFlow.preserves bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope expected type booleans
       (by simpa only [sourceEq] using conditionFound) conditionType
       (by simpa only [sourceEq] using conditionTyped) conditionCertificate sourceEq
@@ -315,12 +322,61 @@ theorem preserves {budget : Nat}
       thenIH elseIH remainingIH size within
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready trace
-include record bindings registered booleans unitValue in
+  | @whileLoop context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body escaped
+      found form conditionFound conditionType conditionTyped conditionCertificate loopTree nativeTyped remaining loopIH remainingIH =>
+    intro size within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+    exact CellAwareLoopSequences.preserves bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) producer transport booleans sourceEq
+      (children context runtime covers sameLedger)
+      (by simpa only [sourceEq] using conditionFound) conditionType
+      (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH
+      (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
+      (by simpa only [sourceEq] using found) form remainingIH within
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready trace
+  | @assign context scope mode id node assignment operator rhs rest expected type body
+      found form head bare _rightTyped operands remaining remainingIH =>
+    intro size within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareScopeBareAssignmentFlow.preserves bridge transport functions producer rfl
+        runtime.graph.nodeOccurrencesUnique found form head bare extension
+        (fun previous right invalid => operandIncluded _ _ (operands previous right invalid))
+        budget (children context runtime covers sameLedger) remainingIH size within
+        environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        initial admitted authority physical owner sameLocation ready trace
+
+  | @breaking context scope mode id node expected type rest found form =>
+    intro size _within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+    exact CellAwareScopeTransferFlow.breaking_preserves bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+      administrative scope mode expected type
+      (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
+      (by simpa only [sourceEq] using found) form size
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready trace
+  | @continuing context scope mode id node expected type rest found form =>
+    intro size _within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+    exact CellAwareScopeTransferFlow.continuing_preserves bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+      administrative scope mode expected type
+      (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
+      (by simpa only [sourceEq] using found) form size
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready trace
+
+include record bindings transport extension registered operandIncluded booleans unitValue in
 theorem reflects {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
-      CellAwareScopeExpressionBounds.ReflectsBelow bridge context model named registry invocation
+      CellAwareScopeExpressionBounds.ReflectsBelow bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named registry invocation
       (certificates context) faults budget)
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context} {reasonAt : ExpressionId → Word}
@@ -329,7 +385,7 @@ theorem reflects {budget : Nat}
     (tree : CellAwareImperativeTree.Tree whole.indexed named compiled certificates administrative reasonAt
       context scope mode statements expected type code)
     (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named reasonAt) :
-    CellAwareScopeFlowBounds.ReflectsAtMost bridge context model named producer registry invocation faults
+    CellAwareScopeFlowBounds.ReflectsAtMost bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode statements expected type code budget := by
   induction tree with
   | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody
@@ -487,7 +543,7 @@ theorem reflects {budget : Nat}
         (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState tailPost
   | @nil context scope mode expected type allowed =>
     intro size _within
-    exact CellAwareScopeEmptyFlow.reflects bridge context model named producer registry invocation faults
+    exact CellAwareScopeEmptyFlow.reflects bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode expected type allowed size
   | @returnUnit context scope mode id node rest found form =>
     intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
@@ -527,7 +583,7 @@ theorem reflects {budget : Nat}
     intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready completed
-    exact CellAwareScopeDiscardFlow.reflects bridge context model named producer registry invocation faults
+    exact CellAwareScopeDiscardFlow.reflects bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode expected type sourceEq
       (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
       (by simpa only [sourceEq] using found) form continuing
@@ -539,7 +595,7 @@ theorem reflects {budget : Nat}
     intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready completed
-    exact CellAwareScopeBlockFlow.reflects bridge context model named producer registry invocation faults
+    exact CellAwareScopeBlockFlow.reflects bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope mode expected type sourceEq
       (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
       (by simpa only [sourceEq] using found) form budget innerIH remainingIH size within
@@ -550,13 +606,59 @@ theorem reflects {budget : Nat}
     intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready completed
-    exact CellAwareScopeConditionalFlow.reflects bridge context model named producer registry invocation faults
+    exact CellAwareScopeConditionalFlow.reflects bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
       administrative scope expected type booleans
       (by simpa only [sourceEq] using conditionFound) conditionType
       (by simpa only [sourceEq] using conditionTyped) conditionCertificate sourceEq
       (by simpa only [sourceEq] using runtime.graph.nodeOccurrencesUnique)
       (by simpa only [sourceEq] using found) form budget (children context runtime covers sameLedger)
       thenIH elseIH remainingIH size within
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+
+  | @whileLoop context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body escaped
+      found form conditionFound conditionType conditionTyped conditionCertificate loopTree nativeTyped remaining loopIH remainingIH =>
+    intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+    exact CellAwareLoopSequences.reflects bridge (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) producer transport booleans sourceEq
+      (children context runtime covers sameLedger)
+      (by simpa only [sourceEq] using conditionFound) conditionType
+      (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH
+      (by simpa only [sourceEq] using found) form remainingIH within
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+  | @assign context scope mode id node assignment operator rhs rest expected type body
+      found form head bare _rightTyped operands remaining remainingIH =>
+    intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareScopeBareAssignmentFlow.reflects bridge transport functions producer rfl
+        runtime.graph.nodeOccurrencesUnique found form head bare extension
+        (fun previous right invalid => operandIncluded _ _ (operands previous right invalid))
+        budget (children context runtime covers sameLedger) remainingIH size within
+        environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        initial admitted authority physical owner sameLocation ready completed
+
+  | @breaking context scope mode id node expected type rest found form =>
+    intro size _within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+    exact CellAwareScopeTransferFlow.breaking_reflects bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+      administrative scope mode expected type
+      (by simpa only [sourceEq] using found) form size
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+  | @continuing context scope mode id node expected type rest found form =>
+    intro size _within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+    exact CellAwareScopeTransferFlow.continuing_reflects bridge context (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
+      administrative scope mode expected type
+      (by simpa only [sourceEq] using found) form size
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready completed
 
