@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Builtin function values reach mixed public execution (2026-10-19)
+
+The common mixed expression producer now retains builtin function references from actual accepted compiler actions. Its certificate preserves the native descriptor, function identity, Source type and emitted closed body. Preservation/reflection and independent Source lifting use that genuine callable while retaining the mixed heap and its captured cells.
+
+The unchanged one-function fixture creates a generalized identity and returns `(f(flag), wordToInteger)`. Its full original function, cache and compiler profile remain present. Original declarative typing and independent Source execution are constructed before three public resumes with inputs `true`, `false`, `true`; the native heap sizes are `2 / 11 / 20 / 29`. A separate native companion calls the returned builtin with Word `17`, obtains integer `17`, then reuses the factory. That companion does not yet establish the Source/public theorem for invoking the returned handle.
+
+Validation: 26 changed modules in a coherent graph of 8,402 modules, including 125 fresh checks and all 174 affected modules. All 37 focused runtime invocations and 4,893 endpoint audits pass, together with the full build (8,442 jobs), registered tests, kernel policy and canonical endpoint audit. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Mixed builtin-handle invocation meaning, for headers and projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. The fixture's original typing proof does not establish general checker soundness. The second goal remains incomplete.
+
 ## Mixed loops and variable writes reach public reuse (2026-10-19)
 
 The same compiler tree now accepts while loops, bare variable assignments, break and continue alongside generalized declarations. Loop installation retains the actual recursive closure and its administrative cell. Finite iterations preserve the mixed heap, captured descriptors and caller state through repeated tests, control transfers, returns and faults. Assignment preserves the snapshot taken before the RHS and writes through the actual reached heap. Operand failures use the diagnostic table issued by that compilation.

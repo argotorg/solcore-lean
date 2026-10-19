@@ -77,6 +77,13 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
       before store embedding outcome after environments heaps locals agrees actualTyped initial admitted scopeAuthority physical owner ownerFrame trace
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact .completed (CellAwareSourceReadProductLifting.exact_trace receipt unique trace.sound)
+  | builtin receipt =>
+    intro current expression code point node found typed mapping world administrative environment canonical actual actualContext
+      before store embedding outcome after environments heaps locals agrees actualTyped initial admitted scopeAuthority physical owner ownerFrame trace
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact .completed (Staging.Recursive.Lifting.atomic_nonlocal unique (lookupExpression?_sound receipt.found)
+      (receipt.form.symm ▸ .reference _ _) receipt.coercions
+      (by intro name binder impossible; rw [receipt.form] at impossible; cases impossible) trace.sound)
   | generalized receipt recipe =>
     intro current expression code point node found typed mapping world administrative environment canonical actual actualContext
       before store embedding outcome after environments heaps locals agrees actualTyped initial admitted scopeAuthority physical owner ownerFrame trace

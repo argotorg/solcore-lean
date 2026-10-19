@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueOrigins
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedGeneralizedReadBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedGeneralizedApplicationBounds
@@ -59,6 +60,7 @@ theorem preserves (size : Nat) :
     (fun _ _ _ read location => CellAwareNamedReadDiagnostics.uninitialized issuer record receiver sourceEq
       runtime.graph.nodeOccurrencesUnique read location)
     (fun _ _ proof => proof)
+    (CellAwareBuiltinValueOrigins.included profile)
     (CellAwareNamedGeneralizedReadBounds.preserves bridge profile runtime.graph.nodeOccurrencesUnique
       runtime.requirements.idsUnique covers catalog)
     (CellAwareNamedGeneralizedApplicationBounds.preserves bridge functions receiver extension runtime wellFormed)
@@ -80,6 +82,7 @@ theorem reflects (size : Nat) :
     (fun _ _ _ read location => CellAwareNamedReadDiagnostics.uninitialized issuer record receiver sourceEq
       runtime.graph.nodeOccurrencesUnique read location)
     (fun _ _ proof => proof)
+    (CellAwareBuiltinValueOrigins.included profile)
     (CellAwareNamedGeneralizedReadBounds.reflects bridge profile runtime.graph.nodeOccurrencesUnique
       runtime.requirements.idsUnique covers catalog)
     (CellAwareNamedGeneralizedApplicationBounds.reflects bridge functions receiver extension runtime wellFormed)

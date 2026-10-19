@@ -15,6 +15,7 @@ open CallableIndexedNamedGeneration (Prepared Compilation context representation
 inductive Form : ExpressionForm → Prop where
   | literal {form} (atomic : CompatibleExpressionLiterals.Atomic form) : Form form
   | read (name : String) (binder : Resolved.LocalId) : Form (.reference name (.local binder))
+  | builtin (name : String) (function : BuiltinFunctionId) : Form (.reference name (.builtinFunction function))
   | group (inner : ExpressionId) : Form (.group inner)
   | pair (left right : ExpressionId) : Form (.tuple [left, right])
   | call (callee : ExpressionId) (arguments : List ExpressionId) (metadata : IndirectCallResolution)
@@ -41,6 +42,7 @@ private def form? (form : ExpressionForm) : Option (PLift (Form form)) :=
   | .literal literal => some ⟨.literal (.word literal)⟩
   | .tuple [] => some ⟨.literal .unit⟩
   | .reference name (.local binder) => some ⟨.read name binder⟩
+  | .reference name (.builtinFunction function) => some ⟨.builtin name function⟩
   | .group inner => some ⟨.group inner⟩
   | .tuple [left, right] => some ⟨.pair left right⟩
   | .call callee arguments (.indirect metadata) =>
@@ -99,6 +101,8 @@ inductive Syntax {checked : SourceCoreCompatibleCatalog.Checked}
       (atomic : CompatibleExpressionLiterals.Atomic site.node.form) : Syntax prepared named source id
   | read {id name binder} (site : Site prepared named source id)
       (form : site.node.form = .reference name (.local binder)) : Syntax prepared named source id
+  | builtin {id name function} (site : Site prepared named source id)
+      (form : site.node.form = .reference name (.builtinFunction function)) : Syntax prepared named source id
   | generalized {id} (observed : GeneralizedLocalNamedReadCompilation.Observations prepared named source id)
       (recipe : GeneralizedLocalNamedRecipeCompilation.Observations prepared named source id) :
       Syntax prepared named source id
@@ -143,6 +147,7 @@ def syntax? {checked : SourceCoreCompatibleCatalog.Checked}
       | .literal literal => pure ⟨.literal site (form ▸ .word literal)⟩
       | .tuple [] => pure ⟨.literal site (form ▸ .unit)⟩
       | .reference _name (.local _binder) => pure ⟨.read site form⟩
+      | .reference _name (.builtinFunction _function) => pure ⟨.builtin site form⟩
       | .group inner => do
         let ⟨child⟩ ← syntax? prepared named source fuel inner
         pure ⟨.group site form child⟩

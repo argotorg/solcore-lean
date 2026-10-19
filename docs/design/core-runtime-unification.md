@@ -54,6 +54,8 @@ The common mixed-cell body tree now also connects generalized and ordinary decla
 
 The mixed-cell tree also covers finite while loops, bare equal and Word compound assignments, break and continue. The actual loop closure and administrative allocation preserve captured descriptors through repeated iterations and the reached suffix. Assignment retains the pre-RHS snapshot and post-RHS write; its operand interpretation comes from the actual issued diagnostic table and public receiver. The complete unchanged loop fixture has independent Source proofs before two, zero and two iterations across three public calls, retaining native heap sizes `2 / 24 / 46 / 68`. Mixed for headers, projected writes and the general selected checker bridge remain open.
 
+The mixed expression producer now accepts genuine builtin function values. Actual compilation supplies their descriptor, identity and closed body; the shared preservation/reflection and Source lifting retain the existing mixed heap. The complete unchanged builtin fixture combines a generalized identity call with a returned `wordToInteger` value. Original typing and independent Source proofs precede three public resumes with native heaps `2 / 11 / 20 / 29`. Native invocation of the returned handle is also checked, but its mixed Source/public invocation proof remains a separate connection.
+
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)

@@ -133,6 +133,46 @@ private theorem plain {id : ExpressionId} (site : Site prepared named source id)
     have sameNode := Option.some.inj (site.found.symm.trans found)
     exact sameNode ▸ site.coercions
 
+private theorem builtin {id : ExpressionId} (site : Site prepared named source id)
+    {name : String} {function : BuiltinFunctionId}
+    (form : site.node.form = .reference name (.builtinFunction function))
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy (namedPolicy compiled rootFuel)
+      (namedLowerBody compiled) fuel (context prepared named) source scope id reasonAt = .ok lowered) :
+    Nonempty (CellAwareBuiltinValueCertificates.Header prepared source id lowered) := by
+  cases fuel with
+  | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+  | succ fuel =>
+    rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    by_cases owner : id.occurrence.owner = source.owner
+    · simp only [owner, ne_eq, not_true_eq_false, ↓reduceIte, site.found,
+        bind, Except.bind, pure, Except.pure] at accepted
+      have bypass := special compiled rootFuel (scope := scope) (reasonAt := reasonAt) site
+        (fun budget childSource childScope childId childReasonAt =>
+          SourceCoreFunctions.lowerExpressionWithPolicy (namedPolicy compiled rootFuel)
+            (namedLowerBody compiled) (min budget fuel) (context prepared named)
+            childSource childScope childId childReasonAt) (fuel + 1)
+      change CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+        (context prepared named) _ _ _ _ _ _ = .ok none at bypass
+      simp only [show (namedPolicy compiled rootFuel).lowerSpecial? = some
+        (CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel) from rfl] at accepted
+      rw [bypass] at accepted
+      simp only [form,
+        CellAwareNamedExpressionPolicies.read compiled site rootFuel] at accepted
+      obtain ⟨pair, read, rest⟩ := bind_ok accepted
+      obtain ⟨other, type⟩ := pair
+      have metadata := CompatibleExpressionReads.metadata_of_read read
+      have same := Option.some.inj (metadata.found.symm.trans site.found)
+      subst other
+      simp only [form] at rest
+      obtain ⟨code, reference, rest⟩ := bind_ok rest
+      obtain ⟨done, _sameType, rest⟩ := bind_ok rest
+      cases done
+      cases rest
+      exact CellAwareBuiltinValueCertificates.of_reference prepared rfl site.found form
+        metadata.requirements metadata.coercions reference
+    · simp [owner, bind, Except.bind] at accepted
+
 /-- The actual root callback remains fixed while each recursive child uses
 its true smaller compiler budget. -/
 theorem of_policy {id : ExpressionId}
@@ -156,6 +196,9 @@ theorem of_policy {id : ExpressionId}
     subst node
     exact plain compiled rootFuel site (.read site.found form)
       (by simp [form, ExpressionForm.references]) unique declarations typed accepted
+  | builtin site form =>
+    obtain ⟨receipt⟩ := builtin compiled rootFuel site form accepted
+    exact .builtin receipt
   | generalized observed recipe =>
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted

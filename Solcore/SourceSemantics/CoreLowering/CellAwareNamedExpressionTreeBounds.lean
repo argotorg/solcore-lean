@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedCallPorts
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBuiltinValueBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeReadProductBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeGeneralizedReadProjection
@@ -73,6 +74,7 @@ private theorem product_values : CallableIndexedOwnedPreparedStagedPairBounds.Pr
 include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
   extension sameLedger runtimeLedger uninitialized semantic in
 theorem preserves_tree
+    (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
     {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
@@ -85,6 +87,10 @@ theorem preserves_tree
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeReadProductBounds.preserves bridge functionModel extension
       GeneralizedLocalDescriptorHeap.ordinary_cells sameLedger runtimeLedger callFaults uninitialized semantic unique size receipt
+  | builtin receipt =>
+    intro current child code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeBuiltinValueBounds.preserves bridge functionModel profile builtins callFaults unique size ⟨receipt⟩
   | generalized receipt recipe =>
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
@@ -129,6 +135,7 @@ theorem preserves_tree
 include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
   extension sameLedger runtimeLedger uninitialized semantic in
 theorem reflects_tree
+    (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
     {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
@@ -141,6 +148,10 @@ theorem reflects_tree
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeReadProductBounds.reflects bridge functionModel extension
       GeneralizedLocalDescriptorHeap.ordinary_cells sameLedger runtimeLedger callFaults uninitialized semantic unique size receipt
+  | builtin receipt =>
+    intro current child code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeBuiltinValueBounds.reflects bridge functionModel profile builtins callFaults size ⟨receipt⟩
   | generalized receipt recipe =>
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point

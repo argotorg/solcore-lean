@@ -98,6 +98,10 @@ mutual
             let ⟨typed⟩ ← uncoerced context node .bool foundAt (form ▸ .reference (.builtinBoolean value))
             let ⟨typeEq⟩ ← observe (node.type = .bool) "mixed Boolean type"
             return ⟨typeEq.symm ▸ typed⟩
+          | .reference _ (.builtinFunction function) =>
+            let ⟨typed⟩ ← uncoerced context node function.type foundAt (form ▸ .reference (.builtinFunction function))
+            let ⟨typeEq⟩ ← observe (node.type = function.type) "mixed builtin function type"
+            return ⟨typeEq.symm ▸ typed⟩
           | .integerLiteral literal resolution =>
             let ⟨target⟩ ← observe (resolution.targetType = .word) "mixed integer target"
             let ⟨requirements⟩ ← observe (node.requirements = [resolution.requirement]) "mixed integer requirements"

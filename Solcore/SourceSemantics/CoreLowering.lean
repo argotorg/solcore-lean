@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueCertificates
+import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueOrigins
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBuiltinValueBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareLoopAllocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareLoopEdges
 import Solcore.SourceSemantics.CoreLowering.CellAwareLoopEntry

@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionPolicies
+import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueCertificates
 
 /-! The mixed-cell compiler tree retains ordinary literal/read receipts,
 actual generalized read wrappers, and the exact ordered indirect children.
@@ -19,6 +20,9 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepa
   | plain {id lowered}
       (receipt : CallableIndexedOwnedPreparedStagedReadProductTreeBounds.Certificate prepared.fuel
         (.initial checked) source sourceContext (context prepared named).solvedRequirements reasonAt scope id lowered) :
+      Tree compiled rootFuel source sourceContext reasonAt scope id lowered
+  | builtin {id lowered}
+      (receipt : CellAwareBuiltinValueCertificates.Header prepared source id lowered) :
       Tree compiled rootFuel source sourceContext reasonAt scope id lowered
   | generalized {id lowered}
       (receipt : GeneralizedLocalNamedReadCompilation.Certificate prepared named source scope id reasonAt lowered)

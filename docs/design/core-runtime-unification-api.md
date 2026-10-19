@@ -4,6 +4,12 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Builtin values in mixed bodies (2026-10-19)
+
+`CellAwareBuiltinValueCertificates` retains the descriptor, identity, raw Source type and closed body emitted by the actual builtin-reference compiler action. `CellAwareBuiltinValueOrigins` embeds that genuine callable in the mixed function model. The common expression collector, preservation/reflection and independent Source lifting now include this leaf through `CellAwareScopeBuiltinValueBounds`.
+
+The unchanged `SourceCoreMixedBuiltinValue` fixture combines a generalized identity call with a returned builtin value. It retains its complete original function and cache, derives original declarative typing, and constructs Source proofs before three public resumes. Existing initial and retained named-call APIs carry the pair output with exact reached heaps. A separate native companion invokes the exported builtin handle; its Source/public invocation proof is subsequent work. Public runtime signatures are unchanged.
+
 ## Mixed loops and variable writes (2026-10-19)
 
 `CellAwareImperativeTree` and its scanner, collector and producer now include while loops, bare assignments, break and continue. `CellAwareLoopState` retains the actual recursive closure, administrative cell, captured descriptors and physical caller. `CellAwareLoopSequences` proves preservation and reflection through the reached suffix; `CellAwareSourceWhileSequenceLifting` starts with independent Source execution.
