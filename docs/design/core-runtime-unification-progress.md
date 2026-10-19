@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Mixed declaration and branch bodies reach public reuse (2026-10-19)
+
+One compiler tree now covers generalized declarations, ordinary initialized and absent locals, discarded expressions, lexical blocks, conditionals and terminal outcomes. Its producer follows actual compiler actions and retains the original statement roots, allocation frames and generalized instance bundles. Independent Source lifting and Core preservation/reflection share this tree and the exact reached state. Original function typing rules out escaped control at the public boundary.
+
+The unchanged one-function fixture keeps its complete original program, cache and profile. It constructs an identity closure, calls it inside a nested block, takes either branch and returns Word and Bool results. Three public calls with inputs `true`, `false`, `true` each have an independent Source proof before resume. The preceding public receipt supplies the next heap and retained history; native heap sizes are `2 / 32 / 53 / 83`.
+
+Validation: 53 changed modules in a coherent graph of 8,353 modules. All 31 focused runtime invocations and 4,724 endpoint audits pass, together with the full build (8,393 jobs), registered tests, kernel policy and canonical endpoint audit. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Mixed-cell loops and writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. The original typing observer certifies this complete fixture; it is not a general checker-soundness proof. The second goal remains incomplete.
+
 ## Returned generalized closures survive public reuse (2026-10-19)
 
 The materialized output proof now retains each actual generalized closure association, captured environment and owning frame through returned functions and pairs. The static body producer follows the real compiler action and closes its expression and body obligations. Selected public output leaves carry these associations into a heterogeneous retained history; callers do not reconstruct them from Source types or handle names.

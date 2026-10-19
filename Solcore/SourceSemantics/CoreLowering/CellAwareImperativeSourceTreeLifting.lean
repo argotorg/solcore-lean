@@ -1,0 +1,135 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTreeBounds
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowGeneralizedLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowOrdinaryLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowAbsentLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowTerminalLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowDiscardLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowBlockLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowConditionalLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalSourceTreeLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceAbsentPrefixLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceOrdinaryPrefixLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNativeBodyTree
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceTerminalLifting
+
+/-! Independent ordinary Source bodies follow the actual compiler tree.
+Generalized declarations construct their real physical state before recursion. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxRecDepth 8192
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceTreeLifting
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
+open CallableIndexedNamedGeneration (source)
+
+variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header whole program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key whole program)}
+  {protocol : ProtectedStateTransition.Protocol (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
+  (bindings : ProtectedStateTransition.Bindings protocol)
+  {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
+    (CompatibleHeap.projects whole.compatible.checked.catalog) whole.indexed.layouts.definitions}
+  {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
+  (compiled : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics namedCode)
+  (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key = .ok named.specialized)
+  (producer : ProtectedStateTransition.CellAllocation.Producer
+    (catalog := CompatibleEquality.storageCatalog whole.compatible.checked.catalog) protocol whole.indexed.layouts
+    whole.indexed.ancestry.layout.frame
+    (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalInstanceValues.model whole.indexed)))
+  (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
+  {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+  {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {faults : RecursiveStageMeaning.FaultRep}
+
+
+variable
+  (booleans : ∀ {mapping world sourceValue nativeValue},
+    model.Represents mapping world .bool sourceValue nativeValue .bool →
+    ∃ truth, sourceValue = .bool truth ∧ nativeValue = .bool truth)
+  (unitValue : ∀ mapping world, model.Represents mapping world .unit .unit .unit .unit)
+
+include record registered bindings booleans unitValue in
+theorem lifts
+    (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
+      invocation.evidence.Covers context →
+      context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
+      ∀ size, CellAwareScopeSourceLiftBounds.LiftsAt bridge context model named registry invocation (certificates context) size)
+    (preservation : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
+      invocation.evidence.Covers context →
+      context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
+      ∀ size, CellAwareScopeExpressionBounds.PreservesAt bridge context model named registry invocation
+        (certificates context) faults size)
+    (sourceEq : invocation.source = source named)
+    {administrative : Core.Context} {reasonAt : ExpressionId → Word}
+    {mode : Bool} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : CellAwareImperativeTree.Tree whole.indexed named compiled certificates administrative reasonAt
+      context scope mode statements expected type code)
+    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named reasonAt) :
+    CellAwareSourceFlowLiftBounds.Lifts (named := named) (administrative := administrative)
+      (registry := registry) (invocation := invocation) bridge producer context scope mode statements := by
+  induction tree with
+  | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody rest expected type lowered body childFuel
+      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same remaining ih =>
+    exact CellAwareSourceFlowGeneralizedLifting.generalized bridge compiled record producer registered
+      (type := type) (body := body) found form declaration polymorphic extended ordinary initializerFound initializerForm
+      valueType requirements coercions site initial nativeTyped allocation annotation same sourceEq issuer ih
+  | @initialized context nextContext scope mode id node binder initializer initializerNode rest expected type lowered body
+      found form member mono extended ordinary initializerFound valueType typed certified allocation annotation same remaining ih =>
+    exact CellAwareSourceFlowOrdinaryLifting.initialized bridge producer registered (type := type) (body := body)
+      found form member mono extended ordinary initializerFound valueType typed certified allocation annotation same
+      sourceEq (children _) (preservation _) ih
+
+  | @uninitialized context nextContext scope mode id node binder rest expected type body payload
+      found form member mono extended ordinary projected allocation annotation same remaining ih =>
+    exact CellAwareSourceFlowAbsentLifting.absent bridge producer registered (body := body)
+      found form member mono extended ordinary projected allocation annotation same sourceEq ih
+
+  | nil _allowed => exact CellAwareSourceFlowTerminalLifting.nil bridge producer
+  | returnUnit rest found form =>
+    exact CellAwareSourceFlowTerminalLifting.return_unit bridge producer sourceEq
+      (by simpa only [sourceEq] using found) form
+  | @returning context scope mode id node expression expressionNode expected lowered rest found form expressionFound _valueType typed certified =>
+    exact CellAwareSourceFlowTerminalLifting.terminal bridge producer sourceEq
+      (.returning rest (by simpa only [sourceEq] using lookupStatement?_sound found) form)
+      (by simpa only [sourceEq] using expressionFound) (by simpa only [sourceEq] using typed)
+      certified (children context)
+  | @tail context scope id node expression expressionNode expected lowered found form expressionFound _valueType typed certified =>
+    exact CellAwareSourceFlowTerminalLifting.terminal bridge producer sourceEq
+      (.tail (by simpa only [sourceEq] using lookupStatement?_sound found) form)
+      (by simpa only [sourceEq] using expressionFound) (by simpa only [sourceEq] using typed)
+      certified (children context)
+  | @discard context scope mode id node expression expressionNode semicolon rest expected lowered type body
+      found form _notTail continuing expressionFound typed certified remaining ih =>
+    exact CellAwareSourceFlowDiscardLifting.lifts bridge producer sourceEq
+      (by simpa only [sourceEq] using found) form continuing
+      (by simpa only [sourceEq] using expressionFound) (by simpa only [sourceEq] using typed)
+      certified (children context) (preservation context) ih
+  | @block context scope mode id node statements rest expected type innerCode body
+      found form inner remaining innerIH remainingIH =>
+    exact CellAwareSourceFlowBlockLifting.lifts bridge producer sourceEq
+      (by simpa only [sourceEq] using found) form innerIH
+      (fun size => CellAwareImperativeTreeBounds.preserves bridge bindings compiled record producer registered
+        booleans unitValue (fun context runtime covers sameLedger childSize _ =>
+          preservation context runtime covers sameLedger childSize) sourceEq inner issuer size (Nat.le_refl _)) remainingIH
+  | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body
+      found form conditionFound conditionType conditionTyped conditionCertificate thenTree elseTree remaining thenIH elseIH remainingIH =>
+    exact CellAwareSourceFlowConditionalLifting.lifts
+      (expected := expected) (type := type) (branchCode := fun truth => if truth then thenCode else elseCode)
+      bridge producer sourceEq booleans
+      (by simpa only [sourceEq] using found) form
+      (by simpa only [sourceEq] using conditionFound) conditionType
+      (by simpa only [sourceEq] using conditionTyped) conditionCertificate
+      (children context) (preservation context)
+      (fun truth => by cases truth <;> assumption)
+      (fun truth size => by
+        cases truth
+        · exact CellAwareImperativeTreeBounds.preserves bridge bindings compiled record producer registered
+            booleans unitValue (fun context runtime covers sameLedger childSize _ =>
+              preservation context runtime covers sameLedger childSize) sourceEq elseTree issuer size (Nat.le_refl _)
+        · exact CellAwareImperativeTreeBounds.preserves bridge bindings compiled record producer registered
+            booleans unitValue (fun context runtime covers sameLedger childSize _ =>
+              preservation context runtime covers sameLedger childSize) sourceEq thenTree issuer size (Nat.le_refl _)) remainingIH
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceTreeLifting

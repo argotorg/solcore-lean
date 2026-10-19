@@ -1,3 +1,6 @@
+import Solcore.Test.SourceCoreMixedImperativeRuntime
+import Solcore.Test.SourceCoreMixedImperativeProbe
+import Solcore.Test.SourceCoreMixedImperativeWellFormed
 import Solcore.Test.SourceCoreGeneralizedExportProbe
 import Solcore.Test.SourceCoreGeneralizedExportRuntime
 import Solcore.Test.SourceCoreSelectedGeneralizedLocalProfile
@@ -3782,6 +3785,9 @@ def main : IO UInt32 := do
   Tests.SourceCoreMethodOriginEvidence.SelectedSourceOutcomes.run
   Tests.SourceCoreGeneralizedExport.probe
   Tests.SourceCoreGeneralizedExport.SourcePublicRuntime.run
+  Tests.SourceCoreMixedImperative.typingProbe
+  Tests.SourceCoreMixedImperative.probe
+  Tests.SourceCoreMixedImperative.ObservedRuntime.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"

@@ -4,6 +4,14 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Mixed declaration and branch bodies (2026-10-19)
+
+`CellAwareImperativeTree` is the common certificate for actual compilation of generalized and ordinary declarations, discarded expressions, lexical blocks, conditionals and terminal outcomes. `CellAwareImperativeBodyProducer` constructs it from accepted original statement roots. `CellAwareImperativeTreeBounds` proves preservation and reflection, while `CellAwareImperativeSourceTreeLifting` lifts independent Source execution and retains authentic earlier stage rejection.
+
+`CellAwareImperativeNamedBodyReceipt.of_header` consumes a selected original header typing certificate. The named invocation and Source invocation layers derive child contexts, actual allocation frames and caller restoration. `CellAwareScopeFlowFinish` uses original function typing to exclude escaped break or continue and checks the actual result projection.
+
+`CellAwarePublicImperativeNamedForward.first_value` and `CellAwarePublicImperativeNamedContinuation.after_value` connect these bodies to actual public startup and retained sessions. They use the existing value-forward receipt. `SourceCoreMixedImperativeRuntime` proves the complete original fixture before each of three resumes, exercising both branches and reuse. Mixed loops and writes and the general selected checker bridge remain open; the current concrete Source invocation still uses original program typing.
+
 ## Returned generalized handles (2026-10-19)
 
 `CellAwareMaterializedOutput.ValueAt` preserves the actual compiled closure association and owner frame through generalized reads and paired outputs. The materialized expression and named-body producers derive this stronger result from authentic compiler receipts. `CellAwareMaterializedRetainedEntries` stores separate owners in one public history and transports them as the heap grows.
