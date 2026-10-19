@@ -4,6 +4,16 @@ Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Prepared closures and initial data inputs (2026-10-19)
+
+`PreparedLambdaBodySupport` and its formation producer retain the actual compiled closure code, original Source view, exact captures, caller history and same-compilation diagnostic receipt. `CallableIndexedOwnedPreparedPhysicalClosureAssociation.preparedBranching` carries this support through the selected physical model. Formation, staged lifting and public closure application dispatch consume that positive association. `functions_include_raw` supplies only the raw callable projection; it replaces the former `functions_include_prepared` accessor without replacing the stronger association used by execution proofs.
+
+The automatic scoped factory profile accepts prepared projected unary bodies. The complete original thirteen-entry `SourceCoreSelectedProjectedBitNotProfile` compilation passes with all thirteen cache and table rows. Its independent Source factory trace reaches a returned handle, then two direct Source calls update the original captured mapping cell and restore its first entry. Unrelated heap suffix cells are preserved. The public conclusions retain authentic earlier stage rejection and sufficient-fuel continuations.
+
+`SelectedCompilationCertifiedPublicInitialData` adds `Initial.lift_data_call`, `forward_data_scalar_plain`, `forward_data_fault_plain`, `forward_data_function_plain`, `forward_data_output_plain`, and the scalar/failure/output reflection endpoints. These construct the receiver from actual initial input encoding, so callers need no `SimplePublic` condition. `PublicDataTypes` and input meanings retain raw constructor, mapping and proxy metadata. Existing narrow initialization APIs preserve their signatures and delegate to the broader proofs.
+
+Fresh mapping regressions cover complement, default-zero insertion, an uninitialized key fault and reuse after failure. The factory regression connects fresh input, handle issuance and both calls in one session. No public runtime instruction or execution behavior changes. A successful supported compiler profile remains required; complete compiler coverage is still unfinished.
+
 ## Projected unary writes and selected compilation scope (2026-10-19)
 
 `CompatibleProjectedBitNotStatements.Head` retains the actual prepared path, original key certificates and Word/integer modifier profile. `CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_value`, `preserves_key_fault`, `preserves_getter_fault` and `reflects_bounded` connect ordered key execution to the reached state and strict continuation bound. The public compiler profile currently selects original raw Word leaves.
@@ -12,7 +22,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 `CompatibleProjectedBitNotStatements.Head.PreparedAt` records the actual unary occurrence, prepared path and emitted diagnostic identities. `PreparedAssignmentReachedDiagnostics.Ready.unary` and the public receiver derive missing-default and uninitialized-read correspondence at the real reached state. Statement, initializer and post-item dispatch use these receipts internally.
 
-The original thirteen-declaration fixture has two explicit compilation receipts: `compileNamedHeaderFixture` selects twelve supported named/header entries; `compileFixture` retains the full executable thirteen-entry cache. Only the former passes the proof profile. A projected unary operation inside a returned closure remains outside that profile, while existing projected value-assignment closures keep their previous support. The complete runtime fixture still checks repeated captured-mapping mutation.
+The original thirteen-declaration fixture has two explicit compilation receipts: `compileNamedHeaderFixture` selects twelve supported named/header entries; `compileFixture` retains the full executable thirteen-entry cache. At the original checkpoint only the former passed the proof profile. The prepared-closure extension above now admits the complete thirteen-entry compilation and connects captured mutation to independent Source proofs.
 
 Validation: 180 changed or new modules checked in a coherent graph of 7,910 modules. Every one of the 2,843 transitively affected modules was freshly elaborated from source. All 17 focused runtime markers and 3,098 endpoint audits pass. Full build (7,950 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
 
