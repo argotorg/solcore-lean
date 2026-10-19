@@ -69,6 +69,7 @@ theorem of_static_compilation
     {sourceContext final : SourceSemantics.Context} {facts : BodyFacts}
     (typed : StatementsHaveType (source named) control sourceContext compiled.statements final facts)
     (declarations : CompatibleExpressionReads.ScopeDeclarations (source named) (scope named) sourceContext)
+    (sourceSignatures : sourceContext.signatures = checked.signatures)
     {nativeType : Ty}
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext (scope named) ++ administrative)
       compiled.body nativeType prepared.layouts.definitions) :
@@ -91,7 +92,7 @@ theorem of_static_compilation
     rfl) rfl
     (CellAwareNamedInitializerProfiles.Rows.at_site compiled _ profile.initializers)
     (CellAwareNamedInitializerProfiles.Rows.bodies_at_site compiled _ profile.initializers)
-    children (profile.scan.syntax unique result typed) declarations generated flowTyped
+    children (profile.scan.syntax unique result typed) declarations sourceSignatures generated flowTyped
   exact ⟨⟨flow, tree, emitted⟩⟩
 
 abbrev Profile (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
@@ -119,11 +120,12 @@ theorem of_compilation
     {sourceContext final : SourceSemantics.Context} {facts : BodyFacts}
     (typed : StatementsHaveType (source named) control sourceContext compiled.statements final facts)
     (declarations : CompatibleExpressionReads.ScopeDeclarations (source named) (scope named) sourceContext)
+    (sourceSignatures : sourceContext.signatures = checked.signatures)
     {administrative : Core.Context} {nativeType : Ty}
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext (scope named) ++ administrative)
       compiled.body nativeType prepared.layouts.definitions) :
     Nonempty (Body compiled (Certificate compiled) administrative sourceContext expected) := by
-  apply of_static_compilation compiled record assignmentsPrepared profile ?_ unique result typed declarations nativeTyped
+  apply of_static_compilation compiled record assignmentsPrepared profile ?_ unique result typed declarations sourceSignatures nativeTyped
   intro childContext childScope fuel id node lowered childDeclarations syntaxTree found childTyped accepted _ _
   exact CellAwareNamedBodyProducer.expression compiled record syntaxTree unique childDeclarations found childTyped accepted
 

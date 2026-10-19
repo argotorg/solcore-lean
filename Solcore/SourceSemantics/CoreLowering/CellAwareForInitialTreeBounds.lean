@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialProjectedAssignment
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialAssignment
 import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialDiscard
 import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderTree
@@ -14,7 +16,7 @@ set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 2000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareForInitialTreeBounds
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference CompatibleEquality GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedFlowOutcomes (Represents Post restore_post)
 open CallableIndexedOwnedAdmittedStagedForInitializerSource
@@ -40,6 +42,14 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
   (operandIncluded : ∀ reason token,
     GenericAssignmentDiagnostics.OperandRep compiled.own.assignments reason token → faults (.semantic reason) token)
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations whole.compatible.checked.catalog functions identities)
+  (assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial whole.compatible.checked)
+    functions protocol (source named)
+    (fun site root => diagnostics.placeReason named.signature.key site root none)
+    (fun site root raw => diagnostics.placeReason named.signature.key site root (some raw))
+    receiving (fun reason token => faults (.semantic reason) token))
   {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
   {test : ExpressionId} {postItems : List ForItemForm} {statements : List StatementId}
@@ -71,7 +81,7 @@ private theorem post_restore {context expected outcome environment index}
     Post bridge context expected (outcome.restore environment) reached := by
   cases outcome <;> exact post
 
-include bindings transport extension registered operandIncluded in
+include bindings transport extension registered operandIncluded faithful observations assignmentDiagnostics in
 theorem preserves {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
@@ -224,8 +234,22 @@ theorem preserves {budget : Nat}
         environments heaps locals agrees actualTyped runtime covers sameLedger
         initial admitted authority physical owner sameLocation ready trace
 
-include bindings transport extension registered operandIncluded in
-theorem reflects {budget : Nat}
+  | @assignProjected context scope assignment operator rhs rest body head projected assignmentTyped site remaining ih =>
+    intro size within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger
+      initial admitted authority physical owner sameLocation ready outcome after trace
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareForInitialProjectedAssignment.preserves bridge transport functions producer runtime.graph.nodeOccurrencesUnique
+        head projected assignmentTyped extension faithful observations
+        (fun typed _ _ initial => PreparedAssignmentReachedDiagnostics.shape_errors
+          (site receiving) operandIncluded assignmentDiagnostics typed initial) budget (children context runtime covers sameLedger) ih size within
+        environments heaps locals agrees actualTyped runtime covers sameLedger
+        initial admitted authority physical owner sameLocation ready trace
+
+include bindings transport extension registered operandIncluded faithful observations assignmentDiagnostics in
+theorem reflects (functionTypes : FunctionRuntimeViews functions) {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
@@ -366,6 +390,20 @@ theorem reflects {budget : Nat}
         fun previous right different => operandIncluded _ _ (operands previous right different)
       exact CellAwareForInitialAssignment.reflects bridge transport functions producer runtime.graph.nodeOccurrencesUnique
         head bare assignmentTyped extension invalid budget (children context runtime covers sameLedger) ih size within
+        environments heaps locals agrees actualTyped runtime covers sameLedger
+        initial admitted authority physical owner sameLocation ready completed
+
+  | @assignProjected context scope assignment operator rhs rest body head projected assignmentTyped site remaining ih =>
+    intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger
+      initial admitted authority physical owner sameLocation ready completed
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareForInitialProjectedAssignment.reflects bridge transport functions producer runtime.graph.nodeOccurrencesUnique
+        head projected assignmentTyped extension faithful observations
+        (fun typed _ _ initial => PreparedAssignmentReachedDiagnostics.shape_errors
+          (site receiving) operandIncluded assignmentDiagnostics typed initial) functionTypes budget (children context runtime covers sameLedger) ih size within
         environments heaps locals agrees actualTyped runtime covers sameLedger
         initial admitted authority physical owner sameLocation ready completed
 

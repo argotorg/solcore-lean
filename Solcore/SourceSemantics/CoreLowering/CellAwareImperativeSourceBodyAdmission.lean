@@ -128,6 +128,20 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
       Scan locals caller active source approved expected mode (id :: rest)
 
+  | assignProjected {mode id node assignment operator rhs rhsNode binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type)
+      (value : approved rhs)
+      (remaining : Scan locals caller active source approved expected mode rest) :
+      Scan locals caller active source approved expected mode (id :: rest)
+
+
 def scan? (locals : Catalog) (caller : Key) (active : Substitution)
     (source : TypedSource) {approved : ExpressionId → Prop}
     (expression : (id : ExpressionId) → Option (PLift (approved id))) (expected : TypeSystem.Ty) :
@@ -220,19 +234,22 @@ def scan? (locals : Catalog) (caller : Key) (active : Substitution)
         match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
         | .error _ => none
         | .ok binder =>
-          if targetType : binder.scheme.body = assignment.target.type then
-            if profile : operator = .equal ∨ assignment.target.type = .word then
-              if bare : assignment.target.projections = [] then
-                match rhsFound : source.lookupExpression? rhs with
-                | none => none
-                | some rhsNode =>
-                  if rhsType : rhsNode.type = assignment.target.type then do
-                    let ⟨value⟩ ← expression rhs
-                    let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
+          if profile : operator = .equal ∨ assignment.target.type = .word then
+            match rhsFound : source.lookupExpression? rhs with
+            | none => none
+            | some rhsNode =>
+              if rhsType : rhsNode.type = assignment.target.type then do
+                let ⟨value⟩ ← expression rhs
+                let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
+                if bare : assignment.target.projections = [] then
+                  if targetType : binder.scheme.body = assignment.target.type then
                     pure ⟨.assign found form declaration targetType profile bare rhsFound rhsType value remaining⟩
                   else none
+                else
+                  let ⟨route⟩ ← AcceptedProjectedAssignmentRoute.check source binder.scheme.body assignment.target.projections assignment.target.type
+                  let ⟨keys⟩ ← CellAwareForHeaderAdmission.approvedKeys? expression (DataPlaceKeyOrder.sourceKeys assignment.target.projections)
+                  pure ⟨.assignProjected found form declaration route profile bare keys rhsFound rhsType value remaining⟩
               else none
-            else none
           else none
       | .letDecl binder (some initializer) =>
         if sourceType : node.type = .unit then
@@ -397,6 +414,21 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
       Syntax locals caller active source approved expected context mode (id :: rest)
 
+  | assignProjected {context mode id node assignment operator rhs rhsNode binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type)
+      (typed : SourceAssignmentHasType source context assignment operator rhs)
+      (value : approved rhs)
+      (remaining : Syntax locals caller active source approved expected context mode rest) :
+      Syntax locals caller active source approved expected context mode (id :: rest)
+
+
 private theorem head_tail {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
     (typed : StatementsHaveType source control context (id :: rest) final facts) :
@@ -537,5 +569,14 @@ theorem Scan.syntax {locals caller active source approved expected mode statemen
     | assignValue assignment =>
       exact .assign found form declaration targetType profile bare rhsFound rhsType assignment value
         (remainingIH result tail)
+
+  | assignProjected found form declaration route profile projected keys rhsFound rhsType value _ ih =>
+    obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+    have original := form_at unique found head
+    rw [form] at original
+    cases original with
+    | assignValue assignment =>
+      exact .assignProjected found form declaration route profile projected keys rhsFound rhsType assignment value
+        (ih result tail)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceBodyAdmission

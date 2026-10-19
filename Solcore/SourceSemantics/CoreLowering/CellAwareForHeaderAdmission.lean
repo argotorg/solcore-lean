@@ -34,6 +34,29 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
 
+  | assignProjected {assignment operator rhs rhsNode binder rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type)
+      (value : approved rhs)
+      (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
+
+
+def approvedKeys? {approved : ExpressionId → Prop}
+    (expression : (id : ExpressionId) → Option (PLift (approved id))) :
+    (ids : List ExpressionId) → Option (PLift (∀ id ∈ ids, approved id))
+  | [] => some ⟨by intro id member; cases member⟩
+  | id :: ids => do
+    let ⟨head⟩ ← expression id
+    let ⟨tail⟩ ← approvedKeys? expression ids
+    pure ⟨by intro child member; rcases List.mem_cons.mp member with same | rest
+             · exact same ▸ head
+             · exact tail child rest⟩
+
 def scan? (source : TypedSource) {approved : ExpressionId → Prop}
     (expression : (id : ExpressionId) → Option (PLift (approved id))) :
     (items : List ForItemForm) → Option (PLift (Scan source approved items))
@@ -73,19 +96,22 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
     match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
     | .error _ => none
     | .ok binder =>
-      if targetType : binder.scheme.body = assignment.target.type then
-        if profile : operator = .equal ∨ assignment.target.type = .word then
-          if bare : assignment.target.projections = [] then
-            match found : source.lookupExpression? rhs with
-            | none => none
-            | some node =>
-              if valueType : node.type = assignment.target.type then do
-                let ⟨approved⟩ ← expression rhs
-                let ⟨remaining⟩ ← scan? source expression rest
-                pure ⟨.assign declaration targetType profile bare found valueType approved remaining⟩
+      if profile : operator = .equal ∨ assignment.target.type = .word then
+        match rhsFound : source.lookupExpression? rhs with
+        | none => none
+        | some rhsNode =>
+          if rhsType : rhsNode.type = assignment.target.type then do
+            let ⟨value⟩ ← expression rhs
+            let ⟨remaining⟩ ← scan? source expression rest
+            if bare : assignment.target.projections = [] then
+              if targetType : binder.scheme.body = assignment.target.type then
+                pure ⟨.assign declaration targetType profile bare rhsFound rhsType value remaining⟩
               else none
+            else
+              let ⟨route⟩ ← AcceptedProjectedAssignmentRoute.check source binder.scheme.body assignment.target.projections assignment.target.type
+              let ⟨keys⟩ ← CellAwareForHeaderAdmission.approvedKeys? expression (DataPlaceKeyOrder.sourceKeys assignment.target.projections)
+              pure ⟨.assignProjected declaration route profile bare keys rhsFound rhsType value remaining⟩
           else none
-        else none
       else none
   | .assignBitNot _ :: _ => none
 
@@ -128,6 +154,20 @@ inductive Syntax (source : TypedSource) (approved : ExpressionId → Prop) :
       (remaining : Syntax source approved context rest final) :
       Syntax source approved context (.assignValue assignment operator rhs :: rest) final
 
+  | assignProjected {context final assignment operator rhs rhsNode binder rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (rhsFound : source.lookupExpression? rhs = some rhsNode)
+      (rhsType : rhsNode.type = assignment.target.type)
+      (typed : SourceAssignmentHasType source context assignment operator rhs)
+      (value : approved rhs)
+      (remaining : Syntax source approved context rest final) :
+      Syntax source approved context (.assignValue assignment operator rhs :: rest) final
+
+
 private theorem expression_at {source : TypedSource} {context : SourceSemantics.Context}
     {id : ExpressionId} {node : ExpressionNode} {type : TypeSystem.Ty}
     (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? id = some node)
@@ -164,5 +204,21 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
     | cons head tail =>
       cases head with
       | assignValue actual => exact .assign declaration targetType profile bare found sourceType actual value (ih tail)
+
+  | assignProjected declaration route profile projected keys rhsFound rhsType value _ ih =>
+    cases typed with
+    | cons head tail =>
+      cases head with
+      | assignValue actual =>
+        exact .assignProjected declaration route profile projected keys rhsFound rhsType actual value (ih tail)
+
+theorem Syntax.signatures {source approved context items final}
+    (tree : Syntax source approved context items final) : final.signatures = context.signatures := by
+  induction tree with
+  | nil => rfl
+  | absent _ _ extended _ _ ih | initialized _ _ extended _ _ _ _ _ _ ih =>
+    cases extended
+    exact ih
+  | discard _ _ _ _ ih | assign _ _ _ _ _ _ _ _ _ ih | assignProjected _ _ _ _ _ _ _ _ _ _ ih => exact ih
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderAdmission

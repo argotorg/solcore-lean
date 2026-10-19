@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareNamedAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeFlowFinish
@@ -112,6 +113,8 @@ theorem preserves {budget : Nat}
   apply CellAwareScopeFlowFinish.preserves bridge producer
     (CellAwareImperativeTreeBounds.preserves bridge bindings transport functions extension compiled record producer registered
       (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compiled issued receiver represented)
+      (CallableIndexedLambdaValues.identity_faithful whole.indexed) (CellAwarePhysicalFunctionOrigins.observations profile)
+      (CellAwareNamedAssignmentDiagnostics.ready record runtime.graph.nodeOccurrencesUnique issued receiver functions protocol)
       (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
       (fun _ _ => CompatiblePayload.ValueRep.unit)
       (fun childContext childRuntime childCovers childLedger childSize _ =>
@@ -180,8 +183,11 @@ theorem reflects {budget : Nat}
   apply CellAwareScopeFlowFinish.reflects bridge producer
     (CellAwareImperativeTreeBounds.reflects bridge bindings transport functions extension compiled record producer registered
       (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compiled issued receiver represented)
+      (CallableIndexedLambdaValues.identity_faithful whole.indexed) (CellAwarePhysicalFunctionOrigins.observations profile)
+      (CellAwareNamedAssignmentDiagnostics.ready record runtime.graph.nodeOccurrencesUnique issued receiver functions protocol)
       (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
       (fun _ _ => CompatiblePayload.ValueRep.unit)
+      (CellAwarePhysicalFunctionOrigins.runtime_views profile)
       (fun childContext childRuntime childCovers childLedger childSize _ =>
         CellAwareNamedExpressionMeaning.reflects compiled bridge profile receiver extension authority sourceEq issuer record
           childLedger (by simpa only [sourceEq] using childRuntime) wellFormed childCovers childSize)

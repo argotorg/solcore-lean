@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeProjectedAssignmentFlow
+import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CellAwareForSequences
 import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareForInitialTerminal
@@ -31,7 +33,7 @@ set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 2000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTreeBounds
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference CompatibleEquality GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedFlowOutcomes (Represents Post restore_post)
 open CallableIndexedOwnedAdmittedStagedTerminalStatements (Head control)
@@ -58,6 +60,14 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
   (operandIncluded : ∀ reason token,
     GenericAssignmentDiagnostics.OperandRep compiled.own.assignments reason token → faults (.semantic reason) token)
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations whole.compatible.checked.catalog functions identities)
+  (assignmentDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial whole.compatible.checked)
+    functions protocol (source named)
+    (fun site root => diagnostics.placeReason named.signature.key site root none)
+    (fun site root raw => diagnostics.placeReason named.signature.key site root (some raw))
+    receiving (fun reason token => faults (.semantic reason) token))
   {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
 
@@ -75,7 +85,7 @@ variable
     ∃ truth, sourceValue = .bool truth ∧ nativeValue = .bool truth)
   (unitValue : ∀ mapping world, (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions).Represents mapping world .unit .unit .unit .unit)
 
-include record bindings transport extension registered operandIncluded booleans unitValue in
+include record bindings transport extension registered operandIncluded faithful observations assignmentDiagnostics booleans unitValue in
 theorem preserves {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
@@ -341,7 +351,7 @@ theorem preserves {budget : Nat}
       initial admitted authority physical owner sameLocation ready trace
   | @forLoop context loopContext postContext scope loopScope postScope mode id node initialItems condition conditionNode postItems statements rest expected type conditionCode loopCode postCode initialCode body escaped
       found form initialTree conditionFound conditionType conditionTyped conditionCertificate loopTree postTree loopSourceTyped postSourceTyped nativeTyped remaining loopIH remainingIH =>
-    have postMeaning := CellAwareForPostTreeBounds.preserves (expected := expected) bridge bindings transport functions extension compiled producer registered operandIncluded
+    have postMeaning := CellAwareForPostTreeBounds.preserves (expected := expected) bridge bindings transport functions extension compiled producer registered operandIncluded faithful observations assignmentDiagnostics
       children sourceEq postTree
     have terminalMeaning : CellAwareScopeForInitialBounds.PreservesAtMost bridge loopContext
         (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
@@ -355,7 +365,7 @@ theorem preserves {budget : Nat}
         (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH postMeaning
         loopSourceTyped postSourceTyped terminalSize within
         environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready trace
-    have initialMeaning := CellAwareForInitialTreeBounds.preserves bridge bindings transport functions extension compiled producer registered operandIncluded
+    have initialMeaning := CellAwareForInitialTreeBounds.preserves bridge bindings transport functions extension compiled producer registered operandIncluded faithful observations assignmentDiagnostics
       children sourceEq initialTree terminalMeaning
     intro size within mapping world actualContext environment canonical actual before store embedding
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
@@ -381,6 +391,22 @@ theorem preserves {budget : Nat}
         environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
         initial admitted authority physical owner sameLocation ready trace
 
+  | @assignProjected context scope mode id node assignment operator rhs rest expected type body
+      found form head projected _rightTyped site remaining remainingIH =>
+    intro size within mapping world actualContext environment canonical actual before store embedding
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareScopeProjectedAssignmentFlow.preserves bridge transport functions producer rfl
+        runtime.graph.nodeOccurrencesUnique found form head projected extension faithful observations
+        (fun typed _ _ initial => PreparedAssignmentReachedDiagnostics.shape_errors
+          (site receiving) operandIncluded assignmentDiagnostics typed initial)
+        budget (children context runtime covers sameLedger) remainingIH size within
+        environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        initial admitted authority physical owner sameLocation ready trace
+
   | @breaking context scope mode id node expected type rest found form =>
     intro size _within mapping world actualContext environment canonical actual before store embedding
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
@@ -402,8 +428,8 @@ theorem preserves {budget : Nat}
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
       initial admitted authority physical owner sameLocation ready trace
 
-include record bindings transport extension registered operandIncluded booleans unitValue in
-theorem reflects {budget : Nat}
+include record bindings transport extension registered operandIncluded faithful observations assignmentDiagnostics booleans unitValue in
+theorem reflects (functionTypes : FunctionRuntimeViews functions) {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
@@ -661,7 +687,7 @@ theorem reflects {budget : Nat}
       initial admitted authority physical owner sameLocation ready completed
   | @forLoop context loopContext postContext scope loopScope postScope mode id node initialItems condition conditionNode postItems statements rest expected type conditionCode loopCode postCode initialCode body escaped
       found form initialTree conditionFound conditionType conditionTyped conditionCertificate loopTree postTree loopSourceTyped postSourceTyped nativeTyped remaining loopIH remainingIH =>
-    have postMeaning := CellAwareForPostTreeBounds.reflects (expected := expected) bridge bindings transport functions extension compiled producer registered operandIncluded
+    have postMeaning := CellAwareForPostTreeBounds.reflects (expected := expected) bridge bindings transport functions extension compiled producer registered operandIncluded faithful observations assignmentDiagnostics functionTypes
       children sourceEq postTree
     have terminalMeaning : CellAwareScopeForInitialBounds.ReflectsAtMost bridge loopContext
         (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions) named producer registry invocation faults
@@ -675,7 +701,7 @@ theorem reflects {budget : Nat}
         (by simpa only [sourceEq] using conditionTyped) conditionCertificate nativeTyped loopIH postMeaning
         loopSourceTyped postSourceTyped terminalSize within
         environments heaps locals agrees actualTyped runtime covers sameLedger initial admitted authority physical owner sameLocation ready completed
-    have initialMeaning := CellAwareForInitialTreeBounds.reflects bridge bindings transport functions extension compiled producer registered operandIncluded
+    have initialMeaning := CellAwareForInitialTreeBounds.reflects bridge bindings transport functions extension compiled producer registered operandIncluded faithful observations assignmentDiagnostics functionTypes
       children sourceEq initialTree terminalMeaning
     intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
@@ -697,6 +723,22 @@ theorem reflects {budget : Nat}
         runtime.graph.nodeOccurrencesUnique found form head bare extension
         (fun previous right invalid => operandIncluded _ _ (operands previous right invalid))
         budget (children context runtime covers sameLedger) remainingIH size within
+        environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        initial admitted authority physical owner sameLocation ready completed
+
+  | @assignProjected context scope mode id node assignment operator rhs rest expected type body
+      found form head projected _rightTyped site remaining remainingIH =>
+    intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
+      environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+      initial admitted authority physical owner sameLocation ready completed
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareScopeProjectedAssignmentFlow.reflects bridge transport functions producer rfl
+        runtime.graph.nodeOccurrencesUnique found form head projected extension faithful observations
+        (fun typed _ _ initial => PreparedAssignmentReachedDiagnostics.shape_errors
+          (site receiving) operandIncluded assignmentDiagnostics typed initial)
+        functionTypes budget (children context runtime covers sameLedger) remainingIH size within
         environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
         initial admitted authority physical owner sameLocation ready completed
 

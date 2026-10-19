@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForItemsProjectedAssignmentLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForItemsAbsentLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForItemsOrdinaryLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForItemsDiscardLifting
@@ -18,7 +19,7 @@ set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 2000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareSourceForHeaderLifting
-open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open Core Frontend SourceInference CompatibleEquality GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedFlowOutcomes (Represents Post restore_post)
 open CallableIndexedOwnedAdmittedStagedForPostContracts (restoredOutcome)
@@ -32,6 +33,9 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (bindings : ProtectedStateTransition.Bindings protocol)
   (transport : ProtectedStateTransition.AdministrativeTransport protocol)
   (functions : FunctionModel whole.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions whole.indexed))
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations whole.compatible.checked.catalog functions identities)
   {receiving : SourceCoreRawMetadata.Registry}
   (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
@@ -56,7 +60,7 @@ private theorem member_of_root {source : TypedSource} {binder : TypedBinder}
     exact List.mem_cons_self
   exact (List.mem_filter.mp member).1
 
-include transport extension registered in
+include transport extension registered faithful observations in
 theorem lifts
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
@@ -103,5 +107,12 @@ theorem lifts
       cases sourceEq
       exact CellAwareSourceForItemsAssignmentLifting.lifts bridge functions transport extension producer
         rfl head bare typed (children context) (preservation context) ih
+
+  | @assignProjected context scope assignment operator rhs rest body head projected typed _site remaining ih =>
+    cases invocation with
+    | mk origin actualSource owned stageContext evidence guards =>
+      cases sourceEq
+      exact CellAwareSourceForItemsProjectedAssignmentLifting.lifts bridge functions faithful observations transport extension producer
+        rfl head projected typed (children context) (preservation context) ih
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareSourceForHeaderLifting

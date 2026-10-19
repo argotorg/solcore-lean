@@ -139,6 +139,7 @@ theorem collected
     (syntaxTree : CellAwareImperativeSourceBodyAdmission.Syntax prepared.base.locals named.signature.key []
       (source named) approved expected sourceContext mode statements)
     (declarations : CompatibleExpressionReads.ScopeDeclarations (source named) scope sourceContext)
+    (sourceSignatures : sourceContext.signatures = checked.signatures)
     {fuel : Nat} {type : Ty} {code : Expr} {escaped : Word} {nativeType : Ty}
     (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel (source named) scope statements
       type reasonAt mode escaped = .ok code)
@@ -247,7 +248,7 @@ theorem collected
       obtain ⟨_, childTyped⟩ := computation_child nativeTyped
       have tail := ih
         (CellAwareNativeBodyCollectors.scope_generalized lowered.type declarations declaration polymorphic extended)
-        generatedTail (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
+        (by cases extended; exact sourceSignatures) generatedTail (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
       exact .generalizedInitialized found form declaration polymorphic extended ordinary
         initializerFound initializerForm valueType requirements coercions site initial
         (initial.typed childTyped) allocation annotation same tail
@@ -276,7 +277,7 @@ theorem collected
         CallableIndexedAllocationCompletion.accepted_receipts (fun error => .sourceAllocation (reprStr error)) generatedAllocation
       obtain ⟨_, childTyped⟩ := computation_child nativeTyped
       have tail := ih (CompatibleMatchArmScopes.scope_bind lowered.type declarations member extended)
-        generatedTail (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
+        (by cases extended; exact sourceSignatures) generatedTail (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
       exact .initialized found form member mono extended ordinary initializerFound valueType typed
         (children sourceContext declarations value initializerFound typed generated childTyped)
         allocation annotation same tail
@@ -300,7 +301,7 @@ theorem collected
       obtain ⟨allocation, annotation, same, rfl⟩ :=
         CallableIndexedAllocationCompletion.accepted_receipts (fun error => .sourceAllocation (reprStr error)) generatedAllocation
       have tail := ih (CompatibleMatchArmScopes.scope_bind payload declarations member extended)
-        generatedTail (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
+        (by cases extended; exact sourceSignatures) generatedTail (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
       exact .uninitialized found form member mono extended ordinary
         (CompatibleStatementBindings.binder_projected (binderPolicy scope binder mono ▸ projected))
         allocation annotation same tail
@@ -326,7 +327,7 @@ theorem collected
         obtain ⟨_, childTyped⟩ := computation_child nativeTyped
         exact .discard found form notTail continuing expressionFound typed
           (children sourceContext declarations value expressionFound typed generated childTyped)
-          (ih declarations generatedBody tailTyped)
+          (ih declarations sourceSignatures generatedBody tailTyped)
   | @block sourceContext mode id node statements rest found form inner remaining innerIH restIH =>
     cases fuel with
     | zero => cases accepted
@@ -340,7 +341,7 @@ theorem collected
       obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
       cases accepted
       obtain ⟨⟨_, headTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
-      exact .block found form (innerIH declarations generatedInner headTyped) (restIH declarations generatedBody tailTyped)
+      exact .block found form (innerIH declarations sourceSignatures generatedInner headTyped) (restIH declarations sourceSignatures generatedBody tailTyped)
   | @ifThen sourceContext mode id node condition conditionNode thenBody elseBody rest found form conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax remaining thenIH elseIH restIH =>
     cases fuel with
     | zero => cases accepted
@@ -370,7 +371,7 @@ theorem collected
         obtain ⟨_, childTyped⟩ := computation_child branchTyped
         exact .ifThen found form conditionFound conditionType typed
           (children sourceContext declarations conditionSyntax conditionFound typed generatedCondition childTyped)
-          (thenIH declarations generatedThen thenTyped) (elseIH declarations generatedElse elseTyped) (restIH declarations generatedBody tailTyped)
+          (thenIH declarations sourceSignatures generatedThen thenTyped) (elseIH declarations sourceSignatures generatedElse elseTyped) (restIH declarations sourceSignatures generatedBody tailTyped)
       | some statements =>
         obtain ⟨elseCode, generatedElse, accepted⟩ := bind_ok accepted
         obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
@@ -380,7 +381,7 @@ theorem collected
         obtain ⟨_, childTyped⟩ := computation_child branchTyped
         exact .ifThen found form conditionFound conditionType typed
           (children sourceContext declarations conditionSyntax conditionFound typed generatedCondition childTyped)
-          (thenIH declarations generatedThen thenTyped) (elseIH declarations generatedElse elseTyped) (restIH declarations generatedBody tailTyped)
+          (thenIH declarations sourceSignatures generatedThen thenTyped) (elseIH declarations sourceSignatures generatedElse elseTyped) (restIH declarations sourceSignatures generatedBody tailTyped)
 
   | @whileLoop sourceContext mode id node condition conditionNode statements rest found form conditionFound conditionType typed conditionSyntax loopSyntax remaining loopIH restIH =>
     cases fuel with
@@ -408,9 +409,9 @@ theorem collected
       obtain ⟨⟨_, loopBodyTyped⟩, loopTyped⟩ := TypedLexicalWhile.Native.while_body loopTyped
       exact .whileLoop found form conditionFound conditionType typed
         (children sourceContext declarations conditionSyntax conditionFound typed generatedCondition childTyped)
-        (loopIH declarations generatedLoop loopBodyTyped)
+        (loopIH declarations sourceSignatures generatedLoop loopBodyTyped)
         loopTyped
-        (restIH declarations generatedBody tailTyped)
+        (restIH declarations sourceSignatures generatedBody tailTyped)
 
   | @forLoop sourceContext loopContext postContext mode id node initialItems condition conditionNode postItems statements rest
       found form initialSyntax conditionFound conditionType typed conditionSyntax loopSyntax postSyntax loopSourceTyped postSourceTyped remaining loopIH restIH =>
@@ -460,15 +461,15 @@ theorem collected
             unique assignmentsPrepared assignmentPolicy binderPolicy allocationPolicy children
             (continuation := fun _ terminal => terminal = LocalLoop.fallthrough type)
             (fun _ _ _ accepted _ _ => Except.ok.inj accepted.symm)
-            postSyntax loopDeclarations origin.post_origin generatedPost postNative
+            postSyntax loopDeclarations (initialSyntax.signatures.trans sourceSignatures) origin.post_origin generatedPost postNative
           subst postTerminal
           exact ⟨code, loopCode, postCode, postScope, rfl,
             children loopContext loopDeclarations conditionSyntax conditionFound typed generatedCondition conditionNative,
-            loopIH loopDeclarations generatedLoop loopNative, postTree, loopTyped⟩)
-        initialSyntax declarations origin.header generatedInitial initialTyped
+            loopIH loopDeclarations (initialSyntax.signatures.trans sourceSignatures) generatedLoop loopNative, postTree, loopTyped⟩)
+        initialSyntax declarations sourceSignatures origin.header generatedInitial initialTyped
       obtain ⟨conditionCode, loopCode, postCode, postScope, rfl, conditionCertificate, loopTree, postTree, loopTyped⟩ := completed
       exact .forLoop found form initialTree conditionFound conditionType typed conditionCertificate
-        loopTree postTree loopSourceTyped postSourceTyped loopTyped (restIH declarations generatedBody tailTyped)
+        loopTree postTree loopSourceTyped postSourceTyped loopTyped (restIH declarations sourceSignatures generatedBody tailTyped)
 
   | @assign sourceContext mode id node assignment operator rhs rhsNode binder rest found form declaration targetType profile bare rhsFound rhsType assignmentTyped value remaining ih =>
     cases fuel with
@@ -507,7 +508,50 @@ theorem collected
         (lookupStatement?_sound found).1 (.statement form) rawProfile
       rw [(lookupStatement?_sound found).2, ← token] at operands
       rw [emitted]
-      exact .assign found form head bare rightTyped operands (ih declarations generatedBody tailTyped)
+      exact .assign found form head bare rightTyped operands (ih declarations sourceSignatures generatedBody tailTyped)
+
+  | @assignProjected sourceContext mode id node assignment operator rhs rhsNode binder rest found form declaration route profile projected keys rhsFound rhsType assignmentTyped value remaining ih =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checkedType, _, accepted⟩ := bind_ok accepted
+      cases checkedType
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      rw [assignmentPolicy] at accepted
+      obtain ⟨sourceTyped, writable, rightTyped, runtimeProfile⟩ :=
+        ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route assignmentTyped
+      obtain ⟨head, emitted, token, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable rightTyped runtimeProfile
+          (certificate := certificates sourceContext)
+          (fun child lowered member generated raw => by
+            obtain ⟨_, native⟩ := raw
+            rcases List.mem_cons.mp member with same | member
+            · subst child
+              exact ⟨rhsNode, rhsFound, children sourceContext declarations value rhsFound
+                (rhsType.symm ▸ rightTyped) generated native⟩
+            · obtain ⟨node, found, childTyped⟩ := route.key_typed unique (sourceTyped binder declaration) member
+              exact ⟨node, found, children sourceContext declarations (keys _ member) found childTyped generated native⟩)
+          accepted nativeTyped
+      have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
+      obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
+      have rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer := by
+        rcases profile with equal | word
+        · exact .inl equal
+        · exact .inr (.inl word)
+      have operands := GenericAssignmentDiagnostics.prepared_operands tablePrepared
+        (lookupStatement?_sound found).1 (.statement form) rawProfile
+      rw [(lookupStatement?_sound found).2, ← token] at operands
+      rw [emitted]
+      exact .assignProjected found form head projected rightTyped
+        (fun registry => CallableIndexedOwnedPreparedBranchingCatalogSites.assignment_site
+          (.statement found form) sourceSignatures preparedAt operands registry)
+        (ih declarations sourceSignatures generatedBody tailTyped)
 
   | breaking rest found form =>
     cases fuel with

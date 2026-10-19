@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareNamedAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeSourceTreeLifting
@@ -62,8 +63,12 @@ theorem lifts
     CellAwareSourceFlowLiftBounds.Lifts (named := named) (administrative := administrative)
       (registry := stages) (invocation := invocation) bridge producer context
       (CellAwareImperativeBodyProducer.scope named) true compiled.statements := by
+  intro size mapping world actualContext environment canonical actual before store embedding
+    environments heaps locals agrees actualTyped runtime
   exact CellAwareImperativeSourceTreeLifting.lifts bridge bindings transport functions extension compiled record producer registered
     (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compiled issued receiver represented)
+    (CallableIndexedLambdaValues.identity_faithful whole.indexed) (CellAwarePhysicalFunctionOrigins.observations profile)
+    (CellAwareNamedAssignmentDiagnostics.ready record runtime.graph.nodeOccurrencesUnique issued receiver functions protocol)
     (fun related => CompatibleExpressionPrimitives.bool_fields related) (fun _ _ => .unit)
     (fun childContext childRuntime childCovers childLedger size =>
       CellAwareNamedExpressionSourceLifting.lifts compiled bridge profile receiver extension authority sourceEq issuer
@@ -71,6 +76,6 @@ theorem lifts
     (fun childContext childRuntime childCovers childLedger size =>
       CellAwareNamedExpressionMeaning.preserves compiled bridge profile receiver extension authority sourceEq issuer
         record childLedger (by simpa only [sourceEq] using childRuntime) wellFormed childCovers size)
-    sourceEq body.tree issuer
+    sourceEq body.tree issuer (size := size) environments heaps locals agrees actualTyped runtime
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeNamedSourceBodyLifting

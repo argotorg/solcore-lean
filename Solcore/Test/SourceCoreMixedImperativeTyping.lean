@@ -3,7 +3,7 @@ import Solcore.Test.SourceCoreSelectedGeneralizedLocalTypingValidation
 import Solcore.Test.SourceCoreGeneralizedExportTyping
 
 /-! A bounded observer constructs declarative typing for the complete original
-mixed body, including branches, lexical scopes, loops and bare variable writes. It accepts
+mixed body, including branches, lexical scopes, loops and mapping writes. It accepts
 only the expression and statement forms used by this regression. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -109,6 +109,19 @@ mutual
             let ⟨typeEq⟩ ← observe (node.type = .word) "mixed integer type"
             let ⟨typed⟩ ← word ⟨node,literal,resolution,foundAt,form,target,requirements,coercions⟩ context
             return ⟨typeEq.symm ▸ typed⟩
+          | .unary .logicalNot operand =>
+            let ⟨child⟩ ← expression fuel source context operand .bool
+            let ⟨typeEq⟩ ← observe (node.type = .bool) "mixed logical not result"
+            let ⟨typed⟩ ← uncoerced context node .bool foundAt
+              (form ▸ .unary child .logicalNot)
+            return ⟨typeEq.symm ▸ typed⟩
+          | .binary left .logicalAnd right =>
+            let ⟨leftTyped⟩ ← expression fuel source context left .bool
+            let ⟨rightTyped⟩ ← expression fuel source context right .bool
+            let ⟨typeEq⟩ ← observe (node.type = .bool) "mixed logical and result"
+            let ⟨typed⟩ ← uncoerced context node .bool foundAt
+              (form ▸ .binary leftTyped rightTyped .booleanAnd)
+            return ⟨typeEq.symm ▸ typed⟩
           | .group inner =>
             let ⟨child⟩ ← expression fuel source context inner node.type
             uncoerced context node node.type foundAt (form ▸ .group child)
@@ -167,6 +180,29 @@ mutual
       let ⟨types,⟨tail⟩⟩ ← expressions fuel source context rest
       return ⟨node.type :: types,⟨.cons head tail⟩⟩
 
+  def projections : (fuel : Nat) → (source : TypedSource) → (context : SourceSemantics.Context) →
+      (root : TypeSystem.Ty) → (steps : List PlaceProjection) → (leaf : TypeSystem.Ty) →
+      IO (PLift (SourceProjectionsHaveType source context root steps leaf))
+    | 0, _, _, _, _, _ => throw (IO.userError "mixed projection typing bound")
+    | _ + 1, _, _, root, [], leaf => do
+      let ⟨same⟩ ← observe (root = leaf) "mixed projection leaf type"
+      return ⟨by cases same; exact .nil root⟩
+    | fuel + 1, source, context, .mapping keyType valueType, .index key :: rest, leaf => do
+      let ⟨keyTyped⟩ ← expression fuel source context key keyType
+      let ⟨restTyped⟩ ← projections fuel source context valueType rest leaf
+      return ⟨.index keyTyped restTyped⟩
+    | _ + 1, _, _, _, _, _ => throw (IO.userError "unsupported mixed place projection")
+
+  def place : (fuel : Nat) → (source : TypedSource) → (context : SourceSemantics.Context) →
+      (target : PlaceResolution) → IO (PLift (SourcePlaceHasType source context target target.type))
+    | 0, _, _, _ => throw (IO.userError "mixed place typing bound")
+    | fuel + 1, source, context, target => do
+      let some root := Resolved.LocalScope.lookup? context.locals target.root
+        | throw (IO.userError "mixed place root declaration")
+      let ⟨rootTyped⟩ ← writable context target.root root.body
+      let ⟨stepsTyped⟩ ← projections fuel source context root.body target.projections target.type
+      return ⟨.intro rootTyped stepsTyped rfl⟩
+
   def statement : (fuel : Nat) → (source : TypedSource) → (control : ControlContext) →
       (context : SourceSemantics.Context) → (id : StatementId) → IO (Statement source control context id)
     | 0, _, _, _, _ => throw (IO.userError "mixed typing statement bound")
@@ -175,6 +211,15 @@ mutual
       | none => throw (IO.userError "mixed original statement")
       | some node =>
         match form : node.form with
+        | .letDecl value none =>
+          let ⟨mono⟩ ← observe (value.scheme.quantified = []) "mixed absent monomorphic binder"
+          let ⟨extended⟩ ← binder context source.owner value
+          let final := context.withLocal value.id value.scheme value.schemeRequirements
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed absent declaration type"
+          match accepted : validateSchemeGeneralizes context value.scheme with
+          | .error _ => throw (IO.userError "mixed absent generalization")
+          | .ok () => return ⟨final,localFacts,.letUninitialized (lookupStatement?_sound found) form mono
+              (validateSchemeGeneralizes_success accepted) extended typeEq⟩
         | .letDecl value (some initializer) =>
           let ⟨extended⟩ ← binder context source.owner value
           let final := context.withLocal value.id value.scheme value.schemeRequirements
@@ -216,10 +261,7 @@ mutual
           return ⟨context,⟨.unit,false,false,.loop bodyTyped.facts.control⟩,
             .whileLoop (lookupStatement?_sound found) form conditionTyped bodyTyped.typed typeEq⟩
         | .assignValue assignment operator rhs =>
-          let ⟨bare⟩ ← observe (assignment.target.projections = []) "mixed bare assignment"
-          let ⟨rootTyped⟩ ← writable context assignment.target.root assignment.target.type
-          let targetTyped : SourcePlaceHasType source context assignment.target assignment.target.type :=
-            .intro rootTyped (bare.symm ▸ .nil _) rfl
+          let ⟨targetTyped⟩ ← place fuel source context assignment.target
           let ⟨rhsTyped⟩ ← expression fuel source context rhs assignment.target.type
           let ⟨requirements⟩ ← observe (assignment.requirements = []) "mixed assignment requirements"
           let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed assignment statement type"
@@ -282,10 +324,7 @@ mutual
           let ⟨typed⟩ ← expression fuel source context id node.type
           return ⟨context,⟨itemEq.symm ▸ .expression typed⟩⟩
         | .assignValue assignment operator rhs =>
-          let ⟨bare⟩ ← observe (assignment.target.projections = []) "mixed for bare assignment"
-          let ⟨rootTyped⟩ ← writable context assignment.target.root assignment.target.type
-          let targetTyped : SourcePlaceHasType source context assignment.target assignment.target.type :=
-            .intro rootTyped (bare.symm ▸ .nil _) rfl
+          let ⟨targetTyped⟩ ← place fuel source context assignment.target
           let ⟨rhsTyped⟩ ← expression fuel source context rhs assignment.target.type
           let ⟨requirements⟩ ← observe (assignment.requirements = []) "mixed for assignment requirements"
           let ⟨assignmentTyped⟩ ← (show IO (PLift (SourceAssignmentHasType source context assignment operator rhs)) from do

@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Mixed mapping writes reach retained public execution (2026-10-20)
+
+The projected assignment certificates and mixed imperative grammar derive target preparation and diagnostics from actual compilation. Named producers derive scope extension from their genuine header signatures. `SourceCoreMixedProjectedSourceHeap`, `SourceLoop` and `SourceFirst` construct independent ordinary Source execution; the public adapters use the actual bootstrap, input and retained-session receipts.
+
+Mixed primitive operators and mapping reads, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
 ## Mixed conditional expressions reach retained public execution (2026-10-20)
 
 `CellAwareScopeSourceConditionalLifting` connects ordinary Source conditional traces to the mixed heap. The `CellAwareNamedExpression` syntax, policies, certificates, collectors and lifting modules derive the corresponding children and native code from actual compilation. `SourceCoreMixedConditional` exercises original typing, initialization and repeated public resumes.

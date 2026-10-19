@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderAdmission
@@ -76,6 +77,21 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
       (typed : SourceAssignmentHasType (source named) context assignment operator rhs)
       (operands : AssignmentOperandDiagnostics.OperandsLaw
         (GenericAssignmentDiagnostics.OperandRep compiled.own.assignments) operator head.invalid)
+      (remaining : Tree prepared named compiled certificates administrative type finalContext finalScope terminal
+        context scope rest body) :
+      Tree prepared named compiled certificates administrative type finalContext finalScope terminal
+        context scope (.assignValue assignment operator rhs :: rest)
+        (head.emit body (LocalLoop.controlType type))
+
+  | assignProjected {context scope assignment operator rhs rest body}
+      (head : GenericAssignmentStatements.Head (.initial checked) (source named) context
+        (certificates context) scope administrative prepared.layouts.definitions assignment operator rhs)
+      (projected : assignment.target.projections ≠ [])
+      (typed : SourceAssignmentHasType (source named) context assignment operator rhs)
+      (site : ∀ registry, PreparedBranchingCatalogSites.AssignmentSite
+        (fun site root => diagnostics.placeReason named.signature.key site root none)
+        (fun site root raw => diagnostics.placeReason named.signature.key site root (some raw))
+        registry (GenericAssignmentDiagnostics.OperandRep compiled.own.assignments) head)
       (remaining : Tree prepared named compiled certificates administrative type finalContext finalScope terminal
         context scope rest body) :
       Tree prepared named compiled certificates administrative type finalContext finalScope terminal

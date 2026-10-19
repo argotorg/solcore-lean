@@ -58,6 +58,7 @@ theorem of_header
     (by simpa only [resultEq] using profile) (sourceEq ▸ header.unique) rfl typed
   · simpa only [sourceEq, RecursiveNamedCatalogNativeContexts.bodyScope, aligned.bindings,
       CellAwareImperativeBodyProducer.scope] using declarations
+  · exact RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header)
   · simpa only [CallableIndexedOwnedPreparedStagedNamedLexicalReceipts.parameterScope,
       aligned.bindings, aligned.body, CellAwareImperativeBodyProducer.scope] using native
 

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderTree
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
@@ -207,6 +208,22 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
       (rightTyped : ExpressionHasType (source named) sourceContext expression assignment.target.type)
       (operands : AssignmentOperandDiagnostics.OperandsLaw
         (GenericAssignmentDiagnostics.OperandRep compiled.own.assignments) operator head.invalid)
+      (remaining : Tree prepared named compiled certificates administrative reasonAt
+        sourceContext scope mode rest expected type body) :
+      Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
+        expected type (head.emit body (LocalLoop.controlType type))
+
+  | assignProjected {sourceContext scope mode id node assignment operator expression rest expected type body}
+      (found : (source named).lookupStatement? id = some node)
+      (form : node.form = .assignValue assignment operator expression)
+      (head : GenericAssignmentStatements.Head (.initial checked) (source named) sourceContext
+        (certificates sourceContext) scope administrative prepared.layouts.definitions assignment operator expression)
+      (projected : assignment.target.projections ≠ [])
+      (rightTyped : ExpressionHasType (source named) sourceContext expression assignment.target.type)
+      (site : ∀ registry, PreparedBranchingCatalogSites.AssignmentSite
+        (fun site root => diagnostics.placeReason named.signature.key site root none)
+        (fun site root raw => diagnostics.placeReason named.signature.key site root (some raw))
+        registry (GenericAssignmentDiagnostics.OperandRep compiled.own.assignments) head)
       (remaining : Tree prepared named compiled certificates administrative reasonAt
         sourceContext scope mode rest expected type body) :
       Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentChildren
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
@@ -85,6 +87,7 @@ theorem collected
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {items : List ForItemForm}
     (syntaxTree : CellAwareForHeaderAdmission.Syntax (source named) approved context items finalContext)
     (declarations : CompatibleExpressionReads.ScopeDeclarations (source named) scope context)
+    (sourceSignatures : context.signatures = checked.signatures)
     {site : SourceCoreElaboration.ErrorSite}
     (origin : AssignmentDiagnosticOrigins.HeaderOriginFor true (source named) site items)
     {fuel : Nat} {type : Ty} {code : Expr} {nativeType : Ty}
@@ -111,7 +114,8 @@ theorem collected
       obtain ⟨allocation, annotation, same, rfl⟩ :=
         CallableIndexedAllocationCompletion.accepted_receipts (fun error => .sourceAllocation (reprStr error)) generatedAllocation
       obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate
-        (scope_bind payload declarations declaration extended) origin.tail generated
+        (scope_bind payload declarations declaration extended)
+        (by cases extended; exact sourceSignatures) origin.tail generated
         (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
       exact ⟨finalScope, terminal, nextReceipt, .absent declaration mono extended ordinary
         (binder_projected (binderPolicy scope binder mono ▸ projected)) allocation annotation same tail⟩
@@ -135,7 +139,8 @@ theorem collected
       obtain ⟨_, childTyped⟩ := computation_child nativeTyped
       have child := children context declarations value found typed generated childTyped
       obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate
-        (scope_bind lowered.type declarations declaration extended) origin.tail generatedBody
+        (scope_bind lowered.type declarations declaration extended)
+        (by cases extended; exact sourceSignatures) origin.tail generatedBody
         (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
       exact ⟨finalScope, terminal, nextReceipt, .initialized declaration mono extended ordinary found sourceType
         typed child allocation annotation same tail⟩
@@ -149,7 +154,7 @@ theorem collected
       cases accepted
       obtain ⟨_, childTyped⟩ := computation_child nativeTyped
       obtain ⟨_, tailTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
-      obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate declarations origin.tail generatedBody tailTyped
+      obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate declarations sourceSignatures origin.tail generatedBody tailTyped
       exact ⟨finalScope, terminal, nextReceipt,
         .discard found typed (children context declarations value found typed generated childTyped) tail⟩
   | @assign context finalContext assignment operator rhs node binder rest declaration targetType profile bare found sourceType typed value remaining ih =>
@@ -177,8 +182,41 @@ theorem collected
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
       have operands := operands_at tablePrepared origin.operand typed
       rw [← token] at operands
-      obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate declarations origin.tail generatedBody tailTyped
+      obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate declarations sourceSignatures origin.tail generatedBody tailTyped
       rw [emitted]
       exact ⟨finalScope, terminal, nextReceipt, .assign head bare typed operands tail⟩
+
+  | @assignProjected context finalContext assignment operator rhs rhsNode binder rest declaration route profile projected keys rhsFound rhsType typed value remaining ih =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerForItems] at accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      rw [assignmentPolicy] at accepted
+      obtain ⟨sourceTyped, writable, rightTyped, runtimeProfile⟩ :=
+        ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route typed
+      obtain ⟨head, emitted, token, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable rightTyped runtimeProfile
+          (certificate := certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨_, native⟩ := raw
+            rcases List.mem_cons.mp member with same | member
+            · subst child
+              exact ⟨rhsNode, rhsFound, children context declarations value rhsFound
+                (rhsType.symm ▸ rightTyped) generated native⟩
+            · obtain ⟨node, found, childTyped⟩ := route.key_typed unique (sourceTyped binder declaration) member
+              exact ⟨node, found, children context declarations (keys _ member) found childTyped generated native⟩)
+          accepted nativeTyped
+      have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
+      obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
+      have operands := operands_at tablePrepared origin.operand typed
+      rw [← token] at operands
+      obtain ⟨finalScope, terminal, nextReceipt, tail⟩ := ih nextCertificate declarations sourceSignatures
+        origin.tail generatedBody tailTyped
+      rw [emitted]
+      exact ⟨finalScope, terminal, nextReceipt, .assignProjected head projected typed
+        (fun registry => CallableIndexedOwnedPreparedBranchingCatalogSites.assignment_site
+          origin.operand sourceSignatures preparedAt operands registry) tail⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareForHeaderCollectors

@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Mixed mapping writes reach retained public execution (2026-10-20)
+
+Mapping element assignments now use the common mixed imperative tree through ordinary statements and for-loop initializer/post items. Actual compiler receipts retain ordered keys, the pre-RHS snapshot and the RHS computation. The commit rebuilds the root found in the reached heap and writes it once. Source lifting and both Core directions retain genuine failures and the exact reached state.
+
+The unchanged one-function fixture declares a generalized identity and an absent mapping, then executes `table[3] = f(10)`. A for initializer adds one; the true branch continues through a post that adds two. Independent Source proofs precede each public resume. Returned mappings contain `13`, `11`, `13` across inputs `true`, `false`, `true`, with native heap sizes `2 / 39 / 70 / 107`. The original program, cache and profile each retain their complete single entry.
+
+Validation: 64 changed modules in a coherent graph of 8,533 modules, 47 focused runtime invocations and 5,424 endpoint audits. Full build (8,573 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Mixed primitive operators and mapping reads, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Mixed conditional expressions reach retained public execution (2026-10-20)
 
 The common mixed expression tree now accepts conditional expressions from the actual compiler receipt. Independent Source lifting and Core preservation/reflection evaluate the condition once, execute the selected arm and retain its reached heap. Generalized local calls and returned builtin values use the same tree.
