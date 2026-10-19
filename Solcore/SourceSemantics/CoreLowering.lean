@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.SourcePreparedFinalCallEdgeOrigins
+import Solcore.SourceSemantics.SourcePreparedOpenCallEdges
+import Solcore.SourceSemantics.SourceCompiledLocalReadEvents
 import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinPackedApplication
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicBuiltinHandleForward
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicBuiltinHandleMeaning

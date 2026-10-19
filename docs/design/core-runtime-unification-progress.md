@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected compilation supplies lookup and call-edge evidence (2026-10-20)
+
+Successful selected compilation now produces local lookup events, operational requirement batches and validated template ownership from the actual inference and worklist computations. These proofs preserve the original nodes, declaration identities and substitutions. They remove separate assumptions about where selected local reads and templates came from.
+
+Recursive preparation now supplies every final open-call edge, including edges in rows appended by coercion and operator selection. Each edge retains its actual origin: an inherited worklist edge, a checked outer call, a scan of a supplied method root, or a later ordinary row scan. The final producer follows the real growing preparation traversal and derives its coverage from the compiled result.
+
+Validation: 23 changed modules in a coherent graph of 8,424 modules, 38 focused runtime invocations and 5,109 endpoint audits. Full build (8,464 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+This supplies static prerequisites for the general selected checker bridge. It does not yet derive full original declarative typing for every selected body. Generalization timing and reference containment, mixed for headers and projected writes, broader materialized bodies and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Retained builtin handles reach Source and public execution (2026-10-20)
 
 A genuine exported builtin entry and the actual packed-input receipt now supply the callee and ordered arguments in the mixed heap. Independent ordinary Source success derives sufficient Core execution and public output budgets. Native completion reflects to the same primitive Source result. These proofs derive builtin behavior from its compiler identity and descriptor; callers supply no builtin body law.

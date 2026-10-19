@@ -676,10 +676,5 @@ theorem reflects :
   exact reflects_with_literals functions extension faithful functionLeaves functionTypes program evidence uninitialized missing
     (CompatibleExpressionLiterals.reflects functions program context evidence valid source faults) ⟨tree, tree.literalSites⟩
 
-/- Preserve generated ordinary API names by aliasing the sole shared main. -/
-abbrev preserves._simp_1_1 := @preserves_with_literals_and_post._simp_1_3
-abbrev preserves._simp_1_2 := @preserves_with_literals_and_post._simp_1_4
-abbrev reflects._simp_1_1 := @reflects_with_literals_and_post._simp_1_3
-abbrev reflects._simp_1_2 := @reflects_with_literals_and_post._simp_1_4
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneral

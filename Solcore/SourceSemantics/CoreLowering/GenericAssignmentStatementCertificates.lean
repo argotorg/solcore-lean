@@ -203,8 +203,6 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     rightTyped profile extract accepted typed
   exact ⟨head, emitted, token⟩
 
-/-- The original static key matcher retains its exact public type. -/
-abbrev Head.of_lower_with_token.match_1_1 := @Head.of_lower_with_prepared.match_1_1
 
 /-- Compatibility projection of the actual compiler receipt. -/
 theorem Head.of_lower {values : ValuesContext} {source : TypedSource}

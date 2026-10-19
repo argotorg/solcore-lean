@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual inference and final prepared call edges (2026-10-20)
+
+`LocalReadEvents`, `LocalReadOriginsProgress` and `LocalReadOriginsInference` record real local lookups and the operational requirement batches issued by inference. `SourceCompiledLocalReadEvents.compile_local_obligations` connects successful selected compilation to these events and to validated local template ownership.
+
+`SourcePreparedPlanGrowth` and `SourcePreparedOpenCallEdges` retain selected rows and open-call edges through actual worklist extension and recursive preparation. `SourcePreparedCallEdgeOrigins` and `SourcePreparedFinalCallEdgeOrigins` reconstruct the genuine edge origins, including operator and coercion methods appended during preparation. Their selected-compilation endpoints derive coverage from the compiled object itself. They do not require a caller-supplied edge-coverage law or whole-original-program typing premise.
+
+These APIs provide provenance for the pending general checker proof. Declarative typing and complete compiler-pass semantics remain separate obligations.
+
 ## Retained builtin handle invocation (2026-10-20)
 
 `CellAwareBuiltinPackedApplication` proves primitive preservation and reflection with the exact unchanged mixed heap. `CellAwarePublicBuiltinHandleMeaning` derives its callable and typed arguments from the actual exported entry, current history and packed start receipt. `source_has_sufficient_fuel` consumes independent ordinary Source success; `completed_reflects_at_arity` recovers the ordered Source arguments and result from actual native completion.

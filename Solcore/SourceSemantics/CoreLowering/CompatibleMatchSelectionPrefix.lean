@@ -233,7 +233,5 @@ theorem Certificate.success_prefix
       ContinuationAgreement actual before (code.rename ξ) finalActual finalStore (body.rename finalEmbedding) := by
   exact Certificate.success_prefix_with_literals certificate ordinary onError allocator _ valid.signatures (fun _ proof => proof) (CompatibleMatchDecision.Certificate.ordinary_sites certificate valid) catalogValid definitions registered extended found uniqueExpression represented environments heaps agrees reference read unmapped evaluated
 
--- Retain the former generated index arithmetic proof.
-abbrev Certificate.success_prefix._proof_1_1 := @Certificate.success_prefix_with_literals._proof_1_1
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleMatchSelectionPrefix

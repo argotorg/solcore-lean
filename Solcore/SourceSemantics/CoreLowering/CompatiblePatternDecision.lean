@@ -807,7 +807,4 @@ theorem compilePattern_failure_preserves (compilation : Compilation) (compilatio
   cases meaning with
   | matched matched bindings => exact False.elim (failure.excludes matched)
   | noMatch => exact evaluated
-/-- Former generated proof names retain their original types. -/
-abbrev Tree.decides._simp_1_1 := @Tree.decides_with_literals._simp_1_1
-abbrev Tree.decides.match_1_2 := @Tree.decides_with_literals.match_1_2
 end Solcore.SourceSemantics.CoreLowering.CompatiblePatternDecision

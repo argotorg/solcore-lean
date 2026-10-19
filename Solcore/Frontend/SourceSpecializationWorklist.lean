@@ -1647,3 +1647,952 @@ theorem run_budgetExhausted_specializations_length_le
     (.budgetExhausted plan next pending) result
 
 end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+
+open SourceInference TypeSystem
+
+/-- Every discovered localInstance retains the original local read which selected
+its exact binder and cumulative substitution. Contextual reads retain the
+already discovered parent, so the receipt follows actual worklist ancestry. -/
+inductive LocalLambdaInstance.ReadOrigin (source : TypedSource) : LocalLambdaInstance → Prop where
+  | root {localInstance : LocalLambdaInstance} (expression : ExpressionNode)
+      (present : Node.expression expression ∈ source.nodes) (name : String)
+      (form : expression.form = .reference name (.local localInstance.binding.binder.id))
+      (matched : SourceSpecialization.matchClosedSchemeInstance?
+        localInstance.binding.binder.scheme expression.rawType = some localInstance.substitution) :
+      ReadOrigin source localInstance
+  | contextual {localInstance parent : LocalLambdaInstance}
+      (parentOrigin : ReadOrigin source parent) (expression : ExpressionNode)
+      (present : Node.expression expression ∈ source.nodes) (name : String)
+      (form : expression.form = .reference name (.local localInstance.binding.binder.id))
+      (child : Substitution)
+      (matched : SourceSpecialization.matchClosedSchemeInstance?
+        (Scheme.apply parent.substitution localInstance.binding.binder.scheme)
+        (parent.substitution.apply expression.rawType) = some child)
+      (cumulative : localInstance.substitution = child.compose parent.substitution) :
+      ReadOrigin source localInstance
+
+private theorem selectedNodes_subset (ids : List NodeId) (nodes : List Node) :
+    ∀ node ∈ selectedNodes ids nodes, node ∈ nodes := by
+  induction nodes with
+  | nil => simp [selectedNodes]
+  | cons head tail ih =>
+      simp only [selectedNodes]
+      split
+      · intro node member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact List.mem_cons_self
+        · exact List.mem_cons_of_mem _ (ih node member)
+      · exact fun node member => List.mem_cons_of_mem _ (ih node member)
+
+private theorem insertLocalLambdaInstance_origin {source : TypedSource}
+    {instances : List LocalLambdaInstance} {localInstance : LocalLambdaInstance}
+    (prior : ∀ value ∈ instances, LocalLambdaInstance.ReadOrigin source value)
+    (current : LocalLambdaInstance.ReadOrigin source localInstance) :
+    ∀ value ∈ insertLocalLambdaInstance instances localInstance, LocalLambdaInstance.ReadOrigin source value := by
+  unfold insertLocalLambdaInstance
+  split
+  · exact prior
+  · intro value member
+    rcases List.mem_append.mp member with old | added
+    · exact prior value old
+    · cases List.mem_singleton.mp added
+      exact current
+
+private theorem exactLocalLambdaBinding_id {bindings : List LocalLambdaBinding}
+    {id : Resolved.LocalId} {binding : LocalLambdaBinding}
+    (accepted : exactLocalLambdaBinding? bindings id = some binding) : binding.binder.id = id := by
+  unfold exactLocalLambdaBinding? at accepted
+  split at accepted <;> try contradiction
+  rename_i only selected
+  cases Option.some.inj accepted
+  have member : binding ∈ bindings.filter (fun value => value.binder.id == id) := by
+    rw [selected]
+    exact List.mem_cons_self
+  exact of_decide_eq_true (List.mem_filter.mp member).2
+
+private theorem collectGroundLocalLambdaInstances_origins
+    {source : TypedSource} (bindings : List LocalLambdaBinding) (nodes : List Node)
+    (contained : ∀ node ∈ nodes, node ∈ source.nodes)
+    (prior result : List LocalLambdaInstance)
+    (origins : ∀ value ∈ prior, LocalLambdaInstance.ReadOrigin source value)
+    (accepted : collectGroundLocalLambdaInstances bindings nodes prior = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.ReadOrigin source value := by
+  induction nodes generalizing prior with
+  | nil =>
+      cases Except.ok.inj accepted
+      exact origins
+  | cons head tail ih =>
+      have rest := fun node member => contained node (List.mem_cons_of_mem head member)
+      have current := contained head List.mem_cons_self
+      cases head with
+      | statement statement => exact ih rest prior origins accepted
+      | expression expression =>
+        cases form : expression.form <;>
+          simp only [collectGroundLocalLambdaInstances, form] at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i name resolution
+        cases resolution <;> simp only at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i id
+        cases found : exactLocalLambdaBinding? bindings id with
+        | none =>
+            simp only [found] at accepted
+            exact ih rest prior origins accepted
+        | some binding =>
+            simp only [found] at accepted
+            split at accepted
+            · exact ih rest prior origins accepted
+            · cases matched : SourceSpecialization.matchClosedSchemeInstance? binding.binder.scheme expression.rawType with
+              | none => simp [matched, bind, Except.bind, throw] at accepted
+              | some substitution =>
+                  simp only [matched, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+                  apply ih rest _ (insertLocalLambdaInstance_origin origins ?_) accepted
+                  exact .root expression current name
+                    (by rw [exactLocalLambdaBinding_id found]; exact form) matched
+
+private theorem collectContextualLocalLambdaInstances_origins
+    {source : TypedSource} (bindings : List LocalLambdaBinding) (parent : LocalLambdaInstance)
+    (parentOrigin : LocalLambdaInstance.ReadOrigin source parent)
+    (nodes : List Node) (contained : ∀ node ∈ nodes, node ∈ source.nodes)
+    (prior result : List LocalLambdaInstance)
+    (origins : ∀ value ∈ prior, LocalLambdaInstance.ReadOrigin source value)
+    (accepted : collectContextualLocalLambdaInstances bindings parent nodes prior = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.ReadOrigin source value := by
+  induction nodes generalizing prior with
+  | nil =>
+      cases Except.ok.inj accepted
+      exact origins
+  | cons head tail ih =>
+      have rest := fun node member => contained node (List.mem_cons_of_mem head member)
+      have current := contained head List.mem_cons_self
+      cases head with
+      | statement statement => exact ih rest prior origins accepted
+      | expression expression =>
+        cases form : expression.form <;>
+          simp only [collectContextualLocalLambdaInstances, form] at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i name resolution
+        cases resolution <;> simp only at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i id
+        cases found : exactLocalLambdaBinding? bindings id with
+        | none =>
+            simp only [found] at accepted
+            exact ih rest prior origins accepted
+        | some binding =>
+            simp only [found] at accepted
+            split at accepted
+            · exact ih rest prior origins accepted
+            · cases matched : SourceSpecialization.matchClosedSchemeInstance?
+                  (Scheme.apply parent.substitution binding.binder.scheme)
+                  (parent.substitution.apply expression.rawType) with
+              | none => simp [matched, bind, Except.bind, throw] at accepted
+              | some substitution =>
+                  simp only [matched, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+                  apply ih rest _ (insertLocalLambdaInstance_origin origins ?_) accepted
+                  exact .contextual parentOrigin expression current name
+                    (by rw [exactLocalLambdaBinding_id found]; exact form) substitution matched rfl
+
+private theorem rootLocalLambdaInstances_origins {source : TypedSource}
+    {bindings : List LocalLambdaBinding} {result : List LocalLambdaInstance}
+    (accepted : rootLocalLambdaInstances source bindings = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.ReadOrigin source value := by
+  unfold rootLocalLambdaInstances at accepted
+  cases selected : directLexicalNodeIds source (bindings.map (·.initializer)) source.roots with
+  | error error => simp [selected, bind, Except.bind] at accepted
+  | ok ids =>
+      simp only [selected, bind, Except.bind] at accepted
+      exact collectGroundLocalLambdaInstances_origins bindings (selectedNodes ids source.nodes)
+        (selectedNodes_subset ids source.nodes) [] result (by simp) accepted
+
+private theorem appendLocalLambdaInstances_origins {source : TypedSource}
+    (left right : List LocalLambdaInstance)
+    (prior : ∀ value ∈ left, LocalLambdaInstance.ReadOrigin source value)
+    (added : ∀ value ∈ right, LocalLambdaInstance.ReadOrigin source value) :
+    ∀ value ∈ appendLocalLambdaInstances left right, LocalLambdaInstance.ReadOrigin source value := by
+  unfold appendLocalLambdaInstances
+  induction right generalizing left with
+  | nil => exact prior
+  | cons head tail ih =>
+      simp only [List.foldl_cons]
+      exact ih _ (insertLocalLambdaInstance_origin prior (added head List.mem_cons_self))
+        (fun value member => added value (List.mem_cons_of_mem _ member))
+
+private theorem closeLocalLambdaInstancesAux_origins {source : TypedSource}
+    (bindings : List LocalLambdaBinding) (fuel : Nat)
+    (seen frontier result : List LocalLambdaInstance)
+    (known : ∀ value ∈ seen, LocalLambdaInstance.ReadOrigin source value)
+    (queued : ∀ value ∈ frontier, LocalLambdaInstance.ReadOrigin source value)
+    (accepted : closeLocalLambdaInstancesAux source bindings seen frontier fuel = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.ReadOrigin source value := by
+  induction fuel generalizing seen frontier with
+  | zero =>
+      cases frontier with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons head rest => simp [closeLocalLambdaInstancesAux, throw] at accepted
+  | succ fuel ih =>
+      cases frontier with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons parent rest =>
+          simp only [closeLocalLambdaInstancesAux] at accepted
+          cases bodyIds : localLambdaBodyNodeIds source bindings parent.binding with
+          | error error => simp [bodyIds, bind, Except.bind] at accepted
+          | ok ids =>
+              simp only [bodyIds, bind, Except.bind] at accepted
+              cases discovered : collectContextualLocalLambdaInstances bindings parent
+                  (selectedNodes ids source.nodes) [] with
+              | error error => simp [discovered] at accepted
+              | ok found =>
+                  simp only [discovered] at accepted
+                  have foundOrigins := collectContextualLocalLambdaInstances_origins bindings parent
+                    (queued parent List.mem_cons_self) (selectedNodes ids source.nodes)
+                    (selectedNodes_subset ids source.nodes) [] found (by simp) discovered
+                  have freshOrigins : ∀ value ∈ found.filter (fun value => !seen.contains value),
+                      LocalLambdaInstance.ReadOrigin source value :=
+                    fun value member => foundOrigins value (List.mem_filter.mp member).1
+                  apply ih _ _
+                    (appendLocalLambdaInstances_origins _ _ known freshOrigins) ?_ accepted
+                  intro value member
+                  rcases List.mem_append.mp member with old | fresh
+                  · exact queued value (List.mem_cons_of_mem _ old)
+                  · exact freshOrigins value fresh
+
+/-- Successful actual discovery cannot invent a local instantiation from its
+type alone: each ordered output has an original local-read origin and exact
+scheme matching through its complete parent substitution chain. -/
+theorem localLambdaInstances_read_origin {source : TypedSource} {contextFuel : Option Nat}
+    {result : List LocalLambdaInstance}
+    (accepted : localLambdaInstances source contextFuel = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.ReadOrigin source value := by
+  cases contextFuel <;> simp only [localLambdaInstances] at accepted
+  all_goals
+    obtain ⟨roots, initial, afterInitial⟩ := except_bind_ok _ _ _ accepted
+    obtain ⟨values, closed, afterClosed⟩ := except_bind_ok _ _ _ afterInitial
+    obtain ⟨_, _, completed⟩ := except_bind_ok _ _ _ afterClosed
+    have same : values = result := by simpa only [pure, Pure.pure, Except.pure, Except.ok.injEq] using completed
+    subst result
+    have rootsOrigin := rootLocalLambdaInstances_origins initial
+    exact closeLocalLambdaInstancesAux_origins _ _ _ _ _ rootsOrigin rootsOrigin closed
+
+private theorem collectAllReferences_local_instances
+    {program : CheckedProgram} {caller : SourceSpecialization.SpecializationKey}
+    {source : TypedSource} {result : List Request × List CallEdge × List ReferenceEdge}
+    (accepted : collectAllReferences program caller source = .ok result) :
+    ∃ instances, localLambdaInstances source = .ok instances := by
+  unfold collectAllReferences at accepted
+  obtain ⟨_, _, afterDirect⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨instances, discovered, _⟩ := except_bind_ok _ _ _ afterDirect
+  exact ⟨instances, discovered⟩
+
+private theorem runAux_local_instances (program : CheckedProgram)
+    (seedKeys : List SourceSpecialization.SpecializationKey) (budget : Nat)
+    (queue : List Request) (seen : List SourceSpecialization.SpecializationKey)
+    (specializations : List SourceSpecialization.SpecializedFunction)
+    (calls : List CallEdge) (references : List ReferenceEdge) (outcome : Outcome)
+    (known : ∀ row ∈ specializations, ∃ instances,
+      localLambdaInstances row.function.typedBody = .ok instances)
+    (accepted : runAux program seedKeys queue seen specializations calls references budget = .ok outcome) :
+    ∀ row ∈ outcome.plan.specializations, ∃ instances,
+      localLambdaInstances row.function.typedBody = .ok instances := by
+  induction budget generalizing queue seen specializations calls references outcome with
+  | zero =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, finished⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj finished; exact known
+      | some entry =>
+          rcases entry with ⟨request, specialized, rest⟩
+          cases Except.ok.inj finished
+          exact known
+  | succ budget ih =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, continuation⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj continuation; exact known
+      | some entry =>
+          rcases entry with ⟨request, specialized, rest⟩
+          obtain ⟨found, discovered, recursive⟩ := except_bind_ok _ _ _ continuation
+          rcases found with ⟨requests, edges, targets⟩
+          apply ih _ _ _ _ _ _ ?_ recursive
+          intro row member
+          rcases List.mem_append.mp member with old | added
+          · exact known row old
+          · cases List.mem_singleton.mp added
+            exact collectAllReferences_local_instances discovered
+
+/-- Every actually processed specialization has its successful local-instance
+discovery receipt. The conclusion concerns selected worklist rows only. -/
+theorem run_local_instances {program : CheckedProgram} {seeds : List Request}
+    {budget : Nat} {outcome : Outcome}
+    (accepted : run program seeds budget = .ok outcome)
+    {row : SourceSpecialization.SpecializedFunction}
+    (member : row ∈ outcome.plan.specializations) :
+    ∃ instances, localLambdaInstances row.function.typedBody = .ok instances ∧
+      ∀ value ∈ instances, LocalLambdaInstance.ReadOrigin row.function.typedBody value := by
+  unfold run at accepted
+  obtain ⟨seedKeys, _, completed⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨instances, discovered⟩ := runAux_local_instances program seedKeys budget
+    seeds [] [] [] [] outcome (by simp) completed row member
+  exact ⟨instances, discovered, localLambdaInstances_read_origin discovered⟩
+
+private theorem exactFunction_member {program : CheckedProgram}
+    {declaration : Resolved.DeclarationId} {function : CheckedFunction}
+    (accepted : exactFunction program declaration = .ok function) :
+    function ∈ program.functions := by
+  unfold exactFunction at accepted
+  generalize filtered : program.functions.filter (fun value => decide (value.declaration = declaration)) = candidates at accepted
+  cases candidates with
+  | nil => cases accepted
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          cases Except.ok.inj accepted
+          exact (List.mem_filter.mp (show function ∈ program.functions.filter
+            (fun value => decide (value.declaration = declaration)) by rw [filtered]; exact List.mem_cons_self)).1
+      | cons second tail => cases accepted
+
+/-- An actual request retains the original checked function and the exact
+specialization computation; equal types alone do not identify that source. -/
+theorem resolveRequest_original {program : CheckedProgram} {request : Request}
+    {specialized : SourceSpecialization.SpecializedFunction}
+    (accepted : resolveRequest program request = .ok specialized) :
+    ∃ original ∈ program.functions, ∃ signature,
+      SourceSpecialization.specializeFunction signature original request.parameterSubstitution = .ok specialized := by
+  unfold resolveRequest at accepted
+  obtain ⟨declaration, _, afterDeclaration⟩ := except_bind_ok _ _ _ accepted
+  split at afterDeclaration
+  · cases afterDeclaration
+  · obtain ⟨signature, _, afterSignature⟩ := except_bind_ok _ _ _ afterDeclaration
+    obtain ⟨original, selected, afterOriginal⟩ := except_bind_ok _ _ _ afterSignature
+    cases lowered : SourceSpecialization.specializeFunction signature original request.parameterSubstitution with
+    | error error => simp [lowered, throw, throwThe, MonadExceptOf.throw] at afterOriginal
+    | ok result =>
+        simp only [lowered, pure, Except.pure, Except.ok.injEq] at afterOriginal
+        subst result
+        exact ⟨original, exactFunction_member selected, signature, lowered⟩
+
+private theorem nextUnseen_resolved {program : CheckedProgram}
+    {seen : List SourceSpecialization.SpecializationKey} {queue rest : List Request}
+    {request : Request} {specialized : SourceSpecialization.SpecializedFunction}
+    (accepted : nextUnseen program seen queue = .ok (some (request, specialized, rest))) :
+    resolveRequest program request = .ok specialized := by
+  induction queue with
+  | nil => cases accepted
+  | cons current tail ih =>
+      simp only [nextUnseen] at accepted
+      obtain ⟨value, resolved, following⟩ := except_bind_ok _ _ _ accepted
+      split at following
+      · exact ih following
+      · have same : (current, value, tail) = (request, specialized, rest) := by
+          simpa only [pure, Except.pure, Except.ok.injEq, Option.some.injEq] using following
+        cases same
+        exact resolved
+
+private theorem runAux_originals (program : CheckedProgram)
+    (seedKeys : List SourceSpecialization.SpecializationKey) (budget : Nat)
+    (queue : List Request) (seen : List SourceSpecialization.SpecializationKey)
+    (specializations : List SourceSpecialization.SpecializedFunction)
+    (calls : List CallEdge) (references : List ReferenceEdge) (outcome : Outcome)
+    (known : ∀ row ∈ specializations, ∃ request, resolveRequest program request = .ok row)
+    (accepted : runAux program seedKeys queue seen specializations calls references budget = .ok outcome) :
+    ∀ row ∈ outcome.plan.specializations, ∃ request, resolveRequest program request = .ok row := by
+  induction budget generalizing queue seen specializations calls references outcome with
+  | zero =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, finished⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj finished; exact known
+      | some entry =>
+          rcases entry with ⟨request, specialized, rest⟩
+          cases Except.ok.inj finished
+          exact known
+  | succ budget ih =>
+      simp only [runAux] at accepted
+      obtain ⟨next, selected, continuation⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj continuation; exact known
+      | some entry =>
+          rcases entry with ⟨request, specialized, rest⟩
+          obtain ⟨found, _, recursive⟩ := except_bind_ok _ _ _ continuation
+          rcases found with ⟨requests, edges, targets⟩
+          apply ih _ _ _ _ _ _ ?_ recursive
+          intro row member
+          rcases List.mem_append.mp member with old | added
+          · exact known row old
+          · cases List.mem_singleton.mp added
+            exact ⟨request, nextUnseen_resolved selected⟩
+
+/-- Each processed selected row is the result of a genuine request against an
+original entry of the checked program. -/
+theorem run_original {program : CheckedProgram} {seeds : List Request}
+    {budget : Nat} {outcome : Outcome}
+    (accepted : run program seeds budget = .ok outcome)
+    {row : SourceSpecialization.SpecializedFunction}
+    (member : row ∈ outcome.plan.specializations) :
+    ∃ original ∈ program.functions, ∃ signature supplied,
+      SourceSpecialization.specializeFunction signature original supplied = .ok row := by
+  unfold run at accepted
+  obtain ⟨seedKeys, _, completed⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨request, resolved⟩ := runAux_originals program seedKeys budget seeds [] [] [] [] outcome
+    (by simp) completed row member
+  obtain ⟨original, originalMember, signature, specialized⟩ := resolveRequest_original resolved
+  exact ⟨original, originalMember, signature, request.parameterSubstitution, specialized⟩
+
+end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem
+
+/-- The actual ordered declaration-use list examined by template validation. -/
+def localDeclarationUses (nodes : List Node) : List ExpressionNode :=
+  nodes.filterMap fun
+    | .expression node =>
+        match declarationInstantiation? node with
+        | some _ => some node
+        | none => none
+    | .statement _ => none
+
+/-- The original generalized lambda bindings used by the real discovery pass. -/
+def localLambdaBindings (source : TypedSource) : List LocalLambdaBinding :=
+  directPolymorphicLambdaBindings source
+
+structure LocalTemplateUses (bindings : List LocalLambdaBinding)
+    (localInstance : LocalLambdaInstance) (nodes : List Node) : Prop where
+  owned : ∀ requirement ∈ localInstance.binding.binder.schemeRequirements.map
+      (·.templateRequirement),
+    (localDeclarationUses nodes).foldl (fun count declarationUse =>
+      count + (declarationUse.requirements.filter fun candidate =>
+        candidate == requirement).length) 0 = 1
+  foreign : ∀ declarationUse ∈ localDeclarationUses nodes,
+    declarationUse.requirements.find? (fun requirement =>
+      (bindings.flatMap fun binding => binding.binder.schemeRequirements.map
+        (·.templateRequirement)).contains requirement &&
+      !(localInstance.binding.binder.schemeRequirements.map
+        (·.templateRequirement)).contains requirement) = none
+
+private theorem forIn_yield_success {alpha : Type} (values : List alpha)
+    (check : alpha → Except Error (ForInStep PUnit))
+    (yieldOnly : ∀ value result, check value = .ok result → result = .yield PUnit.unit)
+    {final : PUnit}
+    (accepted : forIn values PUnit.unit (fun value _ => check value) = .ok final) :
+    ∀ value ∈ values, check value = .ok (.yield PUnit.unit) := by
+  induction values with
+  | nil => simp
+  | cons head tail ih =>
+      simp only [List.forIn_cons] at accepted
+      cases tested : check head with
+      | error error => simp [tested, bind, Except.bind] at accepted
+      | ok step =>
+          have same := yieldOnly head step tested
+          subst step
+          simp only [tested, bind, Except.bind] at accepted
+          intro value member
+          rcases List.mem_cons.mp member with rfl | later
+          · exact tested
+          · exact ih accepted value later
+
+private theorem validateLocalSchemeTemplateUses_receipt
+    {bindings : List LocalLambdaBinding} {localInstance : LocalLambdaInstance}
+    {nodes : List Node}
+    (accepted : validateLocalSchemeTemplateUses bindings localInstance nodes = .ok ()) :
+    LocalTemplateUses bindings localInstance nodes := by
+  unfold validateLocalSchemeTemplateUses at accepted
+  obtain ⟨first, own, rest⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨second, foreign, _⟩ := except_bind_ok _ _ _ rest
+  have checkedOwn := forIn_yield_success _ _ (by
+    intro value result checked
+    try dsimp at checked
+    split at checked
+    · simp [bind, Except.bind, throw, throwThe] at checked
+    · exact (Except.ok.inj checked).symm) own
+  have checkedForeign := forIn_yield_success _ _ (by
+    intro value result checked
+    try dsimp at checked
+    split at checked
+    · simp [bind, Except.bind, throw, throwThe] at checked
+    · exact (Except.ok.inj checked).symm) foreign
+  constructor
+  · intro requirement member
+    have checked := checkedOwn requirement member
+    try dsimp only at checked
+    split at checked
+    · simp [bind, Except.bind, throw, throwThe] at checked
+    · rename_i countGood
+      apply Classical.byContradiction
+      intro denied
+      apply countGood
+      simpa only [bne_iff_ne, localDeclarationUses] using denied
+  · intro declarationUse member
+    have checked := checkedForeign declarationUse member
+    try dsimp only at checked
+    split at checked
+    · simp [bind, Except.bind, throw, throwThe] at checked
+    · assumption
+
+
+private theorem validateReachableOpenDeclarations_template_receipts
+    {source : TypedSource} {bindings : List LocalLambdaBinding}
+    {instances : List LocalLambdaInstance}
+    (accepted : validateReachableOpenDeclarations source bindings instances = .ok ()) :
+    ∀ localInstance ∈ instances, ∃ ids,
+      localLambdaBodyNodeIds source bindings localInstance.binding = .ok ids ∧
+      LocalTemplateUses bindings localInstance (selectedNodes ids source.nodes) := by
+  induction instances with
+  | nil => simp
+  | cons head tail ih =>
+      simp only [validateReachableOpenDeclarations] at accepted
+      obtain ⟨ids, body, afterBody⟩ := except_bind_ok _ _ _ accepted
+      obtain ⟨checked, templates, afterTemplates⟩ := except_bind_ok _ _ _ afterBody
+      cases checked
+      obtain ⟨_, _, afterNodes⟩ := except_bind_ok _ _ _ afterTemplates
+      intro localInstance member
+      rcases List.mem_cons.mp member with rfl | later
+      · exact ⟨ids, body, validateLocalSchemeTemplateUses_receipt templates⟩
+      · exact ih afterNodes localInstance later
+
+/-- Actual accepted discovery retains the exact direct lexical body used by
+validation. Each owned template occurs once, and that body uses no template
+owned by a different generalized binding. -/
+theorem localLambdaInstances_template_receipts
+    {source : TypedSource} {contextFuel : Option Nat}
+    {instances : List LocalLambdaInstance}
+    (accepted : localLambdaInstances source contextFuel = .ok instances) :
+    ∀ localInstance ∈ instances, ∃ nodes,
+      localLambdaBodyNodes source localInstance = .ok nodes ∧
+      nodes ⊆ source.nodes ∧
+      LocalTemplateUses (localLambdaBindings source) localInstance nodes := by
+  have validated : validateOpenDeclarationsCovered source
+      (directPolymorphicLambdaBindings source) instances = .ok () := by
+    cases contextFuel <;> simp only [localLambdaInstances] at accepted
+    all_goals
+      obtain ⟨_, _, afterRoots⟩ := except_bind_ok _ _ _ accepted
+      obtain ⟨values, _, afterClosed⟩ := except_bind_ok _ _ _ afterRoots
+      obtain ⟨checked, validated, finished⟩ := except_bind_ok _ _ _ afterClosed
+      cases checked
+      have same : values = instances := by
+        simpa only [pure, Except.pure, Except.ok.injEq] using finished
+      subst instances
+      exact validated
+  unfold validateOpenDeclarationsCovered at validated
+  obtain ⟨_, _, reachable⟩ := except_bind_ok _ _ _ validated
+  intro localInstance member
+  obtain ⟨ids, body, templates⟩ :=
+    validateReachableOpenDeclarations_template_receipts reachable localInstance member
+  refine ⟨selectedNodes ids source.nodes, ?_, selectedNodes_subset ids source.nodes, templates⟩
+  simp only [localLambdaBodyNodes, body, bind, Except.bind, pure, Except.pure]
+
+/-- Template ownership is exposed as membership, without assuming an
+independent coverage property. It follows from the actual failed-search
+check retained in the receipt. -/
+theorem LocalTemplateUses.foreign_mem
+    {bindings : List LocalLambdaBinding} {localInstance : LocalLambdaInstance}
+    {nodes : List Node} (receipt : LocalTemplateUses bindings localInstance nodes)
+    {expression : ExpressionNode} (used : expression ∈ localDeclarationUses nodes)
+    {requirement : RequirementId} (present : requirement ∈ expression.requirements)
+    (known : requirement ∈ bindings.flatMap fun binding =>
+      binding.binder.schemeRequirements.map (·.templateRequirement)) :
+    requirement ∈ localInstance.binding.binder.schemeRequirements.map (·.templateRequirement) := by
+  letI : LawfulBEq RequirementId := by
+    exact {
+      eq_of_beq := by
+        intro left right same
+        cases left with
+        | mk left =>
+          cases right with
+          | mk right =>
+            change (left == right) = true at same
+            have equal : left = right := eq_of_beq same
+            cases equal
+            rfl
+      rfl := by
+        intro value
+        cases value with
+        | mk index =>
+          change (index == index) = true
+          simp }
+  have checked := receipt.foreign expression used
+  have excluded := List.find?_eq_none.mp checked requirement present
+  apply Classical.byContradiction
+  intro absent
+  apply excluded
+  simp only [Bool.and_eq_true]
+  constructor
+  · exact List.contains_iff_mem.mpr known
+  · have no := Bool.eq_false_iff.mpr (fun yes => absent (List.contains_iff_mem.mp yes))
+    rw [no]
+    rfl
+
+end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem
+
+/-- One direct edge retains the exact successful compiler action, including
+its concrete source node and declaration instantiation. -/
+structure CallEdge.DirectReceipt (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializationKey) (source : TypedSource)
+    (edge : CallEdge) where
+  node : ExpressionNode
+  callee : ExpressionId
+  arguments : List ExpressionId
+  instantiation : DeclarationInstantiation
+  request : Request
+  form : node.form = .call callee arguments (.declaration instantiation)
+  closed : hasOpenDeclarationInstantiation node = false
+  accepted : directCall program caller source node callee instantiation = .ok (request, edge)
+
+/-- Edge discovery distinguishes the original closed node from an actual
+reachable local-template instance. The latter retains the ordered discovery
+and exact contextual selection used by the compiler. -/
+inductive CallEdge.SourceOrigin (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializationKey) (source : TypedSource)
+    (edge : CallEdge) : Prop where
+  | direct (receipt : CallEdge.DirectReceipt program caller source edge)
+      (member : .expression receipt.node ∈ source.nodes)
+  | contextual (instances : List LocalLambdaInstance)
+      (discovered : localLambdaInstances source = .ok instances)
+      (localInstance : LocalLambdaInstance) (member : localInstance ∈ instances)
+      (ids : List NodeId)
+      (selected : openDeclarationNodeIdsFor source (localLambdaBindings source) localInstance = .ok ids)
+      (receipt : CallEdge.DirectReceipt program caller
+        (source.applySubstitution localInstance.substitution) edge)
+      (nodeMember : .expression receipt.node ∈ selectedNodes ids
+        (source.applySubstitution localInstance.substitution).nodes)
+
+private theorem appendCallEdge_subset (left : List CallEdge) (right : CallEdge) :
+    appendCallEdge left right ⊆ left ++ [right] := by
+  unfold appendCallEdge
+  split
+  · exact List.subset_append_left _ _
+  · exact List.Subset.refl _
+
+private theorem appendCallEdges_subset (left right : List CallEdge) :
+    appendCallEdges left right ⊆ left ++ right := by
+  unfold appendCallEdges
+  induction right generalizing left with
+  | nil => simp
+  | cons first rest ih =>
+      simp only [List.foldl_cons]
+      intro edge member
+      have expanded := ih (appendCallEdge left first) member
+      rcases List.mem_append.mp expanded with earlier | later
+      · have inserted := appendCallEdge_subset left first earlier
+        rcases List.mem_append.mp inserted with old | current
+        · exact List.mem_append_left _ old
+        · exact List.mem_append_right _ (List.mem_cons.mpr (.inl (List.mem_singleton.mp current)))
+      · exact List.mem_append_right _ (List.mem_cons_of_mem _ later)
+
+private theorem collectReferences_call_receipts
+    {program : CheckedProgram} {caller : SourceSpecialization.SpecializationKey}
+    {source : TypedSource} {directCallees : List ExpressionId} {nodes : List Node}
+    {result : List Request × List CallEdge × List ReferenceEdge}
+    (accepted : collectReferences program caller source directCallees nodes = .ok result) :
+    ∀ edge ∈ result.2.1, ∃ receipt : CallEdge.DirectReceipt program caller source edge,
+      .expression receipt.node ∈ nodes := by
+  induction nodes generalizing result with
+  | nil => cases accepted; simp
+  | cons node rest ih =>
+      cases node with
+      | statement statement =>
+          intro edge member
+          obtain ⟨receipt, present⟩ := ih accepted edge member
+          exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+      | expression expression =>
+          simp only [collectReferences] at accepted
+          obtain ⟨_, _, continuation⟩ := except_bind_ok _ _ _ accepted
+          split at continuation
+          · obtain ⟨_, _, recursive⟩ := except_bind_ok _ _ _ continuation
+            intro edge member
+            obtain ⟨receipt, present⟩ := ih recursive edge member
+            exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+          · rename_i callee arguments instantiation form
+            split at continuation
+            · obtain ⟨_, _, recursive⟩ := except_bind_ok _ _ _ continuation
+              intro edge member
+              obtain ⟨receipt, present⟩ := ih recursive edge member
+              exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+            · rename_i closed
+              obtain ⟨⟨request, added⟩, emitted, remaining⟩ := except_bind_ok _ _ _ continuation
+              obtain ⟨⟨requests, calls, references⟩, recursive, finished⟩ := except_bind_ok _ _ _ remaining
+              cases Except.ok.inj finished
+              intro edge member
+              rcases List.mem_cons.mp member with rfl | later
+              · exact ⟨⟨expression, callee, arguments, instantiation, request, form,
+                  Bool.eq_false_iff.mpr closed, emitted⟩, List.mem_cons_self⟩
+              · obtain ⟨receipt, present⟩ := ih recursive edge later
+                exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+          · split at continuation
+            · intro edge member
+              obtain ⟨receipt, present⟩ := ih continuation edge member
+              exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+            · split at continuation
+              · split at continuation
+                · intro edge member
+                  obtain ⟨receipt, present⟩ := ih continuation edge member
+                  exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+                · cases continuation
+              · obtain ⟨⟨request, selected⟩, _, remaining⟩ := except_bind_ok _ _ _ continuation
+                obtain ⟨⟨requests, calls, references⟩, recursive, finished⟩ := except_bind_ok _ _ _ remaining
+                cases Except.ok.inj finished
+                intro edge member
+                obtain ⟨receipt, present⟩ := ih recursive edge member
+                exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+          · intro edge member
+            obtain ⟨receipt, present⟩ := ih continuation edge member
+            exact ⟨receipt, List.mem_cons_of_mem _ present⟩
+
+/-- The receipt's caller and occurrence come from the actual edge emitter. -/
+theorem CallEdge.DirectReceipt.emitted {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (receipt : CallEdge.DirectReceipt program caller source edge) :
+    edge.caller = caller ∧ edge.occurrence = receipt.node.id ∧
+      ∃ selected, resolveRequest program receipt.request = .ok selected ∧ edge.callee = selected.key := by
+  have accepted := receipt.accepted
+  unfold directCall at accepted
+  obtain ⟨calleeType, _, remaining⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨⟨request, selected⟩, canonical, finished⟩ := except_bind_ok _ _ _ remaining
+  have same := Prod.mk.inj (Except.ok.inj finished)
+  obtain ⟨requestSame, edgeSame⟩ := same
+  refine ⟨congrArg CallEdge.caller edgeSame.symm, congrArg CallEdge.occurrence edgeSame.symm,
+    selected, ?_, congrArg CallEdge.callee edgeSame.symm⟩
+  unfold canonicalReference at canonical
+  split at canonical <;> try contradiction
+  obtain ⟨value, resolved, remaining⟩ := except_bind_ok _ _ _ canonical
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  have same := Prod.mk.inj (Except.ok.inj remaining)
+  obtain ⟨emittedRequest, rfl⟩ := same
+  rw [← requestSame, ← emittedRequest]
+  exact resolved
+
+private theorem collectInstantiatedReferences_call_receipts
+    {program : CheckedProgram} {caller : SourceSpecialization.SpecializationKey}
+    {source : TypedSource} {bindings : List LocalLambdaBinding} {instances : List LocalLambdaInstance}
+    {result : List Request × List CallEdge × List ReferenceEdge}
+    (accepted : collectInstantiatedReferences program caller source bindings instances = .ok result) :
+    ∀ edge ∈ result.2.1, ∃ localInstance ∈ instances, ∃ ids,
+      openDeclarationNodeIdsFor source bindings localInstance = .ok ids ∧
+      ∃ receipt : CallEdge.DirectReceipt program caller
+        (source.applySubstitution localInstance.substitution) edge,
+        .expression receipt.node ∈ selectedNodes ids
+          (source.applySubstitution localInstance.substitution).nodes := by
+  induction instances generalizing result with
+  | nil => cases accepted; simp
+  | cons localInstance rest ih =>
+      simp only [collectInstantiatedReferences] at accepted
+      obtain ⟨ids, selected, remaining⟩ := except_bind_ok _ _ _ accepted
+      obtain ⟨⟨requests, calls, references⟩, current, remaining⟩ := except_bind_ok _ _ _ remaining
+      obtain ⟨⟨restRequests, restCalls, restReferences⟩, recursive, finished⟩ := except_bind_ok _ _ _ remaining
+      cases Except.ok.inj finished
+      intro edge member
+      rcases List.mem_append.mp (appendCallEdges_subset calls restCalls member) with own | later
+      · obtain ⟨receipt, present⟩ := collectReferences_call_receipts current edge own
+        exact ⟨localInstance, List.mem_cons_self, ids, selected, receipt, present⟩
+      · obtain ⟨localValue, present, ids, selected, receipt, nodeMember⟩ := ih recursive edge later
+        exact ⟨localValue, List.mem_cons_of_mem _ present, ids, selected, receipt, nodeMember⟩
+
+private theorem collectAllReferences_call_origins
+    {program : CheckedProgram} {caller : SourceSpecialization.SpecializationKey}
+    {source : TypedSource} {result : List Request × List CallEdge × List ReferenceEdge}
+    (accepted : collectAllReferences program caller source = .ok result) :
+    ∀ edge ∈ result.2.1, CallEdge.SourceOrigin program caller source edge := by
+  unfold collectAllReferences at accepted
+  obtain ⟨⟨requests, calls, references⟩, direct, remaining⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨instances, discovered, remaining⟩ := except_bind_ok _ _ _ remaining
+  obtain ⟨⟨localRequests, localCalls, localReferences⟩, contextual, finished⟩ := except_bind_ok _ _ _ remaining
+  cases Except.ok.inj finished
+  intro edge member
+  rcases List.mem_append.mp (appendCallEdges_subset calls localCalls member) with own | contextualMember
+  · obtain ⟨receipt, present⟩ := collectReferences_call_receipts direct edge own
+    exact .direct receipt present
+  · obtain ⟨localValue, present, ids, selected, receipt, nodeMember⟩ :=
+      collectInstantiatedReferences_call_receipts contextual edge contextualMember
+    exact .contextual instances discovered localValue present ids selected receipt nodeMember
+
+private theorem runAux_rows_retained {program : CheckedProgram}
+    {seedKeys seen : List SourceSpecialization.SpecializationKey} {queue : List Request}
+    {specializations : List SourceSpecialization.SpecializedFunction}
+    {calls : List CallEdge} {references : List ReferenceEdge} {budget : Nat} {outcome : Outcome}
+    (accepted : runAux program seedKeys queue seen specializations calls references budget = .ok outcome) :
+    specializations ⊆ outcome.plan.specializations := by
+  induction budget generalizing queue seen specializations calls references outcome with
+  | zero =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, finished⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj finished; exact List.Subset.refl _
+      | some entry =>
+          rcases entry with ⟨request, row, rest⟩
+          cases Except.ok.inj finished
+          exact List.Subset.refl _
+  | succ budget ih =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, remaining⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj remaining; exact List.Subset.refl _
+      | some entry =>
+          rcases entry with ⟨request, row, rest⟩
+          obtain ⟨⟨requests, edges, targets⟩, _, recursive⟩ := except_bind_ok _ _ _ remaining
+          exact (List.subset_append_left _ _).trans (ih recursive)
+
+/-- Queue closure preserves the originating processed row for every collected
+call. Previously supplied edges are retained as an explicit alternative. -/
+theorem runAux_call_origins {program : CheckedProgram}
+    {seedKeys seen : List SourceSpecialization.SpecializationKey} {queue : List Request}
+    {specializations : List SourceSpecialization.SpecializedFunction}
+    {calls : List CallEdge} {references : List ReferenceEdge} {budget : Nat} {outcome : Outcome}
+    (accepted : runAux program seedKeys queue seen specializations calls references budget = .ok outcome) :
+    ∀ edge ∈ outcome.plan.callEdges, edge ∈ calls ∨
+      ∃ row ∈ outcome.plan.specializations,
+        CallEdge.SourceOrigin program row.key row.function.typedBody edge := by
+  induction budget generalizing queue seen specializations calls references outcome with
+  | zero =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, finished⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj finished; exact fun _ member => .inl member
+      | some entry =>
+          rcases entry with ⟨request, row, rest⟩
+          cases Except.ok.inj finished
+          exact fun _ member => .inl member
+  | succ budget ih =>
+      simp only [runAux] at accepted
+      obtain ⟨next, _, remaining⟩ := except_bind_ok _ _ _ accepted
+      cases next with
+      | none => cases Except.ok.inj remaining; exact fun _ member => .inl member
+      | some entry =>
+          rcases entry with ⟨request, row, rest⟩
+          obtain ⟨⟨requests, edges, targets⟩, discovered, recursive⟩ := except_bind_ok _ _ _ remaining
+          intro edge member
+          rcases ih recursive edge member with previous | origin
+          · rcases List.mem_append.mp previous with old | added
+            · exact .inl old
+            · right
+              refine ⟨row, ?_, collectAllReferences_call_origins discovered edge added⟩
+              exact runAux_rows_retained recursive (List.mem_append_right _ List.mem_cons_self)
+          · exact .inr origin
+
+/-- Every edge in an actual fresh worklist run has an actual processed source
+row and its exact closed-call or local-instance origin. -/
+theorem run_call_origins {program : CheckedProgram} {seeds : List Request}
+    {budget : Nat} {outcome : Outcome}
+    (accepted : run program seeds budget = .ok outcome)
+    {edge : CallEdge} (member : edge ∈ outcome.plan.callEdges) :
+    ∃ row ∈ outcome.plan.specializations,
+      CallEdge.SourceOrigin program row.key row.function.typedBody edge := by
+  unfold run at accepted
+  obtain ⟨seedKeys, _, completed⟩ := except_bind_ok _ _ _ accepted
+  rcases runAux_call_origins completed edge member with absent | origin
+  · cases absent
+  · exact origin
+
+/-- Extending a plan admits exactly inherited edges, the explicitly supplied
+outer call, the supplied root's real scan, or another actually processed row.
+The synthetic outer call is never classified as a source-emitted edge. -/
+theorem extendCompletePlan_call_origins {program : CheckedProgram} {plan : Plan}
+    {root : SourceSpecialization.SpecializedFunction} {outerEdge : CallEdge}
+    {budget : Nat} {outcome : Outcome}
+    (accepted : extendCompletePlan program plan root outerEdge budget = .ok outcome)
+    {edge : CallEdge} (member : edge ∈ outcome.plan.callEdges) :
+    edge ∈ plan.callEdges ∨ edge = outerEdge ∨
+      CallEdge.SourceOrigin program root.key root.function.typedBody edge ∨
+      ∃ row ∈ outcome.plan.specializations,
+        CallEdge.SourceOrigin program row.key row.function.typedBody edge := by
+  unfold extendCompletePlan at accepted
+  obtain ⟨checked, _, remaining⟩ := except_bind_ok _ _ _ accepted
+  cases checked
+  split at remaining <;> try contradiction
+  dsimp only at remaining
+  split at remaining
+  · simp only [pure, Except.pure, bind, Except.bind] at remaining
+    obtain ⟨⟨requests, calls, references⟩, discovered, completed⟩ := except_bind_ok _ _ _ remaining
+    rcases runAux_call_origins completed edge member with previous | origin
+    · rcases List.mem_append.mp (appendCallEdges_subset _ _ previous) with old | current
+      · rcases List.mem_append.mp (appendCallEdge_subset _ _ old) with inherited | supplied
+        · left
+          simpa only [List.nil_append] using appendCallEdges_subset [] plan.callEdges inherited
+        · exact .inr (.inl (List.mem_singleton.mp supplied))
+      · exact .inr (.inr (.inl (collectAllReferences_call_origins discovered edge current)))
+    · exact .inr (.inr (.inr origin))
+  · split at remaining <;> try contradiction
+    simp only [pure, Except.pure, bind, Except.bind] at remaining
+    obtain ⟨⟨requests, calls, references⟩, discovered, completed⟩ := except_bind_ok _ _ _ remaining
+    rcases runAux_call_origins completed edge member with previous | origin
+    · rcases List.mem_append.mp (appendCallEdges_subset _ _ previous) with old | current
+      · rcases List.mem_append.mp (appendCallEdge_subset _ _ old) with inherited | supplied
+        · left
+          simpa only [List.nil_append] using appendCallEdges_subset [] plan.callEdges inherited
+        · exact .inr (.inl (List.mem_singleton.mp supplied))
+      · exact .inr (.inr (.inl (collectAllReferences_call_origins discovered edge current)))
+    · exact .inr (.inr (.inr origin))
+
+/-- A direct receipt requests exactly the declaration and parameter
+substitution retained by its actual source occurrence. -/
+theorem CallEdge.DirectReceipt.request_exact {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (receipt : CallEdge.DirectReceipt program caller source edge) :
+    receipt.request = {
+      declaration := receipt.instantiation.declaration
+      parameterSubstitution := receipt.instantiation.parameterSubstitution } := by
+  have accepted := receipt.accepted
+  unfold directCall at accepted
+  obtain ⟨calleeType, _, remaining⟩ := except_bind_ok _ _ _ accepted
+  obtain ⟨⟨request, selected⟩, canonical, finished⟩ := except_bind_ok _ _ _ remaining
+  have requestSame := (Prod.mk.inj (Except.ok.inj finished)).1
+  unfold canonicalReference at canonical
+  split at canonical <;> try contradiction
+  obtain ⟨value, _, remaining⟩ := except_bind_ok _ _ _ canonical
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  try dsimp only at remaining
+  split at remaining <;> try contradiction
+  exact requestSame.symm.trans ((Prod.mk.inj (Except.ok.inj remaining)).1.symm)
+
+/-- Source-emitted edges retain the actual calling specialization key. -/
+theorem CallEdge.SourceOrigin.caller_eq {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (origin : CallEdge.SourceOrigin program caller source edge) : edge.caller = caller := by
+  cases origin with
+  | direct receipt _ => exact receipt.emitted.1
+  | contextual _ _ _ _ _ _ receipt _ => exact receipt.emitted.1
+
+private theorem substituted_expression_original {source : TypedSource} {substitution : Substitution}
+    {expression : ExpressionNode}
+    (member : .expression expression ∈ (source.applySubstitution substitution).nodes) :
+    ∃ original : ExpressionNode, .expression original ∈ source.nodes ∧
+      original.applySubstitution substitution = expression := by
+  obtain ⟨node, present, same⟩ := List.mem_map.mp member
+  cases node with
+  | statement statement => cases same
+  | expression original =>
+      exact ⟨original, present, Node.expression.inj same⟩
+
+/-- Contextual scanning never invents an occurrence: the emitted occurrence
+is one of the original caller's typed expression nodes. -/
+theorem CallEdge.SourceOrigin.original_occurrence {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (origin : CallEdge.SourceOrigin program caller source edge) :
+    ∃ original : ExpressionNode, .expression original ∈ source.nodes ∧ original.id = edge.occurrence := by
+  cases origin with
+  | direct receipt present => exact ⟨receipt.node, present, receipt.emitted.2.1.symm⟩
+  | contextual instances discovered localInstance member ids selected receipt present =>
+      obtain ⟨original, originalMember, transformed⟩ := substituted_expression_original
+        (selectedNodes_subset ids _ _ present)
+      refine ⟨original, originalMember, ?_⟩
+      have unchanged := congrArg ExpressionNode.id transformed
+      change original.id = receipt.node.id at unchanged
+      exact unchanged.trans receipt.emitted.2.1.symm
+
+end Solcore.Frontend.SourceSpecializationWorklist

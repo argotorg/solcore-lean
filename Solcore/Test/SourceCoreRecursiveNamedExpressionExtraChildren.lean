@@ -169,6 +169,5 @@ theorem old_empty_admission {extra : ExpressionForm → Prop} {source : TypedSou
     AdmissionWith extra (fun _ => []) source admitted := admission.with_empty
 
 abbrev old_compiler := @tree_of_functions_at_runtime_with_calls
-abbrev original_arity := @tree_of_functions_at_runtime_with_calls._proof_1_33
 end Boundaries
 end Tests.SourceCoreRecursiveNamedExpressionExtraChildren

@@ -715,10 +715,5 @@ theorem reflects :
     (CompatibleExpressionLiterals.reflects functions program context evidence valid source faults) ⟨tree, tree.literalSites⟩
 
 
-/-- Preserve the generated simplification APIs of the former single main. -/
-abbrev preserves._simp_1_1 := @preserves_with_literals_and_post._simp_1_3
-abbrev preserves._simp_1_2 := @preserves_with_literals_and_post._simp_1_4
-abbrev reflects._simp_1_1 := @reflects_with_literals_and_post._simp_1_3
-abbrev reflects._simp_1_2 := @reflects_with_literals_and_post._simp_1_4
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltins

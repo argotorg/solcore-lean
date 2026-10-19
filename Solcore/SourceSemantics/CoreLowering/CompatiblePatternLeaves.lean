@@ -317,8 +317,6 @@ theorem leaf_preserves {compilation : Compilation} {context : Context}
     leaf represented environment store
 
 
-/-- Preserve the generated public simplifier name of the original sole proof. -/
-abbrev leaf_preserves._simp_1_1 := @leaf_preserves_with_requirements._simp_1_1
 
 private theorem apply_lambda_var {environment : Environment} {store finalStore : Store}
     {value result : Value} {input output : Ty} {body : Expr}
