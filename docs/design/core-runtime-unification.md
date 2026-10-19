@@ -6,6 +6,8 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The common mixed expression tree now accepts conditional expressions from the actual compiler receipt. Independent Source lifting and Core preservation/reflection evaluate the condition once, execute the selected arm and retain its reached heap. Generalized local calls and returned builtin values use the same tree. Mixed projected writes and primitive operators, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
 The common mixed body producer now follows actual for-loop compilation, including initializer scope, the loop condition and post items. Source lifting and Core preservation/reflection retain generalized closures, ordinary cells and the actual reached heap. Continue executes the post before the next condition; break skips it. Mixed conditional expressions and projected writes, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
 
 Successful selected compilation now derives local lookup and requirement events, validated local template ownership, and the origins and coverage of every final prepared open-call edge from its actual computation. This includes rows appended by operator and coercion selection. The general selected checker theorem still needs to connect these facts to full original declarative typing; generalization timing, reference containment and complete compiler-pass semantics remain open.

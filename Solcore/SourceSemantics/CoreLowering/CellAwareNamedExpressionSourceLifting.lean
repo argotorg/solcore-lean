@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceConditionalLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadProductLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceProductLifting
@@ -53,6 +54,11 @@ private def Point (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
 private def Two (scope : SourceCoreLocalCell.Scope) (left right : ExpressionId)
     (first second : SourceCoreBasic.LoweredExpr) : GenericExpressionMeaning.Certificate :=
   fun current child code => current = scope ∧ ((child = left ∧ code = first) ∨ (child = right ∧ code = second))
+
+private def Three (scope : SourceCoreLocalCell.Scope) (test yes no : ExpressionId)
+    (a b c : SourceCoreBasic.LoweredExpr) : GenericExpressionMeaning.Certificate :=
+  fun current child code => current = scope ∧
+    ((child = test ∧ code = a) ∨ (child = yes ∧ code = b) ∨ (child = no ∧ code = c))
 
 include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
 private theorem preserve_tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
@@ -122,6 +128,38 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
     exact CellAwareScopeSourceProductLifting.pair bridge model unique children preservation size
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
+      metadata form testFound yesFound noFound testType yesType noType testTree yesTree noTree testIH yesIH noIH =>
+    have children : ∀ childSize, childSize < size → LiftsAt bridge context model named stages invocation
+        (Three scope test yes no ⟨.bool, testCode⟩ ⟨type, yesCode⟩ ⟨type, noCode⟩) childSize := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with test | yes | no
+      · obtain ⟨rfl, rfl⟩ := test; exact testIH childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := yes; exact yesIH childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := no; exact noIH childSize ⟨rfl, rfl, rfl⟩
+    have preservation : ∀ childSize, CellAwareScopeExpressionBounds.PreservesAt bridge context model named stages invocation
+        (Three scope test yes no ⟨.bool, testCode⟩ ⟨type, yesCode⟩ ⟨type, noCode⟩) callFaults childSize := by
+      intro childSize current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with test | yes | no
+      · obtain ⟨rfl, rfl⟩ := test
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers testTree childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := yes
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers yesTree childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := no
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers noTree childSize ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeSourceConditionalLifting.conditional bridge functions size
+      (lowered := ⟨type, LocalControl.choose type testCode yesCode noCode⟩)
+      (conditionCode := ⟨.bool, testCode⟩) (thenCode := ⟨type, yesCode⟩) (elseCode := ⟨type, noCode⟩)
+      metadata form unique rfl
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩
+      children preservation ⟨rfl, rfl, rfl⟩
   | @call id callee ids metadata fuel lowered types compiler calleeReceipt calleeRecipe parent sequence children ih =>
     have childLift : ∀ childSize, childSize < size → LiftsAt bridge context model named stages invocation
         (RecursiveStageTupleMeaning.Entries scope compiler.entries) childSize := by

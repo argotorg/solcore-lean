@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Mixed conditional expressions reach retained public execution (2026-10-20)
+
+`CellAwareScopeSourceConditionalLifting` connects ordinary Source conditional traces to the mixed heap. The `CellAwareNamedExpression` syntax, policies, certificates, collectors and lifting modules derive the corresponding children and native code from actual compilation. `SourceCoreMixedConditional` exercises original typing, initialization and repeated public resumes.
+
+Mixed projected writes and primitive operators, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
 ## Mixed for loops reach retained public execution (2026-10-20)
 
 `CellAwareImperativeNamedProgramProfiles` now accepts for headers through the actual common body tree. The header and loop certificates retain the original `BinderExtends` scope, actual compiled children and continue/break behavior. `SourceCoreMixedFor` connects complete original typing and independent Source traces to initial and retained public execution.

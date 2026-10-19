@@ -206,6 +206,28 @@ theorem of_policy {id : ExpressionId}
       obtain ⟨receipt⟩ := GeneralizedLocalNamedReadCompilation.of_policy compiled observed accepted
       obtain ⟨recipe⟩ := GeneralizedLocalNamedRecipeCompilation.of_certificate recipe receipt
       exact .generalized receipt recipe
+  | conditional site form test yes no testIH thenIH elseIH =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := CompatibleExpressionConditionals.step_of_functions
+        (policy := namedPolicy compiled rootFuel) (body := namedLowerBody compiled)
+        (context := context prepared named) (values := .initial checked)
+        (scope := scope) (reasonAt := reasonAt) site.found (by rw [form]; constructor)
+        (special compiled rootFuel site) (CellAwareNamedExpressionPolicies.read compiled site rootFuel) accepted
+      cases step with
+      | conditional otherForm metadata testGenerated thenGenerated elseGenerated =>
+        obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.conditional.inj (form.symm.trans otherForm)
+        obtain ⟨testNode, thenNode, elseNode, testFound, thenFound, elseFound,
+            testType, thenType, elseType, testTyped, thenTyped, elseTyped⟩ :=
+          CompatibleExpressionConditionals.conditional_source_types unique site.found form site.coercions typed
+        exact .conditional metadata form testFound thenFound elseFound testType thenType elseType
+          (testIH testFound testTyped testGenerated) (thenIH thenFound thenTyped thenGenerated)
+          (elseIH elseFound elseTyped elseGenerated)
+      | unary otherForm _ _ _ | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ =>
+        simp [form] at otherForm
   | group site form child ih =>
     have same := Option.some.inj (site.found.symm.trans found)
     subst node

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceConditionalLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeOperatorBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareForAllocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareForEdges
 import Solcore.SourceSemantics.CoreLowering.CellAwareForEntry

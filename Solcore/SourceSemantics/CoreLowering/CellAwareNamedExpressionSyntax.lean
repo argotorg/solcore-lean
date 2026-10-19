@@ -17,6 +17,7 @@ inductive Form : ExpressionForm → Prop where
   | read (name : String) (binder : Resolved.LocalId) : Form (.reference name (.local binder))
   | builtin (name : String) (function : BuiltinFunctionId) : Form (.reference name (.builtinFunction function))
   | group (inner : ExpressionId) : Form (.group inner)
+  | conditional (condition thenId elseId : ExpressionId) : Form (.conditional condition thenId elseId)
   | pair (left right : ExpressionId) : Form (.tuple [left, right])
   | call (callee : ExpressionId) (arguments : List ExpressionId) (metadata : IndirectCallResolution)
       (coercions : metadata.argumentCoercions = []) : Form (.call callee arguments (.indirect metadata))
@@ -43,6 +44,7 @@ private def form? (form : ExpressionForm) : Option (PLift (Form form)) :=
   | .tuple [] => some ⟨.literal .unit⟩
   | .reference name (.local binder) => some ⟨.read name binder⟩
   | .reference name (.builtinFunction function) => some ⟨.builtin name function⟩
+  | .conditional condition thenId elseId => some ⟨.conditional condition thenId elseId⟩
   | .group inner => some ⟨.group inner⟩
   | .tuple [left, right] => some ⟨.pair left right⟩
   | .call callee arguments (.indirect metadata) =>
@@ -108,6 +110,10 @@ inductive Syntax {checked : SourceCoreCompatibleCatalog.Checked}
       Syntax prepared named source id
   | group {id inner} (site : Site prepared named source id) (form : site.node.form = .group inner)
       (child : Syntax prepared named source inner) : Syntax prepared named source id
+  | conditional {id condition thenId elseId} (site : Site prepared named source id)
+      (form : site.node.form = .conditional condition thenId elseId)
+      (test : Syntax prepared named source condition) (yes : Syntax prepared named source thenId)
+      (no : Syntax prepared named source elseId) : Syntax prepared named source id
   | pair {id left right} (site : Site prepared named source id) (form : site.node.form = .tuple [left, right])
       (first : Syntax prepared named source left) (second : Syntax prepared named source right) :
       Syntax prepared named source id
@@ -148,6 +154,11 @@ def syntax? {checked : SourceCoreCompatibleCatalog.Checked}
       | .tuple [] => pure ⟨.literal site (form ▸ .unit)⟩
       | .reference _name (.local _binder) => pure ⟨.read site form⟩
       | .reference _name (.builtinFunction _function) => pure ⟨.builtin site form⟩
+      | .conditional condition thenId elseId => do
+        let ⟨test⟩ ← syntax? prepared named source fuel condition
+        let ⟨yes⟩ ← syntax? prepared named source fuel thenId
+        let ⟨no⟩ ← syntax? prepared named source fuel elseId
+        pure ⟨.conditional site form test yes no⟩
       | .group inner => do
         let ⟨child⟩ ← syntax? prepared named source fuel inner
         pure ⟨.group site form child⟩

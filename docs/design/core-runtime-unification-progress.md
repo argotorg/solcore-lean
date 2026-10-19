@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Mixed conditional expressions reach retained public execution (2026-10-20)
+
+The common mixed expression tree now accepts conditional expressions from the actual compiler receipt. Independent Source lifting and Core preservation/reflection evaluate the condition once, execute the selected arm and retain its reached heap. Generalized local calls and returned builtin values use the same tree.
+
+The unchanged one-function fixture returns `(flag ? f(true) : f(false), wordToInteger)` after declaring a generalized identity. Full original typing and independent Source plans precede all three public resumes with inputs `true`, `false`, `true`; native heap sizes are `2 / 11 / 20 / 29`. A separate native companion invokes the returned builtin with Word `17`.
+
+Validation: 24 changed modules in a coherent graph of 8,488 modules, 44 focused runtime invocations and 5,297 endpoint audits. Full build (8,528 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Mixed projected writes and primitive operators, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Mixed for loops reach retained public execution (2026-10-20)
 
 The common mixed body producer now follows actual for-loop compilation, including initializer scope, the loop condition and post items. Source lifting and Core preservation/reflection retain generalized closures, ordinary cells and the actual reached heap. Continue executes the post before the next condition; break skips it.

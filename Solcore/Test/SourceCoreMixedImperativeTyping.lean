@@ -112,6 +112,12 @@ mutual
           | .group inner =>
             let ⟨child⟩ ← expression fuel source context inner node.type
             uncoerced context node node.type foundAt (form ▸ .group child)
+          | .conditional test yes no =>
+            let ⟨testTyped⟩ ← expression fuel source context test .bool
+            let ⟨yesTyped⟩ ← expression fuel source context yes node.type
+            let ⟨noTyped⟩ ← expression fuel source context no node.type
+            uncoerced context node node.type foundAt
+              (form ▸ .conditional testTyped yesTyped noTyped)
           | .tuple children =>
             let ⟨types,⟨childrenTyped⟩⟩ ← expressions fuel source context children
             let ⟨typeEq⟩ ← observe (node.type = TypeSystem.Ty.productMany types) "mixed tuple type"

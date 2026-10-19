@@ -44,6 +44,19 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepa
       (rightChild : Tree compiled rootFuel source sourceContext reasonAt scope right second) :
       Tree compiled rootFuel source sourceContext reasonAt scope id
         ⟨.product first.type second.type, LocalSequence.pair first.type second.type first.expression second.expression⟩
+  | conditional {id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
+      (metadata : CompatibleExpressionPrimitives.Metadata checked source id node type)
+      (form : node.form = .conditional condition thenId elseId)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (thenFound : source.lookupExpression? thenId = some thenNode)
+      (elseFound : source.lookupExpression? elseId = some elseNode)
+      (conditionType : conditionNode.type = .bool)
+      (thenType : thenNode.type = node.type) (elseType : elseNode.type = node.type)
+      (conditionTree : Tree compiled rootFuel source sourceContext reasonAt scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Tree compiled rootFuel source sourceContext reasonAt scope thenId ⟨type, thenCode⟩)
+      (elseTree : Tree compiled rootFuel source sourceContext reasonAt scope elseId ⟨type, elseCode⟩) :
+      Tree compiled rootFuel source sourceContext reasonAt scope id
+        ⟨type, LocalControl.choose type conditionCode thenCode elseCode⟩
   | call {id callee ids metadata fuel lowered types}
       (compiler : CallableIndirectCallCertificates.Receipt (namedPolicy compiled rootFuel) (namedLowerBody compiled)
         fuel (context prepared named) source scope id callee ids metadata reasonAt lowered)

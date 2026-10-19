@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeOperatorBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedCallPorts
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBuiltinValueBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectHeadBounds
@@ -66,6 +67,11 @@ private def Two (scope : SourceCoreLocalCell.Scope) (left right : ExpressionId)
     (first second : SourceCoreBasic.LoweredExpr) : GenericExpressionMeaning.Certificate :=
   fun current child code => current = scope ∧ ((child = left ∧ code = first) ∨ (child = right ∧ code = second))
 
+private def Three (scope : SourceCoreLocalCell.Scope) (test yes no : ExpressionId)
+    (a b c : SourceCoreBasic.LoweredExpr) : GenericExpressionMeaning.Certificate :=
+  fun current child code => current = scope ∧
+    ((child = test ∧ code = a) ∨ (child = yes ∧ code = b) ∨ (child = no ∧ code = c))
+
 omit positive in
 private theorem product_values : CallableIndexedOwnedPreparedStagedPairBounds.ProductValues (model := valueModel) := by
   intro mapping world leftType rightType left right first second firstType secondType firstValue secondValue
@@ -117,6 +123,22 @@ theorem preserves_tree
     exact CellAwareScopePairBounds.pair_preserves bridge unique (product_values profile) size children size (Nat.le_refl _)
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
+      metadata form testFound yesFound noFound testType yesType noType testTree yesTree noTree testIH yesIH noIH =>
+    have children : PreservesBelow bridge context valueModel named stages invocation
+        (Three scope test yes no ⟨.bool, testCode⟩ ⟨type, yesCode⟩ ⟨type, noCode⟩) callFaults size := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with test | yes | no
+      · obtain ⟨rfl, rfl⟩ := test; exact testIH childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := yes; exact yesIH childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := no; exact noIH childSize ⟨rfl, rfl, rfl⟩
+    intro current child code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeOperatorBounds.preserves_at bridge functionModel size size (Nat.le_refl _)
+      unique wellFormed runtime covers children
+      (.conditional metadata form testFound yesFound noFound testType yesType noType
+        ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩)
   | @call id callee ids metadata fuel lowered types compiler calleeReceipt calleeRecipe parent sequence children ih =>
     have childMeaning : PreservesBelow bridge context valueModel named stages invocation
         (RecursiveStageTupleMeaning.Entries scope compiler.entries) callFaults size := by
@@ -176,6 +198,22 @@ theorem reflects_tree
     exact CellAwareScopePairBounds.pair_reflects bridge unique (product_values profile) size children size (Nat.le_refl _)
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
+      metadata form testFound yesFound noFound testType yesType noType testTree yesTree noTree testIH yesIH noIH =>
+    have children : ReflectsBelow bridge context valueModel named stages invocation
+        (Three scope test yes no ⟨.bool, testCode⟩ ⟨type, yesCode⟩ ⟨type, noCode⟩) callFaults size := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with test | yes | no
+      · obtain ⟨rfl, rfl⟩ := test; exact testIH childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := yes; exact yesIH childSize ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := no; exact noIH childSize ⟨rfl, rfl, rfl⟩
+    intro current child code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeOperatorBounds.reflects_at bridge functionModel size size (Nat.le_refl _)
+      unique wellFormed runtime covers children
+      (.conditional metadata form testFound yesFound noFound testType yesType noType
+        ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩)
   | @call id callee ids metadata fuel lowered types compiler calleeReceipt calleeRecipe parent sequence children ih =>
     have childMeaning : ReflectsBelow bridge context valueModel named stages invocation
         (RecursiveStageTupleMeaning.Entries scope compiler.entries) callFaults size := by
