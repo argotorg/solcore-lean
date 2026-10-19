@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceOperatorLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceConditionalLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadProductLifting
@@ -128,6 +129,44 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
     exact CellAwareScopeSourceProductLifting.pair bridge model unique children preservation size
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @unary id node operand childNode operator operandType resultType core childCode
+      metadata form childFound inputType outputType operatorProfile child ih =>
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeSourceOperatorLifting.unary bridge size
+      (lowered := ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩)
+      (childCode := ⟨core.operandType, childCode⟩)
+      metadata form unique childFound (children := Point _ operand ⟨core.operandType, childCode⟩)
+      ⟨rfl, rfl, rfl⟩ (fun childSize _smaller => ih childSize) ⟨rfl, rfl, rfl⟩
+  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
+      metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
+    have children : ∀ childSize, childSize < size → LiftsAt bridge context model named stages invocation
+        (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) childSize := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; exact leftIH childSize ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; exact rightIH childSize ⟨rfl, rfl, rfl⟩
+    have preservation : ∀ childSize, CellAwareScopeExpressionBounds.PreservesAt bridge context model named stages invocation
+        (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) callFaults childSize := by
+      intro childSize current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first =>
+        obtain ⟨rfl, rfl⟩ := first
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers leftTree childSize ⟨rfl, rfl, rfl⟩
+      | inr second =>
+        obtain ⟨rfl, rfl⟩ := second
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers rightTree childSize ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeSourceOperatorLifting.binary bridge size
+      (lowered := ⟨mode.resultType operator, mode.binary operator leftCode rightCode⟩)
+      (leftCode := ⟨mode.operandType operator, leftCode⟩) (rightCode := ⟨mode.operandType operator, rightCode⟩)
+      metadata form unique leftFound rightFound
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ children preservation ⟨rfl, rfl, rfl⟩
   | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
       metadata form testFound yesFound noFound testType yesType noType testTree yesTree noTree testIH yesIH noIH =>
     have children : ∀ childSize, childSize < size → LiftsAt bridge context model named stages invocation

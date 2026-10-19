@@ -44,6 +44,28 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepa
       (rightChild : Tree compiled rootFuel source sourceContext reasonAt scope right second) :
       Tree compiled rootFuel source sourceContext reasonAt scope id
         ⟨.product first.type second.type, LocalSequence.pair first.type second.type first.expression second.expression⟩
+  | unary {id node operand childNode operator operandType resultType core childCode}
+      (metadata : CompatibleExpressionPrimitives.Metadata checked source id node core.resultType)
+      (form : node.form = .unary operator operand)
+      (found : source.lookupExpression? operand = some childNode)
+      (inputType : childNode.type = operandType) (outputType : node.type = resultType)
+      (profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core)
+      (child : Tree compiled rootFuel source sourceContext reasonAt scope operand ⟨core.operandType, childCode⟩) :
+      Tree compiled rootFuel source sourceContext reasonAt scope id
+        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+      (metadata : CompatibleExpressionPrimitives.Metadata checked source id node (mode.resultType operator))
+      (form : node.form = .binary left operator right)
+      (leftFound : source.lookupExpression? left = some leftNode)
+      (rightFound : source.lookupExpression? right = some rightNode)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (outputType : node.type = resultType)
+      (profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode)
+      (first : Tree compiled rootFuel source sourceContext reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
+      (second : Tree compiled rootFuel source sourceContext reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
+      Tree compiled rootFuel source sourceContext reasonAt scope id
+        ⟨mode.resultType operator, mode.binary operator leftCode rightCode⟩
+
   | conditional {id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
       (metadata : CompatibleExpressionPrimitives.Metadata checked source id node type)
       (form : node.form = .conditional condition thenId elseId)

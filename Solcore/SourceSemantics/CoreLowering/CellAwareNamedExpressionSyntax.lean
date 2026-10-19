@@ -16,6 +16,8 @@ inductive Form : ExpressionForm → Prop where
   | literal {form} (atomic : CompatibleExpressionLiterals.Atomic form) : Form form
   | read (name : String) (binder : Resolved.LocalId) : Form (.reference name (.local binder))
   | builtin (name : String) (function : BuiltinFunctionId) : Form (.reference name (.builtinFunction function))
+  | unary (operator : Syntax.UnaryOp) (operand : ExpressionId) : Form (.unary operator operand)
+  | binary (operator : Syntax.BinaryOp) (left right : ExpressionId) : Form (.binary left operator right)
   | group (inner : ExpressionId) : Form (.group inner)
   | conditional (condition thenId elseId : ExpressionId) : Form (.conditional condition thenId elseId)
   | pair (left right : ExpressionId) : Form (.tuple [left, right])
@@ -45,6 +47,8 @@ private def form? (form : ExpressionForm) : Option (PLift (Form form)) :=
   | .reference name (.local binder) => some ⟨.read name binder⟩
   | .reference name (.builtinFunction function) => some ⟨.builtin name function⟩
   | .conditional condition thenId elseId => some ⟨.conditional condition thenId elseId⟩
+  | .unary operator operand => some ⟨.unary operator operand⟩
+  | .binary left operator right => some ⟨.binary operator left right⟩
   | .group inner => some ⟨.group inner⟩
   | .tuple [left, right] => some ⟨.pair left right⟩
   | .call callee arguments (.indirect metadata) =>
@@ -108,6 +112,13 @@ inductive Syntax {checked : SourceCoreCompatibleCatalog.Checked}
   | generalized {id} (observed : GeneralizedLocalNamedReadCompilation.Observations prepared named source id)
       (recipe : GeneralizedLocalNamedRecipeCompilation.Observations prepared named source id) :
       Syntax prepared named source id
+  | unary {id operator operand} (site : Site prepared named source id)
+      (form : site.node.form = .unary operator operand)
+      (child : Syntax prepared named source operand) : Syntax prepared named source id
+  | binary {id operator left right} (site : Site prepared named source id)
+      (form : site.node.form = .binary left operator right)
+      (first : Syntax prepared named source left) (second : Syntax prepared named source right) :
+      Syntax prepared named source id
   | group {id inner} (site : Site prepared named source id) (form : site.node.form = .group inner)
       (child : Syntax prepared named source inner) : Syntax prepared named source id
   | conditional {id condition thenId elseId} (site : Site prepared named source id)
@@ -159,6 +170,13 @@ def syntax? {checked : SourceCoreCompatibleCatalog.Checked}
         let ⟨yes⟩ ← syntax? prepared named source fuel thenId
         let ⟨no⟩ ← syntax? prepared named source fuel elseId
         pure ⟨.conditional site form test yes no⟩
+      | .unary _operator operand => do
+        let ⟨child⟩ ← syntax? prepared named source fuel operand
+        pure ⟨.unary site form child⟩
+      | .binary left _operator right => do
+        let ⟨first⟩ ← syntax? prepared named source fuel left
+        let ⟨second⟩ ← syntax? prepared named source fuel right
+        pure ⟨.binary site form first second⟩
       | .group inner => do
         let ⟨child⟩ ← syntax? prepared named source fuel inner
         pure ⟨.group site form child⟩

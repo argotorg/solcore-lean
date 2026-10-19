@@ -26,7 +26,7 @@ theorem contextual (site : Site prepared named source id) :
   | read name binder =>
     have ordinary := site.ordinary name binder shape
     simp only [SourceCoreGeneralFunctions.contextualSource, site.found, bind, Except.bind, pure, Except.pure, shape, ordinary, Bool.false_eq_true, ↓reduceIte]
-  | conditional condition thenId elseId | builtin name function | group inner | pair left right | call callee arguments metadata coercions =>
+  | unary operator operand | binary operator left right | conditional condition thenId elseId | builtin name function | group inner | pair left right | call callee arguments metadata coercions =>
     simp [SourceCoreGeneralFunctions.contextualSource, site.found, shape]
 
 private theorem evidence_none (site : Site prepared named source id)
@@ -53,7 +53,7 @@ private theorem evidence_none (site : Site prepared named source id)
       simp [SourceCoreEvidence.lowerWithProjector, site.found, shape, ordinary, site.coercions]
     | unit | bool name value | word literal =>
       simp [SourceCoreEvidence.lowerWithProjector, site.found, shape, ordinary, requirements, site.coercions]
-  | conditional condition thenId elseId | builtin name function | read name binder | group inner | pair left right =>
+  | unary operator operand | binary operator left right | conditional condition thenId elseId | builtin name function | read name binder | group inner | pair left right =>
     simp [SourceCoreEvidence.lowerWithProjector, site.found, shape, ordinary, requirements, site.coercions]
   | call callee arguments metadata coercions =>
     simp [SourceCoreEvidence.lowerWithProjector, site.found, shape, ordinary, requirements, site.coercions, coercions]
@@ -80,7 +80,7 @@ theorem special (site : Site prepared named source id) (rootFuel : Nat)
     simp only
     rw [site.ordinary name binder shape]
     rfl
-  | conditional condition thenId elseId | builtin name function | group inner | pair left right | call callee arguments metadata coercions => simp
+  | unary operator operand | binary operator left right | conditional condition thenId elseId | builtin name function | group inner | pair left right | call callee arguments metadata coercions => simp
 
 theorem read (site : Site prepared named source id) (rootFuel : Nat) :
     (namedPolicy compiled rootFuel).readExpression source id =

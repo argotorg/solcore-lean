@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionScalarProjection
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionCertificates
 
 /-! Accepted named expression compilation yields the mixed tree recursively.
@@ -206,6 +207,65 @@ theorem of_policy {id : ExpressionId}
       obtain ⟨receipt⟩ := GeneralizedLocalNamedReadCompilation.of_policy compiled observed accepted
       obtain ⟨recipe⟩ := GeneralizedLocalNamedRecipeCompilation.of_certificate recipe receipt
       exact .generalized receipt recipe
+  | unary site form child ih =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := CompatibleExpressionConditionals.step_of_functions
+        (policy := namedPolicy compiled rootFuel) (body := namedLowerBody compiled)
+        (context := context prepared named) (values := .initial checked)
+        (scope := scope) (reasonAt := reasonAt) site.found (by rw [form]; constructor)
+        (special compiled rootFuel site) (CellAwareNamedExpressionPolicies.read compiled site rootFuel) accepted
+      cases step with
+      | @unary operator operand childCode otherForm metadata generated inputChecked =>
+        obtain ⟨rfl, rfl⟩ := ExpressionForm.unary.inj (form.symm.trans otherForm)
+        obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
+          CompatibleExpressionPrimitives.unary_source_types unique site.found form metadata.coercions metadata.requirements typed
+        have childTree := ih childFound childTyped generated
+        have scalar : CellAwareNamedExpressionScalarProjection.Scalar childCode.type :=
+          inputChecked ▸ CellAwareNamedExpressionScalarProjection.unary_input_scalar _ childCode.type
+        have chosen := CompatibleExpressionConditionals.unary_selected profile
+          (CellAwareNamedExpressionScalarProjection.projected childTree childFound scalar)
+        rw [chosen] at metadata inputChecked ⊢
+        obtain ⟨childType, native⟩ := childCode
+        dsimp only at inputChecked childTree ⊢
+        subst childType
+        exact .unary metadata form childFound rfl rfl profile childTree
+      | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ =>
+        simp [form] at otherForm
+  | binary site form first second firstIH secondIH =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := CompatibleExpressionConditionals.step_of_functions
+        (policy := namedPolicy compiled rootFuel) (body := namedLowerBody compiled)
+        (context := context prepared named) (values := .initial checked)
+        (scope := scope) (reasonAt := reasonAt) site.found (by rw [form]; constructor)
+        (special compiled rootFuel site) (CellAwareNamedExpressionPolicies.read compiled site rootFuel) accepted
+      cases step with
+      | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
+        obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
+        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+          CompatibleExpressionPrimitives.binary_source_types unique site.found form metadata.coercions metadata.requirements typed
+        have firstTree := firstIH leftFound leftTyped firstGenerated
+        have secondTree := secondIH rightFound rightTyped secondGenerated
+        have scalar : CellAwareNamedExpressionScalarProjection.Scalar first.type :=
+          leftChecked ▸ CellAwareNamedExpressionScalarProjection.binary_input_scalar
+            (CompatibleExpressionConditionals.selectedMode first.type) _
+        have chosen := CompatibleExpressionConditionals.binary_selected profile
+          (CellAwareNamedExpressionScalarProjection.projected firstTree leftFound scalar)
+        rw [chosen] at metadata leftChecked rightChecked ⊢
+        obtain ⟨firstType, leftCode⟩ := first
+        obtain ⟨secondType, rightCode⟩ := second
+        dsimp only at leftChecked rightChecked firstTree secondTree ⊢
+        subst firstType secondType
+        exact .binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree
+      | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ =>
+        simp [form] at otherForm
   | conditional site form test yes no testIH thenIH elseIH =>
     have same := Option.some.inj (site.found.symm.trans found)
     subst node

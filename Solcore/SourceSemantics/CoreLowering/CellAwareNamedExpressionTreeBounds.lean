@@ -123,6 +123,31 @@ theorem preserves_tree
     exact CellAwareScopePairBounds.pair_preserves bridge unique (product_values profile) size children size (Nat.le_refl _)
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @unary id node operand childNode operator operandType resultType core childCode
+      metadata form childFound inputType outputType operatorProfile child ih =>
+    have children : PreservesBelow bridge context valueModel named stages invocation
+        (Point scope operand ⟨core.operandType, childCode⟩) callFaults size :=
+      fun childSize _smaller => ih childSize
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeOperatorBounds.preserves_at bridge functionModel size size (Nat.le_refl _)
+      unique wellFormed runtime covers children
+      (.unary metadata form childFound inputType outputType operatorProfile ⟨rfl, rfl, rfl⟩)
+  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
+      metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
+    have children : PreservesBelow bridge context valueModel named stages invocation
+        (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) callFaults size := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; exact leftIH childSize ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; exact rightIH childSize ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeOperatorBounds.preserves_at bridge functionModel size size (Nat.le_refl _)
+      unique wellFormed runtime covers children
+      (.binary metadata form leftFound rightFound leftType rightType outputType operatorProfile
+        ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
   | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
       metadata form testFound yesFound noFound testType yesType noType testTree yesTree noTree testIH yesIH noIH =>
     have children : PreservesBelow bridge context valueModel named stages invocation
@@ -197,6 +222,31 @@ theorem reflects_tree
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopePairBounds.pair_reflects bridge unique (product_values profile) size children size (Nat.le_refl _)
       (.actual metadata form leftFound rightFound sourceType
+        ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @unary id node operand childNode operator operandType resultType core childCode
+      metadata form childFound inputType outputType operatorProfile child ih =>
+    have children : ReflectsBelow bridge context valueModel named stages invocation
+        (Point scope operand ⟨core.operandType, childCode⟩) callFaults size :=
+      fun childSize _smaller => ih childSize
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeOperatorBounds.reflects_at bridge functionModel size size (Nat.le_refl _)
+      unique wellFormed runtime covers children
+      (.unary metadata form childFound inputType outputType operatorProfile ⟨rfl, rfl, rfl⟩)
+  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
+      metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
+    have children : ReflectsBelow bridge context valueModel named stages invocation
+        (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) callFaults size := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; exact leftIH childSize ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; exact rightIH childSize ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeOperatorBounds.reflects_at bridge functionModel size size (Nat.le_refl _)
+      unique wellFormed runtime covers children
+      (.binary metadata form leftFound rightFound leftType rightType outputType operatorProfile
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
   | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
       metadata form testFound yesFound noFound testType yesType noType testTree yesTree noTree testIH yesIH noIH =>
