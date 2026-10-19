@@ -51,6 +51,8 @@ def BelowFor
   | .legacy original => LegacyBelowFor model stages original.original packet budget
   | .preparedOrdinary _ _ code _ support _ _ _ _ _ _ _ _ =>
     PacketBelow (headers := headers) (keys := keys) code support.body.toContext model stages packet budget
+  | .preparedBranching _ _ code _ support _ _ _ _ _ _ _ _ =>
+    PacketBelow (headers := headers) (keys := keys) code support.body.toContext model stages packet budget
 end Schema
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -140,6 +142,28 @@ theorem application_lifts (budget : Nat)
         carried (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) observed physical stable raw.heaps typed
         selected budget body called within
   | preparedOrdinary owner captured code history support _origin _prefixContext globals referenceIndex _typed _prepared slots _callerReceipt =>
+    rename_i capturedScope capturedActual
+    have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
+      simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
+    obtain ⟨_metadata, carried⟩ := stable owner.position
+    have reference : captured.canonical[code.referenceIndex]? =
+        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
+      rw [referenceIndex]
+      exact globals.reference
+    have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+        code.compilation.administrativePrefix capturedScope captured.canonical := by
+      cases packet <;> rw [supported.prefix] <;> exact slots
+    obtain ⟨child, selected, body⟩ : ∃ child, stages.Closure function child ∧
+        EntryLiftsBelow (headers := headers) (keys := keys) code support.body.toContext model stages child budget := by
+      cases packet with
+      | terminal terminal => exact ⟨terminal.child, terminal.selected, bodies⟩
+      | branching branching => exact ⟨branching.child, branching.selected, bodies⟩
+    exact SelectedCompilationStageClosureEntryApplicationLifting.lifts_application
+      captured code history support.body.toContext functions represented owner caller heaps raw.captures reference
+      carried (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) observed physical stable raw.heaps typed
+      selected budget body called within
+
+  | preparedBranching owner captured code history support _origin _prefixContext globals referenceIndex _typed _prepared slots _callerReceipt =>
     rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments

@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingScopedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingCoercedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedProgramCertificates
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedScopedClosureAdmission
@@ -98,6 +101,35 @@ theorem of_certificate
       cases selectionEq : certificate.selection with
       | closed methods catalog =>
         obtain ⟨⟨packet, supported⟩⟩ := SelectedCompilationPreparedCoercedClosureAdmission.of_actual
+          (stagePrepared compiled) code support provenance caller issued bodies rows aligned checked identity
+          catalog body
+          (fun principal sourceAt diagnostic certified =>
+            SelectedCompilationPrimitiveMethodAdmission.support methods principal sourceAt diagnostic issued
+              bodies.signatures certified (headers := headers rows) (stages compiled))
+        exact ⟨⟨.terminal packet, supported⟩⟩
+      | origins methods catalog =>
+        simp only [selectionEq, Selection.allowCoerced, Bool.false_eq_true] at enabled
+  | preparedBranching owner captured code history support origin prefixContext globals referenceIndex typed provenance slots callerReceipt =>
+    obtain ⟨caller⟩ := callerReceipt
+    obtain ⟨source⟩ := certificate.rows support.caller.named (List.mem_of_getElem? support.caller.selected)
+    have found := code.sourceFound
+    rw [support.source] at found
+    obtain ⟨body⟩ := source.closures.selected found code.sourceForm
+    cases body with
+    | ordinary body =>
+      obtain ⟨⟨packet, supported⟩⟩ := SelectedCompilationPreparedBranchingClosureAdmission.of_ordinary
+        (stagePrepared compiled) code support provenance caller issued bodies rows aligned checked identity
+        certificate.selection.operatorCatalog body
+      exact ⟨⟨.terminal packet, supported⟩⟩
+    | «scoped» body =>
+      obtain ⟨⟨packet, supported⟩⟩ := SelectedCompilationPreparedBranchingScopedClosureAdmission.of_actual
+        (stagePrepared compiled) code support provenance caller issued bodies rows aligned checked identity
+        certificate.selection.operatorCatalog body
+      exact ⟨⟨.branching packet, supported⟩⟩
+    | coerced enabled body =>
+      cases selectionEq : certificate.selection with
+      | closed methods catalog =>
+        obtain ⟨⟨packet, supported⟩⟩ := SelectedCompilationPreparedBranchingCoercedClosureAdmission.of_actual
           (stagePrepared compiled) code support provenance caller issued bodies rows aligned checked identity
           catalog body
           (fun principal sourceAt diagnostic certified =>

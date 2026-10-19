@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreSelectedProjectedBitNotSourceFirst
+import Solcore.Test.SourceCoreSelectedProjectedBitNotCapturedSourceFirst
 
 set_option autoImplicit false
 set_option Elab.async false
@@ -47,9 +47,9 @@ private def failure {artifact : SourceCoreExecution.Artifact}
     "projected original read diagnostic changed"
   pure after
 
-/-- Source/public proofs use an actual twelve-entry named/header compilation
-of the unchanged thirteen-declaration program. The separate full-cache runtime
-companion retains the captured factory and asserts its current profile boundary. -/
+/-- The unchanged thirteen-declaration program has a complete checked profile.
+Independent Source proofs cover fresh mapping inputs, the returned captured
+handle, and two retained calls. The twelve-entry named/header regression remains. -/
 def run : IO Unit := do
   let proofFixture ← compileNamedHeaderFixture
   let observed ← observeProgram proofFixture
@@ -59,6 +59,35 @@ def run : IO Unit := do
   require (proofFixture.recipe.compiled.sourceProgram.functions.length == 13 &&
       proofFixture.recipe.compiled.indexed.base.functions.length == 12 && profile.table.rows.length == 12)
     "projected bit-not selected originals/cache/table changed"
+  let initialMap ← observeStarted proofFixture observed.invertRow.original.key
+    [publicMap [(Word.ofNatModulo 7, Word.ofNatModulo 4), (Word.ofNatModulo 7, Word.ofNatModulo 99)], word 7]
+  have _initialMapProof := initial_unary_from_source observed.invertRow profile observed.invertShape
+    (Word.ofNatModulo 7) (Word.ofNatModulo 4) [(Word.ofNatModulo 7, Word.ofNatModulo 99)] initialMap
+  let .succeeded mapped ← initialMap.call.checkpoint.resume 100000 1000
+    | throw (IO.userError "initial mapping call failed")
+  require (mapped.value == complemented [(7,99)] 7 4) "initial mapping first-match output changed"
+  let initialDefault ← observeStarted proofFixture observed.invertRow.original.key [publicMap [], word 9]
+  have _initialDefaultProof := initial_default_from_source observed.invertRow profile observed.invertShape
+    (Word.ofNatModulo 9) initialDefault
+  let .succeeded defaulted ← initialDefault.call.checkpoint.resume 100000 1000
+    | throw (IO.userError "initial empty mapping call failed")
+  require (defaulted.value == complemented [] 9 0) "initial mapping default changed"
+  let initialMissing ← observeStarted proofFixture observed.missingRow.original.key
+    [publicMap [(Word.ofNatModulo 7, Word.ofNatModulo 4)], word 7]
+  have _initialMissingProof := initial_missing_from_source observed.missingRow profile observed.missingShape
+    (Word.ofNatModulo 7) (Word.ofNatModulo 4) [] initialMissing
+  let .failed reason failed ← initialMissing.call.checkpoint.resume 100000 1000
+    | throw (IO.userError "initial mapping key did not fail")
+  let some diagnostic ← get "initial mapping diagnostic" (failed.diagnostic observed.missingRow.original.key reason)
+    | throw (IO.userError "initial mapping diagnostic missing")
+  require (match diagnostic.error with | .uninitializedLocal _ => true | _ => false)
+    "initial mapping fault changed"
+  let reused ← success failed observed.invertRow.original.key [table [(7,4)], word 7] (complemented [] 7 4)
+  let initialDataHeaps := [initialMap.session.heapSize, mapped.session.heapSize,
+    initialDefault.session.heapSize, defaulted.session.heapSize,
+    initialMissing.session.heapSize, failed.heapSize, reused.heapSize]
+  require (initialDataHeaps == [13,28,13,28,13,22,37]) "initial mapping exact native heaps changed"
+  IO.println s!"PROJECTED_BITNOT_INITIAL_DATA_HEAPS: {initialDataHeaps}"
   let proofStarted ← observeStarted proofFixture observed.keyRow.original.key [word 7]
   have _sourceFirst := initial_then_invert proofFixture observed profile proofStarted
     (Word.ofNatModulo 7) (Word.ofNatModulo 4)
@@ -86,9 +115,37 @@ def run : IO Unit := do
   require (fixture.recipe.compiled.sourceProgram.functions.length == 13 &&
       fixture.recipe.compiled.indexed.base.functions.length == 13)
     "projected bit-not complete original cache changed"
-  require ((SelectedCompilationCompilerStaticProfile.validateCheckedProfile
-      fixture.recipe.compiled fixture.checked).isNone)
-    "captured projected unary whole-profile boundary changed"
+  let some fullProfile := SelectedCompilationCompilerStaticProfile.validateCheckedProfile
+      fixture.recipe.compiled fixture.checked
+    | throw (IO.userError "captured projected unary complete profile rejected")
+  require (fullProfile.table.rows.length == 13) "captured complete profile table changed"
+  let factory ← Captured.observeFactory fixture
+  let capturedStarted ← observeStarted fixture factory.row.original.key
+    [publicMap [(Word.ofNatModulo 7, Word.ofNatModulo 4)]]
+  have _capturedSourceChain := Captured.from_checked_initial fixture factory fullProfile
+    (Word.ofNatModulo 7) (Word.ofNatModulo 4) [] capturedStarted
+  let .outOfFuel capturedSuspended ← capturedStarted.call.checkpoint.resume 0 0
+    | throw (IO.userError "captured mapping initial suspension")
+  let .succeeded capturedMade ← capturedSuspended.resume 100000 1000
+    | throw (IO.userError "captured mapping initial factory failed")
+  let .function capturedHandle := capturedMade.value
+    | throw (IO.userError "captured mapping initial handle missing")
+  let capturedPending ← get "captured mapping retained first"
+    (capturedMade.session.startHandlePacked capturedHandle (word 7))
+  let .outOfFuel capturedFirstSuspended ← capturedPending.resume 0 0
+    | throw (IO.userError "captured mapping retained first suspension")
+  let .succeeded capturedFirst ← capturedFirstSuspended.resume 100000 1000
+    | throw (IO.userError "captured mapping retained first failed")
+  let capturedAgain ← get "captured mapping retained second"
+    (capturedFirst.session.startHandlePacked capturedHandle (word 7))
+  let .succeeded capturedRestored ← capturedAgain.resume 100000 1000
+    | throw (IO.userError "captured mapping retained restore failed")
+  require (capturedFirst.value == complement 4 && capturedRestored.value == word 4)
+    "captured mapping same-handle complement/restore changed"
+  let capturedHeaps := [capturedStarted.session.heapSize, capturedMade.session.heapSize,
+    capturedFirst.session.heapSize, capturedRestored.session.heapSize]
+  require (capturedHeaps == [14,17,32,47]) "captured mapping exact native heaps changed"
+  IO.println s!"PROJECTED_BITNOT_CAPTURED_SOURCE_CHAIN_HEAPS: {capturedHeaps}"
   let keyRow ← observeRow fixture "key"
   let started ← observeStarted fixture keyRow.original.key [word 7]
   let .outOfFuel suspended ← started.call.checkpoint.resume 0 0
@@ -137,7 +194,7 @@ def run : IO Unit := do
   heaps := heaps ++ [made.session.heapSize, first.session.heapSize, last.session.heapSize]
   require (heaps == [14,20,35,50,83,104,120,136,143,158,167,182,206,221,224,239,254])
     "projected bit-not exact native heaps changed"
-  IO.println s!"PROJECTED_BITNOT_COMPLETE_RUNTIME_CACHE: {recipe.compiled.indexed.base.functions.length}; captured proof profile rejected"
+  IO.println s!"PROJECTED_BITNOT_COMPLETE_PROFILE: originals13/cache{recipe.compiled.indexed.base.functions.length}/table{fullProfile.table.rows.length}; captured Source/public complement and restore"
   IO.println s!"PROJECTED_BITNOT_NATIVE_HEAPS: {heaps}"
   IO.println "PROJECTED_BITNOT_COMPILER_PROFILE_FORWARD_PASS"
 

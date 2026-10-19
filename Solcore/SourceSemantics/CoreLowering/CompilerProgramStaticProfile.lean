@@ -1,4 +1,3 @@
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingBareUnarySyntax
 import Solcore.SourceSemantics.CoreLowering.CompilerCoercedExpressionProfile
 import Solcore.SourceSemantics.CoreLowering.CompilerCoercedMethodProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
@@ -238,7 +237,6 @@ structure ScopedFactory (compiled : SourceCoreUnifiedCompilation.Compiled)
     (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
       binding.initializer = expression)) = none
   body : AcceptedCompilerBodySubsetProfile.Profile named.specialized.function.typedBody expressions.ids statements result
-  bareUnary : PreparedBranchingBareUnarySyntax.Body named.specialized.function.typedBody statements
   lambdas : ∀ actual ∈ named.specialized.function.typedBody.nodes, LambdaAllowed (some node) actual
 
 def scopedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
@@ -265,10 +263,9 @@ def scopedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
                     (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
                       binding.initializer = expression)) = none then do
                   let ⟨body⟩ ← AcceptedCompilerBodySubsetProfile.validate named.specialized.function.typedBody expressions.ids bodyRoots result
-                  let ⟨bareUnary⟩ ← PreparedBranchingBareUnarySyntax.check named.specialized.function.typedBody bodyRoots
                   let ⟨lambdas⟩ ← lambdas? named.specialized.function.typedBody (some node)
                   pure ⟨expressions, outer, rest, outerNode, expression, node, parameters, result, bodyRoots,
-                    roots, outerFound, outerForm, found, form, requirements, coercions, ordinary, body, bareUnary, lambdas⟩
+                    roots, outerFound, outerForm, found, form, requirements, coercions, ordinary, body, lambdas⟩
                 else none
               else none
             else none

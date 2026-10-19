@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationScopedFactorySourceCertificate
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
 
 /-! Selected execution retains prepared closure bodies. Its finite certificate
@@ -16,7 +17,7 @@ inductive RootCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
       compiled named named.specialized.function.typedBody (statements named.specialized.function.typedBody)
       named.specialized.function.inferredBodyType directRows)
   | formation (source : CallableIndexedOwnedPreparedNamedFactoryAdmission.Certificate compiled named)
-  | scopedFactory (source : CallableIndexedOwnedPreparedScopedFactoryAdmission.Certificate compiled named)
+  | scopedFactory (source : SelectedCompilationScopedFactorySourceCertificate.Certificate compiled named)
   | excluded (absent : ∀ signature ∈ compiled.sourceProgram.signatures.functions,
       named.specialized.declaration ≠ signature.id)
 

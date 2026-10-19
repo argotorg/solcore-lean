@@ -116,6 +116,7 @@ def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
   match association with
   | .legacy original => LegacyPacketFor original.original stages
   | .preparedOrdinary _ _ code _ _ _ _ _ _ _ _ _ _ => Packet code stages
+  | .preparedBranching _ _ code _ _ _ _ _ _ _ _ _ _ => Packet code stages
 
 def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -131,6 +132,8 @@ def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
   match association with
   | .legacy original => LegacySupportFor original.original stages packet
   | .preparedOrdinary _ _ code _ support _ _ _ _ _ _ _ _ =>
+      Support (headers := headers) code support.body.toContext stages packet semanticFaults
+  | .preparedBranching _ _ code _ support _ _ _ _ _ _ _ _ =>
       Support (headers := headers) code support.body.toContext stages packet semanticFaults
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalClosureStaticSupport

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageInitialDataInputLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStagePublicInputLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionInitialScalarForward
 
@@ -39,44 +40,8 @@ theorem lift_call
     (trace : PlainCall anchor header invocation ⟨[]⟩ arguments plain after) :
     ∃ staged reached, SourceCall anchor header invocation ⟨[]⟩ arguments staged reached ∧
       Staging.Recursive.Lifting.Adapted plain after staged reached := by
-  have startupRegistry := start.registry rows prepared header simple
-  have metadata : SourceCoreRawMetadata.Extends start.encodedValues.registry initial.result.context.registry := by
-    rw [startupRegistry, support.registry]
-    exact .refl _
-  obtain ⟨caller, stable, globalReference, heaps, heapTyped, represented, argumentsTyped⟩ :=
-    SelectedCompilationPublicInitialArguments.initial_data_arguments
-      (inputs := inputs) (rows := rows) (distinct := distinct) (completion := initial)
-      (profile := support.profile) (bodyRegistry := initial.result.context.registry)
-      (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
-      (bodyTyping := support.bodyTyping) (prepared := prepared) (selected := start.selected)
-      (opened := start.opened) (fresh := start.fresh) (ready := start.ready)
-      (sameRuntime := SourceCoreExecution.Session.SameRuntime.refl session) (atSession := start.atSession)
-      (started := start.started) (inputTypes := inputTypes) (inputMeanings := inputMeanings) (metadata := metadata)
-  obtain ⟨rawD, function, sourceAt, plainTrace⟩ := trace
-  obtain ⟨size, measured⟩ := RecursiveNamedCallBounds.CallOutcome.has_size plainTrace
-  let packet := support.bodies header start.selected.member
-  obtain ⟨capture⟩ := CallableIndexedOwnedNamedPhysicalCaptures.of_headerAt packet.prepared packet.aligned
-    start.selected.member (CallableIndexedOwnedPreparedPhysicalBootstrap.key_physical _ _)
-    caller.physical heaps.runtime_hasTypes
-  obtain ⟨descriptor⟩ := SelectedCompilationCertifiedPublicSession.header_descriptor header
-  obtain ⟨sidecar, _issued, _same, globalSelected, _declaration, _local, _evidence, _return, _analysis⟩ :=
-    CallableIndexedOwnedPreparedStagedNamedSourceScopeReceipts.selected
-      sourceAt packet.prepared packet.aligned (stagePrepared recipe.compiled) descriptor
-  have selected : (stages recipe.compiled).Closure header.function
-      (RecursiveStageRegistry.scope sidecar [] header.function) := by
-    rw [CallableIndexedOwnedPreparedStagedNamedSourceScopeReceipts.global_view sourceAt] at globalSelected
-    exact globalSelected
-  obtain ⟨staged, reached, lifted, adapted⟩ :=
-    SelectedCompilationStageNamedInvocationLifting.lifts_invocation
-      (functions := SelectedCompilationPhysicalProgramSupport.functions support)
-      (registry := initial.result.context.registry)
-      (owner := CallableIndexedOwnedPreparedBootstrapRootState.owner recipe.compiled)
-      (caller := caller.base.val) (header := header) (physicalCapture := capture) (sourceAt := sourceAt)
-      packet.layouts caller.physical start.selected.member support.bodyTyping.function_ids
-      (support.certificates header start.selected.member) stable heapTyped argumentsTyped represented heaps
-      selected size (bodies initial support.issued (.refl _) header start.selected.member size selected)
-      measured (Nat.le_refl _)
-  obtain ⟨stagedSize, stagedTrace⟩ := Staging.Recursive.Size.Applies.of_trace lifted
-  exact ⟨staged, reached, ⟨rawD, function, stagedSize, sourceAt, stagedTrace⟩, adapted⟩
+  have _ := simple
+  exact SelectedCompilationStageInitialDataInputLifting.lift_call
+    rows prepared anchor header support bodies distinct call start inputTypes inputMeanings trace
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageInitialInputLifting

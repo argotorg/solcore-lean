@@ -80,5 +80,8 @@ include semantic faithful observations assignmentInterpretation in
   | preparedOrdinary owner captured code history body origin prefixContext globals referenceIndex typed prepared slots _callerReceipt =>
     exact packet_of_roots (semantic := semantic) (assignmentInterpretation := assignmentInterpretation) code body.body.toContext functions faithful observations packet support owner (owners owner)
       extension children preservation
+  | preparedBranching owner captured code history body origin prefixContext globals referenceIndex typed prepared slots _callerReceipt =>
+    exact packet_of_roots (semantic := semantic) (assignmentInterpretation := assignmentInterpretation) code body.body.toContext functions faithful observations packet support owner (owners owner)
+      extension children preservation
 end Association
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosurePacketRoots

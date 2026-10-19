@@ -1,0 +1,100 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedLambdaBodyFormation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.PreparedLambdaBodyPhysicalFormation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
+
+/-! Ordinary lambda formation uses the actual named packet and keeps the
+same positive closure member in the public receiving model. The retained
+Site and body are static compiler receipts; captures come from this input. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingPhysicalLambdaFormationHeads
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedHistory CallableIndexedLambdaValues CallableIndexedOwnedFunctionState
+open CallableIndexedOwnedSourceAdmission
+open CallableIndexedOwnedAdmittedStagedExpressionBounds
+open RecursiveNamedLambdaFormationHeads
+open PreparedLambdaBodyFormation (Formation)
+
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {bodyRegistry receiving : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (caller : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
+  (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+  (context : SourceSemantics.Context) {stages : Staging.Recursive.Registry}
+  (invocation : Staging.Recursive.Scope)
+  (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  (globals : caller.globals = compiled.indexed.base.globals.length)
+  (slots : ∀ header, header ∈ headers → header.slot < compiled.indexed.base.globals.length)
+  (prefixZero : owner.key.capturePrefix = 0)
+  (sameSource : invocation.source = CallableIndexedNamedGeneration.source caller.named)
+
+local notation "functions" => CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
+local notation "bridge" => CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller
+
+abbrev Certificate : GenericExpressionMeaning.Certificate :=
+  fun scope id lowered => Nonempty (PreparedLambdaBodyFormation.Formation
+    caller context invocation.evidence scope id lowered)
+
+include globals slots prefixZero in
+theorem forms {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+    {lowered : SourceCoreBasic.LoweredExpr}
+    (receipt : PreparedLambdaBodyFormation.Formation
+      caller context invocation.evidence scope id lowered)
+    {mapping world administrative environment canonical actual actualContext before store ξ}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+      mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked receiving functions mapping world before store)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (nativeTyped : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
+    (allSlots : CallableIndexedOwnedPhysicalGlobals.Slots compiled 1 scope canonical)
+    (initial : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
+      ⟨scope, mapping, world, before, store, canonical⟩) :
+    ∃ payload,
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word payload) store ∧
+      ValueRep compiled.compatible.checked receiving functions mapping world
+        receipt.produced.site.code.sourceNode.type (.closure (receipt.function environment)) payload lowered.type := by
+  let head := receipt
+  let entry := CallableIndexedOwnedLambdaViewHeads.nested_entry initial.val owner prefixZero
+    initial.property.observed initial.property.carried initial.property.bundle globals
+  let captured := CallableIndexedOwnedPhysicalLambdaCaptures.captures_for allSlots globals entry environments agrees nativeTyped
+  have observed := CallableIndexedOwnedPhysicalLambdaCaptures.capture_globals_for allSlots globals slots entry environments agrees nativeTyped
+  have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+      (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+      headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation := by
+    change CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+      (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+      headers owner.key.locations 1 scope captured.canonical
+      (initial.val.rows owner.position).authority.frameLocation at observed
+    rw [(initial.val.rows owner.position).frame_eq] at observed
+    exact observed
+  have capturedSlots := CallableIndexedOwnedPhysicalLambdaCaptures.capture_slots_for allSlots globals entry environments agrees nativeTyped
+  let code : Code compiled.indexed (head.function environment) scope captured.administrative := head.code environment
+  let support : PreparedLambdaBodySupport.Support code := head.support environment
+  obtain ⟨_sourceTrace, native, _determined, member⟩ :=
+    @PreparedLambdaBodyPhysicalFormation.formation_member compiled headers keys
+      bodyRegistry semanticFaults mapping world (head.function environment) scope actual canonical before store
+      captured code support owner initial.val initial.property profile rfl observed (receipt.prepared environment)
+      capturedSlots ⟨receipt.callerReceipt⟩ heaps.runtime_hasTypes receipt.ordinary receipt.coercions
+  have payload := CallableIndexedOwnedPreparedPhysicalCellOrigins.payload_static_member (registry := receiving) profile member
+  let actualHistory : History code :=
+    @PreparedLambdaBodyPhysicalFormation.history_at compiled headers keys mapping world (head.function environment) scope actual canonical before store
+      captured code support owner initial.val initial.property
+  refine ⟨@value compiled.compatible.checked compiled.indexed (head.function environment) scope
+    captured.administrative code captured.embedding actualHistory.native actual, ?_, ?_⟩
+  · simpa only [code, PreparedLambdaBodyFormation.Formation.code, recaptureCode, head, receipt.produced.emitted, captured, CallableIndexedOwnedPhysicalLambdaCaptures.captures_for, actualHistory] using native
+  have sourceType : receipt.produced.site.code.sourceNode.type = FunctionValues.sourceType (head.function environment) := receipt.sourceType
+  have nativeType := CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type
+    (compiled := compiled) (function := head.function environment) captured code
+  rw [sourceType]
+  have emittedType : lowered.type = CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore := by
+    simpa only [code, PreparedLambdaBodyFormation.Formation.code, recaptureCode, head, receipt.produced.emitted] using nativeType
+  rw [emittedType]
+  exact payload
+
+end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingPhysicalLambdaFormationHeads

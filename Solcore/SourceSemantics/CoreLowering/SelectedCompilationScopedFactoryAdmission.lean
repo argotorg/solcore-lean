@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationScopedFactorySourceCertificate
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedFactoryAdmission
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalNamedFormationCollectors
 set_option autoImplicit false
@@ -6,7 +7,7 @@ namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationScopedFactoryA
 open Core Frontend SourceInference
 open CallableIndexedOwnedFunctionValues (Header)
 open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
-open CallableIndexedOwnedPreparedScopedFactoryAdmission (Certificate at_header)
+open SelectedCompilationScopedFactorySourceCertificate (Certificate at_header)
 /-- The terminal compiler receipt and its Point are constructed here. No
 caller supplies expression syntax, metadata or a closure execution premise. -/
 theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -48,9 +49,9 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
       intro child generated
       have childEq : child = receipt.child := Except.ok.inj (generated.symm.trans receipt.generated)
       exact ⟨rfl, rfl, childEq⟩ }
-  exact ⟨terminal, SelectedCompilationPhysicalNamedFormationCollectors.of_branching terminal
+  exact ⟨terminal, SelectedCompilationPhysicalNamedFormationCollectors.of_prepared_branching terminal
     ready diagnostic receiver included certified catalog profile member source.found source.form source.owner
     source.requirements source.coercions source.ordinary source.read source.scan.shape
-    (fun typed => (source.scan.syntax header.unique rfl typed).bareUnary source.bareUnary) rfl⟩
+    (fun typed => source.scan.syntax header.unique rfl typed) rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationScopedFactoryAdmission

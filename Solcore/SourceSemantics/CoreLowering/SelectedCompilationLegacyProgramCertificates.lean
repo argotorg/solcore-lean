@@ -17,7 +17,7 @@ def RootCertificate.to_prepared : RootCertificate compiled named directRows →
     SelectedCompilationPreparedProgramCertificates.RootCertificate compiled named directRows
   | .scoped source => .scoped source
   | .formation source => .formation source
-  | .scopedFactory source => .scopedFactory source.toSourceCertificate
+  | .scopedFactory source => .scopedFactory (SelectedCompilationScopedFactorySourceCertificate.of_legacy source.toSourceCertificate)
   | .excluded absent => .excluded absent
 
 /-- The conversion preserves the complete original table and its selection. -/

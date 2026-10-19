@@ -275,6 +275,65 @@ theorem application_preserves (budget : Nat)
         metadata, returned, related, post⟩ := result
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+  | preparedBranching owner captured code history support origin prefixContext globals referenceIndex _typed _prepared slots _callerReceipt =>
+    rename_i capturedScope capturedActual
+    have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
+      simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
+    obtain ⟨_metadata, carried⟩ := stable owner.position
+    have reference : captured.canonical[code.referenceIndex]? =
+        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
+      rw [referenceIndex]
+      exact globals.reference
+    cases packet with
+    | terminal terminal =>
+      have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+          code.compilation.administrativePrefix capturedScope captured.canonical := by
+        rw [supported.prefix]
+        exact slots
+      have below : ∀ child, stages.Closure function child →
+          CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+          (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) code.compilation.administrativePrefix).forgetSlots
+          support.body.toContext.context
+          (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+          stages child terminal.certificate callFaults budget := by
+        intro child selected
+        intro childSize smaller current id lowered point
+        rw [supported.point] at point
+        exact children childSize smaller (supported.rootAt child selected) owner
+          (owners owner) point
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        SelectedCompilationPhysicalTerminalLambdaApplicationBounds.application_preserves
+          captured code history support.body.toContext functions owner caller code.compilation.administrativePrefix observed physical
+          stable raw.heaps typed terminal.receipt terminal.certifies represented heaps raw.captures reference carried
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) runtime
+          budget below trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+
+    | branching branch =>
+      have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+          code.compilation.administrativePrefix capturedScope captured.canonical := by
+        rw [supported.prefix]
+        exact slots
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        SelectedCompilationPhysicalBranchingLambdaApplicationBounds.application_preserves (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
+          (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+          (observations := CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile)
+          («functions» := functions) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := branch) (support := supported)
+          (owner := owner) (caller := caller) (capturedSlots := observed) (physical := physical)
+          (ownerPhysical := owners owner) (stable := stable) (beforeTyped := raw.heaps)
+          (argumentsTyped := typed) (represented := represented) (heaps := heaps)
+          (locals := raw.captures) (reference := reference) (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) children trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
 
 include physical owners supported raw represented heaps stable runtime semantic assignmentInterpretation in
 /-- Reflection uses the packet-selected Source scope. The original parameter
@@ -426,6 +485,64 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
           finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
   | preparedOrdinary owner captured code history support origin prefixContext globals referenceIndex _typed _prepared slots _callerReceipt =>
+    rename_i capturedScope capturedActual
+    have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
+      simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
+    obtain ⟨_metadata, carried⟩ := stable owner.position
+    have reference : captured.canonical[code.referenceIndex]? =
+        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
+      rw [referenceIndex]
+      exact globals.reference
+    cases packet with
+    | terminal terminal =>
+      have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+          code.compilation.administrativePrefix capturedScope captured.canonical := by
+        rw [supported.prefix]
+        exact slots
+      have below : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
+          (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) code.compilation.administrativePrefix).forgetSlots
+          support.body.toContext.context
+          (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+          stages terminal.child terminal.certificate callFaults budget := by
+        intro childSize smaller current id lowered point
+        rw [supported.point] at point
+        exact children childSize smaller (supported.rootAt terminal.child terminal.selected) owner
+          (owners owner) point
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        SelectedCompilationPhysicalTerminalLambdaApplicationBounds.application_reflects
+          captured code history support.body.toContext functions owner caller code.compilation.administrativePrefix observed physical
+          stable raw.heaps typed terminal.receipt terminal.certifies represented heaps raw.captures reference carried
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) runtime
+          terminal.child terminal.selected valid budget below completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+
+    | branching branch =>
+      have observed : CallableIndexedOwnedPhysicalGlobals.Slots compiled
+          code.compilation.administrativePrefix capturedScope captured.canonical := by
+        rw [supported.prefix]
+        exact slots
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        SelectedCompilationPhysicalBranchingLambdaApplicationBounds.application_reflects (semantic := semantic)
+          (assignmentInterpretation := assignmentInterpretation)
+          (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+          (observations := CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile)
+          (functionTypes := CallableIndexedOwnedPreparedPhysicalCellOrigins.runtime_views profile)
+          («functions» := functions) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := branch) (support := supported)
+          (owner := owner) (caller := caller) (capturedSlots := observed) (physical := physical)
+          (ownerPhysical := owners owner) (stable := stable) (beforeTyped := raw.heaps)
+          (argumentsTyped := typed) (represented := represented) (heaps := heaps)
+          (locals := raw.captures) (reference := reference) (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) valid children completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+  | preparedBranching owner captured code history support origin prefixContext globals referenceIndex _typed _prepared slots _callerReceipt =>
     rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments

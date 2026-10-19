@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingPhysicalLambdaFormationBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedPhysicalLambdaFormationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalLambdaFormationBounds
@@ -41,10 +42,15 @@ structure Support (header : Header compiled (Program.ofChecked compiled.sourcePr
         header header.context child.evidence
         (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
         terminal.expression terminal.receipt.child)
-      (PreparedBranchingLambdaFormation.Formation
-        header header.context child.evidence
-        (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
-        terminal.expression terminal.receipt.child))
+      (Sum
+        (PreparedBranchingLambdaFormation.Formation
+          header header.context child.evidence
+          (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+          terminal.expression terminal.receipt.child)
+        (PreparedLambdaBodyFormation.Formation
+          header header.context child.evidence
+          (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+          terminal.expression terminal.receipt.child)))
 
 variable {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
   {terminal : Terminal header}
@@ -87,12 +93,21 @@ theorem preserves {budget : Nat} :
         (by rw [stages.source selected]; exact header.unique)
         runtime covers faults childSize ⟨formation⟩
     | inr formation =>
-      exact SelectedCompilationPreparedPhysicalLambdaFormationBounds.preserves
-        header owner header.context child profile globals
-        (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
-        (by rw [stages.source selected]; exact header.agreement.source)
-        (by rw [stages.source selected]; exact header.unique)
-        runtime covers faults childSize ⟨formation⟩
+      cases formation with
+      | inl formation =>
+        exact SelectedCompilationPreparedPhysicalLambdaFormationBounds.preserves
+          header owner header.context child profile globals
+          (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+          (by rw [stages.source selected]; exact header.agreement.source)
+          (by rw [stages.source selected]; exact header.unique)
+          runtime covers faults childSize ⟨formation⟩
+      | inr formation =>
+        exact SelectedCompilationPreparedBranchingPhysicalLambdaFormationBounds.preserves
+          header owner header.context child profile globals
+          (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+          (by rw [stages.source selected]; exact header.agreement.source)
+          (by rw [stages.source selected]; exact header.unique)
+          runtime covers faults childSize ⟨formation⟩
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps,
     maps, worlds, frame, metadata, reached, related, post⟩ :=
     SelectedCompilationNamedTerminalBounds.preserves_body
@@ -138,11 +153,19 @@ theorem reflects {budget : Nat} :
         (by rw [stages.source selected]; exact header.agreement.source)
         runtime covers faults childSize ⟨formation⟩
     | inr formation =>
-      exact SelectedCompilationPreparedPhysicalLambdaFormationBounds.reflects
-        header owner header.context child profile globals
-        (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
-        (by rw [stages.source selected]; exact header.agreement.source)
-        runtime covers faults childSize ⟨formation⟩
+      cases formation with
+      | inl formation =>
+        exact SelectedCompilationPreparedPhysicalLambdaFormationBounds.reflects
+          header owner header.context child profile globals
+          (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+          (by rw [stages.source selected]; exact header.agreement.source)
+          runtime covers faults childSize ⟨formation⟩
+      | inr formation =>
+        exact SelectedCompilationPreparedBranchingPhysicalLambdaFormationBounds.reflects
+          header owner header.context child profile globals
+          (RecursiveNamedLambdaFormationHeads.cached_capture_slots compiled headers) keyPhysical.prefixZero
+          (by rw [stages.source selected]; exact header.agreement.source)
+          runtime covers faults childSize ⟨formation⟩
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, matched, result, finalHeaps,
     maps, worlds, frame, metadata, reached, related, post⟩ :=
     SelectedCompilationNamedTerminalBounds.reflects_body

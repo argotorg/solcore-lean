@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
 
 /-! Physical payloads retain old associations and actual prepared closures.
 The latter keep their captured slots and support reached diagnostics. Only
-projection to the prepared function model is exposed for all leaves. -/
+projection to the raw function model is exposed for all leaves. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
@@ -52,16 +52,16 @@ inductive FunctionOrigins
       FunctionOrigins headers keys bodyRegistry faults mapping world
         sourceType (.builtin function) native type
 
-/-- Erasure retains the original prepared function representation. -/
+/-- Projection retains the actual Code, captures, and native typing. -/
 theorem FunctionOrigins.forget {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {native : Value} {type : Ty}
     (origin : FunctionOrigins headers keys bodyRegistry faults mapping world sourceType source native type) :
-    CallableIndexedOwnedPreparedOrdinaryLambdaValues.Represents headers keys bodyRegistry faults
+    CallableIndexedLambdaValues.Represents compiled.indexed
       mapping world sourceType source native type := by
   cases origin with
   | closure member => exact member.represents
-  | global related => exact .prior related.represents
-  | builtin related => exact .prior related
+  | global related => exact (related.represents (registry := bodyRegistry) (faults := faults)).forget
+  | builtin related => exact related.forget
 
 /-- Only map/world extension acts on a positive member; it does not assert that
 any source or native cell still contains that member after a write. -/
@@ -73,13 +73,13 @@ def functions (headers : List (Header compiled (Program.ofChecked compiled.sourc
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed) where
   Represents := fun _ mapping world => FunctionOrigins headers keys bodyRegistry faults mapping world
   projection := fun origin =>
-    (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys bodyRegistry faults profile).projection
+    (CallableIndexedLambdaValues.model compiled.indexed profile).projection
       (registry := bodyRegistry) origin.forget
   runtime_hasType := fun origin =>
-    (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys bodyRegistry faults profile).runtime_hasType
+    (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType
       (registry := bodyRegistry) origin.forget
   source_function := fun origin =>
-    (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys bodyRegistry faults profile).source_function
+    (CallableIndexedLambdaValues.model compiled.indexed profile).source_function
       (registry := bodyRegistry) origin.forget
   extend := by
     intro registry futureRegistry mapping futureMapping world futureWorld sourceType source native type
@@ -92,10 +92,10 @@ def functions (headers : List (Header compiled (Program.ofChecked compiled.sourc
         exact .builtin ((CallableIndexedOwnedGeneralLambdaValues.model headers keys bodyRegistry faults profile).extend
           related registries maps worlds)
 
-theorem functions_include_prepared
+theorem functions_include_raw
     (profile : compiled.compatible.checked.catalog.callableContracts = true) :
     (functions headers keys bodyRegistry faults profile).Includes
-      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys bodyRegistry faults profile) :=
+      (CallableIndexedLambdaValues.model compiled.indexed profile) :=
   fun origin => origin.forget
 
 theorem includes_physical
@@ -111,14 +111,14 @@ theorem includes_physical
 theorem runtime_views (profile : compiled.compatible.checked.catalog.callableContracts = true) :
     FunctionRuntimeViews (functions headers keys bodyRegistry faults profile) := by
   intro registry mapping world parameter result source native type related
-  exact CallableIndexedOwnedPreparedOrdinaryLambdaValues.runtime_views headers keys bodyRegistry faults profile
+  exact CallableIndexedLambdaValues.runtime_views compiled.indexed profile
     (registry := registry) related.forget
 
 theorem observations (profile : compiled.compatible.checked.catalog.callableContracts = true) :
     FunctionObservations compiled.compatible.checked.catalog (functions headers keys bodyRegistry faults profile)
       (CallableIndexedLambdaValues.Identity compiled.indexed) := by
   intro registry mapping world sourceType source native type related
-  exact CallableIndexedOwnedPreparedOrdinaryLambdaValues.observations headers keys bodyRegistry faults profile
+  exact CallableIndexedLambdaValues.observations compiled.indexed profile
     (registry := registry) related.forget
 
 /-- Existing payload constructors recurse over positive function leaves. -/
@@ -156,9 +156,9 @@ theorem PayloadOrigins.forget
     (origin : PayloadOrigins headers keys bodyRegistry registry faults profile mapping world
       sourceType source native type) :
     ValueRep compiled.compatible.checked registry
-      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys bodyRegistry faults profile)
+      (CallableIndexedLambdaValues.model compiled.indexed profile)
       mapping world sourceType source native type :=
-  origin.map_functions (functions_include_prepared profile)
+  origin.map_functions (functions_include_raw profile)
 
 /-- Positive source-shape projection includes compatible raw-type wrappers.
 It does not inspect an erased general-model representation. -/
@@ -228,9 +228,9 @@ theorem CellOrigins.empty :
 theorem CellOrigins.forget
     (origins : CellOrigins headers keys bodyRegistry registry faults profile mapping world heap store) :
     CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
-      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys bodyRegistry faults profile)
+      (CallableIndexedLambdaValues.model compiled.indexed profile)
       mapping world heap store :=
-  CompatibleAmbientHeap.extend_definitions (functions_include_prepared profile)
+  CompatibleAmbientHeap.extend_definitions (functions_include_raw profile)
     (.refl _) origins
 
 /-- Real administrative allocation appends a typed native cell while preserving

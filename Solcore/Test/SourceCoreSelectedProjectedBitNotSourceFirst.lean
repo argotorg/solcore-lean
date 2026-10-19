@@ -1,5 +1,6 @@
 import Solcore.Test.SourceCoreSelectedProjectedBitNotFixture
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedOutputForward
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicInitialData
 
 set_option autoImplicit false
 set_option Elab.async false
@@ -431,5 +432,129 @@ theorem initial_then_invert (fixture : CompiledFixture) (observed : ObservedProg
     exact unary_from_source meaning.issued next observed.invertRow observed.invertShape key previous
       tail nextCall ready
   · exact .inr stopped
+
+structure InitialDataSelection {fixture : CompiledFixture} (row : Row fixture)
+    {publicArguments : List SourceCorePublicValues.Value}
+    (started : Started fixture row.original.key publicArguments) where
+  issued : Profiled fixture.recipe
+  initial : Initial issued.toIssued started.call
+  sourceEq : initial.header.function.source = row.original.function.typedBody
+
+/-- The first selected call retains its actual data encoder and original row. -/
+theorem initial_data_selection {fixture : CompiledFixture} (row : Row fixture)
+    (profile : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled)
+    {publicArguments : List SourceCorePublicValues.Value}
+    (started : Started fixture row.original.key publicArguments) :
+    Nonempty (InitialDataSelection row started) := by
+  obtain ⟨eligible, rowSame, _signatureSame⟩ := row.eligible
+  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_checked_profiled_initial_row
+    fixture.checked fixture.accepted fixture.selected profile started.opened started.call
+    started.bootstrap started.fresh started.authority (.single started.ready) eligible
+  exact ⟨⟨issued, initial, initial.header.agreement.source.trans
+    ((congrArg (fun named => named.specialized.function.typedBody) namedEq).trans
+      (congrArg (fun original => original.function.typedBody) rowSame))⟩⟩
+
+def InitialDataForward {fixture : CompiledFixture} {row : Row fixture}
+    {publicArguments : List SourceCorePublicValues.Value}
+    {started : Started fixture row.original.key publicArguments}
+    (selected : InitialDataSelection row started) (arguments : List Dynamic.Value)
+    (value : Dynamic.Value) (after : Dynamic.Heap) : Prop :=
+  ∀ invocation,
+    PlainValue selected.initial.header selected.initial.header invocation ⟨[]⟩ arguments value after ∧
+    ((SourceCall selected.initial.header selected.initial.header invocation ⟨[]⟩ arguments (.value value) after ∧
+      SelectedCompilationStageClosedDirectForward.Output.ForwardAt selected.issued.catalog.rows
+        selected.initial.header selected.issued.initial selected.issued.support.profile fixture.recipe []
+        selected.initial.header.function.resultType started.call.checkpoint value after) ∨
+      SelectedCompilationStageClosedInitialForward.StageStopped selected.issued started.call selected.initial invocation arguments)
+
+/-- A mapping can be the first input. Duplicate keys retain their original
+order, and the exact Source heap contains only this call's two parameter cells. -/
+theorem initial_unary_from_source {fixture : CompiledFixture} (row : Row fixture)
+    (profile : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled)
+    (shape : UnaryShape row.original.function.typedBody)
+    (key previous : Word) (tail : List (Word × Word))
+    (started : Started fixture row.original.key [publicMap ((key, previous) :: tail), .word key]) :
+    ∃ selected : InitialDataSelection row started,
+      InitialDataForward selected [mappingValue (sourceEntries ((key, previous) :: tail)), .word key]
+        (mappingValue (sourceEntries ((key, previous.bitNot) :: tail)))
+        (parameterHeap ⟨[]⟩ (sourceEntries ((key, previous.bitNot) :: tail)) key) := by
+  obtain ⟨selected⟩ := initial_data_selection row profile started
+  have actualShape : UnaryShape selected.initial.header.function.source := by rw [selected.sourceEq]; exact shape
+  obtain ⟨rawD, global, sourceAt⟩ :=
+    (CallableIndexedOwnedPreparedFiniteNamedInventories.source_receipts selected.issued.catalog.rows).receipts
+      selected.initial.header selected.initial.start.selected.member
+  have types : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes selected.initial.header.function.context
+      [publicMap ((key, previous) :: tail), .word key] selected.initial.header.types := by
+    rw [unary_input_types selected.initial.header actualShape]
+    exact .cons (map_types _ _) (.cons (word_types _ _) .nil)
+  refine ⟨selected, ?_⟩
+  intro invocation
+  have plain := unary_call selected.initial.header actualShape sourceAt selected.initial.header invocation ⟨[]⟩
+    key previous (sourceEntries tail)
+  exact ⟨plain, selected.initial.forward_data_output_plain types
+    (.cons (map_meaning _) (.cons (word_meaning _) .nil)) plain⟩
+
+/-- An empty mapping at startup uses the actual Word default before complement. -/
+theorem initial_default_from_source {fixture : CompiledFixture} (row : Row fixture)
+    (profile : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled)
+    (shape : UnaryShape row.original.function.typedBody) (key : Word)
+    (started : Started fixture row.original.key [publicMap [], .word key]) :
+    ∃ selected : InitialDataSelection row started,
+      InitialDataForward selected [mappingValue [], .word key]
+        (mappingValue (sourceEntries [(key, Word.zero.bitNot)]))
+        (parameterHeap ⟨[]⟩ (sourceEntries [(key, Word.zero.bitNot)]) key) := by
+  obtain ⟨selected⟩ := initial_data_selection row profile started
+  have actualShape : UnaryShape selected.initial.header.function.source := by rw [selected.sourceEq]; exact shape
+  obtain ⟨rawD, global, sourceAt⟩ :=
+    (CallableIndexedOwnedPreparedFiniteNamedInventories.source_receipts selected.issued.catalog.rows).receipts
+      selected.initial.header selected.initial.start.selected.member
+  have types : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes selected.initial.header.function.context
+      [publicMap [], .word key] selected.initial.header.types := by
+    rw [unary_input_types selected.initial.header actualShape]
+    exact .cons (map_types _ _) (.cons (word_types _ _) .nil)
+  refine ⟨selected, ?_⟩
+  intro invocation
+  have plain := default_call selected.initial.header actualShape sourceAt selected.initial.header invocation ⟨[]⟩ key
+  exact ⟨plain, selected.initial.forward_data_output_plain types
+    (.cons (map_meaning _) (.cons (word_meaning _) .nil)) plain⟩
+
+/-- A failed key read on the first data call preserves its reached heap and
+returns a session continuation with the encoder's actual metadata registry. -/
+theorem initial_missing_from_source {fixture : CompiledFixture} (row : Row fixture)
+    (profile : CompilerProgramStaticProfile.StaticProfile fixture.recipe.compiled)
+    (shape : MissingShape row.original.function.typedBody)
+    (key previous : Word) (tail : List (Word × Word))
+    (started : Started fixture row.original.key [publicMap ((key, previous) :: tail), .word key]) :
+    ∃ selected : InitialDataSelection row started, ∀ invocation,
+      PlainFault selected.initial.header selected.initial.header invocation ⟨[]⟩
+        [mappingValue (sourceEntries ((key, previous) :: tail)), .word key]
+        (.uninitializedLocation (missingLocation ⟨[]⟩ (sourceEntries ((key, previous) :: tail)) key))
+        (missingHeap ⟨[]⟩ (sourceEntries ((key, previous) :: tail)) key) ∧
+      ((SourceCall selected.initial.header selected.initial.header invocation ⟨[]⟩
+          [mappingValue (sourceEntries ((key, previous) :: tail)), .word key]
+          (.fault (.semantic (.uninitializedLocation (missingLocation ⟨[]⟩ (sourceEntries ((key, previous) :: tail)) key))))
+          (missingHeap ⟨[]⟩ (sourceEntries ((key, previous) :: tail)) key) ∧
+        SelectedCompilationPublicSessionFailureForward.FailureForwardAt (entries := []) selected.issued.catalog.rows
+          selected.initial.header selected.issued.initial selected.issued.support.profile fixture.recipe
+          (.semantic (.uninitializedLocation (missingLocation ⟨[]⟩ (sourceEntries ((key, previous) :: tail)) key)))
+          started.call (missingHeap ⟨[]⟩ (sourceEntries ((key, previous) :: tail)) key)) ∨
+        SelectedCompilationStageClosedInitialForward.StageStopped selected.issued started.call selected.initial invocation
+          [mappingValue (sourceEntries ((key, previous) :: tail)), .word key]) := by
+  obtain ⟨selected⟩ := initial_data_selection row profile started
+  have actualShape : MissingShape selected.initial.header.function.source := by rw [selected.sourceEq]; exact shape
+  obtain ⟨rawD, global, sourceAt⟩ :=
+    (CallableIndexedOwnedPreparedFiniteNamedInventories.source_receipts selected.issued.catalog.rows).receipts
+      selected.initial.header selected.initial.start.selected.member
+  have certified := SelectedCompilationHeaderCertificates.certified selected.issued.support.bodyTyping selected.initial.header
+  have types : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes selected.initial.header.function.context
+      [publicMap ((key, previous) :: tail), .word key] selected.initial.header.types := by
+    rw [missing_input_types selected.initial.header actualShape]
+    exact .cons (map_types _ _) (.cons (word_types _ _) .nil)
+  refine ⟨selected, ?_⟩
+  intro invocation
+  have plain := missing_call selected.initial.header actualShape certified sourceAt selected.initial.header invocation ⟨[]⟩
+    key previous (sourceEntries tail)
+  exact ⟨plain, selected.initial.forward_data_fault_plain types
+    (.cons (map_meaning _) (.cons (word_meaning _) .nil)) plain⟩
 
 end Tests.SourceCoreSelectedProjectedBitNot
