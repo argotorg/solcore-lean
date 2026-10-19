@@ -39,7 +39,7 @@ theorem header {type : Ty} {continuation : SourceSemantics.Context → SourceCor
     (shape : ItemShape items) : tree.ErrorsFor .reachable registry faults := by
   revert shape
   refine HeaderSites.rec (motive := fun {context scope items code} tree _ =>
-    ItemShape items → tree.ErrorsFor .reachable registry faults) ?_ ?_ ?_ ?_ ?_ ?_ sites
+    ItemShape items → tree.ErrorsFor .reachable registry faults) ?_ ?_ ?_ ?_ ?_ ?_ ?_ sites
   · intro context scope code next shape
     exact GenericForHeader.Tree.ErrorsFor.nil (context := context) (scope := scope) (code := code) (next := next)
   · intro context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same remaining remainingErrors ih shape
@@ -52,6 +52,8 @@ theorem header {type : Ty} {continuation : SourceSemantics.Context → SourceCor
     exact GenericForHeader.Tree.ErrorsFor.assign (context := context) (scope := scope) (assignment := assignment) (operator := operator) (rhs := rhs) (rest := rest) (body := body) (head := head) (remaining := remaining) (ih shape.assign_tail.2.2) (PreparedBranchingLegacyCatalogSites.assignment receipt shape.assign_tail.2.1)
   · intro context scope assignment rest body head remaining remainingErrors receipt ih shape
     exact GenericForHeader.Tree.ErrorsFor.bitNot (context := context) (scope := scope) (assignment := assignment) (rest := rest) (body := body) (head := head) (remaining := remaining) (ih shape.bitNot_tail.2.2) receipt
+  · intro context scope assignment rest body head remaining remainingErrors receipt ih shape
+    exact False.elim (head.projected shape.bitNot_tail.2.1)
 
 open GenericImperativeMatch
 
@@ -63,7 +65,7 @@ theorem body {context scope position expected type code}
   revert shape
   refine CatalogSites.rec (motive := fun {context scope position expected type code} tree _ =>
     PositionShape source position → tree.CatalogSites .reachable registry faults)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ sites
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ sites
   · intro context scope mode statements expected type code syntaxTree body shape
     exact Tree.CatalogSites.body (context := context) (scope := scope) (mode := mode) (statements := statements) (expected := expected) (type := type) (code := code) (syntaxTree := syntaxTree) (body := body)
   · intro context nextContext scope mode id node binder rest expected type body payload found form monomorphic extended ordinary projected allocation annotation same remaining remainingErrors remainingErrorsIH shape
@@ -86,6 +88,8 @@ theorem body {context scope position expected type code}
     exact Tree.CatalogSites.assign (context := context) (scope := scope) (mode := mode) (id := id) (node := node) (assignment := assignment) (operator := operator) (rhs := rhs) (rest := rest) (expected := expected) (type := type) (body := body) (found := found) (form := form) (head := head) (remaining := remaining) (remainingErrorsIH (shape.assign_tail found form).2.2) (PreparedBranchingLegacyCatalogSites.assignment headErrors (shape.assign_tail found form).2.1)
   · intro context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors remainingErrorsIH shape
     exact Tree.CatalogSites.bitNot (context := context) (scope := scope) (mode := mode) (id := id) (node := node) (assignment := assignment) (rest := rest) (expected := expected) (type := type) (body := body) (found := found) (form := form) (head := head) (remaining := remaining) (remainingErrorsIH (shape.bitNot_tail found form).2.2) headErrors
+  · intro context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors remainingErrorsIH shape
+    exact False.elim (head.projected (shape.bitNot_tail found form).2.1)
   · intro context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialErrorsIH remainingErrorsIH shape
     have parts := shape.for_children found form
     exact Tree.CatalogSites.forLoop (context := context) (scope := scope) (mode := mode) (id := id) (node := node) (initializer := initializer) (condition := condition) (post := post) (statements := statements) (rest := rest) (expected := expected) (type := type) (initialCode := initialCode) (body := body) (found := found) (form := form) (initial := initial) (remaining := remaining) (initialErrorsIH ⟨parts.1, parts.2.1, parts.2.2.1⟩) (remainingErrorsIH parts.2.2.2)
@@ -101,6 +105,8 @@ theorem body {context scope position expected type code}
     exact Tree.CatalogSites.initializerAssign (context := context) (scope := scope) (assignment := assignment) (operator := operator) (rhs := rhs) (rest := rest) (body := body) (condition := condition) (post := post) (statements := statements) (expected := expected) (type := type) (head := head) (remaining := remaining) (remainingErrorsIH ⟨shape.1.assign_tail.2.2, shape.2⟩) (PreparedBranchingLegacyCatalogSites.assignment headErrors shape.1.assign_tail.2.1)
   · intro context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors remainingErrorsIH shape
     exact Tree.CatalogSites.initializerBitNot (context := context) (scope := scope) (assignment := assignment) (rest := rest) (body := body) (condition := condition) (post := post) (statements := statements) (expected := expected) (type := type) (head := head) (remaining := remaining) (remainingErrorsIH ⟨shape.1.bitNot_tail.2.2, shape.2⟩) headErrors
+  · intro context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors remainingErrorsIH shape
+    exact False.elim (head.projected shape.1.bitNot_tail.2.1)
   · intro context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining catalog patternContext childErrors remainingErrors childErrorsIH remainingErrorsIH shape
     exact Tree.CatalogSites.matchWith (context := context) (scope := scope) (mode := mode) (id := id) (node := node) (resolution := resolution) (scrutineeNode := scrutineeNode) (rest := rest) (expected := expected) (type := type) (matched := matched) (body := body) (selfReason := selfReason) (control := control) (caseFacts := caseFacts) (found := found) (form := form) (scrutineeFound := scrutineeFound) (scrutineeTyped := scrutineeTyped) (casesTyped := casesTyped) (defaultTyped := defaultTyped) (compilation := compilation) (sameValues := sameValues) (sameDefinitions := sameDefinitions) (allocator := allocator) (requests := requests) (receipt := receipt) (ordinary := ordinary) (children := children) (remaining := remaining) catalog patternContext (fun request member childContext valid => childErrorsIH request member childContext valid (shape.match_request found form valid.forget)) (remainingErrorsIH (shape.match_children found form).2.2)
   · intro context scope mode id node statements rest expected type innerCode suffix unique found form inner stops issued innerErrors innerErrorsIH shape

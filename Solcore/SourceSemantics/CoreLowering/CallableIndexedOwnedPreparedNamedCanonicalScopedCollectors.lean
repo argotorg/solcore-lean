@@ -48,7 +48,7 @@ def of_imperative_compiler
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
-    (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax header.function.source expressionSyntax
       header.context (.statements true header.function.body) header.function.resultType)
     (children : ∀ child, stages.Closure header.function child →
       ∀ context, Dynamic.RuntimeContextFields header.context context →
@@ -98,7 +98,7 @@ def of_actual
     (member : entry ∈ compiled.indexed.entries)
     (receipt : Receipt header)
     (actual : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
-    (syntaxTree : GenericImperativeMatch.Syntax header.function.source (GeneralSyntax header.function.source)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax header.function.source (GeneralSyntax header.function.source)
       header.context (.statements true header.function.body) header.function.resultType) :
     CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport.NamedSupport
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) keys bodyRegistry header

@@ -526,6 +526,40 @@ mutual
         (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | bitNotProjected {mode scope context finalContext environment before targetHeap written after assignment values target updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          targetHeap target updated written)
+        (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | bitNotProjectedRootFault {mode scope context environment before assignment id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) before
+    | bitNotProjectedKeysFault {mode scope context environment before after assignment id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | bitNotProjectedGetterFault {mode scope context environment before after assignment values id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) after
     | assignProjected {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -768,6 +802,32 @@ mutual
     | expressionFailure {scope context environment before after expression rest failure}
         (child : Expression program registry scope context environment before expression (.fault failure) after) :
         ForItems program registry scope context environment before (.expression expression :: rest) context (.fault failure) after
+    | projectedBitNot {scope context finalContext environment before targetHeap written after assignment values target updated rest outcome}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          targetHeap target updated written)
+        (next : ForItems program registry scope context environment written rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
+    | projectedBitNotRootFault {scope context environment before assignment rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context (.fault (.semantic reason)) before
+    | projectedBitNotKeysFault {scope context environment before after assignment rest failure}
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context (.fault failure) after
+    | projectedBitNotGetterFault {scope context environment before after assignment values rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context (.fault (.semantic reason)) after
     | projectedAssignment {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
         (projected : assignment.target.projections ≠ [])
         (keys : Expressions program registry scope context environment before
@@ -985,6 +1045,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
+  bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)

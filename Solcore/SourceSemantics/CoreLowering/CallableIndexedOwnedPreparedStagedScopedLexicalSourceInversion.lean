@@ -46,6 +46,10 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   cases trace with
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -105,6 +109,10 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   cases trace with
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -157,6 +165,10 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   cases trace with
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _

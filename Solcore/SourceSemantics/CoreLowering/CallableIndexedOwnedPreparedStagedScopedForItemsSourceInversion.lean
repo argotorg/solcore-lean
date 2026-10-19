@@ -137,6 +137,7 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
           exact False.elim (missing.excludes_read read)
 
 theorem bitNot {assignment : AssignmentResolution}
+    (bare : assignment.target.projections = [])
     (trace : Size.ForItems program registry size invocation context environment before
       (.assignBitNot assignment :: rest) finalContext outcome after) :
     (∃ reason, size = Size.stepSize [] ∧ finalContext = context ∧
@@ -151,5 +152,8 @@ theorem bitNot {assignment : AssignmentResolution}
   cases trace with
   | bitNot snapshot write remaining => exact .inr ⟨_, _, _, _, rfl, snapshot, write, remaining⟩
   | bitNotFault _ failed => exact .inl ⟨_, rfl, rfl, rfl, rfl, failed⟩
+  | projectedBitNot projected _ _ _ _ | projectedBitNotRootFault projected _
+  | projectedBitNotKeysFault projected _ _ | projectedBitNotGetterFault projected _ _ =>
+      exact (projected bare).elim
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion

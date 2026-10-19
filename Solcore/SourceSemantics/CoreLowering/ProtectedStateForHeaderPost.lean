@@ -34,6 +34,10 @@ variable {Records : Type v} (protocol : Protocol.{u, v} Records)
   {contextLocation location : Location} {type : Ty} {conditionCode body postCode : Expr} {selfReason : Word}
   {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap} {store : Store}
 
+variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+
 namespace WithReady
 open RecursiveNamedLexicalContracts.Stateful.WithReady
 variable (readiness : Readiness protocol)
@@ -79,7 +83,7 @@ theorem post_preserves_bounded_for_with_header_result
     by simpa only [post_rename] using agreement.wrap tail.toTailFor.fallthrough_evaluates,
     progress, reached, retained, reachedReady⟩
 
-include definitions registered producer acquire stateTransport stateBindings sites transfers solved in
+include definitions registered producer acquire stateTransport stateBindings sites transfers solved extension faithful observations in
 theorem post_preserves_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -113,6 +117,7 @@ theorem post_preserves_bounded_for
   obtain ⟨postContext, postTyped⟩ := postValues_typed continued state.live.selfTyped state.live.actualTyped
   obtain ⟨tail, maps, worlds, preservation, metadata, related, ⟨returnTo⟩, tailReady, agreement⟩ :=
     Tree.preserves_prefix_bounded_for_with_return (solved := solved)
+      (extension := extension) (faithful := faithful) (observations := observations)
       (functions := functions) (definitions := definitions) (registered := registered)
       (program := program) (evidence := evidence)
       (protocol := protocol) (condition := guard) (producer := producer) (acquire := acquire)
@@ -310,7 +315,7 @@ theorem post_reflects_reachable_bounded_for
 
 end WithReady
 
-include definitions registered producer acquire stateTransport stateBindings solved in
+include definitions registered producer acquire stateTransport stateBindings solved extension faithful observations in
 theorem post_preserves_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -340,6 +345,7 @@ theorem post_preserves_bounded_for
         contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore,
         protocol.Relates state.retained reached.retained := by
   have result := WithReady.post_preserves_bounded_for
+    (extension := extension) (faithful := faithful) (observations := observations)
     (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
     (program := program) (evidence := evidence)
     (protocol := protocol) (guard := guard) (producer := producer) (acquire := acquire)

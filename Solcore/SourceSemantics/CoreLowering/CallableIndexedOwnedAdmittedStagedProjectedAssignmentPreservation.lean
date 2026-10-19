@@ -63,7 +63,7 @@ variable {values : SourceCoreCompatibleValues.Context} {registry : SourceCoreRaw
   {certificate : Certificate} {faults : RecursiveStageMeaning.FaultRep} {scope : Scope}
   {site : SourceCoreElaboration.ErrorSite} {place : PlaceResolution} {prepared : Prepared}
   {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
-  {administrative actualContext : Core.Context} {ξ : Renaming}
+  {rhsType : Core.Ty} {administrative actualContext : Core.Context} {ξ : Renaming}
   {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
   {canonical actual : Environment} {before getter : Dynamic.Heap} {store : Store} {index : Nat}
   {target : Dynamic.ResolvedPlace} {sources : List Dynamic.Value}
@@ -72,7 +72,7 @@ variable {values : SourceCoreCompatibleValues.Context} {registry : SourceCoreRaw
 RHS execution. The original key value types and deep heap typing are retained. -/
 theorem preserves_keys (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) values invocation.source
-      certificate scope site place prepared codes sourceTypes leaf administrative)
+      certificate scope site place prepared codes sourceTypes leaf administrative rhsType)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog values.checked.catalog)
       mapping world administrative scope environment canonical)
     (heaps : HeapRepresents values.checked registry functions mapping world before store)
@@ -123,7 +123,7 @@ theorem preserves_keys (budget : Nat)
 
 theorem preserves_resolution (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) values invocation.source
-      certificate scope site place prepared codes sourceTypes leaf administrative)
+      certificate scope site place prepared codes sourceTypes leaf administrative rhsType)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (extension : SourceCoreRawMetadata.Extends values.registry registry)
     (transport : ProtectedStateTransition.AdministrativeTransport callerProtocol)

@@ -478,6 +478,40 @@ mutual
         (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [loopSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | bitNotProjected {keysSize nextSize : Nat} {mode scope context finalContext environment before targetHeap written after assignment values target updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          targetHeap target updated written)
+        (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [keysSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | bitNotProjectedRootFault {mode scope context environment before assignment id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        StatementsIn program registry mode (stepSize []) scope context environment before (id :: rest) context (.fault (.semantic reason)) before
+    | bitNotProjectedKeysFault {keysSize : Nat} {mode scope context environment before after assignment id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | bitNotProjectedGetterFault {keysSize : Nat} {mode scope context environment before after assignment values id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context (.fault (.semantic reason)) after
     | assignProjected {keysSize childSize nextSize : Nat} {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -718,6 +752,32 @@ mutual
     | expressionFailure {childSize : Nat} {scope context environment before after expression rest failure}
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
         ForItems program registry (stepSize [childSize]) scope context environment before (.expression expression :: rest) context (.fault failure) after
+    | projectedBitNot {keysSize nextSize : Nat} {scope context finalContext environment before targetHeap written after assignment values target updated rest outcome}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
+        (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          targetHeap target updated written)
+        (next : ForItems program registry nextSize scope context environment written rest finalContext outcome after) :
+        ForItems program registry (stepSize [keysSize, nextSize]) scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
+    | projectedBitNotRootFault {scope context environment before assignment rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (failed : ProjectedTarget.RootFault environment before assignment.target reason) :
+        ForItems program registry (stepSize []) scope context environment before (.assignBitNot assignment :: rest) context (.fault (.semantic reason)) before
+    | projectedBitNotKeysFault {keysSize : Nat} {scope context environment before after assignment rest failure}
+        (projected : assignment.target.projections ≠ [])
+        (ready : ProjectedTarget.RootReady environment before assignment.target)
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.fault failure) after) :
+        ForItems program registry (stepSize [keysSize]) scope context environment before (.assignBitNot assignment :: rest) context (.fault failure) after
+    | projectedBitNotGetterFault {keysSize : Nat} {scope context environment before after assignment values rest reason}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
+        ForItems program registry (stepSize [keysSize]) scope context environment before (.assignBitNot assignment :: rest) context (.fault (.semantic reason)) after
     | projectedAssignment {keysSize childSize nextSize : Nat} {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
         (projected : assignment.target.projections ≠ [])
         (keys : Expressions program registry keysSize scope context environment before
@@ -934,6 +994,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
+  bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
@@ -1032,12 +1093,20 @@ local macro "erase_stage_grade" : tactic =>
     case bitNotBareFault => apply Recursive.StatementsIn.bitNotBareFault <;> assumption
     case bitNot => apply Recursive.ForItems.bitNot <;> assumption
     case bitNotFault => apply Recursive.ForItems.bitNotFault <;> assumption
+    case bitNotProjected => apply Recursive.StatementsIn.bitNotProjected <;> assumption
+    case bitNotProjectedRootFault => apply Recursive.StatementsIn.bitNotProjectedRootFault <;> assumption
+    case bitNotProjectedKeysFault => apply Recursive.StatementsIn.bitNotProjectedKeysFault <;> assumption
+    case bitNotProjectedGetterFault => apply Recursive.StatementsIn.bitNotProjectedGetterFault <;> assumption
     case assignProjected => apply Recursive.StatementsIn.assignProjected <;> assumption
     case assignProjectedRootFault => apply Recursive.StatementsIn.assignProjectedRootFault <;> assumption
     case assignProjectedKeysFault => apply Recursive.StatementsIn.assignProjectedKeysFault <;> assumption
     case assignProjectedGetterFault => apply Recursive.StatementsIn.assignProjectedGetterFault <;> assumption
     case assignProjectedRhsFault => apply Recursive.StatementsIn.assignProjectedRhsFault <;> assumption
     case assignProjectedWriteFault => apply Recursive.StatementsIn.assignProjectedWriteFault <;> assumption
+    case projectedBitNot => apply Recursive.ForItems.projectedBitNot <;> assumption
+    case projectedBitNotRootFault => apply Recursive.ForItems.projectedBitNotRootFault <;> assumption
+    case projectedBitNotKeysFault => apply Recursive.ForItems.projectedBitNotKeysFault <;> assumption
+    case projectedBitNotGetterFault => apply Recursive.ForItems.projectedBitNotGetterFault <;> assumption
     case projectedAssignment => apply Recursive.ForItems.projectedAssignment <;> assumption
     case projectedAssignmentRootFault => apply Recursive.ForItems.projectedAssignmentRootFault <;> assumption
     case projectedAssignmentKeysFault => apply Recursive.ForItems.projectedAssignmentKeysFault <;> assumption
@@ -1381,6 +1450,18 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨nextSize, gradedNext⟩ := nextIH
       exact ⟨_, .bitNot snapshot write gradedNext⟩
     case bitNotFault bare failed => exact ⟨_, .bitNotFault bare failed⟩
+    case bitNotProjected contains form projected keys snapshot write next keysIH nextIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨nextSize, nextGraded⟩ := nextIH
+      exact ⟨_, .bitNotProjected contains form projected keysGraded snapshot write nextGraded⟩
+    case bitNotProjectedRootFault contains form projected failed =>
+      exact ⟨_, .bitNotProjectedRootFault contains form projected failed⟩
+    case bitNotProjectedKeysFault contains form projected ready keys keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .bitNotProjectedKeysFault contains form projected ready keysGraded⟩
+    case bitNotProjectedGetterFault contains form projected keys failed keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .bitNotProjectedGetterFault contains form projected keysGraded failed⟩
     case assignProjected contains form projected keys snapshot child write next keysIH childIH nextIH =>
       obtain ⟨keysSize, keysGraded⟩ := keysIH
       obtain ⟨childSize, childGraded⟩ := childIH
@@ -1518,6 +1599,18 @@ local macro "construct_stage_grade" : tactic =>
     case expressionFailure child childIH =>
       obtain ⟨childSize, gradedchild⟩ := childIH
       exact ⟨_, .expressionFailure gradedchild⟩
+    case projectedBitNot projected keys snapshot write next keysIH nextIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      obtain ⟨nextSize, nextGraded⟩ := nextIH
+      exact ⟨_, .projectedBitNot projected keysGraded snapshot write nextGraded⟩
+    case projectedBitNotRootFault projected failed =>
+      exact ⟨_, .projectedBitNotRootFault projected failed⟩
+    case projectedBitNotKeysFault projected ready keys keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .projectedBitNotKeysFault projected ready keysGraded⟩
+    case projectedBitNotGetterFault projected keys failed keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .projectedBitNotGetterFault projected keysGraded failed⟩
     case projectedAssignment projected keys snapshot child write next keysIH childIH nextIH =>
       obtain ⟨keysSize, keysGraded⟩ := keysIH
       obtain ⟨childSize, childGraded⟩ := childIH

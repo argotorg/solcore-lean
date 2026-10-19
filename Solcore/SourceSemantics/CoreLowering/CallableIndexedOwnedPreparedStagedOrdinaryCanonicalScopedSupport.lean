@@ -73,7 +73,7 @@ include provenance receiver wellFormed original rows complete signatureMember so
 RHS and later reads after a genuine assignment or local allocation. -/
 def support_general
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (GeneralSyntax function.source)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (GeneralSyntax function.source)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.CanonicalBranchingSupport
       headers code support.body.toContext stages choice.packet faults := by
@@ -129,7 +129,7 @@ omit choice in
 and all static support together, without selecting a proof as runtime data. -/
 theorem of_actual
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (GeneralSyntax function.source)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (GeneralSyntax function.source)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Packet code stages,

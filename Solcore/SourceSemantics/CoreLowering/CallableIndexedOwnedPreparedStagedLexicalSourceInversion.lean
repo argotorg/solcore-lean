@@ -48,6 +48,10 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | matchBreaking actual same _ | matchContinuing actual same _
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -106,6 +110,10 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | matchBreaking actual same _ | matchContinuing actual same _
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -157,6 +165,10 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | blockBreaking actual same _ | blockContinuing actual same _
   | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | matchBreaking actual same _ | matchContinuing actual same _
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _

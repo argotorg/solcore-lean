@@ -174,7 +174,7 @@ theorem of_actual_with_evidence
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     {stages : Staging.Recursive.Registry}
-    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source
       (fun id => GeneralSyntax principal.sourceBody.source id directSites)
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
     Support principal packet headers stages
@@ -250,7 +250,7 @@ theorem of_actual_generic
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     {stages : Staging.Recursive.Registry}
-    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source
       (fun id => GeneralSyntax principal.sourceBody.source id directSites)
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
     Support principal packet headers stages
@@ -312,7 +312,7 @@ theorem of_actual
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     {stages : Staging.Recursive.Registry}
-    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source
       (fun id => GeneralSyntax principal.sourceBody.source id directSites)
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
     Support principal packet headers stages

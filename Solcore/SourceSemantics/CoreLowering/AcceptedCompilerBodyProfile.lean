@@ -21,7 +21,8 @@ def HeaderReady (source : TypedSource) (reached : ExpressionId → Prop) : ForIt
   | .expression expression => reached expression
   | .assignValue assignment operator expression => ValueAssignable source assignment operator ∧
       ∀ child ∈ expression :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, reached child
-  | .assignBitNot assignment => BitNotAssignable source assignment
+  | .assignBitNot assignment => UnaryAssignable source assignment ∧
+      ∀ child ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, reached child
 
 theorem header_forms {source reached items}
     (_ready : ∀ item ∈ items, HeaderReady source reached item) : HeaderForms items := True.intro
@@ -44,7 +45,8 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .forLoop initializer condition post _ =>
       (∀ item ∈ initializer, HeaderReady source reached item) ∧ reached condition ∧
       (∀ item ∈ post, HeaderReady source reached item)
-  | .assignBitNot assignment => BitNotAssignable source assignment
+  | .assignBitNot assignment => UnaryAssignable source assignment ∧
+      ∀ child ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, reached child
 
 structure Profile (source : TypedSource) (reached : ExpressionId → Prop) : Prop where
   nodes : ∀ node, Node.statement node ∈ source.nodes → StatementReady source reached node
@@ -117,6 +119,29 @@ def bitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
     else none
   else none
 
+def projectedBitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
+    : Option (PLift (ProjectedBitNotAssignable source assignment)) := do
+  if profile : assignment.target.type = .word then
+    if projected : assignment.target.projections ≠ [] then
+      match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+      | .error _ => none
+      | .ok binder => do
+        let ⟨route⟩ ← AcceptedProjectedAssignmentRoute.check source binder.scheme.body assignment.target.projections assignment.target.type
+        pure ⟨⟨profile, projected, by
+          intro actual accepted
+          cases Except.ok.inj (found.symm.trans accepted)
+          exact route⟩⟩
+    else none
+  else none
+
+def unaryAssignment? (source : TypedSource) (assignment : AssignmentResolution)
+    : Option (PLift (UnaryAssignable source assignment)) :=
+  match bitNotAssignment? source assignment with
+  | some ⟨bare⟩ => some ⟨.inl bare⟩
+  | none => do
+      let ⟨projected⟩ ← projectedBitNotAssignment? source assignment
+      pure ⟨.inr projected⟩
+
 def header? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
     (item : ForItemForm) : Option (PLift (HeaderReady source reached item)) := by
   cases item with
@@ -134,7 +159,12 @@ def header? (source : TypedSource) (reached : ExpressionId → Prop) [DecidableP
         if present : reached expression then some ⟨present⟩ else none)
         (expression :: DataPlaceKeyOrder.sourceKeys assignment.target.projections)
       pure ⟨⟨target, children⟩⟩
-  | assignBitNot assignment => exact bitNotAssignment? source assignment
+  | assignBitNot assignment => exact do
+      let ⟨target⟩ ← unaryAssignment? source assignment
+      let ⟨children⟩ ← allProof? reached (fun expression =>
+        if present : reached expression then some ⟨present⟩ else none)
+        (DataPlaceKeyOrder.sourceKeys assignment.target.projections)
+      pure ⟨⟨target, children⟩⟩
 
 def statement? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
     (node : StatementNode) : Option (PLift (StatementReady source reached node)) := by
@@ -161,8 +191,11 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
       pure ⟨by simpa only [StatementReady, form] using And.intro target children⟩
   case assignBitNot assignment =>
     exact do
-      let ⟨target⟩ ← bitNotAssignment? source assignment
-      pure ⟨by simpa only [StatementReady, form] using target⟩
+      let ⟨target⟩ ← unaryAssignment? source assignment
+      let ⟨children⟩ ← allProof? reached (fun expression =>
+        if present : reached expression then some ⟨present⟩ else none)
+        (DataPlaceKeyOrder.sourceKeys assignment.target.projections)
+      pure ⟨by simpa only [StatementReady, form] using And.intro target children⟩
   case expression expression semicolon =>
     exact if present : reached expression then some ⟨by simpa only [StatementReady, form] using present⟩ else none
   case block body => exact some ⟨by simp only [StatementReady, form]⟩
@@ -294,8 +327,19 @@ theorem header_facts {policy : SourceCoreLoops.Policy} {source : TypedSource}
       · exact head.2 _ List.mem_cons_self
       · exact tail.2.2 actual member
 
+  | projectedBitNotted remaining receipt route ih =>
+    have head := profile _ List.mem_cons_self
+    have tail := ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
+    refine ⟨tail.1, tail.2.1, ?_⟩
+    intro actual member
+    rcases List.mem_append.mp member with key | member
+    · apply head.2 actual.expression
+      rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated]
+      exact List.mem_map.mpr ⟨actual, key, rfl⟩
+    · exact tail.2.2 actual member
+
   | bitNotting remaining accepted ih =>
-    exact False.elim (ready.1 (profile _ List.mem_cons_self))
+    exact False.elim (ready.1 (profile _ List.mem_cons_self).1)
   | bitNotted remaining receipt targetType ih =>
     exact ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
 
@@ -366,7 +410,7 @@ theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompa
   | bitNotting read form statementType remaining assigned ih =>
       have original := profile.at (read_found (readPolicy ▸ read))
       simp only [StatementReady, form] at original
-      exact False.elim (ready.1 original)
+      exact False.elim (ready.1 original.1)
   | assigned read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
@@ -392,6 +436,18 @@ theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompa
       · rcases List.mem_cons.mp member with rfl | member
         · exact original.2 _ List.mem_cons_self
         · exact next.2.2 actual member
+  | projectedBitNotted read form statementType remaining receipt route ih =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have next := ih ready (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_append.mp member with key | member
+      · apply original.2 actual.expression
+        rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated]
+        exact List.mem_map.mpr ⟨actual, key, rfl⟩
+      · exact next.2.2 actual member
   | bitNotted read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       exact ih ready (finish.tail found (by simp [form, stopsHere]))

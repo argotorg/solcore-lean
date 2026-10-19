@@ -35,6 +35,13 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
+  | bitNotProjected {assignment binder rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (remaining : Scan source approved rest) : Scan source approved (.assignBitNot assignment :: rest)
   | assignProjected {assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
@@ -62,6 +69,8 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
 
   | assignProjected declaration route profile projected keys found type value _ ih =>
       exact .assignProjected declaration route profile projected (fun key member => mapped key (keys key member)) found type (mapped _ value) ih
+  | bitNotProjected declaration route profile projected keys _ ih =>
+      exact .bitNotProjected declaration route profile projected (fun key member => mapped key (keys key member)) ih
   | bitNot declaration target profile bare _ ih => exact .bitNot declaration target profile bare ih
 
 theorem Scan.shape {source approved items} (scan : Scan source approved items) :
@@ -74,6 +83,7 @@ theorem Scan.shape {source approved items} (scan : Scan source approved items) :
   | assign _ _ profile bare _ _ _ _ ih => exact .assign profile bare ih
 
   | assignProjected _ _ profile projected _ _ _ _ _ ih => exact .assignProjected profile projected ih
+  | bitNotProjected _ _ profile projected _ _ ih => exact .bitNotProjected profile projected ih
   | bitNot _ _ profile bare _ ih => exact .bitNot profile bare ih
 
 private theorem expression_at {source : TypedSource} {context : SourceSemantics.Context}
@@ -177,11 +187,36 @@ theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
       cases projections
       exact targetType.symm ▸ target.symm ▸ writable
 
+/-- Original unary typing and the accepted mapping route identify the declared root. -/
+theorem projected_bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
+    {assignment : AssignmentResolution} {binder : TypedBinder}
+    (unique : NodeOccurrencesUnique source)
+    (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+    (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+    (typed : SourceBitNotAssignmentValid source context assignment) :
+    (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
+    (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      WritableLocal context assignment.target.root actual.scheme.body) := by
+  cases typed with
+  | intro place _ =>
+    cases place with
+    | intro writable projections target =>
+      have atLeaf := target.symm ▸ projections
+      have same := route.root_type unique atLeaf
+      constructor
+      · intro actual actualFound
+        cases Except.ok.inj (declaration.symm.trans actualFound)
+        exact same ▸ atLeaf
+      · intro actual actualFound
+        cases Except.ok.inj (declaration.symm.trans actualFound)
+        exact same ▸ writable
+
 theorem Scan.syntax {source approved items} (scan : Scan source approved items)
     (unique : NodeOccurrencesUnique source) {control : ControlContext}
     {context final : SourceSemantics.Context}
     (typed : ForItemsHaveType source control context items final) :
-    GenericForHeader.Syntax source approved context items := by
+    GenericForHeader.PreparedSyntax source approved context items := by
   induction scan generalizing context final with
   | nil => exact .nil
   | absent declaration monomorphic ordinary remaining ih =>
@@ -209,7 +244,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         | assignValue assignment =>
           obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
             assignment_facts declaration targetType bare assignment
-          apply GenericForHeader.Syntax.assign sourceTyped writable rightTyped numeric
+          apply GenericForHeader.PreparedSyntax.assign sourceTyped writable rightTyped numeric
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
             subst child
@@ -223,13 +258,25 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         | assignValue assignment =>
           obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
             projected_assignment_facts unique declaration route assignment
-          apply GenericForHeader.Syntax.assign sourceTyped writable rightTyped numeric
+          apply GenericForHeader.PreparedSyntax.assign sourceTyped writable rightTyped numeric
           · intro child member
             rcases List.mem_cons.mp member with equal | member
             · subst child
               exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
             · obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
               exact ⟨keys child member, node, found, typed⟩
+          · exact ih tail
+
+  | bitNotProjected declaration route profile projected keys remaining ih =>
+      cases typed with
+      | cons head tail =>
+        cases head with
+        | assignBitNot assignment =>
+          obtain ⟨sourceTyped, writable⟩ := projected_bitNot_facts unique declaration route assignment
+          apply GenericForHeader.PreparedSyntax.bitNotProjected sourceTyped writable projected (.inl (by rw [profile]; rfl))
+          · intro child member
+            obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
+            exact ⟨keys child member, node, found, typed⟩
           · exact ih tail
 
   | bitNot declaration targetType profile bare remaining ih =>
@@ -253,10 +300,10 @@ theorem initializers {source : TypedSource} {approved : ExpressionId → Prop}
     {context final : SourceSemantics.Context} {control : ControlContext}
     {items : List ForItemForm} {condition : ExpressionId} {post : List ForItemForm}
     {body : List StatementId} {expected : TypeSystem.Ty}
-    (tree : GenericForHeader.Syntax source approved context items)
+    (tree : GenericForHeader.PreparedSyntax source approved context items)
     (typed : ForItemsHaveType source control context items final)
-    (next : GenericImperativeMatch.Syntax source approved final (.initializers [] condition post body) expected) :
-    GenericImperativeMatch.Syntax source approved context (.initializers items condition post body) expected := by
+    (next : GenericImperativeMatch.PreparedSyntax source approved final (.initializers [] condition post body) expected) :
+    GenericImperativeMatch.PreparedSyntax source approved context (.initializers items condition post body) expected := by
   induction tree generalizing final with
   | nil => cases typed; exact next
   | uninitialized declaration monomorphic extended ordinary remaining ih =>
@@ -286,6 +333,11 @@ theorem initializers {source : TypedSource} {approved : ExpressionId → Prop}
       | cons head tail =>
         cases head
         exact .initializerAssign sourceTyped writable rightTyped profile children (ih tail next)
+  | bitNotProjected sourceTyped writable projected profile children remaining ih =>
+      cases typed with
+      | cons head tail =>
+        cases head
+        exact .initializerBitNotProjected sourceTyped writable projected profile children (ih tail next)
   | bitNot writable bare profile remaining ih =>
       cases typed with
       | cons head tail =>

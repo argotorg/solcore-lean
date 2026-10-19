@@ -13,6 +13,7 @@ variable {program : Program} {stages : Registry} {invocation : Scope}
   {test : ExpressionId} {body : List StatementId} {size : Nat} {outcome : BodyOutcome}
 
 theorem bitNot {assignment : AssignmentResolution}
+    (bare : assignment.target.projections = [])
     (trace : Trace program stages invocation context environment before
       (.assignBitNot assignment :: items) test post body size outcome after) :
     (∃ reason, size = Size.stepSize [Size.stepSize []] ∧ outcome = .fault (.semantic reason) ∧
@@ -25,14 +26,14 @@ theorem bitNot {assignment : AssignmentResolution}
       Trace program stages invocation context environment written items test post body tailSize outcome after) := by
   cases trace with
   | initializerFault initial =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.bitNot initial with failed | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.bitNot bare initial with failed | continued
       · obtain ⟨reason, rfl, _, same, sameHeap, failed⟩ := failed
         cases same
         exact .inl ⟨reason, rfl, rfl, sameHeap, failed⟩
       · obtain ⟨tailSize, target, updated, written, rfl, snapshot, write, next⟩ := continued
         exact .inr ⟨_, target, updated, written, rfl, snapshot, write, .initializerFault next⟩
   | loop initial loop =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.bitNot initial with failed | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.bitNot bare initial with failed | continued
       · obtain ⟨_, _, _, same, _⟩ := failed
         cases same
       · obtain ⟨tailSize, target, updated, written, rfl, snapshot, write, next⟩ := continued

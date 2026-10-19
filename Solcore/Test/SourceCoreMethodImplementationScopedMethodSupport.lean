@@ -143,6 +143,6 @@ theorem MethodBodies.support {fixture : CompiledFixture} (bodies : MethodBodies 
   have unique := sourceAt.unique
   rw [original.sameSource] at unique
   rw [original.sameSource, statements] at bodyTyped ⊢
-  exact original.shape.body_syntax original.nodes unique original.shape.children bodyTyped
+  exact (original.shape.body_syntax original.nodes unique original.shape.children bodyTyped).prepared
 
 end Tests.SourceCoreMethodImplementationScoped

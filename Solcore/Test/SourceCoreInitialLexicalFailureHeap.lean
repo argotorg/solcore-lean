@@ -91,6 +91,10 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
   | assignProjectedGetterFault contains otherForm _ _ _
   | assignProjectedRhsFault contains otherForm _ _ _ _
   | assignProjectedWriteFault contains otherForm _ _ _ _ _
+  | bitNotProjected contains otherForm _ _ _ _ _
+  | bitNotProjectedRootFault contains otherForm _ _
+  | bitNotProjectedKeysFault contains otherForm _ _ _
+  | bitNotProjectedGetterFault contains otherForm _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
@@ -153,6 +157,10 @@ theorem ActualHeader.failed_heap
   | assignProjectedGetterFault contains otherForm _ _ _
   | assignProjectedRhsFault contains otherForm _ _ _ _
   | assignProjectedWriteFault contains otherForm _ _ _ _ _
+  | bitNotProjected contains otherForm _ _ _ _ _
+  | bitNotProjectedRootFault contains otherForm _ _
+  | bitNotProjectedKeysFault contains otherForm _ _ _
+  | bitNotProjectedGetterFault contains otherForm _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
@@ -229,6 +237,7 @@ private theorem returned_expression
     cases impossible
   | assignBare contains otherForm _ _ _ _
   | assignProjected contains otherForm _ _ _ _ _ _
+  | bitNotProjected contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible

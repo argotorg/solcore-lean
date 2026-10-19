@@ -107,7 +107,7 @@ include provenance prefixContext receiver wellFormed metadata rows complete sign
 private def support_mixed
     (choice : Choice code («stages» := stages))
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (Syntax support.caller)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (Syntax support.caller)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.NestedBranchingSupport
       headers keys support stages choice.packet := by
@@ -159,7 +159,7 @@ private def support_mixed
 include provenance prefixContext receiver wellFormed metadata rows complete signatureMember sourceOwner zero profile in
 theorem of_actual
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (Syntax support.caller)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (Syntax support.caller)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,

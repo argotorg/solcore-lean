@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderControl
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalControl
+import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 
 /-! Header readiness follows the actual Source item slots, allocations and
 written prefixes. The live tail retains its original state and a concrete
@@ -69,6 +70,9 @@ def ReadyReturn.binding {readiness : Readiness protocol} (bindings : Bindings pr
 inductive ExpressionSlot : ForItemForm → ExpressionId → Prop where
   | initialized {binder id} (mono : binder.scheme.quantified = []) : ExpressionSlot (.letDecl binder (some id)) id
   | discard {id} : ExpressionSlot (.expression id) id
+  | projectedBitNotKey {assignment id}
+      (member : id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections) :
+      ExpressionSlot (.assignBitNot assignment) id
 
 structure StaticSites
     (facts : SourceSemantics.Context → List ForItemForm → Prop)

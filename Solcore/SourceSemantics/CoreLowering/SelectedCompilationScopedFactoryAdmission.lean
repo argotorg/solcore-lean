@@ -51,6 +51,6 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
   exact ⟨terminal, SelectedCompilationPhysicalNamedFormationCollectors.of_branching terminal
     ready diagnostic receiver included certified catalog profile member source.found source.form source.owner
     source.requirements source.coercions source.ordinary source.read source.scan.shape
-    (fun typed => source.scan.syntax header.unique rfl typed) rfl⟩
+    (fun typed => (source.scan.syntax header.unique rfl typed).bareUnary source.bareUnary) rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationScopedFactoryAdmission

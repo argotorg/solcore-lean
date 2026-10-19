@@ -34,7 +34,7 @@ private theorem returned_child {policy : SourceCoreLoops.Policy} {checked : Sour
       rfl
   | initialized read actualForm | returnUnit read actualForm | absent read actualForm
   | assigning read actualForm | assigned read actualForm | projectedAssigned read actualForm | whileLoop read actualForm
-  | bitNotting read actualForm | bitNotted read actualForm
+  | bitNotting read actualForm | bitNotted read actualForm | projectedBitNotted read actualForm
   | discard read actualForm | block read actualForm | conditional read actualForm
   | tailValue read actualForm | valueDiscard read actualForm
   | matching read actualForm | matched read actualForm
@@ -74,7 +74,7 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
         List.map_nil, children, and_self]
   | returning read form | returnUnit read form | absent read form
   | assigning read form | assigned read form | projectedAssigned read form | whileLoop read form
-  | bitNotting read form | bitNotted read form
+  | bitNotting read form | bitNotted read form | projectedBitNotted read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form
   | matching read form | matched read form

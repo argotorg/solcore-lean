@@ -118,7 +118,7 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
           exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_keys_fault projected ready measuredKeys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
@@ -139,7 +139,7 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
           exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_keys_fault projected ready measuredKeys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
@@ -160,7 +160,7 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
           exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_keys_fault projected ready measuredKeys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
@@ -182,7 +182,7 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
           exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_keys_fault projected ready measuredKeys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _

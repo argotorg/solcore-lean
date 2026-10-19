@@ -33,6 +33,8 @@ theorem mapContinuation
   | assign head remaining ih => exact .assign head ih
   | bitNot head remaining ih => exact .bitNot head ih
 
+  | bitNotProjected head remaining ih => exact .bitNotProjected head ih
+
 /-- Error interpretation does not depend on the terminal continuation proof. -/
 theorem ErrorsFor.mapContinuation
     {policy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry}

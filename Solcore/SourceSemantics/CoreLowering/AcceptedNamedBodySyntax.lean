@@ -220,6 +220,22 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
         obtain ⟨child, present, same⟩ := List.mem_map.mp member
         subst key
         exact children child (by simp [Tree.children, present])
+  | projectedBitNotted read form statementType remaining receipt route ih =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | assignBitNot assignment =>
+        refine .bitNotProjected found form receipt.description.binding route receipt.sourceProfile receipt.projected ?_
+          (ih closed (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
+        intro key member
+        rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated] at member
+        obtain ⟨child, present, same⟩ := List.mem_map.mp member
+        subst key
+        exact children child (by simp [Tree.children, present])
+
   | bitNotted read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, tail⟩ := head_tail typed
@@ -472,7 +488,7 @@ theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all
-  | assigning read original _ _ _ | assigned read original _ _ _ _ | projectedAssigned read original _ _ _ _ | bitNotting read original _ _ _ | bitNotted read original _ _ _ _ | whileLoop read original _ _ _ _ _ _
+  | assigning read original _ _ _ | assigned read original _ _ _ _ | projectedAssigned read original _ _ _ _ | bitNotting read original _ _ _ | bitNotted read original _ _ _ _ | projectedBitNotted read original _ _ _ _ | whileLoop read original _ _ _ _ _ _
       | discard read original _ _ _ _ | valueDiscard read original _ _ _ _ _ | tailValue read original _ _ _ _ | block read original _ _ | conditional read original _ _ _ _ _ _ =>
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same

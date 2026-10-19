@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPlaceLowering
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
@@ -80,7 +81,7 @@ theorem collected
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         lowered.expression nativeType definitions → certificates context scope id lowered)
     {context : SourceSemantics.Context} {items : List ForItemForm}
-    (syntaxTree : GenericForHeader.Syntax source expressionSyntax context items)
+    (syntaxTree : GenericForHeader.PreparedSyntax source expressionSyntax context items)
     (shape : ItemShape items)
     {faults : FunctionCalls.FaultRep}
     (fields : Dynamic.RuntimeContextFields initial context)
@@ -97,6 +98,8 @@ theorem collected
       faults (.invalidUnaryOperand .bitNot) (invalidUnary parentSite assignment.target.root))
     (origins : ∀ {assignment operator rhs}, .assignValue assignment operator rhs ∈ items →
       AssignmentDiagnosticOrigins.Occurs source parentSite assignment operator rhs)
+    (unaryOrigins : ∀ {assignment}, .assignBitNot assignment ∈ items →
+      GenericAssignmentUnaryDiagnostics.UnaryOccurs source parentSite assignment)
     (accepted : SourceCoreLoops.lowerForItems policy parentSite fuel view scope items type reasonAt
       (fun _ => pure (LocalLoop.fallthrough type)) = .ok code)
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
@@ -130,6 +133,7 @@ theorem collected
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
         (fun member => origins (List.mem_cons_of_mem _ member))
+        (fun member => unaryOrigins (List.mem_cons_of_mem _ member))
         generated (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
       rw [← identical]
       refine ⟨.uninitialized mono extended ordinary (binder_projected (binderPolicy scope binder mono ▸ projected))
@@ -172,6 +176,7 @@ theorem collected
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
         (fun member => origins (List.mem_cons_of_mem _ member))
+        (fun member => unaryOrigins (List.mem_cons_of_mem _ member))
         generatedBody (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
       rw [← identical]
       refine ⟨.initialized mono extended ordinary initializerFound sourceType value originalAllocation originalAnnotation
@@ -197,7 +202,8 @@ theorem collected
         (fun child member => reached child (by simp [ForItemForm.references, member]))
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
-        (fun member => origins (List.mem_cons_of_mem _ member)) generatedBody tailTyped
+        (fun member => origins (List.mem_cons_of_mem _ member))
+        (fun member => unaryOrigins (List.mem_cons_of_mem _ member)) generatedBody tailTyped
       refine ⟨.discard found
         ⟨expressionNode, found, typed, children context fields declarations syntaxValue accessible found typed generated childTyped⟩
         tail, ?_⟩
@@ -244,7 +250,8 @@ theorem collected
         (fun child member => reached child (by simp [ForItemForm.references, member]))
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
-        (fun member => origins (List.mem_cons_of_mem _ member)) generatedBody
+        (fun member => origins (List.mem_cons_of_mem _ member))
+        (fun member => unaryOrigins (List.mem_cons_of_mem _ member)) generatedBody
         (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))
       refine ⟨.assign originalHead tail, ?_⟩
       intro registry
@@ -252,7 +259,7 @@ theorem collected
         (CallableIndexedOwnedPreparedBranchingCatalogSites.assignment_site
           (origins List.mem_cons_self) sourceSignatures preparedAt (sameToken.symm ▸ operands List.mem_cons_self sourceProfile) registry)
   | @bitNot context assignment rest writable bare profile remaining ih =>
-    obtain ⟨rawWord, _, restShape⟩ := shape.bitNot_tail
+    obtain ⟨rawWord, _, restShape⟩ := shape.bitNot_tail bare
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -266,9 +273,48 @@ theorem collected
         (fun child member => reached child (by simp only [List.flatMap_cons]; exact List.mem_append_right _ member))
         (fun member => operands (List.mem_cons_of_mem _ member))
         (fun member => unary (List.mem_cons_of_mem _ member))
-        (fun member => origins (List.mem_cons_of_mem _ member)) generatedBody
+        (fun member => origins (List.mem_cons_of_mem _ member))
+        (fun member => unaryOrigins (List.mem_cons_of_mem _ member)) generatedBody
         (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped))
       refine ⟨.bitNot head tail, fun registry => .bitNot (tailSites registry) ?_⟩
       simpa only [CompatibleBitNotStatements.Head.Errors, token] using unary List.mem_cons_self rawWord
+
+  | @bitNotProjected context assignment rest sourceTyped writable projected profile childSyntax remaining ih =>
+    obtain ⟨_rawWord, restShape⟩ := shape.unary_tail
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerForItems, unaryPolicy] at accepted
+      obtain ⟨body, generatedBody, compiled⟩ := bind_ok accepted
+      have accessible : ∀ child ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+          Reaches source roots (.expression child) := by
+        intro child member
+        exact reached _ (by
+          simp only [List.flatMap_cons, ForItemForm.references]
+          exact List.mem_append_left _ (CallableLambdaViewPlaceLowering.key_reference member))
+      have compiledOriginal := (CallableLambdaViewPlaceLowering.lower
+        (expression := policy.lowerExpression) (fuel := fuel) edited.metadata
+        (fun child member => expression_lookup edited avoids (accessible child member))).trans compiled
+      obtain ⟨head, emitted, _sameToken, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable projected profile
+          (certificate := TypedCertificate source certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨approved, node, found, typed⟩ := childSyntax child member
+            obtain ⟨_, native⟩ := raw
+            exact ⟨node, found, node, found, typed,
+              children context fields declarations approved (accessible child member) found typed generated native⟩)
+          compiledOriginal nativeTyped
+      rw [emitted]
+      obtain ⟨tail, tailSites⟩ := ih restShape fields closed residual sourceSignatures declarations
+        (fun child member => reached child (List.mem_append_right _ member))
+        (fun member => operands (List.mem_cons_of_mem _ member))
+        (fun member => unary (List.mem_cons_of_mem _ member))
+        (fun member => origins (List.mem_cons_of_mem _ member))
+        (fun member => unaryOrigins (List.mem_cons_of_mem _ member)) generatedBody
+        (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped))
+      exact ⟨.bitNotProjected head tail, fun registry =>
+        .bitNotProjected (tailSites registry) (.projected (unaryOrigins List.mem_cons_self)
+          sourceSignatures projected preparedAt)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingHeaderCollectors

@@ -186,7 +186,7 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
   | bitNotting read form statementType remaining assigned ih =>
       have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
       simp only [StatementReady, form] at original
-      exact False.elim (ready.1 original)
+      exact False.elim (ready.1 original.1)
   | assigned read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
@@ -212,6 +212,18 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       · rcases List.mem_cons.mp member with rfl | member
         · exact original.2 _ List.mem_cons_self
         · exact next.2.2 actual member
+  | projectedBitNotted read form statementType remaining receipt route ih =>
+      have found := read_found (readPolicy ▸ read)
+      have original := (profile.at (present _ List.mem_cons_self) found).1
+      simp only [StatementReady, form] at original
+      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_append.mp member with key | member
+      · apply original.2 actual.expression
+        rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated]
+        exact List.mem_map.mpr ⟨actual, key, rfl⟩
+      · exact next.2.2 actual member
   | bitNotted read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       exact ih ready (fun id member => present id (List.mem_cons_of_mem _ member))

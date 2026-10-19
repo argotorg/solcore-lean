@@ -42,6 +42,7 @@ theorem Items.closed_shape {policy : SourceCoreLoops.Policy} {source : TypedSour
   | assigned _ receipt _ ih => exact .assign receipt.sourceProfile receipt.bare (ih closed)
   | projectedAssigned _ receipt _ ih => exact .assignProjected receipt.sourceProfile receipt.projected (ih closed)
   | bitNotted _ receipt _ ih => exact .bitNot receipt.sourceProfile receipt.bare (ih closed)
+  | projectedBitNotted _ receipt _ ih => exact .bitNotProjected receipt.sourceProfile receipt.projected (ih closed)
 
 private theorem arm_shapes {compilation : SourceCoreCompatibleDataMatches.Context}
     {source : TypedSource} {id : StatementId} {scope : SourceCoreLocalCell.Scope} {type : TypeSystem.Ty}
@@ -99,6 +100,8 @@ theorem Tree.formed_shape {policy : SourceCoreLoops.Policy} {checked : SourceCor
     exact .assignProjected (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.projected (ih formed)
   | bitNotted read form _ _ receipt _ ih =>
     exact .bitNot (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.bare (ih formed)
+  | projectedBitNotted read form _ _ receipt _ ih =>
+    exact .bitNotProjected (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.projected (ih formed)
   | discard read form _ _ _ _ ih =>
     exact .discard (original_read (readPolicy ▸ read)) form (.inl rfl) (ih formed)
   | valueDiscard read form _ _ _ _ remaining ih =>

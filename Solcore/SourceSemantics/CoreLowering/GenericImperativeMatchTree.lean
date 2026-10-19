@@ -230,6 +230,268 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) :
       Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
 
+/-! The prepared collector additionally supports projected unary places. -/
+inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId → Prop) :
+    SourceSemantics.Context → Position → TypeSystem.Ty → Prop where
+  | body {context mode statements expected} (syntaxTree : GenericLexicalStatements.Syntax source expressionSyntax context mode statements expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode statements) expected
+  | uninitialized {context nextContext mode id node binder rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder none)
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (remaining : PreparedSyntax source expressionSyntax nextContext (.statements mode rest) expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+  | initialized {context nextContext mode id node binder initializer initializerNode rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some initializer))
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (initializerFound : source.lookupExpression? initializer = some initializerNode)
+      (sourceType : initializerNode.type = binder.scheme.body)
+      (initializerTyped : ExpressionHasType source context initializer initializerNode.type)
+      (initializerSyntax : expressionSyntax initializer)
+      (remaining : PreparedSyntax source expressionSyntax nextContext (.statements mode rest) expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | discard {context mode id node expression expressionNode semicolon rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .expression expression semicolon)
+      (notTail : (!semicolon && mode && rest.isEmpty) = false)
+      (sourceType : node.type = if semicolon then .unit else expressionNode.type)
+      (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (typed : ExpressionHasType source context expression expressionNode.type)
+      (value : expressionSyntax expression)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) : PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | block {context mode id node statements rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (sourceType : node.type = .unit)
+      (inner : PreparedSyntax source expressionSyntax context (.statements false statements) expected)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) : PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | ifThen {context mode id node condition conditionNode thenBody elseBody rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+      (sourceType : node.type = .unit ∨ node.type = expected)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (thenSyntax : PreparedSyntax source expressionSyntax context (.statements false thenBody) expected)
+      (elseSyntax : PreparedSyntax source expressionSyntax context (.statements false (elseBody.getD [])) expected)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) : PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+  | breaking {context mode id node rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | continuing {context mode id node rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | whileLoop {context mode id node condition conditionNode statements rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (loopBody : PreparedSyntax source expressionSyntax context (.statements false statements) expected)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) : PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+  | assign {context mode id node assignment operator rhs rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+      (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+        expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) : PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+
+  | forLoop {context mode id node initializer condition post statements rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post statements)
+      (sourceType : node.type = .unit)
+      (initial : PreparedSyntax source expressionSyntax context (.initializers initializer condition post statements) expected)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) : PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | initializersDone {context condition conditionNode post statements expected}
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (loopBody : PreparedSyntax source expressionSyntax context (.statements false statements) expected)
+      (postSyntax : GenericForHeader.PreparedSyntax source expressionSyntax context post) :
+      PreparedSyntax source expressionSyntax context (.initializers [] condition post statements) expected
+  | initializerUninitialized {context nextContext binder rest condition post statements expected}
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (remaining : PreparedSyntax source expressionSyntax nextContext (.initializers rest condition post statements) expected) : PreparedSyntax source expressionSyntax context (.initializers (.letDecl binder none :: rest) condition post statements) expected
+  | initializerInitialized {context nextContext binder initializer initializerNode rest condition post statements expected}
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (initializerFound : source.lookupExpression? initializer = some initializerNode)
+      (sourceType : initializerNode.type = binder.scheme.body)
+      (initializerTyped : ExpressionHasType source context initializer initializerNode.type)
+      (initializerSyntax : expressionSyntax initializer)
+      (remaining : PreparedSyntax source expressionSyntax nextContext (.initializers rest condition post statements) expected) : PreparedSyntax source expressionSyntax context (.initializers (.letDecl binder (some initializer) :: rest) condition post statements) expected
+  | initializerDiscard {context expression expressionNode rest condition post statements expected}
+      (found : source.lookupExpression? expression = some expressionNode)
+      (typed : ExpressionHasType source context expression expressionNode.type)
+      (syntaxTree : expressionSyntax expression)
+      (remaining : PreparedSyntax source expressionSyntax context (.initializers rest condition post statements) expected) : PreparedSyntax source expressionSyntax context (.initializers (.expression expression :: rest) condition post statements) expected
+  | initializerAssign {context assignment operator rhs rest condition post statements expected}
+      (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+        expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
+      (remaining : PreparedSyntax source expressionSyntax context (.initializers rest condition post statements) expected) : PreparedSyntax source expressionSyntax context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected
+  | bitNot {context mode id node assignment rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (bare : assignment.target.projections = [])
+      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | bitNotProjected {context mode id node assignment rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (projected : assignment.target.projections ≠ [])
+      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+        expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | initializerBitNot {context assignment rest condition post statements expected}
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (bare : assignment.target.projections = [])
+      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (remaining : PreparedSyntax source expressionSyntax context (.initializers rest condition post statements) expected) :
+      PreparedSyntax source expressionSyntax context (.initializers (.assignBitNot assignment :: rest) condition post statements) expected
+
+  | initializerBitNotProjected {context assignment rest condition post statements expected}
+      (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (projected : assignment.target.projections ≠ [])
+      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+        expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
+      (remaining : PreparedSyntax source expressionSyntax context (.initializers rest condition post statements) expected) :
+      PreparedSyntax source expressionSyntax context (.initializers (.assignBitNot assignment :: rest) condition post statements) expected
+
+  | matchWith {context mode id node resolution scrutineeNode rest expected control caseFacts}
+      (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+      (sourceType : node.type = .unit ∨ node.type = expected)
+      (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
+      (scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type)
+      (scrutineeSyntax : expressionSyntax resolution.scrutinee)
+      (casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts)
+      (defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts)
+      (hiddenOrdinary : source.inputs.any (fun input => decide (input.id = resolution.hiddenScrutinee)) = false)
+      (armsOrdinary : ∀ arm ∈ resolution.cases, ∀ binder ∈ arm.pattern.binderIds,
+        source.inputs.any (fun input => decide (input.id = binder)) = false)
+      (children : ∀ request childContext,
+        GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        PreparedSyntax source expressionSyntax childContext (.statements false request.statements) expected)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+  | terminalBlock {context mode id node statements rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (sourceType : node.type = expected)
+      (inner : PreparedSyntax source expressionSyntax context (.statements false statements) expected)
+      (stops : GenericLexicalStatements.Stopped source statements) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | terminalIf {context mode id node condition conditionNode thenBody elseBody rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (sourceType : node.type = expected)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (thenSyntax : PreparedSyntax source expressionSyntax context (.statements false thenBody) expected)
+      (elseSyntax : PreparedSyntax source expressionSyntax context (.statements false elseBody) expected)
+      (thenStops : GenericLexicalStatements.Stopped source thenBody)
+      (elseStops : GenericLexicalStatements.Stopped source elseBody) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+  | terminalMatch {context mode id node resolution scrutineeNode rest expected control caseFacts}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+      (sourceType : node.type = .unit ∨ node.type = expected)
+      (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
+      (scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type)
+      (scrutineeSyntax : expressionSyntax resolution.scrutinee)
+      (casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts)
+      (defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts)
+      (hiddenOrdinary : source.inputs.any (fun input => decide (input.id = resolution.hiddenScrutinee)) = false)
+      (armsOrdinary : ∀ arm ∈ resolution.cases, ∀ binder ∈ arm.pattern.binderIds,
+        source.inputs.any (fun input => decide (input.id = binder)) = false)
+      (children : ∀ request childContext,
+        GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        PreparedSyntax source expressionSyntax childContext (.statements false request.statements) expected)
+      (stops : ReachableMatchContinuations.DefaultStopped source id resolution) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+
+  /-- Ordinary scoped control erases its inner value. The retained source
+  annotation may therefore be non-Unit even when execution falls through. -/
+  | scopedBlock {context mode id node statements rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (inner : PreparedSyntax source expressionSyntax context (.statements false statements) expected)
+      (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) :
+      PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+theorem Syntax.prepared {source : TypedSource} {expressionSyntax : ExpressionId → Prop}
+    {context : SourceSemantics.Context} {position : Position} {expected : TypeSystem.Ty}
+    (tree : Syntax source expressionSyntax context position expected) : PreparedSyntax source expressionSyntax context position expected := by
+  induction tree
+  case body => apply PreparedSyntax.body <;> assumption
+  case uninitialized => apply PreparedSyntax.uninitialized <;> assumption
+  case initialized => apply PreparedSyntax.initialized <;> assumption
+  case discard => apply PreparedSyntax.discard <;> assumption
+  case block => apply PreparedSyntax.block <;> assumption
+  case ifThen => apply PreparedSyntax.ifThen <;> assumption
+  case breaking => apply PreparedSyntax.breaking <;> assumption
+  case continuing => apply PreparedSyntax.continuing <;> assumption
+  case whileLoop => apply PreparedSyntax.whileLoop <;> assumption
+  case assign => apply PreparedSyntax.assign <;> assumption
+  case forLoop => apply PreparedSyntax.forLoop <;> assumption
+  case initializersDone => apply PreparedSyntax.initializersDone <;> first | assumption | exact GenericForHeader.Syntax.prepared (by assumption)
+  case initializerUninitialized => apply PreparedSyntax.initializerUninitialized <;> assumption
+  case initializerInitialized => apply PreparedSyntax.initializerInitialized <;> assumption
+  case initializerDiscard => apply PreparedSyntax.initializerDiscard <;> assumption
+  case initializerAssign => apply PreparedSyntax.initializerAssign <;> assumption
+  case bitNot => apply PreparedSyntax.bitNot <;> assumption
+  case initializerBitNot => apply PreparedSyntax.initializerBitNot <;> assumption
+  case matchWith => apply PreparedSyntax.matchWith <;> assumption
+  case terminalBlock => apply PreparedSyntax.terminalBlock <;> assumption
+  case terminalIf => apply PreparedSyntax.terminalIf <;> assumption
+  case terminalMatch => apply PreparedSyntax.terminalMatch <;> assumption
+  case scopedBlock => apply PreparedSyntax.scopedBlock <;> assumption
+
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
     (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
     (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
@@ -339,6 +601,15 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
         context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type))
 
 
+  | bitNotProjected {context scope mode id node assignment rest expected type body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment)
+      (remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode rest) expected type body) :
+      Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type))
+
+
   | forLoop {context scope mode id node initializer condition post statements rest expected type initialCode body}
       (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post statements)
       (initial : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode)
@@ -399,6 +670,13 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
 
   | initializerBitNot {context scope assignment rest body condition post statements expected type}
       (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body) :
+      Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.assignBitNot assignment :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type))
+
+  | initializerBitNotProjected {context scope assignment rest body condition post statements expected type}
+      (head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment)
       (remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.initializers rest condition post statements) expected type body) :
       Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative

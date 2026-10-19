@@ -14,6 +14,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some node)
     (form : node.form = .assignBitNot assignment)
+    (bare : assignment.target.projections = [])
     (trace : Size.StatementsIn program registry mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
     (∃ reason, size = Size.stepSize [] ∧ finalContext = context ∧
@@ -37,6 +38,12 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotBareFault actual same _ failed =>
       cases (shape actual).symm.trans same
       exact .inl ⟨_, rfl, rfl, rfl, rfl, failed⟩
+  | bitNotProjected actual same projected _ _ _ _
+  | bitNotProjectedRootFault actual same projected _
+  | bitNotProjectedKeysFault actual same projected _ _
+  | bitNotProjectedGetterFault actual same projected _ _ =>
+      cases (shape actual).symm.trans same
+      exact (projected bare).elim
   | breaking actual same | continuing actual same
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _

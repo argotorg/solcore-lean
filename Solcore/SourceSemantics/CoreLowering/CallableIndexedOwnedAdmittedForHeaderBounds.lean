@@ -84,6 +84,7 @@ theorem preserves_prefix_bounded_for
       Dynamic.EnvironmentAgrees after staticFinal.locals finalEnvironment := by
   obtain ⟨tail, maps, worlds, frame, metadata, related, returned, tailReady, continued⟩ := ProtectedForHeader.Stateful.WithReady.Tree.preserves_prefix_bounded_for_with_return
       (functions := functions) (definitions := definitions) (registered := registered)
+      (extension := extension) (faithful := faithful) (observations := observations)
       (program := program) (evidence := evidence)
       (protocol := callerProtocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
@@ -248,6 +249,7 @@ theorem post_preserves_bounded_for
         contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore,
         callerProtocol.Relates state.retained reached.retained ∧ (readiness bridge).Ready context reached.retained := by
   exact ProtectedForHeader.Stateful.WithReady.post_preserves_bounded_for (solved := [])
+    (extension := extension) (faithful := faithful) (observations := observations)
       (functions := functions) (definitions := definitions) (registered := registered)
       (program := program) (evidence := evidence)
       (protocol := callerProtocol) (guard := condition) (producer := producer) (acquire := acquire)

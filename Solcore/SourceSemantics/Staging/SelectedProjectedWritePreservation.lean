@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.SelectedBareWritePreservation
+import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTarget
 
 /-! Actual typed key values determine the saved projection path. Its getter
@@ -155,5 +155,30 @@ theorem projected_write_compound {context : Context} {before middle after : Heap
         exact updatedTyped
       exact ⟨rhs.heap_typed.write currentRead (.some updatedCell) heapWrite,
         rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
+
+/-- Unary assignment writes at the actual getter heap without an RHS phase. -/
+theorem projected_write_bitNot {context : Context} {before after : Heap}
+    {target : ResolvedPlace} {root : Ty} {updated : Dynamic.Value}
+    (targetTyped : ResolvedPlaceHasType context before target root .word)
+    (heap : HeapWellTyped context before)
+    (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+      before target updated after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after := by
+  cases write with
+  | intro currentRead rootEq initialValue update heapWrite =>
+      rename_i currentCell initial
+      have initialTyped := initialValue.preserves (heap _ currentRead.member)
+      have initialRoot : OptionalValueHasType context before initial root := by
+        rw [← targetTyped.root_type, ← rootEq]
+        exact initialTyped
+      have modification : LeafModificationPreservesType context before
+          (fun _ replacement => BitNotSnapshot target.selected replacement) .word := by
+        intro current replacement _ applies
+        exact applies.preserves targetTyped.selected
+      have updatedTyped := update.preserves targetTyped.projections initialRoot modification
+      have updatedCell : ValueHasType context before updated currentCell.type := by
+        rw [rootEq, targetTyped.root_type]
+        exact updatedTyped
+      exact ⟨heap.write currentRead (.some updatedCell) heapWrite, HeapTypesExtend.of_write heapWrite⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation

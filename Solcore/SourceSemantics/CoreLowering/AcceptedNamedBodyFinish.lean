@@ -104,7 +104,7 @@ theorem Tree.complete_of_formed {policy : SourceCoreLoops.Policy}
     have next := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form] at next
     exact ih formed next
-  | bitNotted read form _ _ _ _ ih =>
+  | bitNotted read form _ _ _ _ ih | projectedBitNotted read form _ _ _ _ ih =>
     have next := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form] at next
     exact ih formed next

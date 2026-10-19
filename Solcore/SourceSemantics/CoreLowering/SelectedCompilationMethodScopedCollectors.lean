@@ -104,7 +104,7 @@ theorem collected
         (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
-    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source expressionSyntax
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType)
     (children : ∀ context, Dynamic.RuntimeContextFields packet.sourceAt.context context →
       ∀ {scope fuel id node lowered},
@@ -167,7 +167,7 @@ theorem of_compiler
       assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
         (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
-    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source expressionSyntax
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType)
     (children : ∀ child, stages.Closure principal.sourceFunction child →
       ∀ context, Dynamic.RuntimeContextFields packet.sourceAt.context context →

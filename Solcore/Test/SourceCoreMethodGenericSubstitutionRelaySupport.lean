@@ -62,7 +62,7 @@ theorem ActualHeader.scoped_receipt {fixture : CompiledFixture}
   apply CallableIndexedOwnedPreparedNamedPhysicalMixedScopedCollectors.of_actual_generic actual.prepared actual.aligned
     fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed
     (fun _ impossible => False.elim impossible) _ rows
-    (fun _ impossible => False.elim impossible) checked _ methods entryMember receipt stagePrepared syntaxTree
+    (fun _ impossible => False.elim impossible) checked _ methods entryMember receipt stagePrepared syntaxTree.prepared
   · rw [actual.source]
     exact shape.metadata nodes actual.prepared.named noLocals
   · rw [fixture.sameProgram]

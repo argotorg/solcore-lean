@@ -107,7 +107,7 @@ theorem collected_of_imperative
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
-    (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax header.function.source expressionSyntax
       header.context (.statements true header.function.body) header.function.resultType)
     (children : ∀ context, Dynamic.RuntimeContextFields header.context context →
       ∀ {scope fuel id node lowered},

@@ -33,7 +33,7 @@ theorem BodyScan.syntax {source : TypedSource} {approved : ExpressionId → Prop
     (scan : BodyScan source approved expected statements) (unique : NodeOccurrencesUnique source)
     {context final : SourceSemantics.Context} {facts : BodyFacts}
     (typed : StatementsHaveType source {returnType := expected} context statements final facts) :
-    GenericImperativeMatch.Syntax source approved context (.statements true statements) expected :=
+    GenericImperativeMatch.PreparedSyntax source approved context (.statements true statements) expected :=
   ScopedSourceBodyAdmission.Scan.syntax scan unique rfl typed
 
 /-- Fuel bounds both the original statement graph and expression traversal. -/

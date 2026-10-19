@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedProjectedBitNotStatements
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderReady
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileReady
@@ -59,7 +60,7 @@ variable (readiness : Readiness protocol)
   (sites : StaticSites facts itemFacts exprFacts assignmentFacts snapshotFacts program evidence source)
   (transfers : AllocationTransfers protocol readiness stateBindings source)
 
-include definitions registered producer acquire stateTransport stateBindings sites transfers in
+include definitions registered producer acquire stateTransport stateBindings sites transfers extension faithful observations in
 theorem Tree.preserves_prefix_bounded_for_with_return
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -221,9 +222,31 @@ theorem Tree.preserves_prefix_bounded_for_with_return
         exact (prefixAgreement body (LocalLoop.controlType type)).trans (by
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
 
+  | @bitNotProjected context scope assignment rest body head remaining ih =>
+    have itemFact := sites.head itemsFacts
+    cases trace with | cons first rest =>
+      cases first with | assignBitNot assigned =>
+        obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, ⟨middleState, middleRelated⟩, prefixAgreement⟩ :=
+          head.preserves_prefix_bounded functions extension program evidence protocol stateTransport readiness faithful observations
+            (fun id member node found => sites.expression itemFact (.projectedBitNotKey member) found)
+            budget (boundedMeaning context valid) environments heaps locals agrees actualTyped state ready assigned
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+        have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
+        have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)
+        obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, tailRelated, ⟨tailReturn⟩, tailReady, agreement⟩ :=
+          ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              middleState gate middleReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+        refine ⟨tail, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
+          protocol.trans middleRelated tailRelated, ⟨tailReturn⟩, tailReady, ?_⟩
+        exact (prefixAgreement body (LocalLoop.controlType type)).trans (by
+          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
+
 end WithReady
 
-include definitions registered producer acquire stateTransport stateBindings in
+include definitions registered producer acquire stateTransport stateBindings extension faithful observations in
 theorem Tree.preserves_prefix_bounded_for_with_return
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -261,6 +284,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return
   obtain ⟨tail, maps, worlds, frame, metadata, related, ⟨returnTo⟩, _ready, agreement⟩ :=
     WithReady.Tree.preserves_prefix_bounded_for_with_return (solved := solved)
       (functions := functions) (definitions := definitions) (registered := registered)
+      (extension := extension) (faithful := faithful) (observations := observations)
       (program := program) (evidence := evidence)
       (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
@@ -277,7 +301,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return
       tree valid True.intro environments heaps locals agrees actualTyped reference read unmapped state gate True.intro trace bounded
   exact ⟨tail, maps, worlds, frame, metadata, related, ⟨returnTo.toReturnTo⟩, agreement⟩
 
-include definitions registered producer acquire stateTransport stateBindings in
+include definitions registered producer acquire stateTransport stateBindings extension faithful observations in
 theorem Tree.preserves_prefix_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -314,6 +338,7 @@ theorem Tree.preserves_prefix_bounded_for
   obtain ⟨tail, maps, worlds, preservation, metadata, related, _returnTo, agreement⟩ :=
     Tree.preserves_prefix_bounded_for_with_return
       (functions := functions) (definitions := definitions) (registered := registered)
+      (extension := extension) (faithful := faithful) (observations := observations)
       (program := program) (evidence := evidence)
       (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
@@ -383,6 +408,7 @@ theorem Tree.preserves_prefix_bounded_for
   obtain ⟨tail, maps, worlds, preservation, metadata, _related, agreement⟩ :=
     Stateful.Tree.preserves_prefix_bounded_for
       (functions := functions) (definitions := definitions) (registered := registered)
+      (extension := extension) (faithful := faithful) (observations := observations)
       (program := program) (evidence := evidence)
       (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (condition := fun _ _ => True)
       (producer := legacyProducer functions transport bindings)

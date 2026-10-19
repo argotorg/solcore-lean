@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementHead
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticPolicy
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeMeaning
@@ -58,6 +59,74 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (remaining : Syntax source expressionSyntax context rest) : Syntax source expressionSyntax context (.assignBitNot assignment :: rest)
 
 
+/-! The prepared collector additionally supports projected unary places. -/
+inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId → Prop) : SourceSemantics.Context → List ForItemForm → Prop where
+  | nil {context} : PreparedSyntax source expressionSyntax context []
+  | uninitialized {context nextContext binder rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (remaining : PreparedSyntax source expressionSyntax nextContext rest) : PreparedSyntax source expressionSyntax context (.letDecl binder none :: rest)
+  | initialized {context nextContext binder initializer initializerNode rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (initializerFound : source.lookupExpression? initializer = some initializerNode)
+      (sourceType : initializerNode.type = binder.scheme.body)
+      (initializerTyped : ExpressionHasType source context initializer initializerNode.type)
+      (initializerSyntax : expressionSyntax initializer)
+      (remaining : PreparedSyntax source expressionSyntax nextContext rest) : PreparedSyntax source expressionSyntax context (.letDecl binder (some initializer) :: rest)
+  | discard {context expression expressionNode rest}
+      (found : source.lookupExpression? expression = some expressionNode)
+      (typed : ExpressionHasType source context expression expressionNode.type)
+      (syntaxTree : expressionSyntax expression)
+      (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.expression expression :: rest)
+  | assign {context assignment operator rhs rest}
+      (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+        expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
+      (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.assignValue assignment operator rhs :: rest)
+  | bitNot {context assignment rest}
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (bare : assignment.target.projections = [])
+      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.assignBitNot assignment :: rest)
+
+
+  | bitNotProjected {context assignment rest}
+      (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+      (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+        WritableLocal context assignment.target.root binder.scheme.body)
+      (projected : assignment.target.projections ≠ [])
+      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+        expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
+      (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.assignBitNot assignment :: rest)
+
+
+theorem Syntax.prepared {source : TypedSource} {expressionSyntax : ExpressionId → Prop}
+    {context : SourceSemantics.Context} {items : List ForItemForm}
+    (tree : Syntax source expressionSyntax context items) : PreparedSyntax source expressionSyntax context items := by
+  induction tree
+  case nil => apply PreparedSyntax.nil <;> assumption
+  case uninitialized => apply PreparedSyntax.uninitialized <;> assumption
+  case initialized => apply PreparedSyntax.initialized <;> assumption
+  case discard => apply PreparedSyntax.discard <;> assumption
+  case assign => apply PreparedSyntax.assign <;> assumption
+  case bitNot => apply PreparedSyntax.bitNot <;> assumption
+
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
     (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
     (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
@@ -114,6 +183,13 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
 
   | bitNot {context scope assignment rest body}
       (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        context scope rest body) :
+      Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        context scope (.assignBitNot assignment :: rest) (head.emit body (LocalLoop.controlType type))
+
+  | bitNotProjected {context scope assignment rest body}
+      (head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment)
       (remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
         context scope rest body) :
       Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation

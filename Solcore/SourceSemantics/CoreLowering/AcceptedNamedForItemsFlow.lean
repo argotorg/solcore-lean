@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedBareBitNotReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedBitNotReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentRoute
 
@@ -85,6 +86,15 @@ def BitNotAssignable (source : TypedSource) (assignment : AssignmentResolution) 
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       binder.scheme.body = assignment.target.type
 
+/-- Mapping routes retain the declared root and the actual raw Word leaf. -/
+def ProjectedBitNotAssignable (source : TypedSource) (assignment : AssignmentResolution) : Prop :=
+  assignment.target.type = .word ∧ assignment.target.projections ≠ [] ∧
+    ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+      AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type
+
+def UnaryAssignable (source : TypedSource) (assignment : AssignmentResolution) : Prop :=
+  BitNotAssignable source assignment ∨ ProjectedBitNotAssignable source assignment
+
 /-- Every current header form has a raw compiler receipt. Target eligibility
 is checked separately when that receipt is refined. -/
 def HeaderForms (_items : List ForItemForm) : Prop := True
@@ -144,6 +154,13 @@ inductive Items (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (receipt : AcceptedBareBitNotReceipt.Receipt policy fuel source scope site assignment
         (LocalLoop.controlType result) tail reasonAt code)
       (targetType : receipt.binder.scheme.body = assignment.target.type) :
+      Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignBitNot assignment :: rest) code
+  | projectedBitNotted {fuel scope assignment rest tail code}
+      (remaining : Items policy source site result reasonAt next finalScope finish fuel scope rest tail)
+      (receipt : AcceptedProjectedBitNotReceipt.Receipt policy fuel source scope site assignment
+        (LocalLoop.controlType result) tail reasonAt code)
+      (route : AcceptedProjectedAssignmentRoute.Route source receipt.binder.scheme.body
+        assignment.target.projections assignment.target.type) :
       Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignBitNot assignment :: rest) code
 
 namespace Items
@@ -229,18 +246,20 @@ theorem accepted (tree : Items policy source site result reasonAt next finalScop
   | bitNotting _ accepted _ => exact accepted
   | bitNotted remaining receipt targetType ih =>
     simpa only [SourceCoreLoops.lowerForItems, receipt.selected, ih, bind, Except.bind] using receipt.accepted
+  | projectedBitNotted remaining receipt route ih =>
+    simpa only [SourceCoreLoops.lowerForItems, receipt.callbackSelected, ih, bind, Except.bind] using receipt.accepted
 
 theorem finish_accepted (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) :
     next finalScope = .ok finish := by
   induction tree with
   | nil same accepted => exact same ▸ accepted
   | absent _ _ _ ih | initialized _ _ _ _ _ _ ih | discard _ _ _ ih
-      | assigning _ _ ih | assigned _ _ _ ih | projectedAssigned _ _ _ ih | bitNotting _ _ ih | bitNotted _ _ _ ih => exact ih
+      | assigning _ _ ih | assigned _ _ _ ih | projectedAssigned _ _ _ ih | bitNotting _ _ ih | bitNotted _ _ _ ih | projectedBitNotted _ _ _ ih => exact ih
 
 def closed {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : Bool :=
   match tree with
   | .nil .. => true
-  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotted remaining _ _ => remaining.closed
+  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotted remaining _ _ | .projectedBitNotted remaining _ _ => remaining.closed
   | .assigning .. | .bitNotting .. => false
 
 def children {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : List (Child policy source reasonAt) :=
@@ -256,6 +275,8 @@ def children {fuel scope items code} (tree : Items policy source site result rea
   | @Items.projectedAssigned _ _ _ _ _ _ _ _ fuel scope _ _ expression _ _ _ remaining receipt _route =>
       keyChildren fuel scope receipt.place.keys receipt.keys receipt.keysGenerated ++
         (⟨fuel, scope, expression, receipt.child, receipt.generated⟩ :: remaining.children)
+  | @Items.projectedBitNotted _ _ _ _ _ _ _ _ fuel scope _ _ _ _ remaining receipt _route =>
+      keyChildren fuel scope receipt.place.keys receipt.keys receipt.keysGenerated ++ remaining.children
 
 def bindings {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : List (Binding policy source) :=
   match tree with
@@ -264,16 +285,16 @@ def bindings {fuel scope items code} (tree : Items policy source site result rea
       ⟨scope, binder, payload, projected⟩ :: remaining.bindings
   | @Items.initialized _ _ _ _ _ _ _ _ _ scope binder _ payload _ _ _ projected _ _ _ remaining _ =>
       ⟨scope, binder, payload, projected⟩ :: remaining.bindings
-  | .discard _ _ remaining | .assigning remaining _ | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotting remaining _ | .bitNotted remaining _ _ => remaining.bindings
+  | .discard _ _ remaining | .assigning remaining _ | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotting remaining _ | .bitNotted remaining _ _ | .projectedBitNotted remaining _ _ => remaining.bindings
 
 def Ready {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : Prop :=
   match tree with
   | .nil .. => True
-  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotted remaining _ _ => remaining.Ready
+  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotted remaining _ _ | .projectedBitNotted remaining _ _ => remaining.Ready
   | @Items.assigning _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ remaining _ =>
       ¬ ValueAssignable source assignment operator ∧ remaining.Ready
   | @Items.bitNotting _ _ _ _ _ _ _ _ _ _ assignment _ _ _ remaining _ =>
-      ¬ BitNotAssignable source assignment ∧ remaining.Ready
+      ¬ UnaryAssignable source assignment ∧ remaining.Ready
 
 theorem refine {values : SourceCoreCompatibleValues.Context}
     {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
@@ -320,10 +341,18 @@ theorem refine {values : SourceCoreCompatibleValues.Context}
       simp only [SourceCoreLoops.lowerForItems, unary, remaining.accepted, bind, Except.bind] at lowered
       obtain ⟨receipt⟩ := AcceptedBareBitNotReceipt.of_accepted unary profile bare unary lowered
       exact ⟨.bitNotted refined receipt (type receipt.binder receipt.declaration), ready⟩
-    · exact ⟨.bitNotting refined assigned, supported, ready⟩
+    · by_cases projected : ProjectedBitNotAssignable source assignment
+      · have lowered := assigned
+        simp only [SourceCoreLoops.lowerForItems, unary, remaining.accepted, bind, Except.bind] at lowered
+        obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 unary lowered
+        exact ⟨.projectedBitNotted refined receipt (projected.2.2 receipt.binder receipt.description.binding), ready⟩
+      · exact ⟨.bitNotting refined assigned, (fun eligible => eligible.elim supported projected), ready⟩
   | bitNotted remaining receipt targetType ih =>
     obtain ⟨tail, ready⟩ := ih
     exact ⟨.bitNotted tail receipt targetType, ready⟩
+  | projectedBitNotted remaining receipt route ih =>
+    obtain ⟨tail, ready⟩ := ih
+    exact ⟨.projectedBitNotted tail receipt route, ready⟩
 
 end Items
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow

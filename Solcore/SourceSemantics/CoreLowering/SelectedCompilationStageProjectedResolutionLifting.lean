@@ -28,7 +28,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
   {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
   {place : PlaceResolution} {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr}
-  {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty} {administrative : Core.Context}
+  {rhsType : Core.Ty} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty} {administrative : Core.Context}
 
 local notation "model" => CompatibleAmbientHeap.payloadModel values.checked receiving functions
 
@@ -36,7 +36,7 @@ include extension transport faithful observations in
 /-- Ordinary key effects are lifted before the getter and before any RHS. -/
 theorem lifts (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) values invocation.source
-      certificate scope site place prepared codes sourceTypes leaf administrative)
+      certificate scope site place prepared codes sourceTypes leaf administrative rhsType)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (unique : NodeOccurrencesUnique invocation.source)
     {originalTypes : List TypeSystem.Ty}
@@ -67,6 +67,7 @@ theorem lifts (budget : Nat)
       Staging.Recursive.Expressions program stages invocation context environment before
         (Staging.Recursive.ProjectedTarget.keys place.projections) (.values sources) after ∧
       Staging.Recursive.ProjectedTarget.Snapshot environment before after place sources target ∧
+      Dynamic.ValuesHaveTypes context after sources sourceTypes ∧
       ∃ resolution : CompatiblePlaceResolution.Execution values.checked receiving functions prepared
         (CompatibleRenamedPlace.renamedCodes codes ξ) sourceTypes place leaf target actual store mapping world before after,
         ∃ reached : callerProtocol.State ⟨scope, resolution.mapping, resolution.world, after, resolution.store, canonical⟩,
@@ -87,10 +88,10 @@ theorem lifts (budget : Nat)
       | intro lookup read _ _ _ _ => exact .intro lookup read
   | completed =>
       obtain ⟨stagedSize, measured⟩ := Staging.Recursive.Size.Expressions.of_trace keyTrace
-      obtain ⟨resolution, _sameSources, _keyValues, _keyHeap, _lookup, reached, related, admitted⟩ :=
+      obtain ⟨resolution, _sameSources, keyValues, _keyHeap, _lookup, reached, related, admitted⟩ :=
         CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_resolution bridge stagedSize layout ordinary
           extension transport faithful observations environments heaps locals agrees actualTyped initial admitted unique
           keyTyped (fun n _ => preservation n) slot writable measured (Nat.le_refl _) snapshot
-      exact .inr ⟨sources, keyTrace, snapshot, resolution, reached, related, admitted⟩
+      exact .inr ⟨sources, keyTrace, snapshot, keyValues, resolution, reached, related, admitted⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedResolutionLifting

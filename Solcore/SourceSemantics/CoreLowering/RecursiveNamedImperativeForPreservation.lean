@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderLegacyPreservation
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeCatalogPayloadContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeCatalogReady
@@ -441,11 +442,11 @@ theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (uniqu
     have sameContext : loopFinalContext = loopContext := ContextTransport.loop_context loop
     subst loopFinalContext
     obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, agreement⟩ :=
-      ProtectedForHeader.Stateful.Tree.preserves_prefix_bounded_for_with_return (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+      ProtectedForHeader.Stateful.Tree.preserves_prefix_bounded_for_with_return_reachable (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
         (program := program) (evidence := evidence)
         (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
         (stateTransport := stateTransport) (stateBindings := stateBindings)
-        validity extend budget assignments meaning header
+        validity extend budget assignments meaning header errors
         valid environments heaps locals agrees actualTyped reference read unmapped initial guarded initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
       (loopCorrect tail.certificate) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate (.control loop)
@@ -468,11 +469,11 @@ theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (uniqu
         evaluated, .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
     · obtain ⟨initialSize, loopSize, loopContext, loopEnvironment, initialized, initialization, loop, initialSmall, loopSmall⟩ := loopFailure
       obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, agreement⟩ :=
-        ProtectedForHeader.Stateful.Tree.preserves_prefix_bounded_for_with_return (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+        ProtectedForHeader.Stateful.Tree.preserves_prefix_bounded_for_with_return_reachable (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
         (program := program) (evidence := evidence)
         (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
         (stateTransport := stateTransport) (stateBindings := stateBindings)
-        validity extend budget assignments meaning header
+        validity extend budget assignments meaning header errors
           valid environments heaps locals agrees actualTyped reference read unmapped initial guarded initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
         (loopCorrect tail.certificate) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate (.fault loop)
@@ -505,11 +506,11 @@ theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique 
     (by
       intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
         child small mapping world before after store finalContext finalEnvironment state native realRead guarded continued execution
-      exact ProtectedForHeader.Stateful.post_preserves_bounded_for (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+      exact ProtectedForHeader.Stateful.post_preserves_bounded_for_reachable (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
         (program := program) (evidence := evidence)
         (protocol := protocol) (guard := conditionGate) (producer := producer) (acquire := acquire)
         (stateTransport := stateTransport) (stateBindings := stateBindings)
-        validity extend budget assignments meaning postTree
+        validity extend budget assignments meaning postTree postErrors
         actualValid actualAgrees actualReference state realRead guarded continued execution (Nat.le_of_lt small))
     (by
       intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid

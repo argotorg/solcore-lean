@@ -45,7 +45,7 @@ theorem collected
         (choice.invalidUnary site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
-    (syntaxTree : GenericImperativeMatch.Syntax function.source expressionSyntax
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source expressionSyntax
       inputs.context (.statements true function.body) function.resultType)
     (children : ∀ context, Dynamic.RuntimeContextFields inputs.context context →
       ∀ {scope fuel id node lowered},

@@ -41,7 +41,7 @@ include provenance receiver wellFormed original in
 RHS and later reads after a genuine assignment or local allocation. -/
 def support_reads
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (Read function.source)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (Read function.source)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.BranchingSupport
       code support.body.toContext stages choice.packet faults := by
@@ -97,7 +97,7 @@ and all static support together, without selecting a proof as runtime data. -/
 theorem of_reads
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (Read function.source)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (Read function.source)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Packet code stages,

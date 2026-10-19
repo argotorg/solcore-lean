@@ -179,7 +179,7 @@ private theorem factory_packet {fixture : CompiledFixture} (observed : ObservedP
     stagePrepared code support provenance receiver fixture.source_wellFormed
     (fun instantiation accepted => by simpa only [support.compilation, CallableIndexedNamedGeneration.context, CompatibleNamedBody.bodyContext] using accepted)
     metadata rows complete signatureMember (by rw [sameSource]; exact row.sourceOwner)
-    bodyTree tree _ (.anonymous selected)
+    bodyTree tree.prepared _ (.anonymous selected)
 
 def ObservedProgram.family {fixture : CompiledFixture} (observed : ObservedProgram fixture)
     (wordHeader : ActualHeader fixture observed.wordRow.row)

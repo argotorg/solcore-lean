@@ -1,4 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedAssignmentLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedBitNotLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialProjectedBitNotLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialProjectedLifting
 import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalTreeLifting
@@ -348,10 +350,21 @@ theorem lifts_position {budget : Nat}
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
       contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
       finalContext outcome after trace
-    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail found form
+    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail found form head.bare
     have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not unique
       (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
     exact SelectedCompilationStageBitNotLifting.lifts bridge functions transport condition unique found form head assignmentTyped
+      (ih tailShape (ProtectedStateImperativeStatementSuffixTyping.bitNot unique sourceTyped found form) projection)
+      within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
+  | @bitNotProjected context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
+    intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
+      contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
+      finalContext outcome after trace
+    obtain ⟨_rawWord, tailShape⟩ := shape.unary_tail found form
+    have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not unique
+      (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
+    exact SelectedCompilationStageProjectedBitNotLifting.lifts bridge functions faithful observations transport extension condition unique found form head head.projected assignmentTyped
+      (typedChildren context) (typedPreservation context)
       (ih tailShape (ProtectedStateImperativeStatementSuffixTyping.bitNot unique sourceTyped found form) projection)
       within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @forLoop context scope mode id node items test post statements rest expected type initialCode body found form initialTree remaining initialErrors remainingErrors initialIH remainingIH =>
@@ -413,10 +426,17 @@ theorem lifts_position {budget : Nat}
         (ih ⟨tailShape, shape.2⟩ (InitializerTyping.assignment sourceTyped).2 projection) within ready trace
   | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
     intro shape sourceTyped projection
-    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.1.bitNot_tail
+    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.1.bitNot_tail head.bare
     intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
     exact SelectedCompilationStageForInitialLifting.bitNot bridge functions transport condition head
       (InitializerTyping.bitNot sourceTyped).1
+      (ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2 projection) within ready trace
+  | @initializerBitNotProjected context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
+    intro shape sourceTyped projection
+    obtain ⟨_rawWord, tailShape⟩ := shape.1.unary_tail
+    intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
+    exact SelectedCompilationStageForInitialLifting.bitNotProjected bridge functions faithful observations transport extension condition unique head head.projected
+      (InitializerTyping.bitNot sourceTyped).1 (typedChildren context) (typedPreservation context)
       (ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2 projection) within ready trace
 
 include bridge bindings definitions registered producer acquire transport extension faithful observations in

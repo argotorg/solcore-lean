@@ -89,7 +89,7 @@ def ObservedProgram.family {fixture : CompiledFixture} (observed : ObservedProgr
           stagePrepared code support provenance prefixContext receiver fixture.source_wellFormed metadata
           rows complete signatureMember sourceOwner
           (bootstrap_zero fixture.recipe.compiled)
-          observed.profile shape tree _ (.anonymous selected)
+          observed.profile shape tree.prepared _ (.anonymous selected)
       exact ⟨⟨.nestedBranching packet, nested⟩⟩
   | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
     exact False.elim (fixture.no_principal support.principal)

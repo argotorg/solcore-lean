@@ -103,6 +103,12 @@ theorem Tree.fallthrough_at {context : SourceSemantics.Context} {scope : Scope}
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
+  | @bitNotProjected context scope mode id node assignment rest expected type body found form head remaining ih =>
+    intro program actualContext finalContext evidence environment nextEnvironment before after executed
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
+    · exact ih tail
+    · cases terminal
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialIH restIH =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
     rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
@@ -136,7 +142,7 @@ theorem Tree.fallthrough_at {context : SourceSemantics.Context} {scope : Scope}
     · cases ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops head
     · cases terminal
 
-  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot =>
+  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot | initializerBitNotProjected =>
     trivial
 
 theorem Tree.true_fallthrough_unit {context : SourceSemantics.Context} {scope : Scope}

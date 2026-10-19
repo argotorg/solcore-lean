@@ -89,6 +89,49 @@ theorem for_items_step (size : Nat)
           | expression expressionTyped =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
               exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+  | @projectedBitNot keysSize nextSize scope context finalContext environment before targetHeap written after assignment values target updated rest outcome
+      _projected keys snapshot write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignBitNot assignmentTyped =>
+              cases assignmentTyped with
+              | intro targetTyped _ =>
+                  obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+                  have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                    runtime covers locals heap keyTyped keys
+                  obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
+                    locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot savedTyped keyPost.heap_typed write
+                  have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                    (locals.mono totalExtends) writtenTyped tailTyped next
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+  | projectedBitNotRootFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
+  | @projectedBitNotKeysFault keysSize scope context environment before after assignment rest failure
+      _projected _ready keys =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignBitNot assignmentTyped =>
+              cases assignmentTyped with
+              | intro targetTyped _ =>
+                  obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+                  have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                    runtime covers locals heap keyTyped keys
+                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
+  | @projectedBitNotGetterFault keysSize scope context environment before after assignment values rest reason
+      _projected keys _failed =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignBitNot assignmentTyped =>
+              cases assignmentTyped with
+              | intro targetTyped _ =>
+                  obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+                  have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                    runtime covers locals heap keyTyped keys
+                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
   | @projectedAssignment keysSize childSize nextSize scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome
       _projected keys snapshot child write next =>
       cases typed with

@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsProjectedAssignmentLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsProjectedBitNotLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsLexicalLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsDiscardLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsAssignmentLifting
@@ -122,9 +123,29 @@ theorem lifts {budget : Nat}
         (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2) within
   | @bitNot context scope assignment rest body head tail ih =>
     intro shape sourceTyped
-    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail
+    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail head.bare
     exact SelectedCompilationStageForItemsBitNotLifting.lifts bridge functions transport condition
       head (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
       (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2)
+
+  | @bitNotProjected context scope assignment rest body head tail ih =>
+    intro shape sourceTyped
+    obtain ⟨_rawWord, tailShape⟩ := shape.unary_tail
+    have typedChildren (size : Nat) (smaller : size < budget) :
+        LiftsAt bridge context model stages invocation (TypedCertificate invocation.source certificates context) size := by
+      intro scope id lowered generated node found typed
+      obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
+      exact children context size smaller certified found typed
+    have typedPreservation (size : Nat) :
+        CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesAt bridge context model stages invocation
+          (TypedCertificate invocation.source certificates context) faults size := by
+      intro scope id lowered generated node found typed
+      obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
+      exact preservation context size certified found typed
+    intro size within
+    exact SelectedCompilationStageForItemsProjectedBitNotLifting.lifts bridge functions faithful observations transport extension condition
+      unique head head.projected (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
+      typedChildren typedPreservation
+      (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2) within
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForHeaderLifting

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericForHeaderCertificates
 import Solcore.SourceSemantics.CoreLowering.TypedForHeaderPost
 
@@ -140,6 +141,21 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
+            environments heaps locals agrees actualTyped assigned
+        obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, agreement⟩ :=
+          ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 rest
+        refine ⟨tail, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata, ?_⟩
+        exact (prefixAgreement body (LocalLoop.controlType type)).trans (by
+          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
+
+  | @bitNotProjected context scope assignment rest body head remaining ih =>
+    cases trace with | cons first rest =>
+      cases first with | assignBitNot assigned =>
+        obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
+          head.preserves_prefix functions extension program evidence (meaning _ valid) faithful observations
             environments heaps locals agrees actualTyped assigned
         obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, agreement⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)

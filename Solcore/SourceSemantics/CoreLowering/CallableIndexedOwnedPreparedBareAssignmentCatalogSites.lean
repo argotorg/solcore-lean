@@ -77,12 +77,12 @@ theorem sites
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no
   | whileLoop found form _ _ _ _ _ _ _ _ | forLoop found form _ _ _ _
-  | bitNot found form _ _ _ | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _ _ _
+  | bitNot found form _ _ _ | bitNotProjected found form _ _ _ | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _ _ _
   | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     cases atStatements
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no
   | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard
-  | initializerAssign | initializerBitNot => cases atStatements
+  | initializerAssign | initializerBitNot | initializerBitNotProjected => cases atStatements
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBareAssignmentCatalogSites

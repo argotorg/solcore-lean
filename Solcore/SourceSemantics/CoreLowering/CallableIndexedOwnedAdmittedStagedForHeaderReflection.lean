@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedBitNotReflection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedAssignmentReflection
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
@@ -332,7 +333,7 @@ theorem reflects_at {budget : Nat}
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @bitNot context scope assignment rest body head remaining tailSites headErrors ih =>
-      obtain ⟨_profile, bare, tailShape⟩ := shape.bitNot_tail
+      obtain ⟨_profile, bare, tailShape⟩ := shape.bitNot_tail head.bare
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
       have result := CallableIndexedOwnedAdmittedStagedBareBitNotHeads.reflects_bounded (compiled := compiled) (values := .initial compiled.compatible.checked)
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
@@ -361,5 +362,49 @@ theorem reflects_at {budget : Nat}
             .bitNot snapshot write trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
+
+  | @bitNotProjected context scope assignment rest body head remaining tailSites headErrors ih =>
+      obtain ⟨_profile, tailShape⟩ := shape.unary_tail
+      have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
+      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
+        cases assignmentTyped with | intro typed _ => exact typed
+      have errors := PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment)
+        headErrors diagnostics targetTyped initial
+      have typedChildren : ReflectsBelow bridge context model stages invocation
+          (TypedCertificate invocation.source certificates context) faults budget := by
+        intro size smaller scope id lowered generated node found typed
+        obtain ⟨node, nodeFound, nodeTyped, certified⟩ := generated
+        exact children context size smaller certified found typed
+      have result := CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.reflects_bounded
+        (compiled := compiled) (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative)
+        bridge functions extension transport faithful observations head head.projected
+        environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+        budget typedChildren functionTypes errors completed within
+      cases result with
+      | keyFault ready keysTrace same matched finalHeaps maps worlds preservation metadata reached related stable =>
+        cases same
+        exact ⟨_, context, _, _, _, _, .projectedBitNotKeysFault head.projected ready keysTrace, .fault matched,
+          finalHeaps, maps, worlds, preservation, metadata, reached, related, fault_post bridge reached stable⟩
+      | getterFault keysTrace failed same matched finalHeaps maps worlds preservation metadata reached related stable =>
+        cases same
+        exact ⟨_, context, _, _, _, _, .projectedBitNotGetterFault head.projected keysTrace failed, .fault matched,
+          finalHeaps, maps, worlds, preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+      | success keysTrace snapshot write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
+        have tailTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2
+        obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
+            finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+          ih tailShape tailTyped (Nat.le_trans (Nat.le_of_lt strict) within)
+            (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+            reached conditioned nextAdmitted
+            (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
+        exact ⟨_, finalContext, outcome, after, finalMap, finalWorld,
+          .projectedBitNot head.projected keysTrace snapshot write trace, represented,
+          finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
+          metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeaderReflection

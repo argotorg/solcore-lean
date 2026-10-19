@@ -132,7 +132,7 @@ theorem of_actual
     (member : entry ∈ compiled.indexed.entries)
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {stages : Staging.Recursive.Registry}
-    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source
       (fun id => GeneralSyntax principal.sourceBody.source id (fun _ => False))
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
     Support principal packet headers stages

@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedBitNotPreservation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedProjectedBitNotSourceInversion
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerProjectedInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedAssignmentPreservation
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
@@ -26,9 +29,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSc
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedLexicalSourceInversion
 
-/-! Scoped compiler statements include conditionals, finite while loops, bare plain assignment,
-lexical allocation, discard and return. Strict child bounds run the original recursive
-Source relation; writes target the actual heap reached by the RHS. -/
+/-! Scoped compiler statements include control flow, projected writes and unary
+updates. Strict child bounds follow the original Source relation, and writes
+use the heap reached by their actual key and operand evaluations. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -406,6 +409,72 @@ theorem preserves_position {budget : Nat}
             exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
               maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
               last, callerProtocol.trans related lastRelated, post⟩
+  | @bitNotProjected context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
+      intro shape sourceTyped projection
+      intro size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted finalContext outcome after trace
+      obtain ⟨_word, tailShape⟩ := shape.unary_tail found form
+      have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not unique
+        (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
+      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
+        cases assignmentTyped with | intro typed _ => exact typed
+      have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
+          (TypedCertificate invocation.source certificates context) faults size := by
+        intro scope id lowered generated node found typed
+        obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
+        exact children context size smaller certified found typed
+      have splitTrace := CallableIndexedOwnedPreparedStagedScopedProjectedBitNotSourceInversion.child_and_tail
+        unique found form head.projected trace
+      cases splitTrace with
+      | rootFault failed => exact False.elim (failed.excluded head.writable locals)
+      | keysFault ready keyTrace =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_key_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions
+              head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren ready keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge reached stable⟩
+      | getterFault keyTrace failed =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_getter_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations
+              head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren (PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment) headErrors assignmentDiagnostics targetTyped initial)
+              keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) failed body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+      | success keyTrace snapshot write remainingTrace =>
+          obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
+              count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_value
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations
+              head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih tailShape (ProtectedStateImperativeStatementSuffixTyping.bitNot unique sourceTyped found form)
+              projection (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted remainingTrace
+          have native := (continuation body (LocalLoop.controlType type)).wrap (by
+            simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
+              SourceCoreDataPlaces.shift] using evaluated)
+          exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
+            maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
+            last, callerProtocol.trans related lastRelated, post⟩
   | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerIH remainingIH =>
       intro shape sourceTyped projection
       intro size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted finalContext outcome after trace
@@ -544,10 +613,10 @@ theorem preserves_position {budget : Nat}
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection
       intro size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted finalContext outcome after trace
-      obtain ⟨_word, _bare, tailShape⟩ := shape.bitNot_tail found form
+      obtain ⟨_word, _bare, tailShape⟩ := shape.bitNot_tail found form head.bare
       have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not unique
         (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
-      rcases CallableIndexedOwnedPreparedStagedScopedBareBitNotSourceInversion.child_and_tail unique found form trace with
+      rcases CallableIndexedOwnedPreparedStagedScopedBareBitNotSourceInversion.child_and_tail unique found form head.bare trace with
         ⟨reason, sameSize, contextEq, outcomeEq, heapEq, failed⟩ |
         ⟨tailSize, target, updated, written, sameSize, snapshot, write, remainingTrace⟩
       ·
@@ -901,9 +970,9 @@ theorem preserves_position {budget : Nat}
               last, callerProtocol.trans related lastRelated, post⟩
   | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted outcome after trace
-      obtain ⟨_word, _bare, tailShape⟩ := shape.1.bitNot_tail
+      obtain ⟨_word, _bare, tailShape⟩ := shape.1.bitNot_tail head.bare
       have assignmentTyped := (InitializerTyping.bitNot sourceTyped).1
-      rcases CallableIndexedOwnedAdmittedStagedForInitializerSource.bitNot trace with
+      rcases CallableIndexedOwnedAdmittedStagedForInitializerSource.bitNot head.bare trace with
         ⟨reason, sameSize, outcomeEq, heapEq, failed⟩ |
         ⟨tailSize, target, updated, written, sameSize, snapshot, write, remainingTrace⟩
       ·
@@ -942,6 +1011,70 @@ theorem preserves_position {budget : Nat}
         exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
           maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
           last, callerProtocol.trans related lastRelated, post⟩
+
+  | @initializerBitNotProjected context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
+      intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted outcome after trace
+      obtain ⟨_word, tailShape⟩ := shape.1.unary_tail
+      have assignmentTyped := (InitializerTyping.bitNot sourceTyped).1
+      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
+        cases assignmentTyped with | intro typed _ => exact typed
+      have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
+          (TypedCertificate invocation.source certificates context) faults size := by
+        intro scope id lowered generated node found typed
+        obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
+        exact children context size smaller certified found typed
+      have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotInversion.projected_bitNot head.projected trace
+      cases splitTrace with
+      | rootFault failed => exact False.elim (failed.excluded head.writable locals)
+      | keysFault ready keyTrace =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_key_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions
+              head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren ready keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge reached stable⟩
+      | getterFault keyTrace failed =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_getter_fault
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations
+              head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren (PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment) headErrors assignmentDiagnostics targetTyped initial)
+              keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) failed body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+      | success keyTrace snapshot write remainingTrace =>
+          obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
+              count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
+            CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_value
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension transport faithful observations
+              head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2
+              projection (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted remainingTrace
+          have native := (continuation body (LocalLoop.controlType type)).wrap (by
+            simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
+              SourceCoreDataPlaces.shift] using evaluated)
+          exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
+            maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
+            last, callerProtocol.trans related lastRelated, post⟩
 
 include bridge bindings definitions registered producer acquire transport extension faithful observations in
 theorem preserves_at {budget : Nat}

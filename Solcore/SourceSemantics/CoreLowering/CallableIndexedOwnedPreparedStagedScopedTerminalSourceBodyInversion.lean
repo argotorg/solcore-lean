@@ -93,6 +93,10 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
       have same := shape actual
       rw [form] at same
       cases same
+    | bitNotProjected actual form _ _ _ _ _
+    | bitNotProjectedRootFault actual form _ _
+    | bitNotProjectedKeysFault actual form _ _ _
+    | bitNotProjectedGetterFault actual form _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
@@ -178,6 +182,10 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
       have same := shape actual
       rw [form] at same
       cases same
+    | bitNotProjected actual form _ _ _ _ _
+    | bitNotProjectedRootFault actual form _ _
+    | bitNotProjectedKeysFault actual form _ _ _
+    | bitNotProjectedGetterFault actual form _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same

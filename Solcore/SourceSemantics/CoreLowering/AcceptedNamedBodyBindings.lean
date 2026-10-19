@@ -168,7 +168,7 @@ private theorem items_receipts {policy : SourceCoreLoops.Policy} {source : Typed
         · exact ih (fun b e p => defined b e (List.mem_cons_of_mem _ p)) tail
             (fun b p => monomorphic b (List.mem_cons_of_mem _ p)) binding present
       | letInitializedGeneralized poly _ _ _ _ => exact False.elim (poly mono)
-  | discard _ _ remaining ih | assigning remaining _ ih | assigned remaining _ _ ih | projectedAssigned remaining _ _ ih | bitNotting remaining _ ih | bitNotted remaining _ _ ih =>
+  | discard _ _ remaining ih | assigning remaining _ ih | assigned remaining _ _ ih | projectedAssigned remaining _ _ ih | bitNotting remaining _ ih | bitNotted remaining _ _ ih | projectedBitNotted remaining _ _ ih =>
     cases typed with
     | cons head tail =>
       exact ih (fun b e p => defined b e (List.mem_cons_of_mem _ p)) tail monomorphic
@@ -238,7 +238,7 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
         · exact receipt
         · exact ih tail (fun next present => monomorphic next (List.mem_cons_of_mem _ present)) binding member
 
-  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotting _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih
+  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotting _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | projectedBitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih
       | matching _ _ _ _ _ ih | valueDiscard _ _ _ _ _ _ _ ih =>
       obtain ⟨_, _, _, _, tail⟩ := head_tail typed
       exact ih tail monomorphic

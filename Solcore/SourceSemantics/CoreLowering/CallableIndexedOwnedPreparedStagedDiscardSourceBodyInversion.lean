@@ -95,6 +95,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _

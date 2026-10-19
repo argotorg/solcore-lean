@@ -742,6 +742,21 @@ private def assignment_head {values : SourceCoreCompatibleValues.Context} {conte
              right := expressions _ _ _ (reached rhs (by simp)) head.right}
 
 
+private def projected_unary_head {values : SourceCoreCompatibleValues.Context} {context : SourceSemantics.Context}
+    {before after : GenericExpressionMeaning.Certificate}
+    (expressions : ∀ scope id lowered, Reaches source roots (.expression id) → before scope id lowered → after scope id lowered)
+    {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution}
+    (head : CompatibleProjectedBitNotStatements.Head values source context before scope administrative definitions assignment)
+    (reached : ∀ id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, Reaches source roots (.expression id)) :
+    CompatibleProjectedBitNotStatements.Head values view context after scope administrative definitions assignment :=
+  {head with
+    layout := {head.layout with
+      path := prepared_path edited avoids head.layout.path reached
+      views := key_views edited avoids head.layout.views reached
+      children := sequence_tree edited avoids expressions head.layout.children reached}}
+
+
 include avoids in
 private theorem assignment_prepared_at {values : SourceCoreCompatibleValues.Context} {context : SourceSemantics.Context}
     {before after : GenericExpressionMeaning.Certificate}
@@ -922,6 +937,16 @@ private theorem header_tree {type : Ty} {continuation : SourceSemantics.Context 
       (ih (fun child member => reached child (List.mem_append_right _ member)))
   | bitNot head remaining ih =>
     exact .bitNot head
+      (ih (fun child member => reached child (List.mem_append_right _ member)))
+  | @bitNotProjected context scope assignment rest body head remaining ih =>
+    have children : ∀ id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+        Reaches source roots (.expression id) := by
+      intro id member
+      exact reached _ (by
+        simp only [List.flatMap_cons, ForItemForm.references, AssignmentResolution.references,
+          PlaceResolution.references, List.mem_append]
+        exact Or.inl (sourceKeys_references member))
+    exact .bitNotProjected (projected_unary_head edited avoids (expressions context) head children)
       (ih (fun child member => reached child (List.mem_append_right _ member)))
 /-- The original header mapping carries a constructor payload on the same target tree. -/
 theorem header_payload_with {type : Ty} {continuation : SourceSemantics.Context → SourceCoreLocalCell.Scope → Expr → Prop}
@@ -1211,6 +1236,16 @@ theorem transport_with {context : SourceSemantics.Context} {scope : SourceCoreLo
   | bitNot found form head remaining ih =>
     exact .bitNot (edited.metadata.symm.statement found) form head
       (ih (fun child member => reached child (List.mem_cons_of_mem _ member)))
+  | @bitNotProjected context scope mode id node assignment rest expected type body found form head remaining ih =>
+    have children : ∀ child ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+        Reaches source roots (.expression child) := by
+      intro child member
+      exact .statement (reached id List.mem_cons_self) found
+        (by simpa only [form, StatementForm.references, AssignmentResolution.references,
+          PlaceResolution.references] using sourceKeys_references member)
+    exact .bitNotProjected (edited.metadata.symm.statement found) form
+      (projected_unary_head edited avoids (expressions context) head children)
+      (ih (fun child member => reached child (List.mem_cons_of_mem id member)))
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialIH restIH =>
     exact .forLoop (edited.metadata.symm.statement found) form
       (initialIH (fun child member => .statement (reached id (by simp)) found
@@ -1272,6 +1307,17 @@ theorem transport_with {context : SourceSemantics.Context} {scope : SourceCoreLo
   | initializerBitNot head remaining ih =>
     exact .initializerBitNot head (ih (fun child member => reached child (by
       simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member)))
+  | @initializerBitNotProjected context scope assignment rest body condition post statements expected type head remaining ih =>
+    have children : ∀ id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+        Reaches source roots (.expression id) := by
+      intro id member
+      apply reached
+      simp only [List.flatMap_cons, ForItemForm.references, AssignmentResolution.references,
+        PlaceResolution.references, List.mem_append]
+      exact Or.inl (Or.inl (Or.inl (Or.inl (sourceKeys_references member))))
+    exact .initializerBitNotProjected (projected_unary_head edited avoids (expressions context) head children)
+      (ih (fun child member => reached child (by
+        simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member)))
 
   | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining childrenIH restIH =>
     have refs : Within source roots resolution.references :=

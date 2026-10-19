@@ -73,6 +73,7 @@ private theorem returned_expression
     cases impossible
   | assignBare contains otherForm _ _ _ _
   | assignProjected contains otherForm _ _ _ _ _ _
+  | bitNotProjected contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
@@ -241,6 +242,7 @@ theorem ActualHeader.returned_capture
       cases impossible
     | assignBare contains otherForm _ _ _ _
     | assignProjected contains otherForm _ _ _ _ _ _
+    | bitNotProjected contains otherForm _ _ _ _ _
     | bitNotBare contains otherForm _ _ _ =>
       have impossible := (same contains) ▸ otherForm
       rw [observed.shape.initializedForm] at impossible

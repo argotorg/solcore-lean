@@ -54,6 +54,10 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _ | letFault actual same _ _
+  | bitNotProjected actual same _ _ _ _ _
+  | bitNotProjectedRootFault actual same _ _
+  | bitNotProjectedKeysFault actual same _ _ _
+  | bitNotProjectedGetterFault actual same _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _

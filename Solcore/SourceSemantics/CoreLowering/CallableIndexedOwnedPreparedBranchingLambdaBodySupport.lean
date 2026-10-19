@@ -165,7 +165,7 @@ theorem of_branching
       matchPolicy rfl rfl matchAllocator hidden catalog matchLedger
       (certificates := fun _ _ _ _ => True)
       (by intros; exact True.intro)
-      syntaxTree rfl shape.forget (Dynamic.RuntimeContextFields.refl _)
+      syntaxTree.prepared rfl shape.forget (Dynamic.RuntimeContextFields.refl _)
       runtime.variables_closed runtime.residual_variables_open signatures declarations
       (fun id member => .root (List.mem_map.mpr ⟨id, member, rfl⟩)) projection generatedSource native
   let full := collected.tree

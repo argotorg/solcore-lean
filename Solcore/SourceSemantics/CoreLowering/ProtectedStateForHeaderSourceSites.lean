@@ -31,6 +31,21 @@ private theorem stored_expression {context : SourceSemantics.Context}
   change ExpressionHasType source context id node.type
   exact sourceType ▸ typing
 
+private theorem key_typed {context : SourceSemantics.Context}
+    {root leaf : TypeSystem.Ty} {projections : List PlaceProjection}
+    (typed : SourceProjectionsHaveType source context root projections leaf)
+    {id : ExpressionId} (member : id ∈ DataPlaceKeyOrder.sourceKeys projections) :
+    ∃ type, ExpressionHasType source context id type := by
+  induction projections generalizing root leaf with
+  | nil => cases typed; cases member
+  | cons projection projections ih =>
+    cases typed with
+    | index head rest =>
+      rcases List.mem_cons.mp member with rfl | tail
+      · exact ⟨_, head⟩
+      · exact ih rest tail
+    | member _ rest => exact ih rest member
+
 theorem expression {context : SourceSemantics.Context} {item : ForItemForm}
     {id : ExpressionId} {node : ExpressionNode} (unique : NodeOccurrencesUnique source)
     (facts : ItemFacts source control context item) (slot : ExpressionSlot item id)
@@ -44,6 +59,15 @@ theorem expression {context : SourceSemantics.Context} {item : ForItemForm}
   | discard =>
     cases typed with
     | expression typing => exact stored_expression unique typing found
+  | projectedBitNotKey member =>
+    cases typed with
+    | assignBitNot typing =>
+      cases typing with
+      | intro target _ =>
+        cases target with
+        | intro _ projections _ =>
+          obtain ⟨type, keyTyped⟩ := key_typed projections member
+          exact stored_expression unique keyTyped found
 
 theorem item_context {program : Program} {context staticFinal runtimeFinal : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {environment next : Dynamic.Environment}

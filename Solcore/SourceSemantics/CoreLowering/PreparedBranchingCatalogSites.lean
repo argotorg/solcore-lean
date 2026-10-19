@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.GenericProjectedBitNotPreparedOrigins
+import Solcore.SourceSemantics.CoreLowering.ProjectedBitNotDiagnosticOrigins
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
 
@@ -28,6 +30,23 @@ inductive AssignmentSite
         (missingDefault site assignment.target.root))
       (operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid) :
       AssignmentSite invalidProjection missingDefault registry faults head
+
+/-- Unary preparation retains its actual owner and keys without a Source RHS. -/
+inductive UnarySite
+    (invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word)
+    (missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word)
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate}
+    {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution}
+    (head : CompatibleProjectedBitNotStatements.Head values source context certificate scope administrative definitions assignment) : Prop where
+  | projected {site : SourceCoreElaboration.ErrorSite} {fuel : Nat}
+      (origin : ProjectedBitNotDiagnosticOrigins.Occurs source site assignment)
+      (signatures : context.signatures = values.checked.signatures)
+      (nonempty : assignment.target.projections ≠ [])
+      (retained : head.PreparedAt site fuel (invalidProjection site assignment.target.root)
+        (missingDefault site assignment.target.root)) :
+      UnarySite invalidProjection missingDefault head
 
 section Headers
 open GenericForHeader
@@ -99,6 +118,14 @@ inductive HeaderSites (invalidProjection : SourceCoreElaboration.ErrorSite → R
       (remainingErrors : HeaderSites invalidProjection missingDefault registry faults remaining)
       (headErrors : head.Errors faults)
       : HeaderSites invalidProjection missingDefault registry faults (.bitNot head remaining)
+
+  | bitNotProjected {context scope assignment rest body}
+      {head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment}
+      {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        context scope rest body}
+      (remainingErrors : HeaderSites invalidProjection missingDefault registry faults remaining)
+      (headErrors : UnarySite invalidProjection missingDefault head)
+      : HeaderSites invalidProjection missingDefault registry faults (.bitNotProjected head remaining)
 
 end Headers
 
@@ -230,6 +257,16 @@ inductive CatalogSites (invalidProjection : SourceCoreElaboration.ErrorSite → 
       (headErrors : head.Errors faults)
       : CatalogSites invalidProjection missingDefault registry faults (.bitNot found form head remaining)
 
+  | bitNotProjected {context scope mode id node assignment rest expected type body}
+      {found : source.lookupStatement? id = some node}
+      {form : node.form = .assignBitNot assignment}
+      {head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment}
+      {remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode rest) expected type body}
+      (remainingErrors : CatalogSites invalidProjection missingDefault registry faults remaining)
+      (headErrors : UnarySite invalidProjection missingDefault head)
+      : CatalogSites invalidProjection missingDefault registry faults (.bitNotProjected found form head remaining)
+
   | forLoop {context scope mode id node initializer condition post statements rest expected type initialCode body}
       {found : source.lookupStatement? id = some node} {form : node.form = .forLoop initializer condition post statements}
       {initial : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode}
@@ -296,6 +333,13 @@ inductive CatalogSites (invalidProjection : SourceCoreElaboration.ErrorSite → 
       (remainingErrors : CatalogSites invalidProjection missingDefault registry faults remaining)
       (headErrors : head.Errors faults)
       : CatalogSites invalidProjection missingDefault registry faults (.initializerBitNot head remaining)
+  | initializerBitNotProjected {context scope assignment rest body condition post statements expected type}
+      {head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment}
+      {remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body}
+      (remainingErrors : CatalogSites invalidProjection missingDefault registry faults remaining)
+      (headErrors : UnarySite invalidProjection missingDefault head)
+      : CatalogSites invalidProjection missingDefault registry faults (.initializerBitNotProjected head remaining)
   | matchWith {context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts}
       {found : source.lookupStatement? id = some node} (form : node.form = .matchWith resolution)
       {scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode}

@@ -70,7 +70,7 @@ theorem ActualHeader.scoped_support {fixture : CompiledFixture}
   refine ⟨body, ?_⟩
   apply CallableIndexedOwnedPreparedNamedEvidenceScopedCollectors.of_actual actual.prepared actual.aligned
     fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed (fun _ witness => witness)
-    _ rows complete (bootstrap_zero fixture.recipe.compiled) entryMember receipt stagePrepared syntaxTree
+    _ rows complete (bootstrap_zero fixture.recipe.compiled) entryMember receipt stagePrepared syntaxTree.prepared
   rw [actual.source]
   exact shape.metadata nodes actual.prepared.named noLocals
 

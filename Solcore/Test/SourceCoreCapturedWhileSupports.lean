@@ -190,7 +190,7 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedFactory 
         CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.unique
       exact CallableIndexedOwnedPreparedStagedBranchingLambdaReadRoots.of_reads code support provenance receiver
         fixture.source_wellFormed (by rw [sameSource]; exact observed.metadata support.caller.named)
-        shape.forget syntaxTree (RecursiveStageRegistry.scope sidecar code.active function)
+        shape.forget syntaxTree.prepared (RecursiveStageRegistry.scope sidecar code.active function)
         (RecursiveNamedPreparedStageScopes.anonymous_preserved stagePrepared selected)
     | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
       exact False.elim (fixture.no_principal support.principal)

@@ -80,6 +80,7 @@ theorem of_produced (produced : Produced prepared header parameters result state
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
       header.function.source directRows directOnly allowIndices allowConstructors)
     (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements result)
+    (bareUnary : PreparedBranchingBareUnarySyntax.Body header.function.source statements)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (certified : SelectedCompilationNamedSourceTyping.Certified header) :
     Nonempty (SourceCertificate compiled prepared.named header.function.source header.function.body) ∧
@@ -100,7 +101,8 @@ theorem of_produced (produced : Produced prepared header parameters result state
     coercions := produced.coercions
     ordinary := produced.ordinary
     read := produced.read
-    scan := scan.map (fun _ _ => True.intro) }
+    scan := scan.map (fun _ _ => True.intro)
+    bareUnary := bareUnary }
   obtain ⟨signature, member, owner⟩ := origin_owner prepared
   have source := (CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned).1
   have typedScan := scan
@@ -124,13 +126,14 @@ theorem of_returning {outer : StatementId} {rest : List StatementId} {outerNode 
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
       header.function.source directRows directOnly allowIndices allowConstructors)
     (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements result)
+    (bareUnary : PreparedBranchingBareUnarySyntax.Body header.function.source statements)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (certified : SelectedCompilationNamedSourceTyping.Certified header) :
     Nonempty (SourceCertificate compiled prepared.named header.function.source header.function.body) ∧
       Nonempty (SourceBodyCertificate compiled prepared.named directRows statements) := by
   obtain ⟨produced⟩ := AcceptedScopedLambdaBodyReceipts.of_returning prepared aligned roots outerFound outerForm
     found form requirements coercions ordinary
-  exact of_produced prepared aligned produced expressions bodyProfile supported certified
+  exact of_produced prepared aligned produced expressions bodyProfile bareUnary supported certified
 
 include aligned in
 /-- Full cache identity transports the factory certificate to its original row. -/

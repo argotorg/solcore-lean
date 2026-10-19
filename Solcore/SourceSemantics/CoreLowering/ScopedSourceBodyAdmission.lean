@@ -103,6 +103,15 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
 
+  | bitNotProjected {mode id node assignment binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+      (profile : assignment.target.type = .word)
+      (projected : assignment.target.projections ≠ [])
+      (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
+      (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
+
   | assignProjected {mode id node assignment operator rhs rhsNode binder rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -200,6 +209,7 @@ theorem Scan.shape {source approved expected mode statements}
   | whileLoop found form _ _ _ _ _ inner remaining => exact .whileLoop found form inner remaining
   | assign found form _ _ profile bare _ _ _ _ ih => exact .assign found form profile bare ih
   | assignProjected found form _ _ profile projected _ _ _ _ _ ih => exact .assignProjected found form profile projected ih
+  | bitNotProjected found form _ _ profile projected _ _ ih => exact .bitNotProjected found form profile projected ih
   | bitNot found form _ _ profile bare _ ih => exact .bitNot found form profile bare ih
   | matching found form _ _ _ _ _ _ _ arms fallback remaining =>
       exact .matchWith found form arms fallback remaining
@@ -218,7 +228,7 @@ theorem Scan.syntax {source approved expected mode statements}
     {control : ControlContext} (result : control.returnType = expected)
     {context final : SourceSemantics.Context} {facts : BodyFacts}
     (typed : StatementsHaveType source control context statements final facts) :
-    GenericImperativeMatch.Syntax source approved context (.statements mode statements) expected := by
+    GenericImperativeMatch.PreparedSyntax source approved context (.statements mode statements) expected := by
   induction scan generalizing control context final facts with
   | nil allowed => exact .body (.nil allowed)
   | breaking rest found form => exact .breaking found form
@@ -298,7 +308,7 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignValue assignment =>
         obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
           ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare assignment
-        apply GenericImperativeMatch.Syntax.assign found form sourceTyped writable rightTyped numeric
+        apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable rightTyped numeric
         · intro child member
           simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
           subst child
@@ -313,13 +323,26 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignValue assignment =>
         obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
           ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route assignment
-        apply GenericImperativeMatch.Syntax.assign found form sourceTyped writable rightTyped numeric
+        apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable rightTyped numeric
         · intro child member
           rcases List.mem_cons.mp member with equal | member
           · subst child
             exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
           · obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
             exact ⟨keys child member, node, found, typed⟩
+        · exact ih result tail
+
+  | bitNotProjected found form declaration route profile projected keys _ ih =>
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | assignBitNot assignment =>
+        obtain ⟨sourceTyped, writable⟩ := ScopedSourceForItemsAdmission.projected_bitNot_facts unique declaration route assignment
+        apply GenericImperativeMatch.PreparedSyntax.bitNotProjected found form sourceTyped writable projected (.inl (by rw [profile]; rfl))
+        · intro child member
+          obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
+          exact ⟨keys child member, node, found, typed⟩
         · exact ih result tail
 
   | bitNot found form declaration targetType profile bare _ ih =>
@@ -339,7 +362,7 @@ theorem Scan.syntax {source approved expected mode statements}
       subst middle
       have sourceType := ScopedSourceMatchAdmission.statement_type unique found form head
       rw [result] at sourceType
-      apply GenericImperativeMatch.Syntax.matchWith found form sourceType scrutineeFound scrutineeTyped
+      apply GenericImperativeMatch.PreparedSyntax.matchWith found form sourceType scrutineeFound scrutineeTyped
         value casesTyped defaultTyped hiddenOrdinary armsOrdinary
       · intro request childContext selected
         obtain ⟨last, childFacts, childTyped⟩ :=
@@ -386,7 +409,7 @@ theorem Scan.syntax {source approved expected mode statements}
       obtain ⟨_, _, _, head, _⟩ := head_tail typed
       obtain ⟨_, caseFacts, scrutineeTyped, casesTyped, defaultTyped⟩ :=
         ScopedSourceMatchAdmission.statement_sites unique found form scrutineeFound head
-      apply GenericImperativeMatch.Syntax.terminalMatch unique found form (.inr sourceType)
+      apply GenericImperativeMatch.PreparedSyntax.terminalMatch unique found form (.inr sourceType)
         scrutineeFound scrutineeTyped value casesTyped defaultTyped hiddenOrdinary armsOrdinary
       · intro request childContext selected
         obtain ⟨last, childFacts, childTyped⟩ :=

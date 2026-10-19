@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedBitNotReflection
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotSource
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedAssignmentReflection
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerProjectedSource
@@ -470,7 +472,7 @@ theorem reflects_position {budget : Nat}
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection
       intro size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-      obtain ⟨_, bare, tailShape⟩ := shape.bitNot_tail found form
+      obtain ⟨_, bare, tailShape⟩ := shape.bitNot_tail found form head.bare
       have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not graph.nodeOccurrencesUnique
         (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
       have result := CallableIndexedOwnedAdmittedStagedBareBitNotHeads.reflects_bounded (compiled := compiled) (values := .initial compiled.compatible.checked)
@@ -498,6 +500,60 @@ theorem reflects_position {budget : Nat}
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
             .bitNotBare (lookupStatement?_sound found) form snapshot write trace, represented,
+            finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
+            metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
+  | @bitNotProjected context scope mode id node assignment rest expected type body found form head remaining remainingErrors headSite ih =>
+      intro shape sourceTyped projection
+      intro size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
+      obtain ⟨_, tailShape⟩ := shape.unary_tail found form
+      have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not graph.nodeOccurrencesUnique
+        (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
+      have projected : assignment.target.projections ≠ [] := by
+        cases headSite with
+        | projected _ _ nonempty _ => exact nonempty
+      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
+        cases assignmentTyped with
+        | intro typed _ => exact typed
+      have typedChildren : ReflectsBelow bridge context model stages invocation
+          (TypedCertificate invocation.source certificates context) faults budget := by
+        intro size smaller scope id lowered generated node found typed
+        obtain ⟨node, nodeFound, nodeTyped, certified⟩ := generated
+        exact children context size smaller certified found typed
+      have result := CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.reflects_bounded
+        (compiled := compiled) (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative) bridge functions extension transport faithful observations
+        head projected environments heaps locals agrees actualTyped initial admitted graph.nodeOccurrencesUnique assignmentTyped
+        budget typedChildren functionTypes
+        (PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment) headSite assignmentDiagnostics targetTyped initial)
+        completed within
+      cases result with
+      | keyFault ready keyTrace same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+            .bitNotProjectedKeysFault (lookupStatement?_sound found) form projected ready keyTrace, .fault matched,
+            finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge reached stable
+      | getterFault keyTrace failed same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+            .bitNotProjectedGetterFault (lookupStatement?_sound found) form projected keyTrace failed, .fault matched,
+            finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic _) reached stable
+      | success keyTrace snapshot write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
+          have tailTyped := ProtectedStateImperativeStatementSuffixTyping.bitNot graph.nodeOccurrencesUnique sourceTyped found form
+          obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih tailShape tailTyped projection (Nat.le_trans (Nat.le_of_lt strict) within)
+              (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted
+              (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
+          exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
+            .bitNotProjected (lookupStatement?_sound found) form projected keyTrace snapshot write trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @forLoop context scope mode id node items test post statements rest expected type initialCode body found form initialTree remaining initialErrors remainingErrors initialIH remainingIH =>
@@ -729,7 +785,7 @@ theorem reflects_position {budget : Nat}
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-      obtain ⟨_, bare, tailShape⟩ := shape.1.bitNot_tail
+      obtain ⟨_, bare, tailShape⟩ := shape.1.bitNot_tail head.bare
       have assignmentTyped := (InitializerTyping.bitNot sourceTyped).1
       have result := CallableIndexedOwnedAdmittedStagedBareBitNotHeads.reflects_bounded (compiled := compiled) (values := .initial compiled.compatible.checked)
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
@@ -756,6 +812,58 @@ theorem reflects_position {budget : Nat}
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [sourceSize], outcome, after, finalMap, finalWorld,
             CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_bitNot snapshot write trace, represented,
+            finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
+            metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
+  | @initializerBitNotProjected context scope assignment rest body test post statements expected type head remaining remainingErrors headSite ih =>
+      intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
+      obtain ⟨_, tailShape⟩ := shape.1.unary_tail
+      have assignmentTyped := (InitializerTyping.bitNot sourceTyped).1
+      have projected : assignment.target.projections ≠ [] := by
+        cases headSite with
+        | projected _ _ nonempty _ => exact nonempty
+      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
+        cases assignmentTyped with
+        | intro typed _ => exact typed
+      have typedChildren : ReflectsBelow bridge context model stages invocation
+          (TypedCertificate invocation.source certificates context) faults budget := by
+        intro size smaller scope id lowered generated node found typed
+        obtain ⟨node, nodeFound, nodeTyped, certified⟩ := generated
+        exact children context size smaller certified found typed
+      have result := CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.reflects_bounded
+        (compiled := compiled) (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative) bridge functions extension transport faithful observations
+        head projected environments heaps locals agrees actualTyped initial admitted graph.nodeOccurrencesUnique assignmentTyped
+        budget typedChildren functionTypes
+        (PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment) headSite assignmentDiagnostics targetTyped initial)
+        completed within
+      cases result with
+      | keyFault ready keyTrace same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize [_]], _, _, _, _,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_bitNot_keys_fault projected ready keyTrace, .fault matched,
+            finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge reached stable
+      | getterFault keyTrace failed same matched finalHeaps maps worlds preservation metadata reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize [_]], _, _, _, _,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_bitNot_getter_fault projected keyTrace failed, .fault matched,
+            finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic _) reached stable
+      | success keyTrace snapshot write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
+          have tailTyped := (InitializerTyping.bitNot sourceTyped).2
+          obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih ⟨tailShape, shape.2⟩ tailTyped projection (Nat.le_trans (Nat.le_of_lt strict) within)
+              (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted
+              (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
+          exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], outcome, after, finalMap, finalWorld,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_bitNot projected keyTrace snapshot write trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 

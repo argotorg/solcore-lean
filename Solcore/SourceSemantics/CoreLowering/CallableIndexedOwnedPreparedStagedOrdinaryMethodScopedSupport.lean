@@ -84,7 +84,7 @@ include provenance receiver wellFormed supported original rows covered checked c
 RHS and later reads after a genuine assignment or local allocation. -/
 def support_general_with_catalog
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
       headers code support.body.toContext stages choice.packet faults := by
@@ -140,7 +140,7 @@ omit choice in
 and all static support together, without selecting a proof as runtime data. -/
 theorem of_actual_with_catalog
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
@@ -200,7 +200,7 @@ local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults co
 include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
 def support_general_generic
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
       headers code support.body.toContext stages choice.packet faults := by
@@ -210,7 +210,7 @@ include provenance receiver wellFormed supported original rows covered checked c
 omit choice in
 theorem of_actual_generic
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
@@ -264,7 +264,7 @@ local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults co
 include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
 def support_general_with_evidence
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
       headers code support.body.toContext stages choice.packet faults := by
@@ -274,7 +274,7 @@ include provenance receiver wellFormed supported original rows covered checked c
 omit choice in
 theorem of_actual_with_evidence
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
@@ -328,7 +328,7 @@ local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults co
 include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
 def support_general
     (choiceIssued : choice.Issued code support.caller.named)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
       headers code support.body.toContext stages choice.packet faults := by
@@ -338,7 +338,7 @@ include provenance receiver wellFormed supported original rows covered checked c
 omit choice in
 theorem of_actual
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
-    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,

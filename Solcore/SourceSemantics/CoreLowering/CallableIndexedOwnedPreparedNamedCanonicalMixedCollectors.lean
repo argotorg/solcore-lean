@@ -318,7 +318,7 @@ def of_actual
     prepared aligned ready diagnostic wellFormed complete zero member receipt
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic prepared aligned diagnostic receiver)
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.unary_of_diagnostic prepared aligned diagnostic receiver)
-    (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
+    (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree.prepared
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
   obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt
     prepared aligned accepted

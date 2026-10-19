@@ -1,5 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
+import Solcore.SourceSemantics.CoreLowering.ProjectedBitNotDiagnosticOrigins
+import Solcore.SourceSemantics.CoreLowering.GenericProjectedBitNotPreparedOrigins
 
 /-! Compiler origins and preparation equations are interpreted at the actual
 receiving table and reached caller. This internal port is filled from the
@@ -18,7 +20,7 @@ variable {values : SourceCoreCompatibleValues.Context}
   (missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word)
   (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
 
-def Ready : Prop :=
+def AssignmentReady : Prop :=
   ∀ {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate}
     {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
@@ -34,6 +36,27 @@ def Ready : Prop :=
       (initial : protocol.State initialIndex),
     ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions protocol source context certificate
       scope administrative environment assignment.target head.prepared operator head.invalid initial faults head.shape
+
+def UnaryReady : Prop :=
+  ∀ {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate}
+    {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {assignment : AssignmentResolution}
+    (head : CompatibleProjectedBitNotStatements.Head values source context certificate scope administrative
+      ambient.definitions assignment)
+    {site : SourceCoreElaboration.ErrorSite} {fuel : Nat},
+    ProjectedBitNotDiagnosticOrigins.Occurs source site assignment →
+    context.signatures = values.checked.signatures →
+    head.PreparedAt site fuel (invalidProjection site assignment.target.root)
+      (missingDefault site assignment.target.root) →
+    ∀ {type : TypeSystem.Ty}, SourcePlaceHasType source context assignment.target type →
+    ∀ {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
+      (initial : protocol.State initialIndex),
+    head.ReachedErrors functions protocol environment initial faults (registry := registry)
+
+/-- Both operation families use the same genuine receiving authority. -/
+structure Ready : Prop where
+  assignment : AssignmentReady functions protocol source invalidProjection missingDefault registry faults
+  unary : UnaryReady functions protocol source invalidProjection missingDefault registry faults
 
 section Sites
 variable {functions protocol source invalidProjection missingDefault registry faults}
@@ -66,7 +89,28 @@ theorem shape_errors
       fun nonempty location => semantic _ _ (errors.uninitialized nonempty location),
       fun previous right invalid => semantic _ _ (errors.operands previous right invalid)⟩
   | projected origin signatures nonempty retained _ =>
-    exact ready head origin signatures nonempty retained typed initial
+    exact ready.assignment head origin signatures nonempty retained typed initial
 end Sites
 
+section UnarySites
+variable {functions protocol source invalidProjection missingDefault registry faults}
+
+/-- A genuine unary compiler site is interpreted by the same receiving table. -/
+theorem unary_errors
+    {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate}
+    {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {assignment : AssignmentResolution}
+    {head : CompatibleProjectedBitNotStatements.Head values source context certificate scope administrative
+      ambient.definitions assignment}
+    (site : PreparedBranchingCatalogSites.UnarySite invalidProjection missingDefault head)
+    (ready : Ready functions protocol source invalidProjection missingDefault registry faults)
+    {type : TypeSystem.Ty} (typed : SourcePlaceHasType source context assignment.target type)
+    {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
+    (initial : protocol.State initialIndex) :
+    head.ReachedErrors functions protocol environment initial faults (registry := registry) := by
+  cases site with
+  | projected origin signatures _ retained =>
+    exact ready.unary head origin signatures retained typed initial
+
+end UnarySites
 end Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics

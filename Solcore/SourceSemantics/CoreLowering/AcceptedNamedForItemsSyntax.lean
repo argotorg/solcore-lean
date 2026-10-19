@@ -88,6 +88,18 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
           subst key
           exact children child (by simp [Items.children, present])
 
+  | projectedBitNotted remaining receipt route ih =>
+      cases typed with
+      | cons head tail =>
+        refine .bitNotProjected receipt.description.binding route receipt.sourceProfile receipt.projected ?_
+          (ih closed (fun child member => children child (by simp [Items.children, member]))
+            (fun binding member => bindings binding (by simpa only [Items.bindings] using member)) tail)
+        intro key member
+        rw [← receipt.keyIds, ← keyChildren_ids receipt.keysGenerated] at member
+        obtain ⟨child, present, same⟩ := List.mem_map.mp member
+        subst key
+        exact children child (by simp [Items.children, present])
+
   | bitNotting => cases closed
   | bitNotted remaining receipt targetType ih =>
       cases typed with

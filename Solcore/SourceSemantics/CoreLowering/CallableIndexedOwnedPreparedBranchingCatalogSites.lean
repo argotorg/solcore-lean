@@ -244,6 +244,18 @@ namespace Collected
   intro registry
   exact .bitNot (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) unary
 
+ theorem bitNotProjected {context scope mode id node assignment rest expected type body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode rest) expected type body)
+    (unary : PreparedBranchingCatalogSites.UnarySite invalidProjection missingDefault head) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type)) := by
+  refine ⟨.bitNotProjected found form head remaining.tree, ?_⟩
+  intro registry
+  exact .bitNotProjected (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) unary
+
  theorem matchWith {context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts}
       (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
       (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
@@ -453,6 +465,19 @@ namespace Collected
   refine ⟨.initializerBitNot head remaining.tree, ?_⟩
   intro registry
   exact .initializerBitNot (head := head) (remaining := remaining.tree)
+    (remaining.sites registry)
+    unary
+
+ theorem initializerBitNotProjected {context scope assignment rest body condition post statements expected type}
+      (head : CompatibleProjectedBitNotStatements.Head values source context (certificates context) scope administrative definitions assignment)
+      (remaining : Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body)
+      (unary : PreparedBranchingCatalogSites.UnarySite invalidProjection missingDefault head) :
+      Collected invalidProjection missingDefault (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.assignBitNot assignment :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type)) := by
+  refine ⟨.initializerBitNotProjected head remaining.tree, ?_⟩
+  intro registry
+  exact .initializerBitNotProjected (head := head) (remaining := remaining.tree)
     (remaining.sites registry)
     unary
 

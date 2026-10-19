@@ -865,6 +865,18 @@ local macro "erase_recursive_plain" : tactic =>
         (.assignBitNot contains form (.intro (snapshot.resolves _ _ _ _) write)) nextIH
     case bitNotBareFault contains form _bare failed =>
       exact StatementsPlain.head_fault (.assignBitNot contains form failed)
+    case bitNotProjected contains form _projected keys snapshot write _next keysIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form])
+        (.assignBitNot contains form (.intro (snapshot.resolves keysIH) write)) nextIH
+    case bitNotProjectedRootFault contains form _projected failed =>
+      exact StatementsPlain.head_fault (.assignBitNot contains form (.target failed.source))
+    case bitNotProjectedKeysFault contains form _projected ready keys keysIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignBitNot contains form (.target (ready.key_fault keysIH)))
+    case bitNotProjectedGetterFault contains form _projected keys failed keysIH =>
+      exact StatementsPlain.head_fault (.assignBitNot contains form (.target (failed.source keysIH)))
     case assignProjected contains form _projected keys snapshot child write _next keysIH childIH nextIH =>
       exact StatementsPlain.prepend contains (by intro expression; simp [form])
         (.assignValue contains form (.intro (snapshot.resolves keysIH) childIH write)) nextIH
@@ -1012,6 +1024,17 @@ local macro "erase_recursive_plain" : tactic =>
     case bitNot snapshot write _next nextIH =>
       exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
     case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+    case projectedBitNot _projected keys snapshot write _next keysIH nextIH =>
+      exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves keysIH) write)) nextIH
+    case projectedBitNotRootFault _projected failed =>
+      exact .head (.assignBitNot (.target failed.source))
+    case projectedBitNotKeysFault _projected ready keys keysIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignBitNot (.target (ready.key_fault keysIH)))
+    case projectedBitNotGetterFault _projected keys failed keysIH =>
+      exact .head (.assignBitNot (.target (failed.source keysIH)))
     case projectedAssignment _projected keys snapshot child write _next keysIH childIH nextIH =>
       exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keysIH) childIH write)) nextIH
     case projectedAssignmentRootFault _projected failed =>

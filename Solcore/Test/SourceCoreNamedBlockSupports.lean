@@ -71,7 +71,7 @@ theorem ActualHeader.support {fixture : CompiledFixture} {observed : ObservedFac
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic
       actual.prepared actual.aligned actual.diagnostic receiver)
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.unary_of_diagnostic
-      actual.prepared actual.aligned actual.diagnostic receiver) _ actual.syntax
+      actual.prepared actual.aligned actual.diagnostic receiver) _ actual.syntax.prepared
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType _native
   obtain ⟨original, name, localId, lookup, form⟩ := approved
   have same := Option.some.inj (found.symm.trans lookup)

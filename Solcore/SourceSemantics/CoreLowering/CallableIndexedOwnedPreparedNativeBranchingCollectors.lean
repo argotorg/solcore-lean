@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPlaceLowering
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentUnaryDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
@@ -256,7 +257,7 @@ theorem collected_at
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         lowered.expression nativeType definitions → certificates context scope id lowered)
     {context : SourceSemantics.Context} {position : GenericImperativeMatch.Position} {expected : TypeSystem.Ty}
-    (syntaxTree : GenericImperativeMatch.Syntax source expressionSyntax context position expected)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax source expressionSyntax context position expected)
     (shape : PositionShape source position)
     (fields : Dynamic.RuntimeContextFields initial context)
     (closed : context.typeVariables = []) (residual : context.residualTypeVariables = true)
@@ -772,7 +773,7 @@ theorem collected_at
       · exact ⟨by simpa only [SourceCoreCompatibleDataMatches.Context.signatures, SourceCoreCompatibleDataMatches.Context.checked, matchValues] using sourceSignatures,
           fields.solvedRequirements.trans ledger⟩
   | @bitNot context mode id node assignment rest expected found form writable bare profile remaining ih =>
-    obtain ⟨rawWord, _, restShape⟩ := shape.bitNot_tail found form
+    obtain ⟨rawWord, _, restShape⟩ := shape.bitNot_tail found form bare
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -794,6 +795,45 @@ theorem collected_at
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
           (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)))
         (by simpa only [CompatibleBitNotStatements.Head.Errors, token] using unary (.statement found form) rawWord)
+  | @bitNotProjected context mode id node assignment rest expected found form sourceTyped writable projected profile childSyntax remaining ih =>
+    obtain ⟨_rawWord, restShape⟩ := shape.unary_tail found form
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      simp only [unaryPolicy] at accepted
+      obtain ⟨body, generatedBody, compiled⟩ := bind_ok accepted
+      have accessible : ∀ child ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+          Reaches source roots (.expression child) := by
+        intro child member
+        exact .statement (reached id List.mem_cons_self) found
+          (by simpa only [form, StatementForm.references, AssignmentResolution.references,
+            PlaceResolution.references] using CallableLambdaViewPlaceLowering.key_reference member)
+      have compiledOriginal := (CallableLambdaViewPlaceLowering.lower
+        (expression := policy.lowerExpression) (fuel := fuel) edited.metadata
+        (fun child member => expression_lookup edited avoids (accessible child member))).trans compiled
+      obtain ⟨head, emitted, _sameToken, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable projected profile
+          (certificate := TypedCertificate source certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨approved, childNode, childFound, typed⟩ := childSyntax child member
+            obtain ⟨_, native⟩ := raw
+            exact ⟨childNode, childFound, childNode, childFound, typed,
+              children context fields declarations approved (accessible child member) childFound typed generated native⟩)
+          compiledOriginal nativeTyped
+      rw [emitted]
+      exact .bitNotProjected found form head
+        (ih restShape fields closed residual sourceSignatures declarations
+          (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
+          (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)))
+        (.projected (.statement found form) sourceSignatures projected preparedAt)
   | @forLoop context mode id node initializer condition post statements rest expected found form sourceType initialSyntax remaining initialIH restIH =>
     obtain ⟨initialShape, postShape, bodyShape, restShape⟩ := shape.for_children found form
     cases fuel with
@@ -848,6 +888,7 @@ theorem collected_at
       (fun member rawWord => unary (header_unary
         (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member) rawWord)
       (fun member => header_operand (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member)
+      (fun member => header_unary (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member)
       postGenerated postTyped
     refine Collected.initializersDone conditionFound conditionType
       ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax accessible conditionFound typed conditionGenerated conditionNative⟩
@@ -972,7 +1013,7 @@ theorem collected_at
             (AssignmentDiagnosticOrigins.HeaderOriginFor.operand (tracked := true) (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceSignatures preparedAt
             (sameToken.symm ▸ operands (AssignmentDiagnosticOrigins.HeaderOriginFor.operand (tracked := true) (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceProfile) registry)
   | @initializerBitNot context assignment rest condition post statements expected writable bare profile remaining ih =>
-    obtain ⟨rawWord, _, restShape⟩ := shape.1.bitNot_tail
+    obtain ⟨rawWord, _, restShape⟩ := shape.1.bitNot_tail bare
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -992,6 +1033,44 @@ theorem collected_at
         (by simpa only [CompatibleBitNotStatements.Head.Errors, token] using (unary
           (AssignmentDiagnosticOrigins.HeaderOriginFor.unary (tracked := true)
             (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) rawWord))
+
+  | @initializerBitNotProjected context assignment rest condition post statements expected sourceTyped writable projected profile childSyntax remaining ih =>
+    obtain ⟨_rawWord, restShape⟩ := shape.1.unary_tail
+    obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
+    cases headerFuel with
+    | zero => cases accepted
+    | succ headerFuel =>
+      simp only [SourceCoreLoops.lowerForItems, unaryPolicy] at accepted
+      obtain ⟨body, generatedBody, compiled⟩ := bind_ok accepted
+      have accessible : ∀ child ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+          Reaches source roots (.expression child) := by
+        intro child member
+        apply reached
+        simp only [List.flatMap_cons, ForItemForm.references, AssignmentResolution.references,
+          PlaceResolution.references, List.mem_append]
+        exact Or.inl (Or.inl (Or.inl (Or.inl (CallableLambdaViewPlaceLowering.key_reference member))))
+      have compiledOriginal := (CallableLambdaViewPlaceLowering.lower
+        (expression := policy.lowerExpression) (fuel := headerFuel) edited.metadata
+        (fun child member => expression_lookup edited avoids (accessible child member))).trans compiled
+      obtain ⟨head, emitted, _sameToken, preparedAt⟩ :=
+        CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
+          unique sourceSignatures sourceTyped writable projected profile
+          (certificate := TypedCertificate source certificates context)
+          (fun child lowered member generated raw => by
+            obtain ⟨approved, childNode, childFound, typed⟩ := childSyntax child member
+            obtain ⟨_, native⟩ := raw
+            exact ⟨childNode, childFound, childNode, childFound, typed,
+              children context fields declarations approved (accessible child member) childFound typed generated native⟩)
+          compiledOriginal nativeTyped
+      rw [emitted]
+      exact .initializerBitNotProjected head
+        (ih ⟨restShape, shape.2⟩ fields closed residual sourceSignatures declarations
+          (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using
+            (List.mem_append_right (ForItemForm.references _) member))) projection
+          ⟨headerFuel, parentSite, next, AssignmentDiagnosticOrigins.ForOriginFor.tail (tracked := true) origin,
+            generatedBody, nextReceipt⟩ (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)))
+        (.projected (AssignmentDiagnosticOrigins.HeaderOriginFor.unary (tracked := true)
+          (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceSignatures projected preparedAt)
 
 
 theorem collected
@@ -1028,7 +1107,7 @@ theorem collected
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         lowered.expression nativeType definitions → certificates context scope id lowered)
     {context : SourceSemantics.Context} {position : GenericImperativeMatch.Position} {expected : TypeSystem.Ty}
-    (syntaxTree : GenericImperativeMatch.Syntax source expressionSyntax context position expected)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax source expressionSyntax context position expected)
     {mode : Bool} {statements : List StatementId} (atStatements : position = .statements mode statements)
     (shape : Shape source mode statements)
     (fields : Dynamic.RuntimeContextFields initial context)

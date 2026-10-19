@@ -123,7 +123,7 @@ private theorem factory_packet {fixture : CompiledFixture} (observed : ObservedP
     stagePrepared code support provenance receiver fixture.source_wellFormed
     (fun _ impossible => False.elim impossible) metadata rows
     (fun _ impossible => False.elim impossible) checked _ methods signatureMember
-    (by rw [sameSource]; exact row.sourceOwner) branching tree _ (.anonymous selected)
+    (by rw [sameSource]; exact row.sourceOwner) branching tree.prepared _ (.anonymous selected)
   rw [fixture.sameProgram]
   exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked
 

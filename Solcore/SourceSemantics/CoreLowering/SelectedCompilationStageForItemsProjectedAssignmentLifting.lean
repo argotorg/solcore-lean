@@ -113,7 +113,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · exact ⟨_, _, _, .projectedAssignmentKeysFault projected ready keys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
             (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
@@ -129,7 +129,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · exact ⟨_, _, _, .projectedAssignmentKeysFault projected ready keys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
             (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
@@ -145,7 +145,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · exact ⟨_, _, _, .projectedAssignmentKeysFault projected ready keys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
             (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
@@ -162,7 +162,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
           ⟨origin, call, reason, reached, ready, keys⟩ |
-          ⟨sources, keys, snapshot, resolution, getterState, _getterRelated, getterAdmission⟩
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
         · exact ⟨_, _, _, .projectedAssignmentKeysFault projected ready keys, .rejected origin call reason _ reached⟩
         · obtain ⟨staged, reached, lifted, adapted⟩ := children _
             (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)

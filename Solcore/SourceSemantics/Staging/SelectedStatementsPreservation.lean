@@ -73,6 +73,53 @@ theorem statements_step (size : Nat)
             cases controlTyped
             rfl
           exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+  | @bitNotProjected keysSize nextSize mode scope context finalContext environment before targetHeap written after assignment values target updated id rest node outcome
+      contains form _projected keys snapshot write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignBitNot assignmentTyped =>
+          cases assignmentTyped with
+          | intro targetTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
+                locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot savedTyped keyPost.heap_typed write
+              have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono totalExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+  | bitNotProjectedRootFault => exact fault_statements heap (.refl _)
+  | @bitNotProjectedKeysFault keysSize mode scope context environment before after assignment id rest node failure
+      contains form _projected _ready keys =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignBitNot assignmentTyped =>
+          cases assignmentTyped with
+          | intro targetTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              exact fault_statements keyPost.heap_typed keyPost.heap_extends
+  | @bitNotProjectedGetterFault keysSize mode scope context environment before after assignment values id rest node reason
+      contains form _projected keys _failed =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignBitNot assignmentTyped =>
+          cases assignmentTyped with
+          | intro targetTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              exact fault_statements keyPost.heap_typed keyPost.heap_extends
   | @assignProjected keysSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome
       contains form _projected keys snapshot child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed

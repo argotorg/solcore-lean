@@ -48,7 +48,7 @@ def of_actual
     (member : entry ∈ compiled.indexed.entries)
     (receipt : Receipt header)
     (actual : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
-    (syntaxTree : GenericImperativeMatch.Syntax header.function.source (fun id => GeneralSyntax header.function.source id directSites)
+    (syntaxTree : GenericImperativeMatch.PreparedSyntax header.function.source (fun id => GeneralSyntax header.function.source id directSites)
       header.context (.statements true header.function.body) header.function.resultType) :
     CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport.NamedSupport
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) keys bodyRegistry header

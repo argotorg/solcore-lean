@@ -116,6 +116,16 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
         assignment (LocalLoop.controlType result) tail reasonAt code)
       (targetType : receipt.binder.scheme.body = assignment.target.type) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
+  | projectedBitNotted {mode escaped fuel scope id rest node stored assignment tail code}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .assignBitNot assignment)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail)
+      (receipt : AcceptedProjectedBitNotReceipt.Receipt policy fuel source scope (.occurrence id.occurrence)
+        assignment (LocalLoop.controlType result) tail reasonAt code)
+      (route : AcceptedProjectedAssignmentRoute.Route source receipt.binder.scheme.body
+        assignment.target.projections assignment.target.type) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
   | discard {mode escaped fuel scope id rest node stored expression tail}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .expression expression true)
@@ -472,7 +482,7 @@ def Tree.closed {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .boundary .. | .assigning .. | .bitNotting .. | .forBoundary .. | .matching .. | .tailValue .. => false
   | .returning .. | .returnUnit .. | .breaking .. | .continuing .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.closed
-  | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.closed
+  | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.closed
   | .valueDiscard _ _ _ _ _ _ tail => !mode && tail.closed
   | .block _ _ inner tail => inner.closed && tail.closed
   | .conditional _ _ _ _ _ left right tail =>
@@ -514,6 +524,8 @@ def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
 
   | @Tree.forLoop _ _ _ _ _ _ fuel _ _ _ _ _ _ condition _ _ loopScope _ _ _ _ _ _ _ _ child generated _ initial inner after tail =>
       initial.children ++ (⟨fuel, loopScope, condition, child, generated⟩ :: (inner.children ++ after.children ++ tail.children))
+  | @Tree.projectedBitNotted _ _ _ _ _ _ fuel scope _ _ _ _ _ _ _ _ _ _ tail receipt _route =>
+      keyChildren fuel scope receipt.place.keys receipt.keys receipt.keysGenerated ++ tail.children
 
 def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
@@ -524,7 +536,7 @@ def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
   | @Tree.absent _ _ _ _ _ _ _ scope _ _ _ _ binder payload _ _ _ _ _ projected tail _ =>
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
-  | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotting _ _ _ tail _ | .bitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail | .matching _ _ _ _ tail => tail.bindings
+  | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotting _ _ _ tail _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail | .matching _ _ _ _ tail => tail.bindings
   | .block _ _ inner tail => inner.bindings ++ tail.bindings
   | .conditional _ _ _ _ _ left right tail => left.bindings ++ right.bindings ++ tail.bindings
   | .matched _ _ receipt branches tail =>
@@ -537,11 +549,11 @@ def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Prop :=
   match tree with
   | .nil | .returning .. | .returnUnit .. | .boundary .. | .forBoundary .. | .breaking .. | .continuing .. | .tailValue .. => True
-  | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ => tail.Ready
+  | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ => tail.Ready
   | @Tree.assigning _ _ _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ _ _ tail _ =>
       ¬ ValueAssignable source assignment operator ∧ tail.Ready
   | @Tree.bitNotting _ _ _ _ _ _ _ _ _ _ _ _ assignment _ _ _ _ _ tail _ =>
-      ¬ BitNotAssignable source assignment ∧ tail.Ready
+      ¬ UnaryAssignable source assignment ∧ tail.Ready
   | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail => tail.Ready
   | .block _ _ inner tail => inner.Ready ∧ tail.Ready
   | .conditional _ _ _ _ _ left right tail => left.Ready ∧ right.Ready ∧ tail.Ready
@@ -592,6 +604,9 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
   | bitNotted read form statementType _ receipt _ ih =>
       simpa only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         receipt.selected, ih, bind, Except.bind] using receipt.accepted
+  | projectedBitNotted read form statementType _ receipt _ ih =>
+      simpa only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        receipt.callbackSelected, ih, bind, Except.bind] using receipt.accepted
   | discard read form child generated statementType _ ih =>
       simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, generated, statementType,
         ih, bind, Except.bind, pure, Except.pure]
@@ -698,10 +713,21 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
             unary, remaining.accepted, bind, Except.bind] at lowered
           obtain ⟨receipt⟩ := AcceptedBareBitNotReceipt.of_accepted unary profile bare unary lowered
           exact ⟨.bitNotted read form statementType tail receipt (target receipt.binder receipt.declaration), ready⟩
-        · exact ⟨.bitNotting read form statementType tail assigned, supported, ready⟩
+        · by_cases projected : ProjectedBitNotAssignable source assignment
+          · have lowered := assigned
+            simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+              unary, remaining.accepted, bind, Except.bind] at lowered
+            obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 unary lowered
+            exact ⟨.projectedBitNotted read form statementType tail receipt
+              (projected.2.2 receipt.binder receipt.description.binding), ready⟩
+          · exact ⟨.bitNotting read form statementType tail assigned,
+              (fun eligible => eligible.elim supported projected), ready⟩
     | bitNotted read form statementType remaining receipt targetType =>
         obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.bitNotted read form statementType tail receipt targetType, ready⟩
+    | projectedBitNotted read form statementType remaining receipt route =>
+        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.projectedBitNotted read form statementType tail receipt route, ready⟩
     | discard read form child generated statementType remaining =>
         obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.discard read form child generated statementType tail, ready⟩
@@ -806,7 +832,7 @@ theorem Tree.frontier {escaped : Word} {fuel scope statements code}
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih => exact ih openBranch
   | assigning read form statementType remaining assigned ih =>
       exact ⟨.assignment _ _ _ _ _ (Tree.assigning read form statementType remaining assigned).accepted⟩
-  | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih => exact ih openBranch
+  | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | projectedBitNotted _ _ _ _ _ _ ih => exact ih openBranch
   | bitNotting read form statementType remaining accepted ih =>
       exact ⟨.assignment _ _ _ _ _ accepted⟩
   | discard _ _ _ _ _ _ ih => exact ih openBranch

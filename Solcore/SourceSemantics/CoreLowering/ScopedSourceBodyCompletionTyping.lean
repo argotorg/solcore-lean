@@ -388,6 +388,15 @@ private theorem Scan.control_compatible {source approved expected mode statement
     exact prefix_compatible remaining ordinary_return_compatible
       (fun _ fallen => (Option.some.inj fallen).symm) (ih tail)
 
+  | bitNotProjected found form declaration route profile projected keys remaining ih =>
+    obtain ⟨_, _, _, head, tail, same⟩ := head_tail_control typed
+    have original := form_control_at unique found head
+    rw [form] at original
+    cases original
+    rw [same]
+    exact prefix_compatible remaining ordinary_return_compatible
+      (fun _ fallen => (Option.some.inj fallen).symm) (ih tail)
+
   | terminalBlock found form sourceType _ stops _ _ =>
     obtain ⟨_, _, _, head, _, same⟩ := head_tail_control typed
     rw [same]

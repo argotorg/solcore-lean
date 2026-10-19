@@ -128,7 +128,7 @@ def of_receipt {inputs : List (Input compiled)} (rows : Inventory inputs)
       bodyReceipt (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   have admission := at_header prepared aligned selected same certificate
   have table := table_aligned_of_complete rows complete certificate.table
-  have syntaxTree : GenericImperativeMatch.Syntax header.function.source
+  have syntaxTree : GenericImperativeMatch.PreparedSyntax header.function.source
       (fun id => CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax
         header.function.source id (DirectSite certificate.table.rows))
       header.context (.statements true header.function.body) header.function.resultType := by

@@ -233,7 +233,7 @@ private theorem scoped_factory_of_header
   obtain ⟨⟨factory⟩, ⟨closure⟩⟩ := SelectedCompilationAcceptedScopedFactories.of_returning prepared aligned
     (by rw [body]; exact profile.roots) (by rw [source]; exact profile.outerFound) profile.outerForm
     (by rw [source]; exact profile.found) profile.form profile.requirements profile.coercions
-    ordinary expressions bodyProfile supported certified
+    ordinary expressions bodyProfile (by rw [source]; exact profile.bareUnary) supported certified
   obtain ⟨factory⟩ := AcceptedNamedScopedFactoryAdmission.source_of_header prepared aligned selected same factory
   obtain ⟨closure⟩ := AcceptedNamedScopedFactoryAdmission.closure_of_header prepared selected same closure
   refine ⟨⟨.scopedFactory factory, ⟨?_⟩⟩⟩

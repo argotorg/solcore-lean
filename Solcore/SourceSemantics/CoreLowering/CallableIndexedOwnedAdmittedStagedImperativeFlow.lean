@@ -264,13 +264,13 @@ theorem reflects_at {budget : Nat}
   | terminalBlock _ found form _ _ _ _ => cases atStatements; exact False.elim (shape.not_block found form)
   | terminalIf _ found form _ _ _ _ _ _ _ _ _ _ => cases atStatements; exact False.elim (shape.not_if found form)
   | breaking found form | continuing found form | whileLoop found form _ _ _ _ _ _ _ _
-  | bitNot found form _ _ _ | forLoop found form _ _ _ _
+  | bitNot found form _ _ _ | bitNotProjected found form _ _ _ | forLoop found form _ _ _ _
   | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
   | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
       cases atStatements
       have impossible := shape.head_allowed found
       simp only [form, CallableIndexedOwnedPreparedStagedBareAssignmentTree.allowedForm, Bool.false_eq_true] at impossible
-  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot =>
+  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot | initializerBitNotProjected =>
       cases atStatements
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedImperativeFlow

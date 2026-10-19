@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingBareUnarySyntax
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingLegacySyntax
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSourceAdmissionTransport
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalNamedFormationCollectors
@@ -34,6 +36,7 @@ structure SourceCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
   read : SourceCoreCompatibleDataExpressions.readExpression compiled.compatible.checked
     source expression = .ok (node, reported)
   scan : ScopedSourceBodyAdmission.Scan source (fun _ => True) result true statements
+  bareUnary : PreparedBranchingBareUnarySyntax.Body source statements
 
 abbrev Certificate (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) :=
@@ -124,6 +127,6 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
   exact ⟨terminal, CallableIndexedOwnedPreparedPhysicalNamedFormationCollectors.of_branching terminal
     ready diagnostic receiver included wellFormed profile member source.found source.form source.owner
     source.requirements source.coercions source.ordinary source.read source.shape
-    (fun typed => source.scan.syntax header.unique rfl typed) rfl⟩
+    (fun typed => (source.scan.syntax header.unique rfl typed).legacy source.shape) rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedFactoryAdmission
