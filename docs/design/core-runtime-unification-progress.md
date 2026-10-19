@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Mixed mapping reads reach retained public execution (2026-10-20)
+
+Mapping reads now join the common mixed expression tree through actual compiler receipts. Base evaluation precedes key evaluation. The general comparator retains structural and callable key meaning; the concrete function model derives identity and runtime-type observations. Source lifting and Core preservation/reflection retain child faults, missing-default diagnostics and the reached mixed heap, including native administrative allocations.
+
+The unchanged one-function fixture updates a mapping and returns `(table[f(3)], f(flag))` using a generalized identity. Complete original typing and independent Source plans precede each public resume with inputs `true`, `false`, `true`. Returned Word values are `13`, `11`, `13`; native heap sizes are `2 / 44 / 80 / 122`. The full original program, cache and profile remain present.
+
+Validation: 31 changed modules in a coherent graph of 8,568 modules, 53 focused runtime invocations and 5,567 endpoint audits. Full build (8,608 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Mixed primitive operators reach retained public execution (2026-10-20)
 
 Primitive unary and binary expressions now join the common mixed compiler tree. Actual accepted receipts supply scalar selection and the emitted code. Preservation/reflection and ordinary Source lifting retain left-to-right evaluation, short circuit behavior, genuine faults and the exact reached heap.

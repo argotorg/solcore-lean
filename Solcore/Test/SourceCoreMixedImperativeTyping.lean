@@ -122,6 +122,12 @@ mutual
             let ⟨typed⟩ ← uncoerced context node .bool foundAt
               (form ▸ .binary leftTyped rightTyped .booleanAnd)
             return ⟨typeEq.symm ▸ typed⟩
+          | .index base key =>
+            let some baseNode := source.lookupExpression? base | throw (IO.userError "mixed index base")
+            let .mapping keyType _ := baseNode.type | throw (IO.userError "mixed index mapping type")
+            let ⟨baseTyped⟩ ← expression fuel source context base (.mapping keyType node.type)
+            let ⟨keyTyped⟩ ← expression fuel source context key keyType
+            uncoerced context node node.type foundAt (form ▸ .index baseTyped keyTyped)
           | .group inner =>
             let ⟨child⟩ ← expression fuel source context inner node.type
             uncoerced context node node.type foundAt (form ▸ .group child)

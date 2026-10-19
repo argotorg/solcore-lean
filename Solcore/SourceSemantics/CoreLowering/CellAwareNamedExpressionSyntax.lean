@@ -18,6 +18,7 @@ inductive Form : ExpressionForm → Prop where
   | builtin (name : String) (function : BuiltinFunctionId) : Form (.reference name (.builtinFunction function))
   | unary (operator : Syntax.UnaryOp) (operand : ExpressionId) : Form (.unary operator operand)
   | binary (operator : Syntax.BinaryOp) (left right : ExpressionId) : Form (.binary left operator right)
+  | index (base key : ExpressionId) : Form (.index base key)
   | group (inner : ExpressionId) : Form (.group inner)
   | conditional (condition thenId elseId : ExpressionId) : Form (.conditional condition thenId elseId)
   | pair (left right : ExpressionId) : Form (.tuple [left, right])
@@ -49,6 +50,7 @@ private def form? (form : ExpressionForm) : Option (PLift (Form form)) :=
   | .conditional condition thenId elseId => some ⟨.conditional condition thenId elseId⟩
   | .unary operator operand => some ⟨.unary operator operand⟩
   | .binary left operator right => some ⟨.binary operator left right⟩
+  | .index base key => some ⟨.index base key⟩
   | .group inner => some ⟨.group inner⟩
   | .tuple [left, right] => some ⟨.pair left right⟩
   | .call callee arguments (.indirect metadata) =>
@@ -119,6 +121,10 @@ inductive Syntax {checked : SourceCoreCompatibleCatalog.Checked}
       (form : site.node.form = .binary left operator right)
       (first : Syntax prepared named source left) (second : Syntax prepared named source right) :
       Syntax prepared named source id
+  | index {id base key} (site : Site prepared named source id)
+      (form : site.node.form = .index base key)
+      (first : Syntax prepared named source base) (second : Syntax prepared named source key) :
+      Syntax prepared named source id
   | group {id inner} (site : Site prepared named source id) (form : site.node.form = .group inner)
       (child : Syntax prepared named source inner) : Syntax prepared named source id
   | conditional {id condition thenId elseId} (site : Site prepared named source id)
@@ -177,6 +183,10 @@ def syntax? {checked : SourceCoreCompatibleCatalog.Checked}
         let ⟨first⟩ ← syntax? prepared named source fuel left
         let ⟨second⟩ ← syntax? prepared named source fuel right
         pure ⟨.binary site form first second⟩
+      | .index base key => do
+        let ⟨first⟩ ← syntax? prepared named source fuel base
+        let ⟨second⟩ ← syntax? prepared named source fuel key
+        pure ⟨.index site form first second⟩
       | .group inner => do
         let ⟨child⟩ ← syntax? prepared named source fuel inner
         pure ⟨.group site form child⟩

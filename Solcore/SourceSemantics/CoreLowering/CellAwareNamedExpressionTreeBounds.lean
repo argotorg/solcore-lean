@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndexBounds
+import Solcore.SourceSemantics.CoreLowering.CellAwareNamedIndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeOperatorBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedCallPorts
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBuiltinValueBounds
@@ -48,6 +50,11 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry completion.result.context.registry)
   (sameLedger : context.solvedRequirements = (CallableIndexedNamedGeneration.context compiled.indexed named).solvedRequirements)
   (runtimeLedger : RuntimeRequirementLedgerValid context)
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (functionLeaves : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functionModel identities)
+  (functionTypes : FunctionRuntimeViews functionModel)
+  (indices : CellAwareNamedIndexDiagnostics.Ready compiled invocation.source reasonAt)
   {readFaults : FunctionCalls.FaultRep}
   (uninitialized : ∀ scope id lowered,
     CompatibleExpressionReads.LoweredRead compiled.indexed.fuel (.initial compiled.compatible.checked)
@@ -78,7 +85,7 @@ private theorem product_values : CallableIndexedOwnedPreparedStagedPairBounds.Pr
   exact .product firstValue secondValue
 
 include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
-  extension sameLedger runtimeLedger uninitialized semantic in
+  extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
 theorem preserves_tree
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
@@ -123,6 +130,22 @@ theorem preserves_tree
     exact CellAwareScopePairBounds.pair_preserves bridge unique (product_values profile) size children size (Nat.le_refl _)
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType
+      firstTree secondTree firstIH secondIH =>
+    have children : PreservesBelow bridge context valueModel named stages invocation
+        (Two scope base key first second) callFaults size := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; exact firstIH childSize ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; exact secondIH childSize ⟨rfl, rfl, rfl⟩
+    obtain ⟨port⟩ := indices header
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeIndexBounds.preserves bridge functionModel callFaults unique wellFormed runtime covers
+      header keyFound form sourceType faithful functionLeaves functionTypes
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩
+      (port.missing receiver functionModel keyFound form) size children ⟨rfl, rfl, rfl⟩
   | @unary id node operand childNode operator operandType resultType core childCode
       metadata form childFound inputType outputType operatorProfile child ih =>
     have children : PreservesBelow bridge context valueModel named stages invocation
@@ -180,7 +203,7 @@ theorem preserves_tree
       (fun childSize _smaller => applications childSize) ⟨rfl, rfl, rfl⟩
 
 include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
-  extension sameLedger runtimeLedger uninitialized semantic in
+  extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
 theorem reflects_tree
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
@@ -223,6 +246,22 @@ theorem reflects_tree
     exact CellAwareScopePairBounds.pair_reflects bridge unique (product_values profile) size children size (Nat.le_refl _)
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType
+      firstTree secondTree firstIH secondIH =>
+    have children : ReflectsBelow bridge context valueModel named stages invocation
+        (Two scope base key first second) callFaults size := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; exact firstIH childSize ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; exact secondIH childSize ⟨rfl, rfl, rfl⟩
+    obtain ⟨port⟩ := indices header
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeIndexBounds.reflects bridge functionModel callFaults unique wellFormed runtime covers
+      header keyFound form sourceType faithful functionLeaves functionTypes
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩
+      (port.missing receiver functionModel keyFound form) size children ⟨rfl, rfl, rfl⟩
   | @unary id node operand childNode operator operandType resultType core childCode
       metadata form childFound inputType outputType operatorProfile child ih =>
     have children : ReflectsBelow bridge context valueModel named stages invocation

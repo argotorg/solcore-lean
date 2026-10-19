@@ -51,6 +51,9 @@ theorem projected (tree : Tree compiled rootFuel source sourceContext reasonAt s
   | pair metadata _ _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected
+  | index header _ _ _ _ _ =>
+    cases Option.some.inj (found.symm.trans header.metadata.found)
+    exact header.metadata.projected
   | unary metadata _ _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected

@@ -57,6 +57,9 @@ theorem preserves (size : Nat) :
   exact CellAwareNamedExpressionTreeBounds.preserves_tree (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) generation bridge profile receiver
     (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) authority wellFormed runtime covers
     runtime.graph.nodeOccurrencesUnique extension sameLedger runtime.requirements
+    (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+    (CellAwarePhysicalFunctionOrigins.observations profile) (CellAwarePhysicalFunctionOrigins.runtime_views profile)
+    (CellAwareNamedIndexDiagnostics.ready issuer record sourceEq runtime.graph.nodeOccurrencesUnique)
     (fun _ _ _ read location => CellAwareNamedReadDiagnostics.uninitialized issuer record receiver sourceEq
       runtime.graph.nodeOccurrencesUnique read location)
     (fun _ _ proof => proof)
@@ -79,6 +82,9 @@ theorem reflects (size : Nat) :
   exact CellAwareNamedExpressionTreeBounds.reflects_tree (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) generation bridge profile receiver
     (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) authority wellFormed runtime covers
     runtime.graph.nodeOccurrencesUnique extension sameLedger runtime.requirements
+    (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
+    (CellAwarePhysicalFunctionOrigins.observations profile) (CellAwarePhysicalFunctionOrigins.runtime_views profile)
+    (CellAwareNamedIndexDiagnostics.ready issuer record sourceEq runtime.graph.nodeOccurrencesUnique)
     (fun _ _ _ read location => CellAwareNamedReadDiagnostics.uninitialized issuer record receiver sourceEq
       runtime.graph.nodeOccurrencesUnique read location)
     (fun _ _ proof => proof)

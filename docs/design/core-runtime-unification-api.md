@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Mixed mapping reads reach retained public execution (2026-10-20)
+
+`CellAwareScopeIndexBounds` and `CellAwareScopeSourceIndexLifting` connect ordered child execution to the actual lookup helper. `CompatibleCellIndexLookup` preserves mixed cells through comparator allocations. `CellAwareNamedIndexDiagnostics` derives missing-default tokens from the actual original issuer and public receiver. The concrete named expression meaning supplies comparator conditions internally; public signatures retain their previous premises.
+
+Broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
 ## Mixed primitive operators reach retained public execution (2026-10-20)
 
 `CellAwareNamedExpressionScalarProjection` derives scalar carriers from accepted expression trees. `CellAwareScopeSourceOperatorLifting` connects independent ordinary Source operators to the same mixed state. The common syntax, collectors and certificate producers retain actual compiler children. `SourceCoreMixedOperators` connects the full original fixture to initialization and repeated public execution.

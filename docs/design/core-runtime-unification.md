@@ -6,7 +6,9 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
-Primitive unary and binary expressions now join the common mixed compiler tree. Actual accepted receipts supply scalar selection and the emitted code. Preservation/reflection and ordinary Source lifting retain left-to-right evaluation, short circuit behavior, genuine faults and the exact reached heap. Mixed mapping reads, broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+Mapping reads now join the common mixed expression tree through actual compiler receipts. Base evaluation precedes key evaluation. The general comparator retains structural and callable key meaning; the concrete function model derives identity and runtime-type observations. Source lifting and Core preservation/reflection retain child faults, missing-default diagnostics and the reached mixed heap, including native administrative allocations. Broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
+
+Primitive unary and binary expressions now join the common mixed compiler tree. Actual accepted receipts supply scalar selection and the emitted code. Preservation/reflection and ordinary Source lifting retain left-to-right evaluation, short circuit behavior, genuine faults and the exact reached heap.
 
 Mapping element assignments now use the common mixed imperative tree through ordinary statements and for-loop initializer/post items. Actual compiler receipts retain ordered keys, the pre-RHS snapshot and the RHS computation. The commit rebuilds the root found in the reached heap and writes it once. Source lifting and both Core directions retain genuine failures and the exact reached state.
 

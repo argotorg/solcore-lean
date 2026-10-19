@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexCertificates
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionPolicies
 import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueCertificates
 
@@ -44,6 +45,16 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepa
       (rightChild : Tree compiled rootFuel source sourceContext reasonAt scope right second) :
       Tree compiled rootFuel source sourceContext reasonAt scope id
         ⟨.product first.type second.type, LocalSequence.pair first.type second.type first.expression second.expression⟩
+  | index {id node base key baseNode keyNode layout comparison first second}
+      (header : CompatibleExpressionIndices.Header (.initial checked) source id base node baseNode layout comparison first second)
+      (keyFound : source.lookupExpression? key = some keyNode)
+      (form : node.form = .index base key)
+      (sourceType : baseNode.type = .mapping keyNode.type node.type)
+      (firstChild : Tree compiled rootFuel source sourceContext reasonAt scope base first)
+      (secondChild : Tree compiled rootFuel source sourceContext reasonAt scope key second) :
+      Tree compiled rootFuel source sourceContext reasonAt scope id
+        ⟨layout.valueType, SourceCoreCompatibleDataExpressions.index layout comparison.expression
+          first.expression second.expression (reasonAt id)⟩
   | unary {id node operand childNode operator operandType resultType core childCode}
       (metadata : CompatibleExpressionPrimitives.Metadata checked source id node core.resultType)
       (form : node.form = .unary operator operand)

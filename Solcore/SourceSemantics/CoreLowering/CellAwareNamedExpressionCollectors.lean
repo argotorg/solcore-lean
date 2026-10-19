@@ -207,6 +207,29 @@ theorem of_policy {id : ExpressionId}
       obtain ⟨receipt⟩ := GeneralizedLocalNamedReadCompilation.of_policy compiled observed accepted
       obtain ⟨recipe⟩ := GeneralizedLocalNamedRecipeCompilation.of_certificate recipe receipt
       exact .generalized receipt recipe
+  | index site form first second firstIH secondIH =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types
+        unique site.found form site.coercions typed
+      obtain ⟨baseNode, baseContains, baseType⟩ := baseTyped.stored_type
+      obtain ⟨keyNode, keyContains, actualKeyType⟩ := keyTyped.stored_type
+      have baseFound := lookupExpression?_complete unique baseContains
+      have keyFound := lookupExpression?_complete unique keyContains
+      rw [← actualKeyType] at keyTyped baseType baseTyped
+      rw [← baseType] at baseTyped
+      obtain ⟨layout, comparison, firstCode, secondCode, rfl, header, firstGenerated, secondGenerated⟩ :=
+        CompatibleExpressionIndices.index_of_functions
+          (policy := namedPolicy compiled rootFuel) (body := namedLowerBody compiled)
+          (context := context prepared named) (values := .initial checked)
+          (scope := scope) (reasonAt := reasonAt) site.found baseFound form
+          (special compiled rootFuel site) (CellAwareNamedExpressionPolicies.read compiled site rootFuel)
+          (by rfl) accepted
+      exact .index header keyFound form baseType (firstIH baseFound baseTyped firstGenerated)
+        (secondIH keyFound keyTyped secondGenerated)
   | unary site form child ih =>
     have same := Option.some.inj (site.found.symm.trans found)
     subst node

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceIndexLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceOperatorLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceConditionalLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionMeaning
@@ -129,6 +130,32 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
     exact CellAwareScopeSourceProductLifting.pair bridge model unique children preservation size
       (.actual metadata form leftFound rightFound sourceType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType
+      firstTree secondTree firstIH secondIH =>
+    have children : ∀ childSize, childSize < size → LiftsAt bridge context model named stages invocation
+        (Two scope base key first second) childSize := by
+      intro childSize _smaller current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; exact firstIH childSize ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; exact secondIH childSize ⟨rfl, rfl, rfl⟩
+    have preservation : ∀ childSize, CellAwareScopeExpressionBounds.PreservesAt bridge context model named stages invocation
+        (Two scope base key first second) callFaults childSize := by
+      intro childSize current child code point
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first =>
+        obtain ⟨rfl, rfl⟩ := first
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers firstTree childSize ⟨rfl, rfl, rfl⟩
+      | inr second =>
+        obtain ⟨rfl, rfl⟩ := second
+        exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
+          runtime wellFormed covers secondTree childSize ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareScopeSourceIndexLifting.index bridge (reason := diagnostics.reasonAt named.signature.key expression) header keyFound form unique
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ size children preservation ⟨rfl, rfl, rfl⟩
   | @unary id node operand childNode operator operandType resultType core childCode
       metadata form childFound inputType outputType operatorProfile child ih =>
     intro current expression code point
