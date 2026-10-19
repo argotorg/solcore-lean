@@ -1,8 +1,20 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-15.
+Last updated: 2026-10-19.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
+
+## Projected unary writes and selected compilation scope (2026-10-19)
+
+`CompatibleProjectedBitNotStatements.Head` retains the actual prepared path, original key certificates and Word/integer modifier profile. `CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.preserves_value`, `preserves_key_fault`, `preserves_getter_fault` and `reflects_bounded` connect ordered key execution to the reached state and strict continuation bound. The public compiler profile currently selects original raw Word leaves.
+
+`ProtectedStagedProjectedBitNotCommit.of_write` commits the actual `BitNotSnapshot` through the root and heap reached after key evaluation. Its seven native slots include an administrative Unit value. `CallableIndexedOwnedStagedProjectedBitNotAdmission` derives the resulting deep heap admission from the typed key row and real write. No Source RHS trace is required.
+
+`CompatibleProjectedBitNotStatements.Head.PreparedAt` records the actual unary occurrence, prepared path and emitted diagnostic identities. `PreparedAssignmentReachedDiagnostics.Ready.unary` and the public receiver derive missing-default and uninitialized-read correspondence at the real reached state. Statement, initializer and post-item dispatch use these receipts internally.
+
+The original thirteen-declaration fixture has two explicit compilation receipts: `compileNamedHeaderFixture` selects twelve supported named/header entries; `compileFixture` retains the full executable thirteen-entry cache. Only the former passes the proof profile. A projected unary operation inside a returned closure remains outside that profile, while existing projected value-assignment closures keep their previous support. The complete runtime fixture still checks repeated captured-mapping mutation.
+
+Validation: 180 changed or new modules checked in a coherent graph of 7,910 modules. Every one of the 2,843 transitively affected modules was freshly elaborated from source. All 17 focused runtime markers and 3,098 endpoint audits pass. Full build (7,950 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
 
 ## Prepared mapping writes and callable origins (2026-10-15)
 

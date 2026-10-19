@@ -1,12 +1,28 @@
 # Core unification: T0 audit of features, semantics, and proof boundaries
 
-Initial audit: 2026-09-30. Last updated: 2026-10-15.
+Initial audit: 2026-09-30. Last updated: 2026-10-19.
 
 This document preserves the initial audit for the [implementation design](core-runtime-unification.md) and subsequent dated investigations. Sections 1–9 record the state on 2026-09-30; later sections record the state on their respective dates. References to the "current" implementation, "unfinished" work, "next steps," or old API names describe that historical state.
 
 Runtime Core unification was completed in `a3168382`. See the [API migration record](core-runtime-unification-api.md) for the current public entry points. The [implementation record](core-runtime-unification-progress.md) and the latest dated audit section describe the latest commits, validation, and uncommitted work.
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
+
+## Projected unary assignment audit (2026-10-19)
+
+The selected named-body proof covers original raw Word mapping leaves in statements and for-loop headers. Ordered key evaluation precedes the snapshot; the actual reached heap supplies both the selected value and the latest root for the write. Source traces have no RHS. A missing Word key defaults to zero and is complemented successfully.
+
+The physical proof retains the reached caller state, heap representation, map/world extensions and actual continuation size. Typed key values establish heap admission after the write. Genuine key/getter failures keep their prefix heaps, and the original prepared unary occurrence supplies the receiving diagnostic token. Successful numeric snapshots do not acquire an artificial operand-fault branch.
+
+The static prepared syntax is distinct from legacy uniform-diagnostic syntax. The legacy fault grammar remains restricted to cases it can prove. Named bodies and loop headers use actual reached diagnostics. Returned lambdas retain a separate bare-unary condition until their prepared structural certificate is extended; earlier projected value-assignment closures remain supported.
+
+The test source retains thirteen original declarations. Its supported named/header compilation selects twelve entries and passes the automatic proof profile. Its complete thirteen-entry compilation includes the captured-mapping factory, runs successfully and has an explicit negative profile check. Independent Source proofs and public forward continuations belong to the twelve-entry compilation. Forward conclusions also allow authentic earlier stage rejection. The concrete failure fixtures exercise uninitialized key reads; generic getter and missing-default diagnostic theorems provide separate coverage. Missing Word keys succeed using zero. Captured-handle, additional key-effect and control tests are runtime coverage of the complete compilation.
+
+The selected success/failure/reuse session has native heap sizes `13 / 19 / 34 / 43 / 58`. The complete runtime sequence has native heap sizes `14 / 20 / 35 / 50 / 83 / 104 / 120 / 136 / 143 / 158 / 167 / 182 / 206 / 221 / 224 / 239 / 254`.
+
+Validation: 180 changed or new modules checked in a coherent graph of 7,910 modules. Every one of the 2,843 transitively affected modules was freshly elaborated from source. All 17 focused runtime markers and 3,098 endpoint audits pass. Full build (7,950 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+The closure certificate extension and full actual-pass composition remain unfinished. The test boundary follows the selected-compilation target and records the unsupported complete-cache profile explicitly.
 
 ## Projected mapping assignment audit (2026-10-15)
 

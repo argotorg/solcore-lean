@@ -1,10 +1,24 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-15
+Updated: 2026-10-19
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
+
+## Mapping element bit-not reaches selected public execution (2026-10-19)
+
+The automatic named-body profile accepts `table[key] ~=;` on original raw Word leaves, including nested mapping keys and for-loop initializer/post items. The compiler receipt keeps the exact prepared path and ordered key children. Source lifting, physical preservation/reflection and the public session use the same reached state. The native Unit temporary is administrative; the Source operation has no RHS.
+
+Successful key evaluation supplies the actual snapshot and latest root used for the write. A missing Word key supplies zero, whose complement is inserted at that key. Actual key, getter and uninitialized-read failures retain their reached heaps. The receiving diagnostic table is derived from the original unary occurrence and the same compiled preparation. Public constructors retain their existing premises.
+
+The fixture keeps all thirteen original declarations. Two explicitly named compilations separate the supported proof scope from complete runtime coverage. `compileNamedHeaderFixture` selects twelve named/header entries and is accepted by the automatic proof profile. `compileFixture` retains all thirteen entries, including the captured-mapping factory; that complete compilation is executable and is explicitly rejected by the proof profile. The factory's projected unary body still requires an extension of the prepared closure body certificate. Existing supported closure bodies, including projected value assignments, retain their earlier coverage.
+
+Independent ordinary Source traces cover an existing-key complement, default-zero insertion, ordered nested keys, for initialization, and a genuine uninitialized key read. A scalar helper establishes the initial public state before mapping calls. The public continuations preserve complete mapping results, the actual failure heap and reuse of the same issued session. Forward conclusions also allow authentic earlier stage rejection. The selected session checks success, an uninitialized key read and reuse, with native heap sizes `13 / 19 / 34 / 43 / 58`. Runtime companions cover duplicate-key precedence, insertion order, key-call effects, continue/break behavior, virtual local mappings and repeated calls through a captured mapping handle. The complete thirteen-entry runtime sequence has native heap sizes `14 / 20 / 35 / 50 / 83 / 104 / 120 / 136 / 143 / 158 / 167 / 182 / 206 / 221 / 224 / 239 / 254`.
+
+Validation: 180 changed or new modules checked in a coherent graph of 7,910 modules. Every one of the 2,843 transitively affected modules was freshly elaborated from source. All 17 focused runtime markers and 3,098 endpoint audits pass. Full build (7,950 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Next, extend the prepared closure certificate to accept projected unary bodies and connect the factory through the same selected public proof. Other projected place forms, broader raw target types, generalized locals and full compiler-pass composition remain open. Runtime unification is complete; the second goal remains incomplete.
 
 ## Mapping element assignment reaches the public proof (2026-10-15)
 
