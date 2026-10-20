@@ -15283,3 +15283,138 @@ theorem inferMatchCasesFuel_state_header
     (inferMatchCasesFuel_state_header success)
 
 end Solcore.Frontend.SourceInference.Detail
+
+/-! Exact helper scope and allocator facts for local-reference provenance. -/
+namespace Solcore.Frontend.SourceInference.Detail
+open TypeSystem
+
+theorem localReadScope_withExpected_lexicalScope
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    result.state.lexicalScope = state.lexicalScope  := by
+  exact withExpected_lexicalScope success
+
+theorem localReadScope_withExpected_nextLocal
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    result.state.nextLocal = state.nextLocal  := by
+  exact withExpected_nextLocal success
+
+theorem localReadScope_unify_preserves_nextLocal
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.nextLocal = state.nextLocal  := by
+  exact unify_preserves_nextLocal success
+
+theorem localReadScope_recordExpressionWithExpected_lexicalScope
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    result.2.lexicalScope = state.lexicalScope  := by
+  exact recordExpressionWithExpected_lexicalScope success
+
+theorem localReadScope_recordExpressionWithExpected_nextLocal
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    result.2.nextLocal = state.nextLocal  := by
+  exact recordExpressionWithExpected_nextLocal success
+
+theorem localReadScope_inferUnaryOperator_lexicalScope
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope  := by
+  exact inferUnaryOperator_lexicalScope success
+
+theorem localReadScope_inferUnaryOperator_nextLocal
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    result.state.nextLocal = state.nextLocal  := by
+  exact inferUnaryOperator_nextLocal success
+
+theorem localReadScope_inferBinaryOperator_lexicalScope
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope  := by
+  exact inferBinaryOperator_lexicalScope success
+
+theorem localReadScope_inferBinaryOperator_nextLocal
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    result.state.nextLocal = state.nextLocal  := by
+  exact inferBinaryOperator_nextLocal success
+
+theorem localReadScope_selectFunctionCandidateFrom_lexicalScope
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope  := by
+  exact selectFunctionCandidateFrom_lexicalScope success
+
+theorem localReadScope_selectFunctionCandidateFrom_nextLocal
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    result.state.nextLocal = state.nextLocal  := by
+  exact selectFunctionCandidateFrom_nextLocal success
+
+theorem localReadScope_applyFunctionType_lexicalScope
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope  := by
+  exact applyFunctionType_lexicalScope success
+
+theorem localReadScope_applyFunctionType_nextLocal
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    result.state.nextLocal = state.nextLocal  := by
+  exact applyFunctionType_nextLocal success
+
+theorem localReadScope_bindLambdaParameters_nextLocal_le
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {state : State}
+    {result : List TypedBinder × List Ty × State}
+    (success : bindLambdaParameters context parameters index seen state =
+      .ok result) :
+    state.nextLocal ≤ result.2.2.nextLocal  := by
+  exact bindLambdaParameters_nextLocal_le success
+
+end Solcore.Frontend.SourceInference.Detail

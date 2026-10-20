@@ -6,6 +6,10 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Accepted selected compilation now connects every discovered local instance to its exact original initialized binder and generalization event. The proof follows all eleven mutually recursive inference operations, including nested lambdas, both let annotation paths, match branches and for headers. References to initializer locals that have left scope are traced back to their actual occurrence before generalization. Scope restoration uses saved binders and real allocator bounds.
+
+The same original function check retains body inference, return-type unification and finalization. Its actual finalizer constructs `FinalInferenceResources`, including the solved ledger, substitution and local no-capture facts. The selected row preserves both the solver and parameter substitutions. The connection uses actual compiler success and selected-row membership; it adds no assumed generalization, body-typing or compiler-pass law. Original declarative typing for generalized initializers, the general selected checker bridge, broader materialized bodies and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 Mapping reads now join the common mixed expression tree through actual compiler receipts. Base evaluation precedes key evaluation. The general comparator retains structural and callable key meaning; the concrete function model derives identity and runtime-type observations. Source lifting and Core preservation/reflection retain child faults, missing-default diagnostics and the reached mixed heap, including native administrative allocations. Broader materialized bodies, the general selected checker bridge and complete compiler-pass coverage remain unfinished.
 
 Primitive unary and binary expressions now join the common mixed compiler tree. Actual accepted receipts supply scalar selection and the emitted code. Preservation/reflection and ordinary Source lifting retain left-to-right evaluation, short circuit behavior, genuine faults and the exact reached heap.
@@ -16,7 +20,7 @@ The common mixed expression tree now accepts conditional expressions from the ac
 
 The common mixed body producer now follows actual for-loop compilation, including initializer scope, the loop condition and post items. Source lifting and Core preservation/reflection retain generalized closures, ordinary cells and the actual reached heap. Continue executes the post before the next condition; break skips it.
 
-Successful selected compilation now derives local lookup and requirement events, validated local template ownership, and the origins and coverage of every final prepared open-call edge from its actual computation. This includes rows appended by operator and coercion selection. The general selected checker theorem still needs to connect these facts to full original declarative typing; generalization timing, reference containment and complete compiler-pass semantics remain open.
+Successful selected compilation now derives local lookup and requirement events, validated local template ownership, and the origins and coverage of every final prepared open-call edge from its actual computation. This includes rows appended by operator and coercion selection. The general selected checker theorem still needs to connect these facts to full original declarative typing; original generalized initializer typing and complete compiler-pass semantics remain open.
 
 Retained builtin handles in mixed sessions now connect actual exported entries and packed inputs to independent ordinary Source success, sufficient public execution/output, and native reflection. The full original fixture proves each call before execution, including reuse of the same handle after an intervening factory call. See the latest implementation checkpoint for validation.
 

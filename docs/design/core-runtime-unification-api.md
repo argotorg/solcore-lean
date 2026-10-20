@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected local bindings retain actual generalization and finalization (2026-10-20)
+
+`SourceCompiledLocalBindings` derives exact collector membership from the actual worklist. `SourceCompiledLocalGeneralizationBoundaries` connects it to the original inference event and the final inferred-body read boundary. `SourceCompiledLocalFinalization.BodyReceipt` retains one actual body-check computation; `SourceCompiledSelectedFinalization.of_compile` supplies that receipt and the selected parameter specialization. The finalizer connection uses this same witness for the event and solver resources.
+
+Original declarative typing for generalized initializers, the general selected checker bridge, broader materialized bodies and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Mixed mapping reads reach retained public execution (2026-10-20)
 
 `CellAwareScopeIndexBounds` and `CellAwareScopeSourceIndexLifting` connect ordered child execution to the actual lookup helper. `CompatibleCellIndexLookup` preserves mixed cells through comparator allocations. `CellAwareNamedIndexDiagnostics` derives missing-default tokens from the actual original issuer and public receiver. The concrete named expression meaning supplies comparator conditions internally; public signatures retain their previous premises.

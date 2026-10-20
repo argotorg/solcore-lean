@@ -2596,3 +2596,208 @@ theorem CallEdge.SourceOrigin.original_occurrence {program : CheckedProgram}
       exact unchanged.trans receipt.emitted.2.1.symm
 
 end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem
+
+private theorem insertLocalLambdaInstance_bindings {bindings : List LocalLambdaBinding}
+    {instances : List LocalLambdaInstance} {localInstance : LocalLambdaInstance}
+    (prior : ∀ value ∈ instances, value.binding ∈ bindings)
+    (current : localInstance.binding ∈ bindings) :
+    ∀ value ∈ insertLocalLambdaInstance instances localInstance, value.binding ∈ bindings := by
+  unfold insertLocalLambdaInstance
+  split
+  · exact prior
+  · intro value member
+    rcases List.mem_append.mp member with old | added
+    · exact prior value old
+    · cases List.mem_singleton.mp added
+      exact current
+
+private theorem exactLocalLambdaBinding_member {bindings : List LocalLambdaBinding}
+    {id : Resolved.LocalId} {binding : LocalLambdaBinding}
+    (accepted : exactLocalLambdaBinding? bindings id = some binding) : binding ∈ bindings := by
+  unfold exactLocalLambdaBinding? at accepted
+  split at accepted <;> try contradiction
+  rename_i only selected
+  cases Option.some.inj accepted
+  have member : binding ∈ bindings.filter (fun value => value.binder.id == id) := by
+    rw [selected]
+    exact List.mem_cons_self
+  exact (List.mem_filter.mp member).1
+
+private theorem collectGroundLocalLambdaInstances_bindings
+    (bindings : List LocalLambdaBinding) (nodes : List Node)
+    (prior result : List LocalLambdaInstance)
+    (origins : ∀ value ∈ prior, value.binding ∈ bindings)
+    (accepted : collectGroundLocalLambdaInstances bindings nodes prior = .ok result) :
+    ∀ value ∈ result, value.binding ∈ bindings := by
+  induction nodes generalizing prior with
+  | nil =>
+      cases Except.ok.inj accepted
+      exact origins
+  | cons head tail ih =>
+      cases head with
+      | statement statement => exact ih prior origins accepted
+      | expression expression =>
+        cases form : expression.form <;>
+          simp only [collectGroundLocalLambdaInstances, form] at accepted
+        all_goals try exact ih prior origins accepted
+        rename_i name resolution
+        cases resolution <;> simp only at accepted
+        all_goals try exact ih prior origins accepted
+        rename_i id
+        cases found : exactLocalLambdaBinding? bindings id with
+        | none =>
+            simp only [found] at accepted
+            exact ih prior origins accepted
+        | some binding =>
+            simp only [found] at accepted
+            split at accepted
+            · exact ih prior origins accepted
+            · cases matched : SourceSpecialization.matchClosedSchemeInstance? binding.binder.scheme expression.rawType with
+              | none => simp [matched, bind, Except.bind, throw] at accepted
+              | some substitution =>
+                  simp only [matched, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+                  apply ih _ (insertLocalLambdaInstance_bindings origins ?_) accepted
+                  exact exactLocalLambdaBinding_member found
+
+private theorem collectContextualLocalLambdaInstances_bindings
+    (bindings : List LocalLambdaBinding) (parent : LocalLambdaInstance)
+    (nodes : List Node)
+    (prior result : List LocalLambdaInstance)
+    (origins : ∀ value ∈ prior, value.binding ∈ bindings)
+    (accepted : collectContextualLocalLambdaInstances bindings parent nodes prior = .ok result) :
+    ∀ value ∈ result, value.binding ∈ bindings := by
+  induction nodes generalizing prior with
+  | nil =>
+      cases Except.ok.inj accepted
+      exact origins
+  | cons head tail ih =>
+      cases head with
+      | statement statement => exact ih prior origins accepted
+      | expression expression =>
+        cases form : expression.form <;>
+          simp only [collectContextualLocalLambdaInstances, form] at accepted
+        all_goals try exact ih prior origins accepted
+        rename_i name resolution
+        cases resolution <;> simp only at accepted
+        all_goals try exact ih prior origins accepted
+        rename_i id
+        cases found : exactLocalLambdaBinding? bindings id with
+        | none =>
+            simp only [found] at accepted
+            exact ih prior origins accepted
+        | some binding =>
+            simp only [found] at accepted
+            split at accepted
+            · exact ih prior origins accepted
+            · cases matched : SourceSpecialization.matchClosedSchemeInstance?
+                  (Scheme.apply parent.substitution binding.binder.scheme)
+                  (parent.substitution.apply expression.rawType) with
+              | none => simp [matched, bind, Except.bind, throw] at accepted
+              | some substitution =>
+                  simp only [matched, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+                  apply ih _ (insertLocalLambdaInstance_bindings origins ?_) accepted
+                  exact exactLocalLambdaBinding_member found
+
+private theorem rootLocalLambdaInstances_bindings {source : TypedSource}
+    {bindings : List LocalLambdaBinding} {result : List LocalLambdaInstance}
+    (accepted : rootLocalLambdaInstances source bindings = .ok result) :
+    ∀ value ∈ result, value.binding ∈ bindings := by
+  unfold rootLocalLambdaInstances at accepted
+  cases selected : directLexicalNodeIds source (bindings.map (·.initializer)) source.roots with
+  | error error => simp [selected, bind, Except.bind] at accepted
+  | ok ids =>
+      simp only [selected, bind, Except.bind] at accepted
+      exact collectGroundLocalLambdaInstances_bindings bindings (selectedNodes ids source.nodes)
+        [] result (by simp) accepted
+
+private theorem appendLocalLambdaInstances_bindings {bindings : List LocalLambdaBinding}
+    (left right : List LocalLambdaInstance)
+    (prior : ∀ value ∈ left, value.binding ∈ bindings)
+    (added : ∀ value ∈ right, value.binding ∈ bindings) :
+    ∀ value ∈ appendLocalLambdaInstances left right, value.binding ∈ bindings := by
+  unfold appendLocalLambdaInstances
+  induction right generalizing left with
+  | nil => exact prior
+  | cons head tail ih =>
+      simp only [List.foldl_cons]
+      exact ih _ (insertLocalLambdaInstance_bindings prior (added head List.mem_cons_self))
+        (fun value member => added value (List.mem_cons_of_mem _ member))
+
+private theorem closeLocalLambdaInstancesAux_bindings {source : TypedSource}
+    (bindings : List LocalLambdaBinding) (fuel : Nat)
+    (seen frontier result : List LocalLambdaInstance)
+    (known : ∀ value ∈ seen, value.binding ∈ bindings)
+    (accepted : closeLocalLambdaInstancesAux source bindings seen frontier fuel = .ok result) :
+    ∀ value ∈ result, value.binding ∈ bindings := by
+  induction fuel generalizing seen frontier with
+  | zero =>
+      cases frontier with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons head rest => simp [closeLocalLambdaInstancesAux, throw] at accepted
+  | succ fuel ih =>
+      cases frontier with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons parent rest =>
+          simp only [closeLocalLambdaInstancesAux] at accepted
+          cases bodyIds : localLambdaBodyNodeIds source bindings parent.binding with
+          | error error => simp [bodyIds, bind, Except.bind] at accepted
+          | ok ids =>
+              simp only [bodyIds, bind, Except.bind] at accepted
+              cases discovered : collectContextualLocalLambdaInstances bindings parent
+                  (selectedNodes ids source.nodes) [] with
+              | error error => simp [discovered] at accepted
+              | ok found =>
+                  simp only [discovered] at accepted
+                  have foundOrigins := collectContextualLocalLambdaInstances_bindings bindings parent
+                    (selectedNodes ids source.nodes) [] found (by simp) discovered
+                  have freshOrigins : ∀ value ∈ found.filter (fun value => !seen.contains value),
+                      value.binding ∈ bindings :=
+                    fun value member => foundOrigins value (List.mem_filter.mp member).1
+                  apply ih _ _
+                    (appendLocalLambdaInstances_bindings _ _ known freshOrigins) accepted
+
+/-- Every discovered instance uses a binding from the actual source collector. -/
+theorem localLambdaInstances_bindings {source : TypedSource} {contextFuel : Option Nat}
+    {result : List LocalLambdaInstance}
+    (accepted : localLambdaInstances source contextFuel = .ok result) :
+    ∀ value ∈ result, value.binding ∈ localLambdaBindings source := by
+  cases contextFuel <;> simp only [localLambdaInstances] at accepted
+  all_goals
+    obtain ⟨roots, initial, afterInitial⟩ := except_bind_ok _ _ _ accepted
+    obtain ⟨values, closed, afterClosed⟩ := except_bind_ok _ _ _ afterInitial
+    obtain ⟨_, _, completed⟩ := except_bind_ok _ _ _ afterClosed
+    have same : values = result := by simpa only [pure, Pure.pure, Except.pure, Except.ok.injEq] using completed
+    subst result
+    have rootsOrigin := rootLocalLambdaInstances_bindings initial
+    exact closeLocalLambdaInstancesAux_bindings _ _ _ _ _ rootsOrigin closed
+
+/-- The actual collector retains the complete original binder and initializer. -/
+theorem localLambdaBindings_statement_origin {source : TypedSource} {binding : LocalLambdaBinding}
+    (member : binding ∈ localLambdaBindings source) :
+    ∃ statement : StatementNode, Node.statement statement ∈ source.nodes ∧
+      statement.form = .letDecl binding.binder (some binding.initializer) := by
+  change binding ∈ directPolymorphicLambdaBindings source at member
+  obtain ⟨node, present, found⟩ := List.mem_filterMap.mp member
+  cases node with
+  | expression expression => simp at found
+  | statement statement =>
+    cases statement with
+    | mk id span type form =>
+      cases form
+      all_goals try contradiction
+      rename_i binder initializer
+      cases initializer with
+      | none => contradiction
+      | some initializer =>
+        change (if binder.scheme.quantified.isEmpty ||
+          !SourceSpecialization.isDirectLambdaInitializer source initializer then none
+          else some { binder, initializer }) = some binding at found
+        split at found
+        · contradiction
+        · cases Option.some.inj found
+          exact ⟨⟨id,span,type,.letDecl binder (some initializer)⟩, present, rfl⟩
+
+end Solcore.Frontend.SourceSpecializationWorklist
