@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual initializer prefixes supply prior quantifier conditions (2026-10-20)
+
+Original top-level initialized statements now derive the freshness condition against earlier local scheme quantifiers from their actual checker prefix. The proof follows exact binder origins, allocation bounds, template backing and the privacy of every active scheme through the real initializer call.
+
+The selected initializer receipt opens the same child scope used by declarative typing, adds the actual retained initializer frame and supplies the existing generalized-let certificate. Final predicate formation comes from the selected whole-body check and solver. Prior-quantifier blocking comes from the derived prefix privacy and the current local context alignment.
+
+The public compilation endpoint joins these facts for one selected body and one exact initializer occurrence. Its remaining semantic inputs are the selected-scope generalization barrier and typing of that particular smaller child in the scope just opened. It requires no source-monomorphism condition or assumed whole-body typing theorem.
+
+Validation: 8 changed modules in a coherent graph of 8,792 modules, 62 retained runtime invocations and 6,693 endpoint audits. Full build (8,831 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The child typing callback still needs the generalized recursive checker proof, and successful selected compilation must still supply the final generalization barrier. Unconditional prefix selection currently covers top-level initialized statements; nested blocks, headers and lambdas need the corresponding connections. Complete compiler-pass preservation also remains unfinished.
+
+The target is successful selected compilation. Checker acceptance alone does not imply the current global solved-ledger barrier for a nested qualified local scheme. The retained counterexample is rejected by the selected compiler; deriving the needed exclusion from actual compiled call edges and local instances is still in progress.
+
 ## Initializer conditions follow actual checking and finalization (2026-10-20)
 
 All eleven mutually recursive inference operations now preserve normalized type and predicate formation. The proof follows all 76 executable cases, including generalized declarations, calls, operators, constructors, mappings, loops and match branches. The selected function check supplies the initial formation, final substitution and capture checks.

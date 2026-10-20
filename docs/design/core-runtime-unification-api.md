@@ -4,6 +4,16 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual initializer prefixes supply prior quantifier conditions (2026-10-20)
+
+`Selected.initializedPriorPrivate` and `compile_initialized_prior_private` derive `InitializedPriorPrivate` from the actual selected prefix. Its `prior_blocked` method consumes local context alignment and supplies `PriorQuantifiersBlockedAt` for the exact initializer boundary.
+
+`InitializerContinuation.enter` opens the allocated child scope and its retained frame. `certificate_of_child` consumes typing of that smaller child and the selected-scope barrier. `InitializedPriorPrivate.certificate_of_child` internally supplies the prior condition. `Selected.initializedCertificate_of_child` and `compile_initialized_certificate_of_child` connect this consumer to the actual selected checker and public compiler receipts.
+
+Goal two remains incomplete. The child typing callback still needs the generalized recursive checker proof, and successful selected compilation must still supply the final generalization barrier. Unconditional prefix selection currently covers top-level initialized statements; nested blocks, headers and lambdas need the corresponding connections. Complete compiler-pass preservation also remains unfinished.
+
+The target is successful selected compilation. Checker acceptance alone does not imply the current global solved-ledger barrier for a nested qualified local scheme. The retained counterexample is rejected by the selected compiler; deriving the needed exclusion from actual compiled call edges and local instances is still in progress.
+
 ## Initializer conditions follow actual checking and finalization (2026-10-20)
 
 `Selected.normalizedBodyFormation` and `compile_normalized_ledger` derive formation from the actual selected original body. `Selected.normalizedSolvedLedger` and `normalizedTemplatePredicate` transport it through the same final solver and exact template owner. `FinalizedBindingEvent.finalPredicates` and `InitializerContinuation.finalPredicates` supply the existing generalized initializer certificate interface.
