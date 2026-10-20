@@ -4,6 +4,16 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized initializer certificates produce source statement typing (2026-10-20)
+
+`InitializerContinuation.statement_of_certificate` derives the actual statement typing, following `ActiveLocalContextInvariant` and `ActualContext`, and matching result facts. `InitializedPriorPrivate.statement_of_child` consumes the exact child proof and selected generalization barrier while deriving prior privacy and predicate formation internally.
+
+`GeneralizedActualStateInvariant` carries the operational conditions without `SourceMonomorphic`. Its `ofRetainedInitializer` method needs only the exact allocated binder in the final raw source. `PrivateBlockContinuation.of_selected` constructs the nested privacy carrier; `enter_block`, `enter_while_body` and `enter_if_without_else` follow real child calls. Its `initialized` method returns `InitializedReceiptPrivate` for the selected nested declaration.
+
+Goal two remains incomplete. Semantic typing of the concrete smaller child and the selected-scope generalization barrier are still explicit in the statement consumer. The generalized mutual recursive checker proof must connect these consumers and transport raw scheme isolation. Nested privacy descent through both-arm conditionals, for loops, match and lambdas remains under implementation, as does complete compiler-pass preservation.
+
+The operational initializer theorem applies to lambda-local declarations when their exact retained binder and continuation are provided. It does not establish complete lambda descent or the entire selected checker soundness theorem.
+
 ## Actual initializer prefixes supply prior quantifier conditions (2026-10-20)
 
 `Selected.initializedPriorPrivate` and `compile_initialized_prior_private` derive `InitializedPriorPrivate` from the actual selected prefix. Its `prior_blocked` method consumes local context alignment and supplies `PriorQuantifiersBlockedAt` for the exact initializer boundary.

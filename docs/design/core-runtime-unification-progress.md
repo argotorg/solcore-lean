@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized initializer certificates produce source statement typing (2026-10-20)
+
+The actual selected initializer certificate now produces the ordinary Source statement judgment and the active context used by following statements. The proof installs the exact allocated binder, derives its scheme and requirement formation, and uses the matching monomorphic or generalized typing rule in the same finalized whole source.
+
+The generalized operational invariant carries the actual requirement ledger, binder origins, quantifier bounds, privacy and backing constraint rows. Actual initialization, allocation and expression inference construct or preserve it. An initialized declaration only needs its own retained binder and final substitution continuation; unrelated node updates do not require a whole node-table prefix. The declaration proof also works inside a lambda whose return type still contains inference variables.
+
+Starting from the real selected function check, nested scoped blocks, while bodies and if statements without an else preserve prefix privacy and their actual continuation to the same finalizer. Their initialized declarations derive prior-variable avoidance, older template provenance and final privacy without an assumed body-typing theorem. These descents can be composed.
+
+Validation: 14 changed modules in a coherent graph of 8,805 modules, 62 retained runtime invocations and 6,722 endpoint audits. Full build (8,844 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Semantic typing of the concrete smaller child and the selected-scope generalization barrier are still explicit in the statement consumer. The generalized mutual recursive checker proof must connect these consumers and transport raw scheme isolation. Nested privacy descent through both-arm conditionals, for loops, match and lambdas remains under implementation, as does complete compiler-pass preservation.
+
+The operational initializer theorem applies to lambda-local declarations when their exact retained binder and continuation are provided. It does not establish complete lambda descent or the entire selected checker soundness theorem.
+
 ## Actual initializer prefixes supply prior quantifier conditions (2026-10-20)
 
 Original top-level initialized statements now derive the freshness condition against earlier local scheme quantifiers from their actual checker prefix. The proof follows exact binder origins, allocation bounds, template backing and the privacy of every active scheme through the real initializer call.

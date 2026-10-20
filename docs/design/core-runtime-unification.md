@@ -6,6 +6,16 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The actual selected initializer certificate now produces the ordinary Source statement judgment and the active context used by following statements. The proof installs the exact allocated binder, derives its scheme and requirement formation, and uses the matching monomorphic or generalized typing rule in the same finalized whole source.
+
+The generalized operational invariant carries the actual requirement ledger, binder origins, quantifier bounds, privacy and backing constraint rows. Actual initialization, allocation and expression inference construct or preserve it. An initialized declaration only needs its own retained binder and final substitution continuation; unrelated node updates do not require a whole node-table prefix. The declaration proof also works inside a lambda whose return type still contains inference variables.
+
+Starting from the real selected function check, nested scoped blocks, while bodies and if statements without an else preserve prefix privacy and their actual continuation to the same finalizer. Their initialized declarations derive prior-variable avoidance, older template provenance and final privacy without an assumed body-typing theorem. These descents can be composed.
+
+Goal two remains incomplete. Semantic typing of the concrete smaller child and the selected-scope generalization barrier are still explicit in the statement consumer. The generalized mutual recursive checker proof must connect these consumers and transport raw scheme isolation. Nested privacy descent through both-arm conditionals, for loops, match and lambdas remains under implementation, as does complete compiler-pass preservation.
+
+The operational initializer theorem applies to lambda-local declarations when their exact retained binder and continuation are provided. It does not establish complete lambda descent or the entire selected checker soundness theorem.
+
 Original top-level initialized statements now derive the freshness condition against earlier local scheme quantifiers from their actual checker prefix. The proof follows exact binder origins, allocation bounds, template backing and the privacy of every active scheme through the real initializer call.
 
 The selected initializer receipt opens the same child scope used by declarative typing, adds the actual retained initializer frame and supplies the existing generalized-let certificate. Final predicate formation comes from the selected whole-body check and solver. Prior-quantifier blocking comes from the derived prefix privacy and the current local context alignment.
