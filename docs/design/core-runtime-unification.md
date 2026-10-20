@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Every actual cached ordinary function now supplies its original checker receipt and executable interfaces, including helper functions added during implementation-method preparation. Those interfaces feed the existing generalized body proof and full FunctionDefinition.Valid, conditional only on the exact initializer barriers.
+
+Implementation methods now supply the same original checking budget, synthetic signature, header formation, rigid predicate scope and normalized finalizer state from actual catalog membership and method selection. A shared BodySelection retains the exact body receipt for either ordinary or method origins.
+
+Successful specialization closes every solved predicate outside the actual template inventory. Rigid parameter substitution retains flexible variables, so closure transfers to the original finalizer. Actual preparation supplies this result for all cached rows, including later ordinary helpers and implementation methods.
+
+Goal two remains incomplete. The generalized recursive checker must consume the shared method carrier, and successful compilation must derive the full initializer barriers. Remaining compiler passes and the final Source/Core/public meaning-preservation theorem are still open.
+
 Direct-call requirements retain their raw predicate and catalog origin through all eleven inference paths. The same body finalizer pairs each raw row with its solved predicate; parameter specialization retains that exact pairing.
 
 Successful selected compilation now confines each original finalized template predicate to its original owner quantifiers. Closed emitters exclude flexible variables through the exact paired predicate. Open emitters use the actual discovered instance and qualified-read metadata.

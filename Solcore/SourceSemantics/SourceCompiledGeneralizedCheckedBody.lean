@@ -34,16 +34,18 @@ private theorem roots_injective {left right : List StatementId}
           subst other
           exact congrArg (List.cons head) (ih same.2)
 
-theorem checked_statements_of_recursive {raw : Workspace.RawWorkspace}
+theorem checked_statements_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
     (selected : Selected compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (member : row ∈ compiled.plan.specializations)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
     (sound : StatementsRootedSoundness selected fuel) :
     CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original := by
   obtain ⟨target, entry, finalContext, facts, _, _, _, typed, matching⟩ :=
-    body_of_recursive selected checked member sound
+    body_of_recursive_of_interfaces selected checked interfaces sound
   have header := selected_body_header selected checked
   have returnFixed : selected.body.finalized.substitution.apply
       (Ty.productMany selected.signature.returnTypes) = Ty.productMany selected.signature.returnTypes := by
@@ -72,6 +74,30 @@ theorem checked_statements_of_recursive {raw : Workspace.RawWorkspace}
 
 /-- This is the original checked body's complete declarative judgment.
 The caller supplies the recursive assembly at the same selected receipt. -/
+theorem checked_body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (sound : StatementsRootedSoundness selected fuel) :
+    CheckedBodyHasType compiled.program.signatures selected.signature selected.original :=
+  checkedBodyHasType_ofStatements selected.body.accepted
+    (checked_statements_of_recursive_of_interfaces selected checked interfaces sound)
+
+theorem checked_statements_of_recursive {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (member : row ∈ compiled.plan.specializations)
+    (sound : StatementsRootedSoundness selected fuel) :
+    CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original :=
+  checked_statements_of_recursive_of_interfaces selected checked
+    (selected_original_interfaces selected member) sound
+
 theorem checked_body_of_recursive {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
@@ -80,7 +106,7 @@ theorem checked_body_of_recursive {raw : Workspace.RawWorkspace}
     (member : row ∈ compiled.plan.specializations)
     (sound : StatementsRootedSoundness selected fuel) :
     CheckedBodyHasType compiled.program.signatures selected.signature selected.original :=
-  checkedBodyHasType_ofStatements selected.body.accepted
-    (checked_statements_of_recursive selected checked member sound)
+  checked_body_of_recursive_of_interfaces selected checked
+    (selected_original_interfaces selected member) sound
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

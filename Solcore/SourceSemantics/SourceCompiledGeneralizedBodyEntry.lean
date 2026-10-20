@@ -97,10 +97,12 @@ structure BodyEntry (selected : Selected compiled row fuel)
 
 /-- All entry conditions belong to the same original successful body check.
 Actual executable preparation supplies the complete source interfaces. -/
-theorem body_entry {raw : Workspace.RawWorkspace}
+theorem body_entry_of_interfaces {raw : Workspace.RawWorkspace}
     (selected : Selected compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (member : row ∈ compiled.plan.specializations) :
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource) :
     ∃ target, BodyEntry selected target := by
   have header := selected_body_header selected checked
   obtain ⟨target, inputs⟩ := header.inputs_extend
@@ -187,7 +189,7 @@ theorem body_entry {raw : Workspace.RawWorkspace}
         (StructuralSubstitution.TypesWellFormed.toTypesWellScoped header.return_types)⟩)
   · refine {
       accepted := selected.body.inferred
-      interfaces := selected_original_interfaces selected member
+      interfaces := interfaces
       extension := progress.final_substitution
       scope := .refl selected
       invariant
@@ -219,17 +221,41 @@ theorem body_entry {raw : Workspace.RawWorkspace}
     · intro child _
       exact ActualContext.covers_empty (.statement child)
 
+theorem body_entry {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (member : row ∈ compiled.plan.specializations) :
+    ∃ target, BodyEntry selected target :=
+  body_entry_of_interfaces selected checked (selected_original_interfaces selected member)
+
 /-- The recursive assembly is applied at the real whole-body entry, with its
 safe return type and state/context invariants discharged by accepted checking. -/
+theorem body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (sound : StatementsRootedSoundness selected fuel) :
+    ∃ target, BodyEntry selected target ∧
+      StatementsConclusion selected (checkingContext selected)
+        (Ty.productMany selected.signature.returnTypes) selected.body.body [] target := by
+  obtain ⟨target, entry⟩ := body_entry_of_interfaces selected checked interfaces
+  exact ⟨target, entry, sound entry.returnSafe entry.returnAdmissible entry.boundary⟩
+
 theorem body_of_recursive {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
     (selected : Selected compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations)
     (sound : StatementsRootedSoundness selected fuel) :
     ∃ target, BodyEntry selected target ∧
       StatementsConclusion selected (checkingContext selected)
-        (Ty.productMany selected.signature.returnTypes) selected.body.body [] target := by
-  obtain ⟨target, entry⟩ := body_entry selected checked member
-  exact ⟨target, entry, sound entry.returnSafe entry.returnAdmissible entry.boundary⟩
+        (Ty.productMany selected.signature.returnTypes) selected.body.body [] target :=
+  body_of_recursive_of_interfaces selected checked
+    (selected_original_interfaces selected member) sound
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual cached bodies supply checker inputs and closed ledger predicates (2026-10-20)
+
+Every actual cached ordinary function now supplies its original checker receipt and executable interfaces, including helper functions added during implementation-method preparation. Those interfaces feed the existing generalized body proof and full FunctionDefinition.Valid, conditional only on the exact initializer barriers.
+
+Implementation methods now supply the same original checking budget, synthetic signature, header formation, rigid predicate scope and normalized finalizer state from actual catalog membership and method selection. A shared BodySelection retains the exact body receipt for either ordinary or method origins.
+
+Successful specialization closes every solved predicate outside the actual template inventory. Rigid parameter substitution retains flexible variables, so closure transfers to the original finalizer. Actual preparation supplies this result for all cached rows, including later ordinary helpers and implementation methods.
+
+Validation: 14 changed modules in a coherent graph of 8,976 modules, 71 retained runtime invocations and 7,327 endpoint audits. Full build (9,015 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The generalized recursive checker must consume the shared method carrier, and successful compilation must derive the full initializer barriers. Remaining compiler passes and the final Source/Core/public meaning-preservation theorem are still open.
+
 ## Original template predicates retain their actual owner scope (2026-10-20)
 
 Direct-call requirements retain their raw predicate and catalog origin through all eleven inference paths. The same body finalizer pairs each raw row with its solved predicate; parameter specialization retains that exact pairing.

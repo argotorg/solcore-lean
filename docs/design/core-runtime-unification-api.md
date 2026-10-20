@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual cached bodies supply checker inputs and closed ledger predicates (2026-10-20)
+
+SourceCompiledCachedOrdinaryBody connects the actual cache to original ordinary body validity. SourceCompiledCachedMethodInputs and SourceCompiledCachedBodySelection retain original method inputs and same-source BodySelection. SourceCompiledNonTemplateLedger.cached_closed and finalized_closed derive non-template ledger closure from actual preparation and specialization.
+
+The common carrier adds no body typing premise. Its ordinary adapter preserves original, signature and body fields definitionally. The generalized body theorem still states its exact initializer-barrier dependency explicitly.
+
+Goal two remains incomplete. The generalized recursive checker must consume the shared method carrier, and successful compilation must derive the full initializer barriers. Remaining compiler passes and the final Source/Core/public meaning-preservation theorem are still open.
+
 ## Original template predicates retain their actual owner scope (2026-10-20)
 
 `SourceCompiledDirectCallPredicateOrigins` connects actual direct-call issuance with the same finalizer and specialization. `SourceCompiledGeneralizedBarrierConnection.original_template_scoped` and `original_solved_template_scoped` keep the original template owner and ledger predicate while proving their variable scope from successful compilation.

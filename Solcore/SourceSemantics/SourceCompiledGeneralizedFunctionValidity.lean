@@ -10,12 +10,14 @@ open SourceCompiledLocalFinalization
 
 /-- Complete validity for the original ordinary definition selected by this
 compiler row. The barrier producer is tied to the same selected body. -/
-theorem function_valid_of_barriers
+theorem function_valid_of_barriers_of_interfaces
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
     (selected : Selected compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (member : row ∈ compiled.plan.specializations)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
     (barriers : SelectedInitializerBarriers selected) :
     FunctionDefinition.Valid compiled.program.signatures
       (FunctionDefinition.ofChecked selected.original) := by
@@ -27,6 +29,18 @@ theorem function_valid_of_barriers
       ((checkFunctionBody_success_declaration bodySuccess).symm.trans
         (checkFunctionBody_success_declaration selected.body.accepted))
   subst signature
-  exact checked_body_of_barriers selected checked member barriers
+  exact checked_body_of_barriers_of_interfaces selected checked interfaces barriers
+
+theorem function_valid_of_barriers {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (member : row ∈ compiled.plan.specializations)
+    (barriers : SelectedInitializerBarriers selected) :
+    FunctionDefinition.Valid compiled.program.signatures
+      (FunctionDefinition.ofChecked selected.original) :=
+  function_valid_of_barriers_of_interfaces selected checked
+    (selected_original_interfaces selected member) barriers
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

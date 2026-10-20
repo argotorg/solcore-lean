@@ -33,4 +33,32 @@ theorem checked_body_of_barriers {raw : Workspace.RawWorkspace}
   checkedBodyHasType_ofStatements selected.body.accepted
     (checked_statements_of_barriers selected checked member barriers)
 
+/-- Executable interfaces may come from any actual cached ordinary row,
+including one discovered after the initial specialization frontier. -/
+theorem checked_statements_of_barriers_of_interfaces {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (barriers : SelectedInitializerBarriers selected) :
+    CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original :=
+  checked_statements_of_recursive_of_interfaces selected checked interfaces
+    (recursiveSoundness_of_barriers checked barriers fuel).2.2.1
+
+theorem checked_body_of_barriers_of_interfaces {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (barriers : SelectedInitializerBarriers selected) :
+    CheckedBodyHasType compiled.program.signatures selected.signature selected.original :=
+  checkedBodyHasType_ofStatements selected.body.accepted
+    (checked_statements_of_barriers_of_interfaces selected checked interfaces barriers)
+
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
