@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Materialized local bodies preserve duplicate reads, captures and literals (2026-10-20)
+
+Actual materialized local lambda bodies now accept finite trees of literals, ordinary reads, groups and pairs. Their certificates come from the same accepted contextual compiler and actual parameter/capture scopes. Completion follows the ordered children and retains read failures, per-occurrence diagnostics, lazy mapping reads, reached heaps, descriptor metadata and native administrative cells. Source and Core may use different execution sizes.
+
+The complete original fixture declares `f = lam(value) { return ((value, value), (flag, 0)); }` and calls it at Word and Bool. Original declarative typing supplies the actual closure frame and numeric evidence. Independent Source plans precede every public resume with inputs `true`, `false`, `true`; the original function, cache and profile each retain their full single entry. Native heap sizes are `2 / 14 / 26 / 38`.
+
+Validation: 32 changed modules in a coherent graph of 8,621 modules, 56 retained runtime invocations and 5,980 endpoint audits. Full build (8,661 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Broader materialized statement bodies, original generalized initializer typing, the general selected checker bridge and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Selected local bindings retain actual generalization and finalization (2026-10-20)
 
 Accepted selected compilation now connects every discovered local instance to its exact original initialized binder and generalization event. The proof follows all eleven mutually recursive inference operations, including nested lambdas, both let annotation paths, match branches and for headers. References to initializer locals that have left scope are traced back to their actual occurrence before generalization. Scope restoration uses saved binders and real allocator bounds.

@@ -51,19 +51,19 @@ private theorem atomic_not_local {form : ExpressionForm} (atomic : Atomic form) 
     ∀ name binder, form ≠ .reference name (.local binder) := by
   cases atomic <;> intros <;> intro impossible <;> cases impossible
 
-private theorem literal_atomic {solved node type code} (literal : Literal solved node type code) : Atomic node.form := by
+theorem literal_atomic {solved node type code} (literal : Literal solved node type code) : Atomic node.form := by
   cases literal with
   | unit form _ _ _ => rw [form]; exact .unit
   | bool value form _ _ _ => rw [form]; exact .bool _ _
   | word value form _ _ _ _ => rw [form]; exact .word _
   | resolvedWord form _ | resolvedInteger form _ => rw [form]; exact .integer _ _
 
-private theorem literal_coercions {solved node type code} (literal : Literal solved node type code) : node.coercions = [] := by
+theorem literal_coercions {solved node type code} (literal : Literal solved node type code) : node.coercions = [] := by
   cases literal with
   | unit _ _ _ empty | bool _ _ _ _ empty | word _ _ _ _ empty _ => exact empty
   | resolvedWord _ metadata | resolvedInteger _ metadata => exact metadata.coercions
 
-private theorem evaluation_raw
+theorem evaluation_raw
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}
@@ -83,7 +83,7 @@ private theorem evaluation_raw
     subst same
     exact False.elim (atomic_not_local atomic _ _ form)
 
-private theorem fault_raw
+theorem fault_raw
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
@@ -104,7 +104,7 @@ private theorem fault_raw
     subst same
     exact False.elim (atomic_not_local atomic _ _ form)
 
-private theorem literal_form_unique {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
+theorem literal_form_unique {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
     (literal : Literal solved node type code)
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {environment : Dynamic.Environment} {heap firstHeap secondHeap : Dynamic.Heap}
@@ -129,7 +129,7 @@ private theorem literal_form_unique {solved : List SolvedRequirement} {node : Ex
     cases first with | integerLiteral _ first =>
       cases second with | integerLiteral _ second => exact ⟨first.functional second, rfl⟩
 
-private theorem literal_excludes_fault_with_evidence {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
+theorem literal_excludes_fault_with_evidence {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
     (literal : Literal solved node type code)
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     (valid : NumericEvidence context evidence node)
@@ -146,7 +146,7 @@ private theorem literal_excludes_fault_with_evidence {solved : List SolvedRequir
       exact (valid _ _ form).2 unavailable
 
 
-private theorem literal_atomic_staged {solved node type code}
+theorem literal_atomic_staged {solved node type code}
     (literal : Literal solved node type code) : Staging.Recursive.AtomicForm node.form := by
   cases literal with
   | unit form _ _ _ => rw [form]; exact .unit
@@ -155,7 +155,7 @@ private theorem literal_atomic_staged {solved node type code}
   | resolvedWord form _ | resolvedInteger form _ => rw [form]; exact .integerLiteral _ _
 
 /-- The actual atomic compiler forms cannot acquire a nested stage failure. -/
-private theorem no_stage
+theorem no_stage
     {program : Program} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
     {context : SourceSemantics.Context} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {id : ExpressionId} {node : ExpressionNode} {size : Nat}

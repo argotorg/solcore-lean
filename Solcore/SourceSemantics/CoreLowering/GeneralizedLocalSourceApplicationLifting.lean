@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyProfileReceipts
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyExpressionAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedProvenance
-import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadProductLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureSourceTrace
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedInvocationLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageTerminalInversion
@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSu
 
 /-! An ordinary Source call of an actually materialized local function lifts
 through its retained compiler profile and original parameter allocation.
-The terminal read uses its real Source descriptor and requirement outcome. -/
+The terminal expression tree uses its real Source descriptor and requirement outcome. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
@@ -46,21 +46,20 @@ theorem application {registry : Registry} {child caller : Scope}
     SelectedCompilationStageTerminalInversion.child_of_body material.unique terminal bodyTrace
   subst finalContext
   subst bodyOutcome
-  let site := GeneralizedLocalBodyProfileReceipts.read_site material
   have unique : NodeOccurrencesUnique child.source := source ▸ material.unique
-  have found : child.source.lookupExpression? material.bodyProfile.expression = some site.node := by
-    simpa only [source, ← compilerSource] using site.found
   have plainTrace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compiled.sourceProgram)
       inputs.context child.evidence child.source environment bound material.bodyProfile.expression plain after := by
     simpa only [source, evidence] using evaluated.sound
-  have lifted := CellAwareSourceReadLifting.read (registry := registry) unique found site.form site.coercions plainTrace
   obtain ⟨receipt⟩ := GeneralizedLocalBodyProfileReceipts.receipt material
+  obtain ⟨tree, _resultType, _typed⟩ := GeneralizedLocalBodyExpressionAdmission.actual_tree material inputs valid source receipt
+  simp only [compilerSource, ← source] at tree
+  have lifted := CellAwareSourceReadProductLifting.exact_trace (registry := registry) tree unique plainTrace
   have head := receipt.head child (source.trans compilerSource.symm)
   have bodyLift := SelectedCompilationStageBodyLiftBounds.terminal_expression head (Lifting.ExpressionLift.completed lifted)
   exact BodyLift.closure selected valid inputs.extended allocated bodyLift converted
 
 include inputs in
-/-- A materialized terminal read introduces no stage rejection: its complete
+/-- A materialized terminal expression tree introduces no stage rejection: its complete
 ordinary outcome and reached Source heap embed exactly. -/
 theorem application_exact {registry : Registry} {child caller : Scope}
     (selected : registry.Closure function child)
@@ -85,15 +84,14 @@ theorem application_exact {registry : Registry} {child caller : Scope}
     SelectedCompilationStageTerminalInversion.child_of_body material.unique terminal bodyTrace
   subst finalContext
   subst bodyOutcome
-  let site := GeneralizedLocalBodyProfileReceipts.read_site material
   have unique : NodeOccurrencesUnique child.source := source ▸ material.unique
-  have found : child.source.lookupExpression? material.bodyProfile.expression = some site.node := by
-    simpa only [source, ← compilerSource] using site.found
   have plainTrace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compiled.sourceProgram)
       inputs.context child.evidence child.source environment bound material.bodyProfile.expression plain after := by
     simpa only [source, evidence] using evaluated.sound
-  have lifted := CellAwareSourceReadLifting.read (registry := registry) unique found site.form site.coercions plainTrace
   obtain ⟨receipt⟩ := GeneralizedLocalBodyProfileReceipts.receipt material
+  obtain ⟨tree, _resultType, _typed⟩ := GeneralizedLocalBodyExpressionAdmission.actual_tree material inputs valid source receipt
+  simp only [compilerSource, ← source] at tree
+  have lifted := CellAwareSourceReadProductLifting.exact_trace (registry := registry) tree unique plainTrace
   have head := receipt.head child (source.trans compilerSource.symm)
   obtain ⟨_size, measured⟩ := Size.Expression.of_trace lifted
   cases plain with

@@ -30,7 +30,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
 
 /-- A payload model may combine two represented values at the same reached
 heap/world. This is a representation constructor, with no execution input. -/
-private inductive SourceChildren (size : Nat) (environment : Dynamic.Environment)
+inductive SourceChildren (size : Nat) (environment : Dynamic.Environment)
     (before : Dynamic.Heap) (left right : ExpressionId) :
     Staging.Recursive.Outcome → Dynamic.Heap → Prop where
   | leftFault {childSize after failure}
@@ -53,7 +53,7 @@ private inductive SourceChildren (size : Nat) (environment : Dynamic.Environment
         environment middle right (.value rightValue) after) :
       SourceChildren size environment before left right (.value (.product leftValue rightValue)) after
 
-private theorem source_children
+theorem source_children
     {id left right : ExpressionId} {node : ExpressionNode}
     {size : Nat} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {outcome : Staging.Recursive.Outcome}
@@ -145,7 +145,7 @@ private theorem source_children
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
   | applied occurrence _ _ _ _ _ _ => cases occurrence_form occurrence
 
-private theorem child_typing
+theorem child_typing
     {id left right : ExpressionId} {node leftNode rightNode : ExpressionNode} {type : Ty}
     (metadata : Metadata checked invocation.source id node type)
     (form : node.form = .tuple [left, right])

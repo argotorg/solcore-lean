@@ -1,3 +1,6 @@
+import Solcore.Test.SourceCoreGeneralizedBodyExpressionRuntime
+import Solcore.Test.SourceCoreGeneralizedBodyExpressionProbe
+import Solcore.Test.SourceCoreGeneralizedBodyExpressionWellFormed
 import Solcore.Test.SourceCoreMixedIndexReadRuntime
 import Solcore.Test.SourceCoreMixedIndexReadProbe
 import Solcore.Test.SourceCoreMixedIndexReadWellFormed
@@ -3832,6 +3835,9 @@ def main : IO UInt32 := do
   Tests.SourceCoreMixedIndexRead.typingProbe
   Tests.SourceCoreMixedIndexRead.probe
   Tests.SourceCoreMixedIndexRead.ObservedRuntime.run
+  Tests.SourceCoreGeneralizedBodyExpression.typingProbe
+  Tests.SourceCoreGeneralizedBodyExpression.nativeProbe
+  Tests.SourceCoreGeneralizedBodyExpression.ObservedRuntime.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"

@@ -1,7 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyReadCertificate
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyExpressionCertificate
 
 /-! The profile stored by the actual initializer determines its materialized
-body and ordinary read certificate. No terminal execution law is supplied. -/
+body and ordinary expression certificate. No terminal execution law is supplied. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyProfileReceipts
 open Core Frontend SourceInference GeneralHeap
@@ -23,10 +24,15 @@ theorem terminal : Terminal material.code.view material.bodyProfile.expression f
   rw [material.view, ← bodies]
   exact material.bodyProfile.terminal
 
-def read_site : GeneralizedLocalBodyReadCertificate.Site material.inputs material.code.view
+def expression_site : GeneralizedLocalBodyExpressionCertificate.Site material.inputs material.code.view
     material.bodyProfile.expression := by
   rw [material.view]
-  exact material.bodyProfile.read
+  exact material.bodyProfile.expressionSite
+
+theorem expression_profile : GeneralizedLocalOrdinaryExpressionProfile.Tree material.inputs.locals material.inputs.current.owner
+    material.code.view material.bodyProfile.expression := by
+  rw [material.view]
+  exact material.bodyProfile.expressionTree
 
 theorem receipt : Nonempty (Receipt (GeneralizedLocalBodyCompiler.policy material)
     material.code.fuel material.code.view

@@ -12,6 +12,7 @@ open CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts (Receipt)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationMap} {world : StoreTyping}
   {function : Dynamic.Closure} (material : Materialization compiled mapping world function)
+  (readSite : GeneralizedLocalBodyReadCertificate.Site material.inputs material.code.view material.bodyProfile.expression)
   (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) material.code)
   {program : Program} (frame : Dynamic.ClosureFrame program function)
   {invocation : Staging.Recursive.Scope} (source : invocation.source = function.source)
@@ -20,13 +21,13 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationM
     material.bodyProfile.expression function.body material.code.receipt.resultCore material.code.reasonAt
     material.code.compilation.internalReason material.code.compilation.internalReason material.code.receipt.body)
 
-include frame source in
+include readSite frame source in
 theorem actual_read :
     CompatibleExpressionReads.LoweredRead compiled.indexed.fuel (.initial compiled.compatible.checked)
       material.code.view inputs.context material.code.reasonAt
       (material.code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ material.inputs.scope)
       material.bodyProfile.expression receipt.child ∧
-    (GeneralizedLocalBodyProfileReceipts.read_site material).node.type = function.resultType := by
+    readSite.node.type = function.resultType := by
   have declarations := CallableIndexedOwnedPreparedLambdaScopeDeclarations.at_parameters
     (values := .initial compiled.compatible.checked) material.code inputs frame material.capturedDeclarations
   have body := CallableIndexedOwnedLambdaSourceAdmission.body_typed_at_parameters frame inputs.extended
@@ -37,7 +38,7 @@ theorem actual_read :
   rw [← source] at bodyTyped
   obtain ⟨node, found, type, typed⟩ :=
     CallableIndexedOwnedPreparedStagedTerminalBodyTyping.child_typed unique head bodyTyped completes
-  let site := GeneralizedLocalBodyProfileReceipts.read_site material
+  let site := readSite
   have foundView : material.code.view.lookupExpression? material.bodyProfile.expression = some node := by
     rwa [source, ← compilerSource] at found
   have same := Option.some.inj (site.found.symm.trans foundView)

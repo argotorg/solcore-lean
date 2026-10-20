@@ -25,7 +25,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
   {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {children : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
 
-private theorem source_group_inv
+theorem source_group_inv
     {id inner : ExpressionId} {node : ExpressionNode}
     {size : Nat} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {outcome : Staging.Recursive.Outcome}
@@ -82,7 +82,7 @@ private theorem source_group_inv
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
   | applied occurrence _ _ _ _ _ _ => cases occurrence_form occurrence
 
-private theorem child_typed
+theorem child_typed
     {id inner : ExpressionId} {node innerNode : ExpressionNode} {type : Ty}
     (metadata : Metadata checked invocation.source id node type)
     (form : node.form = .group inner)

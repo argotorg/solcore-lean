@@ -34,8 +34,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (runtime : Dynamic.SourceRuntimeValid program callerContext callerSource)
   (wellFormed : ProgramWellFormed program)
   {registry : Staging.Recursive.Registry} {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
-  (uninitialized : ∀ location, semanticFaults (.uninitializedLocation location)
-    (material.code.reasonAt material.bodyProfile.expression))
+  (uninitialized : ∀ {id : ExpressionId} {node : ExpressionNode} {name : String} {binder : Resolved.LocalId},
+    function.source.lookupExpression? id = some node → node.form = .reference name (.local binder) →
+    ∀ location, semanticFaults (.uninitializedLocation location) (material.code.reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions
@@ -171,7 +172,7 @@ theorem preserves
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨value, bodyStore, evaluated, represented, finalHeaps, bodyFrame, metadata, bodyEffect⟩ :=
     GeneralizedLocalTerminalBodyMeaning.preserves material inputs view functions extension entry frame raw selected
-      uninitialized semantic bodyTrace matched
+      wellFormed uninitialized semantic bodyTrace matched
   exact ⟨value, _, wrap evaluated, finish material view inputs functions owner caller frame raw stable runtime wellFormed
     entry reached related effect selected bodyTrace matched represented finalHeaps bodyFrame metadata bodyEffect⟩
 
@@ -194,9 +195,9 @@ theorem reflects
     GeneralizedLocalViewedEntry.prepare material view inputs functions owner caller atFrame
       argumentsRep heaps raw.captures stable
   obtain ⟨bodyStore, bodyEvaluation, finalEq⟩ := unwrap completed
-  obtain ⟨sourceOutcome, after, bodyTrace, represented, finalHeaps, bodyFrame, metadata, bodyEffect⟩ :=
+  obtain ⟨sourceSize, sourceOutcome, after, bodyTrace, represented, finalHeaps, bodyFrame, metadata, bodyEffect⟩ :=
     GeneralizedLocalTerminalBodyMeaning.reflects material inputs view functions extension entry frame raw selected
-      uninitialized semantic bodyEvaluation
+      wellFormed uninitialized semantic bodyEvaluation
   cases sourceOutcome with
   | value sourceValue =>
     have matched := CallableIndexedOwnedAdmittedStagedTerminalBody.body_result function.resultType (.value sourceValue)

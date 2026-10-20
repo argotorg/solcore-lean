@@ -84,19 +84,16 @@ theorem Materialization.uninitialized (material : Materialization compiled mappi
       (by simpa only [material.reasons, callback, token] using decoded)
     exact .readUninitialized location binder
 
-/-- The stored terminal body profile supplies its actual read occurrence to
-that same public decoder. -/
+/-- Every actual body leaf uses its original issued token. -/
 theorem Materialization.body_uninitialized (material : Materialization compiled mapping world function)
     {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
-    (location : Dynamic.Location) :
+    {id : ExpressionId} {node : ExpressionNode} {name : String} {binder : Resolved.LocalId}
+    (found : function.source.lookupExpression? id = some node)
+    (form : node.form = .reference name (.local binder)) (location : Dynamic.Location) :
     CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
-      (.uninitializedLocation location) (material.code.reasonAt material.bodyProfile.expression) := by
-  have found : function.source.lookupExpression? material.bodyProfile.expression =
-      some material.bodyProfile.read.node := by
-    rw [material.source]
-    exact material.bodyProfile.read.found
-  exact material.uninitialized receiver found material.bodyProfile.read.form location
+      (.uninitializedLocation location) (material.code.reasonAt id) :=
+  material.uninitialized receiver found form location
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedAssociation

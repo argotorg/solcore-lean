@@ -1,9 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryReadSite
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryExpressionProfile
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalLambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts
 
 /-! Bounded instance bodies retain their actual source lambda and terminal
-ordinary read. This finite profile contains no body execution premise. -/
+ordinary expression tree. This finite profile contains no body execution premise. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyProfile
@@ -20,7 +20,8 @@ structure Profile (locals : SourceCoreLocalPolymorphism.Catalog)
   form : node.form = .lambda parameters result body
   expression : ExpressionId
   terminal : Terminal source expression body
-  read : GeneralizedLocalOrdinaryReadSite.Observations locals owner source expression
+  expressionSite : GeneralizedLocalOrdinaryExpressionProfile.Site locals owner source expression
+  expressionTree : GeneralizedLocalOrdinaryExpressionProfile.Tree locals owner source expression
 
 private def terminal? (source : TypedSource) (body : List StatementId) :
     Option (Sigma fun expression => PLift (Terminal source expression body)) :=
@@ -45,8 +46,9 @@ def profile? (locals : SourceCoreLocalPolymorphism.Catalog)
   | some node => match form : node.form with
     | .lambda parameters result body => do
       let ⟨expression, ⟨terminal⟩⟩ ← terminal? source body
-      let read ← GeneralizedLocalOrdinaryReadSite.observations? locals owner source expression
-      pure ⟨node, parameters, result, body, found, form, expression, terminal, read⟩
+      let site ← GeneralizedLocalOrdinaryExpressionProfile.site? locals owner source expression
+      let ⟨tree⟩ ← GeneralizedLocalOrdinaryExpressionProfile.tree? locals owner source (source.nodes.length + 1) expression
+      pure ⟨node, parameters, result, body, found, form, expression, terminal, site, tree⟩
     | _ => none
 
 /-- The same source occurrence fixes the actual emitted lambda's body. -/

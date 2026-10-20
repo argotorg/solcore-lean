@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyReadAdmission
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyExpressionAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyEntryEffects
-import Solcore.SourceSemantics.CoreLowering.CellAwareTerminalReadCompletion
+import Solcore.SourceSemantics.CoreLowering.CellAwareTerminalExpressionCompletion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaSourceAdmission
 
@@ -31,8 +31,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationM
   {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   (selected : registry.Closure function invocation)
   {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
-  (uninitialized : ∀ location, semanticFaults (.uninitializedLocation location)
-    (material.code.reasonAt material.bodyProfile.expression))
+  (wellFormed : ProgramWellFormed program)
+  (uninitialized : ∀ {id : ExpressionId} {node : ExpressionNode} {name : String} {binder : Resolved.LocalId},
+    function.source.lookupExpression? id = some node → node.form = .reference name (.local binder) →
+    ∀ location, semanticFaults (.uninitializedLocation location) (material.code.reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions
@@ -46,7 +48,7 @@ theorem heap_typed : Dynamic.HeapWellTyped inputs.context entry.entry.heap := by
   exact reached.transportClosed fields.signatures frame.code.closed (fields.targetClosed frame.code.closed)
     frame.code.variables_closed (fields.targetResidualVariablesOpen frame.code.residual_variables_open)
 
-include extension frame raw selected uninitialized semantic in
+include extension frame raw selected wellFormed uninitialized semantic in
 /-- Preservation follows the same terminal body and genuine parameter heap.
 The returned map and world are those already allocated by the real prefix. -/
 theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
@@ -67,7 +69,7 @@ theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
   obtain ⟨receipt⟩ := GeneralizedLocalBodyProfileReceipts.receipt material
   have source := registry.source selected
   have compilerSource := GeneralizedLocalBodyProfileReceipts.view_source material
-  obtain ⟨read, resultType⟩ := GeneralizedLocalBodyReadAdmission.actual_read material inputs frame source receipt
+  obtain ⟨read, resultType, typed⟩ := GeneralizedLocalBodyExpressionAdmission.actual_tree material inputs frame source receipt
   let terminal : CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.Receipt
       (GeneralizedLocalBodyCompiler.policy material) material.code.fuel invocation.source
       (material.code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ material.inputs.scope)
@@ -81,29 +83,40 @@ theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
     terminal := by simpa only [source, ← compilerSource] using receipt.terminal
     accepted := by simpa only [source, ← compilerSource] using receipt.accepted
     emitted := receipt.emitted }
-  simp only [← source, compilerSource] at read
-  let site := GeneralizedLocalBodyProfileReceipts.read_site material
+  simp only [← source, compilerSource] at read typed
+  let site := GeneralizedLocalBodyProfileReceipts.expression_site material
   have siteType : site.node.type = function.resultType := resultType
   have found := site.found
   simp only [compilerSource, ← source] at found
   have unique : NodeOccurrencesUnique invocation.source := by simpa only [source] using material.unique
-  have result := CellAwareTerminalReadCompletion.preserves (program := program) (registry := registry) (outcome := outcome) functions extension
-    GeneralizedLocalDescriptorHeap.ordinary_cells terminal read found unique
+  have runtimeAt := CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters frame inputs.extended
+  have runtime : Dynamic.SourceRuntimeValid program inputs.context invocation.source := by
+    simpa only [source] using runtimeAt.1
+  have covers : invocation.evidence.Covers inputs.context := by
+    simpa only [registry.evidence selected] using runtimeAt.2
+  have issued : ∀ scope id lowered,
+      CompatibleExpressionReads.LoweredRead compiled.indexed.fuel (.initial compiled.compatible.checked)
+        invocation.source inputs.context material.code.reasonAt scope id lowered →
+      ∀ location, semanticFaults (.uninitializedLocation location) (material.code.reasonAt id) := by
+    intro scope id lowered receipt
+    obtain ⟨leaf, _, _⟩ := receipt
+    exact uninitialized (by simpa only [source] using leaf.metadata.found) leaf.form
+  have result := CellAwareTerminalExpressionCompletion.preserves (program := program) (registry := registry) (outcome := outcome) functions extension
+    GeneralizedLocalDescriptorHeap.ordinary_cells terminal read found unique typed wellFormed runtime covers
     entry.entry.environments entry.entry.heaps (heap_typed material inputs view functions entry frame raw)
-    entry.entry.locals entry.entry.lookups uninitialized semantic trace
+    entry.entry.locals entry.entry.lookups issued semantic trace
     (by simpa only [siteType] using matched)
   simp only [siteType] at result
   exact result
 
-include extension frame raw selected uninitialized semantic in
+include extension frame raw selected wellFormed uninitialized semantic in
 /-- Native body completion reconstructs the independently graded Source body
 using its actual compilation and parameter initialization receipts. -/
 theorem reflects {value : Value} {finalStore : Store}
     (completed : Evaluates entry.entry.actualBody entry.entry.store
       (material.code.receipt.body.rename entry.entry.embedding) value finalStore) :
-    ∃ sourceOutcome : Dynamic.ExpressionOutcome, ∃ after,
-      Staging.Recursive.Size.Statements program registry
-        (Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize []]) invocation inputs.context
+    ∃ sourceSize, ∃ sourceOutcome : Dynamic.ExpressionOutcome, ∃ after,
+      Staging.Recursive.Size.Statements program registry sourceSize invocation inputs.context
         entry.entry.environment entry.entry.heap function.body inputs.context
         (CallableIndexedOwnedAdmittedStagedTerminalStatements.control
           (match sourceOutcome with | .value v => .value v | .fault f => .fault (.semantic f))) after ∧
@@ -118,7 +131,7 @@ theorem reflects {value : Value} {finalStore : Store}
   obtain ⟨receipt⟩ := GeneralizedLocalBodyProfileReceipts.receipt material
   have source := registry.source selected
   have compilerSource := GeneralizedLocalBodyProfileReceipts.view_source material
-  obtain ⟨read, resultType⟩ := GeneralizedLocalBodyReadAdmission.actual_read material inputs frame source receipt
+  obtain ⟨read, resultType, typed⟩ := GeneralizedLocalBodyExpressionAdmission.actual_tree material inputs frame source receipt
   let terminal : CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.Receipt
       (GeneralizedLocalBodyCompiler.policy material) material.code.fuel invocation.source
       (material.code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ material.inputs.scope)
@@ -132,16 +145,28 @@ theorem reflects {value : Value} {finalStore : Store}
     terminal := by simpa only [source, ← compilerSource] using receipt.terminal
     accepted := by simpa only [source, ← compilerSource] using receipt.accepted
     emitted := receipt.emitted }
-  simp only [← source, compilerSource] at read
-  let site := GeneralizedLocalBodyProfileReceipts.read_site material
+  simp only [← source, compilerSource] at read typed
+  let site := GeneralizedLocalBodyProfileReceipts.expression_site material
   have siteType : site.node.type = function.resultType := resultType
   have found := site.found
   simp only [compilerSource, ← source] at found
   have unique : NodeOccurrencesUnique invocation.source := by simpa only [source] using material.unique
-  have result := CellAwareTerminalReadCompletion.reflects (program := program) (registry := registry) functions extension
-    GeneralizedLocalDescriptorHeap.ordinary_cells terminal read found unique
+  have runtimeAt := CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters frame inputs.extended
+  have runtime : Dynamic.SourceRuntimeValid program inputs.context invocation.source := by
+    simpa only [source] using runtimeAt.1
+  have covers : invocation.evidence.Covers inputs.context := by
+    simpa only [registry.evidence selected] using runtimeAt.2
+  have issued : ∀ scope id lowered,
+      CompatibleExpressionReads.LoweredRead compiled.indexed.fuel (.initial compiled.compatible.checked)
+        invocation.source inputs.context material.code.reasonAt scope id lowered →
+      ∀ location, semanticFaults (.uninitializedLocation location) (material.code.reasonAt id) := by
+    intro scope id lowered receipt
+    obtain ⟨leaf, _, _⟩ := receipt
+    exact uninitialized (by simpa only [source] using leaf.metadata.found) leaf.form
+  have result := CellAwareTerminalExpressionCompletion.reflects (program := program) (registry := registry) functions extension
+    GeneralizedLocalDescriptorHeap.ordinary_cells terminal read found unique typed wellFormed runtime covers
     entry.entry.environments entry.entry.heaps (heap_typed material inputs view functions entry frame raw)
-    entry.entry.locals entry.entry.lookups uninitialized semantic completed
+    entry.entry.locals entry.entry.lookups issued semantic completed
   simp only [siteType] at result
   exact result
 

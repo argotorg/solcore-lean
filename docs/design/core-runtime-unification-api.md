@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Materialized local bodies preserve duplicate reads, captures and literals (2026-10-20)
+
+`GeneralizedLocalOrdinaryExpressionProfile` records the finite original expression tree. `GeneralizedLocalBodyExpressionAdmission.actual_tree` derives its certificate from actual accepted lowering and static closure typing. `CellAwareReadProductCompletion.completes` constructs the common Source/native result and reached mixed heap; `CellAwareTerminalExpressionCompletion` and `GeneralizedLocalTerminalBodyMeaning` connect that result to application preservation and reflection. `CompatibleExpressionTypedLiteralEvidence.of_typed` obtains numeric evidence from the original Source typing, unique actual requirement identities and dictionary coverage.
+
+Broader materialized statement bodies, original generalized initializer typing, the general selected checker bridge and complete compiler-pass coverage remain unfinished. Goal two remains incomplete.
+
 ## Selected local bindings retain actual generalization and finalization (2026-10-20)
 
 `SourceCompiledLocalBindings` derives exact collector membership from the actual worklist. `SourceCompiledLocalGeneralizationBoundaries` connects it to the original inference event and the final inferred-body read boundary. `SourceCompiledLocalFinalization.BodyReceipt` retains one actual body-check computation; `SourceCompiledSelectedFinalization.of_compile` supplies that receipt and the selected parameter specialization. The finalizer connection uses this same witness for the event and solver resources.
