@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized checking reaches the actual selected ordinary function (2026-10-20)
+
+The full inference recursion now proves that protected type variables remain fixed. Fresh-quantifier privacy and return-type privacy are derived from actual initialized statements and ordered for headers, including the continuation after a new declaration.
+
+Expression, statement, statement-sequence, for-item and for-item-sequence soundness are assembled by fuel induction. The complete statement sequence and for loop consume the derived return privacy without a separate child-fixedness premise.
+
+The selected ordinary function supplies its real input context, signature, executable interfaces, initial state, retained roots and finalizer. The recursive proof now reaches CheckedBodyHasType and FunctionDefinition.Valid for that same original function. It still requires SelectedInitializerBarriers for the actual initialized statement and header occurrences.
+
+Validation: 35 changed modules in a coherent graph of 8,942 modules, 65 retained runtime invocations and 7,053 endpoint audits. Full build (8,981 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Successful selected compilation must still supply the exact initializer barriers. Generalized implementation methods need their own selected-body entry; the ordinary-function result does not cover them. Remaining compiler-pass preservation and the final selected meaning-preservation theorem are also unfinished.
+
 ## Generalized checker branches retain the selected final source (2026-10-20)
 
 Lambda entry and expression dispatch now use the actual smaller inference calls. Writable places, simple and compound assignments, annotated declarations and statement sequencing preserve ordinary source typing in the same selected final source.

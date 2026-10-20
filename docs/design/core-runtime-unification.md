@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The full inference recursion now proves that protected type variables remain fixed. Fresh-quantifier privacy and return-type privacy are derived from actual initialized statements and ordered for headers, including the continuation after a new declaration.
+
+Expression, statement, statement-sequence, for-item and for-item-sequence soundness are assembled by fuel induction. The complete statement sequence and for loop consume the derived return privacy without a separate child-fixedness premise.
+
+The selected ordinary function supplies its real input context, signature, executable interfaces, initial state, retained roots and finalizer. The recursive proof now reaches CheckedBodyHasType and FunctionDefinition.Valid for that same original function. It still requires SelectedInitializerBarriers for the actual initialized statement and header occurrences.
+
+Goal two remains incomplete. Successful selected compilation must still supply the exact initializer barriers. Generalized implementation methods need their own selected-body entry; the ordinary-function result does not cover them. Remaining compiler-pass preservation and the final selected meaning-preservation theorem are also unfinished.
+
 Lambda entry and expression dispatch now use the actual smaller inference calls. Writable places, simple and compound assignments, annotated declarations and statement sequencing preserve ordinary source typing in the same selected final source.
 
 Conditional branches, while loops and match arms retain the actual successor state and restore genuine saved scopes. Match inference covers single and multiple scrutinees, all arms and both default branches. Pattern and body inference supply return-type privacy at each arm entry.

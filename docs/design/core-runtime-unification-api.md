@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized checking reaches the actual selected ordinary function (2026-10-20)
+
+`SourceCompiledGeneralizedSoundness.recursiveSoundness_of_barriers` closes all five inference families. `checked_body_of_barriers` consumes that assembly at the actual body entry, and `function_valid_of_barriers` supplies the existing ordinary-function validity judgment. Each endpoint uses the same selected checker receipt and finalizer.
+
+`InitializerOccurrence.generalized_type_safe` and `return_safe`, together with the ordered header and statement consumers, derive return privacy from actual inference fixedness. `SelectedInitializerBarriers` is the remaining internal generalization obligation. It has not yet been derived from compilation success.
+
+Goal two remains incomplete. Successful selected compilation must still supply the exact initializer barriers. Generalized implementation methods need their own selected-body entry; the ordinary-function result does not cover them. Remaining compiler-pass preservation and the final selected meaning-preservation theorem are also unfinished.
+
 ## Generalized checker branches retain the selected final source (2026-10-20)
 
 `SourceCompiledGeneralizedSoundness.expressionRetained_step`, `placeRootedSoundness`, `statement_match` and `forItemsRooted_of_item` connect actual smaller calls to the same selected final source. The branch conclusions retain ordinary source judgments, actual contexts and all generalized state invariants.
