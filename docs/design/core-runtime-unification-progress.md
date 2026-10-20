@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual generalized descriptors preserve capture frames through body entry (2026-10-21)
+
+Successful selected compilation now supplies local candidate metadata from its real preparation and callable-contract attachment. Actual binding lookup and contextual filtering retain the same caller, binder identity, contextual lambda, closed function type and native parameter and result projections.
+
+The generalized descriptor representation carries the actual candidate packet and complete body compiler receipt. Creation, ordered bundle storage, marked allocation, raw reads and materialization retain the same captured environment and saved frame. The representation no longer requires the old finite body profile.
+
+Actual argument allocation supplies the Source body context and matching Core environment. The generalized initializer prefix has bidirectional continuation agreement, preserves the reached heap and stored rows, and yields a strictly smaller native execution for the remaining body.
+
+Validation: 16 changed modules in a coherent graph of 9,019 modules, 74 retained runtime invocations and 7,459 endpoint audits. Full build (9,058 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The current read and initializer connections still require source and binding identities, genuine candidate packets and actual view recipes. Arbitrary nonempty lexical substitutions and nested generalized descriptors need the source-substitution relation currently being connected. Actual inference provenance must discharge checker barriers, and the complete accepted body still needs Source/Core execution preservation before the final public theorem follows.
+
 ## Actual compiler actions retain generalized inputs and complete lambda bodies (2026-10-21)
 
 Every completed-cache row now supplies the same actual named compilation and a receipt for each accepted contextual action. The compiler callback itself selects initializer, evidence, generalized local read or plain expression; the proof does not assume a separate metadata scan or branch-selection law.

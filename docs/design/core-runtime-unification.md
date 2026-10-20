@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-21.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Successful selected compilation now supplies local candidate metadata from its real preparation and callable-contract attachment. Actual binding lookup and contextual filtering retain the same caller, binder identity, contextual lambda, closed function type and native parameter and result projections.
+
+The generalized descriptor representation carries the actual candidate packet and complete body compiler receipt. Creation, ordered bundle storage, marked allocation, raw reads and materialization retain the same captured environment and saved frame. The representation no longer requires the old finite body profile.
+
+Actual argument allocation supplies the Source body context and matching Core environment. The generalized initializer prefix has bidirectional continuation agreement, preserves the reached heap and stored rows, and yields a strictly smaller native execution for the remaining body.
+
+Goal two remains incomplete. The current read and initializer connections still require source and binding identities, genuine candidate packets and actual view recipes. Arbitrary nonempty lexical substitutions and nested generalized descriptors need the source-substitution relation currently being connected. Actual inference provenance must discharge checker barriers, and the complete accepted body still needs Source/Core execution preservation before the final public theorem follows.
+
 Every completed-cache row now supplies the same actual named compilation and a receipt for each accepted contextual action. The compiler callback itself selects initializer, evidence, generalized local read or plain expression; the proof does not assume a separate metadata scan or branch-selection law.
 
 Generalized initialization retains the complete ordered candidate bundle. Generalized reads retain the contextual source, full original substitution, selected bundle slot, indexed view and checked result type. A reached ordinary lambda retains its capture scope, parameter allocation, fuel, result type and entire compiled body, without a first-return or single-lambda restriction.

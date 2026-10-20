@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual generalized descriptors preserve capture frames through body entry (2026-10-21)
+
+PreparedLocalInstanceMetadata.of_preparation and SelectedCompilationLocalMetadata.of_compiled derive metadata from actual compiler execution. GeneralizedLocalAcceptedInitializer.formation, GeneralizedLocalAcceptedMaterialization, GeneralizedLocalAcceptedBodyCompiler.body_receipt, GeneralizedLocalAcceptedInvocation.enters and GeneralizedLocalAcceptedPrefix.complete retain the exact descriptor through storage, readout and entry.
+
+These endpoints use the same actual compiler output, source closure, captured frame and marked allocations. Body execution is not assumed by the new descriptor representation; its complete preservation proof remains unfinished.
+
+Goal two remains incomplete. The current read and initializer connections still require source and binding identities, genuine candidate packets and actual view recipes. Arbitrary nonempty lexical substitutions and nested generalized descriptors need the source-substitution relation currently being connected. Actual inference provenance must discharge checker barriers, and the complete accepted body still needs Source/Core execution preservation before the final public theorem follows.
+
 ## Actual compiler actions retain generalized inputs and complete lambda bodies (2026-10-21)
 
 AcceptedNamedActionTrace.at_cache and of_contextual derive all actual named action receipts. AcceptedContextualSpecialActions.of_head exposes the selected callback branch. AcceptedContextualLambdaBody.of_head retains the full ordinary lambda body, while AcceptedNamedGeneralizedInitializer connects actual cached inputs to initializer receipts.
