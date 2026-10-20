@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+A reached initialized declaration now carries its actual child inference context, recorded statement and selected function finalizer into the generalized initializer certificate. The certificate produces ordinary Source statement typing, the following semantic context and the generalized operational state. The same path supports both annotated and unannotated declarations without requiring every local scheme to be monomorphic.
+
+Both arms of an if statement now follow the actual checker continuation. The completed then branch preserves active-variable privacy and bounds; restoring its saved scope supplies the real entering state for the else branch. Each child block retains its continuation to the same finalizer.
+
+Actual pattern inference now preserves raw stored scheme isolation in addition to resolved-variable privacy and allocation bounds. Constructor and tuple patterns carry these conditions through their ordered recursive calls. This supplies the generalized replacement for the old monomorphic pattern-state assumption.
+
+Goal two remains incomplete. The concrete smaller child semantic proof and the selected compilation generalization barrier are still explicit in the initializer consumer. The generalized mutual checker proof must derive and connect those inputs. Further nested paths and complete compiler-pass preservation also remain unfinished.
+
 The actual selected initializer certificate now produces the ordinary Source statement judgment and the active context used by following statements. The proof installs the exact allocated binder, derives its scheme and requirement formation, and uses the matching monomorphic or generalized typing rule in the same finalized whole source.
 
 The generalized operational invariant carries the actual requirement ledger, binder origins, quantifier bounds, privacy and backing constraint rows. Actual initialization, allocation and expression inference construct or preserve it. An initialized declaration only needs its own retained binder and final substitution continuation; unrelated node updates do not require a whole node-table prefix. The declaration proof also works inside a lambda whose return type still contains inference variables.

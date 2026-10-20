@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Nested initializer typing follows the selected checker call (2026-10-20)
+
+A reached initialized declaration now carries its actual child inference context, recorded statement and selected function finalizer into the generalized initializer certificate. The certificate produces ordinary Source statement typing, the following semantic context and the generalized operational state. The same path supports both annotated and unannotated declarations without requiring every local scheme to be monomorphic.
+
+Both arms of an if statement now follow the actual checker continuation. The completed then branch preserves active-variable privacy and bounds; restoring its saved scope supplies the real entering state for the else branch. Each child block retains its continuation to the same finalizer.
+
+Actual pattern inference now preserves raw stored scheme isolation in addition to resolved-variable privacy and allocation bounds. Constructor and tuple patterns carry these conditions through their ordered recursive calls. This supplies the generalized replacement for the old monomorphic pattern-state assumption.
+
+Validation: 6 changed modules in a coherent graph of 8,810 modules, 62 retained runtime invocations and 6,742 endpoint audits. Full build (8,849 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The concrete smaller child semantic proof and the selected compilation generalization barrier are still explicit in the initializer consumer. The generalized mutual checker proof must derive and connect those inputs. Further nested paths and complete compiler-pass preservation also remain unfinished.
+
 ## Generalized initializer certificates produce source statement typing (2026-10-20)
 
 The actual selected initializer certificate now produces the ordinary Source statement judgment and the active context used by following statements. The proof installs the exact allocated binder, derives its scheme and requirement formation, and uses the matching monomorphic or generalized typing rule in the same finalized whole source.

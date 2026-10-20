@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Nested initializer typing follows the selected checker call (2026-10-20)
+
+`RetainedInitializer` fixes the real child receipt and its selected finalizer. `certificate_of_child` opens the retained initializer scope and consumes its concrete child typing. `statement_of_child_with_state` returns whole Source statement typing together with the following semantic and operational contexts. `PrivateBlockContinuation.retained_initializer` constructs the carrier from an actual reached declaration.
+
+`PrivateBlockContinuation.enter_if_with_else` returns both actual child continuations. `ProtectedVariables.activeState_inferStatementsFuel` preserves active privacy and bounds across a real statement list. `inferMatchPatternFuel_active_isolation` supplies raw scheme isolation, bounds and resolved privacy after actual pattern allocation.
+
+Goal two remains incomplete. The concrete smaller child semantic proof and the selected compilation generalization barrier are still explicit in the initializer consumer. The generalized mutual checker proof must derive and connect those inputs. Further nested paths and complete compiler-pass preservation also remain unfinished.
+
 ## Generalized initializer certificates produce source statement typing (2026-10-20)
 
 `InitializerContinuation.statement_of_certificate` derives the actual statement typing, following `ActiveLocalContextInvariant` and `ActualContext`, and matching result facts. `InitializedPriorPrivate.statement_of_child` consumes the exact child proof and selected generalization barrier while deriving prior privacy and predicate formation internally.
