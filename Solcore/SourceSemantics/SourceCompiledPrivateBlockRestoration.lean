@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledPrivateBlockContinuation
 import Solcore.SourceSemantics.SourceInferenceActiveScopePrivacy
 
@@ -8,7 +9,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.PrivateBlockContinuation
 open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVariables
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
-    {fuel : Nat} {selected : Selected compiled row fuel}
+    {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 theorem after_unchanged_occurrence (block : PrivateBlockContinuation selected)
     {source : Syntax.Statement}

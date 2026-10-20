@@ -57,7 +57,7 @@ theorem Selected.nestedLambdaPrivacy
   have checked := SourceCoreCompiler.compile_checked_source accepted
   have progress := selected.inferenceProgress checked
   have formation := Frontend.checkProgram_success_signature_formation checked
-  let scope : CheckingScope selected (checkingContext selected) := .refl selected
+  let scope : CheckingScope selected.toBodySelection (checkingContext selected.toBodySelection) := .refl selected.toBodySelection
   obtain ⟨resume⟩ := selected.statementResume checked outerPosition
   obtain ⟨childFuel,receipt,_,_⟩ := resume.toOccurrence.initialized outerForm
     (scope.formation checked) (scope.functionsCanonical checked)
@@ -76,7 +76,7 @@ theorem Selected.nestedLambdaPrivacy
     change receipt.initializer.value = _
     rw [initializerEq]
     exact lambdaForm
-  obtain ⟨nested⟩ := outer.lambdaResume checked scope resume.ready resume.entryNodesBelow
+  obtain ⟨nested⟩ := InitializerOccurrence.lambdaResume (selected := selected) outer checked scope resume.ready resume.entryNodesBelow
     resume.entryInvariant.1 resume.entryInvariant.2.2 retained actualLambda innerPosition innerForm
   have added := SourceCompiledNestedTemplatePrivacy.outer_binder_safe
     accepted member outer nested.inner nested.valueSafe

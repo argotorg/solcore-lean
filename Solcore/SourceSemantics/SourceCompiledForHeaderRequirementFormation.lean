@@ -10,7 +10,7 @@ namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.HeaderInitiali
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
-    {fuel : Nat} {selected : Selected compiled row fuel} {source : Syntax.ForItem}
+    {fuel : Nat} {selected : BodySelection compiled row fuel} {source : Syntax.ForItem}
 
 theorem retained_formation (continuation : HeaderInitializerContinuation selected source)
     {target : SourceSemantics.Context}

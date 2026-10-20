@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedExpressionListState
 import Solcore.SourceSemantics.SourceInferenceSelectedIndirectCall
 
@@ -12,7 +13,7 @@ open SourceCompiledLocalFinalization
 theorem indirectCall_typing
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {expression calleeSource : Syntax.Expr}

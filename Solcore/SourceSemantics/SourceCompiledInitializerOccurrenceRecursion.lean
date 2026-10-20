@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceInvariant
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
 import Solcore.SourceSemantics.SourceInferenceSelectedLetCoverage
@@ -7,13 +8,13 @@ expression contract. Its retained child subtree, annotation, scope frame and
 operational state all come from the same receipt and parent boundary. -/
 set_option autoImplicit false
 set_option Elab.async false
-namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 open SourceCompiledGeneralizedSoundness ProtectedVariables
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 private theorem annotation_admissible
     {inferenceContext : SourceInference.Context} {target : SourceSemantics.Context}
@@ -34,7 +35,7 @@ private theorem annotation_admissible
         (resolveSourceType_success_typeWellFormed canonical signatures parameters owner accepted)
 
 theorem statement_of_expressionSoundness
-    (continuation : InitializerOccurrence selected source)
+    (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {expectedReturn : Ty} {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     (scope : CheckingScope selected continuation.inferenceContext)
@@ -137,4 +138,8 @@ theorem statement_of_expressionSoundness
   · simpa only [continuation.receipt.completed, LocalLetRequirementTiming.finish,
       State.recordNode, State.allocateBinder, State.withLocals] using requirements
 
+end Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
+
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+export BodyInitializerOccurrence (statement_of_expressionSoundness)
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence

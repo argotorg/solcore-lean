@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledNestedInitializerPrivacy
 
 /-! The exact initialized statement is retained alongside its private receipt,
@@ -9,7 +10,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVaria
 
 structure InitializedStatementReceiptPrivate
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     {childFuel : Nat} {inferenceContext : SourceInference.Context} {source : Syntax.Statement}
     {entry : State} {result : Detail.StatementResult}
     (receipt : LocalLetRequirementTiming.Receipt childFuel inferenceContext source entry result) : Prop
@@ -22,7 +23,7 @@ structure InitializedStatementReceiptPrivate
 
 namespace PrivateBlockContinuation
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 theorem initialized_statement (block : PrivateBlockContinuation selected)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

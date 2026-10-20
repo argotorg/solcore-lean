@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
@@ -12,7 +13,7 @@ open SourceInferenceStatementsSoundness
 theorem statement_returnValue
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRootedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
@@ -138,7 +139,7 @@ from actual checking. Lambda return inputs use their own fresh prefix. -/
 theorem statement_function_returnValue
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRootedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
@@ -149,19 +150,15 @@ theorem statement_function_returnValue
       (Ty.productMany selected.signature.returnTypes) initial result frames target) :
     StatementConclusion selected inferenceContext (Ty.productMany selected.signature.returnTypes) result frames target := by
   let expectedReturn := Ty.productMany selected.signature.returnTypes
-  have formation := Frontend.checkProgram_success_signature_formation checked
-  have signatureParameters := (Frontend.checkProgram_success_signature_parameters_wellFormed checked).functions
-    selected.signature selected.signatureMember
-  have returns := (formation.functions selected.signature selected.signatureMember).2.1
-  have returnClosed : expectedReturn.VariablesBelow 0 :=
-    Ty.variablesBelow_productMany (returns.variablesBelow 0)
+  have signatureParameters := selected.canonical checked
+  have returnClosed : expectedReturn.VariablesBelow 0 := selected.returns_closed checked
   have declarationEq := (ProgramEnvironment.declaration?_sound selected.body.declared).2
-  have baseFormed := SignatureTypesFormationValidated.typesWellFormed returns signatureParameters []
+  have baseFormed := (selected.header checked).return_types
   have resultTypes : TypesWellFormed target selected.signature.returnTypes :=
     StructuralSubstitution.TypesWellFormed.transportContext (RecursiveExpressionInvariant.ofStatement boundary.invariant).signatures_eq_whole
       boundary.invariant.typeParametersEq (by
         change target.currentDeclaration = some selected.signature.id
-        simpa only [checkingContext, context, ProgramTypeScope.ofDeclaration, declarationEq, signatureContext]
+        simpa only [checkingContext, context, ProgramTypeScope.ofDeclaration, declarationEq, checkedBodyContext, declarationContext, Context.withResidualTypeVariables, Context.withSolvedRequirements, Context.withAssumptions, Context.forDeclaration]
           using boundary.invariant.declarationEq) baseFormed
   have returnFormed : TypeWellFormed target expectedReturn := {
     binders := (RecursiveExpressionInvariant.ofStatement boundary.invariant).typeParameterBinders

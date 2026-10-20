@@ -223,10 +223,10 @@ theorem lambda_initializer_resume
     {expected : Option Ty} {initial : State} {final : InferredExpression × State}
     {index : Nat} {statement : Syntax.Statement}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (scope : CheckingScope selected context)
+    (scope : CheckingScope selected.toBodySelection context)
     (ready : initial.InferenceReady) (nodesBelow : initial.NodesBelowNextOccurrence)
-    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
-    (owner : initial.owner = (evidenceSource selected).owner)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected.toBodySelection))
+    (owner : initial.owner = (evidenceSource selected.toBodySelection).owner)
     (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
     (expectedSafe : ∀ binder ∈ initial.localBinders, ∀ type ∈ expected,
       Safe binder.scheme.quantified initial type)

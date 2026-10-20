@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializedStatementPrivacy
 import Solcore.SourceSemantics.SourceInferenceBackedStatementPrivacy
 
@@ -21,7 +22,7 @@ private theorem return_owner {before after : State} {left right : Ty}
 
 structure InitializedStatementPrivate
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
     (actual : InitializerContinuation selected source) : Prop where
   origins : ActiveBinderCaptureOrigins actual.receipt.ready
     (selected.body.returned.toTypedSource (selected.body.body.statements.map NodeId.statement))
@@ -36,9 +37,9 @@ structure InitializedStatementPrivate
 
 /-- Both provenance invariants and the suffix privacy proof follow the same
 actual source-position traversal. The finalizer checks apply to its exact binder. -/
-theorem Selected.initializedStatementPrivate {raw : Workspace.RawWorkspace}
+theorem BodySelection.initializedStatementPrivate {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement}
     (position : selected.signature.source.value.body.value[index]? = some source)
@@ -83,7 +84,7 @@ theorem Selected.initializedStatementPrivate {raw : Workspace.RawWorkspace}
   have inferred := receipt.initializer_inference occurrence.ready formation canonical
   have live := actual.generalized_live readyOrigins readyTemplates
   have closed : (Ty.productMany selected.signature.returnTypes).VariablesBelow 0 :=
-    Ty.variablesBelow_productMany ((formation.functions selected.signature selected.signatureMember).2.1.variablesBelow 0)
+    selected.returns_closed checked
   have suffix := occurrence.privacy actual.receipt.binding.1.scheme.quantified
     (actual.quantified_below inferred.2.2) live (safe_closed _ _ closed)
   refine ⟨actual,⟨readyOrigins,readyTemplates,?_,?_⟩⟩
@@ -110,10 +111,22 @@ theorem compile_initialized_statement_private {raw : Workspace.RawWorkspace}
         selected.signature.source.value.body.value[index]? = some source →
         ∀ {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr},
           source.value = .letDecl name annotation (some initializer) →
-          ∃ actual : InitializerContinuation selected source, InitializedStatementPrivate actual := by
+          ∃ actual : InitializerContinuation selected.toBodySelection source, InitializedStatementPrivate actual := by
   obtain ⟨selected⟩ := of_compile accepted member
   refine ⟨selected,?_⟩
   intro index source position name annotation initializer form
-  exact selected.initializedStatementPrivate (SourceCoreCompiler.compile_checked_source accepted) position form
+  exact selected.toBodySelection.initializedStatementPrivate (SourceCoreCompiler.compile_checked_source accepted) position form
+
+
+theorem Selected.initializedStatementPrivate {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {source : Syntax.Statement}
+    (position : selected.signature.source.value.body.value[index]? = some source)
+    {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}
+    (form : source.value = .letDecl name annotation (some initializer)) :
+    ∃ actual : InitializerContinuation selected.toBodySelection source, InitializedStatementPrivate actual :=
+  selected.toBodySelection.initializedStatementPrivate checked position form
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

@@ -12,7 +12,7 @@ from that scrutinee computation, including the synthetic tuple branch. -/
 theorem patternEntered_after_scrutinees
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel expressionFuel patternFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {span : Syntax.SourceSpan}
     {sources : List Syntax.Expr}

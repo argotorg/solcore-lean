@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedInitializer
 import Solcore.SourceSemantics.SourceInferenceRetainedInitializerState
 
@@ -10,7 +11,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 theorem operational (continuation : RetainedInitializer selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

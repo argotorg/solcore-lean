@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceSelectedPrivacyFinalization
 import Solcore.SourceSemantics.SourceInferenceSelectedMonomorphicGeneralization
 import Solcore.SourceSemantics.SourceCompiledSelectedInferenceProgress
@@ -73,20 +74,28 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVaria
 /-- A selected actual checker receipt supplies the closed return signature,
 its successful unification and its finalizer. No return-type privacy or
 post-defaulting transport law is requested from the caller. -/
+theorem BodySelection.finishPrivacy {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : BodySelection compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (protectedVars : List TypeVarId) :
+    ∀ type, Safe protectedVars selected.body.body.state type →
+      Avoids protectedVars (selected.body.finalized.substitution.apply type) := by
+  have closed : (Ty.productMany selected.signature.returnTypes).VariablesBelow 0 :=
+    selected.returns_closed checked
+  have returned : SafeTransport protectedVars selected.body.body.state selected.body.returned :=
+    unify_closed_right_private closed selected.body.unified
+  intro type safe
+  exact finalize_private selected.body.finalization type (returned type safe)
+
+
 theorem Selected.finishPrivacy {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
     (selected : Selected compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (protectedVars : List TypeVarId) :
     ∀ type, Safe protectedVars selected.body.body.state type →
-      Avoids protectedVars (selected.body.finalized.substitution.apply type) := by
-  have formation := Frontend.checkProgram_success_signature_formation checked
-  have closed : (Ty.productMany selected.signature.returnTypes).VariablesBelow 0 :=
-    Ty.variablesBelow_productMany
-      ((formation.functions selected.signature selected.signatureMember).2.1.variablesBelow 0)
-  have returned : SafeTransport protectedVars selected.body.body.state selected.body.returned :=
-    unify_closed_right_private closed selected.body.unified
-  intro type safe
-  exact finalize_private selected.body.finalization type (returned type safe)
+      Avoids protectedVars (selected.body.finalized.substitution.apply type) :=
+  selected.toBodySelection.finishPrivacy checked protectedVars
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

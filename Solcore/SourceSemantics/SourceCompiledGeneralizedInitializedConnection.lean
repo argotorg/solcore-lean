@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceRecursion
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceProducer
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     {source : Syntax.Statement} {expectedReturn : Ty}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
 
@@ -21,16 +22,16 @@ theorem StatementBoundary.initializerOccurrence
       expectedReturn initial result frames target)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (form : source.value = .letDecl name annotation (some initializer)) :
-    ∃ occurrence : InitializerOccurrence selected source,
+    ∃ occurrence : BodyInitializerOccurrence selected source,
       occurrence.childFuel = childFuel ∧ occurrence.inferenceContext = inferenceContext ∧
       occurrence.entry = initial ∧ occurrence.result = result :=
-  InitializerOccurrence.of_accepted checked boundary.scope form boundary.accepted boundary.invariant.ready
+  BodyInitializerOccurrence.of_accepted checked boundary.scope form boundary.accepted boundary.invariant.ready
     boundary.operational boundary.rawSubtree boundary.extension
 
 /-- The concrete occurrence and its selected-scope barrier feed the same
 statement conclusion consumed by source-order sequencing. -/
 theorem statement_initialized
-    (occurrence : InitializerOccurrence selected source)
+    (occurrence : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRootedSoundness selected occurrence.childFuel)
     (boundary : StatementBoundary selected (occurrence.childFuel + 1)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementInvariant
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceState
 
@@ -6,15 +7,15 @@ Resolved privacy alone is insufficient: the proof also uses the exact freshly
 generalized variables, which the solved initializer substitution leaves fixed. -/
 set_option autoImplicit false
 set_option Elab.async false
-namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 open SourceCompiledGeneralizedSoundness ProtectedVariables
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
-theorem schemeIsolation (continuation : InitializerOccurrence selected source)
+theorem schemeIsolation (continuation : BodyInitializerOccurrence selected source)
     (isolated : ActiveSchemeQuantifierIsolation continuation.entry)
     (resultPrivate : ActiveQuantifiersPrivate continuation.result.state) :
     ActiveSchemeQuantifierIsolation continuation.result.state := by
@@ -51,7 +52,7 @@ theorem schemeIsolation (continuation : InitializerOccurrence selected source)
 
 theorem statement_of_child_recursive
     {raw : Workspace.RawWorkspace} {expectedReturn : Ty}
-    (continuation : InitializerOccurrence selected source)
+    (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     (scope : CheckingScope selected continuation.inferenceContext)
@@ -117,4 +118,8 @@ theorem statement_of_child_recursive
     extension (continuation.schemeIsolation invariant.schemeIsolation operational.privacy) typed
   exact ⟨finalContext, finalInvariant, actualFinal, operational, typed, matching⟩
 
+end Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
+
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+export BodyInitializerOccurrence (schemeIsolation statement_of_child_recursive)
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence

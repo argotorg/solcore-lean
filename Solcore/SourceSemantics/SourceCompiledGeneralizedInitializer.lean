@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedLetTyping
 import Solcore.SourceSemantics.SourceCompiledNestedInitializerStatementPrivacy
 
@@ -11,7 +12,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 structure RetainedInitializer {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) (source : Syntax.Statement) where
+    (selected : BodySelection compiled row fuel) (source : Syntax.Statement) where
   childFuel : Nat
   inferenceContext : SourceInference.Context
   entry : State
@@ -22,7 +23,7 @@ structure RetainedInitializer {compiled : SourceCoreCompiler.Compiled}
 namespace RetainedInitializer
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 theorem original_retained (continuation : RetainedInitializer selected source) :
     .statement {
@@ -435,7 +436,7 @@ initializer and retained statement. The child inference context is unchanged. -/
 theorem PrivateBlockContinuation.retained_initializer
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} (block : PrivateBlockContinuation selected)
+    {selected : BodySelection compiled row fuel} (block : PrivateBlockContinuation selected)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement} (position : block.sources[index]? = some source)
     {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}

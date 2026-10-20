@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionList
 import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
 
@@ -11,7 +12,7 @@ open SourceCompiledLocalFinalization
 theorem expressionRetained_tuple
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr}

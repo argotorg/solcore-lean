@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedForState
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPlaceContracts
 
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization
 theorem forItem_assignBitNot
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (placeSound : PlaceRootedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}

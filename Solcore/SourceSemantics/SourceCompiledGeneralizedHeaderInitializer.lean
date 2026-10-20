@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedHeaderInitializerState
 import Solcore.SourceSemantics.SourceCompiledNormalizedTemplates
 import Solcore.SourceSemantics.SourceCompiledGeneralizedInitializerContexts
@@ -33,7 +34,7 @@ actual inference and the selected finalizer. -/
 theorem forItem_initialized_of_receipt
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (childSound : ExpressionRootedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}

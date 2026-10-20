@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssemblyContracts
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCoercionInterfaces
 
@@ -14,7 +15,7 @@ open SourceCompiledLocalFinalization
 variable {compiled : SourceCoreCompiler.Compiled}
   {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-theorem selected_original_interfaces (selected : Selected compiled row fuel)
+theorem selected_original_interfaces (selected : BodySelection compiled row fuel)
     (member : row ∈ compiled.plan.specializations) :
     ExecutableCoercionInterfaces.SourceInterfaces (checkingContext selected).signatures
       selected.body.finalized.solvedRequirements selected.body.finalized.typedSource := by
@@ -32,17 +33,10 @@ theorem selected_original_interfaces (selected : Selected compiled row fuel)
         selected.body.solved] using original
 
 theorem selected_body_header {raw : Workspace.RawWorkspace}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
     CheckedBodyHeaderWellFormed compiled.program.signatures selected.signature selected.original := by
-  obtain ⟨signature, member, header⟩ :=
-    checkedFunctionHeaderWellFormed_ofCheckProgram checked selected.originalMember
-  have same := eq_of_mem_of_nodup_map
-    (SignatureCatalogWellFormed.ofCheckProgram checked).function_ids member selected.signatureMember
-    (header.declaration_eq.symm.trans
-      (checkFunctionBody_success_declaration selected.body.accepted))
-  subst signature
-  exact header
+  exact selected.header checked
 
 private theorem input_context_fields {owner : Resolved.DeclarationId}
     {base target : SourceSemantics.Context} {binders : List TypedBinder} {types : List Ty}
@@ -71,7 +65,7 @@ private theorem input_type_formed {owner : Resolved.DeclarationId}
       cases head
       exact ih (formed.withLocal _ _ _)
 
-private theorem returned_source (selected : Selected compiled row fuel) :
+private theorem returned_source (selected : BodySelection compiled row fuel) :
     evidenceSource selected = selected.body.body.state.toTypedSource (bodyRoots selected) := by
   have header := Detail.unify_state_header selected.body.unified
   have owner := congrArg State.Header.owner header
@@ -80,7 +74,7 @@ private theorem returned_source (selected : Selected compiled row fuel) :
   change selected.body.returned.inputs = selected.body.body.state.inputs at inputs
   simp only [evidenceSource, State.toTypedSource, owner, inputs, selected.body.returned_nodes]
 
-structure BodyEntry (selected : Selected compiled row fuel)
+structure BodyEntry (selected : BodySelection compiled row fuel)
     (target : SourceSemantics.Context) : Prop where
   inputs : MonoBindersExtend selected.signature.id
     (checkedBodyContext compiled.program.signatures selected.signature selected.original)
@@ -98,7 +92,7 @@ structure BodyEntry (selected : Selected compiled row fuel)
 /-- All entry conditions belong to the same original successful body check.
 Actual executable preparation supplies the complete source interfaces. -/
 theorem body_entry_of_interfaces {raw : Workspace.RawWorkspace}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
@@ -127,8 +121,7 @@ theorem body_entry_of_interfaces {raw : Workspace.RawWorkspace}
   have predicatesFixed : selected.signature.scheme.predicates.map
       (TypedTraitResolution.applySubstitution selected.body.finalized.substitution) =
         selected.signature.scheme.predicates :=
-    ((Frontend.checkProgram_success_signature_formation checked).functions
-      selected.signature selected.signatureMember).2.2.apply_eq_self _
+    selected.predicates_fixed checked _
   have emptyActual : ActualContext (checkingContext selected) selected.body.finalized []
       (checkedBodyContext compiled.program.signatures selected.signature selected.original) := by
     apply ActualContext.empty
@@ -180,9 +173,7 @@ theorem body_entry_of_interfaces {raw : Workspace.RawWorkspace}
   refine ⟨target, inputs, ?_, ?_, ?_⟩
   · intro binder present
     exact ProtectedVariables.safe_closed _ _
-      (Ty.variablesBelow_productMany
-        (((Frontend.checkProgram_success_signature_formation checked).functions
-          selected.signature selected.signatureMember).2.1.variablesBelow 0))
+      (selected.returns_closed checked)
   · rw [returnFixed]
     exact TypeAdmissible.ofWellFormed (input_type_formed inputs
       ⟨header.parameter_binders, StructuralSubstitution.TypesWellScoped.productMany
@@ -224,7 +215,7 @@ theorem body_entry_of_interfaces {raw : Workspace.RawWorkspace}
 theorem body_entry {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations) :
     ∃ target, BodyEntry selected target :=
@@ -233,7 +224,7 @@ theorem body_entry {raw : Workspace.RawWorkspace}
 /-- The recursive assembly is applied at the real whole-body entry, with its
 safe return type and state/context invariants discharged by accepted checking. -/
 theorem body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
@@ -248,7 +239,7 @@ theorem body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
 theorem body_of_recursive {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations)
     (sound : StatementsRootedSoundness selected fuel) :

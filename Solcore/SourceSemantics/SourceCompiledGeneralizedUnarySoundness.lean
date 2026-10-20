@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedNamedCall
 import Solcore.SourceSemantics.SourceInferenceSelectedOperatorRecording
 
@@ -11,7 +12,7 @@ open SourceCompiledLocalFinalization
 theorem expressionRetained_unary_operator
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRetainedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {expression operandExpression : Syntax.Expr}
@@ -156,7 +157,7 @@ theorem expressionRetained_unary_operator
 theorem expressionRetained_unary
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {expression operandExpression : Syntax.Expr}

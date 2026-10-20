@@ -41,7 +41,7 @@ theorem initialized_block_resume
     {expectedReturn : Ty} {initial : State} {result : Detail.BlockResult}
     {index : Nat} {statement : Syntax.Statement}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (scope : CheckingScope selected inferenceContext)
+    (scope : CheckingScope selected.toBodySelection inferenceContext)
     (ready : initial.InferenceReady) (nodesBelow : initial.NodesBelowNextOccurrence)
     (entering : ResumeEntryInvariant selected expectedReturn initial)
     (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
@@ -62,8 +62,8 @@ theorem initialized_block_resume
   let occurrence := InitializerOccurrence.ofReceipt checked scope receipt resume.ready
     resume.entryInvariant.1 recorded resultExtension
   have afterOwner := (Detail.inferStatementFuel_preserves_owner resume.accepted).trans resume.entryInvariant.2.2
-  have afterSource : TypingSourceExtends (resume.result.state.toTypedSource (bodyRoots selected))
-      (evidenceSource selected) :=
+  have afterSource : TypingSourceExtends (resume.result.state.toTypedSource (bodyRoots selected.toBodySelection))
+      (evidenceSource selected.toBodySelection) :=
     ⟨afterOwner.symm, resume.retained.trans retained⟩
   have afterOperational := resume.entryInvariant.1.ofInitializer receipt selected.body.resources resume.ready
     (scope.catalog checked) formation canonical (resume.retained.trans retained) afterSource resultExtension

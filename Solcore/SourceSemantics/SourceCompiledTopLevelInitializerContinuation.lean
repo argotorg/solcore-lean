@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledSelectedInferenceProgress
 import Solcore.Frontend.SourceInference.StatementInferenceContinuation
 
@@ -12,7 +13,7 @@ open Frontend SourceInference TypeSystem
 
 structure InitializerContinuation {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) (source : Syntax.Statement) where
+    (selected : BodySelection compiled row fuel) (source : Syntax.Statement) where
   childFuel : Nat
   entry : State
   result : Detail.StatementResult
@@ -26,7 +27,7 @@ structure InitializerContinuation {compiled : SourceCoreCompiler.Compiled}
 
 namespace InitializerContinuation
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
-    {fuel : Nat} {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {fuel : Nat} {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 theorem substitution (continuation : InitializerContinuation selected source) :
     selected.body.finalized.substitution.SemanticallyExtends
@@ -58,9 +59,9 @@ theorem no_capture (continuation : InitializerContinuation selected source) :
 
 end InitializerContinuation
 
-theorem Selected.topLevelInitializer {raw : Workspace.RawWorkspace}
+theorem BodySelection.topLevelInitializer {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement}
     (position : selected.signature.source.value.body.value[index]? = some source)
@@ -93,10 +94,22 @@ theorem compile_top_level_initializer_continuation {raw : Workspace.RawWorkspace
         selected.signature.source.value.body.value[index]? = some source →
         ∀ {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr},
           source.value = .letDecl name annotation (some initializer) →
-          Nonempty (InitializerContinuation selected source) := by
+          Nonempty (InitializerContinuation selected.toBodySelection source) := by
   obtain ⟨selected⟩ := of_compile accepted member
   refine ⟨selected, ?_⟩
   intro index source position name annotation initializer form
-  exact selected.topLevelInitializer (SourceCoreCompiler.compile_checked_source accepted) position form
+  exact selected.toBodySelection.topLevelInitializer (SourceCoreCompiler.compile_checked_source accepted) position form
+
+
+theorem Selected.topLevelInitializer {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {source : Syntax.Statement}
+    (position : selected.signature.source.value.body.value[index]? = some source)
+    {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}
+    (form : source.value = .letDecl name annotation (some initializer)) :
+    Nonempty (InitializerContinuation selected.toBodySelection source) :=
+  selected.toBodySelection.topLevelInitializer checked position form
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

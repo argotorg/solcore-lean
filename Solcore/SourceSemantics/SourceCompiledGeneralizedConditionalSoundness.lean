@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
 import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
 import Solcore.SourceSemantics.SourceInferenceSelectedExpressionState
@@ -40,7 +41,7 @@ private theorem safe_after_expression
 theorem expressionRetained_conditional
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRetainedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {expression condition thenBranch elseBranch : Syntax.Expr}

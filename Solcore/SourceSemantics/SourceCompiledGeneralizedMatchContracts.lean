@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedMatchState
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPatternEntry
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
@@ -11,7 +12,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness Protecte
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure MatchCasesBoundary (selected : Selected compiled row fuel)
+structure MatchCasesBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (cases : List Syntax.MatchCase) (scrutinee expectedReturn : Ty)
     (initial : State) (outerScope : LexicalScope) (result : Detail.MatchCasesResult)
@@ -44,7 +45,7 @@ structure MatchCasesBoundary (selected : Selected compiled row fuel)
   actualCovered : ∀ arm ∈ result.cases, ∀ child ∈ arm.body,
     ActualContext.Covers selected.body.finalized frames (.statement child)
 
-def MatchCasesConclusion (selected : Selected compiled row fuel)
+def MatchCasesConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (scrutinee expectedReturn : Ty)
     (result : Detail.MatchCasesResult) (frames : List InitializedLetBinding)
     (target : SourceSemantics.Context) : Prop :=
@@ -58,7 +59,7 @@ def MatchCasesConclusion (selected : Selected compiled row fuel)
     allBodiesSawReturn facts = result.allReturn
 
 theorem MatchCasesBoundary.resultInvariant
-    {raw : Workspace.RawWorkspace} {selected : Selected compiled row fuel}
+    {raw : Workspace.RawWorkspace} {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {childFuel : Nat} {inferenceContext : SourceInference.Context} {cases : List Syntax.MatchCase}
     {scrutinee expectedReturn : Ty} {initial : State} {outerScope : LexicalScope}

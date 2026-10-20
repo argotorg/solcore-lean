@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionList
 import Solcore.SourceSemantics.SourceCompiledGeneralizedMatchContracts
 
@@ -9,7 +10,7 @@ open SourceCompiledLocalFinalization
 
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure ScrutineeBoundary (selected : Selected compiled row fuel)
+structure ScrutineeBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context) (span : Syntax.SourceSpan)
     (sources : List Syntax.Expr) (initial : State) (inferred : InferredExpression) (result : State)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop where
@@ -32,7 +33,7 @@ structure ScrutineeBoundary (selected : Selected compiled row fuel)
 private theorem syntheticScrutinee
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
@@ -106,7 +107,7 @@ private theorem syntheticScrutinee
 theorem scrutineeRooted
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {span : Syntax.SourceSpan} {sources : List Syntax.Expr}

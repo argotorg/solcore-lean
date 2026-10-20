@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPlaceContracts
 import Solcore.SourceSemantics.SourceInferenceSelectedAssignmentChildren
 
@@ -9,7 +10,7 @@ open SourceCompiledLocalFinalization
 
 structure AssignedValueBoundary {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) (childFuel : Nat) (inferenceContext : SourceInference.Context)
+    (selected : BodySelection compiled row fuel) (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (targetExpression : Syntax.Expr) (operator : Syntax.ValueAssignOp) (value : Syntax.Expr)
     (initial : State) (assignment : AssignmentResolution) (inferred : InferredExpression) (final : State)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop where
@@ -38,7 +39,7 @@ structure AssignedValueBoundary {compiled : SourceCoreCompiler.Compiled}
 theorem assignedValue_of_actual_children
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (placeSound : PlaceRootedSoundness selected childFuel)
     (expressionSound : ExpressionRootedSoundness selected childFuel)

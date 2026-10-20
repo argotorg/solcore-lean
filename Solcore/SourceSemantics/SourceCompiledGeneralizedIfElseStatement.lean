@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedBlockStatement
 
 set_option autoImplicit false
@@ -9,7 +10,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 theorem statement_if_with_else
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursiveExpression : ExpressionRootedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceStatementPrivacyContinuation
 import Solcore.SourceSemantics.SourceInferenceSelectedPrivacyReturnFinalization
 
@@ -11,9 +12,9 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVaria
 
 /-- The actual checker result supplies the continuation through all later
 statements, return unification and finalization for a selected source position. -/
-theorem Selected.statementPrivacy {raw : Workspace.RawWorkspace}
+theorem BodySelection.statementPrivacy {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement}
     (position : selected.signature.source.value.body.value[index]? = some source) :
@@ -43,7 +44,7 @@ theorem Selected.statementPrivacy {raw : Workspace.RawWorkspace}
   refine ⟨occurrence,?_⟩
   intro protectedVars bound live
   have closed : (Ty.productMany selected.signature.returnTypes).VariablesBelow 0 :=
-    Ty.variablesBelow_productMany ((formation.functions selected.signature selected.signatureMember).2.1.variablesBelow 0)
+    selected.returns_closed checked
   have continuation := occurrence.privacy protectedVars bound live
     (safe_closed protectedVars occurrence.result.state closed)
   constructor
@@ -77,7 +78,29 @@ theorem compile_statement_privacy {raw : Workspace.RawWorkspace}
               ∀ type ∈ requirement.predicate.subject :: requirement.predicate.arguments,
                 Avoids protectedVars (selected.body.finalized.substitution.apply type)) := by
   obtain ⟨selected⟩ := of_compile accepted member
-  exact ⟨selected,fun position => selected.statementPrivacy
+  exact ⟨selected,fun position => selected.toBodySelection.statementPrivacy
     (SourceCoreCompiler.compile_checked_source accepted) position⟩
+
+
+theorem Selected.statementPrivacy {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {source : Syntax.Statement}
+    (position : selected.signature.source.value.body.value[index]? = some source) :
+    ∃ occurrence : StatementPrivacyOccurrence
+        (context compiled.program.environment compiled.program.signatures selected.signature selected.body.declaration)
+        source (Ty.productMany selected.signature.returnTypes)
+        (initial selected.signature selected.body.declaration) selected.body.body.state,
+      ∀ protectedVars : List TypeVarId,
+        (∀ v ∈ protectedVars, v.index < occurrence.result.state.inference.next) →
+        LiveBindersSafe protectedVars occurrence.result.state →
+        (∀ type, Safe protectedVars occurrence.result.state type →
+          Avoids protectedVars (selected.body.finalized.substitution.apply type)) ∧
+        (∀ requirement ∈ selected.body.body.state.requirements,
+          requirement ∉ occurrence.result.state.requirements →
+          ∀ type ∈ requirement.predicate.subject :: requirement.predicate.arguments,
+            Avoids protectedVars (selected.body.finalized.substitution.apply type)) :=
+  selected.toBodySelection.statementPrivacy checked position
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

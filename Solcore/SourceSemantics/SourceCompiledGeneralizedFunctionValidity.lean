@@ -16,7 +16,7 @@ theorem function_valid_of_barriers_of_interfaces
     (selected : Selected compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
-      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      (checkingContext selected.toBodySelection).signatures selected.body.finalized.solvedRequirements
       selected.body.finalized.typedSource)
     (barriers : SelectedInitializerBarriers selected) :
     FunctionDefinition.Valid compiled.program.signatures
@@ -29,7 +29,7 @@ theorem function_valid_of_barriers_of_interfaces
       ((checkFunctionBody_success_declaration bodySuccess).symm.trans
         (checkFunctionBody_success_declaration selected.body.accepted))
   subst signature
-  exact checked_body_of_barriers_of_interfaces selected checked interfaces barriers
+  exact checked_body_of_barriers_of_interfaces selected.toBodySelection checked interfaces barriers
 
 theorem function_valid_of_barriers {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
@@ -41,6 +41,6 @@ theorem function_valid_of_barriers {raw : Workspace.RawWorkspace}
     FunctionDefinition.Valid compiled.program.signatures
       (FunctionDefinition.ofChecked selected.original) :=
   function_valid_of_barriers_of_interfaces selected checked
-    (selected_original_interfaces selected member) barriers
+    (selected_original_interfaces selected.toBodySelection member) barriers
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

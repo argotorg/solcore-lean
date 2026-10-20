@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
@@ -13,7 +14,7 @@ open SourceInferenceStatementsSoundness
 theorem statement_block
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {body : List Syntax.Statement} {expectedReturn : Ty}

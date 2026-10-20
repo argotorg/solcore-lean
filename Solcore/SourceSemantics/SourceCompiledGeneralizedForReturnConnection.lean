@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForStatement
 import Solcore.SourceSemantics.SourceInferenceHeaderSequenceReturnPrivacy
 
@@ -11,7 +12,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 theorem statement_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursiveItems : ForItemsRootedSoundness selected childFuel)
     (recursiveExpression : ExpressionRootedSoundness selected childFuel)

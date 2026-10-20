@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPlaceContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
@@ -11,7 +12,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 theorem statement_assignBitNot
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (placeSound : PlaceRootedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrence
 
 /-! The initialized declaration consumer uses the minimal actual occurrence.
@@ -8,26 +9,26 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
-namespace InitializerOccurrence
+namespace BodyInitializerOccurrence
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
-theorem original_retained (continuation : InitializerOccurrence selected source) :
+theorem original_retained (continuation : BodyInitializerOccurrence selected source) :
     .statement {
       id := continuation.entry.allocateStatementId.1, span := source.span, type := .unit,
       form := .letDecl continuation.receipt.binding.1 (some continuation.receipt.value.id) } ∈ selected.body.returned.nodes :=
   continuation.recorded
 
-theorem no_capture (continuation : InitializerOccurrence selected source) :
+theorem no_capture (continuation : BodyInitializerOccurrence selected source) :
     Detail.LocalBinderInstantiationNoCapture selected.body.finalized.substitution continuation.receipt.binding.1 :=
   selected.body.resources.local_no_capture _ continuation.retained
 
-theorem substitution (continuation : InitializerOccurrence selected source) :
+theorem substitution (continuation : BodyInitializerOccurrence selected source) :
     selected.body.finalized.substitution.SemanticallyExtends continuation.receipt.ready.inference.substitution :=
   continuation.extension
 
-theorem finalPredicates (continuation : InitializerOccurrence selected source)
+theorem finalPredicates (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context}
     (signatures : target.signatures = compiled.program.signatures)
@@ -57,7 +58,7 @@ theorem finalPredicates (continuation : InitializerOccurrence selected source)
 /-- The exact generalized binder keeps the final type returned by its actual
 initializer. The actual finalizer excludes quantifier capture and absorbs the
 initializer's inference substitution. -/
-theorem finalBody (continuation : InitializerOccurrence selected source) :
+theorem finalBody (continuation : BodyInitializerOccurrence selected source) :
     (continuation.receipt.binding.1.applySubstitution selected.body.finalized.substitution).scheme.body =
       selected.body.finalized.substitution.apply continuation.receipt.value.type := by
   have restriction : selected.body.finalized.substitution.without
@@ -76,7 +77,7 @@ theorem finalBody (continuation : InitializerOccurrence selected source) :
 
 /-- The child typing result supplied by the recursive call is converted to
 this allocated binder's scheme body without changing the initializer or context. -/
-theorem initializerTyping (continuation : InitializerOccurrence selected source)
+theorem initializerTyping (continuation : BodyInitializerOccurrence selected source)
     {target : SourceSemantics.Context}
     (typed : ExpressionHasType selected.body.finalized.typedSource
       (localSchemeInitializerContext target
@@ -96,7 +97,7 @@ theorem initializerTyping (continuation : InitializerOccurrence selected source)
 /-- The generalized initializer consumer now uses the real selected receipt,
 finalizer, and producer formation. There is no monomorphism or whole-body typing
 premise. Prior quantifier blocking comes from the actual prefix; the selected-scope barrier remains explicit. -/
-theorem certificate (continuation : InitializerOccurrence selected source)
+theorem certificate (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context}
     (invariant : RecursiveExpressionInvariant
@@ -139,13 +140,13 @@ theorem certificate (continuation : InitializerOccurrence selected source)
     (priorQuantifiersBlockedAt_of_activeQuantifiersAvoided invariant.active.aligned
       continuation.priorAvoided) (continuation.initializerTyping typed)
 
-def initializerBinding (continuation : InitializerOccurrence selected source) : InitializedLetBinding :=
+def initializerBinding (continuation : BodyInitializerOccurrence selected source) : InitializedLetBinding :=
   ⟨continuation.receipt.binding.1.applySubstitution selected.body.finalized.substitution,
     .expression continuation.receipt.value.id⟩
 
 /-- The same actual let occurrence opens its exact initializer scope at the
 state used by the real child call. This step does not assume source monomorphism. -/
-theorem enter (continuation : InitializerOccurrence selected source)
+theorem enter (continuation : BodyInitializerOccurrence selected source)
     {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     (invariant : RecursiveExpressionInvariant
       (context compiled.program.environment compiled.program.signatures
@@ -205,7 +206,7 @@ theorem enter (continuation : InitializerOccurrence selected source)
 /-- Apply the concrete child typing step after opening the actual receipt's
 scope, then assemble the existing generalized-let certificate. The callback is
 restricted to this one child, so it can be the smaller recursive typing case. -/
-theorem certificate_of_child (continuation : InitializerOccurrence selected source)
+theorem certificate_of_child (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     (invariant : RecursiveExpressionInvariant
@@ -249,7 +250,7 @@ theorem certificate_of_child (continuation : InitializerOccurrence selected sour
 /-- The concrete certificate installs the very binder allocated by the actual
 receipt. Its statement is typed in the same final source as its initializer. -/
 theorem statement_of_certificate
-    (continuation : InitializerOccurrence selected source)
+    (continuation : BodyInitializerOccurrence selected source)
     {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     {control : ControlContext}
     (invariant : RecursiveExpressionInvariant
@@ -369,7 +370,7 @@ theorem statement_of_certificate
 
 theorem statement_of_child
     {raw : Workspace.RawWorkspace} {control : ControlContext}
-    (continuation : InitializerOccurrence selected source)
+    (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     (invariant : RecursiveExpressionInvariant
@@ -417,5 +418,9 @@ theorem statement_of_child
     (continuation.certificate_of_child checked invariant actual covered barrier child)
 
 
+end BodyInitializerOccurrence
+namespace InitializerOccurrence
+export BodyInitializerOccurrence (original_retained no_capture substitution finalPredicates finalBody initializerTyping certificate initializerBinding enter certificate_of_child statement_of_certificate statement_of_child)
 end InitializerOccurrence
+
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

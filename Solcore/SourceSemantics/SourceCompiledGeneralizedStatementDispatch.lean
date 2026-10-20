@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssemblyContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedBlockStatement
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionStatement
@@ -19,7 +20,7 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
 
 theorem statementRooted_zero : StatementRootedSoundness selected 0 := by
   intro inferenceContext statement expectedReturn initial result frames target returnSafe returnAdmissible boundary
@@ -29,7 +30,7 @@ theorem statementRooted_zero : StatementRootedSoundness selected 0 := by
 
 theorem statementRooted_step_of_for
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (barriers : SelectedInitializerBarriers selected)
+    (barriers : BodyInitializerBarriers selected)
     (recursiveExpression : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     (recursiveBody : ∀ smaller, smaller < childFuel + 1 → StatementsRootedSoundness selected smaller)
     (placeSound : PlaceRootedSoundness selected childFuel)

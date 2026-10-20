@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionContracts
 import Solcore.SourceSemantics.SourceInferenceActualLocalExpression
 import Solcore.SourceSemantics.SourceInferenceSelectedDeclaration
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementDispatch
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForDispatch
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForSequence
@@ -16,11 +17,11 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
 
 theorem recursiveSoundness_of_barriers
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (barriers : SelectedInitializerBarriers selected) :
+    (barriers : BodyInitializerBarriers selected) :
     ∀ childFuel,
       ExpressionRetainedSoundness selected childFuel ∧
       StatementRootedSoundness selected childFuel ∧

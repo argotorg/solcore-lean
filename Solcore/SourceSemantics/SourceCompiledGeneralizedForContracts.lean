@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceInferenceSelectedForItemTransport
 
@@ -12,7 +13,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure ForItemBoundary (selected : Selected compiled row fuel)
+structure ForItemBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context) (item : Syntax.ForItem)
     (expectedReturn : Ty) (initial : State) (inferred : ForItemForm) (final : State)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop where
@@ -38,7 +39,7 @@ structure ForItemBoundary (selected : Selected compiled row fuel)
     ActualContext.Covers selected.body.finalized frames reference
   actualBindings : ActualForItemBindings selected.body.finalized frames inferred
 
-def ForItemConclusion (selected : Selected compiled row fuel)
+def ForItemConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)
     (inferred : ForItemForm) (final : State)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop :=
@@ -51,7 +52,7 @@ def ForItemConclusion (selected : Selected compiled row fuel)
         loopDepth := inferenceContext.loopDepth }
       target (inferred.applySubstitution selected.body.finalized.substitution) finalContext
 
-structure ForItemsBoundary (selected : Selected compiled row fuel)
+structure ForItemsBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context) (items : List Syntax.ForItem)
     (expectedReturn : Ty) (initial : State) (result : Detail.InferredForItems)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop where
@@ -77,7 +78,7 @@ structure ForItemsBoundary (selected : Selected compiled row fuel)
     ActualContext.Covers selected.body.finalized frames reference
   actualBindings : ActualForItemsBindings selected.body.finalized frames result.items
 
-def ForItemsConclusion (selected : Selected compiled row fuel)
+def ForItemsConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)
     (result : Detail.InferredForItems)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop :=
@@ -90,14 +91,14 @@ def ForItemsConclusion (selected : Selected compiled row fuel)
         loopDepth := inferenceContext.loopDepth }
       target (result.items.map (ForItemForm.applySubstitution selected.body.finalized.substitution)) finalContext
 
-def ForItemRootedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def ForItemRootedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {item : Syntax.ForItem} {expectedReturn : Ty}
     {initial final : State} {inferred : ForItemForm}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},
     ForItemBoundary selected childFuel inferenceContext item expectedReturn initial inferred final frames target →
     ForItemConclusion selected inferenceContext expectedReturn inferred final frames target
 
-def ForItemsRootedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def ForItemsRootedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {items : List Syntax.ForItem} {expectedReturn : Ty}
     {initial : State} {result : Detail.InferredForItems}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},

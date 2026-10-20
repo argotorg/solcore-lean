@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledStatementPrivacyContinuation
 import Solcore.SourceSemantics.SourceCompiledTopLevelInitializerContinuation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedPrivacyBoundary
@@ -12,7 +13,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVaria
 
 namespace InitializerContinuation
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
-    {fuel : Nat} {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {fuel : Nat} {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 theorem retained_binding (continuation : InitializerContinuation selected source) :
     continuation.receipt.binding.1 ∈
@@ -57,9 +58,9 @@ end InitializerContinuation
 /-- Both the generalization and later privacy use one actual statement call
 at the chosen original source position. The remaining producer inputs describe
 only the old live binders and their genuine pre-initializer template rows. -/
-theorem Selected.initializedStatementPrivacy {raw : Workspace.RawWorkspace}
+theorem BodySelection.initializedStatementPrivacy {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement}
     (position : selected.signature.source.value.body.value[index]? = some source)
@@ -116,7 +117,7 @@ theorem compile_initialized_statement_privacy {raw : Workspace.RawWorkspace}
         selected.signature.source.value.body.value[index]? = some source →
         ∀ {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr},
           source.value = .letDecl name annotation (some initializer) →
-          ∃ actual : InitializerContinuation selected source,
+          ∃ actual : InitializerContinuation selected.toBodySelection source,
             ∀ _origins : ActiveBinderCaptureOrigins actual.receipt.ready
                 (selected.body.returned.toTypedSource (selected.body.body.statements.map NodeId.statement)),
               (∀ older ∈ actual.receipt.ready.localBinders,
@@ -130,6 +131,28 @@ theorem compile_initialized_statement_privacy {raw : Workspace.RawWorkspace}
   obtain ⟨selected⟩ := of_compile accepted member
   refine ⟨selected,?_⟩
   intro index source position name annotation initializer form
-  exact selected.initializedStatementPrivacy (SourceCoreCompiler.compile_checked_source accepted) position form
+  exact selected.toBodySelection.initializedStatementPrivacy (SourceCoreCompiler.compile_checked_source accepted) position form
+
+
+theorem Selected.initializedStatementPrivacy {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {source : Syntax.Statement}
+    (position : selected.signature.source.value.body.value[index]? = some source)
+    {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}
+    (form : source.value = .letDecl name annotation (some initializer)) :
+    ∃ actual : InitializerContinuation selected.toBodySelection source,
+      ∀ _origins : ActiveBinderCaptureOrigins actual.receipt.ready
+          (selected.body.returned.toTypedSource (selected.body.body.statements.map NodeId.statement)),
+        (∀ older ∈ actual.receipt.ready.localBinders,
+          BinderTemplatesBefore actual.receipt.ready actual.entry.nextRequirement older) →
+        (∀ type, Safe actual.receipt.binding.1.scheme.quantified actual.receipt.ready type →
+          Avoids actual.receipt.binding.1.scheme.quantified (selected.body.finalized.substitution.apply type)) ∧
+        (∀ requirement ∈ selected.body.body.state.requirements,
+          requirement ∉ actual.receipt.ready.requirements →
+          ∀ type ∈ requirement.predicate.subject :: requirement.predicate.arguments,
+            Avoids actual.receipt.binding.1.scheme.quantified (selected.body.finalized.substitution.apply type)) :=
+  selected.toBodySelection.initializedStatementPrivacy checked position form
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

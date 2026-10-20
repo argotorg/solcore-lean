@@ -40,8 +40,8 @@ theorem outer_binder_safe {raw : Workspace.RawWorkspace}
   have bodyEq : outer.receipt.binding.1.scheme.body =
       outer.receipt.ready.resolve outer.receipt.value.type := by
     exact Detail.generalizeValue_scheme_body _ _ _ _
-  have innerCapture := selected.body.resources.local_no_capture _ inner.retained
-  have outerCapture := selected.body.resources.local_no_capture _ outer.retained
+  have innerCapture := selected.body.resources.local_no_capture _ (BodyInitializerOccurrence.retained inner)
+  have outerCapture := selected.body.resources.local_no_capture _ (BodyInitializerOccurrence.retained outer)
   have fixed : ∀ q ∈ inner.receipt.binding.1.scheme.quantified,
       selected.body.finalized.substitution.apply (.variable q) = .variable q := by
     intro q quantified
@@ -66,12 +66,14 @@ theorem outer_binder_safe {raw : Workspace.RawWorkspace}
     let owner : LocalSchemeTemplateOwner :=
       ⟨outer.receipt.binding.1, .expression outer.receipt.value.id, requirement⟩
     have initialized : ({binder := outer.receipt.binding.1, initializer := .expression outer.receipt.value.id} :
-        InitializedLetBinding) ∈ initializedLetBindings (SourceCompiledGeneralizedSoundness.evidenceSource selected) :=
+        InitializedLetBinding) ∈ initializedLetBindings (SourceCompiledGeneralizedSoundness.evidenceSource selected.toBodySelection) :=
       List.mem_flatMap.mpr ⟨_, outer.recorded, List.mem_singleton_self _⟩
-    have contains : ContainsLocalSchemeTemplate (SourceCompiledGeneralizedSoundness.evidenceSource selected) owner :=
+    have contains : ContainsLocalSchemeTemplate (SourceCompiledGeneralizedSoundness.evidenceSource selected.toBodySelection) owner :=
       List.mem_flatMap.mpr ⟨_, initialized, List.mem_map.mpr ⟨requirement, owned, rfl⟩⟩
     have finalizedContains := FlexibleSubstitution.ContainsLocalSchemeTemplate.applySubstitution
       selected.body.finalized.substitution contains
+    simp only [SourceCompiledGeneralizedSoundness.evidenceSource,
+      SourceCompiledGeneralizedSoundness.bodyRoots, Selected.toBodySelection] at finalizedContains
     rw [← selected.body.resources.source_eq] at finalizedContains
     have restricted : selected.body.finalized.substitution.without outer.receipt.binding.1.scheme.quantified =
         selected.body.finalized.substitution :=

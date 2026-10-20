@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceGeneralizedLambdaParameters
@@ -11,7 +12,7 @@ open SourceCompiledLocalFinalization
 theorem statement_annotatedUninitialized
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {name : Syntax.Identifier} {sourceType : Syntax.TypeExpr} {expectedReturn : Ty}

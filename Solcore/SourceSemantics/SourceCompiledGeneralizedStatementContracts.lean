@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementInvariant
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
 
@@ -13,7 +14,7 @@ open SourceInferenceStatementsSoundness
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure StatementBoundary (selected : Selected compiled row fuel)
+structure StatementBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (statement : Syntax.Statement) (expectedReturn : Ty)
     (initial : State) (result : Detail.StatementResult)
@@ -38,7 +39,7 @@ structure StatementBoundary (selected : Selected compiled row fuel)
   covered : TemplateScopeCovered selected.body.finalized.typedSource target (.statement result.id)
   actualCovered : ActualContext.Covers selected.body.finalized frames (.statement result.id)
 
-def StatementConclusion (selected : Selected compiled row fuel)
+def StatementConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)
     (result : Detail.StatementResult)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop :=

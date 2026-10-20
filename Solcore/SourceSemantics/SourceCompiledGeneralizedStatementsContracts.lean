@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 
 set_option autoImplicit false
@@ -10,7 +11,7 @@ open SourceInferenceStatementsSoundness
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure StatementsBoundary (selected : Selected compiled row fuel)
+structure StatementsBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (statements : List Syntax.Statement) (expectedReturn : Ty)
     (initial : State) (result : Detail.BlockResult)
@@ -38,7 +39,7 @@ structure StatementsBoundary (selected : Selected compiled row fuel)
   actualCovered : ∀ child ∈ result.statements,
     ActualContext.Covers selected.body.finalized frames (.statement child)
 
-def StatementsConclusion (selected : Selected compiled row fuel)
+def StatementsConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)
     (result : Detail.BlockResult)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop :=

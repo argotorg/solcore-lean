@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledTopLevelInitializerContinuation
 import Solcore.Frontend.SourceInference.ForHeaderInferenceContinuation
 
@@ -10,7 +11,7 @@ open Frontend SourceInference TypeSystem ForStatementInferenceContinuation
 
 structure HeaderInitializerContinuation {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) (source : Syntax.ForItem) where
+    (selected : BodySelection compiled row fuel) (source : Syntax.ForItem) where
   inferenceContext : SourceInference.Context
   original : StatementNode
   originalPresent : .statement original ∈ selected.body.body.state.nodes
@@ -19,7 +20,7 @@ structure HeaderInitializerContinuation {compiled : SourceCoreCompiler.Compiled}
 
 namespace HeaderInitializerContinuation
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
-    {fuel : Nat} {selected : Selected compiled row fuel} {source : Syntax.ForItem}
+    {fuel : Nat} {selected : BodySelection compiled row fuel} {source : Syntax.ForItem}
 
 theorem substitution (continuation : HeaderInitializerContinuation selected source) :
     selected.body.finalized.substitution.SemanticallyExtends
@@ -40,9 +41,9 @@ theorem no_capture (continuation : HeaderInitializerContinuation selected source
 
 end HeaderInitializerContinuation
 
-theorem Selected.topLevelForHeader {raw : Workspace.RawWorkspace}
+theorem BodySelection.topLevelForHeader {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {statementIndex : Nat} {statement : Syntax.Statement}
     (statementPosition : selected.signature.source.value.body.value[statementIndex]? = some statement)
@@ -101,12 +102,29 @@ theorem compile_top_level_for_header_continuation {raw : Workspace.RawWorkspace}
             (if isPost then post else initializers)[headerIndex]? = some source →
             ∀ {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr},
               source.value = .letDecl name annotation (some initializer) →
-              Nonempty (HeaderInitializerContinuation selected source) := by
+              Nonempty (HeaderInitializerContinuation selected.toBodySelection source) := by
   obtain ⟨selected⟩ := of_compile accepted member
   refine ⟨selected, ?_⟩
   intro statementIndex statement statementPosition initializers post condition body headerSpan statementForm
     isPost headerIndex source position name annotation initializer form
-  exact selected.topLevelForHeader (SourceCoreCompiler.compile_checked_source accepted)
+  exact selected.toBodySelection.topLevelForHeader (SourceCoreCompiler.compile_checked_source accepted)
     statementPosition statementForm isPost position form
+
+
+theorem Selected.topLevelForHeader {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {statementIndex : Nat} {statement : Syntax.Statement}
+    (statementPosition : selected.signature.source.value.body.value[statementIndex]? = some statement)
+    {initializers post : List Syntax.ForItem} {condition : Syntax.Expr}
+    {body : Syntax.Located (List Syntax.Statement)} {headerSpan : Syntax.SourceSpan}
+    (statementForm : statement.value = .forLoop headerSpan initializers condition post body)
+    (isPost : Bool) {headerIndex : Nat} {source : Syntax.ForItem}
+    (position : (if isPost then post else initializers)[headerIndex]? = some source)
+    {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}
+    (form : source.value = .letDecl name annotation (some initializer)) :
+    Nonempty (HeaderInitializerContinuation selected.toBodySelection source) :=
+  selected.toBodySelection.topLevelForHeader checked statementPosition statementForm isPost position form
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

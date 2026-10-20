@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedLambdaPrefix
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
 import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
@@ -102,7 +103,7 @@ private theorem monoBinders_ambientFields
 theorem expressionRetained_lambda
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {keyword : Syntax.SourceSpan}
     {sourceParameters : Syntax.DelimitedList Syntax.LambdaParameter}

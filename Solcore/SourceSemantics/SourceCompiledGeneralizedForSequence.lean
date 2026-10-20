@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForContracts
 
 set_option autoImplicit false
@@ -8,7 +9,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
 
 theorem forItemsRooted_of_item
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

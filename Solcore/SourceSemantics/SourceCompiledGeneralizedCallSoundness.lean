@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedNamedCall
 import Solcore.SourceSemantics.SourceCompiledGeneralizedBuiltinCall
 import Solcore.SourceSemantics.SourceCompiledGeneralizedIndirectCall
@@ -14,7 +15,7 @@ open SourceCompiledLocalFinalization
 theorem expressionRetained_call
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}

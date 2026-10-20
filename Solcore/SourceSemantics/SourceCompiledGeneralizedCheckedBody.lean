@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedBodyEntry
 
 /-! The actual recursive result supplies one body-facts witness for every
@@ -37,7 +38,7 @@ private theorem roots_injective {left right : List StatementId}
 theorem checked_statements_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
@@ -77,7 +78,7 @@ The caller supplies the recursive assembly at the same selected receipt. -/
 theorem checked_body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
@@ -90,7 +91,7 @@ theorem checked_body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
 theorem checked_statements_of_recursive {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations)
     (sound : StatementsRootedSoundness selected fuel) :
@@ -101,7 +102,7 @@ theorem checked_statements_of_recursive {raw : Workspace.RawWorkspace}
 theorem checked_body_of_recursive {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations)
     (sound : StatementsRootedSoundness selected fuel) :

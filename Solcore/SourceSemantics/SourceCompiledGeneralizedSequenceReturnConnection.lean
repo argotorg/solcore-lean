@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssemblyContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementSequence
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementReturnPrivacy
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
 
 /-- The actual head statement derives the return privacy required by the tail. -/
 theorem statements_cons_with_return

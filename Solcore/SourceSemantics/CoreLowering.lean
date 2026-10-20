@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledCachedMethodValidity
 import Solcore.SourceSemantics.SourceInferenceStatementPrivacyResume
 import Solcore.SourceSemantics.SourceCompiledStatementPrivacyResume
 import Solcore.SourceSemantics.SourceCompiledInitializedBlockResume

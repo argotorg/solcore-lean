@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedMatchContracts
 
 set_option autoImplicit false
@@ -34,7 +35,7 @@ private theorem admissible_binders {owner : Resolved.DeclarationId}
 theorem matchCases
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {cases : List Syntax.MatchCase}
     {scrutinee expectedReturn : Ty} {initial : State} {outerScope : LexicalScope}

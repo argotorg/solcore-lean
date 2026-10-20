@@ -1,16 +1,17 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceInvariant
 
 set_option autoImplicit false
 set_option Elab.async false
-namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 open SourceCompiledGeneralizedSoundness ProtectedVariables
 
 theorem quantified_at_or_after_entry
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
-    (occurrence : InitializerOccurrence selected source)
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
+    (occurrence : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (scope : CheckingScope selected occurrence.inferenceContext)
     (ready : occurrence.entry.InferenceReady)
@@ -65,4 +66,8 @@ theorem quantified_at_or_after_entry
     _ occurrence.receipt.child
   exact actual.2.1 q occurs (List.mem_singleton_self _)
 
+end Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
+
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+export BodyInitializerOccurrence (quantified_at_or_after_entry)
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence

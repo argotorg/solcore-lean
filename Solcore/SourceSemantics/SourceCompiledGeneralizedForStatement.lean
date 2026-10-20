@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForSequence
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementState
@@ -17,7 +18,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
 theorem statement_for_of_initializer_privacy
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursiveItems : ForItemsRootedSoundness selected childFuel)
     (recursiveExpression : ExpressionRootedSoundness selected childFuel)

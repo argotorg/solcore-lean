@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionList
 import Solcore.SourceSemantics.SourceInferenceSelectedConstructorInstantiation
 
@@ -14,7 +15,7 @@ open SourceCompiledLocalFinalization
 theorem constructorArgumentsRooted
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRetainedSoundness selected childFuel) :
     ∀ {inferenceContext : SourceInference.Context} {sources : List Syntax.Expr}

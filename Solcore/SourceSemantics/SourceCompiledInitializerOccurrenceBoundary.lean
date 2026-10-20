@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceRecursion
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceProducer
 
 /-! A generalized initialized statement is indexed by the actual selected
-receipt. Its barrier concerns that one allocation; it is not a law over
-arbitrary checker calls. -/
+receipt. Its barrier concerns that allocation and remains an explicit
+premise until the actual call reachability is supplied. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
@@ -13,10 +13,10 @@ open SourceCompiledLocalFinalization
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure InitializedOccurrenceBoundary (selected : Selected compiled row fuel)
+structure InitializedOccurrenceBoundary (selected : BodySelection compiled row fuel)
     (source : Syntax.Statement) (expectedReturn : Ty)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) where
-  occurrence : InitializerOccurrence selected source
+  occurrence : BodyInitializerOccurrence selected source
   scope : CheckingScope selected occurrence.inferenceContext
   interfaces : ExecutableCoercionInterfaces.SourceInterfaces
     (checkingContext selected).signatures selected.body.finalized.solvedRequirements
@@ -39,7 +39,7 @@ structure InitializedOccurrenceBoundary (selected : Selected compiled row fuel)
     occurrence.entry.nextRequirement (occurrence.receipt.ready.resolve occurrence.receipt.value.type)
     selected.body.finalized.substitution target (localSchemeTemplateIds occurrence.initializerBinding.binder)
 
-def InitializerOccurrenceConclusion {selected : Selected compiled row fuel}
+def InitializerOccurrenceConclusion {selected : BodySelection compiled row fuel}
     {source : Syntax.Statement} {expectedReturn : Ty}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
     (boundary : InitializedOccurrenceBoundary selected source expectedReturn frames target) : Prop :=
@@ -57,7 +57,7 @@ def InitializerOccurrenceConclusion {selected : Selected compiled row fuel}
       { type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit }
 
 theorem InitializedOccurrenceBoundary.sound {raw : Workspace.RawWorkspace}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement} {expectedReturn : Ty}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement} {expectedReturn : Ty}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
     (boundary : InitializedOccurrenceBoundary selected source expectedReturn frames target)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

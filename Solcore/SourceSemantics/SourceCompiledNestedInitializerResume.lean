@@ -31,10 +31,10 @@ theorem InitializerOccurrence.lambdaResume
     {selected : Selected compiled row fuel} {outerSource innerSource : Syntax.Statement}
     (outer : InitializerOccurrence selected outerSource)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (scope : CheckingScope selected outer.inferenceContext)
+    (scope : CheckingScope selected.toBodySelection outer.inferenceContext)
     (ready : outer.entry.InferenceReady) (nodesBelow : outer.entry.NodesBelowNextOccurrence)
-    (operational : GeneralizedActualStateInvariant outer.entry (evidenceSource selected))
-    (owner : outer.entry.owner = (evidenceSource selected).owner)
+    (operational : GeneralizedActualStateInvariant outer.entry (evidenceSource selected.toBodySelection))
+    (owner : outer.entry.owner = (evidenceSource selected.toBodySelection).owner)
     (retained : outer.result.state.nodes <+: selected.body.returned.nodes)
     {keyword : Syntax.SourceSpan} {parameters : Syntax.DelimitedList Syntax.LambdaParameter}
     {annotation : Option Syntax.TypeExpr} {body : Syntax.Block}
@@ -55,7 +55,8 @@ theorem InitializerOccurrence.lambdaResume
       rw [congrArg (fun result : Detail.StatementResult => result.state.nodes) outer.receipt.completed]
       exact List.prefix_append _ _
     obtain ⟨inner,context,transport,valueSafe,live,bound,olderSafe,newRows⟩ :=
-      lambda_initializer_resume checked scope ready.allocateStatementId
+      lambda_initializer_resume (selected := selected)
+        (final := (outer.receipt.value, outer.receipt.ready)) checked scope ready.allocateStatementId
         (State.allocateStatementId_preserves_nodesBelowNextOccurrence _ nodesBelow)
         operational.allocateStatementId owner
         (outer.receipt.annotationAccepted.variablesBelow _)

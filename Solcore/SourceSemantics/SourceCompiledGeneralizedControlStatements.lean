@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceClosedLeftUnificationPrivacy
@@ -11,7 +12,7 @@ open SourceInferenceStatementsSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement} {expectedReturn : Ty}
     {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}

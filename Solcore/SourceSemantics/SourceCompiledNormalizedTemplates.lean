@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledNormalizedFormation
 
 /-! Whole-body producer formation follows the real solver's row correspondence
@@ -28,11 +29,11 @@ private theorem solved_predicates_formed
       exact formed requirement (by simp)
     · exact ih (fun requirement member => formed requirement (by simp [member])) candidate member
 
-namespace Selected
+namespace BodySelection
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
   {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-theorem normalizedSolvedLedger (selected : Selected compiled row fuel)
+theorem normalizedSolvedLedger (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {semantic : SourceSemantics.Context}
     (signatures : semantic.signatures = compiled.program.signatures)
@@ -50,7 +51,7 @@ theorem normalizedSolvedLedger (selected : Selected compiled row fuel)
 
 /-- A retained template's predicate equals the exact solved row whose
 formation was proved through the complete original producer traversal. -/
-theorem normalizedTemplatePredicate (selected : Selected compiled row fuel)
+theorem normalizedTemplatePredicate (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {semantic : SourceSemantics.Context}
     (signatures : semantic.signatures = compiled.program.signatures)
@@ -68,7 +69,7 @@ theorem normalizedTemplatePredicate (selected : Selected compiled row fuel)
 
 /-- Any actual finalized initializer receives qualified predicate formation,
 including nested declarations and for-header items. -/
-theorem normalizedBindingPredicates (selected : Selected compiled row fuel)
+theorem normalizedBindingPredicates (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context}
     (signatures : target.signatures = compiled.program.signatures)
@@ -87,7 +88,7 @@ theorem normalizedBindingPredicates (selected : Selected compiled row fuel)
 
 /-- The input is a real raw retained template, transformed by this exact
 finalizer. It directly supplies the finalPredicates certificate interface. -/
-theorem originalBindingPredicates (selected : Selected compiled row fuel)
+theorem originalBindingPredicates (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context}
     (signatures : target.signatures = compiled.program.signatures)
@@ -114,5 +115,66 @@ theorem originalBindingPredicates (selected : Selected compiled row fuel)
   exact FlexibleSubstitution.ContainsLocalSchemeTemplate.applySubstitution
     selected.body.finalized.substitution (retained original originalMember)
 
+end BodySelection
+
+
+namespace Selected
+variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+  {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+
+theorem normalizedSolvedLedger (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {semantic : SourceSemantics.Context}
+    (signatures : semantic.signatures = compiled.program.signatures)
+    (parameters : semantic.typeParameters = selected.signature.scheme.parameters)
+    (owner : semantic.currentDeclaration = some selected.signature.id)
+    (residual : semantic.residualTypeVariables = true) :
+    ∀ requirement ∈ selected.body.finalized.solvedRequirements,
+      PredicateAdmissible semantic requirement.predicate :=
+  selected.toBodySelection.normalizedSolvedLedger checked signatures parameters owner residual
+
+theorem normalizedTemplatePredicate (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {semantic : SourceSemantics.Context}
+    (signatures : semantic.signatures = compiled.program.signatures)
+    (parameters : semantic.typeParameters = selected.signature.scheme.parameters)
+    (owner : semantic.currentDeclaration = some selected.signature.id)
+    (residual : semantic.residualTypeVariables = true)
+    {template : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate selected.body.finalized.typedSource template) :
+    PredicateAdmissible semantic template.requirement.predicate :=
+  selected.toBodySelection.normalizedTemplatePredicate checked signatures parameters owner residual contains
+
+theorem normalizedBindingPredicates (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {target : SourceSemantics.Context}
+    (signatures : target.signatures = compiled.program.signatures)
+    (parameters : target.typeParameters = selected.signature.scheme.parameters)
+    (owner : target.currentDeclaration = some selected.signature.id)
+    (residual : target.residualTypeVariables = true)
+    {binding : InitializedLetBinding}
+    (retained : binding ∈ initializedLetBindings selected.body.finalized.typedSource) :
+    ∀ requirement ∈ binding.binder.schemeRequirements,
+      PredicateAdmissible (localSchemeInitializerContext target binding.binder) requirement.predicate :=
+  selected.toBodySelection.normalizedBindingPredicates checked signatures parameters owner residual retained
+
+theorem originalBindingPredicates (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {target : SourceSemantics.Context}
+    (signatures : target.signatures = compiled.program.signatures)
+    (parameters : target.typeParameters = selected.signature.scheme.parameters)
+    (owner : target.currentDeclaration = some selected.signature.id)
+    (residual : target.residualTypeVariables = true)
+    {binder : TypedBinder} {initializer : NodeId}
+    (retained : ∀ requirement ∈ binder.schemeRequirements,
+      ContainsLocalSchemeTemplate
+        (selected.body.returned.toTypedSource (selected.body.body.statements.map NodeId.statement))
+        {binder, initializer, requirement}) :
+    ∀ requirement ∈ (binder.applySubstitution selected.body.finalized.substitution).schemeRequirements,
+      PredicateAdmissible (localSchemeInitializerContext target
+        (binder.applySubstitution selected.body.finalized.substitution)) requirement.predicate :=
+  selected.toBodySelection.originalBindingPredicates checked signatures parameters owner residual retained
+
 end Selected
+
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

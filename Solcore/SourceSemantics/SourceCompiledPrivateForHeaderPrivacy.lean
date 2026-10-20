@@ -16,7 +16,7 @@ def RetainedHeaderItem (whole : TypedSource) (item : ForItemForm) : Prop :=
 
 structure InitializedHeaderReceiptPrivate
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     {childFuel : Nat} {inferenceContext : SourceInference.Context} {source : Syntax.ForItem}
     {entry : State} {result : ForItemForm × State}
     (receipt : LocalHeaderRequirementTiming.Receipt childFuel inferenceContext source entry result) : Prop where
@@ -52,7 +52,7 @@ private theorem RetainedHeaderItem.initialized
 
 private theorem initialized_header_of_occurrence
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {headerFuel : Nat} {context : SourceInference.Context} {source : Syntax.ForItem}
     {initial final : State} {forms : List ForItemForm}
@@ -117,7 +117,7 @@ private theorem initialized_header_of_occurrence
 
 namespace PrivateBlockContinuation
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 /-- Both header lists are selected by original syntax positions. The returned
 context is exactly the entering context, with only loop depth changed for post. -/

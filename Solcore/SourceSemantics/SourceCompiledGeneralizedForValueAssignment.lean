@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssignedValue
 
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization
 theorem forItem_assignValue
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (placeSound : PlaceRootedSoundness selected childFuel)
     (expressionSound : ExpressionRootedSoundness selected childFuel)

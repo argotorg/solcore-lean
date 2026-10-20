@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedMatchStatement
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementInvariant
 
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness Protecte
 theorem statement_match_with_default
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursiveExpression : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
@@ -161,7 +162,7 @@ theorem statement_match_with_default
 theorem statement_match
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursiveExpression : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}

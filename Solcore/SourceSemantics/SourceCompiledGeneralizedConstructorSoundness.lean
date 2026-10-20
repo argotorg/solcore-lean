@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedFreshConstructor
 
 set_option autoImplicit false
@@ -9,7 +10,7 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
   {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-  {selected : Selected compiled row fuel}
+  {selected : BodySelection compiled row fuel}
 
 theorem constructor_call
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

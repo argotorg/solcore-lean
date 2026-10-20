@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledBlockContinuations
 import Solcore.SourceSemantics.SourceCompiledInitializedPriorPrivacy
 import Solcore.SourceSemantics.SourceInferenceLiveStatementPosition
@@ -12,7 +13,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVaria
 
 structure PrivateBlockContinuation {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) extends BlockContinuation selected where
+    (selected : BodySelection compiled row fuel) extends BlockContinuation selected where
   entryWellFormed : entry.RequirementsWellFormed
   entryTemplates : LiveTemplatesBacked entry
   entryOrigins : ActiveBinderCaptureOrigins entry
@@ -43,9 +44,9 @@ private theorem return_owner {before after : State} {left right : Ty}
 
 namespace PrivateBlockContinuation
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
-def of_selected (selected : Selected compiled row fuel)
+def of_selected (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) : PrivateBlockContinuation selected := by
   have monomorphic : ∀ entry ∈ (selected.signature.parameterNames.zip selected.signature.parameterTypes).map
       (fun parameter => (parameter.1,Scheme.mono parameter.2)), entry.2.quantified = [] := by
@@ -60,7 +61,7 @@ def of_selected (selected : Selected compiled row fuel)
     entryOrigins := activeBinderCaptureOrigins_initial_mono _ _ _ _ monomorphic
     entryPrivate := ActiveQuantifiersPrivate.initial _ _ _ monomorphic
     entryBound := activeQuantifiersBelowNext_initial_mono _ _ _ monomorphic
-    expectedClosed := Ty.variablesBelow_productMany ((formation.functions selected.signature selected.signatureMember).2.1.variablesBelow 0)
+    expectedClosed := selected.returns_closed checked
     retainedSource := ?_
     privacy := ?_ }
   · refine ⟨return_owner selected.body.unified,?_⟩

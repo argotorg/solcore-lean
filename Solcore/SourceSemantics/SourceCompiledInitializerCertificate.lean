@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerPredicateFormation
 
 /-! Assemble the existing generalized-let certificate at the exact selected
@@ -11,7 +12,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 /-- The exact generalized binder keeps the final type returned by its actual
 initializer. The actual finalizer excludes quantifier capture and absorbs the

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedConstructorState
 import Solcore.SourceSemantics.SourceInferenceSelectedExpressionList
 import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
@@ -65,7 +66,7 @@ private theorem unify_success_typingSourceExtends
 theorem expressionRetained_index
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRetainedSoundness selected childFuel)
     {inferenceContext : SourceInference.Context} {expression baseExpression indexExpression : Syntax.Expr}

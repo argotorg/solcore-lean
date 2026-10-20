@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerQuantifierFreshness
 import Solcore.SourceSemantics.SourceInferenceNewQuantifierFrame
 
@@ -6,15 +7,15 @@ initializer entry. The actual child computation supplies fixedness of any
 older variable which its live context avoids. -/
 set_option autoImplicit false
 set_option Elab.async false
-namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 open SourceCompiledGeneralizedSoundness ProtectedVariables
 
 theorem generalized_type_safe
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
-    (occurrence : InitializerOccurrence selected source)
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
+    (occurrence : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (scope : CheckingScope selected occurrence.inferenceContext)
     (ready : occurrence.entry.InferenceReady)
@@ -36,8 +37,8 @@ theorem generalized_type_safe
 theorem return_safe
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
-    (occurrence : InitializerOccurrence selected source)
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
+    (occurrence : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (scope : CheckingScope selected occurrence.inferenceContext)
     (ready : occurrence.entry.InferenceReady)
@@ -64,4 +65,8 @@ theorem return_safe
     have safe := privacy.1 expectedReturn (returnSafe binder old)
     simpa only [Safe, State.resolve, InferState.resolve, occurrence.receipt.inference_eq] using safe
 
+end Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
+
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+export BodyInitializerOccurrence (generalized_type_safe return_safe)
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence

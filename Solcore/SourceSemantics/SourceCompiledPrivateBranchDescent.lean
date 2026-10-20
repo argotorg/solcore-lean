@@ -9,7 +9,7 @@ set_option maxHeartbeats 1800000
 namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.PrivateBlockContinuation
 open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVariables
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 theorem enter_if_with_else (block : PrivateBlockContinuation selected)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

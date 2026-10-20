@@ -26,7 +26,7 @@ theorem cached_ordinary_receipt
       (∃ (index : Nat) (named : SourceCoreGeneralFunctions.Function),
         cached.indexed.base.functions[index]? = some named ∧ named.specialized = row) ∧
       ExecutableCoercionInterfaces.SourceInterfaces
-        (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+        (checkingContext selected.toBodySelection).signatures selected.body.finalized.solvedRequirements
         selected.body.finalized.typedSource := by
   obtain ⟨index, named, signature, supplied, position, _signatureMember, member, specialized⟩ := origin
   have programEq := (compiled.artifact_fields artifact).1

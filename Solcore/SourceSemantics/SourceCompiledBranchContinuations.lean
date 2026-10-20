@@ -7,7 +7,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BlockContinuation
 open Frontend SourceInference TypeSystem
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 theorem enter_if_without_else (block : BlockContinuation selected)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

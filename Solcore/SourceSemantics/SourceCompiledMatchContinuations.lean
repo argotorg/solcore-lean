@@ -11,7 +11,7 @@ open Frontend SourceInference TypeSystem
 
 structure CasesContinuation {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) where
+    (selected : BodySelection compiled row fuel) where
   checkingFuel : Nat
   inferenceContext : SourceInference.Context
   sources : List Syntax.MatchCase
@@ -29,7 +29,7 @@ structure CasesContinuation {compiled : SourceCoreCompiler.Compiled}
   retained : result.state.nodes <+: selected.body.body.state.nodes
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 theorem CasesContinuation.arm (cases : CasesContinuation selected)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

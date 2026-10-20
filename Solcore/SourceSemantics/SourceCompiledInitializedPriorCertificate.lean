@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerCertificate
 import Solcore.SourceSemantics.SourceCompiledInitializedPriorPrivacy
 
@@ -11,7 +12,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 /-- The real prefix closes the prior blocker using the same child entry's local
 alignment. The certificate uses actual whole-body predicate formation. -/
@@ -60,8 +61,8 @@ theorem InitializedPriorPrivate.certificate_of_child
 /-- At an actual selected top-level declaration, prior privacy and predicate
 formation are generated internally. The callback is only the exact smaller child
 in the scope opened by that same declaration. -/
-theorem Selected.initializedCertificate_of_child
-    (selected : Selected compiled row fuel)
+theorem BodySelection.initializedCertificate_of_child
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement}
     (position : selected.signature.source.value.body.value[index]? = some source)
@@ -119,7 +120,7 @@ theorem compile_initialized_certificate_of_child
         selected.signature.source.value.body.value[index]? = some source →
         ∀ {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr},
           source.value = .letDecl name annotation (some initializer) →
-    ∃ continuation : InitializerContinuation selected source,
+    ∃ continuation : InitializerContinuation selected.toBodySelection source,
       ∀ {target : SourceSemantics.Context} {frames : List InitializedLetBinding},
         RecursiveExpressionInvariant
           (context compiled.program.environment compiled.program.signatures
@@ -157,7 +158,52 @@ theorem compile_initialized_certificate_of_child
   obtain ⟨selected⟩ := of_compile accepted member
   refine ⟨selected,?_⟩
   intro index source position name annotation initializer form
-  exact selected.initializedCertificate_of_child
+  exact selected.toBodySelection.initializedCertificate_of_child
     (SourceCoreCompiler.compile_checked_source accepted) position form
+
+
+theorem Selected.initializedCertificate_of_child
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {source : Syntax.Statement}
+    (position : selected.signature.source.value.body.value[index]? = some source)
+    {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}
+    (form : source.value = .letDecl name annotation (some initializer)) :
+    ∃ continuation : InitializerContinuation selected.toBodySelection source,
+      ∀ {target : SourceSemantics.Context} {frames : List InitializedLetBinding},
+        RecursiveExpressionInvariant
+          (context compiled.program.environment compiled.program.signatures
+            selected.signature selected.body.declaration)
+          selected.body.finalized continuation.entry target →
+        ActualContext
+          (context compiled.program.environment compiled.program.signatures
+            selected.signature selected.body.declaration)
+          selected.body.finalized frames target →
+        ActualContext.Covers selected.body.finalized frames
+          (.statement continuation.entry.allocateStatementId.1) →
+        GeneralizationBarrierTransport continuation.receipt.ready continuation.receipt.locals
+          continuation.entry.nextRequirement (continuation.receipt.ready.resolve continuation.receipt.value.type)
+          selected.body.finalized.substitution target
+          (localSchemeTemplateIds (continuation.receipt.binding.1.applySubstitution selected.body.finalized.substitution)) →
+        (RecursiveExpressionInvariant
+            (context compiled.program.environment compiled.program.signatures
+              selected.signature selected.body.declaration)
+            selected.body.finalized continuation.entry.allocateStatementId.2
+            (localSchemeInitializerContext target continuation.initializerBinding.binder) →
+          ActualContext
+            (context compiled.program.environment compiled.program.signatures
+              selected.signature selected.body.declaration)
+            selected.body.finalized (frames ++ [continuation.initializerBinding])
+            (localSchemeInitializerContext target continuation.initializerBinding.binder) →
+          ActualContext.Covers selected.body.finalized (frames ++ [continuation.initializerBinding])
+            (.expression continuation.receipt.value.id) →
+          ExpressionHasType selected.body.finalized.typedSource
+            (localSchemeInitializerContext target continuation.initializerBinding.binder)
+            continuation.receipt.value.id
+            (selected.body.finalized.substitution.apply continuation.receipt.value.type)) →
+        UnannotatedInitializedLetCertificate
+          (selected.body.returned.toTypedSource (selected.body.body.statements.map NodeId.statement))
+          target selected.body.finalized.substitution continuation.receipt.binding.1 continuation.receipt.value.id :=
+  selected.toBodySelection.initializedCertificate_of_child checked position form
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerReturnPrivacy
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceInferenceActiveQuantifierOrigins
@@ -12,7 +13,7 @@ open SourceCompiledLocalFinalization ProtectedVariables
 theorem StatementBoundary.return_safe
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
@@ -37,11 +38,11 @@ theorem StatementBoundary.return_safe
         form := .letDecl receipt.binding.1 (some receipt.value.id) } ∈ selected.body.returned.nodes := by
       apply boundary.rawSubtree.nodes _ receipt.recorded
       exact .inl (congrArg NodeId.statement idEq.symm)
-    let occurrence := InitializerOccurrence.ofReceipt checked boundary.scope receipt boundary.invariant.ready
+    let occurrence := BodyInitializerOccurrence.ofReceipt checked boundary.scope receipt boundary.invariant.ready
       boundary.operational recorded boundary.extension
     have safe := occurrence.generalized_type_safe checked boundary.scope boundary.invariant.ready
       boundary.operational boundary.invariant.returnBelow
-    simpa only [occurrence, InitializerOccurrence.ofReceipt, Safe, State.resolve,
+    simpa only [occurrence, BodyInitializerOccurrence.ofReceipt, Safe, State.resolve,
       InferState.resolve, receipt.inference_eq] using safe
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

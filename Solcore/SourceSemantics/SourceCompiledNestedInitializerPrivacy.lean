@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledPrivateBlockRestoration
 
 /-! Every reached block supplies an actual initialized-let receipt with prior
@@ -9,7 +10,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness ProtectedVaria
 
 structure InitializedReceiptPrivate
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     {childFuel : Nat} {inferenceContext : SourceInference.Context} {source : Syntax.Statement}
     {entry : State} {result : Detail.StatementResult}
     (receipt : LocalLetRequirementTiming.Receipt childFuel inferenceContext source entry result) : Prop where
@@ -29,7 +30,7 @@ structure InitializedReceiptPrivate
 
 namespace PrivateBlockContinuation
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
 theorem initialized (block : PrivateBlockContinuation selected)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

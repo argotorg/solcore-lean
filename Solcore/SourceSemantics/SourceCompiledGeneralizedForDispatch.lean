@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssemblyContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForAnnotatedInitializer
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForAnnotation
@@ -13,7 +14,7 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
 
 theorem forItemRooted_zero : ForItemRootedSoundness selected 0 := by
   intro inferenceContext item expectedReturn initial final inferred frames target boundary
@@ -23,7 +24,7 @@ theorem forItemRooted_zero : ForItemRootedSoundness selected 0 := by
 
 theorem forItemRooted_step
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (barriers : SelectedInitializerBarriers selected)
+    (barriers : BodyInitializerBarriers selected)
     (expressionSound : ExpressionRootedSoundness selected childFuel)
     (placeSound : PlaceRootedSoundness selected childFuel) :
     ForItemRootedSoundness selected (childFuel + 1) := by

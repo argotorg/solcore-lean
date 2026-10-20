@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
 
 /-! Source-order composition passes only the actual head and tail calls to
@@ -11,7 +12,7 @@ open SourceInferenceStatementsSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     {inferenceContext : SourceInference.Context} {expectedReturn : Ty}
     {initial : State} {result : Detail.BlockResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}

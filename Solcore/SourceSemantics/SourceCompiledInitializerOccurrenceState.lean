@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceTyping
 import Solcore.SourceSemantics.SourceInferenceRetainedInitializerState
 
@@ -5,14 +6,14 @@ import Solcore.SourceSemantics.SourceInferenceRetainedInitializerState
 the same receipt and finalizer. Only its own retained binder is needed. -/
 set_option autoImplicit false
 set_option Elab.async false
-namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
-theorem operational (continuation : InitializerOccurrence selected source)
+theorem operational (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (signatures : continuation.inferenceContext.signatures = compiled.program.signatures)
     (ready : continuation.entry.InferenceReady)
@@ -36,7 +37,7 @@ theorem operational (continuation : InitializerOccurrence selected source)
 
 theorem statement_of_child_with_state
     {raw : Workspace.RawWorkspace} {control : ControlContext}
-    (continuation : InitializerOccurrence selected source)
+    (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
     (signatures : continuation.inferenceContext.signatures = compiled.program.signatures)
@@ -90,4 +91,8 @@ theorem statement_of_child_with_state
   exact ⟨finalContext,active,actualFinal,
     continuation.operational checked signatures invariant.ready entering,typed,matching⟩
 
+end Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
+
+namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence
+export BodyInitializerOccurrence (operational statement_of_child_with_state)
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization.InitializerOccurrence

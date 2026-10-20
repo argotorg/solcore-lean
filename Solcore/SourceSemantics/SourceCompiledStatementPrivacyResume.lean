@@ -18,17 +18,17 @@ theorem statement_operational_return_privacy
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (scope : CheckingScope selected inferenceContext)
+    (scope : CheckingScope selected.toBodySelection inferenceContext)
     (ready : initial.InferenceReady)
-    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected.toBodySelection))
     (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
     (returnSafe : ∀ binder ∈ initial.localBinders,
       Safe binder.scheme.quantified initial expectedReturn)
-    (retained : TypingSourceExtends (result.state.toTypedSource (bodyRoots selected))
-      (evidenceSource selected))
+    (retained : TypingSourceExtends (result.state.toTypedSource (bodyRoots selected.toBodySelection))
+      (evidenceSource selected.toBodySelection))
     (extension : selected.body.finalized.substitution.SemanticallyExtends result.state.inference.substitution)
     (accepted : Detail.inferStatementFuel childFuel inferenceContext statement expectedReturn initial = .ok result) :
-    GeneralizedActualStateInvariant result.state (evidenceSource selected) ∧
+    GeneralizedActualStateInvariant result.state (evidenceSource selected.toBodySelection) ∧
       ∀ binder ∈ result.state.localBinders,
         Safe binder.scheme.quantified result.state expectedReturn := by
   have formation := scope.formation checked
@@ -48,7 +48,7 @@ theorem statement_operational_return_privacy
         retained.nodes_prefix retained extension
       exact after.privacy _ member
   obtain ⟨pending, ledger⟩ := operational.ledger
-  have after : GeneralizedActualStateInvariant result.state (evidenceSource selected) := {
+  have after : GeneralizedActualStateInvariant result.state (evidenceSource selected.toBodySelection) := {
     ledger := ⟨pending, (actualLedgerFamily childFuel).statements.statement accepted ledger⟩
     origins := inferStatementFuel_captureOrigins accepted operational.origins retained
     quantifiersBelow := activeQuantifiersBelowNext_inferStatementFuel operational.quantifiersBelow
@@ -74,9 +74,9 @@ theorem statement_operational_return_privacy
 def ResumeEntryInvariant
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
     {fuel : Nat} (selected : Selected compiled row fuel) (expected : Ty) (state : State) : Prop :=
-  GeneralizedActualStateInvariant state (evidenceSource selected) ∧
+  GeneralizedActualStateInvariant state (evidenceSource selected.toBodySelection) ∧
     (∀ binder ∈ state.localBinders, Safe binder.scheme.quantified state expected) ∧
-    state.owner = (evidenceSource selected).owner
+    state.owner = (evidenceSource selected.toBodySelection).owner
 
 theorem selected_statement_privacy_resume
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
@@ -86,7 +86,7 @@ theorem selected_statement_privacy_resume
     {expectedReturn : Ty} {initial : State} {result : Detail.BlockResult}
     {index : Nat} {statement : Syntax.Statement}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (scope : CheckingScope selected inferenceContext)
+    (scope : CheckingScope selected.toBodySelection inferenceContext)
     (ready : initial.InferenceReady) (nodesBelow : initial.NodesBelowNextOccurrence)
     (entering : ResumeEntryInvariant selected expectedReturn initial)
     (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
@@ -101,8 +101,8 @@ theorem selected_statement_privacy_resume
     returnBelow accepted position entering
   intro stepFuel source before after beforeReady _ beforeBelow continuation afterRetained executed invariant
   have afterOwner := (Detail.inferStatementFuel_preserves_owner executed).trans invariant.2.2
-  have afterSource : TypingSourceExtends (after.state.toTypedSource (bodyRoots selected))
-      (evidenceSource selected) :=
+  have afterSource : TypingSourceExtends (after.state.toTypedSource (bodyRoots selected.toBodySelection))
+      (evidenceSource selected.toBodySelection) :=
     ⟨afterOwner.symm, afterRetained.trans retained⟩
   have afterInvariant := statement_operational_return_privacy checked scope beforeReady invariant.1
     beforeBelow invariant.2.1 afterSource (extension.trans continuation.substitution_extends) executed

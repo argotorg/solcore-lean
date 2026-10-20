@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## One generalized checker covers every actual cached body (2026-10-20)
+
+The existing recursive checker proof now accepts BodySelection, retaining a genuine ordinary-function or implementation-method origin and the same original body receipt. All five recursive families reuse the same syntax proofs.
+
+Actual method catalog membership supplies the synthetic signature, header, rigid predicate scope and return formation. The original checked body then produces MethodDefinition.Valid. Ordinary FunctionDefinition.Valid keeps its existing entry API through definitional adapters.
+
+Successful raw Core compilation and the actual artifact now derive SelectedCompilationBodyTyping.Bodies for every completed-cache row, including later dependencies. The only remaining body-proof premise is CachedBodyInitializerBarriers for those exact rows; no independent declarative body-typing premise is added.
+
+Validation: 118 changed modules in a coherent graph of 8,992 modules, 73 retained runtime invocations and 7,387 endpoint audits. Full build (9,031 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Actual compilation still has to produce all cached initializer barriers. The existing StaticProfile covers a strict subset, so general pass preservation must handle accepted nested closures and generalized local binders before the final Source/Core/public meaning-preservation theorem can be derived.
+
 ## Nested initializer privacy follows actual cached body continuations (2026-10-20)
 
 Actual statement positions recover the original initializer and its remaining computation. A nested lambda initializer now retains its real parameter setup, body prefix, return unification and restored outer scope, then resumes through the selected body finalizer.

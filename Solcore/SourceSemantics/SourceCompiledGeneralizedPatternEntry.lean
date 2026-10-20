@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedPatternState
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionContracts
 
@@ -26,7 +27,7 @@ private theorem binder_context_fields {owner : Resolved.DeclarationId}
 theorem patternEntered
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {patternSource : Syntax.Pattern}
     {expected : Ty} {initial resultState : State} {inferred : TypedMatchPattern}
@@ -98,7 +99,7 @@ actual scrutinee call. Reserving the hidden local changes no lexical scheme. -/
 theorem patternEntered_after_expression
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel expressionFuel patternFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
     {patternSource : Syntax.Pattern} {entry scrutineeState initial resultState : State}

@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The existing recursive checker proof now accepts BodySelection, retaining a genuine ordinary-function or implementation-method origin and the same original body receipt. All five recursive families reuse the same syntax proofs.
+
+Actual method catalog membership supplies the synthetic signature, header, rigid predicate scope and return formation. The original checked body then produces MethodDefinition.Valid. Ordinary FunctionDefinition.Valid keeps its existing entry API through definitional adapters.
+
+Successful raw Core compilation and the actual artifact now derive SelectedCompilationBodyTyping.Bodies for every completed-cache row, including later dependencies. The only remaining body-proof premise is CachedBodyInitializerBarriers for those exact rows; no independent declarative body-typing premise is added.
+
+Goal two remains incomplete. Actual compilation still has to produce all cached initializer barriers. The existing StaticProfile covers a strict subset, so general pass preservation must handle accepted nested closures and generalized local binders before the final Source/Core/public meaning-preservation theorem can be derived.
+
 Actual statement positions recover the original initializer and its remaining computation. A nested lambda initializer now retains its real parameter setup, body prefix, return unification and restored outer scope, then resumes through the selected body finalizer.
 
 Complete executable preparation supplies original template scope for cached ordinary functions, including helpers first discovered while preparing implementation methods. The same template owner bounds its predicate variables; finalizer freshness and the actual outer initializer type keep a nested binder private.

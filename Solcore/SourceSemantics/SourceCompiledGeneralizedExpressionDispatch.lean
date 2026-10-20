@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAtomicSoundness
 import Solcore.SourceSemantics.SourceCompiledGeneralizedGroupSoundness
 import Solcore.SourceSemantics.SourceCompiledGeneralizedTupleSoundness
@@ -18,9 +19,9 @@ open SourceCompiledLocalFinalization
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
 
-def StatementsRootedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def StatementsRootedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {statements : List Syntax.Statement}
     {expectedReturn : Ty} {initial : State} {result : Detail.BlockResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},

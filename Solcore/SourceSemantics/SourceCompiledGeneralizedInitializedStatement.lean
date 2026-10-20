@@ -12,7 +12,7 @@ open SourceCompiledLocalFinalization
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure InitializedStatementBoundary (selected : Selected compiled row fuel)
+structure InitializedStatementBoundary (selected : BodySelection compiled row fuel)
     (source : Syntax.Statement) (expectedReturn : Ty)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) where
   continuation : RetainedInitializer selected source
@@ -38,7 +38,7 @@ structure InitializedStatementBoundary (selected : Selected compiled row fuel)
     continuation.entry.nextRequirement (continuation.receipt.ready.resolve continuation.receipt.value.type)
     selected.body.finalized.substitution target (localSchemeTemplateIds continuation.initializerBinding.binder)
 
-def InitializedStatementConclusion {selected : Selected compiled row fuel}
+def InitializedStatementConclusion {selected : BodySelection compiled row fuel}
     {source : Syntax.Statement} {expectedReturn : Ty}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
     (boundary : InitializedStatementBoundary selected source expectedReturn frames target) : Prop :=
@@ -56,7 +56,7 @@ def InitializedStatementConclusion {selected : Selected compiled row fuel}
       { type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit }
 
 theorem InitializedStatementBoundary.sound {raw : Workspace.RawWorkspace}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement} {expectedReturn : Ty}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement} {expectedReturn : Ty}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
     (boundary : InitializedStatementBoundary selected source expectedReturn frames target)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)

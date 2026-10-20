@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedRetainedExpressionList
 import Solcore.SourceSemantics.SourceInferenceSelectedCandidateCall
 import Solcore.SourceSemantics.SourceInferenceSelectedOperatorMetadata
@@ -15,7 +16,7 @@ argument proofs in the same selected final source. -/
 theorem selectedCall_typing
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}

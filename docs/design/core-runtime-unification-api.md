@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## One generalized checker covers every actual cached body (2026-10-20)
+
+SourceCompiledCachedMethodValidity.compile_cached_bodies_of_barriers is the complete-cache checker endpoint. BodyInitializerOccurrence and BodyInitializerBarriers use the shared body carrier; ordinary Selected and InitializerOccurrence entry APIs retain explicit adapters.
+
+The migration changes the body index rather than duplicating recursion. Nested initializer consumers keep the same retained binder, body finalizer and source occurrence through explicit toBodySelection adapters.
+
+Goal two remains incomplete. Actual compilation still has to produce all cached initializer barriers. The existing StaticProfile covers a strict subset, so general pass preservation must handle accepted nested closures and generalized local binders before the final Source/Core/public meaning-preservation theorem can be derived.
+
 ## Nested initializer privacy follows actual cached body continuations (2026-10-20)
 
 SourceCompiledInitializerLambdaResume and SourceCompiledNestedInitializerFinalPrivacy connect actual nested source positions to finalizer privacy. SourceCachedTemplateScope derives original owner scope from full-cache preparation; SourceCachedNestedTemplatePrivacy uses it for late ordinary functions.

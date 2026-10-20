@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledForHeaderContinuation
 import Solcore.SourceSemantics.SourceInferenceSoundness
 
@@ -11,7 +12,7 @@ open Frontend SourceInference TypeSystem
 
 structure BlockContinuation {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) where
+    (selected : BodySelection compiled row fuel) where
   checkingFuel : Nat
   inferenceContext : SourceInference.Context
   sources : List Syntax.Statement
@@ -28,9 +29,9 @@ structure BlockContinuation {compiled : SourceCoreCompiler.Compiled}
 
 namespace BlockContinuation
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
-    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : Selected compiled row fuel}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat} {selected : BodySelection compiled row fuel}
 
-def of_selected (selected : Selected compiled row fuel)
+def of_selected (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) : BlockContinuation selected :=
   { checkingFuel := fuel
     inferenceContext := context compiled.program.environment compiled.program.signatures

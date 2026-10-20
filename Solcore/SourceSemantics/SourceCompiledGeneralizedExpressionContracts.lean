@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedInitializerState
 import Solcore.SourceSemantics.SourceInferenceActualRootedContracts
 
@@ -14,51 +15,51 @@ open SourceCompiledLocalFinalization
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-abbrev checkingContext (selected : Selected compiled row fuel) : SourceInference.Context :=
+abbrev checkingContext (selected : BodySelection compiled row fuel) : SourceInference.Context :=
   context compiled.program.environment compiled.program.signatures
     selected.signature selected.body.declaration
 
-abbrev bodyRoots (selected : Selected compiled row fuel) : List NodeId :=
+abbrev bodyRoots (selected : BodySelection compiled row fuel) : List NodeId :=
   selected.body.body.statements.map NodeId.statement
 
-abbrev evidenceSource (selected : Selected compiled row fuel) : TypedSource :=
+abbrev evidenceSource (selected : BodySelection compiled row fuel) : TypedSource :=
   selected.body.returned.toTypedSource (bodyRoots selected)
 
 /-- Lexical descent may change loop depth while preserving the actual
 declaration's static type environment. -/
-structure CheckingScope (selected : Selected compiled row fuel)
+structure CheckingScope (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) : Prop where
   signatures : inferenceContext.signatures = (checkingContext selected).signatures
   owner : inferenceContext.scope.genericOwner = (checkingContext selected).scope.genericOwner
   parameters : inferenceContext.typeParameters = (checkingContext selected).typeParameters
   assumptions : inferenceContext.assumptions = (checkingContext selected).assumptions
 
-theorem CheckingScope.refl (selected : Selected compiled row fuel) :
+theorem CheckingScope.refl (selected : BodySelection compiled row fuel) :
     CheckingScope selected (checkingContext selected) :=
   ⟨rfl, rfl, rfl, rfl⟩
 
-theorem CheckingScope.withLoopDepth {selected : Selected compiled row fuel}
+theorem CheckingScope.withLoopDepth {selected : BodySelection compiled row fuel}
     {inferenceContext : SourceInference.Context} (scope : CheckingScope selected inferenceContext)
     (depth : Nat) :
     CheckingScope selected { inferenceContext with loopDepth := depth } :=
   ⟨scope.signatures, scope.owner, scope.parameters, scope.assumptions⟩
 
 theorem CheckingScope.formation {raw : Workspace.RawWorkspace}
-    {selected : Selected compiled row fuel} {inferenceContext : SourceInference.Context}
+    {selected : BodySelection compiled row fuel} {inferenceContext : SourceInference.Context}
     (scope : CheckingScope selected inferenceContext)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
     ProgramSignatureFormationValidated inferenceContext.signatures :=
   scope.signatures.symm ▸ Frontend.checkProgram_success_signature_formation checked
 
 theorem CheckingScope.catalog {raw : Workspace.RawWorkspace}
-    {selected : Selected compiled row fuel} {inferenceContext : SourceInference.Context}
+    {selected : BodySelection compiled row fuel} {inferenceContext : SourceInference.Context}
     (scope : CheckingScope selected inferenceContext)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
     SignatureCatalogWellFormed inferenceContext.signatures :=
   scope.signatures.symm ▸ SignatureCatalogWellFormed.ofCheckProgram checked
 
 theorem CheckingScope.functionsCanonical {raw : Workspace.RawWorkspace}
-    {selected : Selected compiled row fuel} {inferenceContext : SourceInference.Context}
+    {selected : BodySelection compiled row fuel} {inferenceContext : SourceInference.Context}
     (scope : CheckingScope selected inferenceContext)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
     ∀ candidate ∈ inferenceContext.signatures.functions,
@@ -69,18 +70,17 @@ theorem CheckingScope.functionsCanonical {raw : Workspace.RawWorkspace}
   exact (Frontend.checkProgram_success_function_signature_shape checked member).2
 
 theorem CheckingScope.canonical {raw : Workspace.RawWorkspace}
-    {selected : Selected compiled row fuel} {inferenceContext : SourceInference.Context}
+    {selected : BodySelection compiled row fuel} {inferenceContext : SourceInference.Context}
     (scope : CheckingScope selected inferenceContext)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
     SignatureParametersWellFormed inferenceContext.scope.genericOwner
       inferenceContext.typeParameters := by
-  have canonical := (Frontend.checkProgram_success_signature_parameters_wellFormed checked).functions
-    selected.signature selected.signatureMember
+  have canonical := selected.canonical checked
   have declarationEq := (ProgramEnvironment.declaration?_sound selected.body.declared).2
   rw [scope.owner, scope.parameters]
   simpa only [checkingContext, context, ProgramTypeScope.ofDeclaration, declarationEq] using canonical
 
-structure ExpressionCallBoundary (selected : Selected compiled row fuel)
+structure ExpressionCallBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (expression : Syntax.Expr) (expected : Option Ty)
     (initial : State) (inferred : InferredExpression) (resultState : State)
@@ -108,7 +108,7 @@ structure ExpressionCallBoundary (selected : Selected compiled row fuel)
   covered : TemplateScopeCovered selected.body.finalized.typedSource target (.expression inferred.id)
   actualCovered : ActualContext.Covers selected.body.finalized frames (.expression inferred.id)
 
-structure RetainedExpressionBoundary (selected : Selected compiled row fuel)
+structure RetainedExpressionBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (expression : Syntax.Expr) (expected : Option Ty)
     (initial : State) (inferred : InferredExpression) (resultState : State)
@@ -129,7 +129,7 @@ structure RetainedExpressionBoundary (selected : Selected compiled row fuel)
   directChildren : ExpressionDirectChildrenRetainedAt
     (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource inferred.id
 
-structure RootedExpressionBoundary (selected : Selected compiled row fuel)
+structure RootedExpressionBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (expression : Syntax.Expr) (expected : Option Ty)
     (initial : State) (inferred : InferredExpression) (resultState : State)
@@ -139,7 +139,7 @@ structure RootedExpressionBoundary (selected : Selected compiled row fuel)
   rawSubtree : RawSubtreePreserved (resultState.toTypedSource (bodyRoots selected))
     (evidenceSource selected) (.expression inferred.id)
 
-def ExpressionRetainedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def ExpressionRetainedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},
@@ -148,7 +148,7 @@ def ExpressionRetainedSoundness (selected : Selected compiled row fuel) (childFu
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
       selected.body.finalized.typedSource target selected.body.finalized.substitution inferred
 
-def ExpressionRootedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def ExpressionRootedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},

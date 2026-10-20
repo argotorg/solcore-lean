@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledNormalizedTemplates
 import Solcore.SourceSemantics.SourceCompiledGeneralizedInitializerContexts
 import Solcore.SourceSemantics.SourceCompiledTopLevelInitializerContinuation
@@ -31,7 +32,7 @@ end FinalizedBindingEvent
 namespace InitializerContinuation
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 /-- This uses the continuation's exact recorded binder and initializer. All
 predicate formation is discharged by the selected body traversal and solver. -/

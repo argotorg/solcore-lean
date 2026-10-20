@@ -11,7 +11,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness
 and no-capture for normalized issuances from earlier generalized binders. -/
 theorem retained_normalized_formation
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction}
-    {fuel : Nat} {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {fuel : Nat} {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
     (continuation : InitializerContinuation selected source)
     {target : SourceSemantics.Context}
     (issued : ∀ requirement ∈ continuation.receipt.ready.requirements,

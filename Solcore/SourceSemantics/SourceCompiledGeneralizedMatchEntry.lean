@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedScrutineeTyping
 import Solcore.SourceSemantics.SourceCompiledGeneralizedMatchCases
 import Solcore.SourceSemantics.SourceInferenceGeneralizedScrutineeState
@@ -12,7 +13,7 @@ open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness Protecte
 theorem matchEntry
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}

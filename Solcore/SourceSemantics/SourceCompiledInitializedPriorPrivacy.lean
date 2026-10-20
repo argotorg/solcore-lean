@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializedPrivacyProvenance
 import Solcore.SourceSemantics.SourceInferenceActiveStatementPosition
 
@@ -21,13 +22,13 @@ private theorem return_owner {before after : State} {left right : Ty}
 
 structure InitializedPriorPrivate
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
     (actual : InitializerContinuation selected source) : Prop extends InitializedStatementPrivate actual where
   priorAvoided : Avoids (activeSchemeQuantifiers actual.entry) (actual.receipt.ready.resolve actual.receipt.value.type)
 
 theorem InitializedPriorPrivate.prior_blocked
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
     {actual : InitializerContinuation selected source} (privateVars : InitializedPriorPrivate actual)
     {target : SourceSemantics.Context} {outer : Substitution}
     (aligned : LocalEnvironmentAligned actual.entry outer target) :
@@ -37,9 +38,9 @@ theorem InitializedPriorPrivate.prior_blocked
 
 /-- Both provenance invariants and the suffix privacy proof follow the same
 actual source-position traversal. The finalizer checks apply to its exact binder. -/
-theorem Selected.initializedPriorPrivate {raw : Workspace.RawWorkspace}
+theorem BodySelection.initializedPriorPrivate {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {index : Nat} {source : Syntax.Statement}
     (position : selected.signature.source.value.body.value[index]? = some source)
@@ -54,7 +55,7 @@ theorem Selected.initializedPriorPrivate {raw : Workspace.RawWorkspace}
     intro signature member
     exact (Frontend.checkProgram_success_function_signature_shape checked member).2
   have closed : (Ty.productMany selected.signature.returnTypes).VariablesBelow 0 :=
-    Ty.variablesBelow_productMany ((formation.functions selected.signature selected.signatureMember).2.1.variablesBelow 0)
+    selected.returns_closed checked
   have monomorphic : ∀ entry ∈ (selected.signature.parameterNames.zip selected.signature.parameterTypes).map (fun parameter =>
       (parameter.1, Scheme.mono parameter.2)), entry.2.quantified = [] := by
     intro entry member
@@ -121,10 +122,22 @@ theorem compile_initialized_prior_private {raw : Workspace.RawWorkspace}
         selected.signature.source.value.body.value[index]? = some source →
         ∀ {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr},
           source.value = .letDecl name annotation (some initializer) →
-          ∃ actual : InitializerContinuation selected source, InitializedPriorPrivate actual := by
+          ∃ actual : InitializerContinuation selected.toBodySelection source, InitializedPriorPrivate actual := by
   obtain ⟨selected⟩ := of_compile accepted member
   refine ⟨selected,?_⟩
   intro index source position name annotation initializer form
-  exact selected.initializedPriorPrivate (SourceCoreCompiler.compile_checked_source accepted) position form
+  exact selected.toBodySelection.initializedPriorPrivate (SourceCoreCompiler.compile_checked_source accepted) position form
+
+
+theorem Selected.initializedPriorPrivate {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {source : Syntax.Statement}
+    (position : selected.signature.source.value.body.value[index]? = some source)
+    {name : Syntax.Identifier} {annotation : Option Syntax.TypeExpr} {initializer : Syntax.Expr}
+    (form : source.value = .letDecl name annotation (some initializer)) :
+    ∃ actual : InitializerContinuation selected.toBodySelection source, InitializedPriorPrivate actual :=
+  selected.toBodySelection.initializedPriorPrivate checked position form
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionDispatch
 import Solcore.SourceSemantics.SourceCompiledGeneralizedInitializedConnection
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForContracts
@@ -15,7 +16,7 @@ open SourceCompiledLocalFinalization
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-def StatementRootedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def StatementRootedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},
@@ -26,10 +27,10 @@ def StatementRootedSoundness (selected : Selected compiled row fuel) (childFuel 
       initial result frames target →
     StatementConclusion selected inferenceContext expectedReturn result frames target
 
-structure SelectedInitializerBarriers (selected : Selected compiled row fuel) : Prop where
+structure BodyInitializerBarriers (selected : BodySelection compiled row fuel) : Prop where
   statement : ∀ {source : Syntax.Statement} {expectedReturn : Ty}
       {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
-      (occurrence : InitializerOccurrence selected source),
+      (occurrence : BodyInitializerOccurrence selected source),
     StatementBoundary selected (occurrence.childFuel + 1) occurrence.inferenceContext source expectedReturn
       occurrence.entry occurrence.result frames target →
     GeneralizationBarrierTransport occurrence.receipt.ready occurrence.receipt.locals
@@ -44,5 +45,9 @@ structure SelectedInitializerBarriers (selected : Selected compiled row fuel) : 
     GeneralizationBarrierTransport receipt.ready receipt.locals initial.nextRequirement
       (receipt.ready.resolve receipt.value.type) selected.body.finalized.substitution target
       (localSchemeTemplateIds (receipt.binding.1.applySubstitution selected.body.finalized.substitution))
+
+/-- The ordinary API retains its original Selected argument. -/
+abbrev SelectedInitializerBarriers (selected : Selected compiled row fuel) : Prop :=
+  BodyInitializerBarriers selected.toBodySelection
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

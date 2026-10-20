@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializedPriorCertificate
 
 /-! Consume the actual selected initializer certificate in the ordinary source
@@ -9,7 +10,7 @@ open Frontend SourceInference TypeSystem SourceInferenceSoundness
 
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 /-- The concrete certificate installs the very binder allocated by the actual
 receipt. Its statement is typed in the same final source as its initializer. -/

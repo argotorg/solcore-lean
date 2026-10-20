@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
 import Solcore.SourceSemantics.SourceInferenceGeneralizedPlaceState
 
@@ -10,7 +11,7 @@ open SourceCompiledLocalFinalization
 variable {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
-structure PlaceBoundary (selected : Selected compiled row fuel)
+structure PlaceBoundary (selected : BodySelection compiled row fuel)
     (childFuel : Nat) (inferenceContext : SourceInference.Context)
     (expression : Syntax.Expr) (initial : State) (place : PlaceResolution) (final : State)
     (frames : List InitializedLetBinding) (target : SourceSemantics.Context) : Prop where
@@ -33,7 +34,7 @@ structure PlaceBoundary (selected : Selected compiled row fuel)
   actualCovered : ∀ key, .expression key ∈ place.references →
     ActualContext.Covers selected.body.finalized frames (.expression key)
 
-def PlaceConclusion (selected : Selected compiled row fuel)
+def PlaceConclusion (selected : BodySelection compiled row fuel)
     (place : PlaceResolution) (final : State) (target : SourceSemantics.Context) : Prop :=
   SourcePlaceHasType selected.body.finalized.typedSource target
     (place.applySubstitution selected.body.finalized.substitution)
@@ -42,7 +43,7 @@ def PlaceConclusion (selected : Selected compiled row fuel)
   ∀ binder ∈ final.localBinders,
     ProtectedVariables.Safe binder.scheme.quantified final place.type
 
-def PlaceRootedSoundness (selected : Selected compiled row fuel) (childFuel : Nat) : Prop :=
+def PlaceRootedSoundness (selected : BodySelection compiled row fuel) (childFuel : Nat) : Prop :=
   ∀ {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
     {initial final : State} {place : PlaceResolution}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context},

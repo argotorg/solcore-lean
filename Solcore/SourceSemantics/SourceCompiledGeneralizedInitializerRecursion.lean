@@ -13,7 +13,7 @@ open SourceCompiledGeneralizedSoundness ProtectedVariables
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 private theorem annotation_admissible
     {inferenceContext : SourceInference.Context} {target : SourceSemantics.Context}

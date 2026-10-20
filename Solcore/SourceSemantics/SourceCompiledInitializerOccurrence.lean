@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionContracts
 
 /-! The semantic initializer carrier retains only the actual computation,
@@ -10,9 +11,9 @@ namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 open SourceCompiledGeneralizedSoundness
 
-structure InitializerOccurrence {compiled : SourceCoreCompiler.Compiled}
+structure BodyInitializerOccurrence {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel) (source : Syntax.Statement) where
+    (selected : BodySelection compiled row fuel) (source : Syntax.Statement) where
   childFuel : Nat
   inferenceContext : SourceInference.Context
   entry : State
@@ -26,10 +27,10 @@ structure InitializerOccurrence {compiled : SourceCoreCompiler.Compiled}
   priorAvoided : ProtectedVariables.Avoids (activeSchemeQuantifiers entry)
     (receipt.ready.resolve receipt.value.type)
 
-namespace InitializerOccurrence
+namespace BodyInitializerOccurrence
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
     {inferenceContext : SourceInference.Context} {entry : State} {result : Detail.StatementResult}
 
 /-- An actual accepted initializer and its exact retained statement suffice.
@@ -43,7 +44,7 @@ def ofReceipt (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
       id := entry.allocateStatementId.1, span := source.span, type := .unit
       form := .letDecl receipt.binding.1 (some receipt.value.id) } ∈ selected.body.returned.nodes)
     (extension : selected.body.finalized.substitution.SemanticallyExtends result.state.inference.substitution) :
-    InitializerOccurrence selected source where
+    BodyInitializerOccurrence selected source where
   childFuel
   inferenceContext
   entry
@@ -57,16 +58,16 @@ def ofReceipt (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     ready operational.requirements operational.quantifiersBelow operational.privacy
     (scope.catalog checked) (scope.formation checked) (scope.functionsCanonical checked)
 
-theorem retained (occurrence : InitializerOccurrence selected source) :
+theorem retained (occurrence : BodyInitializerOccurrence selected source) :
     occurrence.receipt.binding.1 ∈ (evidenceSource selected).initializedLetBinders :=
   List.mem_flatMap.mpr ⟨_, occurrence.recorded, List.mem_singleton_self _⟩
 
-end InitializerOccurrence
+end BodyInitializerOccurrence
 
 def RetainedInitializer.toOccurrence {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
-    (continuation : RetainedInitializer selected source) : InitializerOccurrence selected source where
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
+    (continuation : RetainedInitializer selected source) : BodyInitializerOccurrence selected source where
   childFuel := continuation.childFuel
   inferenceContext := continuation.inferenceContext
   entry := continuation.entry
@@ -76,5 +77,15 @@ def RetainedInitializer.toOccurrence {compiled : SourceCoreCompiler.Compiled}
   extension := continuation.privacy.extension
   recorded := continuation.privacy.recorded
   priorAvoided := continuation.privacy.priorAvoided
+
+/-- Ordinary callers keep their exact original selection witness. -/
+abbrev InitializerOccurrence {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : Selected compiled row fuel) (source : Syntax.Statement) :=
+  BodyInitializerOccurrence selected.toBodySelection source
+
+namespace InitializerOccurrence
+export BodyInitializerOccurrence (ofReceipt retained)
+end InitializerOccurrence
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization

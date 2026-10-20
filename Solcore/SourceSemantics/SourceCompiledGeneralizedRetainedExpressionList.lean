@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
 import Solcore.SourceSemantics.SourceInferenceSelectedAttachedChild
 import Solcore.SourceSemantics.SourceInferenceSelectedExpressionState
@@ -13,7 +14,7 @@ open SourceCompiledLocalFinalization
 theorem expressionsRetainedBases
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel}
+    {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
     ∀ childFuel : Nat,
     (∀ smaller, smaller < childFuel → ExpressionRetainedSoundness selected smaller) →

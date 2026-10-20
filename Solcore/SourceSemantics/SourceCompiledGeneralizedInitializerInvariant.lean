@@ -11,7 +11,7 @@ open SourceCompiledGeneralizedSoundness ProtectedVariables
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    {selected : Selected compiled row fuel} {source : Syntax.Statement}
+    {selected : BodySelection compiled row fuel} {source : Syntax.Statement}
 
 theorem schemeIsolation (continuation : RetainedInitializer selected source)
     (isolated : ActiveSchemeQuantifierIsolation continuation.entry)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedCheckedBody
 import Solcore.SourceSemantics.SourceCompiledGeneralizedRecursiveAssembly
 
@@ -12,10 +13,10 @@ open SourceCompiledLocalFinalization
 theorem checked_statements_of_barriers {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations)
-    (barriers : SelectedInitializerBarriers selected) :
+    (barriers : BodyInitializerBarriers selected) :
     CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original :=
   checked_statements_of_recursive selected checked member
     (recursiveSoundness_of_barriers checked barriers fuel).2.2.1
@@ -25,10 +26,10 @@ all supplied internally for the same selected original body and finalizer. -/
 theorem checked_body_of_barriers {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (member : row ∈ compiled.plan.specializations)
-    (barriers : SelectedInitializerBarriers selected) :
+    (barriers : BodyInitializerBarriers selected) :
     CheckedBodyHasType compiled.program.signatures selected.signature selected.original :=
   checkedBodyHasType_ofStatements selected.body.accepted
     (checked_statements_of_barriers selected checked member barriers)
@@ -38,12 +39,12 @@ including one discovered after the initial specialization frontier. -/
 theorem checked_statements_of_barriers_of_interfaces {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
       selected.body.finalized.typedSource)
-    (barriers : SelectedInitializerBarriers selected) :
+    (barriers : BodyInitializerBarriers selected) :
     CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original :=
   checked_statements_of_recursive_of_interfaces selected checked interfaces
     (recursiveSoundness_of_barriers checked barriers fuel).2.2.1
@@ -51,12 +52,12 @@ theorem checked_statements_of_barriers_of_interfaces {raw : Workspace.RawWorkspa
 theorem checked_body_of_barriers_of_interfaces {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
-    (selected : Selected compiled row fuel)
+    (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
       selected.body.finalized.typedSource)
-    (barriers : SelectedInitializerBarriers selected) :
+    (barriers : BodyInitializerBarriers selected) :
     CheckedBodyHasType compiled.program.signatures selected.signature selected.original :=
   checkedBodyHasType_ofStatements selected.body.accepted
     (checked_statements_of_barriers_of_interfaces selected checked interfaces barriers)
