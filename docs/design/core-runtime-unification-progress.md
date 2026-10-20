@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected compilation records local owners and direct requirement emitters (2026-10-20)
+
+Qualified local-read metadata now identifies the actual discovered local lambda binding. The checked row and the worklist instance retain the same complete binding identity, including its original binder and quantified variables.
+
+The actual inference computation now supplies direct requirement emitters for all eleven recursive inference families. Candidate selection and call recording retain the concrete call node; successful public compilation supplies the original body receipts.
+
+Three registered regression fixtures cover used inner closures, independent outer quantifiers and direct requirement emitters across conditional branches. Production compiler behavior is unchanged; the added results describe its existing computation.
+
+Validation: 13 changed modules in a coherent graph of 8,861 modules, 65 retained runtime invocations and 6,917 endpoint audits. Full build (8,900 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The whole mutual checker proof still needs statement recursion and the selected generalization barrier. Complete compiler-pass preservation and the final selected meaning-preservation theorem remain unfinished.
+
 ## Generalized calls, operators and constructors use the selected final source (2026-10-20)
 
 Unary and binary operators, mapping index reads and constructor expressions now consume actual smaller checker calls under the same selected body and finalizer. Fresh constructor payload types and mapping key/value variables obtain their privacy conditions from actual allocation and unification. Binary selected-function calls retain their argument coercions and trailing result coercion.

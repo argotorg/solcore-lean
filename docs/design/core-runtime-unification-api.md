@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected compilation records local owners and direct requirement emitters (2026-10-20)
+
+`SourcePreparedQualifiedLocalReadBindings.compiled_template_excludes` and `SourcePreparedQualifiedLocalReadOwner.compile_instance_templates` use actual compiled metadata and worklist instances to identify template ownership. The appended worklist lemmas preserve the original executable definitions.
+
+`SourceCompiledDirectCallOrigins.compile_direct_emitters` connects successful public compilation to the actual original body and its issued direct requirements. The later proof must still derive coverage for all generalized template rows and use that coverage to discharge each concrete local generalization barrier.
+
+Goal two remains incomplete. The whole mutual checker proof still needs statement recursion and the selected generalization barrier. Complete compiler-pass preservation and the final selected meaning-preservation theorem remain unfinished.
+
 ## Generalized calls, operators and constructors use the selected final source (2026-10-20)
 
 `expressionRetained_unary`, `expressionRetained_binary`, `expressionRetained_index` and `expressionRetained_call` consume actual selected expression boundaries. The call dispatch uses `selectedCall_typing`, `builtinCall_typing`, `indirectCall_typing` and the constructor branch. `constructorArgumentsRooted` checks ordered arguments against the actual payload types; `GeneralizedActualStateInvariant.unify` and `GeneralizedActualStateInvariant.ofExpressions` supply the operational continuation.

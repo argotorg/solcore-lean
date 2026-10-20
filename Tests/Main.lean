@@ -1,3 +1,6 @@
+import Solcore.Test.SourcePreparedQualifiedLocalReadBindings
+import Solcore.Test.SourcePreparedQualifiedLocalReadOwner
+import Solcore.Test.SourceCompiledDirectCallOrigins
 import Solcore.Test.SourceCoreGeneralizedSelectedRuntime
 import Solcore.Test.SourceCoreGeneralizedNamedSelectedRuntime
 import Solcore.Test.SourceCoreSelectedFaultingLocalSelectedRuntime
@@ -3270,6 +3273,10 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodDirectEvidence.runForward
 
 def run : IO Unit := do
+  Tests.SourcePreparedQualifiedLocalReadBindings.main
+  Tests.SourcePreparedQualifiedLocalReadOwner.main
+  Tests.SourceCompiledDirectCallOrigins.main
+
   SourceCoreChosenOrdinaryAcceptedFixture.run
   SourceCoreChosenOrdinaryAcceptedPublicBootstrapReceipt.run
   SourceCoreChosenOrdinaryAcceptedPublicSessionEntry.run
