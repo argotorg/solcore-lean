@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual checker state through finalization (2026-10-21)
+
+BodySelection.inferenceCall_inputs derives the original root inputs; actualCall_inputs transports them along the exact accepted checker calls. ChildStep.suffixProgress and CallOccurrence.suffixProgress derive each actual result continuation without a supplied suffix premise.
+
+BodySelection.actualCall_continuation, actualCall_final_extension and actualCall_initial_extension connect every reached call to the same original checked body and its finalizer. The selected-body receipt covers both ordinary functions and implementation methods.
+
+Goal two remains incomplete. The actual initializer barriers and unrestricted closure/body compiler simulation are still required before the final Source/Core/public meaning-preservation theorem can be stated without the existing conditional profile.
+
 ## Actual checker provenance through original bodies and public issuance (2026-10-21)
 
 BodySelection.InferenceCall identifies the original accepted inference call. The shared provenance-indexed recursion yields CheckedBodyHasType through checked_body_of_actual_barriers_of_interfaces. compile_cached_bodies_of_actual_barriers covers the same original ordinary and method bodies in the actual cache.

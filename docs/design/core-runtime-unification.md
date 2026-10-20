@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-21.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The original checked body now supplies readiness, allocator bounds, the requirement ledger and signature catalog for every actual nested inference call. These inputs are derived from the real initialization of ordinary functions and implementation methods.
+
+All 55 immediate call edges derive the inference-state continuation from the child result to the parent result. Induction over the actual call path reaches the selected body result, then the actual return check and source finalizer.
+
+The resulting final substitution extension is available for both entry and result states of each reached call. Event lifetime helpers cover operator, call, branch, loop and lambda continuations; the full initializer barrier producer still needs retained binder and entry privacy facts.
+
+Goal two remains incomplete. The actual initializer barriers and unrestricted closure/body compiler simulation are still required before the final Source/Core/public meaning-preservation theorem can be stated without the existing conditional profile.
+
 The selected original checker call now supplies the root for the complete shared mutual proof. Expressions, constructor arguments, statements, loop headers, mapping places, assignments and match cases preserve the exact child calls from that root.
 
 Existing unrestricted checker APIs are adapters that select the same semantic derivations with an unrestricted call predicate. Single match scrutinees retain the actual expression call; multiple scrutinees use the actual expression-list call without inventing a tuple inference call.
