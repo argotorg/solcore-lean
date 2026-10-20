@@ -2988,3 +2988,164 @@ theorem localLambdaInstances_selected {source : TypedSource} {contextFuel : Opti
 
 
 end Solcore.Frontend.SourceSpecializationWorklist
+
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem
+
+/-- A source-emitted contextual call keeps the same discovered instance and
+all actual ordered body/node selection receipts. -/
+structure CallEdge.ContextualReceipt (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializationKey) (source : TypedSource)
+    (edge : CallEdge) where
+  instances : List LocalLambdaInstance
+  discovered : localLambdaInstances source = .ok instances
+  localInstance : LocalLambdaInstance
+  member : localInstance ∈ instances
+  ids : List NodeId
+  selected : openDeclarationNodeIdsFor source (localLambdaBindings source) localInstance = .ok ids
+  receipt : CallEdge.DirectReceipt program caller (source.applySubstitution localInstance.substitution) edge
+  nodeMember : .expression receipt.node ∈ selectedNodes ids
+    (source.applySubstitution localInstance.substitution).nodes
+
+/-- Expose the actual branch without dropping its contextual selectors. -/
+theorem CallEdge.SourceOrigin.receipts {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (origin : CallEdge.SourceOrigin program caller source edge) :
+    (∃ receipt : CallEdge.DirectReceipt program caller source edge,
+      .expression receipt.node ∈ source.nodes) ∨
+    Nonempty (CallEdge.ContextualReceipt program caller source edge) := by
+  cases origin with
+  | direct receipt member => exact .inl ⟨receipt, member⟩
+  | contextual instances discovered localInstance member ids selected receipt nodeMember =>
+      exact .inr ⟨⟨instances, discovered, localInstance, member, ids, selected, receipt, nodeMember⟩⟩
+
+/-- The contextual receipt's node is the substituted original occurrence. -/
+theorem CallEdge.ContextualReceipt.original {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (contextual : CallEdge.ContextualReceipt program caller source edge) :
+    ∃ original : ExpressionNode, .expression original ∈ source.nodes ∧
+      original.applySubstitution contextual.localInstance.substitution = contextual.receipt.node :=
+  substituted_expression_original (selectedNodes_subset contextual.ids _ _ contextual.nodeMember)
+
+private theorem nodeLawful : LawfulBEq NodeId := by
+  letI : LawfulBEq OccurrenceId := {
+    eq_of_beq := by
+      rintro ⟨a, i⟩ ⟨b, j⟩ equal
+      change (a == b && i == j) = true at equal
+      simp only [Bool.and_eq_true, beq_iff_eq] at equal
+      rcases equal with ⟨rfl, rfl⟩
+      rfl
+    rfl := by intro value; cases value; change (_ && _) = true; simp }
+  letI : LawfulBEq ExpressionId := {
+    eq_of_beq := by
+      rintro ⟨a⟩ ⟨b⟩ equal
+      change (a == b) = true at equal
+      have same := eq_of_beq equal
+      cases same
+      rfl
+    rfl := by rintro ⟨a⟩; change (a == a) = true; exact beq_self_eq_true a }
+  letI : LawfulBEq StatementId := {
+    eq_of_beq := by
+      rintro ⟨a⟩ ⟨b⟩ equal
+      change (a == b) = true at equal
+      have same := eq_of_beq equal
+      cases same
+      rfl
+    rfl := by rintro ⟨a⟩; change (a == a) = true; exact beq_self_eq_true a }
+  exact {
+    eq_of_beq := by
+      intro left right equal
+      cases left with
+      | expression a =>
+          cases right with
+          | statement b => cases equal
+          | expression b =>
+              change (a == b) = true at equal
+              have same := eq_of_beq equal
+              cases same
+              rfl
+      | statement a =>
+          cases right with
+          | expression b => cases equal
+          | statement b =>
+              change (a == b) = true at equal
+              have same := eq_of_beq equal
+              cases same
+              rfl
+    rfl := by
+      intro value
+      cases value with
+      | expression a => change (a == a) = true; exact beq_self_eq_true a
+      | statement a => change (a == a) = true; exact beq_self_eq_true a }
+
+private theorem selectedNode_id {ids : List NodeId} {nodes : List Node} {node : Node}
+    (present : node ∈ selectedNodes ids nodes) : node.id ∈ ids := by
+  letI := nodeLawful
+  induction nodes with
+  | nil => cases present
+  | cons head rest ih =>
+      unfold selectedNodes at present
+      split at present
+      · rename_i selected
+        rcases List.mem_cons.mp present with rfl | later
+        · exact List.contains_iff_mem.mp selected
+        · exact ih later
+      · exact ih present
+
+private theorem selectedNode_contains {ids : List NodeId} {nodes : List Node} {node : Node}
+    (present : node ∈ nodes) (selected : ids.contains node.id = true) :
+    node ∈ selectedNodes ids nodes := by
+  induction nodes with
+  | nil => cases present
+  | cons head rest ih =>
+      rcases List.mem_cons.mp present with rfl | later
+      · simp only [selectedNodes, selected, if_true]
+        exact List.mem_cons_self
+      · unfold selectedNodes
+        split
+        · exact List.mem_cons_of_mem _ (ih later)
+        · exact ih later
+
+/-- The original node lies in the same lexical body inspected by template
+ownership validation, not merely somewhere in the enclosing source table. -/
+theorem CallEdge.ContextualReceipt.original_body {program : CheckedProgram}
+    {caller : SourceSpecialization.SpecializationKey} {source : TypedSource} {edge : CallEdge}
+    (contextual : CallEdge.ContextualReceipt program caller source edge) :
+    ∃ original : ExpressionNode, ∃ body : List Node,
+      localLambdaBodyNodes source contextual.localInstance = .ok body ∧
+      .expression original ∈ body ∧
+      original.applySubstitution contextual.localInstance.substitution = contextual.receipt.node := by
+  letI := nodeLawful
+  obtain ⟨original, originalMember, transformed⟩ := contextual.original
+  have sameId := congrArg ExpressionNode.id transformed
+  change original.id = contextual.receipt.node.id at sameId
+  have selectedId := selectedNode_id contextual.nodeMember
+  change NodeId.expression contextual.receipt.node.id ∈ contextual.ids at selectedId
+  rw [← sameId] at selectedId
+  have accepted := contextual.selected
+  unfold openDeclarationNodeIdsFor at accepted
+  obtain ⟨bodyIds, bodyAccepted, finished⟩ := except_bind_ok _ _ _ accepted
+  have idsEq := Except.ok.inj finished
+  have picked := List.mem_filterMap.mp (idsEq.symm ▸ selectedId)
+  obtain ⟨candidate, _candidateMember, picked⟩ := picked
+  have inBody : bodyIds.contains (.expression original.id) = true := by
+    cases candidate with
+    | statement statement => cases picked
+    | expression candidate =>
+        cases chosen : bodyIds.contains (.expression candidate.id) with
+        | false => simp only [chosen, Bool.not_false, if_true] at picked; cases picked
+        | true =>
+            simp only [chosen, Bool.not_true, Bool.false_eq_true, if_false] at picked
+            cases instantiation : declarationInstantiation? candidate with
+            | none => simp only [instantiation] at picked; cases picked
+            | some actual =>
+                simp only [instantiation] at picked
+                split at picked <;> try contradiction
+                have same := Option.some.inj picked
+                simpa only [same] using chosen
+  refine ⟨original, selectedNodes bodyIds source.nodes, ?_, selectedNode_contains originalMember inBody, transformed⟩
+  change localLambdaBodyNodeIds source (directPolymorphicLambdaBindings source) contextual.localInstance.binding = .ok bodyIds at bodyAccepted
+  simp only [localLambdaBodyNodes, bodyAccepted, bind, Except.bind, pure, Except.pure]
+
+end Solcore.Frontend.SourceSpecializationWorklist

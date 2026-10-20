@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected compilation identifies every local template owner (2026-10-20)
+
+The classified and cataloged call producers retain actual direct requirement issuance. `SourcePreparedOpenCallOwner` and `SourceCompiledTemplateCallOwner` identify the same selected template through executable preparation and worklist discovery.
+
+`SourceSelectedTemplateInventory` derives the original lambda-binding inventory from accepted specialization and proves predicate variables belong to their actual owner. The closed-emitter alternative remains explicit. These facts are prerequisites for the initializer-barrier producer, which is still unfinished.
+
+Goal two remains incomplete. Raw predicate correspondence across inference and exclusion of nested generalization variables still need to connect these owner facts to SelectedInitializerBarriers. Generalized implementation methods, remaining compiler-pass preservation and final selected meaning preservation also remain open.
+
 ## Generalized checking reaches the actual selected ordinary function (2026-10-20)
 
 `SourceCompiledGeneralizedSoundness.recursiveSoundness_of_barriers` closes all five inference families. `checked_body_of_barriers` consumes that assembly at the actual body entry, and `function_valid_of_barriers` supplies the existing ordinary-function validity judgment. Each endpoint uses the same selected checker receipt and finalizer.

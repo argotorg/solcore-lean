@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected compilation identifies every local template owner (2026-10-20)
+
+Actual inference classifies each direct requirement issuer as an original cataloged call or a local template call. Compiler preparation preserves the original caller, occurrence and complete substitution when it discovers a local instance.
+
+An accepted prepared open call now identifies its actual lexical template owner in the original selected body. The worklist proof covers inherited calls, supplied requests, root scanning and later row scanning.
+
+The specialization guard and local identity checks give a complete inventory of original lambda bindings. Each retained template predicate is scoped to the quantifiers of that same owner. The runtime fixtures retain the full original program and exercise public compilation.
+
+Validation: 20 changed modules in a coherent graph of 8,959 modules, 69 retained runtime invocations and 7,212 endpoint audits. Full build (8,998 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Raw predicate correspondence across inference and exclusion of nested generalization variables still need to connect these owner facts to SelectedInitializerBarriers. Generalized implementation methods, remaining compiler-pass preservation and final selected meaning preservation also remain open.
+
 ## Generalized checking reaches the actual selected ordinary function (2026-10-20)
 
 The full inference recursion now proves that protected type variables remain fixed. Fresh-quantifier privacy and return-type privacy are derived from actual initialized statements and ordered for headers, including the continuation after a new declaration.

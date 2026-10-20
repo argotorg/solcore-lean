@@ -1,3 +1,7 @@
+import Solcore.Test.SourceCompiledTemplateCallOrigins
+import Solcore.Test.SourceCompiledCatalogedCallOrigins
+import Solcore.Test.SourceCompiledTemplateCallOwner
+import Solcore.Test.SourceSelectedTemplateInventory
 import Solcore.Test.SourcePreparedQualifiedLocalReadBindings
 import Solcore.Test.SourcePreparedQualifiedLocalReadOwner
 import Solcore.Test.SourceCompiledDirectCallOrigins
@@ -3272,7 +3276,13 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodGenericSubstitution.runForward
   SourceCoreMethodDirectEvidence.runForward
 
+set_option maxRecDepth 2048 in
 def run : IO Unit := do
+  Tests.SourceCompiledTemplateCallOrigins.main
+  Tests.SourceCompiledCatalogedCallOrigins.main
+  Tests.SourceCompiledTemplateCallOwner.main
+  Tests.SourceSelectedTemplateInventory.main
+
   Tests.SourcePreparedQualifiedLocalReadBindings.main
   Tests.SourcePreparedQualifiedLocalReadOwner.main
   Tests.SourceCompiledDirectCallOrigins.main

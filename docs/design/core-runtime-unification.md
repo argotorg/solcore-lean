@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Actual inference classifies each direct requirement issuer as an original cataloged call or a local template call. Compiler preparation preserves the original caller, occurrence and complete substitution when it discovers a local instance.
+
+An accepted prepared open call now identifies its actual lexical template owner in the original selected body. The worklist proof covers inherited calls, supplied requests, root scanning and later row scanning.
+
+The specialization guard and local identity checks give a complete inventory of original lambda bindings. Each retained template predicate is scoped to the quantifiers of that same owner. The runtime fixtures retain the full original program and exercise public compilation.
+
+Goal two remains incomplete. Raw predicate correspondence across inference and exclusion of nested generalization variables still need to connect these owner facts to SelectedInitializerBarriers. Generalized implementation methods, remaining compiler-pass preservation and final selected meaning preservation also remain open.
+
 The full inference recursion now proves that protected type variables remain fixed. Fresh-quantifier privacy and return-type privacy are derived from actual initialized statements and ordered for headers, including the continuation after a new declaration.
 
 Expression, statement, statement-sequence, for-item and for-item-sequence soundness are assembled by fuel induction. The complete statement sequence and for loop consume the derived return privacy without a separate child-fixedness premise.
