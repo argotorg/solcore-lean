@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedExpressionListState
 import Solcore.SourceSemantics.SourceInferenceSelectedIndirectCall
@@ -8,14 +9,15 @@ set_option maxRecDepth 4096
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem indirectCall_typing
+theorem indirectCall_typing_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    (descend : ChildClosed callProvenance)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor callProvenance selected smaller)
     {inferenceContext : SourceInference.Context} {expression calleeSource : Syntax.Expr}
     {expected : Option Ty} {parentInitial initial argumentState calleeState resultState : State}
     {inferred callee : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
@@ -26,8 +28,10 @@ theorem indirectCall_typing
     (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
     (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
     (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsHere : callProvenance (.expressions childFuel inferenceContext argumentSources initial arguments argumentState))
     (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
       .ok (arguments, argumentState))
+    (calleeHere : callProvenance (.expression childFuel inferenceContext calleeSource none argumentState callee calleeState))
     (calleeSuccess : Detail.inferExprFuel childFuel inferenceContext calleeSource none argumentState =
       .ok (callee, calleeState))
     (applicationSuccess : Detail.applyFunctionType inferenceContext call callee.type arguments expected
@@ -144,17 +148,17 @@ theorem indirectCall_typing
     have recorded := Detail.recordIndirectCall_requirements_subset expression callee arguments application
     rw [recording] at recorded
     exact recorded.trans requirementsSubset
-  have argumentsTyped := expressionsRooted checked childFuel
+  have argumentsTyped := expressionsRooted_for checked descend childFuel
     (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self childFuel)))
-    argumentsSuccess interfaces argumentExtension boundary.scope invariant actual operational
+    argumentsHere argumentsSuccess interfaces argumentExtension boundary.scope invariant actual operational
     (fun argument member => (rawProper.childSubtree (argumentEdge argument member)).monoBefore argumentToParent)
     ((Detail.inferExprFuel_integerPatterns_subset calleeSuccess).trans calleePatterns)
     ((Detail.inferExprFuel_integerLiterals_subset calleeSuccess).trans calleeLiterals)
     ((Detail.inferExprFuel_requirements_subset calleeSuccess).trans calleeRequirements)
     (fun argument member => covered.expressionChild resources.graph_closed (boundary.directChildren (argumentEdge argument member)))
     (fun argument member => actualCovered.directChild (boundary.directChildren (argumentEdge argument member)))
-  have calleeTyped := expressionRooted_of_retained checked
-    (recursive childFuel (Nat.lt_succ_self childFuel)) ({
+  have calleeTyped := expressionRooted_of_retained_for checked
+    (recursive childFuel (Nat.lt_succ_self childFuel)) calleeHere ({
       accepted := calleeSuccess
       interfaces := interfaces
       extension := calleeExtension
@@ -194,5 +198,36 @@ theorem indirectCall_typing
       resources.ledger resources.ownership invariant.signaturesEq invariant.solvedRequirementsEq
       invariant.assumptionsMono covered)
 
+
+theorem indirectCall_typing
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    {inferenceContext : SourceInference.Context} {expression calleeSource : Syntax.Expr}
+    {expected : Option Ty} {parentInitial initial argumentState calleeState resultState : State}
+    {inferred callee : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {call : ExpressionId} {application : Detail.IndirectApplicationResult}
+    (boundary : RetainedExpressionBoundary selected parentFuel inferenceContext expression expected
+      parentInitial inferred resultState frames target)
+    (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
+      .ok (arguments, argumentState))
+    (calleeSuccess : Detail.inferExprFuel childFuel inferenceContext calleeSource none argumentState =
+      .ok (callee, calleeState))
+    (applicationSuccess : Detail.applyFunctionType inferenceContext call callee.type arguments expected
+      calleeState = .ok application)
+    (recording : Detail.recordIndirectCall expression callee arguments application = (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact indirectCall_typing_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary)
+    boundary invariant operational expectedBelow True.intro argumentsSuccess True.intro calleeSuccess applicationSuccess recording
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

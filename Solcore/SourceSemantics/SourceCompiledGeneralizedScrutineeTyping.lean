@@ -6,7 +6,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 variable {compiled : SourceCoreCompiler.Compiled} {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
 
@@ -30,15 +30,18 @@ structure ScrutineeBoundary (selected : BodySelection compiled row fuel)
   covered : TemplateScopeCovered selected.body.finalized.typedSource target (.expression inferred.id)
   actualCovered : ActualContext.Covers selected.body.finalized frames (.expression inferred.id)
 
-private theorem syntheticScrutinee
+private theorem syntheticScrutinee_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {callProvenance : CallIndex → Prop}
+    (descend : ChildClosed callProvenance)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor callProvenance selected smaller)
     {inferenceContext : SourceInference.Context} {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
     {initial elementsState : State} {elements : List InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expressions childFuel inferenceContext sources initial elements elementsState))
     (accepted : Detail.inferExprsFuel childFuel inferenceContext sources initial = .ok (elements, elementsState))
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces (checkingContext selected).signatures
       selected.body.finalized.solvedRequirements selected.body.finalized.typedSource)
@@ -77,9 +80,9 @@ private theorem syntheticScrutinee
     simpa [node, nodeChildIds, Node.references, ExpressionForm.references] using
       (List.mem_map.mpr ⟨element.id, List.mem_map.mpr ⟨element, member, rfl⟩, rfl⟩ :
         NodeId.expression element.id ∈ (elements.map (·.id)).map NodeId.expression)
-  have typed := expressionsRooted checked childFuel
+  have typed := expressionsRooted_for checked descend childFuel
     (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self childFuel)))
-    accepted interfaces extension scope invariant actual operational
+    here accepted interfaces extension scope invariant actual operational
     (fun element member => (rawSubtree.child (edge element member)).monoBefore sourceExtension)
     integerPatterns integerLiterals requirements
     (fun element member => covered.expressionChild selected.body.resources.graph_closed
@@ -104,6 +107,68 @@ private theorem syntheticScrutinee
     (by intro requirement member; simp at member)
     (.nil _) (by simp [node, ExpressionNode.applySubstitution, ExpressionForm.applySubstitution, coercionRequirementIds])
 
+theorem scrutineeRooted_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {callProvenance : CallIndex → Prop}
+    (descend : ChildClosed callProvenance)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor callProvenance selected smaller)
+    {inferenceContext : SourceInference.Context} {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {initial result : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (singleHere : ∀ expression, sources = [expression] →
+      callProvenance (.expression childFuel inferenceContext expression none initial inferred result))
+    (manyHere : ∀ elements elementsState, (∀ expression, sources ≠ [expression]) →
+      Detail.inferExprsFuel childFuel inferenceContext sources initial = .ok (elements, elementsState) →
+      callProvenance (.expressions childFuel inferenceContext sources initial elements elementsState))
+    (boundary : ScrutineeBoundary selected childFuel inferenceContext span sources initial inferred result frames target) :
+    ExpressionHasType selected.body.finalized.typedSource target inferred.id
+      (selected.body.finalized.substitution.apply inferred.type) := by
+  have accepted := boundary.accepted
+  have tupleCase : ∀ (manySources : List Syntax.Expr), sources = manySources →
+      (∀ expression, manySources ≠ [expression]) →
+      inferMatchScrutineesFuel childFuel inferenceContext span manySources initial = .ok (inferred, result) →
+      ExpressionHasType selected.body.finalized.typedSource target inferred.id
+        (selected.body.finalized.substitution.apply inferred.type) := by
+    intro manySources sourceEq nonsingle accepted
+    subst sources
+    unfold inferMatchScrutineesFuel at accepted
+    split at accepted
+    next => exact False.elim (nonsingle _ rfl)
+    next _ _ =>
+      cases elementsAccepted : Detail.inferExprsFuel childFuel inferenceContext manySources initial with
+      | error error => simp [elementsAccepted, bind, Except.bind] at accepted
+      | ok pair =>
+        rcases pair with ⟨elements, elementsState⟩
+        simp only [elementsAccepted, bind, Except.bind] at accepted
+        simp only [pure, Pure.pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at accepted
+        rcases accepted with ⟨rfl, rfl⟩
+        exact syntheticScrutinee_for descend checked recursive
+          (manyHere elements elementsState nonsingle elementsAccepted) elementsAccepted boundary.interfaces
+          boundary.extension boundary.scope boundary.invariant boundary.actual boundary.operational
+          boundary.rawSubtree boundary.integerPatterns boundary.integerLiterals boundary.requirements
+          boundary.covered boundary.actualCovered
+  cases sources with
+  | nil => exact tupleCase [] rfl (by simp) accepted
+  | cons source rest =>
+    cases rest with
+    | nil =>
+      exact expressionRooted_of_retained_for checked (recursive childFuel (Nat.lt_succ_self _))
+        (singleHere source rfl) ({
+        accepted := by simpa [inferMatchScrutineesFuel] using accepted
+        interfaces := boundary.interfaces, extension := boundary.extension, scope := boundary.scope
+        invariant := boundary.invariant, actual := boundary.actual, operational := boundary.operational
+        expectedBelow := by simp
+        expectedAdmissible := by simp
+        expectedSafe := by simp
+        integerPatterns := boundary.integerPatterns, integerLiterals := boundary.integerLiterals
+        requirements := boundary.requirements, covered := boundary.covered, actualCovered := boundary.actualCovered
+        rawSubtree := boundary.rawSubtree } : RootedExpressionBoundary selected childFuel inferenceContext
+          source none initial inferred result frames target)
+    | cons second tail => exact tupleCase (source :: second :: tail) rfl (by simp) accepted
+
 theorem scrutineeRooted
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -116,44 +181,10 @@ theorem scrutineeRooted
     (boundary : ScrutineeBoundary selected childFuel inferenceContext span sources initial inferred result frames target) :
     ExpressionHasType selected.body.finalized.typedSource target inferred.id
       (selected.body.finalized.substitution.apply inferred.type) := by
-  have accepted := boundary.accepted
-  have tupleCase : ∀ (sources : List Syntax.Expr),
-      (∀ expression, sources ≠ [expression]) →
-      inferMatchScrutineesFuel childFuel inferenceContext span sources initial = .ok (inferred, result) →
-      ExpressionHasType selected.body.finalized.typedSource target inferred.id
-        (selected.body.finalized.substitution.apply inferred.type) := by
-    intro manySources nonsingle accepted
-    unfold inferMatchScrutineesFuel at accepted
-    split at accepted
-    next source => exact False.elim (nonsingle source rfl)
-    next _ _ =>
-      cases elementsAccepted : Detail.inferExprsFuel childFuel inferenceContext manySources initial with
-      | error error => simp [elementsAccepted, bind, Except.bind] at accepted
-      | ok pair =>
-        rcases pair with ⟨elements, elementsState⟩
-        simp only [elementsAccepted, bind, Except.bind] at accepted
-        simp only [pure, Pure.pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at accepted
-        rcases accepted with ⟨rfl, rfl⟩
-        exact syntheticScrutinee checked recursive elementsAccepted boundary.interfaces
-          boundary.extension boundary.scope boundary.invariant boundary.actual boundary.operational
-          boundary.rawSubtree boundary.integerPatterns boundary.integerLiterals boundary.requirements
-          boundary.covered boundary.actualCovered
-  cases sources with
-  | nil => exact tupleCase [] (by simp) accepted
-  | cons source rest =>
-    cases rest with
-    | nil =>
-      exact expressionRooted_of_retained checked (recursive childFuel (Nat.lt_succ_self _)) ({
-        accepted := by simpa [inferMatchScrutineesFuel] using accepted
-        interfaces := boundary.interfaces, extension := boundary.extension, scope := boundary.scope
-        invariant := boundary.invariant, actual := boundary.actual, operational := boundary.operational
-        expectedBelow := by simp
-        expectedAdmissible := by simp
-        expectedSafe := by simp
-        integerPatterns := boundary.integerPatterns, integerLiterals := boundary.integerLiterals
-        requirements := boundary.requirements, covered := boundary.covered, actualCovered := boundary.actualCovered
-        rawSubtree := boundary.rawSubtree } : RootedExpressionBoundary selected childFuel inferenceContext
-          source none initial inferred result frames target)
-    | cons second tail => exact tupleCase (source :: second :: tail) (by simp) accepted
+  exact scrutineeRooted_for (callProvenance := fun _ => True) true_childClosed checked
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary)
+    (fun _ _ => True.intro) (fun _ _ _ _ => True.intro) boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

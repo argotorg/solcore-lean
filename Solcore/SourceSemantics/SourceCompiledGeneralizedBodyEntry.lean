@@ -1,5 +1,7 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssemblyContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceCompatibility
+import Solcore.SourceSemantics.SourceCompiledBodyCallIndex
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCoercionInterfaces
 
 /-! The original selected checker call supplies the complete recursive body
@@ -10,7 +12,7 @@ set_option Elab.async false
 set_option maxHeartbeats 1200000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 variable {compiled : SourceCoreCompiler.Compiled}
   {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
@@ -223,6 +225,21 @@ theorem body_entry {raw : Workspace.RawWorkspace}
 
 /-- The recursive assembly is applied at the real whole-body entry, with its
 safe return type and state/context invariants discharged by accepted checking. -/
+theorem body_of_recursive_of_interfaces_for {raw : Workspace.RawWorkspace}
+    (selected : BodySelection compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    {callProvenance : CallIndex → Prop}
+    (rootHere : callProvenance selected.inferenceCall)
+    (sound : StatementsRootedSoundnessFor callProvenance selected fuel) :
+    ∃ target, BodyEntry selected target ∧
+      StatementsConclusion selected (checkingContext selected)
+        (Ty.productMany selected.signature.returnTypes) selected.body.body [] target := by
+  obtain ⟨target, entry⟩ := body_entry_of_interfaces selected checked interfaces
+  exact ⟨target, entry, sound rootHere entry.returnSafe entry.returnAdmissible entry.boundary⟩
+
 theorem body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
     (selected : BodySelection compiled row fuel)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
@@ -233,8 +250,8 @@ theorem body_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
     ∃ target, BodyEntry selected target ∧
       StatementsConclusion selected (checkingContext selected)
         (Ty.productMany selected.signature.returnTypes) selected.body.body [] target := by
-  obtain ⟨target, entry⟩ := body_entry_of_interfaces selected checked interfaces
-  exact ⟨target, entry, sound entry.returnSafe entry.returnAdmissible entry.boundary⟩
+  exact body_of_recursive_of_interfaces_for (callProvenance := fun _ => True) selected checked interfaces True.intro
+    (statementsRootedSoundnessFor_true sound)
 
 theorem body_of_recursive {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPlaceContracts
 
@@ -7,25 +8,27 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
     {selected : BodySelection compiled row fuel}
 
-theorem placeRootedSoundness
-    (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
-    ∀ childFuel, (∀ smaller, smaller < childFuel → ExpressionRootedSoundness selected smaller) →
-      PlaceRootedSoundness selected childFuel := by
+theorem placeRootedSoundness_for
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed provenance) :
+    ∀ childFuel, (∀ smaller, smaller < childFuel → ExpressionRootedSoundnessFor provenance selected smaller) →
+      PlaceRootedSoundnessFor provenance selected childFuel := by
   intro childFuel
   induction childFuel with
   | zero =>
-      intro _ inferenceContext expression initial final place frames target boundary
+      intro _ inferenceContext expression initial final place frames target _here boundary
       have success := boundary.accepted
       simp only [Detail.inferPlaceFuel] at success
       cases success
   | succ childFuel induction =>
-      intro expressionSound inferenceContext expression initial final place frames target boundary
+      intro expressionSound inferenceContext expression initial final place frames target here boundary
       have formation := boundary.scope.formation checked
       have canonical := boundary.scope.functionsCanonical checked
       have catalog := boundary.scope.catalog checked
@@ -41,6 +44,7 @@ theorem placeRootedSoundness
           simpa only [Detail.inferPlaceFuel, form] using boundary.accepted
         exact (induction (fun smaller below => expressionSound smaller
           (Nat.lt_trans below (Nat.lt_succ_self childFuel)))
+          (descend here (ChildStep.place_group boundary.accepted form childSuccess))
           { boundary with accepted := childSuccess }).1
       case index base brackets key =>
         obtain ⟨basePlace, baseState, keyInitial, inferredKey, baseSuccess,
@@ -59,7 +63,8 @@ theorem placeRootedSoundness
           intro keyId member
           exact inferPlaceFuel_index_base_references_subset form baseSuccess boundary.accepted member
         have baseTyped := (induction (fun smaller below => expressionSound smaller
-          (Nat.lt_trans below (Nat.lt_succ_self childFuel))) ({
+          (Nat.lt_trans below (Nat.lt_succ_self childFuel)))
+          (descend here (ChildStep.place_index_base boundary.accepted form baseSuccess)) ({
             accepted := baseSuccess
             interfaces := boundary.interfaces
             extension := baseInvariant.substitutionExtension
@@ -94,7 +99,9 @@ theorem placeRootedSoundness
         have expectedEq : selected.body.finalized.substitution.apply (keyInitial.resolve baseState.fresh.1) =
             selected.body.finalized.substitution.apply baseState.fresh.1 := by
           simpa only [State.resolve, InferState.resolve] using keyInvariant.substitutionExtension baseState.fresh.1
-        have keyTyped := expressionSound childFuel (Nat.lt_succ_self childFuel) ({
+        have keyTyped := expressionSound childFuel (Nat.lt_succ_self childFuel)
+          (descend here (ChildStep.place_index_key boundary.accepted form baseSuccess rfl rfl
+            unifySuccess keySuccess)) ({
           accepted := keySuccess
           interfaces := boundary.interfaces
           extension := boundary.extension
@@ -134,5 +141,18 @@ theorem placeRootedSoundness
       all_goals
         have success := boundary.accepted
         simp [Detail.inferPlaceFuel, form] at success
+
+theorem placeRootedSoundness
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program) :
+    ∀ childFuel, (∀ smaller, smaller < childFuel → ExpressionRootedSoundness selected smaller) →
+      PlaceRootedSoundness selected childFuel := by
+  intro childFuel expressionSound
+  have recursiveFor (smaller : Nat) (below : smaller < childFuel) :
+      ExpressionRootedSoundnessFor (fun _ => True) selected smaller :=
+    fun _ boundary => expressionSound smaller below boundary
+  intro inferenceContext expression initial final place frames target boundary
+  exact placeRootedSoundness_for (provenance := fun _ => True) checked
+    true_childClosed childFuel recursiveFor
+    trivial boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

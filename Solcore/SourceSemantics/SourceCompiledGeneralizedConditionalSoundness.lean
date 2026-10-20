@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
 import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
@@ -7,7 +8,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 private theorem safe_after_expression
     {childFuel : Nat} {context : SourceInference.Context} {expression : Syntax.Expr}
@@ -38,16 +39,18 @@ private theorem safe_after_expression
     (expectedSafe binder entering) _ accepted).1 type (laterSafe binder entering type typeMember)
 
 /-- Conditional inference threads privacy through the condition and both branches before assembling their common final-source typing. -/
-theorem expressionRetained_conditional
+theorem expressionRetained_conditional_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression condition thenBranch elseBranch : Syntax.Expr}
     {question colon : Syntax.SourceSpan}
     {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
     (expressionEq : expression.value = .conditional condition question thenBranch colon elseBranch)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
       expression expected initial inferred resultState frames target) :
@@ -299,7 +302,8 @@ theorem expressionRetained_conditional
       (List.mem_map.mpr ⟨child, member, rfl⟩ : NodeId.expression child ∈
         [conditionResult.id, thenResult.id, elseResult.id].map NodeId.expression)
   have conditionEdge := edge conditionResult.id (by simp)
-  have conditionTypeRaw := expressionRooted_of_retained checked recursive ({
+  have conditionTypeRaw := expressionRooted_of_retained_for checked recursive
+    (descend here (.expression_conditional_condition boundary.accepted expressionEq allocationEq conditionSuccess)) ({
     accepted := conditionSuccess
     interfaces := boundary.interfaces
     extension := laterCondition
@@ -324,7 +328,8 @@ theorem expressionRetained_conditional
     RootedExpressionBoundary selected childFuel inferenceContext condition (some .bool)
       allocated conditionResult conditionState frames target)
   have thenEdge := edge thenResult.id (by simp)
-  have thenTypeRaw := expressionRooted_of_retained checked recursive ({
+  have thenTypeRaw := expressionRooted_of_retained_for checked recursive
+    (descend here (.expression_conditional_then boundary.accepted expressionEq allocationEq conditionSuccess thenSuccess)) ({
     accepted := thenSuccess
     interfaces := boundary.interfaces
     extension := laterThen
@@ -344,7 +349,8 @@ theorem expressionRetained_conditional
     RootedExpressionBoundary selected childFuel inferenceContext thenBranch expected
       conditionState thenResult thenState frames target)
   have elseEdge := edge elseResult.id (by simp)
-  have elseTypeRaw := expressionRooted_of_retained checked recursive ({
+  have elseTypeRaw := expressionRooted_of_retained_for checked recursive
+    (descend here (.expression_conditional_else boundary.accepted expressionEq allocationEq conditionSuccess thenSuccess elseSuccess)) ({
     accepted := elseSuccess
     interfaces := boundary.interfaces
     extension := laterElse
@@ -417,5 +423,23 @@ theorem expressionRetained_conditional
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
     recorded boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
     catalog boundary.scope.signatures boundary.invariant formType thenType.type_admissible boundary.covered
+
+theorem expressionRetained_conditional
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression condition thenBranch elseBranch : Syntax.Expr}
+    {question colon : Syntax.SourceSpan}
+    {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (expressionEq : expression.value = .conditional condition question thenBranch colon elseBranch)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_conditional_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro expressionEq boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

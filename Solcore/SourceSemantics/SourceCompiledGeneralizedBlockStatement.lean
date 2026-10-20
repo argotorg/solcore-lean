@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
-import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
 import Solcore.SourceSemantics.SourceInferencePrivacyScopeRetention
@@ -8,7 +8,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 open SourceInferenceStatementsSoundness
 
 theorem statement_block
@@ -104,5 +104,31 @@ theorem statement_block
     boundary.extension (activeSchemeQuantifierIsolation_transport boundary.invariant.schemeIsolation bindersEq)
     typing
   exact ⟨target, facts, finalInvariant, boundary.actual, operational, typing, agreement⟩
+
+
+/-- Reuse the block typing proof with its actual, fixed child call. -/
+theorem statement_block_for {callProvenance : CallIndex → Prop}
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed callProvenance)
+    (recursive : StatementsRootedSoundnessFor callProvenance selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {body : List Syntax.Statement} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
+    (form : statement.value = .block body)
+    (returnSafe : ∀ binder ∈ initial.localBinders,
+      ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  apply statement_block checked form boundary
+  intro bodyResult childBoundary
+  apply recursive (descend here (.statement_block boundary.accepted form rfl childBoundary.accepted))
+    (fun binder member => returnSafe binder member) returnAdmissible childBoundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

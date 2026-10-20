@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedForContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssignedValue
@@ -6,19 +7,22 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem forItem_assignValue
+theorem forItem_assignValue_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (placeSound : PlaceRootedSoundness selected childFuel)
-    (expressionSound : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (placeSound : PlaceRootedSoundnessFor provenance selected childFuel)
+    (expressionSound : ExpressionRootedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
     {targetExpression valueExpression : Syntax.Expr} {operator : Syntax.Located Syntax.ValueAssignOp}
     {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.forItem (childFuel + 1) inferenceContext item initial inferred final))
     (form : item.value = .assignValue targetExpression operator valueExpression)
     (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
       initial inferred final frames target) :
@@ -36,7 +40,8 @@ theorem forItem_assignValue
   have valueMember : (.expression value.id : NodeId) ∈
       (ForItemForm.assignValue assignment operator.value value.id).references := by
     simp [ForItemForm.references]
-  obtain ⟨typed, operational⟩ := assignedValue_of_actual_children checked placeSound expressionSound ({
+  obtain ⟨typed, operational⟩ := assignedValue_of_actual_children_for checked descend placeSound expressionSound
+    (descend here (ChildStep.forItem_assignment boundary.accepted form accepted)) ({
     accepted
     interfaces := boundary.interfaces
     extension := boundary.extension
@@ -68,5 +73,23 @@ theorem forItem_assignValue
     (activeSchemeQuantifierIsolation_transport boundary.invariant.schemeIsolation binders)
     boundary.extension itemTyped
   exact ⟨target, invariant, boundary.actual, operational, itemTyped⟩
+
+theorem forItem_assignValue
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (placeSound : PlaceRootedSoundness selected childFuel)
+    (expressionSound : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
+    {targetExpression valueExpression : Syntax.Expr} {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : item.value = .assignValue targetExpression operator valueExpression)
+    (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
+      initial inferred final frames target) :
+    ForItemConclusion selected inferenceContext expectedReturn inferred final frames target := by
+  exact forItem_assignValue_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => placeSound boundary) (fun _ boundary => expressionSound boundary) trivial form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

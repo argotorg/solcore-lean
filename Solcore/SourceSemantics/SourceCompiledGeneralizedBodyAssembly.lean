@@ -62,4 +62,33 @@ theorem checked_body_of_barriers_of_interfaces {raw : Workspace.RawWorkspace}
   checkedBodyHasType_ofStatements selected.body.accepted
     (checked_statements_of_barriers_of_interfaces selected checked interfaces barriers)
 
+
+/-- The remaining barriers are requested only at calls actually reached from
+this original selected ordinary or method body check. -/
+theorem checked_statements_of_actual_barriers_of_interfaces {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : BodySelection compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (barriers : BodyInitializerBarriersFor selected.InferenceCall selected) :
+    CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original :=
+  checked_statements_of_recursive_of_interfaces_for selected checked interfaces selected.inferenceCall_root
+    (recursiveSoundness_of_barriers_for checked selected.inferenceCall_closed barriers fuel).2.2.1
+
+theorem checked_body_of_actual_barriers_of_interfaces {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : BodySelection compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (barriers : BodyInitializerBarriersFor selected.InferenceCall selected) :
+    CheckedBodyHasType compiled.program.signatures selected.signature selected.original :=
+  checkedBodyHasType_ofStatements selected.body.accepted
+    (checked_statements_of_actual_barriers_of_interfaces selected checked interfaces barriers)
+
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

@@ -10,18 +10,20 @@ set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem constructorArgumentsRooted
+theorem constructorArgumentsRooted_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel) :
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel) :
     ∀ {inferenceContext : SourceInference.Context} {sources : List Syntax.Expr}
       {expectedTypes : List Ty} {initial resultState : State}
       {inferred : List InferredExpression}
       {frames : List InitializedLetBinding} {target : SourceSemantics.Context},
+    callProvenance (.constructorArguments childFuel inferenceContext sources expectedTypes initial inferred resultState) →
     Detail.inferConstructorArgumentsFuel childFuel inferenceContext sources expectedTypes initial =
       .ok (inferred, resultState) →
     ExecutableCoercionInterfaces.SourceInterfaces (checkingContext selected).signatures
@@ -48,7 +50,7 @@ theorem constructorArgumentsRooted
   intro inferenceContext sources
   induction sources with
   | nil =>
-    intro expectedTypes initial resultState inferred frames target accepted
+    intro expectedTypes initial resultState inferred frames target here accepted
     cases expectedTypes with
     | nil =>
       simp only [Detail.inferConstructorArgumentsFuel, pure, Except.pure, Except.ok.injEq,
@@ -58,7 +60,7 @@ theorem constructorArgumentsRooted
       exact .nil target
     | cons _ _ => simp [Detail.inferConstructorArgumentsFuel] at accepted
   | cons source sources induction =>
-    intro expectedTypes initial resultState inferred frames target accepted interfaces extension scope
+    intro expectedTypes initial resultState inferred frames target here accepted interfaces extension scope
       invariant actual operational expectedBelow expectedAdmissible expectedSafe rawPreserved
       integerPatternsSubset integerLiteralsSubset requirementsSubset covered actualCovered
     cases expectedTypes with
@@ -67,6 +69,7 @@ theorem constructorArgumentsRooted
       have formation := scope.formation checked
       have functions := scope.functionsCanonical checked
       have catalog := scope.catalog checked
+      have parentAccepted := accepted
       unfold Detail.inferConstructorArgumentsFuel at accepted
       cases headSuccess : Detail.inferExprFuel childFuel inferenceContext source
           (some (initial.resolve expected)) initial with
@@ -121,7 +124,9 @@ theorem constructorArgumentsRooted
             headExpectedBelow headExpectedSafe headSuccess
           have headToFinal := inferConstructorArgumentsFuel_success_typingSourceExtends
             tailSuccess headInvariant.nodesBelow (bodyRoots selected)
-          have headTyped := expressionRooted_of_retained checked recursive ({
+          have headHere := descend here (.constructorArguments_head parentAccepted headSuccess)
+          have tailHere := descend here (.constructorArguments_tail parentAccepted headSuccess tailSuccess)
+          have headTyped := expressionRooted_of_retained_for checked recursive headHere ({
             accepted := headSuccess
             interfaces := interfaces
             extension := headExtension
@@ -158,7 +163,7 @@ theorem constructorArgumentsRooted
               (operational.privacy binder old) catalog formation functions headExpectedBelow
               (headExpectedSafe binder old) _ headSuccess
             exact privacy.1 type (expectedSafe binder old type (by simp [typeMember]))
-          have tailTyped := induction tailSuccess interfaces extension scope headInvariant actual
+          have tailTyped := induction tailHere tailSuccess interfaces extension scope headInvariant actual
             headOperational tailExpectedBelow
             (fun type member => expectedAdmissible type (by simp [member])) tailSafe
             (fun argument member => rawPreserved argument (by simp [member]))
@@ -166,5 +171,42 @@ theorem constructorArgumentsRooted
             (fun argument member => covered argument (by simp [member]))
             (fun argument member => actualCovered argument (by simp [member]))
           exact .cons (by simpa only [headTypeEq] using headTyped) tailTyped
+
+theorem constructorArgumentsRooted
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel) :
+    ∀ {inferenceContext : SourceInference.Context} {sources : List Syntax.Expr}
+      {expectedTypes : List Ty} {initial resultState : State}
+      {inferred : List InferredExpression}
+      {frames : List InitializedLetBinding} {target : SourceSemantics.Context},
+    Detail.inferConstructorArgumentsFuel childFuel inferenceContext sources expectedTypes initial =
+      .ok (inferred, resultState) →
+    ExecutableCoercionInterfaces.SourceInterfaces (checkingContext selected).signatures
+      selected.body.finalized.solvedRequirements selected.body.finalized.typedSource →
+    selected.body.finalized.substitution.SemanticallyExtends resultState.inference.substitution →
+    CheckingScope selected inferenceContext →
+    RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target →
+    ActualContext (checkingContext selected) selected.body.finalized frames target →
+    GeneralizedActualStateInvariant initial (evidenceSource selected) →
+    (∀ type ∈ expectedTypes, type.VariablesBelow initial.inference.next) →
+    (∀ type ∈ expectedTypes, TypeAdmissible target (selected.body.finalized.substitution.apply type)) →
+    (∀ binder ∈ initial.localBinders, ∀ type ∈ expectedTypes,
+      ProtectedVariables.Safe binder.scheme.quantified initial type) →
+    (∀ argument ∈ inferred, RawSubtreePreserved (resultState.toTypedSource (bodyRoots selected))
+      (evidenceSource selected) (.expression argument.id)) →
+    resultState.integerPatterns ⊆ selected.body.returned.integerPatterns →
+    resultState.integerLiterals ⊆ selected.body.returned.integerLiterals →
+    resultState.requirements ⊆ selected.body.returned.requirements →
+    (∀ argument ∈ inferred, TemplateScopeCovered selected.body.finalized.typedSource target
+      (.expression argument.id)) →
+    (∀ argument ∈ inferred, ActualContext.Covers selected.body.finalized frames (.expression argument.id)) →
+    ExpressionsHaveTypes selected.body.finalized.typedSource target (inferred.map (·.id))
+      (expectedTypes.map selected.body.finalized.substitution.apply) := by
+  intro inferenceContext sources expectedTypes initial resultState inferred frames target accepted
+  exact constructorArgumentsRooted_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro accepted
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledInitializerOccurrenceInvariant
-import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceInferenceSelectedLetCoverage
 
 /-! The actual initialized statement consumes the smaller generalized
@@ -10,7 +10,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledGeneralizedSoundness ProtectedVariables
+open SourceCompiledGeneralizedSoundness ProtectedVariables SourceInferenceExecution
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
@@ -34,7 +34,7 @@ private theorem annotation_admissible
       exact TypeAdmissible.ofWellFormed
         (resolveSourceType_success_typeWellFormed canonical signatures parameters owner accepted)
 
-theorem statement_of_expressionSoundness
+theorem statement_of_expressionSoundness_for {provenance : CallIndex → Prop}
     (continuation : BodyInitializerOccurrence selected source)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {expectedReturn : Ty} {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
@@ -59,7 +59,10 @@ theorem statement_of_expressionSoundness
     (barrier : GeneralizationBarrierTransport continuation.receipt.ready continuation.receipt.locals
       continuation.entry.nextRequirement (continuation.receipt.ready.resolve continuation.receipt.value.type)
       selected.body.finalized.substitution target (localSchemeTemplateIds continuation.initializerBinding.binder))
-    (childSound : ExpressionRootedSoundness selected continuation.childFuel) :
+    (childHere : provenance (.expression continuation.childFuel continuation.inferenceContext
+      continuation.receipt.initializer continuation.receipt.expected continuation.entry.allocateStatementId.2
+      continuation.receipt.value continuation.receipt.ready))
+    (childSound : ExpressionRootedSoundnessFor provenance selected continuation.childFuel) :
     ∃ finalContext,
       RecursiveStatementInvariant (checkingContext selected) expectedReturn
         selected.body.finalized continuation.result.state finalContext ∧
@@ -106,7 +109,7 @@ theorem statement_of_expressionSoundness
       (localSchemeInitializerContext target continuation.initializerBinding.binder)
       (.expression continuation.receipt.value.id) :=
     templateScopeCovered_letInitializer selected.body.resources.graph_closed finalContains rfl covered
-  apply childSound
+  apply childSound childHere
   refine {
     accepted := continuation.receipt.child
     interfaces
@@ -137,6 +140,48 @@ theorem statement_of_expressionSoundness
       State.recordNode, State.allocateBinder, State.withLocals] using literals
   · simpa only [continuation.receipt.completed, LocalLetRequirementTiming.finish,
       State.recordNode, State.allocateBinder, State.withLocals] using requirements
+
+theorem statement_of_expressionSoundness
+    (continuation : BodyInitializerOccurrence selected source)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {expectedReturn : Ty} {target : SourceSemantics.Context} {frames : List InitializedLetBinding}
+    (scope : CheckingScope selected continuation.inferenceContext)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (invariant : RecursiveStatementInvariant (checkingContext selected) expectedReturn
+      selected.body.finalized continuation.entry target)
+    (actual : ActualContext (checkingContext selected) selected.body.finalized frames target)
+    (operational : GeneralizedActualStateInvariant continuation.entry (evidenceSource selected))
+    (rawSubtree : RawSubtreePreserved
+      (continuation.result.state.toTypedSource (bodyRoots selected)) (evidenceSource selected)
+      (.statement continuation.result.id))
+    (patterns : continuation.result.state.integerPatterns ⊆ selected.body.returned.integerPatterns)
+    (literals : continuation.result.state.integerLiterals ⊆ selected.body.returned.integerLiterals)
+    (requirements : continuation.result.state.requirements ⊆ selected.body.returned.requirements)
+    (covered : TemplateScopeCovered selected.body.finalized.typedSource target
+      (.statement continuation.entry.allocateStatementId.1))
+    (actualCovered : ActualContext.Covers selected.body.finalized frames
+      (.statement continuation.entry.allocateStatementId.1))
+    (barrier : GeneralizationBarrierTransport continuation.receipt.ready continuation.receipt.locals
+      continuation.entry.nextRequirement (continuation.receipt.ready.resolve continuation.receipt.value.type)
+      selected.body.finalized.substitution target (localSchemeTemplateIds continuation.initializerBinding.binder))
+    (childSound : ExpressionRootedSoundness selected continuation.childFuel) :
+    ∃ finalContext,
+      RecursiveStatementInvariant (checkingContext selected) expectedReturn
+        selected.body.finalized continuation.result.state finalContext ∧
+      ActualContext (checkingContext selected) selected.body.finalized frames finalContext ∧
+      GeneralizedActualStateInvariant continuation.result.state (evidenceSource selected) ∧
+      StatementHasType selected.body.finalized.typedSource
+        { returnType := selected.body.finalized.substitution.apply expectedReturn
+          loopDepth := continuation.inferenceContext.loopDepth }
+        target continuation.result.id finalContext
+        { type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit } ∧
+      StatementResultMatchesFactsAfterSubstitution selected.body.finalized.substitution continuation.result
+        { type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit } := by
+  exact continuation.statement_of_expressionSoundness_for (provenance := fun _ => True) checked scope interfaces invariant actual
+    operational rawSubtree patterns literals requirements covered actualCovered barrier True.intro
+    (fun _ boundary => childSound boundary)
 
 end Solcore.SourceSemantics.SourceCompiledLocalFinalization.BodyInitializerOccurrence
 

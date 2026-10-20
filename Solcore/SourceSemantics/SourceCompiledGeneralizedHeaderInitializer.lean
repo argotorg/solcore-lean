@@ -2,13 +2,14 @@ import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedHeaderInitializerState
 import Solcore.SourceSemantics.SourceCompiledNormalizedTemplates
 import Solcore.SourceSemantics.SourceCompiledGeneralizedInitializerContexts
-import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
+import Solcore.SourceSemantics.SourceInferenceGeneralizationReceiptCalls
 
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables SourceInferenceExecution
 
 private theorem annotation_admissible
     {inferenceContext : SourceInference.Context} {target : SourceSemantics.Context}
@@ -31,15 +32,17 @@ private theorem annotation_admissible
 /-- The only remaining generalization premise concerns this exact header
 allocation. Its child, source ownership and final predicates are produced by
 actual inference and the selected finalizer. -/
-theorem forItem_initialized_of_receipt
+theorem forItem_initialized_of_receipt_for {provenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (childSound : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (childSound : ExpressionRootedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
     {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.forItem (childFuel + 1) inferenceContext item initial inferred final))
     (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
       initial inferred final frames target)
     (receipt : SourceInference.LocalHeaderRequirementTiming.Receipt childFuel inferenceContext item initial (inferred, final))
@@ -99,7 +102,8 @@ theorem forItem_initialized_of_receipt
     congrArg (fun p : ForItemForm × State => p.2.integerLiterals) receipt.completed
   have requirementEq : final.requirements = receipt.ready.requirements :=
     congrArg (fun p : ForItemForm × State => p.2.requirements) receipt.completed
-  have childTyping := childSound ({
+  have childHere := descend here (header_initializer_child receipt boundary.accepted)
+  have childTyping := childSound childHere ({
     accepted := receipt.child, interfaces := boundary.interfaces, extension := extension, scope := boundary.scope
     invariant := childInvariant, actual := childActual, operational := boundary.operational
     expectedBelow := receipt.annotationAccepted.variablesBelow _
@@ -175,5 +179,24 @@ theorem forItem_initialized_of_receipt
   have finalInvariant := RecursiveStatementInvariant.of_forItem_typing boundary.invariant boundary.accepted
     formation canonical finalActive isolation boundary.extension finalTyping
   exact ⟨finalContext, finalInvariant, boundary.actual.of_forItem finalTyping, operational, finalTyping⟩
+
+theorem forItem_initialized_of_receipt
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (childSound : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
+    {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
+      initial inferred final frames target)
+    (receipt : SourceInference.LocalHeaderRequirementTiming.Receipt childFuel inferenceContext item initial (inferred, final))
+    (barrier : GeneralizationBarrierTransport receipt.ready receipt.locals initial.nextRequirement
+      (receipt.ready.resolve receipt.value.type) selected.body.finalized.substitution target
+      (localSchemeTemplateIds (receipt.binding.1.applySubstitution selected.body.finalized.substitution))) :
+    ForItemConclusion selected inferenceContext expectedReturn inferred final frames target := by
+  exact forItem_initialized_of_receipt_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => childSound boundary) True.intro boundary receipt barrier
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

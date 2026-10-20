@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedForState
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPlaceContracts
@@ -6,18 +7,21 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem forItem_assignBitNot
+theorem forItem_assignBitNot_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (placeSound : PlaceRootedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (placeSound : PlaceRootedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
     {expression : Syntax.Expr} {operatorSpan : Syntax.SourceSpan}
     {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.forItem (childFuel + 1) inferenceContext item initial inferred final))
     (form : item.value = .assignBitNot expression operatorSpan)
     (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
       initial inferred final frames target) :
@@ -46,7 +50,7 @@ theorem forItem_assignBitNot
         {target := {place with type := unified.resolve place.type}}).references := by
     intro key member
     simpa [ForItemForm.references, AssignmentResolution.references, PlaceResolution.references] using member
-  obtain ⟨placeTyped, _placeOperational, _placeSafe⟩ := placeSound ({
+  obtain ⟨placeTyped, _placeOperational, _placeSafe⟩ := placeSound (descend here (ChildStep.forItem_bitnot boundary.accepted form placeSuccess)) ({
     accepted := placeSuccess
     interfaces := boundary.interfaces
     extension := placeExtension
@@ -71,5 +75,22 @@ theorem forItem_assignBitNot
     boundary.operational.ofForItemPreservingBinders boundary.invariant.ready
       (boundary.scope.catalog checked) (boundary.scope.formation checked)
       (boundary.scope.functionsCanonical checked) boundary.accepted binders, typing⟩
+
+theorem forItem_assignBitNot
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (placeSound : PlaceRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
+    {expression : Syntax.Expr} {operatorSpan : Syntax.SourceSpan}
+    {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : item.value = .assignBitNot expression operatorSpan)
+    (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
+      initial inferred final frames target) :
+    ForItemConclusion selected inferenceContext expectedReturn inferred final frames target := by
+  exact forItem_assignBitNot_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => placeSound boundary) trivial form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

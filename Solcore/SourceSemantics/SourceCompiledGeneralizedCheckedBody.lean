@@ -7,7 +7,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 private theorem input_context_unique {owner : Resolved.DeclarationId}
     {base left right : SourceSemantics.Context} {binders : List TypedBinder} {types : List Ty}
@@ -35,7 +35,7 @@ private theorem roots_injective {left right : List StatementId}
           subst other
           exact congrArg (List.cons head) (ih same.2)
 
-theorem checked_statements_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
+theorem checked_statements_of_recursive_of_interfaces_for {raw : Workspace.RawWorkspace}
     {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
     (selected : BodySelection compiled row fuel)
@@ -43,10 +43,12 @@ theorem checked_statements_of_recursive_of_interfaces {raw : Workspace.RawWorksp
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
       (checkingContext selected).signatures selected.body.finalized.solvedRequirements
       selected.body.finalized.typedSource)
-    (sound : StatementsRootedSoundness selected fuel) :
+    {callProvenance : CallIndex → Prop}
+    (rootHere : callProvenance selected.inferenceCall)
+    (sound : StatementsRootedSoundnessFor callProvenance selected fuel) :
     CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original := by
   obtain ⟨target, entry, finalContext, facts, _, _, _, typed, matching⟩ :=
-    body_of_recursive_of_interfaces selected checked interfaces sound
+    body_of_recursive_of_interfaces_for selected checked interfaces rootHere sound
   have header := selected_body_header selected checked
   have returnFixed : selected.body.finalized.substitution.apply
       (Ty.productMany selected.signature.returnTypes) = Ty.productMany selected.signature.returnTypes := by
@@ -72,6 +74,20 @@ theorem checked_statements_of_recursive_of_interfaces {raw : Workspace.RawWorksp
   subst lexicalContext
   refine ⟨finalContext, ?_⟩
   simpa only [selected.body.source, returnFixed, checkingContext, context] using typed
+
+
+theorem checked_statements_of_recursive_of_interfaces {raw : Workspace.RawWorkspace}
+    {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel : Nat}
+    (selected : BodySelection compiled row fuel)
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      (checkingContext selected).signatures selected.body.finalized.solvedRequirements
+      selected.body.finalized.typedSource)
+    (sound : StatementsRootedSoundness selected fuel) :
+    CheckedBodyStatementsHaveType compiled.program.signatures selected.signature selected.original := by
+  exact checked_statements_of_recursive_of_interfaces_for (callProvenance := fun _ => True) selected checked interfaces True.intro
+    (statementsRootedSoundnessFor_true sound)
 
 /-- This is the original checked body's complete declarative judgment.
 The caller supplies the recursive assembly at the same selected receipt. -/

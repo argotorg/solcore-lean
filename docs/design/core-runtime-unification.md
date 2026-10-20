@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-21.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The selected original checker call now supplies the root for the complete shared mutual proof. Expressions, constructor arguments, statements, loop headers, mapping places, assignments and match cases preserve the exact child calls from that root.
+
+Existing unrestricted checker APIs are adapters that select the same semantic derivations with an unrestricted call predicate. Single match scrutinees retain the actual expression call; multiple scrutinees use the actual expression-list call without inventing a tuple inference call.
+
+Original ordinary functions and implementation methods, including later discovered cache rows, supply body validity to the existing public session and initial-call proof. Initializer barriers are requested only for calls actually reached from each selected body root.
+
+Goal two remains incomplete. CachedActualBodyInitializerBarriers still needs a producer from actual checker state and retained event lifetimes. Public execution still requires the existing StaticProfile; unrestricted closure/body correspondence and the final Source/Core/public meaning-preservation theorem remain unfinished.
+
 Generalized closure creation, marked allocation, stored-row reads and initializer continuation now share a snapshot representation that retains the actual compiler packet, body receipt, captured environment and frame. The general path carries its independently instantiated runtime Source through the actual paired history.
 
 The actual read recipe supplies the descriptor stage origin. Runtime Source is distinct from the native compiler view in the named/contextual body invocation index. Arbitrary-active stored-row reads retain the exact original snapshot and preserve the heap and capture environment.

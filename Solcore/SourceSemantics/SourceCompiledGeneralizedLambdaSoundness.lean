@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedLambdaPrefix
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementsContracts
@@ -10,7 +11,7 @@ set_option maxRecDepth 4096
 set_option maxHeartbeats 1600000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend Frontend.SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 private theorem bindLambdaParameters_owner_eq
     {inferenceContext : Frontend.SourceInference.Context}
@@ -100,21 +101,25 @@ private theorem monoBinders_ambientFields
     cases head
     exact induction
 
-theorem expressionRetained_lambda
+theorem expressionRetained_lambda_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed callProvenance)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {keyword : Syntax.SourceSpan}
     {sourceParameters : Syntax.DelimitedList Syntax.LambdaParameter}
     {returnAnnotation : Option Syntax.TypeExpr} {body : Syntax.Block} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
     (expressionEq : expression.value = .lambda keyword sourceParameters returnAnnotation body)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
       expression expected initial inferred resultState frames target)
     (bodySound : ∀ {expectedReturn : Ty} {entry : State} {result : Detail.BlockResult}
         {lambdaTarget : SourceSemantics.Context},
+      callProvenance (.statements childFuel {inferenceContext with loopDepth := 0}
+        body.value expectedReturn entry result) →
       (∀ binder ∈ entry.localBinders,
         ProtectedVariables.Safe binder.scheme.quantified entry expectedReturn) →
       TypeAdmissible lambdaTarget (selected.body.finalized.substitution.apply expectedReturn) →
@@ -452,7 +457,8 @@ theorem expressionRetained_lambda
     · exact lambdaFields.2.2.2.1
     · exact resultAdmissible
   obtain ⟨bodyFinal, bodyFacts, _, _, _, bodyType, bodyAgreement⟩ :=
-    bodySound prefixScope.2.2 lambdaReturnAdmissible ({
+    bodySound (descend here (.expression_lambda_body success expressionEq allocationEq
+      parametersSuccess prefixFacts bodySuccess)) prefixScope.2.2 lambdaReturnAdmissible ({
       accepted := bodySuccess
       interfaces := boundary.interfaces
       extension := laterExtendsBody
@@ -561,5 +567,32 @@ theorem expressionRetained_lambda
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
     recordSuccess resultSubstitutionExtension requirementsSubset boundary.expressionRequirements boundary.coercionPrimaries
     catalog signaturesEq invariant formType rawAdmissible covered
+
+theorem expressionRetained_lambda
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {keyword : Syntax.SourceSpan}
+    {sourceParameters : Syntax.DelimitedList Syntax.LambdaParameter}
+    {returnAnnotation : Option Syntax.TypeExpr} {body : Syntax.Block} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (expressionEq : expression.value = .lambda keyword sourceParameters returnAnnotation body)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target)
+    (bodySound : ∀ {expectedReturn : Ty} {entry : State} {result : Detail.BlockResult}
+        {lambdaTarget : SourceSemantics.Context},
+      (∀ binder ∈ entry.localBinders,
+        ProtectedVariables.Safe binder.scheme.quantified entry expectedReturn) →
+      TypeAdmissible lambdaTarget (selected.body.finalized.substitution.apply expectedReturn) →
+      StatementsBoundary selected childFuel { inferenceContext with loopDepth := 0 }
+        body.value expectedReturn entry result frames lambdaTarget →
+      StatementsConclusion selected { inferenceContext with loopDepth := 0 }
+        expectedReturn result frames lambdaTarget) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_lambda_for (callProvenance := fun _ => True) checked true_childClosed
+    True.intro expressionEq boundary (fun _ safe admissible boundary => bodySound safe admissible boundary)
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

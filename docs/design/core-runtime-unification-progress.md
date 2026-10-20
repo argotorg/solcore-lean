@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual checker provenance through original bodies and public issuance (2026-10-21)
+
+The selected original checker call now supplies the root for the complete shared mutual proof. Expressions, constructor arguments, statements, loop headers, mapping places, assignments and match cases preserve the exact child calls from that root.
+
+Existing unrestricted checker APIs are adapters that select the same semantic derivations with an unrestricted call predicate. Single match scrutinees retain the actual expression call; multiple scrutinees use the actual expression-list call without inventing a tuple inference call.
+
+Original ordinary functions and implementation methods, including later discovered cache rows, supply body validity to the existing public session and initial-call proof. Initializer barriers are requested only for calls actually reached from each selected body root.
+
+Validation: 48 changed modules in a coherent graph of 9,040 modules, 74 retained runtime invocations and 7,630 endpoint audits. Full build (9,079 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. CachedActualBodyInitializerBarriers still needs a producer from actual checker state and retained event lifetimes. Public execution still requires the existing StaticProfile; unrestricted closure/body correspondence and the final Source/Core/public meaning-preservation theorem remain unfinished.
+
 ## Independent Source through generalized closure creation and entry (2026-10-21)
 
 Generalized closure creation, marked allocation, stored-row reads and initializer continuation now share a snapshot representation that retains the actual compiler packet, body receipt, captured environment and frame. The general path carries its independently instantiated runtime Source through the actual paired history.

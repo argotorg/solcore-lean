@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
-import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
 
@@ -7,19 +7,21 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 open SourceInferenceStatementsSoundness
 
-theorem statement_returnValue
+theorem statement_returnValue_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRootedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {expression : Syntax.Expr} {expectedReturn : Ty}
     {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .returnStmt (some expression))
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
       expectedReturn initial result frames target)
@@ -74,7 +76,8 @@ theorem statement_returnValue
     have stateEq : initial.allocateStatementId.2 = allocated := congrArg Prod.snd allocationEq
     rw [← stateEq] at present ⊢
     exact returnSafe binder present
-  have typed := recursive ({
+  have childHere := descend here (.statement_return boundary.accepted form allocationEq childSuccess)
+  have typed := recursive childHere ({
     accepted := childSuccess
     interfaces := boundary.interfaces
     extension := childExtension
@@ -133,6 +136,27 @@ theorem statement_returnValue
     boundary.extension (activeSchemeQuantifierIsolation_transport boundary.invariant.schemeIsolation bindersEq)
     typing
   exact ⟨target, _, finalInvariant, boundary.actual, operational, typing, agreement⟩
+
+theorem statement_returnValue
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {expression : Syntax.Expr} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .returnStmt (some expression))
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target)
+    (returnSafe : ∀ binder ∈ initial.localBinders,
+      ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target
+      (selected.body.finalized.substitution.apply expectedReturn)) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_returnValue_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro form boundary returnSafe returnAdmissible
 
 /-- The selected function signature supplies both return-input conditions
 from actual checking. Lambda return inputs use their own fresh prefix. -/

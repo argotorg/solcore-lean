@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
-import Solcore.SourceSemantics.SourceCompiledGeneralizedForContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedLambdaParameters
 import Solcore.SourceSemantics.SourceInferenceSelectedAnnotatedForItems
 
@@ -7,18 +7,20 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem forItem_annotatedInitialized
+theorem forItem_annotatedInitialized_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (expressionSound : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (expressionSound : ExpressionRootedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
     {name : Syntax.Identifier} {sourceType : Syntax.TypeExpr} {initializer : Syntax.Expr}
     {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.forItem (childFuel + 1) inferenceContext item initial inferred final))
     (form : item.value = .letDecl name (some sourceType) (some initializer))
     (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
       initial inferred final frames target) :
@@ -81,7 +83,8 @@ theorem forItem_annotatedInitialized
     simpa [← bindingEq, State.allocateBinder, State.withLocals] using boundary.integerLiterals
   have childRequirements : initializerState.requirements ⊆ selected.body.returned.requirements := by
     simpa [← bindingEq, State.allocateBinder, State.withLocals] using boundary.requirements
-  have childTyped := expressionSound ({
+  have childHere := descend here (.forItem_initializer boundary.accepted form (.present resolution) childSuccess)
+  have childTyped := expressionSound childHere ({
     accepted := childSuccess
     interfaces := boundary.interfaces
     extension := childExtension
@@ -134,5 +137,22 @@ theorem forItem_annotatedInitialized
     exact ProtectedVariables.safe_closed _ _ (by intro metavariable present; simp [valueClosed] at present)
 
   exact ⟨finalContext, finalInvariant, boundary.actual.of_forItem typing, bindingOperational, typing⟩
+
+theorem forItem_annotatedInitialized
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (expressionSound : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {item : Syntax.ForItem}
+    {name : Syntax.Identifier} {sourceType : Syntax.TypeExpr} {initializer : Syntax.Expr}
+    {expectedReturn : Ty} {initial final : State} {inferred : ForItemForm}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : item.value = .letDecl name (some sourceType) (some initializer))
+    (boundary : ForItemBoundary selected (childFuel + 1) inferenceContext item expectedReturn
+      initial inferred final frames target) :
+    ForItemConclusion selected inferenceContext expectedReturn inferred final frames target := by
+  exact forItem_annotatedInitialized_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => expressionSound boundary) True.intro form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

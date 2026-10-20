@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedExpressionListState
 import Solcore.SourceSemantics.SourceInferenceSelectedBuiltinCall
@@ -8,14 +9,15 @@ set_option maxRecDepth 4096
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem builtinCall_typing
+theorem builtinCall_typing_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundness selected smaller)
+    (descend : ChildClosed callProvenance)
+    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundnessFor callProvenance selected smaller)
     {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}
     {expected : Option Ty} {parentInitial initial argumentState resultState : State}
     {inferred : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
@@ -26,6 +28,7 @@ theorem builtinCall_typing
     (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
     (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
     (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsHere : callProvenance (.expressions childFuel inferenceContext argumentSources initial arguments argumentState))
     (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
       .ok (arguments, argumentState))
     (recording : Detail.recordBuiltinFunctionCall expression callee name function arguments
@@ -90,8 +93,8 @@ theorem builtinCall_typing
     exact integerLiteralsSubset
   have argumentRequirements := List.Subset.trans
     (Detail.recordBuiltinFunctionCall_requirements_subset recording) requirementsSubset
-  have argumentsTyped := expressionsRooted checked childFuel recursive
-    argumentsSuccess interfaces argumentExtension boundary.scope invariant actual operational
+  have argumentsTyped := expressionsRooted_for checked descend childFuel recursive
+    argumentsHere argumentsSuccess interfaces argumentExtension boundary.scope invariant actual operational
     (fun argument member => (rawProper.childSubtree (argumentEdge argument member)).monoBefore argumentToParent)
     argumentPatterns argumentLiterals argumentRequirements
     (fun argument member => covered.expressionChild resources.graph_closed (boundary.directChildren (argumentEdge argument member)))
@@ -100,5 +103,33 @@ theorem builtinCall_typing
     semanticPreserved argumentsTyped
     (invariant.typeParameterBinders (by simpa only [ownerEq, typeParametersEq] using canonical))
 
+
+theorem builtinCall_typing
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundness selected smaller)
+    {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}
+    {expected : Option Ty} {parentInitial initial argumentState resultState : State}
+    {inferred : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {name : String} {function : BuiltinFunctionId} {call : ExpressionId}
+    (boundary : RetainedExpressionBoundary selected parentFuel inferenceContext expression expected
+      parentInitial inferred resultState frames target)
+    (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
+      .ok (arguments, argumentState))
+    (recording : Detail.recordBuiltinFunctionCall expression callee name function arguments
+      call expected argumentState = .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact builtinCall_typing_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary)
+    boundary invariant operational expectedBelow True.intro argumentsSuccess recording
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

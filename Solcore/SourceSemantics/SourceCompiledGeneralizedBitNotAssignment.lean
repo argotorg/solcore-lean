@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedPlaceContracts
@@ -7,18 +8,21 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
+open SourceCompiledLocalFinalization SourceInferenceExecution SourceInferenceStatementsSoundness
 
-theorem statement_assignBitNot
+theorem statement_assignBitNot_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (placeSound : PlaceRootedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (placeSound : PlaceRootedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {targetExpression : Syntax.Expr} {operatorSpan : Syntax.SourceSpan} {expectedReturn : Ty}
     {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .assignBitNot targetExpression operatorSpan)
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
       expectedReturn initial result frames target) :
@@ -61,7 +65,7 @@ theorem statement_assignBitNot
     · simpa [StatementNode.applySubstitution, StatementForm.applySubstitution, StatementForm.references,
         AssignmentResolution.references, AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution,
         PlaceResolution.references] using reference key member
-  obtain ⟨placeTyping, placeOperational, placeSafe⟩ := placeSound ({
+  obtain ⟨placeTyping, placeOperational, placeSafe⟩ := placeSound (descend here (ChildStep.statement_bitnot boundary.accepted form rfl placeAccepted)) ({
     accepted := placeAccepted
     interfaces := boundary.interfaces
     extension := placeExtension
@@ -128,5 +132,22 @@ theorem statement_assignBitNot
   refine ⟨target, _, invariant, boundary.actual, operational, typing, ?_⟩
   rw [resultEq]
   exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit _ _ _
+
+theorem statement_assignBitNot
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (placeSound : PlaceRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {targetExpression : Syntax.Expr} {operatorSpan : Syntax.SourceSpan} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .assignBitNot targetExpression operatorSpan)
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_assignBitNot_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => placeSound boundary) trivial form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

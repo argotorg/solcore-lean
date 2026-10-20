@@ -13,20 +13,22 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness SourceInferenceExecution
 
-theorem statement_for_of_initializer_privacy
+theorem statement_for_of_initializer_privacy_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursiveItems : ForItemsRootedSoundness selected childFuel)
-    (recursiveExpression : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursiveItems : ForItemsRootedSoundnessFor callProvenance selected childFuel)
+    (recursiveExpression : ExpressionRootedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {headerSpan : Syntax.SourceSpan} {initializer post : List Syntax.ForItem}
     {condition : Syntax.Expr} {body : Syntax.Block} {expectedReturn : Ty}
     {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .forLoop headerSpan initializer condition post body)
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
       expectedReturn initial result frames target)
@@ -39,6 +41,8 @@ theorem statement_for_of_initializer_privacy
         ProtectedVariables.Safe binder.scheme.quantified actualInitializer.state expectedReturn)
     (recursiveBody : ∀ {bodyInitial : State} {bodyResult : Detail.BlockResult}
       {loopContext : SourceSemantics.Context},
+      callProvenance (.statements childFuel {inferenceContext with loopDepth := inferenceContext.loopDepth + 1}
+        body.value expectedReturn bodyInitial bodyResult) →
       (∀ binder ∈ bodyInitial.localBinders,
         ProtectedVariables.Safe binder.scheme.quantified bodyInitial expectedReturn) →
       TypeAdmissible loopContext (selected.body.finalized.substitution.apply expectedReturn) →
@@ -125,7 +129,7 @@ theorem statement_for_of_initializer_privacy
       (State.allocateStatementId_header initial)
     exact retained.trans (parentOwner.trans allocatedOwner.symm)
   obtain ⟨loopContext, initializerInvariant, initializerActual, initializerOperational, initializerTyping⟩ :=
-    recursiveItems ({
+    recursiveItems (descend here (.statement_for_initializer boundary.accepted form rfl initializerSuccess)) ({
       accepted := initializerSuccess
       interfaces := boundary.interfaces
       extension := initializerSubstitutionExtension
@@ -173,7 +177,8 @@ theorem statement_for_of_initializer_privacy
     apply TemplateScopeCovered.forLoopCondition boundary.covered resources.graph_closed
     · simpa [StatementNode.applySubstitution, StatementForm.applySubstitution] using containsFinal
     · exact loopAssumptions
-  have conditionTyping := recursiveExpression ({
+  have conditionTyping := recursiveExpression
+    (descend here (.statement_for_condition boundary.accepted form rfl initializerSuccess conditionSuccess)) ({
     accepted := conditionSuccess
     interfaces := boundary.interfaces
     extension := conditionSubstitutionExtension
@@ -234,7 +239,8 @@ theorem statement_for_of_initializer_privacy
     intro predicate present
     simpa [loopAssumptions] using present
   obtain ⟨bodyFinal, bodyFacts, _, _, bodyOperational, bodyTyping, bodyAgreement⟩ :=
-    recursiveBody bodyReturnSafe loopReturn ({
+    recursiveBody (descend here (.statement_for_body boundary.accepted form rfl initializerSuccess conditionSuccess bodySuccess))
+      bodyReturnSafe loopReturn ({
       accepted := bodySuccess
       interfaces := boundary.interfaces
       extension := bodySubstitutionExtension
@@ -273,7 +279,7 @@ theorem statement_for_of_initializer_privacy
     have retained := resultExtension.owner_eq
     simpa [State.toTypedSource] using retained.trans (ownerToPost.trans postOwner)
   obtain ⟨postContext, _, _, _, postTyping⟩ :=
-    recursiveItems ({
+    recursiveItems (descend here (.statement_for_post boundary.accepted form rfl initializerSuccess conditionSuccess bodySuccess postSuccess)) ({
       accepted := postSuccess
       interfaces := boundary.interfaces
       extension := postSubstitutionExtension
@@ -320,5 +326,41 @@ theorem statement_for_of_initializer_privacy
   have finalOperational := boundary.operational.ofStatementPreservingBinders boundary.invariant.ready
     catalog formation canonical boundary.invariant.returnBelow returnSafe boundary.accepted bindersEq
   exact ⟨target, facts, finalInvariant, boundary.actual, finalOperational, typing, agreement⟩
+
+theorem statement_for_of_initializer_privacy
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursiveItems : ForItemsRootedSoundness selected childFuel)
+    (recursiveExpression : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {headerSpan : Syntax.SourceSpan} {initializer post : List Syntax.ForItem}
+    {condition : Syntax.Expr} {body : Syntax.Block} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .forLoop headerSpan initializer condition post body)
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target)
+    (returnSafe : ∀ binder ∈ initial.localBinders,
+      ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
+    (initializerPrivacy : ∀ {actualInitializer : Detail.InferredForItems},
+      Detail.inferForItemsFuel childFuel inferenceContext initializer initial.allocateStatementId.2 = .ok actualInitializer →
+      ∀ binder ∈ actualInitializer.state.localBinders,
+        ProtectedVariables.Safe binder.scheme.quantified actualInitializer.state expectedReturn)
+    (recursiveBody : ∀ {bodyInitial : State} {bodyResult : Detail.BlockResult}
+      {loopContext : SourceSemantics.Context},
+      (∀ binder ∈ bodyInitial.localBinders,
+        ProtectedVariables.Safe binder.scheme.quantified bodyInitial expectedReturn) →
+      TypeAdmissible loopContext (selected.body.finalized.substitution.apply expectedReturn) →
+      StatementsBoundary selected childFuel {inferenceContext with loopDepth := inferenceContext.loopDepth + 1} body.value expectedReturn
+        bodyInitial bodyResult frames loopContext →
+      StatementsConclusion selected {inferenceContext with loopDepth := inferenceContext.loopDepth + 1} expectedReturn bodyResult frames loopContext) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_for_of_initializer_privacy_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursiveItems boundary) (fun _ boundary => recursiveExpression boundary)
+    True.intro form boundary returnSafe returnAdmissible initializerPrivacy
+    (fun _ safe admissible boundary => recursiveBody safe admissible boundary)
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

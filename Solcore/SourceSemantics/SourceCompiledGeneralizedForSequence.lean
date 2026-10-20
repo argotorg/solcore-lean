@@ -1,21 +1,22 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
-import Solcore.SourceSemantics.SourceCompiledGeneralizedForContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness SourceInferenceExecution
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
 
-theorem forItemsRooted_of_item
+theorem forItemsRooted_of_item_for {callProvenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (itemSound : ForItemRootedSoundness selected childFuel) :
-    ForItemsRootedSoundness selected childFuel := by
-  intro inferenceContext items expectedReturn initial result frames target boundary
+    (descend : ChildClosed callProvenance)
+    (itemSound : ForItemRootedSoundnessFor callProvenance selected childFuel) :
+    ForItemsRootedSoundnessFor callProvenance selected childFuel := by
+  intro inferenceContext items expectedReturn initial result frames target here boundary
   induction items generalizing initial result target with
   | nil =>
       have success := boundary.accepted
@@ -43,7 +44,7 @@ theorem forItemsRooted_of_item
                 ).nodesBelowNextOccurrence boundary.invariant.nodesBelow
               have itemToTail := inferForItemsFuel_success_typingSourceExtends tailSuccess itemBelow (bodyRoots selected)
               obtain ⟨middle, middleInvariant, middleActual, middleOperational, itemTyped⟩ :=
-                itemSound ({
+                itemSound (descend here (.forItems_head boundary.accepted itemSuccess)) ({
                   accepted := itemSuccess
                   interfaces := boundary.interfaces
                   extension := boundary.extension.trans tailProperties.1.substitution_extends
@@ -68,7 +69,7 @@ theorem forItemsRooted_of_item
                 } : ForItemBoundary selected childFuel inferenceContext item expectedReturn
                   initial inferredItem itemState frames target)
               obtain ⟨finalContext, invariant, actual, operational, tailTyped⟩ :=
-                induction ({
+                induction (descend here (.forItems_tail boundary.accepted itemSuccess tailSuccess)) ({
                   accepted := tailSuccess
                   interfaces := boundary.interfaces
                   extension := boundary.extension
@@ -92,5 +93,12 @@ theorem forItemsRooted_of_item
                   actualBindings := fun next member => boundary.actualBindings next (by simp [member])
                 } : ForItemsBoundary selected childFuel inferenceContext rest expectedReturn itemState tail frames middle)
               exact ⟨finalContext, invariant, actual, operational, .cons itemTyped tailTyped⟩
+
+theorem forItemsRooted_of_item
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (itemSound : ForItemRootedSoundness selected childFuel) :
+    ForItemsRootedSoundness selected childFuel := by
+  exact forItemsRooted_of_item_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => itemSound boundary) True.intro
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

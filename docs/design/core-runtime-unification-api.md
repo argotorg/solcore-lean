@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual checker provenance through original bodies and public issuance (2026-10-21)
+
+BodySelection.InferenceCall identifies the original accepted inference call. The shared provenance-indexed recursion yields CheckedBodyHasType through checked_body_of_actual_barriers_of_interfaces. compile_cached_bodies_of_actual_barriers covers the same original ordinary and method bodies in the actual cache.
+
+Receipt.actual_bodies, Receipt.actual_profiled and Receipt.actual_initial_row connect the actual raw public compilation to body validity, profiled session issuance and the real initial row. SourceBodyGeneralizationFrameOrigins.statement and header trace every active context type variable to a different raw outer initialized binding using actual containment, acyclicity and local identity uniqueness. The public endpoints still require actual-call initializer barriers and the existing compiler profile.
+
+Goal two remains incomplete. CachedActualBodyInitializerBarriers still needs a producer from actual checker state and retained event lifetimes. Public execution still requires the existing StaticProfile; unrestricted closure/body correspondence and the final Source/Core/public meaning-preservation theorem remain unfinished.
+
 ## Independent Source through generalized closure creation and entry (2026-10-21)
 
 GeneralizedLocalAcceptedInstances.Snapshot and modelWith share the representation used by the original model and trackedModel. GeneralizedLocalAppliedSourceOrigins derives applied stage origins from the same authentic recipe. ActualBodyInvocation.Index retains separate source and compilerSource fields and an accepted body at the latter.

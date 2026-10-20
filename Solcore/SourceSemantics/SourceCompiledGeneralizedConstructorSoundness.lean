@@ -6,20 +6,22 @@ set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
   {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
   {selected : BodySelection compiled row fuel}
 
-theorem constructor_call
+theorem constructor_call_for {callProvenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}
     {arguments : Syntax.DelimitedList Syntax.Expr} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
     {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
     (form : expression.value = .call callee arguments)
     (discovery : Detail.constructorCalleeCandidates inferenceContext initial.allocateExpressionId.2 callee =
       .ok [(dataType, constructor)])
@@ -37,16 +39,19 @@ theorem constructor_call
   simp only [allocation, form, found, bind, Except.bind] at success
   generalize fresh : Detail.freshDataConstructorInstantiation dataType constructor allocated = pair at success
   obtain ⟨instantiation, constructorState⟩ := pair
-  exact freshConstructorRetained checked recursive boundary allocation members.1 members.2 fresh success
+  exact freshConstructorRetained_for checked descend recursive boundary allocation members.1 members.2 fresh
+    (descend here (.expression_call_constructor boundary.accepted form allocation found fresh success)) success
 
-theorem constructor_dot
+theorem constructor_dot_for {callProvenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
     {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
     {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
     (form : expression.value = .dotConstructor dot name arguments)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
       expected initial inferred resultState frames target) :
@@ -106,20 +111,23 @@ theorem constructor_dot
           (some expectedType) name.value = .ok (dataType, constructor, typeArguments) := expectedEq ▸ found
       exact ProtectedVariables.contextual_constructor invariant.ready formation
         (expectedSafe binder member expectedType (by simp [expectedEq])) accepted
-    exact constructorApplicationRetained checked recursive success boundary.interfaces boundary.extension
+    exact constructorApplicationRetained_for checked descend recursive
+      (descend here (.expression_contextual_constructor boundary.accepted form allocation found success)) success boundary.interfaces boundary.extension
       boundary.scope invariant boundary.actual operational bounded.1 bounded.2 expectedBelow
       (fun binder member => (privacy binder member).1)
       (fun binder member => (privacy binder member).2) expectedSafe valid boundary.rawProper
       boundary.integerPatterns boundary.integerLiterals boundary.requirements boundary.expressionRequirements
       boundary.coercionPrimaries boundary.directChildren boundary.covered boundary.actualCovered
 
-theorem constructor_field
+theorem constructor_field_for {callProvenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression base : Syntax.Expr}
     {dot : Syntax.SourceSpan} {name : Syntax.Identifier} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
     (form : expression.value = .field base dot name)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
       expected initial inferred resultState frames target) :
@@ -147,6 +155,56 @@ theorem constructor_field
         have members := Detail.constructorCalleeCandidates_success_members discovery dataType constructor (by simp)
         generalize fresh : Detail.freshDataConstructorInstantiation dataType constructor allocated = pair at success
         obtain ⟨instantiation, constructorState⟩ := pair
-        exact freshConstructorRetained checked recursive boundary allocation members.1 members.2 fresh success
+        exact freshConstructorRetained_for checked descend recursive boundary allocation members.1 members.2 fresh
+          (descend here (.expression_field_constructor boundary.accepted form allocation discovery fresh success)) success
+
+theorem constructor_call
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}
+    {arguments : Syntax.DelimitedList Syntax.Expr} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+    (form : expression.value = .call callee arguments)
+    (discovery : Detail.constructorCalleeCandidates inferenceContext initial.allocateExpressionId.2 callee =
+      .ok [(dataType, constructor)])
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  exact constructor_call_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro form discovery boundary
+
+theorem constructor_dot
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : expression.value = .dotConstructor dot name arguments)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  exact constructor_dot_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro form boundary
+
+theorem constructor_field
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression base : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : expression.value = .field base dot name)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  exact constructor_field_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

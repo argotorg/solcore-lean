@@ -6,18 +6,21 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables SourceInferenceExecution
 
-theorem statement_match_without_default
+theorem statement_match_without_default_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {callProvenance : CallIndex → Prop}
+    (descend : ChildClosed callProvenance)
     (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursiveExpression : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    (recursiveExpression : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor callProvenance selected smaller)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr} {arms : Syntax.MatchArms}
     {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .matchWith scrutinees arms)
     (defaultEq : arms.value.defaultBody = none)
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
@@ -27,6 +30,7 @@ theorem statement_match_without_default
     (recursiveBody : ∀ small, small < childFuel + 1 →
       ∀ {bodySource : List Syntax.Statement} {bodyInitial : State} {bodyResult : Detail.BlockResult}
         {bodyTarget : SourceSemantics.Context},
+        callProvenance (.statements small inferenceContext bodySource expectedReturn bodyInitial bodyResult) →
         (∀ binder ∈ bodyInitial.localBinders, Safe binder.scheme.quantified bodyInitial expectedReturn) →
         TypeAdmissible bodyTarget (selected.body.finalized.substitution.apply expectedReturn) →
         StatementsBoundary selected small inferenceContext bodySource expectedReturn
@@ -49,10 +53,19 @@ theorem statement_match_without_default
   have requirements : checked.state.requirements ⊆ selected.body.returned.requirements := by
     simpa [resultEq, State.recordNode] using boundary.requirements
   obtain ⟨casesBoundary, scrutineeTyping, hiddenSafe⟩ :=
-    matchEntry checkedProgram recursiveExpression boundary returnSafe scrutineeAccepted hiddenAllocation
+    matchEntry_for descend checkedProgram recursiveExpression boundary returnSafe
+      (fun expression single => descend here (ChildStep.statement_match_single boundary.accepted form rfl
+        single (by
+          have child := scrutineeAccepted
+          rw [single] at child
+          exact child)))
+      (fun _ _ multiple child => descend here (ChildStep.statement_match_many boundary.accepted form rfl
+        multiple child)) scrutineeAccepted hiddenAllocation
       casesAccepted casesExtension casesSource patterns literals requirements contains
   obtain ⟨casesInvariant, casesActual, casesOperational, caseFacts, casesTyping, allReturnEq⟩ :=
-    matchCases checkedProgram casesBoundary hiddenSafe returnAdmissible
+    matchCases_for descend checkedProgram
+      (descend here (ChildStep.statement_match_cases boundary.accepted form rfl scrutineeAccepted
+        hiddenAllocation casesAccepted)) casesBoundary hiddenSafe returnAdmissible
       (fun small less => recursiveBody small (Nat.lt_trans less (Nat.lt_succ_self childFuel)))
   have casesNonempty : checked.cases ≠ [] := by
     intro empty
@@ -110,5 +123,39 @@ theorem statement_match_without_default
     (inferStatementFuel_preserves_localBindersBelowNextLocal boundary.invariant.bindersBelow boundary.accepted)
     boundary.extension isolation typing
   exact ⟨target, facts, invariant, casesActual, operational, typing, agreement⟩
+
+theorem statement_match_without_default
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursiveExpression : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr} {arms : Syntax.MatchArms}
+    {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target)
+    (returnSafe : ∀ binder ∈ initial.localBinders, Safe binder.scheme.quantified initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
+    (recursiveBody : ∀ small, small < childFuel + 1 →
+      ∀ {bodySource : List Syntax.Statement} {bodyInitial : State} {bodyResult : Detail.BlockResult}
+        {bodyTarget : SourceSemantics.Context},
+        (∀ binder ∈ bodyInitial.localBinders, Safe binder.scheme.quantified bodyInitial expectedReturn) →
+        TypeAdmissible bodyTarget (selected.body.finalized.substitution.apply expectedReturn) →
+        StatementsBoundary selected small inferenceContext bodySource expectedReturn
+          bodyInitial bodyResult frames bodyTarget →
+        StatementsConclusion selected inferenceContext expectedReturn bodyResult frames bodyTarget) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_match_without_default_for (callProvenance := fun _ => True) true_childClosed checkedProgram
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursiveExpression smaller less boundary)
+    True.intro form defaultEq boundary returnSafe returnAdmissible
+    (fun small less => by
+      intro bodySource bodyInitial bodyResult bodyTarget _
+      exact recursiveBody small less)
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

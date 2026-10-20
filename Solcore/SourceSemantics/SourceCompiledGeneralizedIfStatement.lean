@@ -5,18 +5,20 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness SourceInferenceExecution
 
-theorem statement_if_without_else
+theorem statement_if_without_else_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursiveExpression : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursiveExpression : ExpressionRootedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {condition : Syntax.Expr} {body : Syntax.Block} {expectedReturn : Ty}
     {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .ifThen condition body none)
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
       expectedReturn initial result frames target)
@@ -24,6 +26,7 @@ theorem statement_if_without_else
       ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
     (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
     (recursiveBody : ∀ {bodyInitial : State} {bodyResult : Detail.BlockResult},
+      callProvenance (.statements childFuel inferenceContext body.value expectedReturn bodyInitial bodyResult) →
       (∀ binder ∈ bodyInitial.localBinders,
         ProtectedVariables.Safe binder.scheme.quantified bodyInitial expectedReturn) →
       TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn) →
@@ -86,7 +89,8 @@ theorem statement_if_without_else
     simpa [resultEq, State.restoreLexicalScope, State.recordNode] using boundary.integerLiterals
   have conditionSource := (inferStatementsFuel_success_typingSourceExtends bodyAccepted
     conditionInvariant.nodesBelow (bodyRoots selected)).trans bodyExtension
-  have conditionTyping := recursiveExpression ({
+  have conditionHere := descend here (.statement_if_condition boundary.accepted form rfl conditionAccepted)
+  have conditionTyping := recursiveExpression conditionHere ({
     accepted := conditionAccepted
     interfaces := boundary.interfaces
     extension := conditionSubstitution
@@ -130,7 +134,8 @@ theorem statement_if_without_else
       (conditionSafe binder entering) _ conditionAccepted
     exact privacy.1 expectedReturn (returnSafe binder entering)
   obtain ⟨bodyContext, bodyFacts, _, _, bodyOperational, bodyTyping, bodyAgreement⟩ :=
-    recursiveBody bodyReturnSafe returnAdmissible ({
+    recursiveBody (descend here (.statement_if_then boundary.accepted form rfl conditionAccepted bodyAccepted))
+      bodyReturnSafe returnAdmissible ({
     accepted := bodyAccepted
     interfaces := boundary.interfaces
     extension := bodySubstitution
@@ -181,5 +186,33 @@ theorem statement_if_without_else
     (inferStatementFuel_preserves_localBindersBelowNextLocal boundary.invariant.bindersBelow boundary.accepted)
     boundary.extension (activeSchemeQuantifierIsolation_transport boundary.invariant.schemeIsolation bindersEq) typing
   exact ⟨target, facts, finalInvariant, boundary.actual, operational, typing, agreement⟩
+
+theorem statement_if_without_else
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursiveExpression : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {condition : Syntax.Expr} {body : Syntax.Block} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .ifThen condition body none)
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target)
+    (returnSafe : ∀ binder ∈ initial.localBinders,
+      ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
+    (recursiveBody : ∀ {bodyInitial : State} {bodyResult : Detail.BlockResult},
+      (∀ binder ∈ bodyInitial.localBinders,
+        ProtectedVariables.Safe binder.scheme.quantified bodyInitial expectedReturn) →
+      TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn) →
+      StatementsBoundary selected childFuel inferenceContext body.value expectedReturn
+        bodyInitial bodyResult frames target →
+      StatementsConclusion selected inferenceContext expectedReturn bodyResult frames target) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_if_without_else_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursiveExpression boundary) True.intro form boundary returnSafe returnAdmissible
+    (fun _ safe admissible boundary => recursiveBody safe admissible boundary)
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

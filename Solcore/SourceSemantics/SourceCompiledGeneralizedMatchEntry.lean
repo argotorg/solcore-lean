@@ -8,14 +8,16 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables SourceInferenceExecution
 
-theorem matchEntry
+theorem matchEntry_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {callProvenance : CallIndex → Prop}
+    (descend : ChildClosed callProvenance)
     (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor callProvenance selected smaller)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr} {arms : Syntax.MatchArms}
     {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
@@ -26,6 +28,14 @@ theorem matchEntry
     {scrutinee : InferredExpression} {scrutineeState hiddenState : State}
     {hiddenScrutinee : Resolved.LocalId} {checked : Detail.MatchCasesResult}
     {defaultBody : Option (List StatementId)}
+    (singleHere : ∀ expression, scrutinees.elements.toList = [expression] →
+      callProvenance (.expression childFuel inferenceContext expression none
+        initial.allocateStatementId.2 scrutinee scrutineeState))
+    (manyHere : ∀ elements elementsState, (∀ expression, scrutinees.elements.toList ≠ [expression]) →
+      Detail.inferExprsFuel childFuel inferenceContext scrutinees.elements.toList initial.allocateStatementId.2 =
+        .ok (elements, elementsState) →
+      callProvenance (.expressions childFuel inferenceContext scrutinees.elements.toList
+        initial.allocateStatementId.2 elements elementsState))
     (scrutineeAccepted : inferMatchScrutineesFuel childFuel inferenceContext statement.span
       scrutinees.elements.toList initial.allocateStatementId.2 = .ok (scrutinee, scrutineeState))
     (hiddenAllocation : scrutineeState.allocateHiddenLocal = (hiddenScrutinee, hiddenState))
@@ -129,7 +139,7 @@ theorem matchEntry
     have rows := Detail.inferMatchCasesFuel_requirements_subset casesAccepted
     simpa [← hiddenEq] using rows
   have finalContains := (boundary.rawSubtree.finalized resources).containsStatement contains
-  have typed := scrutineeRooted checkedProgram recursive ({
+  have typed := scrutineeRooted_for descend checkedProgram recursive singleHere manyHere ({
     accepted := scrutineeAccepted
     interfaces := boundary.interfaces, extension := scrutineeExtension, scope := boundary.scope
     invariant := RecursiveExpressionInvariant.ofStatement allocatedInvariant
@@ -182,5 +192,48 @@ theorem matchEntry
     exact TemplateScopeCovered.statementChild boundary.covered resources.graph_closed
       ((boundary.rawSubtree.finalized resources).directChild
         (directChild_statement_reference contains (reference arm present child member))) (fun _ member => member)
+
+theorem matchEntry
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checkedProgram : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr} {arms : Syntax.MatchArms}
+    {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target)
+    (returnSafe : ∀ binder ∈ initial.localBinders, Safe binder.scheme.quantified initial expectedReturn)
+    {scrutinee : InferredExpression} {scrutineeState hiddenState : State}
+    {hiddenScrutinee : Resolved.LocalId} {checked : Detail.MatchCasesResult}
+    {defaultBody : Option (List StatementId)}
+    (scrutineeAccepted : inferMatchScrutineesFuel childFuel inferenceContext statement.span
+      scrutinees.elements.toList initial.allocateStatementId.2 = .ok (scrutinee, scrutineeState))
+    (hiddenAllocation : scrutineeState.allocateHiddenLocal = (hiddenScrutinee, hiddenState))
+    (casesAccepted : Detail.inferMatchCasesFuel childFuel inferenceContext scrutinee.type expectedReturn
+      hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked)
+    (casesExtension : selected.body.finalized.substitution.SemanticallyExtends checked.state.inference.substitution)
+    (casesSource : TypingSourceExtends (checked.state.toTypedSource (bodyRoots selected))
+      (result.state.toTypedSource (bodyRoots selected)))
+    (patterns : checked.state.integerPatterns ⊆ selected.body.returned.integerPatterns)
+    (literals : checked.state.integerLiterals ⊆ selected.body.returned.integerLiterals)
+    (requirements : checked.state.requirements ⊆ selected.body.returned.requirements)
+    (contains : ContainsStatement (result.state.toTypedSource (bodyRoots selected)) result.id {
+      id := result.id, span := statement.span, type := result.type, form := .matchWith {
+        scrutinee := scrutinee.id, hiddenScrutinee, cases := checked.cases, defaultBody,
+        requirements := checked.cases.flatMap (·.pattern.requirements) } }) :
+    MatchCasesBoundary selected childFuel inferenceContext arms.value.cases scrutinee.type expectedReturn
+      hiddenState hiddenState.lexicalScope checked frames target (.statement result.id) ∧
+    ExpressionHasType selected.body.finalized.typedSource target scrutinee.id
+      (selected.body.finalized.substitution.apply scrutinee.type) ∧
+    Safe (activeSchemeQuantifiers hiddenState) hiddenState expectedReturn := by
+  exact matchEntry_for (callProvenance := fun _ => True) true_childClosed checkedProgram
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary)
+    boundary returnSafe (fun _ _ => True.intro) (fun _ _ _ _ => True.intro)
+    scrutineeAccepted hiddenAllocation casesAccepted casesExtension casesSource patterns literals requirements contains
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

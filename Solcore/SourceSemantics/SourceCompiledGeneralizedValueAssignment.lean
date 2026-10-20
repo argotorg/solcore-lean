@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssignedValue
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
@@ -7,19 +8,22 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
+open SourceCompiledLocalFinalization SourceInferenceExecution SourceInferenceStatementsSoundness
 
-theorem statement_assignValue
+theorem statement_assignValue_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (placeSound : PlaceRootedSoundness selected childFuel)
-    (expressionSound : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (placeSound : PlaceRootedSoundnessFor provenance selected childFuel)
+    (expressionSound : ExpressionRootedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {targetExpression value : Syntax.Expr} {operator : Syntax.Located Syntax.ValueAssignOp}
     {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .assignValue targetExpression operator value)
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
       expectedReturn initial result frames target) :
@@ -52,7 +56,8 @@ theorem statement_assignValue
       boundary.covered selected.body.resources.graph_closed (finalized.containsStatement containsRaw)
     · simp [StatementNode.applySubstitution, StatementForm.applySubstitution, statementInitializedLetBindings]
     · simp [StatementNode.applySubstitution, StatementForm.applySubstitution, StatementForm.references]
-  obtain ⟨assignmentTyped, assignmentOperational⟩ := assignedValue_of_actual_children checked placeSound expressionSound ({
+  obtain ⟨assignmentTyped, assignmentOperational⟩ := assignedValue_of_actual_children_for checked descend placeSound expressionSound
+    (descend here (ChildStep.statement_assignment boundary.accepted form rfl assignmentAccepted)) ({
     accepted := assignmentAccepted
     interfaces := boundary.interfaces
     extension := assignedExtension
@@ -97,5 +102,23 @@ theorem statement_assignValue
   refine ⟨target, _, invariant, boundary.actual, operational, typing, ?_⟩
   rw [resultEq]
   exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit _ _ _
+
+theorem statement_assignValue
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (placeSound : PlaceRootedSoundness selected childFuel)
+    (expressionSound : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {targetExpression value : Syntax.Expr} {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : Ty} {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .assignValue targetExpression operator value)
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_assignValue_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => placeSound boundary) (fun _ boundary => expressionSound boundary) trivial form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

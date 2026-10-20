@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedConstructorState
 
@@ -6,18 +7,21 @@ set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem constructorApplicationRetained
+theorem constructorApplicationRetained_for {callProvenance : CallIndex → Prop}
     {rawSource : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram rawSource fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {source : Syntax.Expr} {id : ExpressionId}
     {arguments : List Syntax.Expr} {instantiation : DataConstructorInstantiation} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.constructorApplication childFuel inferenceContext source id instantiation
+      arguments expected initial inferred resultState))
     (success : Detail.inferConstructorApplicationFuel childFuel inferenceContext source id instantiation
       arguments expected initial = .ok (inferred, resultState))
     (interfaces : ExecutableCoercionInterfaces.SourceInterfaces (checkingContext selected).signatures
@@ -68,6 +72,8 @@ theorem constructorApplicationRetained
       (payloadAt : ∀ type ∈ instantiation.payloadTypes, type.VariablesBelow argumentInitial.inference.next)
       (resultAt : instantiation.resultType.VariablesBelow argumentInitial.inference.next)
       (expectedAt : ∀ type ∈ expected, type.VariablesBelow argumentInitial.inference.next)
+      (argumentsHere : callProvenance (.constructorArguments childFuel inferenceContext arguments
+        instantiation.payloadTypes argumentInitial inferredArguments argumentsState))
       (argumentsSuccess : Detail.inferConstructorArgumentsFuel childFuel inferenceContext arguments instantiation.payloadTypes
         argumentInitial = .ok (inferredArguments, argumentsState))
       (recorded : Detail.recordExpressionWithExpected inferenceContext source id
@@ -101,7 +107,7 @@ theorem constructorApplicationRetained
       apply SourceSemantics.DataConstructorInstantiation.Admissible.payload_type_admissible
         activeCatalog binders instantiationValid
       exact List.mem_map.mpr ⟨type, member, rfl⟩
-    have typed := constructorArgumentsRooted checked recursive argumentsSuccess interfaces argumentExtension
+    have typed := constructorArgumentsRooted_for checked descend recursive argumentsHere argumentsSuccess interfaces argumentExtension
       scope argumentInvariant actual argumentOperational payloadAt payloadAdmissible argumentSafe
       (fun argument member => (raw.childSubtree (edge argument member)).monoBefore argumentToParent)
       (by rw [← recordExpressionWithExpected_integerPatterns_eq recorded]; exact patterns)
@@ -124,6 +130,7 @@ theorem constructorApplicationRetained
       exact .constructor instantiationValid typed
     exact recordExpressionWithExpected_success_expressionTypingBase_actual selected.body.resources interfaces recorded extension
       requirements retained coercionsRetained catalog scope.signatures invariant formType rawAdmissible covered
+  have parentAccepted := success
   unfold Detail.inferConstructorApplicationFuel at success
   by_cases arity : arguments.length = instantiation.payloadTypes.length
   · simp only [arity] at success
@@ -135,7 +142,8 @@ theorem constructorApplicationRetained
       | ok pair =>
         obtain ⟨inferredArguments, argumentsState⟩ := pair
         simp only [args] at success
-        exact finish invariant operational payloadSafe payloadBelow resultBelow expectedBelow args success
+        exact finish invariant operational payloadSafe payloadBelow resultBelow expectedBelow
+          (descend here (.constructorApplication_arguments parentAccepted arity rfl args)) args success
     | some expectedType =>
       cases unified : Detail.unify initial instantiation.resultType expectedType with
       | error error => simp [unified, bind, Except.bind] at success
@@ -169,8 +177,59 @@ theorem constructorApplicationRetained
                 (payloadSafe binder old type typeMember))
             (fun type member => (payloadBelow type member).weaken progress.next_le)
             (resultBelow.weaken progress.next_le)
-            (fun type member => (expectedBelow type member).weaken progress.next_le) args success
+            (fun type member => (expectedBelow type member).weaken progress.next_le)
+            (descend here (.constructorApplication_arguments parentAccepted arity unified args)) args success
   · simp [arity, bind, Except.bind] at success
 
+
+theorem constructorApplicationRetained
+    {rawSource : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram rawSource fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {source : Syntax.Expr} {id : ExpressionId}
+    {arguments : List Syntax.Expr} {instantiation : DataConstructorInstantiation} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (success : Detail.inferConstructorApplicationFuel childFuel inferenceContext source id instantiation
+      arguments expected initial = .ok (inferred, resultState))
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces (checkingContext selected).signatures
+      selected.body.finalized.solvedRequirements selected.body.finalized.typedSource)
+    (extension : selected.body.finalized.substitution.SemanticallyExtends resultState.inference.substitution)
+    (scope : CheckingScope selected inferenceContext)
+    (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
+    (actual : ActualContext (checkingContext selected) selected.body.finalized frames target)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (payloadBelow : ∀ type ∈ instantiation.payloadTypes, type.VariablesBelow initial.inference.next)
+    (resultBelow : instantiation.resultType.VariablesBelow initial.inference.next)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (payloadSafe : ∀ binder ∈ initial.localBinders, ∀ type ∈ instantiation.payloadTypes,
+      ProtectedVariables.Safe binder.scheme.quantified initial type)
+    (resultSafe : ∀ binder ∈ initial.localBinders,
+      ProtectedVariables.Safe binder.scheme.quantified initial instantiation.resultType)
+    (expectedSafe : ∀ binder ∈ initial.localBinders, ∀ type ∈ expected,
+      ProtectedVariables.Safe binder.scheme.quantified initial type)
+    (instantiationValid : SourceSemantics.DataConstructorInstantiation.Admissible target
+      (instantiation.applySubstitution selected.body.finalized.substitution))
+    (raw : RawProperDescendantsPreserved (resultState.toTypedSource (bodyRoots selected))
+      (evidenceSource selected) (.expression inferred.id))
+    (patterns : resultState.integerPatterns ⊆ selected.body.returned.integerPatterns)
+    (literals : resultState.integerLiterals ⊆ selected.body.returned.integerLiterals)
+    (requirements : resultState.requirements ⊆ selected.body.returned.requirements)
+    (retained : ExpressionRequirementsRetainedAt (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource inferred.id)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource inferred.id)
+    (childrenRetained : ExpressionDirectChildrenRetainedAt (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource inferred.id)
+    (covered : TemplateScopeCovered selected.body.finalized.typedSource target (.expression inferred.id))
+    (actualCovered : ActualContext.Covers selected.body.finalized frames (.expression inferred.id)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  exact constructorApplicationRetained_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro success interfaces extension scope invariant actual
+    operational payloadBelow resultBelow expectedBelow payloadSafe resultSafe expectedSafe instantiationValid
+    raw patterns literals requirements retained coercionsRetained childrenRetained covered actualCovered
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

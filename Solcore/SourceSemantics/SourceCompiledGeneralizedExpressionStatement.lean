@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
-import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
 import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
 
@@ -7,19 +7,21 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 open SourceInferenceStatementsSoundness
 
-theorem statement_expression
+theorem statement_expression_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRootedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRootedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
     {expression : Syntax.Expr} {trailingSemicolon : Bool} {expectedReturn : Ty}
     {initial : State} {result : Detail.StatementResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.statement (childFuel + 1) inferenceContext statement expectedReturn initial result))
     (form : statement.value = .expression expression trailingSemicolon)
     (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
       expectedReturn initial result frames target) :
@@ -58,7 +60,8 @@ theorem statement_expression
       childState.inference.substitution := childSubstitutionEq ▸ boundary.extension
   have childLiterals : childState.integerLiterals ⊆ selected.body.returned.integerLiterals := by
     simpa [resultEq, State.recordNode] using boundary.integerLiterals
-  have typed := recursive ({
+  have childHere := descend here (.statement_expression boundary.accepted form allocationEq childSuccess)
+  have typed := recursive childHere ({
     accepted := childSuccess
     interfaces := boundary.interfaces
     extension := childExtension
@@ -115,5 +118,22 @@ theorem statement_expression
     boundary.extension (activeSchemeQuantifierIsolation_transport boundary.invariant.schemeIsolation bindersEq)
     typing
   exact ⟨target, facts, finalInvariant, boundary.actual, operational, typing, agreement⟩
+
+theorem statement_expression
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {statement : Syntax.Statement}
+    {expression : Syntax.Expr} {trailingSemicolon : Bool} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (form : statement.value = .expression expression trailingSemicolon)
+    (boundary : StatementBoundary selected (childFuel + 1) inferenceContext statement
+      expectedReturn initial result frames target) :
+    StatementConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statement_expression_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) True.intro form boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

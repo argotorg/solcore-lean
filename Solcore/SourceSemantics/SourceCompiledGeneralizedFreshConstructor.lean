@@ -5,14 +5,15 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem freshConstructorRetained
+theorem freshConstructorRetained_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {expected : Option Ty}
     {initial allocated constructorState resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
@@ -25,6 +26,8 @@ theorem freshConstructorRetained
     (constructorMember : constructor ∈ dataType.constructors)
     (fresh : Detail.freshDataConstructorInstantiation dataType constructor allocated =
       (instantiation, constructorState))
+    (applicationHere : callProvenance (.constructorApplication childFuel inferenceContext expression id instantiation
+      arguments expected constructorState inferred resultState))
     (accepted : Detail.inferConstructorApplicationFuel childFuel inferenceContext expression id
       instantiation arguments expected constructorState = .ok (inferred, resultState)) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
@@ -78,7 +81,7 @@ theorem freshConstructorRetained
       (formation.data_constructor_payloadTypes_variablesBelow dataMember constructorMember 0)
     rw [fresh] at privateTypes
     exact privateTypes
-  exact constructorApplicationRetained checked recursive accepted boundary.interfaces boundary.extension
+  exact constructorApplicationRetained_for checked descend recursive applicationHere accepted boundary.interfaces boundary.extension
     boundary.scope freshInvariant boundary.actual freshOperational properties.2.2.2.1 properties.2.2.2.2
     (fun type member => (allocatedExpected type member).weaken properties.1.next_le)
     (fun binder member => (privacy binder member).2.1)
@@ -88,5 +91,30 @@ theorem freshConstructorRetained
     valid boundary.rawProper boundary.integerPatterns boundary.integerLiterals boundary.requirements
     boundary.expressionRequirements boundary.coercionPrimaries boundary.directChildren boundary.covered
     boundary.actualCovered
+
+theorem freshConstructorRetained
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {expected : Option Ty}
+    {initial allocated constructorState resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {id : ExpressionId} {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+    {instantiation : DataConstructorInstantiation} {arguments : List Syntax.Expr}
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (dataMember : dataType ∈ inferenceContext.signatures.dataTypes)
+    (constructorMember : constructor ∈ dataType.constructors)
+    (fresh : Detail.freshDataConstructorInstantiation dataType constructor allocated =
+      (instantiation, constructorState))
+    (accepted : Detail.inferConstructorApplicationFuel childFuel inferenceContext expression id
+      instantiation arguments expected constructorState = .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  exact freshConstructorRetained_for (callProvenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) boundary allocation dataMember constructorMember fresh True.intro accepted
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

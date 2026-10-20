@@ -1,12 +1,13 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedMatchContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness ProtectedVariables SourceInferenceExecution
 
 private theorem binder_assumptions {owner : Resolved.DeclarationId}
     {before after : SourceSemantics.Context} {binders : List TypedBinder}
@@ -32,15 +33,18 @@ private theorem admissible_binders {owner : Resolved.DeclarationId}
     cases head
     exact admissible_local typed _
 
-theorem matchCases
+theorem matchCases_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {callProvenance : CallIndex → Prop}
+    (descend : ChildClosed callProvenance)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     {inferenceContext : SourceInference.Context} {cases : List Syntax.MatchCase}
     {scrutinee expectedReturn : Ty} {initial : State} {outerScope : LexicalScope}
     {result : Detail.MatchCasesResult} {frames : List InitializedLetBinding}
     {target : SourceSemantics.Context} {occurrence : NodeId}
+    (here : callProvenance (.matchCases childFuel inferenceContext scrutinee expectedReturn outerScope cases initial result))
     (boundary : MatchCasesBoundary selected childFuel inferenceContext cases scrutinee expectedReturn
       initial outerScope result frames target occurrence)
     (returnSafe : Safe (activeSchemeQuantifiers initial) initial expectedReturn)
@@ -48,6 +52,7 @@ theorem matchCases
     (recursiveBody : ∀ small, small < childFuel →
       ∀ {bodySource : List Syntax.Statement} {bodyInitial : State} {bodyResult : Detail.BlockResult}
         {bodyTarget : SourceSemantics.Context},
+        callProvenance (.statements small inferenceContext bodySource expectedReturn bodyInitial bodyResult) →
         (∀ binder ∈ bodyInitial.localBinders, Safe binder.scheme.quantified bodyInitial expectedReturn) →
         TypeAdmissible bodyTarget (selected.body.finalized.substitution.apply expectedReturn) →
         StatementsBoundary selected small inferenceContext bodySource expectedReturn bodyInitial bodyResult frames bodyTarget →
@@ -153,7 +158,9 @@ theorem matchCases
               boundary.scrutineeBelow boundary.scrutineeSafe returnSafe patternAccepted
             have assumptions := binder_assumptions certificate.binders_extend
             obtain ⟨bodyContext, bodyFacts, bodyInvariant, _, bodyOperational, bodyTyping, bodyAgreement⟩ :=
-              recursiveBody childFuel (Nat.lt_succ_self _) (safe_active_iff.mp armReturnSafe)
+              recursiveBody childFuel (Nat.lt_succ_self _)
+                (descend here (ChildStep.matchCases_body boundary.accepted patternAccepted bodyAccepted))
+                (safe_active_iff.mp armReturnSafe)
                 (admissible_binders certificate.binders_extend returnAdmissible) ({
                   accepted := bodyAccepted
                   interfaces := boundary.interfaces
@@ -226,7 +233,8 @@ theorem matchCases
             have tailOwner : tailInput.owner = (checkingContext selected).scope.genericOwner :=
               (Detail.inferStatementsFuel_preserves_owner bodyAccepted).trans
                 ((Detail.inferMatchPatternFuel_preserves_owner patternAccepted).trans boundary.owner)
-            obtain ⟨tailFacts, tailTyping, tailAgreement⟩ := ih ({
+            obtain ⟨tailFacts, tailTyping, tailAgreement⟩ := ih
+              (descend here (ChildStep.matchCases_tail boundary.accepted patternAccepted bodyAccepted tailAccepted)) ({
               accepted := tailAccepted
               interfaces := boundary.interfaces
               extension := boundary.extension
@@ -254,5 +262,31 @@ theorem matchCases
             · simpa only [List.map_cons] using MatchCasesHaveType.cons headTyping tailTyping
             · change (headFacts.sawReturn && allBodiesSawReturn tailFacts) = (bodyResult.sawReturn && tail.allReturn)
               rw [headAgreement.sawReturn_eq, tailAgreement]
+
+theorem matchCases
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    {inferenceContext : SourceInference.Context} {cases : List Syntax.MatchCase}
+    {scrutinee expectedReturn : Ty} {initial : State} {outerScope : LexicalScope}
+    {result : Detail.MatchCasesResult} {frames : List InitializedLetBinding}
+    {target : SourceSemantics.Context} {occurrence : NodeId}
+    (boundary : MatchCasesBoundary selected childFuel inferenceContext cases scrutinee expectedReturn
+      initial outerScope result frames target occurrence)
+    (returnSafe : Safe (activeSchemeQuantifiers initial) initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
+    (recursiveBody : ∀ small, small < childFuel →
+      ∀ {bodySource : List Syntax.Statement} {bodyInitial : State} {bodyResult : Detail.BlockResult}
+        {bodyTarget : SourceSemantics.Context},
+        (∀ binder ∈ bodyInitial.localBinders, Safe binder.scheme.quantified bodyInitial expectedReturn) →
+        TypeAdmissible bodyTarget (selected.body.finalized.substitution.apply expectedReturn) →
+        StatementsBoundary selected small inferenceContext bodySource expectedReturn bodyInitial bodyResult frames bodyTarget →
+        StatementsConclusion selected inferenceContext expectedReturn bodyResult frames bodyTarget) :
+    MatchCasesConclusion selected inferenceContext scrutinee expectedReturn result frames target := by
+  exact matchCases_for (callProvenance := fun _ => True) true_childClosed checked True.intro
+    boundary returnSafe returnAdmissible (fun small less => by
+      intro bodySource bodyInitial bodyResult bodyTarget _
+      exact recursiveBody small less)
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
