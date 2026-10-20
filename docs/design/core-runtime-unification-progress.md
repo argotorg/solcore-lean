@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized checker recursion consumes actual child results (2026-10-20)
+
+The generalized expression contracts now fix one selected function body and its actual finalizer. They distinguish the raw typing of a child whose root may acquire coercion metadata from typing a retained root in the whole final source. Literal, identifier, proxy, group, tuple, conditional and ordered expression-list cases consume smaller actual checker calls without a monomorphic-local restriction.
+
+An initialized declaration now invokes the smaller rooted expression contract on its actual initializer. The child annotation, scope frame, subtree and requirement inventory come from that same receipt. The result includes ordinary Source statement typing and the complete recursive invariant needed by the following statement. Raw scheme isolation follows from the actual solved substitution and active-variable privacy.
+
+Both for headers and the loop body now obtain their privacy conditions from actual inference. Each selected header retains its exact item in the enclosing for node. The body and post paths follow the actual saved scope restorations and remaining statements to the same finalizer.
+
+Validation: 19 changed modules in a coherent graph of 8,828 modules, 62 retained runtime invocations and 6,781 endpoint audits. Full build (8,867 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The whole mutual checker proof must connect the remaining syntax cases and derive all entry conditions from the selected computation. The selected compilation generalization barrier is still explicit in the initialized-statement boundary. Complete compiler-pass preservation and the final selected meaning-preservation theorem with compiler-derived obligations remain unfinished.
+
 ## Nested initializer typing follows the selected checker call (2026-10-20)
 
 A reached initialized declaration now carries its actual child inference context, recorded statement and selected function finalizer into the generalized initializer certificate. The certificate produces ordinary Source statement typing, the following semantic context and the generalized operational state. The same path supports both annotated and unannotated declarations without requiring every local scheme to be monomorphic.

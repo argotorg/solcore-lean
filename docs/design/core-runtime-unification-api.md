@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized checker recursion consumes actual child results (2026-10-20)
+
+`RetainedExpressionBoundary` and `RootedExpressionBoundary` retain the actual call and selected finalizer. `expressionRooted_of_retained` uses the real finalizer to upgrade retained raw typing. The atomic, group, tuple and conditional cases and `expressionsRooted` provide concrete recursive branches; `InitializedStatementBoundary.sound` applies their smaller rooted contract to the exact initializer and returns the full following statement invariant.
+
+`RetainedInitializer.schemeIsolation` derives raw isolation from the actual newly generalized variables and solved substitution. `PrivateBlockContinuation.initialized_for_header` produces the exact initialized header receipt and its retained enclosing node. `PrivateBlockContinuation.enter_for_body` produces the real loop-body continuation with its initialized scope and post-inference suffix.
+
+Goal two remains incomplete. The whole mutual checker proof must connect the remaining syntax cases and derive all entry conditions from the selected computation. The selected compilation generalization barrier is still explicit in the initialized-statement boundary. Complete compiler-pass preservation and the final selected meaning-preservation theorem with compiler-derived obligations remain unfinished.
+
 ## Nested initializer typing follows the selected checker call (2026-10-20)
 
 `RetainedInitializer` fixes the real child receipt and its selected finalizer. `certificate_of_child` opens the retained initializer scope and consumes its concrete child typing. `statement_of_child_with_state` returns whole Source statement typing together with the following semantic and operational contexts. `PrivateBlockContinuation.retained_initializer` constructs the carrier from an actual reached declaration.

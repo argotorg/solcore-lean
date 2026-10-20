@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+The generalized expression contracts now fix one selected function body and its actual finalizer. They distinguish the raw typing of a child whose root may acquire coercion metadata from typing a retained root in the whole final source. Literal, identifier, proxy, group, tuple, conditional and ordered expression-list cases consume smaller actual checker calls without a monomorphic-local restriction.
+
+An initialized declaration now invokes the smaller rooted expression contract on its actual initializer. The child annotation, scope frame, subtree and requirement inventory come from that same receipt. The result includes ordinary Source statement typing and the complete recursive invariant needed by the following statement. Raw scheme isolation follows from the actual solved substitution and active-variable privacy.
+
+Both for headers and the loop body now obtain their privacy conditions from actual inference. Each selected header retains its exact item in the enclosing for node. The body and post paths follow the actual saved scope restorations and remaining statements to the same finalizer.
+
+Goal two remains incomplete. The whole mutual checker proof must connect the remaining syntax cases and derive all entry conditions from the selected computation. The selected compilation generalization barrier is still explicit in the initialized-statement boundary. Complete compiler-pass preservation and the final selected meaning-preservation theorem with compiler-derived obligations remain unfinished.
+
 A reached initialized declaration now carries its actual child inference context, recorded statement and selected function finalizer into the generalized initializer certificate. The certificate produces ordinary Source statement typing, the following semantic context and the generalized operational state. The same path supports both annotated and unannotated declarations without requiring every local scheme to be monomorphic.
 
 Both arms of an if statement now follow the actual checker continuation. The completed then branch preserves active-variable privacy and bounds; restoring its saved scope supplies the real entering state for the else branch. Each child block retains its continuation to the same finalizer.
