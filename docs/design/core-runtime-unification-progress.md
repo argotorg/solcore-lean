@@ -1,10 +1,22 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-20
+Updated: 2026-10-21
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
+
+## Actual compiler actions retain generalized inputs and complete lambda bodies (2026-10-21)
+
+Every completed-cache row now supplies the same actual named compilation and a receipt for each accepted contextual action. The compiler callback itself selects initializer, evidence, generalized local read or plain expression; the proof does not assume a separate metadata scan or branch-selection law.
+
+Generalized initialization retains the complete ordered candidate bundle. Generalized reads retain the contextual source, full original substitution, selected bundle slot, indexed view and checked result type. A reached ordinary lambda retains its capture scope, parameter allocation, fuel, result type and entire compiled body, without a first-return or single-lambda restriction.
+
+The new receipts cover ordinary functions, implementation methods and dependencies added during preparation through their actual cache positions. They provide inputs for the unrestricted semantic proof; they do not themselves prove execution preservation.
+
+Validation: 6 changed modules in a coherent graph of 9,004 modules, 74 retained runtime invocations and 7,415 endpoint audits. Full build (9,043 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Actual inference provenance must discharge generalized checker barriers, and the new compiler-action receipts must feed descriptor creation, stored reads and complete body execution. Contextual initializer candidates also need the corresponding trace under their active lexical substitution. The existing restricted StaticProfile is not a completeness theorem.
 
 ## Actual public compilation supplies the original checker inputs (2026-10-21)
 

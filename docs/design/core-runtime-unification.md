@@ -2,9 +2,17 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-20.
+Created: 2026-09-30. Updated: 2026-10-21.
 
 ## Current proof target: the selected compilation (2026-10-14)
+
+Every completed-cache row now supplies the same actual named compilation and a receipt for each accepted contextual action. The compiler callback itself selects initializer, evidence, generalized local read or plain expression; the proof does not assume a separate metadata scan or branch-selection law.
+
+Generalized initialization retains the complete ordered candidate bundle. Generalized reads retain the contextual source, full original substitution, selected bundle slot, indexed view and checked result type. A reached ordinary lambda retains its capture scope, parameter allocation, fuel, result type and entire compiled body, without a first-return or single-lambda restriction.
+
+The new receipts cover ordinary functions, implementation methods and dependencies added during preparation through their actual cache positions. They provide inputs for the unrestricted semantic proof; they do not themselves prove execution preservation.
+
+Goal two remains incomplete. Actual inference provenance must discharge generalized checker barriers, and the new compiler-action receipts must feed descriptor creation, stored reads and complete body execution. Contextual initializer candidates also need the corresponding trace under their active lexical substitution. The existing restricted StaticProfile is not a completeness theorem.
 
 Successful public compilation now yields the same underlying Core compilation, actual compiled artifact, preparation recipe and raw checker result. The public bridge consumes the complete cached-body checker result rather than assuming independently supplied source typing.
 

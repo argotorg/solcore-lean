@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual compiler actions retain generalized inputs and complete lambda bodies (2026-10-21)
+
+AcceptedNamedActionTrace.at_cache and of_contextual derive all actual named action receipts. AcceptedContextualSpecialActions.of_head exposes the selected callback branch. AcceptedContextualLambdaBody.of_head retains the full ordinary lambda body, while AcceptedNamedGeneralizedInitializer connects actual cached inputs to initializer receipts.
+
+All these results preserve the actual compiler output and original contextual source. They introduce no assumed execution law, finite body profile or independently chosen initializer.
+
+Goal two remains incomplete. Actual inference provenance must discharge generalized checker barriers, and the new compiler-action receipts must feed descriptor creation, stored reads and complete body execution. Contextual initializer candidates also need the corresponding trace under their active lexical substitution. The existing restricted StaticProfile is not a completeness theorem.
+
 ## Actual public compilation supplies the original checker inputs (2026-10-21)
 
 SelectedCompilationRawPublicReceipt.of_compile retains the actual public/Core artifact identity. SelectedCompilationCheckedPublicProfile.Receipt.bodies and initial_row connect actual checking to cached body typing and the existing public execution theorem. SelectedCompilationPreparedRuntimeFacts.of_compiled derives runtime policy and diagnostic availability.
