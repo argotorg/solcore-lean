@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Finite lexical closure bodies reach retained public execution (2026-10-20)
+
+Materialized local lambda bodies now support finite sequences of initialized and uninitialized declarations, discarded expressions, scoped blocks, conditionals, returns and fallthrough. The actual accepted compiler traversal supplies their body certificates. Independent ordinary Source execution reaches the same value or semantic fault and the same corresponding heap. Allocated cells, captured descriptors and native administrative state remain linked through completion, preservation and reflection.
+
+The full original Word/Bool fixture includes an absent Word local, an initialized copy, a scoped discard and an if without else before returning duplicate reads, a captured flag and a numeric literal. Original declarative typing and independent Source plans precede every true/false/true public resume. Source and native heaps reach `2 / 26 / 50 / 74`; the complete original function, cache and profile remain present.
+
+Validation: 52 changed modules in a coherent graph of 8,700 modules, 59 retained runtime invocations and 6,259 endpoint audits. Full build (8,740 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+This finite lexical closure profile excludes assignments, loops and nested generalized declarations. The generalizing checker must still derive original body typing. Public whole-program typing premises still need the selected-target connection, and complete compiler-pass preservation remains unfinished. Goal two remains incomplete.
+
 ## Selected initializer occurrences reach their actual finalizer (2026-10-20)
 
 The selected checker receipt now supplies initial inference readiness, allocator bounds and the continuation from the actual function body through return unification to the final solver. Initialized bindings inside blocks, branches, while loops, for headers and bodies, and match arms and defaults retain their original occurrence and reach that same finalizer. The proofs use the actual child inference equations, scope restoration and retained nodes. They do not take the selected body typing as an assumption.

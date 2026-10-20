@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Finite lexical closure bodies reach retained public execution (2026-10-20)
+
+`GeneralizedLocalOrdinaryBodyProfile` retains the actual finite lexical body scan. `GeneralizedLocalOrdinaryBodyMeaning` and `GeneralizedLocalBodySourceAdmission` derive body completion from accepted compilation and actual closure arguments. `CellAwareOrdinaryBodySourceLifting` lifts independent Source success and failure through declarations, blocks and conditionals. `CellAwareLexicalBodyCompletion` retains allocated cells and administrative state. The public packed and retained materialized consumers use these same producers. The former terminal-only `packet_terminal` and receipt APIs (`expression_profile`, `expression_site`, `receipt`, `terminal`) are retired: the expanded profile admits whole statement sequences. Use `packet_body`, `packet_scan`, `packet_lexical`, the `lambda_fields`/`view_source`/`scan`/`lexical` receipts and `GeneralizedLocalOrdinaryBodyAdmission.tree` for actual body admission. All replacement endpoints remain included in the cumulative axiom audit.
+
+This finite lexical closure profile excludes assignments, loops and nested generalized declarations. The generalizing checker must still derive original body typing. Public whole-program typing premises still need the selected-target connection, and complete compiler-pass preservation remains unfinished. Goal two remains incomplete.
+
 ## Selected initializer occurrences reach their actual finalizer (2026-10-20)
 
 `SourceCompiledSelectedInferenceProgress` connects selected compilation to the real body inference and final solver. `SourceCompiledGeneralizedInitializerContexts` preserves local scheme formation when entering an actual initialized binder. `SourceCompiledBlockContinuations`, `SourceCompiledBranchContinuations` and `SourceCompiledMatchContinuations` compose occurrence-specific continuations through nested statements. `SourceCompiledInitializerRequirementFormation` connects actual issuance formation to retained normalized requirements. The proof-only unification, scheme allocation and pattern inference exports leave checker computation unchanged.

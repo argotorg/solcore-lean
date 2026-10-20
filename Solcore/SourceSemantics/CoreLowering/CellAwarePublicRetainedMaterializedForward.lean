@@ -138,7 +138,9 @@ theorem source_failure {invocation : Staging.Recursive.Scope}
   have staged : Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages invocation
       anchor.function.context before entry.source sources (.fault (.semantic reason)) after := by
     rw [sourceEq] at trace ⊢
-    exact GeneralizedLocalSourceApplicationLifting.selected_association_exact association frame arity.symm trace
+    exact GeneralizedLocalSourceApplicationLifting.selected_association_exact association frame wellFormed
+      (CellAwarePublicMaterializedHandleMeaning.source_arguments functions bodyTyping history entry inHistory
+        entryType sourceEq input started parameterView metadata packing arity) arity.symm trace
   obtain ⟨size, measured⟩ := Staging.Recursive.Size.Applies.of_trace staged
   have heapTyped := CellAwarePublicMaterializedFaultHeap.after_fault functions bodyTyping wellFormed history
     entry inHistory entryType input started parameterView metadata packing measured

@@ -83,6 +83,19 @@ private theorem current_inputs :
   obtain ⟨packedRelated, packedTyped⟩ := CellAwarePublicPackedInputs.history_input_compatible started history input parameterView.symm metadata
   exact ⟨callableEq, typed, packedRelated, packedTyped⟩
 
+include bodyTyping history inHistory entryType sourceEq input started parameterView metadata in
+/-- Current public history and the accepted packed input recover Source argument
+and capture typing at the exact incoming heap. -/
+theorem source_arguments {sources : List Dynamic.Value}
+    (packing : Dynamic.ValuesPack sources packedSource) (arity : sources.length = function.parameters.length) :
+    CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before sources := by
+  obtain ⟨_callableEq, calleeTyped, _packedRelated, packedTyped⟩ :=
+    current_inputs functions history entry inHistory entryType sourceEq input started parameterView metadata
+  obtain ⟨parameterEq, _resultEq, _signatures, _code, _covers, _captures⟩ := calleeTyped.closure_function_inv
+  have sourceTyped := packing.unpackTypes (parameterEq ▸ packedTyped) (by simpa only [List.length_map] using arity)
+  exact CallableIndexedOwnedStoredClosureSourceArguments.at_arguments (anchor_runtime bodyTyping) calleeTyped
+    history.current.2.2.2.1 sourceTyped packing parameterEq.symm arity
+
 include profile receiver extension bodyTyping wellFormed history inHistory entryType sourceEq atFrame input started parameterView metadata in
 /-- Finite completion of the original public checkpoint reconstructs the
 materialized Source call using its current captures and packed input. -/
@@ -140,7 +153,7 @@ theorem has_sufficient_fuel {invocation : Staging.Recursive.Scope} {sources : Li
 include profile receiver extension bodyTyping wellFormed history inHistory entryType sourceEq atFrame input started parameterView metadata in
 /-- An ordinary independent Source call derives sufficient fuel for the
 accepted public handle checkpoint. The exact result and reached heap embed
-without a stage outcome because this retained body is a terminal read. -/
+without a stage outcome through the retained finite lexical body. -/
 theorem source_has_sufficient_fuel {invocation : Staging.Recursive.Scope}
     {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment} {sources : List Dynamic.Value}
     (packing : Dynamic.ValuesPack sources packedSource) (arity : sources.length = function.parameters.length)
@@ -161,7 +174,8 @@ theorem source_has_sufficient_fuel {invocation : Staging.Recursive.Scope}
   have staged : Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages invocation
       anchor.function.context before entry.source sources (Staging.Recursive.Lifting.embed outcome) after := by
     rw [sourceEq] at trace ⊢
-    exact GeneralizedLocalSourceApplicationLifting.selected_association_exact association frame arity.symm trace
+    exact GeneralizedLocalSourceApplicationLifting.selected_association_exact association frame wellFormed
+      (source_arguments functions bodyTyping history entry inHistory entryType sourceEq input started parameterView metadata packing arity) arity.symm trace
   obtain ⟨size, measured⟩ := Staging.Recursive.Size.Applies.of_trace staged
   exact has_sufficient_fuel functions profile receiver extension bodyTyping wellFormed history entry inHistory
     entryType sourceEq association owner atFrame input started parameterView metadata packing arity measured

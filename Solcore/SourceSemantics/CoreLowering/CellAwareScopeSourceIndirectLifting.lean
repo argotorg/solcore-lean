@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourcePrefixLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageApplicationArity
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSuccessfulArgumentTyping
 
 /-! Original indirect calls lift through the actual generalized local value.
 The retained materialization supplies its real body compiler and parameter
@@ -45,6 +46,8 @@ include positive port runtime unique in
 /-- The finite compiler certificate determines the actual callee and call
 body. The only recursive inputs are the ordered argument children. -/
 theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (covers : invocation.evidence.Covers context)
     (budget : Nat)
     (calleeCertificate : GeneralizedLocalNamedReadCompilation.Certificate compiled.indexed named
       invocation.source scope callee reasonAt compiler.calleeCode)
@@ -80,7 +83,7 @@ theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : Rec
   · exact complete
   · obtain ⟨_calleeSize, _argumentsSize, _callSize, sourceValue, _calleeHeap, _argumentsHeap, sources, _callEvidence,
       calleeTrace, accepted, argumentsTrace, called, _smaller, prefixResult⟩ := application
-    obtain ⟨rawParameter, rawResult, functionType, _bundle, _originalResult,
+    obtain ⟨rawParameter, rawResult, functionType, bundle, _originalResult,
       _calleeStore, _calleeMap, _calleeWorld, _carrier, _values, _argumentsStore, _finalMap, _finalWorld,
       _originalNode, _originalMetadata, _calleePost, calleeTyped, _firstGate, _argumentsNative,
       _represented, _calleeRelated, strong, _callView, _boundary, _heaps, _maps, _worlds,
@@ -98,10 +101,21 @@ theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : Rec
         have frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function :=
           ⟨signatures.trans runtime.signatures, sourceCode.owner, sourceCode,
             sourceCode.requirement_ledger.idsUnique, evidence⟩
+        obtain ⟨_parameter, _result, _calleeType, argumentsTyped, _bundle, _resultType⟩ :=
+          CallableIndexedOwnedIndirectSourceTypeRows.original_rows compiler port.sourceParent
+            tree unique parentTyped port.calleeFound
+        obtain ⟨_nativeCallee, _representedCallee, _strong, _calleeHeaps, _calleeMaps, _calleeWorlds,
+          _calleeFrame, calleeMetadata, _calleeEffect, _calleeReached, _calleeRelated, calleeAdmission⟩ := _calleePost
+        obtain ⟨sourceValuesTyped, _heapTyped, argumentMetadata⟩ :=
+          CallableIndexedOwnedPreparedStagedSuccessfulArgumentTyping.values_at wellFormed runtime covers
+            (locals.mono calleeMetadata) calleeAdmission.at_value.2.heap argumentsTyped argumentsTrace
+        obtain ⟨packed, packing⟩ := Dynamic.ValuesPack.exists_pack sources
+        have raw := CallableIndexedOwnedStoredClosureSourceArguments.at_arguments runtime
+          (rawCallee.mono argumentMetadata) _admitted.heap sourceValuesTyped packing bundle arity.symm
         cases association with
         | viewed material _view _typed =>
           obtain ⟨inputs⟩ := GeneralizedLocalBodyCompiler.entry_context material frame material.ownership
-          exact GeneralizedLocalSourceApplicationLifting.selected_application material inputs arity called
+          exact GeneralizedLocalSourceApplicationLifting.selected_application material inputs wellFormed raw arity called
       · exact SelectedCompilationStageApplicationArity.closure_mismatch arity called
     obtain ⟨staged, reached, applied, adapted⟩ := lifted
     exact ⟨staged, reached, .applied occurrence compiler.argumentCoercions calleeTrace.sound accepted

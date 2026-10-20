@@ -1,3 +1,6 @@
+import Solcore.Test.SourceCoreGeneralizedLexicalBodyRuntime
+import Solcore.Test.SourceCoreGeneralizedLexicalBodyProbe
+import Solcore.Test.SourceCoreGeneralizedLexicalBodyWellFormed
 import Solcore.Test.SourceCoreGeneralizedBodyExpressionRuntime
 import Solcore.Test.SourceCoreGeneralizedBodyExpressionProbe
 import Solcore.Test.SourceCoreGeneralizedBodyExpressionWellFormed
@@ -3838,6 +3841,9 @@ def main : IO UInt32 := do
   Tests.SourceCoreGeneralizedBodyExpression.typingProbe
   Tests.SourceCoreGeneralizedBodyExpression.nativeProbe
   Tests.SourceCoreGeneralizedBodyExpression.ObservedRuntime.run
+  Tests.SourceCoreGeneralizedLexicalBody.typingProbe
+  Tests.SourceCoreGeneralizedLexicalBody.nativeProbe
+  Tests.SourceCoreGeneralizedLexicalBody.ObservedRuntime.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"

@@ -1,71 +1,54 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyExpressionAdmission
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedProvenance
-import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadProductLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySourceLifting
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureSourceTrace
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedInvocationLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageTerminalInversion
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageBodyLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 
-/-! An ordinary Source call of an actually materialized local function lifts
-through its retained compiler profile and original parameter allocation.
-The terminal expression tree uses its real Source descriptor and requirement outcome. -/
+/-! Independent Source calls enter the actual parameter allocation and lift
+through the complete finite lexical body extracted from contextual compilation.
+Source argument and capture typing refer to the actual incoming heap. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
 open Core Frontend SourceInference GeneralHeap
 open GeneralizedLocalMaterializedAssociation
 open Staging.Recursive
-open SelectedCompilationStageBodyLiftBounds (BodyLift)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationMap} {world : StoreTyping}
   {function : Dynamic.Closure} (material : Materialization compiled mapping world function)
   (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) material.code)
 
 include inputs in
-theorem application {registry : Registry} {child caller : Scope}
+/-- Parameter allocation supplies the complete Source state at the body boundary. -/
+theorem parameter_state {registry : Registry} {child : Scope}
     (selected : registry.Closure function child)
-    {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
-    {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
-    {size : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (arity : function.parameters.length = arguments.length)
-    (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
-      callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
-    Lifting.ApplicationLift (Program.ofChecked compiled.sourceProgram) registry caller callContext before
-      (.closure function) arguments outcome after := by
-  obtain ⟨childSize, environment, bound, valid, allocated, sourceTrace, _smaller⟩ :=
-    SelectedCompilationStageClosureSourceTrace.source_prefix inputs.extended arity trace
-  obtain ⟨finalContext, bodyOutcome, bodyTrace, converted⟩ :=
-    SelectedCompilationStageNamedInvocationLifting.body_control sourceTrace
-  have source := registry.source selected
-  have evidence := registry.evidence selected
-  have compilerSource := GeneralizedLocalBodyProfileReceipts.view_source material
-  have terminal := GeneralizedLocalBodyProfileReceipts.terminal material
-  rw [compilerSource] at terminal
-  obtain ⟨expressionSize, plain, _strict, sameContext, sameOutcome, evaluated⟩ :=
-    SelectedCompilationStageTerminalInversion.child_of_body material.unique terminal bodyTrace
-  subst finalContext
-  subst bodyOutcome
-  have unique : NodeOccurrencesUnique child.source := source ▸ material.unique
-  have plainTrace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compiled.sourceProgram)
-      inputs.context child.evidence child.source environment bound material.bodyProfile.expression plain after := by
-    simpa only [source, evidence] using evaluated.sound
-  obtain ⟨receipt⟩ := GeneralizedLocalBodyProfileReceipts.receipt material
-  obtain ⟨tree, _resultType, _typed⟩ := GeneralizedLocalBodyExpressionAdmission.actual_tree material inputs valid source receipt
-  simp only [compilerSource, ← source] at tree
-  have lifted := CellAwareSourceReadProductLifting.exact_trace (registry := registry) tree unique plainTrace
-  have head := receipt.head child (source.trans compilerSource.symm)
-  have bodyLift := SelectedCompilationStageBodyLiftBounds.terminal_expression head (Lifting.ExpressionLift.completed lifted)
-  exact BodyLift.closure selected valid inputs.extended allocated bodyLift converted
+    (frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
+    {arguments : List Dynamic.Value} {before bound : Dynamic.Heap} {environment : Dynamic.Environment}
+    (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
+    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound) :
+    CellAwareOrdinaryBodySourceState.State (program := Program.ofChecked compiled.sourceProgram)
+      (invocation := child) inputs.context environment bound := by
+  have runtime := CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters frame inputs.extended
+  have mono := FunctionCallBody.mono_binders inputs.extended
+  have reached := Dynamic.BindersAllocate.preservesHeapTyping raw.heaps raw.arguments allocated
+  have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
+  refine ⟨?_,?_,allocated.preservesEnvironmentAgreement mono.1 mono.2 raw.captures,?_⟩
+  · simpa only [registry.source selected] using runtime.1
+  · simpa only [registry.evidence selected] using runtime.2
+  · exact reached.transportClosed fields.signatures frame.code.closed (fields.targetClosed frame.code.closed)
+      frame.code.variables_closed (fields.targetResidualVariablesOpen frame.code.residual_variables_open)
 
 include inputs in
-/-- A materialized terminal expression tree introduces no stage rejection: its complete
-ordinary outcome and reached Source heap embed exactly. -/
+/-- The original outcome and reached Source heap embed exactly. -/
 theorem application_exact {registry : Registry} {child caller : Scope}
     (selected : registry.Closure function child)
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
       callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
@@ -75,38 +58,47 @@ theorem application_exact {registry : Registry} {child caller : Scope}
     SelectedCompilationStageClosureSourceTrace.source_prefix inputs.extended arity trace
   obtain ⟨finalContext, bodyOutcome, bodyTrace, converted⟩ :=
     SelectedCompilationStageNamedInvocationLifting.body_control sourceTrace
+  obtain ⟨flow,_emitted,tree⟩ := GeneralizedLocalOrdinaryBodyAdmission.tree material inputs valid
   have source := registry.source selected
-  have evidence := registry.evidence selected
-  have compilerSource := GeneralizedLocalBodyProfileReceipts.view_source material
-  have terminal := GeneralizedLocalBodyProfileReceipts.terminal material
-  rw [compilerSource] at terminal
-  obtain ⟨expressionSize, plain, _strict, sameContext, sameOutcome, evaluated⟩ :=
-    SelectedCompilationStageTerminalInversion.child_of_body material.unique terminal bodyTrace
-  subst finalContext
-  subst bodyOutcome
-  have unique : NodeOccurrencesUnique child.source := source ▸ material.unique
-  have plainTrace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compiled.sourceProgram)
-      inputs.context child.evidence child.source environment bound material.bodyProfile.expression plain after := by
-    simpa only [source, evidence] using evaluated.sound
-  obtain ⟨receipt⟩ := GeneralizedLocalBodyProfileReceipts.receipt material
-  obtain ⟨tree, _resultType, _typed⟩ := GeneralizedLocalBodyExpressionAdmission.actual_tree material inputs valid source receipt
-  simp only [compilerSource, ← source] at tree
-  have lifted := CellAwareSourceReadProductLifting.exact_trace (registry := registry) tree unique plainTrace
-  have head := receipt.head child (source.trans compilerSource.symm)
-  obtain ⟨_size, measured⟩ := Size.Expression.of_trace lifted
-  cases plain with
-  | value value =>
-    cases converted
-    exact .closure selected valid inputs.extended allocated (head.trace measured).sound .returned
-  | fault reason =>
-    cases converted
-    exact .closure selected valid inputs.extended allocated (head.trace measured).sound .fault
+  rw [← source] at tree
+  have plain : SelectedCompilationStageScopedLiftBounds.PlainStatements
+      (Program.ofChecked compiled.sourceProgram) true childSize child inputs.context environment bound
+      function.body finalContext bodyOutcome after := by
+    simpa only [SelectedCompilationStageScopedLiftBounds.PlainStatements, Bool.true_eq, ↓reduceIte, source,registry.evidence selected] using bodyTrace
+  obtain ⟨lifted,_post⟩ := CellAwareOrdinaryBodySourceLifting.lifts wellFormed tree
+    (parameter_state material inputs selected valid raw allocated) plain
+  have matched : BodyResult function.resultType (CellAwareOrdinaryBodySourceState.embed bodyOutcome)
+      (Lifting.embed outcome) := by
+    cases converted with
+    | returned => exact .returned
+    | unit _ same => rw [same]; exact .unit
+    | fault => exact .fault
+    | breaking => exact .breaking
+    | continuing => exact .continuing
+  exact .closure selected valid inputs.extended allocated lifted matched
+
+include inputs in
+theorem application {registry : Registry} {child caller : Scope}
+    (selected : registry.Closure function child)
+    {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
+    {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
+    {size : Nat} {outcome : Dynamic.ExpressionOutcome}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
+    (arity : function.parameters.length = arguments.length)
+    (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
+      callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
+    Lifting.ApplicationLift (Program.ofChecked compiled.sourceProgram) registry caller callContext before
+      (.closure function) arguments outcome after :=
+  ⟨_, _, application_exact material inputs selected wellFormed raw arity trace, .completed⟩
 
 include inputs in
 theorem selected_application_exact {caller : Scope}
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
       callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
@@ -114,7 +106,7 @@ theorem selected_application_exact {caller : Scope}
       caller callContext before (.closure function) arguments (Lifting.embed outcome) after := by
   obtain ⟨_sidecar, _accepted, selected⟩ := material.scope_at
   exact application_exact (registry := SelectedCompilationPhysicalProgramSupport.stages compiled)
-    material inputs (.anonymous selected) arity trace
+    material inputs (.anonymous selected) wellFormed raw arity trace
 
 include inputs in
 /-- The selected child comes from the actual compiler packet retained by the
@@ -123,6 +115,8 @@ theorem selected_application {caller : Scope}
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
       callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
@@ -130,7 +124,7 @@ theorem selected_application {caller : Scope}
       (SelectedCompilationPhysicalProgramSupport.stages compiled) caller callContext before
       (.closure function) arguments outcome after := by
   obtain ⟨_sidecar, _accepted, selected⟩ := material.scope_at
-  exact application (registry := SelectedCompilationPhysicalProgramSupport.stages compiled) material inputs (.anonymous selected) arity trace
+  exact application (registry := SelectedCompilationPhysicalProgramSupport.stages compiled) material inputs (.anonymous selected) wellFormed raw arity trace
 
 /-- Public representations expose the retained materialization directly; the
 actual Source closure frame determines its original parameter context. -/
@@ -143,6 +137,8 @@ theorem selected_association_exact
     {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
       callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
@@ -151,6 +147,6 @@ theorem selected_association_exact
   cases association with
   | viewed material _view _typed =>
     obtain ⟨inputs⟩ := GeneralizedLocalBodyCompiler.entry_context material frame material.ownership
-    exact selected_application_exact material inputs arity trace
+    exact selected_application_exact material inputs wellFormed raw arity trace
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting

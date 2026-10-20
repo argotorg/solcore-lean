@@ -242,7 +242,7 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
     have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ wellFormed.signatures
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeSourceIndirectLifting.indirect (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) bridge profile compiler port runtime unique size
+    exact CellAwareScopeSourceIndirectLifting.indirect (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) bridge profile compiler port runtime unique wellFormed covers size
       calleeReceipt calleeRecipe sequence childLift preservation
       (CellAwareNamedGeneralizedReadBounds.preserves bridge profile unique runtime.requirements.idsUnique covers catalog) ⟨rfl, rfl, rfl⟩
 

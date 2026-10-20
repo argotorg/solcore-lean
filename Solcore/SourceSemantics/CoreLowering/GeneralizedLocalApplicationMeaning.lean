@@ -90,18 +90,21 @@ theorem finish
     (trace : Staging.Recursive.Size.Statements program registry size child inputs.context
       entry.entry.environment entry.entry.heap function.body finalContext bodyOutcome after)
     (matched : Staging.Recursive.BodyResult function.resultType bodyOutcome outcome)
-    (represented : RecursiveStageMeaning.ResultRepresentsFor model entry.entry.mapping entry.entry.world
+    {bodyMap : LocationMap} {bodyWorld : StoreTyping}
+    (bodyMaps : LocationMap.Extends entry.entry.mapping bodyMap)
+    (bodyWorlds : WorldExtends entry.entry.world bodyWorld)
+    (represented : RecursiveStageMeaning.ResultRepresentsFor model bodyMap bodyWorld
       function.resultType material.code.receipt.resultCore faults outcome value)
-    (heaps : GenericHeap.CellHeapRepresents cells entry.entry.mapping entry.entry.world after bodyStore)
-    (bodyFrame : AdministrativePreserved entry.entry.mapping entry.entry.store entry.entry.mapping bodyStore)
+    (heaps : GenericHeap.CellHeapRepresents cells bodyMap bodyWorld after bodyStore)
+    (bodyFrame : AdministrativePreserved entry.entry.mapping entry.entry.store bodyMap bodyStore)
     (metadata : Dynamic.HeapMetadataExtend entry.entry.heap after)
     (effect : CellAwareScopeAuthority.Effect instances entry.entry.mapping entry.entry.world entry.entry.heap entry.entry.store
-      entry.entry.mapping entry.entry.world after bodyStore) :
+      bodyMap bodyWorld after bodyStore) :
     ResultAt (rawRegistry := rawRegistry) (faults := faults) (callerContext := callerContext) material functions caller outcome after value
       (bodyStore.set owner.key.frameLocation
         (encode compiled.indexed.ancestry.layout.frame (caller.rows owner.position).authority.current)) := by
   let bodyState := (administrativeTransport headers keys).extend reached
-    (LocationMap.Extends.refl _) (WorldExtends.refl _) bodyFrame metadata
+    bodyMaps bodyWorlds bodyFrame metadata
   have bodyRelated : Relates reached bodyState := Relates.of_records_eq rfl
   have bodyCaller := related.trans bodyRelated
   have prefixFrame : AdministrativePreserved mapping
@@ -112,7 +115,7 @@ theorem finish
     exact prefixPreserved
   have fullFrame := prefixFrame.trans bodyFrame
   obtain ⟨finalHeaps, finalFrame, _current, finalRelated⟩ := CellAwareOwnedBodyRestoration.restore_return
-    caller bodyState owner.position heaps entry.entry.worlds fullFrame bodyCaller
+    caller bodyState owner.position heaps (entry.entry.worlds.trans bodyWorlds) fullFrame bodyCaller
   have finalEffect := CellAwareOwnedBodyRestoration.restored_effect caller bodyState owner.position instances
     (prefixEffect.trans effect)
   let returned := CallableIndexedOwnedBodyRestoration.returned caller bodyState owner.position
@@ -129,7 +132,7 @@ theorem finish
       function.body staticFinal facts := by simpa only [source] using bodyTyped
   have successful := GeneralizedLocalBodySourceAdmission.successful wellFormed
     (by simpa only [source] using bodyRuntime.1) (by simpa only [evidence] using bodyRuntime.2)
-    entry.entry.locals (GeneralizedLocalTerminalBodyMeaning.heap_typed material inputs view functions entry frame raw)
+    entry.entry.locals (GeneralizedLocalOrdinaryBodyMeaning.heap_typed material inputs view functions entry frame raw)
     typedAt completes trace matched
   have post : PostAdmission bridge callerContext function.resultType outcome returned := by
     cases outcome with
@@ -142,8 +145,8 @@ theorem finish
     | fault failure => cases failure with
       | semantic reason => exact ⟨rows, by intro value same; cases same⟩
       | stage _ _ _ => exact rows
-  exact ⟨entry.entry.mapping, entry.entry.world, represented, finalHeaps, entry.entry.maps,
-    entry.entry.worlds, finalFrame, entry.entry.metadata.trans metadata, finalEffect, returned, finalRelated, post⟩
+  exact ⟨bodyMap, bodyWorld, represented, finalHeaps, entry.entry.maps.trans bodyMaps,
+    entry.entry.worlds.trans bodyWorlds, finalFrame, entry.entry.metadata.trans metadata, finalEffect, returned, finalRelated, post⟩
 
 include inputs extension atFrame frame raw stable runtime wellFormed uninitialized semantic in
 /-- Source application selects the actual body and parameter allocation. The
@@ -170,11 +173,14 @@ theorem preserves
       argumentsRep heaps raw.captures stable
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
-  obtain ⟨value, bodyStore, evaluated, represented, finalHeaps, bodyFrame, metadata, bodyEffect⟩ :=
-    GeneralizedLocalTerminalBodyMeaning.preserves material inputs view functions extension entry frame raw selected
+  obtain ⟨body,sameOutcome,sameHeap⟩ :=
+    GeneralizedLocalOrdinaryBodyMeaning.preserves material inputs view functions extension entry frame raw selected
       wellFormed uninitialized semantic bodyTrace matched
-  exact ⟨value, _, wrap evaluated, finish material view inputs functions owner caller frame raw stable runtime wellFormed
-    entry reached related effect selected bodyTrace matched represented finalHeaps bodyFrame metadata bodyEffect⟩
+  refine ⟨body.value, _, wrap body.evaluated, ?_⟩
+  exact finish material view inputs functions owner caller frame raw stable runtime wellFormed
+    entry reached related effect selected bodyTrace matched body.effect.maps body.effect.worlds
+    (sameOutcome.symm ▸ body.represented) (sameHeap.symm ▸ body.heaps) body.preserved
+    (sameHeap.symm ▸ body.effect.metadata) (sameHeap.symm ▸ body.effect)
 
 include inputs extension atFrame frame raw stable runtime wellFormed uninitialized semantic in
 /-- Native completion reflects through the same authentic view and parameters,
@@ -195,23 +201,14 @@ theorem reflects
     GeneralizedLocalViewedEntry.prepare material view inputs functions owner caller atFrame
       argumentsRep heaps raw.captures stable
   obtain ⟨bodyStore, bodyEvaluation, finalEq⟩ := unwrap completed
-  obtain ⟨sourceSize, sourceOutcome, after, bodyTrace, represented, finalHeaps, bodyFrame, metadata, bodyEffect⟩ :=
-    GeneralizedLocalTerminalBodyMeaning.reflects material inputs view functions extension entry frame raw selected
+  obtain ⟨body,sameValue,sameStore⟩ :=
+    GeneralizedLocalOrdinaryBodyMeaning.reflects material inputs view functions extension entry frame raw selected
       wellFormed uninitialized semantic bodyEvaluation
-  cases sourceOutcome with
-  | value sourceValue =>
-    have matched := CallableIndexedOwnedAdmittedStagedTerminalBody.body_result function.resultType (.value sourceValue)
-    have result := finish material view inputs functions owner caller frame raw stable runtime wellFormed
-      entry reached related effect selected bodyTrace matched represented finalHeaps bodyFrame metadata bodyEffect
-    refine ⟨_, .value sourceValue, after, .closure selected frame inputs.extended entry.entry.allocation bodyTrace matched, ?_⟩
-    rw [finalEq]
-    exact result
-  | fault reason =>
-    have matched := CallableIndexedOwnedAdmittedStagedTerminalBody.body_result function.resultType (.fault (.semantic reason))
-    have result := finish material view inputs functions owner caller frame raw stable runtime wellFormed
-      entry reached related effect selected bodyTrace matched represented finalHeaps bodyFrame metadata bodyEffect
-    refine ⟨_, .fault (.semantic reason), after, .closure selected frame inputs.extended entry.entry.allocation bodyTrace matched, ?_⟩
-    rw [finalEq]
-    exact result
+  have result := finish material view inputs functions owner caller frame raw stable runtime wellFormed
+    entry reached related effect selected body.trace body.matched body.effect.maps body.effect.worlds
+    body.represented body.heaps body.preserved body.effect.metadata body.effect
+  refine ⟨_, body.outcome, body.after, .closure selected frame inputs.extended entry.entry.allocation body.trace body.matched, ?_⟩
+  rw [finalEq]
+  simpa only [sameValue,sameStore] using result
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalApplicationMeaning

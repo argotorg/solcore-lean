@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalTerminalBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryBodyMeaning
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 

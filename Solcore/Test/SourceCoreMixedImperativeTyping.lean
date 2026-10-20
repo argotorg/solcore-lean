@@ -292,6 +292,12 @@ mutual
           let ⟨typeEq⟩ ← observe (node.type = child.facts.type) "mixed block type"
           return ⟨context,⟨child.facts.type,child.facts.sawReturn,child.facts.sawReturn,child.facts.control.eraseValue⟩,
             .block (lookupStatement?_sound found) form child.typed typeEq⟩
+        | .ifThen condition yes none =>
+          let ⟨conditionTyped⟩ ← expression fuel source context condition .bool
+          let yesTyped ← statements fuel source control context yes
+          let ⟨typeEq⟩ ← observe (node.type = .unit) "mixed branch without else type"
+          return ⟨context,⟨.unit,false,false,yesTyped.facts.control.branches (.ordinary .unit)⟩,
+            .ifWithoutElse (lookupStatement?_sound found) form conditionTyped yesTyped.typed typeEq⟩
         | .ifThen condition yes (some no) =>
           let ⟨conditionTyped⟩ ← expression fuel source context condition .bool
           let yesTyped ← statements fuel source control context yes
