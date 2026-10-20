@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized checker branches retain the selected final source (2026-10-20)
+
+`SourceCompiledGeneralizedSoundness.expressionRetained_step`, `placeRootedSoundness`, `statement_match` and `forItemsRooted_of_item` connect actual smaller calls to the same selected final source. The branch conclusions retain ordinary source judgments, actual contexts and all generalized state invariants.
+
+`statement_for_of_initializer_privacy` assembles all four actual loop children. `forItem_initialized_of_receipt` derives its header certificate from the actual allocation and selected finalizer. Their initializer privacy and concrete generalization barrier premises are internal obligations awaiting actual producers, not claims of completed public checker soundness.
+
+Goal two remains incomplete. The exact local generalization barrier and return-type privacy after newly generalized declarations remain explicit internal obligations. Their producers, the whole mutual checker proof, remaining compiler-pass preservation and the final selected meaning-preservation theorem are unfinished.
+
 ## Selected compilation records local owners and direct requirement emitters (2026-10-20)
 
 `SourcePreparedQualifiedLocalReadBindings.compiled_template_excludes` and `SourcePreparedQualifiedLocalReadOwner.compile_instance_templates` use actual compiled metadata and worklist instances to identify template ownership. The appended worklist lemmas preserve the original executable definitions.

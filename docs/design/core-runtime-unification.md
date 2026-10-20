@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Lambda entry and expression dispatch now use the actual smaller inference calls. Writable places, simple and compound assignments, annotated declarations and statement sequencing preserve ordinary source typing in the same selected final source.
+
+Conditional branches, while loops and match arms retain the actual successor state and restore genuine saved scopes. Match inference covers single and multiple scrutinees, all arms and both default branches. Pattern and body inference supply return-type privacy at each arm entry.
+
+For-header traversal now covers expression and assignment items, annotated declarations and generalized initialized declarations. The complete for-loop consumer connects the actual initializer, condition, body and post calls to statement typing and the complete generalized successor state.
+
+Goal two remains incomplete. The exact local generalization barrier and return-type privacy after newly generalized declarations remain explicit internal obligations. Their producers, the whole mutual checker proof, remaining compiler-pass preservation and the final selected meaning-preservation theorem are unfinished.
+
 Qualified local-read metadata now identifies the actual discovered local lambda binding. The checked row and the worklist instance retain the same complete binding identity, including its original binder and quantified variables.
 
 The actual inference computation now supplies direct requirement emitters for all eleven recursive inference families. Candidate selection and call recording retain the concrete call node; successful public compilation supplies the original body receipts.

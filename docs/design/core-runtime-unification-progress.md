@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized checker branches retain the selected final source (2026-10-20)
+
+Lambda entry and expression dispatch now use the actual smaller inference calls. Writable places, simple and compound assignments, annotated declarations and statement sequencing preserve ordinary source typing in the same selected final source.
+
+Conditional branches, while loops and match arms retain the actual successor state and restore genuine saved scopes. Match inference covers single and multiple scrutinees, all arms and both default branches. Pattern and body inference supply return-type privacy at each arm entry.
+
+For-header traversal now covers expression and assignment items, annotated declarations and generalized initialized declarations. The complete for-loop consumer connects the actual initializer, condition, body and post calls to statement typing and the complete generalized successor state.
+
+Validation: 48 changed modules in a coherent graph of 8,908 modules, 65 retained runtime invocations and 6,988 endpoint audits. Full build (8,947 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The exact local generalization barrier and return-type privacy after newly generalized declarations remain explicit internal obligations. Their producers, the whole mutual checker proof, remaining compiler-pass preservation and the final selected meaning-preservation theorem are unfinished.
+
 ## Selected compilation records local owners and direct requirement emitters (2026-10-20)
 
 Qualified local-read metadata now identifies the actual discovered local lambda binding. The checked row and the worklist instance retain the same complete binding identity, including its original binder and quantified variables.
