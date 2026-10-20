@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual public compilation supplies the original checker inputs (2026-10-21)
+
+Successful public compilation now yields the same underlying Core compilation, actual compiled artifact, preparation recipe and raw checker result. The public bridge consumes the complete cached-body checker result rather than assuming independently supplied source typing.
+
+Every cached ordinary or implementation-method body has original template ownership and scope, including nested retained binders. The new method fixture keeps the original body, nonempty generalized templates and actual selected cache.
+
+The actual compiler also derives callable-contract enablement and the exact diagnostic table from successful preparation. These facts no longer need an independently supplied readiness claim.
+
+Validation: 9 changed modules in a coherent graph of 8,999 modules, 74 retained runtime invocations and 7,406 endpoint audits. Full build (9,038 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The public initial-row bridge still requires exact cached initializer barriers and the existing restricted StaticProfile. Actual inference call provenance and unrestricted compiler-pass preservation are being connected to remove these assumptions.
+
 ## One generalized checker covers every actual cached body (2026-10-20)
 
 The existing recursive checker proof now accepts BodySelection, retaining a genuine ordinary-function or implementation-method origin and the same original body receipt. All five recursive families reuse the same syntax proofs.

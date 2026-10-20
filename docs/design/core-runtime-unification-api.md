@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual public compilation supplies the original checker inputs (2026-10-21)
+
+SelectedCompilationRawPublicReceipt.of_compile retains the actual public/Core artifact identity. SelectedCompilationCheckedPublicProfile.Receipt.bodies and initial_row connect actual checking to cached body typing and the existing public execution theorem. SelectedCompilationPreparedRuntimeFacts.of_compiled derives runtime policy and diagnostic availability.
+
+SourceBodyTemplateScope.cached_selection_scope and SourceBodyRetainedTemplatePrivacy.cached_statement/cached_header use BodySelection for both ordinary and implementation-method origins. No ordinary-origin membership premise is imposed on method bodies.
+
+Goal two remains incomplete. The public initial-row bridge still requires exact cached initializer barriers and the existing restricted StaticProfile. Actual inference call provenance and unrestricted compiler-pass preservation are being connected to remove these assumptions.
+
 ## One generalized checker covers every actual cached body (2026-10-20)
 
 SourceCompiledCachedMethodValidity.compile_cached_bodies_of_barriers is the complete-cache checker endpoint. BodyInitializerOccurrence and BodyInitializerBarriers use the shared body carrier; ordinary Selected and InitializerOccurrence entry APIs retain explicit adapters.

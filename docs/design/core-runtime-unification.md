@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Successful public compilation now yields the same underlying Core compilation, actual compiled artifact, preparation recipe and raw checker result. The public bridge consumes the complete cached-body checker result rather than assuming independently supplied source typing.
+
+Every cached ordinary or implementation-method body has original template ownership and scope, including nested retained binders. The new method fixture keeps the original body, nonempty generalized templates and actual selected cache.
+
+The actual compiler also derives callable-contract enablement and the exact diagnostic table from successful preparation. These facts no longer need an independently supplied readiness claim.
+
+Goal two remains incomplete. The public initial-row bridge still requires exact cached initializer barriers and the existing restricted StaticProfile. Actual inference call provenance and unrestricted compiler-pass preservation are being connected to remove these assumptions.
+
 The existing recursive checker proof now accepts BodySelection, retaining a genuine ordinary-function or implementation-method origin and the same original body receipt. All five recursive families reuse the same syntax proofs.
 
 Actual method catalog membership supplies the synthetic signature, header, rigid predicate scope and return formation. The original checked body then produces MethodDefinition.Valid. Ordinary FunctionDefinition.Valid keeps its existing entry API through definitional adapters.
