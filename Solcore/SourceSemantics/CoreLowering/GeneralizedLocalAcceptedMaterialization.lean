@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalNamedMaterialization
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalReadView
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAppliedSourceOrigins
 
 /-! Materialized local functions retain their real compiler row, Source
 instantiation, lexical capture and read-time view. The relation records no
@@ -33,9 +34,7 @@ structure Materialization (compiled : SourceCoreUnifiedCompilation.Compiled)
   initializer : inputs.initializer = binding.initializer
   candidateSource : candidate.origin.source = binding.source
   candidateBinder : candidate.origin.binder.id = binding.binder.id
-  descriptorSource : descriptor.source = binding.source
   descriptorInitializer : descriptor.initializer = binding.initializer
-  binderScheme : descriptor.binder.scheme = binding.binder.scheme
   origin : Origin compiled.indexed descriptor binding lexical
   descriptorUnique : NodeOccurrencesUnique descriptor.source
   sourceCaptures : Dynamic.GeneralizedClosureCaptures descriptor.definitionContext descriptor.source
@@ -67,7 +66,6 @@ structure Materialization (compiled : SourceCoreUnifiedCompilation.Compiled)
   certificate : HEq code.receipt packet.certificate
   view : code.view = packet.original.emission.prepared.source
   reasons : code.reasonAt = inputs.reasonAt
-  source : function.source = packet.original.emission.prepared.source
   rawTyped : RuntimeValueHasType world (CallableIndexedLambdaValues.value code captured.embedding origin.native actual)
     candidate.type compiled.indexed.layouts.definitions
   ownership : LocalIdentityOwnership function.source
@@ -90,11 +88,28 @@ theorem Materialization.frame_reference (material : Materialization compiled map
   simpa only [Code.referenceIndex, material.compilation, GeneralizedLocalInstanceValues.referenceIndex]
     using material.frameReference
 
-theorem Materialization.source_receipt (material : Materialization compiled mapping world function) :
+/-- Canonical provenance belongs to the compiler view. The independently
+substituted runtime Source is carried by the actual paired history. -/
+theorem Materialization.compiler_source_receipt (material : Materialization compiled mapping world function) :
     LambdaSourceAlignment.SourceReceipt compiled.indexed.base.sourceProgram compiled.indexed.base.plan
-      material.code.compilation.owner material.code.active function.source :=
-  GeneralizedLocalMaterializedCode.source_receipt material.indexed material.code
-    material.compilation material.active material.source
+      material.code.compilation.owner material.code.active material.code.view := by
+  have authentic : LambdaSourceAlignment.SourceReceipt material.inputs.program material.inputs.current.plan
+      material.candidate.origin.caller material.packet.original.emission.prepared.substitution
+      material.packet.original.emission.prepared.source :=
+    .contextual material.packet.original.emission.authentic
+  simpa only [material.indexed.program, material.indexed.plan, ← material.indexed.owner,
+    material.compilation, material.active, material.view, GeneralizedLocalLambdaCompilation.context] using authentic
+
+/-- Compatibility for clients whose actual source is the canonical compiler
+view. General applied origins use the independent paired-source producer. -/
+theorem Materialization.source_receipt_of_eq (material : Materialization compiled mapping world function)
+    (same : function.source = material.code.view) :
+    LambdaSourceAlignment.SourceReceipt compiled.indexed.base.sourceProgram compiled.indexed.base.plan
+      material.code.compilation.owner material.code.active function.source := by
+  rw [same]
+  exact material.compiler_source_receipt
+
+abbrev Materialization.source_receipt := @Materialization.source_receipt_of_eq
 
 theorem Materialization.native_type (material : Materialization compiled mapping world function) :
     material.candidate.type = CallableContract.functionType material.code.receipt.parameterCore material.code.receipt.resultCore := by
@@ -213,13 +228,18 @@ theorem Association.stage_origin
       (.closure function) native := by
   cases member with
   | viewed material view _ =>
-    have prepared := RecursiveNamedPreparedStageContracts.of_compiled compiled
-      compiled.indexed.ancestry.graph.inputs.callableSelected
-    have sourceReceipt := material.source_receipt
-    rw [(SourceCoreUnifiedPreparationCertificates.compiled_fields compiled).1] at sourceReceipt
-    exact CompatibleAmbientStageOrigins.actual_lambda_origin prepared.accepted material.code.descriptor
-      sourceReceipt material.code.viewOfSource material.unique material.code.found
-      (material.code.form.trans material.code.sourceForm) _
+    have captures : Dynamic.GeneralizedClosureCaptures material.descriptor.definitionContext
+        material.descriptor.source material.descriptor.captured material.descriptor.binder
+        view.recipe.read.entry.view.principal.initializer material.descriptor := by
+      rw [← view.initializer]
+      exact material.sourceCaptures
+    let payload : Value := match view.native with
+      | .pair payload _ => payload
+      | _ => .unit
+    have result := GeneralizedLocalAppliedSourceOrigins.materialized material.origin view.recipe
+      captures material.descriptorUnique material.instantiation view.scheme view.actualType payload
+    simpa only [← material.materialized, payload, View.native, GeneralizedLocalReadView.value] using result.2
+
 
 theorem Association.observation
     (member : Association compiled mapping world function native bindings parameter result)

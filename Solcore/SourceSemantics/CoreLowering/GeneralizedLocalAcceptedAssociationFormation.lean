@@ -41,8 +41,6 @@ theorem materialize_framed
   cases row with
   | retained packet indexed acceptedBody sameLexical owner instanceInitializer candidateSource candidateBinder descriptorSource origin captured declarations ownership issuer frameReference typed runtimeTyped =>
     have initializerEq := initializer.trans instanceInitializer.symm
-    have sourceEq := GeneralizedLocalNamedMaterialization.source_eq receipt instantiation sameScheme sameType
-      descriptorSource candidateSource packet
     obtain ⟨code, compilation, active, _id, loweredEq, _policy, _lowerBody, _fuel, _descriptor, _certificate, codeView, reasons, valueEq⟩ :=
       GeneralizedLocalNamedMaterialization.code_at_read receipt instantiation sameScheme sameType
         descriptorSource candidateSource packet indexed captures unique initializerEq captured typed profile origin.native
@@ -56,14 +54,14 @@ theorem materialize_framed
       { descriptor := descriptor, binding := receipt.binding, lexical := lexical
         inputs := _, candidate := receipt.candidate, raw := _, packet := packet, indexed := indexed, body := acceptedBody
         sameLexical := sameLexical, owner := owner, initializer := instanceInitializer
-        candidateSource := candidateSource, candidateBinder := candidateBinder, descriptorSource := descriptorSource, descriptorInitializer := initializer, binderScheme := sameScheme
+        candidateSource := candidateSource, candidateBinder := candidateBinder, descriptorInitializer := initializer
         origin := origin, descriptorUnique := unique, sourceCaptures := captures, context := context, callerEvidence := callerEvidence
         produced := produced, actualType := actualType, requirements := requirements, semantic := semantic
         instantiation := instantiation, materialized := rfl, actual := _, captured := captured
         capturedDeclarations := GeneralizedLocalScopeDeclarations.materialized declarations semantic (produced ++ callerEvidence.applySubstitution semantic)
         frameLocation := frameLocation, frameReference := frameReference, code := code
         compilation := compilation, active := active, lowered := loweredEq, codeId := _id, policy := _policy, lowerBody := _lowerBody,
-        fuel := _fuel, descriptorId := _descriptor, certificate := _certificate, view := codeView, reasons := reasons, source := sourceEq,
+        fuel := _fuel, descriptorId := _descriptor, certificate := _certificate, view := codeView, reasons := reasons,
         rawTyped := valueEq.symm ▸ runtimeTyped,
         ownership := FlexibleSubstitution.LocalIdentityOwnership.applySubstitution semantic ownership,
         issuer := issuer, unique := materializedUnique }

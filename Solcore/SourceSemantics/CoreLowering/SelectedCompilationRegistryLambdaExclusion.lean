@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationRegistryGlobals
 import Solcore.SourceSemantics.SourceInferenceSoundness
+import Solcore.SourceSemantics.CoreLowering.CallableIndependentSourceViews
 
 /-! A lambda body cannot also be the complete declaration root list of a
 successfully checked source forest. This distinguishes registry entry kinds. -/
@@ -52,6 +53,12 @@ theorem lambda_header {plan : Plan} {owner : Key} {id : ExpressionId}
       exact lookupExpression?_sound recipe.source_node
     · rw [parameters, result, body]
       exact recipe.source_node_form
+
+  | independentApplied recipe _ _ _ _ _ paired header =>
+    obtain ⟨node, found, _, form⟩ := (CallableIndependentSourceViews.of_pair paired).expression
+      recipe.source_node
+    exact ⟨_, node, lookupExpression?_sound found,
+      form.trans (recipe.source_node_form.trans (recipe.header.trans header.symm))⟩
 
 theorem root_exists {source : TypedSource} {id : NodeId}
     (reachable : Reachable source id) : ∃ root, root ∈ source.roots := by

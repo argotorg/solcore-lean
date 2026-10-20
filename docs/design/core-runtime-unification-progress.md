@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Independent Source through generalized closure creation and entry (2026-10-21)
+
+Generalized closure creation, marked allocation, stored-row reads and initializer continuation now share a snapshot representation that retains the actual compiler packet, body receipt, captured environment and frame. The general path carries its independently instantiated runtime Source through the actual paired history.
+
+The actual read recipe supplies the descriptor stage origin. Runtime Source is distinct from the native compiler view in the named/contextual body invocation index. Arbitrary-active stored-row reads retain the exact original snapshot and preserve the heap and capture environment.
+
+The former source-equality path remains an adapter over the shared snapshot model. Materialization.source_receipt now takes explicit Source equality; general stage origins use the actual Source instantiation instead. Initializer completion preserves both evaluation directions and the exact allocated store, environments and frame reference.
+
+Validation: 17 changed modules in a coherent graph of 9,034 modules, 74 retained runtime invocations and 7,565 endpoint audits. Full build (9,073 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Code.viewOfSource still requires a global metadata correspondence, and the general materialization producer must derive the needed correspondence from the actual candidate compilation and runtime history. Whole-body simulation, checker barrier removal and the final Source/Core/public theorem remain unfinished.
+
 ## Checker recursion retains its exact actual calls (2026-10-21)
 
 All eleven inference families now have an exact call index and child steps derived from the real syntax, guards, prefixes and threaded states. Every selected ordinary or method body supplies its actual accepted root. Initializer receipts are unique for the same exact call.

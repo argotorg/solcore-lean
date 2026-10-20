@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Independent Source through generalized closure creation and entry (2026-10-21)
+
+GeneralizedLocalAcceptedInstances.Snapshot and modelWith share the representation used by the original model and trackedModel. GeneralizedLocalAppliedSourceOrigins derives applied stage origins from the same authentic recipe. ActualBodyInvocation.Index retains separate source and compilerSource fields and an accepted body at the latter.
+
+Located.preserves_snapshot keeps the retained row at an arbitrary compatible active context. GeneralizedLocalAcceptedPrefix.complete_tracked connects actual descriptor allocation to the emitted continuation with capture, heap, frame and protocol preservation. Expression and flow bounds remain internal assembly contracts.
+
+Goal two remains incomplete. Code.viewOfSource still requires a global metadata correspondence, and the general materialization producer must derive the needed correspondence from the actual candidate compilation and runtime history. Whole-body simulation, checker barrier removal and the final Source/Core/public theorem remain unfinished.
+
 ## Checker recursion retains its exact actual calls (2026-10-21)
 
 SourceInferenceExecution.CallIndex, ChildStep and CallOccurrence retain actual computation provenance. BodySelection.inferenceCall supplies the real selected root. OrderedExpressionCalls retains the genuine argument calls. The shared expression and statement entry points use the For and _for APIs while retaining existing theorem names as adapters.
