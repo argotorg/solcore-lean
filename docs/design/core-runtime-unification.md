@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-21.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+All eleven inference families now have an exact call index and child steps derived from the real syntax, guards, prefixes and threaded states. Every selected ordinary or method body supplies its actual accepted root. Initializer receipts are unique for the same exact call.
+
+Group, tuple, ordered arguments, named calls, statement sequences, unary and binary operators, and mapping indices now share their existing semantic proof bodies under a predicate on those actual calls. Old APIs use the same proofs through unrestricted adapters. A selected unary call retains the real operand as an ordered singleton without claiming that a synthetic list call occurred.
+
+This keeps the actual inference state alongside the original semantic boundary, allowing later initialization conditions to refer to the same computation. The change preserves existing checker consumers and introduces no arbitrary state equality or privacy transport law.
+
+Goal two remains incomplete. The remaining syntax dispatch and mutual recursive assembly must consume this provenance. Actual complete initializer lifetimes must then remove the cached-body barrier premise. Unrestricted compiler-pass preservation and the final Source/Core/public theorem are also unfinished.
+
 Successful selected compilation now supplies local candidate metadata from its real preparation and callable-contract attachment. Actual binding lookup and contextual filtering retain the same caller, binder identity, contextual lambda, closed function type and native parameter and result projections.
 
 The generalized descriptor representation carries the actual candidate packet and complete body compiler receipt. Creation, ordered bundle storage, marked allocation, raw reads and materialization retain the same captured environment and saved frame. The representation no longer requires the old finite body profile.

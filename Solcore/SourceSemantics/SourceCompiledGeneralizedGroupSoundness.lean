@@ -1,23 +1,27 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
-import Solcore.SourceSemantics.SourceCompiledGeneralizedExpressionRooted
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
 
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 /-- The actual group child is checked in the same selected final source. -/
-theorem expressionRetained_group
+theorem expressionRetained_group_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression inner : Syntax.Expr}
     {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
     (expressionEq : expression.value = .group inner)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
       expression expected initial inferred resultState frames target) :
@@ -70,7 +74,9 @@ theorem expressionRetained_group
     exact boundary.integerLiterals
   have childRequirements := List.Subset.trans
     (Detail.recordExpressionWithExpected_requirements_subset recorded) boundary.requirements
-  have typed := expressionRooted_of_retained checked recursive ({
+  have childHere := descend here
+    (ChildStep.expression_group boundary.accepted expressionEq allocationEq innerSuccess)
+  have typed := expressionRooted_of_retained_for checked recursive childHere ({
     accepted := innerSuccess
     interfaces := boundary.interfaces
     extension := innerExtension
@@ -96,5 +102,23 @@ theorem expressionRetained_group
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
     recorded boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
     (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant formType typed.type_admissible boundary.covered
+
+/-- Compatibility with unrestricted recursive typing. -/
+theorem expressionRetained_group
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression inner : Syntax.Expr}
+    {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (expressionEq : expression.value = .group inner)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_group_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) trivial expressionEq boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

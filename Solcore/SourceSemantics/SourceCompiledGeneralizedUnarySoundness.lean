@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedNamedCall
 import Solcore.SourceSemantics.SourceInferenceSelectedOperatorRecording
@@ -7,14 +8,15 @@ set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem expressionRetained_unary_operator
+theorem expressionRetained_unary_operator_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression operandExpression : Syntax.Expr}
     {operator : Syntax.Located Syntax.UnaryOp} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
@@ -26,6 +28,8 @@ theorem expressionRetained_unary_operator
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (operandSuccess : Detail.inferExprFuel childFuel inferenceContext operandExpression none allocated =
       .ok (operand, operandState))
+    (operandHere : provenance (.expression childFuel inferenceContext operandExpression none
+      allocated operand operandState))
     (operatorSuccess : Detail.inferUnaryOperator inferenceContext operator.value operand.type expected
       (Detail.relevantIntegerLiterals operandState allocated.integerLiterals.length [operand])
       operandState = .ok operatorResult)
@@ -107,7 +111,7 @@ theorem expressionRetained_unary_operator
   have childRequirements := List.Subset.trans
     (Detail.inferUnaryOperator_requirements_subset operatorSuccess)
     (List.Subset.trans (Detail.recordExpressionWithExpected_requirements_subset recorded) requirementsSubset)
-  have typed := expressionRooted_of_retained checked recursive ({
+  have typed := expressionRooted_of_retained_for checked recursive operandHere ({
     accepted := operandSuccess
     interfaces := boundary.interfaces
     extension := childExtension
@@ -154,6 +158,78 @@ theorem expressionRetained_unary_operator
       resources.solve_success resources.solved_context_eq resources.ledger resources.ownership
       invariant.signaturesEq invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
+theorem expressionRetained_unary_operator
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression operandExpression : Syntax.Expr}
+    {operator : Syntax.Located Syntax.UnaryOp} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target)
+    {allocated operandState : State} {id : ExpressionId}
+    {operand : InferredExpression} {operatorResult : Detail.OperatorInferenceResult}
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (operandSuccess : Detail.inferExprFuel childFuel inferenceContext operandExpression none allocated =
+      .ok (operand, operandState))
+    (operatorSuccess : Detail.inferUnaryOperator inferenceContext operator.value operand.type expected
+      (Detail.relevantIntegerLiterals operandState allocated.integerLiterals.length [operand])
+      operandState = .ok operatorResult)
+    (recorded : Detail.recordExpressionWithExpected inferenceContext expression id operatorResult.type
+      (.unary operator.value operand.id) operatorResult.requirements expected
+      operatorResult.state = .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_unary_operator_for (provenance := fun _ => True) checked
+    (fun _ boundary => recursive boundary) boundary allocationEq operandSuccess trivial
+    operatorSuccess recorded
+
+theorem expressionRetained_unary_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed provenance)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor provenance selected smaller)
+    {inferenceContext : SourceInference.Context} {expression operandExpression : Syntax.Expr}
+    {operator : Syntax.Located Syntax.UnaryOp} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
+    (expressionEq : expression.value = .unary operator operandExpression)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  generalize allocationEq : initial.allocateExpressionId = pair
+  obtain ⟨id, allocated⟩ := pair
+  obtain ⟨operand, operandState, operandSuccess, dispatch⟩ :=
+    Detail.inferExprFuel_success_unary_facts expressionEq allocationEq boundary.accepted
+  have operandHere := descend here
+    (ChildStep.expression_unary boundary.accepted expressionEq allocationEq operandSuccess)
+  cases dispatch with
+  | directFunction _ _ operatorSuccess recorded =>
+      exact expressionRetained_unary_operator_for checked (recursive childFuel (Nat.lt_succ_self _))
+        boundary allocationEq operandSuccess operandHere operatorSuccess recorded
+  | traitMethod _ operatorSuccess recorded =>
+      exact expressionRetained_unary_operator_for checked (recursive childFuel (Nat.lt_succ_self _))
+        boundary allocationEq operandSuccess operandHere operatorSuccess recorded
+  | selectedFunction _ lookup selectedCall recorded =>
+      have argumentCalls := OrderedExpressionCalls.singleton operandSuccess operandHere
+      have argumentsSuccess := argumentCalls.accepted
+      have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
+        rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+        exact boundary.operational.allocateExpressionId
+      exact selectedCall_typing_for checked recursive boundary
+        (boundary.invariant.allocateExpressionId allocationEq) allocatedOperational
+        (by simpa only [allocateExpressionId_inferenceNext_eq allocationEq] using boundary.expectedBelow)
+        argumentCalls argumentsSuccess selectedCall recorded (Detail.functionsNamed_success_subset_catalog lookup)
+
 theorem expressionRetained_unary
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -169,29 +245,8 @@ theorem expressionRetained_unary
       expression expected initial inferred resultState frames target) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
       selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
-  generalize allocationEq : initial.allocateExpressionId = pair
-  obtain ⟨id, allocated⟩ := pair
-  obtain ⟨operand, operandState, operandSuccess, dispatch⟩ :=
-    Detail.inferExprFuel_success_unary_facts expressionEq allocationEq boundary.accepted
-  cases dispatch with
-  | directFunction _ _ operatorSuccess recorded =>
-      exact expressionRetained_unary_operator checked (recursive childFuel (Nat.lt_succ_self _))
-        boundary allocationEq operandSuccess operatorSuccess recorded
-  | traitMethod _ operatorSuccess recorded =>
-      exact expressionRetained_unary_operator checked (recursive childFuel (Nat.lt_succ_self _))
-        boundary allocationEq operandSuccess operatorSuccess recorded
-  | selectedFunction _ lookup selectedCall recorded =>
-      have argumentsSuccess : Detail.inferExprsFuel (childFuel + 1) inferenceContext [operandExpression] allocated =
-          .ok ([operand], operandState) := by
-        cases childFuel with
-        | zero => simp [Detail.inferExprFuel] at operandSuccess
-        | succ childFuel => simp [Detail.inferExprsFuel, operandSuccess, bind, Except.bind, pure, Except.pure]
-      have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
-        rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
-        exact boundary.operational.allocateExpressionId
-      exact selectedCall_typing checked recursive boundary
-        (boundary.invariant.allocateExpressionId allocationEq) allocatedOperational
-        (by simpa only [allocateExpressionId_inferenceNext_eq allocationEq] using boundary.expectedBelow)
-        argumentsSuccess selectedCall recorded (Detail.functionsNamed_success_subset_catalog lookup)
-
+  exact expressionRetained_unary_for (provenance := fun _ => True) checked true_childClosed
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary) trivial expressionEq boundary
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

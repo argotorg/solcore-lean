@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Checker recursion retains its exact actual calls (2026-10-21)
+
+SourceInferenceExecution.CallIndex, ChildStep and CallOccurrence retain actual computation provenance. BodySelection.inferenceCall supplies the real selected root. OrderedExpressionCalls retains the genuine argument calls. The shared expression and statement entry points use the For and _for APIs while retaining existing theorem names as adapters.
+
+The semantic boundaries and source typing conclusions remain unchanged. Provenance refers to exact input and output states; synthetic unary argument lists receive no invented reachability evidence.
+
+Goal two remains incomplete. The remaining syntax dispatch and mutual recursive assembly must consume this provenance. Actual complete initializer lifetimes must then remove the cached-body barrier premise. Unrestricted compiler-pass preservation and the final Source/Core/public theorem are also unfinished.
+
 ## Actual generalized descriptors preserve capture frames through body entry (2026-10-21)
 
 PreparedLocalInstanceMetadata.of_preparation and SelectedCompilationLocalMetadata.of_compiled derive metadata from actual compiler execution. GeneralizedLocalAcceptedInitializer.formation, GeneralizedLocalAcceptedMaterialization, GeneralizedLocalAcceptedBodyCompiler.body_receipt, GeneralizedLocalAcceptedInvocation.enters and GeneralizedLocalAcceptedPrefix.complete retain the exact descriptor through storage, readout and entry.

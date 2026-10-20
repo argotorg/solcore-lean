@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Checker recursion retains its exact actual calls (2026-10-21)
+
+All eleven inference families now have an exact call index and child steps derived from the real syntax, guards, prefixes and threaded states. Every selected ordinary or method body supplies its actual accepted root. Initializer receipts are unique for the same exact call.
+
+Group, tuple, ordered arguments, named calls, statement sequences, unary and binary operators, and mapping indices now share their existing semantic proof bodies under a predicate on those actual calls. Old APIs use the same proofs through unrestricted adapters. A selected unary call retains the real operand as an ordered singleton without claiming that a synthetic list call occurred.
+
+This keeps the actual inference state alongside the original semantic boundary, allowing later initialization conditions to refer to the same computation. The change preserves existing checker consumers and introduces no arbitrary state equality or privacy transport law.
+
+Validation: 19 changed modules in a coherent graph of 9,027 modules, 74 retained runtime invocations and 7,516 endpoint audits. Full build (9,066 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The remaining syntax dispatch and mutual recursive assembly must consume this provenance. Actual complete initializer lifetimes must then remove the cached-body barrier premise. Unrestricted compiler-pass preservation and the final Source/Core/public theorem are also unfinished.
+
 ## Actual generalized descriptors preserve capture frames through body entry (2026-10-21)
 
 Successful selected compilation now supplies local candidate metadata from its real preparation and callable-contract attachment. Actual binding lookup and contextual filtering retain the same caller, binder identity, contextual lambda, closed function type and native parameter and result projections.

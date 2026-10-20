@@ -6,18 +6,22 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 /-- The actual tuple elements share the selected finalizer and carry generalized state through their ordered checker calls. -/
-theorem expressionRetained_tuple
+theorem expressionRetained_tuple_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    (descend : ChildClosed provenance)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor provenance selected smaller)
     {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr}
     {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
     (expressionEq : expression.value = .tuple elements)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
       expression expected initial inferred resultState frames target) :
@@ -75,9 +79,11 @@ theorem expressionRetained_tuple
     exact boundary.integerLiterals
   have childRequirements := List.Subset.trans
     (Detail.recordExpressionWithExpected_requirements_subset recorded) boundary.requirements
-  have typed := expressionsRooted checked childFuel
+  have elementsHere := descend here
+    (ChildStep.expression_tuple boundary.accepted expressionEq allocationEq elementsSuccess)
+  have typed := expressionsRooted_for checked descend childFuel
     (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self childFuel)))
-    elementsSuccess boundary.interfaces elementsExtension boundary.scope
+    elementsHere elementsSuccess boundary.interfaces elementsExtension boundary.scope
     allocatedInvariant boundary.actual allocatedOperational
     (fun element member => (boundary.rawProper.childSubtree (edge element member)).monoBefore elementsToParent)
     childPatterns childLiterals childRequirements
@@ -97,5 +103,25 @@ theorem expressionRetained_tuple
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
     recorded boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
     (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant formType rawAdmissible boundary.covered
+
+/-- Compatibility with unrestricted recursive typing. -/
+theorem expressionRetained_tuple
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundness selected smaller)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr}
+    {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (expressionEq : expression.value = .tuple elements)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_tuple_for (provenance := fun _ => True) checked true_childClosed
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary) trivial expressionEq boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

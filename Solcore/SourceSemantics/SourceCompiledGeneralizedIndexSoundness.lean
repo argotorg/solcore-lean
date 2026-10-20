@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceInferenceGeneralizedConstructorState
 import Solcore.SourceSemantics.SourceInferenceSelectedExpressionList
@@ -7,7 +8,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend Frontend.SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 private theorem fresh_eq_typingSourceExtends
     {initial final : Frontend.SourceInference.State}
@@ -63,16 +64,20 @@ private theorem unify_success_typingSourceExtends
     rw [(Detail.unify_occurrenceState_eq success).1]
     exact List.prefix_rfl
 
-theorem expressionRetained_index
+theorem expressionRetained_index_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression baseExpression indexExpression : Syntax.Expr}
     {brackets : Syntax.SourceSpan} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
     (expressionEq : expression.value = .index baseExpression brackets indexExpression)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
       expression expected initial inferred resultState frames target) :
@@ -393,7 +398,9 @@ theorem expressionRetained_index
       (List.mem_map.mpr ⟨child, member, rfl⟩ : NodeId.expression child ∈
         [baseResult.id, indexResult.id].map NodeId.expression)
   have baseEdge := edge baseResult.id (by simp)
-  have baseTypeRaw := expressionRooted_of_retained checked recursive ({
+  have baseHere := descend here
+    (ChildStep.expression_index_base boundary.accepted expressionEq allocationEq baseSuccess)
+  have baseTypeRaw := expressionRooted_of_retained_for checked recursive baseHere ({
     accepted := baseSuccess
     interfaces := boundary.interfaces
     extension := laterBase
@@ -448,7 +455,10 @@ theorem expressionRetained_index
     simpa [Frontend.SourceInference.State.resolve,
       TypeSystem.InferState.resolve] using laterMapping keyType
   have indexEdge := edge indexResult.id (by simp)
-  have indexTypeRaw := expressionRooted_of_retained checked recursive ({
+  have indexHere := descend here
+    (ChildStep.expression_index_key boundary.accepted expressionEq allocationEq baseSuccess
+      keyFresh valueFresh mappingSuccess indexSuccess)
+  have indexTypeRaw := expressionRooted_of_retained_for checked recursive indexHere ({
     accepted := indexSuccess
     interfaces := boundary.interfaces
     extension := laterIndex
@@ -507,5 +517,23 @@ theorem expressionRetained_index
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
     recorded resultSubstitutionExtension requirementsSubset boundary.expressionRequirements boundary.coercionPrimaries
     catalog signaturesEq invariant formType rawAdmissible covered
+
+theorem expressionRetained_index
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression baseExpression indexExpression : Syntax.Expr}
+    {brackets : Syntax.SourceSpan} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (expressionEq : expression.value = .index baseExpression brackets indexExpression)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_index_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) trivial expressionEq boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

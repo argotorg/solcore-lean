@@ -9,16 +9,17 @@ set_option maxRecDepth 4096
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
 /-- Candidate selection and argument attachment consume the actual retained
 argument proofs in the same selected final source. -/
-theorem selectedCall_typing
+theorem selectedCall_typing_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundness selected smaller)
+    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundnessFor provenance selected smaller)
     {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}
     {expected : Option Ty} {parentInitial initial argumentState resultState : State}
     {inferred : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
@@ -31,6 +32,8 @@ theorem selectedCall_typing
     (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
     (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
     (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentCalls : OrderedExpressionCalls provenance inferenceContext childFuel
+      argumentSources initial arguments argumentState)
     (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
       .ok (arguments, argumentState))
     (selectionSuccess : Detail.selectFunctionCandidateFrom inferenceContext name candidates arguments
@@ -138,7 +141,7 @@ theorem selectedCall_typing
     rw [recordSuccess, Detail.SelectedMetadata.tryFunctionCandidate_integerLiterals_eq candidateSuccess] at recordedLiterals
     rw [← recordedLiterals]
     exact integerLiteralsSubset
-  have argumentBases := expressionsRetainedBases checked childFuel recursive argumentsSuccess
+  have argumentBases := expressionsRetainedBases_for checked childFuel recursive argumentCalls argumentsSuccess
     interfaces argumentExtension boundary.scope invariant actual operational argumentPreserved
     argumentPatterns argumentLiterals argumentRequirements
     (fun argument member => covered.expressionChild resources.graph_closed (boundary.directChildren (argumentEdge argument member)))
@@ -202,5 +205,39 @@ theorem selectedCall_typing
       signatureMember activeSignaturesEq resources.solve_success resources.solved_context_eq
       resources.ledger resources.ownership invariant.signaturesEq invariant.solvedRequirementsEq
       invariant.assumptionsMono covered (.nil _))
+
+/-- The previous API supplies unrestricted head provenance from actual argument inference. -/
+theorem selectedCall_typing
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundness selected smaller)
+    {inferenceContext : SourceInference.Context} {expression callee : Syntax.Expr}
+    {expected : Option Ty} {parentInitial initial argumentState resultState : State}
+    {inferred : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {name : String} {candidates : List ProgramFunctionSignature}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {attempt : Detail.CandidateAttemptResult}
+    (boundary : RetainedExpressionBoundary selected parentFuel inferenceContext expression expected
+      parentInitial inferred resultState frames target)
+    (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
+      .ok (arguments, argumentState))
+    (selectionSuccess : Detail.selectFunctionCandidateFrom inferenceContext name candidates arguments
+      integerLiteralOrigins call expected argumentState = .ok attempt)
+    (recording : Detail.recordSelectedCall expression callee name arguments attempt = (inferred, resultState))
+    (candidatesSubset : candidates ⊆ inferenceContext.signatures.functions) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact selectedCall_typing_for (provenance := fun _ => True) checked
+    (fun smaller less => by
+      intro context source expected initial final value frames target _ boundary
+      exact recursive smaller less boundary)
+    boundary invariant operational expectedBelow (OrderedExpressionCalls.of_accepted argumentsSuccess)
+    argumentsSuccess selectionSuccess recording candidatesSubset
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

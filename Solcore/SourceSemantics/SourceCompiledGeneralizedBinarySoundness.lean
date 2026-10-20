@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceCompiledProvenanceExpressionContracts
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedUnarySoundness
 import Solcore.SourceSemantics.SourceInferenceSelectedBinarySoundness
@@ -7,14 +8,15 @@ set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization
+open SourceCompiledLocalFinalization SourceInferenceExecution
 
-theorem expressionRetained_binary_operator
+theorem expressionRetained_binary_operator_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (recursive : ExpressionRetainedSoundness selected childFuel)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression leftExpression rightExpression : Syntax.Expr}
     {operator : Syntax.Located Syntax.BinaryOp} {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
@@ -27,6 +29,10 @@ theorem expressionRetained_binary_operator
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (leftSuccess : Detail.inferExprFuel childFuel inferenceContext leftExpression none allocated = .ok (left, leftState))
     (rightSuccess : Detail.inferExprFuel childFuel inferenceContext rightExpression none leftState = .ok (right, rightState))
+    (leftHere : provenance (.expression childFuel inferenceContext leftExpression none
+      allocated left leftState))
+    (rightHere : provenance (.expression childFuel inferenceContext rightExpression none
+      leftState right rightState))
     (operatorSuccess : Detail.inferBinaryOperator inferenceContext operator.value left.type right.type expected
       (Detail.relevantIntegerLiterals rightState allocated.integerLiterals.length [left, right])
       rightState = .ok operatorResult)
@@ -123,7 +129,7 @@ theorem expressionRetained_binary_operator
   have rightRequirements := List.Subset.trans
     (Detail.inferBinaryOperator_requirements_subset operatorSuccess)
     (List.Subset.trans (Detail.recordExpressionWithExpected_requirements_subset recorded) requirementsSubset)
-  have leftTyped := expressionRooted_of_retained checked recursive ({
+  have leftTyped := expressionRooted_of_retained_for checked recursive leftHere ({
     accepted := leftSuccess
     interfaces := boundary.interfaces
     extension := leftExtension
@@ -143,7 +149,7 @@ theorem expressionRetained_binary_operator
   have leftInvariant := allocatedInvariant.ofExpression signatureFormation functionsCanonical (by simp) leftExtension leftSuccess
   have leftOperational := allocatedOperational.ofExpression allocatedInvariant.ready catalog
     signatureFormation functionsCanonical (by simp) (by simp) leftSuccess
-  have rightTyped := expressionRooted_of_retained checked recursive ({
+  have rightTyped := expressionRooted_of_retained_for checked recursive rightHere ({
     accepted := rightSuccess
     interfaces := boundary.interfaces
     extension := rightExtension
@@ -187,12 +193,43 @@ theorem expressionRetained_binary_operator
       resources.solve_success resources.solved_context_eq resources.ledger resources.ownership
       invariant.signaturesEq invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
-theorem expressionRetained_binary_selected
+theorem expressionRetained_binary_operator
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression leftExpression rightExpression : Syntax.Expr}
+    {operator : Syntax.Located Syntax.BinaryOp} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target)
+    {allocated leftState rightState : State} {id : ExpressionId}
+    {left right : InferredExpression}
+    {operatorResult : Detail.OperatorInferenceResult}
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (leftSuccess : Detail.inferExprFuel childFuel inferenceContext leftExpression none allocated = .ok (left, leftState))
+    (rightSuccess : Detail.inferExprFuel childFuel inferenceContext rightExpression none leftState = .ok (right, rightState))
+    (operatorSuccess : Detail.inferBinaryOperator inferenceContext operator.value left.type right.type expected
+      (Detail.relevantIntegerLiterals rightState allocated.integerLiterals.length [left, right])
+      rightState = .ok operatorResult)
+    (recorded : Detail.recordExpressionWithExpected inferenceContext expression id operatorResult.type
+      (.binary left.id operator.value right.id) operatorResult.requirements expected
+      operatorResult.state = .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_binary_operator_for (provenance := fun _ => True) checked
+    (fun _ boundary => recursive boundary) boundary allocationEq leftSuccess rightSuccess
+    trivial trivial operatorSuccess recorded
+
+theorem expressionRetained_binary_selected_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expression leftExpression rightExpression : Syntax.Expr}
     {expected : Option Ty}
     {initial resultState : State} {inferred : InferredExpression}
@@ -206,6 +243,10 @@ theorem expressionRetained_binary_selected
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (leftSuccess : Detail.inferExprFuel childFuel inferenceContext leftExpression none allocated = .ok (left, leftState))
     (rightSuccess : Detail.inferExprFuel childFuel inferenceContext rightExpression none leftState = .ok (right, rightState))
+    (leftHere : provenance (.expression childFuel inferenceContext leftExpression none
+      allocated left leftState))
+    (rightHere : provenance (.expression childFuel inferenceContext rightExpression none
+      leftState right rightState))
     (selectionSuccess : Detail.selectFunctionCandidateFrom inferenceContext name candidates [left, right]
       (Detail.relevantIntegerLiterals rightState allocated.integerLiterals.length [left, right])
       id (some .bool) rightState = .ok attempt)
@@ -358,7 +399,7 @@ theorem expressionRetained_binary_selected
   have leftNodes := (Detail.inferExprFuel_occurrenceBoundExtends leftSuccess).nodesBelowNextOccurrence allocatedInvariant.nodesBelow
   have leftToRight := inferExprFuel_success_typingSourceExtends rightSuccess leftNodes roots
   have leftPreserved := (argumentPreserved left (by simp)).monoBefore leftToRight
-  have leftTyped := recursive ({
+  have leftTyped := recursive leftHere ({
     accepted := leftSuccess
     interfaces := boundary.interfaces
     extension := leftExtension
@@ -384,7 +425,7 @@ theorem expressionRetained_binary_selected
   have leftOperational := allocatedOperational.ofExpression allocatedInvariant.ready catalog
     signatureFormation functionsCanonical (by simp) (by simp) leftSuccess
   have rightPreserved := argumentPreserved right (by simp)
-  have rightTyped := recursive ({
+  have rightTyped := recursive rightHere ({
     accepted := rightSuccess
     interfaces := boundary.interfaces
     extension := rightExtension
@@ -490,6 +531,77 @@ theorem expressionRetained_binary_selected
       resources.ledger resources.ownership invariant.signaturesEq invariant.solvedRequirementsEq
       invariant.assumptionsMono covered trailing)
 
+theorem expressionRetained_binary_selected
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression leftExpression rightExpression : Syntax.Expr}
+    {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target)
+    {allocated leftState rightState : State} {id : ExpressionId}
+    {left right : InferredExpression}
+    {name : String} {candidates : List ProgramFunctionSignature}
+    {attempt : Detail.CandidateAttemptResult} {fitted : Detail.ExpectationResult} {callee : Syntax.Expr}
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (leftSuccess : Detail.inferExprFuel childFuel inferenceContext leftExpression none allocated = .ok (left, leftState))
+    (rightSuccess : Detail.inferExprFuel childFuel inferenceContext rightExpression none leftState = .ok (right, rightState))
+    (selectionSuccess : Detail.selectFunctionCandidateFrom inferenceContext name candidates [left, right]
+      (Detail.relevantIntegerLiterals rightState allocated.integerLiterals.length [left, right])
+      id (some .bool) rightState = .ok attempt)
+    (fitting : Detail.withExpected inferenceContext attempt.state attempt.result expected = .ok fitted)
+    (recordSuccess : Detail.recordSelectedCallResult expression callee name [left, right] attempt
+      fitted.expression fitted.coercions fitted.state = (inferred, resultState))
+    (candidatesSubset : candidates ⊆ inferenceContext.signatures.functions) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  exact expressionRetained_binary_selected_for (provenance := fun _ => True) checked
+    (fun _ boundary => recursive boundary) boundary allocationEq leftSuccess rightSuccess
+    trivial trivial selectionSuccess fitting recordSuccess candidatesSubset
+
+theorem expressionRetained_binary_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed provenance)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression leftExpression rightExpression : Syntax.Expr}
+    {operator : Syntax.Located Syntax.BinaryOp} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
+    (expressionEq : expression.value = .binary leftExpression operator rightExpression)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  generalize allocationEq : initial.allocateExpressionId = pair
+  obtain ⟨id, allocated⟩ := pair
+  obtain ⟨left, leftState, right, rightState, leftSuccess, rightSuccess, dispatch⟩ :=
+    Detail.inferExprFuel_success_binary_facts expressionEq allocationEq boundary.accepted
+  have leftHere := descend here
+    (ChildStep.expression_binary_left boundary.accepted expressionEq allocationEq leftSuccess)
+  have rightHere := descend here
+    (ChildStep.expression_binary_right boundary.accepted expressionEq allocationEq leftSuccess rightSuccess)
+  cases dispatch with
+  | directFunction _ _ operatorSuccess recorded =>
+      exact expressionRetained_binary_operator_for checked recursive boundary
+        allocationEq leftSuccess rightSuccess leftHere rightHere operatorSuccess recorded
+  | traitMethod _ operatorSuccess recorded =>
+      exact expressionRetained_binary_operator_for checked recursive boundary
+        allocationEq leftSuccess rightSuccess leftHere rightHere operatorSuccess recorded
+  | selectedFunction _ lookup selectedCall fitted recorded =>
+      exact expressionRetained_binary_selected_for checked recursive boundary
+        allocationEq leftSuccess rightSuccess leftHere rightHere selectedCall fitted recorded
+        (Detail.functionsNamed_success_subset_catalog lookup)
+
 theorem expressionRetained_binary
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -505,20 +617,7 @@ theorem expressionRetained_binary
       expression expected initial inferred resultState frames target) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
       selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
-  generalize allocationEq : initial.allocateExpressionId = pair
-  obtain ⟨id, allocated⟩ := pair
-  obtain ⟨left, leftState, right, rightState, leftSuccess, rightSuccess, dispatch⟩ :=
-    Detail.inferExprFuel_success_binary_facts expressionEq allocationEq boundary.accepted
-  cases dispatch with
-  | directFunction _ _ operatorSuccess recorded =>
-      exact expressionRetained_binary_operator checked recursive boundary
-        allocationEq leftSuccess rightSuccess operatorSuccess recorded
-  | traitMethod _ operatorSuccess recorded =>
-      exact expressionRetained_binary_operator checked recursive boundary
-        allocationEq leftSuccess rightSuccess operatorSuccess recorded
-  | selectedFunction _ lookup selectedCall fitted recorded =>
-      exact expressionRetained_binary_selected checked recursive boundary
-        allocationEq leftSuccess rightSuccess selectedCall fitted recorded
-        (Detail.functionsNamed_success_subset_catalog lookup)
+  exact expressionRetained_binary_for (provenance := fun _ => True) checked true_childClosed
+    (fun _ boundary => recursive boundary) trivial expressionEq boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

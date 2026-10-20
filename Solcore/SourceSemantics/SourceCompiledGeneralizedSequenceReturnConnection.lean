@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.SourceCompiledBodySelectionFormation
 import Solcore.SourceSemantics.SourceCompiledGeneralizedAssemblyContracts
+import Solcore.SourceSemantics.SourceCompiledProvenanceStatementContracts
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementSequence
 import Solcore.SourceSemantics.SourceCompiledGeneralizedStatementReturnPrivacy
 
@@ -7,21 +8,25 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
-open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness
+open SourceCompiledLocalFinalization SourceInferenceStatementsSoundness SourceInferenceExecution
 
 variable {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
     {selected : BodySelection compiled row fuel}
 
 /-- The actual head statement derives the return privacy required by the tail. -/
-theorem statements_cons_with_return
+theorem statements_cons_with_return_for
+    {provenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (headSound : StatementRootedSoundness selected childFuel)
-    (tailSound : StatementsRootedSoundness selected childFuel)
+    (descend : ChildClosed provenance)
+    (headSound : StatementRootedSoundnessFor provenance selected childFuel)
+    (tailSound : StatementsRootedSoundnessFor provenance selected childFuel)
     {inferenceContext : SourceInference.Context} {expectedReturn : Ty}
     {initial : State} {result : Detail.BlockResult}
     {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
     {statement next : Syntax.Statement} {rest : List Syntax.Statement}
+    (here : provenance (.statements (childFuel + 1) inferenceContext
+      (statement :: next :: rest) expectedReturn initial result))
     (returnSafe : ∀ binder ∈ initial.localBinders,
       ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
     (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
@@ -57,7 +62,8 @@ theorem statements_cons_with_return
       actualCovered := boundary.actualCovered head.id (by simp) } :
       StatementBoundary selected childFuel inferenceContext statement expectedReturn initial head frames target)
   obtain ⟨middle, headFacts, middleInvariant, middleActual, middleOperational, headTyping, headAgreement⟩ :=
-    headSound returnSafe returnAdmissible headBoundary
+    headSound (descend here (.statements_head boundary.accepted headAccepted))
+      returnSafe returnAdmissible headBoundary
   have middleSafe := headBoundary.return_safe checked returnSafe
   have middleAdmissible : TypeAdmissible middle (selected.body.finalized.substitution.apply expectedReturn) :=
     StructuralSubstitution.TypeAdmissible.transportContext
@@ -74,7 +80,8 @@ theorem statements_cons_with_return
     rw [assumptionsEq]
     exact boundary.covered id (by simp [member]) owner scopes
   obtain ⟨finalContext, tailFacts, invariant, actual, operational, tailTyping, tailAgreement⟩ :=
-    tailSound middleSafe middleAdmissible ({
+    tailSound (descend here (.statements_tail boundary.accepted (by simp) headAccepted tailAccepted))
+      middleSafe middleAdmissible ({
       accepted := tailAccepted
       interfaces := boundary.interfaces
       extension := boundary.extension
@@ -107,17 +114,66 @@ theorem statementsRooted_zero : StatementsRootedSoundness selected 0 := by
   cases success
 
 /-- Source-order recursion consumes the smaller actual statement and block proofs. -/
+theorem statementsRooted_step_for
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed provenance)
+    (headSound : StatementRootedSoundnessFor provenance selected childFuel)
+    (tailSound : StatementsRootedSoundnessFor provenance selected childFuel) :
+    StatementsRootedSoundnessFor provenance selected (childFuel + 1) := by
+  intro inferenceContext statements expectedReturn initial result frames target here returnSafe returnAdmissible boundary
+  cases statements with
+  | nil => exact statements_nil boundary
+  | cons statement rest =>
+    cases rest with
+    | nil =>
+        apply statements_singleton boundary
+        intro head childBoundary
+        exact headSound (descend here (.statements_head boundary.accepted childBoundary.accepted))
+          returnSafe returnAdmissible childBoundary
+    | cons next rest =>
+        exact statements_cons_with_return_for checked descend headSound tailSound
+          here returnSafe returnAdmissible boundary
+
+theorem statementsRooted_zero_for {provenance : CallIndex → Prop} :
+    StatementsRootedSoundnessFor provenance selected 0 := by
+  intro context source expected initial result frames target _ safe admissible boundary
+  exact statementsRooted_zero safe admissible boundary
+
+theorem statements_cons_with_return
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (headSound : StatementRootedSoundness selected childFuel)
+    (tailSound : StatementsRootedSoundness selected childFuel)
+    {inferenceContext : SourceInference.Context} {expectedReturn : Ty}
+    {initial : State} {result : Detail.BlockResult}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {statement next : Syntax.Statement} {rest : List Syntax.Statement}
+    (returnSafe : ∀ binder ∈ initial.localBinders,
+      ProtectedVariables.Safe binder.scheme.quantified initial expectedReturn)
+    (returnAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expectedReturn))
+    (boundary : StatementsBoundary selected (childFuel + 1) inferenceContext
+      (statement :: next :: rest) expectedReturn initial result frames target) :
+    StatementsConclusion selected inferenceContext expectedReturn result frames target := by
+  exact statements_cons_with_return_for (provenance := fun _ => True) checked true_childClosed
+    (by
+      intro context source expected initial result frames target _ safe admissible boundary
+      exact headSound safe admissible boundary)
+    (by
+      intro context source expected initial result frames target _ safe admissible boundary
+      exact tailSound safe admissible boundary) trivial returnSafe returnAdmissible boundary
+
 theorem statementsRooted_step
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (headSound : StatementRootedSoundness selected childFuel)
     (tailSound : StatementsRootedSoundness selected childFuel) :
     StatementsRootedSoundness selected (childFuel + 1) := by
-  intro inferenceContext statements expectedReturn initial result frames target returnSafe returnAdmissible boundary
-  cases statements with
-  | nil => exact statements_nil boundary
-  | cons statement rest =>
-    cases rest with
-    | nil => exact statements_singleton boundary (fun head => headSound returnSafe returnAdmissible head)
-    | cons next rest => exact statements_cons_with_return checked headSound tailSound returnSafe returnAdmissible boundary
+  intro context source expected initial result frames target safe admissible boundary
+  exact statementsRooted_step_for (provenance := fun _ => True) checked true_childClosed
+    (by
+      intro context source expected initial result frames target _ safe admissible boundary
+      exact headSound safe admissible boundary)
+    (by
+      intro context source expected initial result frames target _ safe admissible boundary
+      exact tailSound safe admissible boundary) trivial safe admissible boundary
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness

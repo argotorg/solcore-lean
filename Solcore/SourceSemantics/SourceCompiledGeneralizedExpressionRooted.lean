@@ -54,12 +54,14 @@ theorem RootedExpressionBoundary.retained
 
 /-- Root preservation upgrades retained expression typing using the same
 selected finalizer's formation proof for that actual recorded node. -/
-theorem expressionRooted_of_retained {raw : Workspace.RawWorkspace}
+theorem RootedExpressionBoundary.typing_of_base {raw : Workspace.RawWorkspace}
+    (boundary : RootedExpressionBoundary selected childFuel inferenceContext expression expected
+      initial inferred resultState frames target)
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
-    (sound : ExpressionRetainedSoundness selected childFuel) :
-    ExpressionRootedSoundness selected childFuel := by
-  intro inferenceContext expression expected initial resultState inferred frames target boundary
-  have base := sound boundary.retained
+    (base : ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred) :
+    ExpressionHasType selected.body.finalized.typedSource target inferred.id
+      (selected.body.finalized.substitution.apply inferred.type) := by
   cases base with
   | @intro node rawType plan contains typeEq formType rawAdmissible requirements =>
       have member : Node.expression node ∈ (evidenceSource selected).nodes :=
@@ -76,5 +78,14 @@ theorem expressionRooted_of_retained {raw : Workspace.RawWorkspace}
         simpa only [typeEq] using formed
       exact (ExpressionTypingBase.intro contains typeEq formType rawAdmissible requirements
         ).expressionHasType boundary.finalNodes finalAdmissible
+
+
+/-- The original unrestricted recursive API uses the shared final-node step. -/
+theorem expressionRooted_of_retained {raw : Workspace.RawWorkspace}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (sound : ExpressionRetainedSoundness selected childFuel) :
+    ExpressionRootedSoundness selected childFuel := by
+  intro inferenceContext expression expected initial resultState inferred frames target boundary
+  exact boundary.typing_of_base checked (sound boundary.retained)
 
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
