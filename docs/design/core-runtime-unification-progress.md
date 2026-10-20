@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generalized calls, operators and constructors use the selected final source (2026-10-20)
+
+Unary and binary operators, mapping index reads and constructor expressions now consume actual smaller checker calls under the same selected body and finalizer. Fresh constructor payload types and mapping key/value variables obtain their privacy conditions from actual allocation and unification. Binary selected-function calls retain their argument coercions and trailing result coercion.
+
+Call dispatch now covers named functions, builtins, constructors and indirect calls. Indirect callees use the actual argument-list result state. Each branch produces ordinary Source typing in the selected final source without requiring monomorphic locals.
+
+The initialized-statement consumer uses a minimal occurrence derived from the accepted annotated or unannotated declaration and its retained node. It no longer carries unused suffix-privacy obligations. Actual pattern inference preserves old binders and introduces monomorphic binders with no requirements, preserving generalized capture origins, template backing, allocator bounds and privacy.
+
+Validation: 24 changed modules in a coherent graph of 8,851 modules, 62 retained runtime invocations and 6,828 endpoint audits. Full build (8,890 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. Whole mutual checker assembly must still connect lambda bodies and the remaining statement branches. The concrete selected compilation generalization barrier is still explicit. Complete compiler-pass preservation and the final selected meaning-preservation theorem with compiler-derived obligations remain unfinished.
+
 ## Generalized checker recursion consumes actual child results (2026-10-20)
 
 The generalized expression contracts now fix one selected function body and its actual finalizer. They distinguish the raw typing of a child whose root may acquire coercion metadata from typing a retained root in the whole final source. Literal, identifier, proxy, group, tuple, conditional and ordered expression-list cases consume smaller actual checker calls without a monomorphic-local restriction.

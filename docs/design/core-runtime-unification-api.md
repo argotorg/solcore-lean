@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generalized calls, operators and constructors use the selected final source (2026-10-20)
+
+`expressionRetained_unary`, `expressionRetained_binary`, `expressionRetained_index` and `expressionRetained_call` consume actual selected expression boundaries. The call dispatch uses `selectedCall_typing`, `builtinCall_typing`, `indirectCall_typing` and the constructor branch. `constructorArgumentsRooted` checks ordered arguments against the actual payload types; `GeneralizedActualStateInvariant.unify` and `GeneralizedActualStateInvariant.ofExpressions` supply the operational continuation.
+
+`InitializerOccurrence.of_accepted` constructs the minimal initialized-declaration receipt from the actual accepted statement and final retained subtree. `InitializedOccurrenceBoundary.sound` consumes that receipt and the smaller expression hypothesis. Pattern active-state results retain old capture origins and actual template rows; expected scrutinee privacy remains an explicit caller obligation.
+
+Goal two remains incomplete. Whole mutual checker assembly must still connect lambda bodies and the remaining statement branches. The concrete selected compilation generalization barrier is still explicit. Complete compiler-pass preservation and the final selected meaning-preservation theorem with compiler-derived obligations remain unfinished.
+
 ## Generalized checker recursion consumes actual child results (2026-10-20)
 
 `RetainedExpressionBoundary` and `RootedExpressionBoundary` retain the actual call and selected finalizer. `expressionRooted_of_retained` uses the real finalizer to upgrade retained raw typing. The atomic, group, tuple and conditional cases and `expressionsRooted` provide concrete recursive branches; `InitializedStatementBoundary.sound` applies their smaller rooted contract to the exact initializer and returns the full following statement invariant.
