@@ -99,9 +99,9 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
     CompatibleExpressionReads.LoweredRead fuel (.initial checked) invocation.source context reasonAt scope id lowered →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
-  (wellFormed : ProgramWellFormed program)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
-include extension uninitialized semantic wellFormed in
+include extension uninitialized semantic selectedBodies in
 theorem terminal {context scope mode statements expression lowered node expected}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (head : Terminal invocation.source expression mode statements)
@@ -110,7 +110,7 @@ theorem terminal {context scope mode statements expression lowered node expected
       (reasonAt := reasonAt) context scope expression lowered) :
     Nonempty (Result entry registry faults mode statements expected lowered.type (LocalLoop.returnValue lowered.type lowered.expression)) := by
   obtain ⟨size,outcome,after,value,finalStore,trace,evaluated,represented,heaps,preserved,effect,_,determines⟩ :=
-    CellAwareLexicalBodyExpressions.expression functions extension uninitialized semantic wellFormed entry certificate found
+    CellAwareLexicalBodyExpressions.expression functions extension uninitialized semantic selectedBodies entry certificate found
   have actualHead : CallableIndexedOwnedAdmittedStagedScopedTerminalStatements.Head invocation expression mode statements := by
     cases head with
     | returning rest found form => exact .returning rest (lookupStatement?_sound found) form

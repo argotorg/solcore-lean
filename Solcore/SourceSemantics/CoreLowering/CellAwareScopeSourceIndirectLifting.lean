@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourcePrefixLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyCompiler
@@ -45,8 +47,8 @@ local notation "stages" => SelectedCompilationPhysicalProgramSupport.stages comp
 include positive port runtime unique in
 /-- The finite compiler certificate determines the actual callee and call
 body. The only recursive inputs are the ordered argument children. -/
-theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+theorem indirect_selected {children : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) (SelectedCompilationPhysicalProgramSupport.stages compiled))
     (covers : invocation.evidence.Covers context)
     (budget : Nat)
     (calleeCertificate : GeneralizedLocalNamedReadCompilation.Certificate compiled.indexed named
@@ -107,7 +109,7 @@ theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : Rec
         obtain ⟨_nativeCallee, _representedCallee, _strong, _calleeHeaps, _calleeMaps, _calleeWorlds,
           _calleeFrame, calleeMetadata, _calleeEffect, _calleeReached, _calleeRelated, calleeAdmission⟩ := _calleePost
         obtain ⟨sourceValuesTyped, _heapTyped, argumentMetadata⟩ :=
-          CallableIndexedOwnedPreparedStagedSuccessfulArgumentTyping.values_at wellFormed runtime covers
+          SelectedStagedArgumentTyping.values_at selectedBodies runtime covers
             (locals.mono calleeMetadata) calleeAdmission.at_value.2.heap argumentsTyped argumentsTrace
         obtain ⟨packed, packing⟩ := Dynamic.ValuesPack.exists_pack sources
         have raw := CallableIndexedOwnedStoredClosureSourceArguments.at_arguments runtime
@@ -115,10 +117,30 @@ theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : Rec
         cases association with
         | viewed material _view _typed =>
           obtain ⟨inputs⟩ := GeneralizedLocalBodyCompiler.entry_context material frame material.ownership
-          exact GeneralizedLocalSourceApplicationLifting.selected_application material inputs wellFormed raw arity called
+          exact GeneralizedLocalSourceApplicationLifting.selected_application material inputs (selectedBodies) raw arity called
       · exact SelectedCompilationStageApplicationArity.closure_mismatch arity called
     obtain ⟨staged, reached, applied, adapted⟩ := lifted
     exact ⟨staged, reached, .applied occurrence compiler.argumentCoercions calleeTrace.sound accepted
       argumentsTrace.sound port.sourceParent.arity applied, adapted⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include positive port runtime unique in
+theorem indirect {children : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (covers : invocation.evidence.Covers context)
+    (budget : Nat)
+    (calleeCertificate : GeneralizedLocalNamedReadCompilation.Certificate compiled.indexed named
+      invocation.source scope callee reasonAt compiler.calleeCode)
+    (calleeRecipe : GeneralizedLocalNamedRecipeCompilation.Receipt calleeCertificate)
+    {sourceTypes : List TypeSystem.Ty}
+    (tree : DataExpressionSequence.Tree invocation.source children scope ids sourceTypes compiler.codes)
+    (childLift : ∀ size, size < budget → LiftsAt bridge context model named stages invocation children size)
+    (preservation : ∀ size, CellAwareScopeExpressionBounds.PreservesAt
+      bridge context model named stages invocation children faults size)
+    (calleeMeaning : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt
+      bridge context model named stages invocation faults size) :
+    LiftsAt bridge context model named stages invocation
+      (CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds.Point scope id lowered) budget := by
+  apply indirect_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)  <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceIndirectLifting

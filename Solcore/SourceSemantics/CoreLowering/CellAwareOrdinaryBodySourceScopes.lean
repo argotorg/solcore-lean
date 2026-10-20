@@ -17,7 +17,7 @@ theorem Post.trans {context before middle after outcome}
   cases outcome <;> try exact trivial
   all_goals exact ⟨post.1,extension.trans post.2⟩
 
-theorem discard (wellFormed : ProgramWellFormed program)
+theorem discard (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {checked : SourceCoreCompatibleCatalog.Checked} {reasonAt context scope mode semicolon id node expression expressionNode lowered rest}
     (found : invocation.source.lookupStatement? id = some node) (form : node.form = .expression expression semicolon)
     (continuing : semicolon = true ∨ mode = false)
@@ -31,7 +31,7 @@ theorem discard (wellFormed : ProgramWellFormed program)
     exact ⟨.expressionFault (lookupStatement?_sound found) form (CellAwareOrdinaryBodySourceState.expression certificate state.runtime.graph.nodeOccurrencesUnique child),trivial⟩
   · obtain ⟨_,_,_,_,_,_,child,tail⟩ := done
     have first := CellAwareOrdinaryBodySourceState.expression (registry := registry) certificate state.runtime.graph.nodeOccurrencesUnique child
-    obtain ⟨_,reached,extension⟩ := expression_typed wellFormed certificate expressionFound state child
+    obtain ⟨_,reached,extension⟩ := expression_typed selectedBodies certificate expressionFound state child
     obtain ⟨lifted,post⟩ := remaining reached tail
     refine ⟨?_,post.trans extension⟩
     rcases continuing with rfl | rfl

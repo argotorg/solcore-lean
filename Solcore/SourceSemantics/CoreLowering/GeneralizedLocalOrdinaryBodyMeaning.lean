@@ -32,7 +32,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationM
   {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   (selected : registry.Closure function invocation)
   {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
-  (wellFormed : ProgramWellFormed program)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
   (uninitialized : ∀ {id : ExpressionId} {node : ExpressionNode} {name : String} {binder : Resolved.LocalId},
     function.source.lookupExpression? id = some node → node.form = .reference name (.local binder) →
     ∀ location, semanticFaults (.uninitializedLocation location) (material.code.reasonAt id))
@@ -103,7 +103,7 @@ structure Result where
   determines : CellAwareLexicalBodyDeterminacy.Body (program := program) (registry := registry) (invocation := invocation)
     true inputs.context entry.entry.environment entry.entry.heap function.body finalContext bodyOutcome after
 
-include extension frame raw selected wellFormed uninitialized semantic in
+include extension frame raw selected selectedBodies uninitialized semantic in
 theorem completes : Nonempty (Result (program := program) (registry := registry) (invocation := invocation) (faults := faults) material inputs view functions entry) := by
   obtain ⟨flow,emitted,tree⟩ := GeneralizedLocalOrdinaryBodyAdmission.tree material inputs frame
   have source := registry.source selected
@@ -117,7 +117,7 @@ theorem completes : Nonempty (Result (program := program) (registry := registry)
     exact uninitialized (by simpa only [source] using leaf.metadata.found) leaf.form
   let start := state material inputs view functions entry frame raw selected
   obtain ⟨result⟩ := CellAwareLexicalBodyCompletion.completes (registry := registry)
-    rfl (CallableIndexedAmbient.frame_registered compiled.indexed) extension issued semantic wellFormed tree start
+    rfl (CallableIndexedAmbient.frame_registered compiled.indexed) extension issued semantic selectedBodies tree start
   have noEscaped : result.outcome.embed.NoEscapedControl := by
     cases result.outcome <;> constructor <;> intro _ impossible <;> cases impossible
   have represented := result.represented.to_function (GeneralizedLocalOrdinaryBodyAdmission.result_projected material) noEscaped
@@ -142,27 +142,27 @@ theorem completes : Nonempty (Result (program := program) (registry := registry)
     effect := result.effect
     determines := result.determines }⟩
 
-include extension frame raw selected wellFormed uninitialized semantic in
+include extension frame raw selected selectedBodies uninitialized semantic in
 theorem preserves {size finalContext bodyOutcome outcome after}
     (trace : Staging.Recursive.Size.Statements program registry size invocation inputs.context
       entry.entry.environment entry.entry.heap function.body finalContext bodyOutcome after)
     (matched : Staging.Recursive.BodyResult function.resultType bodyOutcome outcome) :
     ∃ result : Result (program := program) (registry := registry) (invocation := invocation) (faults := faults) material inputs view functions entry,
       outcome = result.outcome ∧ after = result.after := by
-  obtain ⟨result⟩ := completes material inputs view functions extension entry frame raw selected wellFormed uninitialized semantic
+  obtain ⟨result⟩ := completes material inputs view functions extension entry frame raw selected selectedBodies uninitialized semantic
   obtain ⟨_,same,heap⟩ := result.determines trace
   have outcomeEq := (CallableIndexedOwnedAdmittedStagedLexicalFooter.outcome_eq matched).trans
     ((congrArg CallableIndexedOwnedAdmittedStagedLexicalFlow.result same).trans
       (CallableIndexedOwnedAdmittedStagedLexicalFooter.outcome_eq result.matched).symm)
   exact ⟨result,outcomeEq,heap⟩
 
-include extension frame raw selected wellFormed uninitialized semantic in
+include extension frame raw selected selectedBodies uninitialized semantic in
 theorem reflects {value finalStore}
     (completed : Evaluates entry.entry.actualBody entry.entry.store
       (material.code.receipt.body.rename entry.entry.embedding) value finalStore) :
     ∃ result : Result (program := program) (registry := registry) (invocation := invocation) (faults := faults) material inputs view functions entry,
       result.value = value ∧ result.store = finalStore := by
-  obtain ⟨result⟩ := completes material inputs view functions extension entry frame raw selected wellFormed uninitialized semantic
+  obtain ⟨result⟩ := completes material inputs view functions extension entry frame raw selected selectedBodies uninitialized semantic
   exact ⟨result,evaluation_deterministic result.evaluated completed⟩
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryBodyMeaning

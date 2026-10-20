@@ -33,9 +33,9 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
     CompatibleExpressionReads.LoweredRead fuel (.initial checked) invocation.source context reasonAt scope id lowered →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
-  (wellFormed : ProgramWellFormed program)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
-include definitions registered extension uninitialized semantic wellFormed in
+include definitions registered extension uninitialized semantic selectedBodies in
 theorem completes {context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError (.initial checked) invocation.source
       (CellAwareLexicalBodyExpressions.Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt))
@@ -51,11 +51,11 @@ theorem completes {context scope mode statements expected type code}
     exact CellAwareLexicalBodyLeaves.returnUnit entry rest found form
   | returnValue rest found form expressionFound valueType value =>
     intro entry
-    exact CellAwareLexicalBodyLeaves.terminal extension uninitialized semantic wellFormed entry
+    exact CellAwareLexicalBodyLeaves.terminal extension uninitialized semantic selectedBodies entry
       (.returning rest found form) expressionFound valueType value
   | tail found form expressionFound valueType value =>
     intro entry
-    exact CellAwareLexicalBodyLeaves.terminal extension uninitialized semantic wellFormed entry
+    exact CellAwareLexicalBodyLeaves.terminal extension uninitialized semantic selectedBodies entry
       (.tail found form) expressionFound valueType value
   | uninitialized found form mono extended ordinary projected allocation annotation same remaining ih =>
     intro entry
@@ -63,28 +63,28 @@ theorem completes {context scope mode statements expected type code}
       projected allocation annotation same ih
   | initialized found form mono extended ordinary initializerFound sourceType initial allocation annotation same remaining ih =>
     intro entry
-    exact CellAwareLexicalBodyInitialized.completes definitions registered extension uninitialized semantic wellFormed
+    exact CellAwareLexicalBodyInitialized.completes definitions registered extension uninitialized semantic selectedBodies
       entry found form mono extended ordinary initializerFound sourceType initial allocation annotation same ih
   | discard found form notTail continuing expressionFound value remaining ih =>
     intro entry
-    exact CellAwareLexicalBodyDiscard.completes extension uninitialized semantic wellFormed
+    exact CellAwareLexicalBodyDiscard.completes extension uninitialized semantic selectedBodies
       entry found form continuing expressionFound value ih
   | block found form inner remaining innerIH restIH =>
     intro entry
     exact CellAwareLexicalBodyBlock.completes entry found form innerIH restIH
   | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH restIH =>
     intro entry
-    exact CellAwareLexicalBodyConditional.completes extension uninitialized semantic wellFormed
+    exact CellAwareLexicalBodyConditional.completes extension uninitialized semantic selectedBodies
       entry found form conditionFound conditionType conditionTree thenIH elseIH (.inl restIH)
   | terminalBlock unique found form inner stops issued innerIH =>
     intro entry
     exact CellAwareLexicalBodyBlock.stopped entry found form stops innerIH
   | terminalIf unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
     intro entry
-    exact CellAwareLexicalBodyConditional.completes extension uninitialized semantic wellFormed
+    exact CellAwareLexicalBodyConditional.completes extension uninitialized semantic selectedBodies
       entry found form conditionFound conditionType conditionTree thenIH elseIH (.inr ⟨thenStops,elseStops⟩)
 
-include definitions registered extension uninitialized semantic wellFormed in
+include definitions registered extension uninitialized semantic selectedBodies in
 theorem reflects {context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError (.initial checked) invocation.source
       (CellAwareLexicalBodyExpressions.Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt))
@@ -94,11 +94,11 @@ theorem reflects {context scope mode statements expected type code}
     (completed : Evaluates entry.actual entry.store (code.rename entry.embedding) value finalStore) :
     ∃ result : Result entry registry faults mode statements expected type code,
       result.value = value ∧ result.store = finalStore := by
-  obtain ⟨result⟩  := completes (registry := registry) definitions registered extension uninitialized semantic wellFormed tree entry
+  obtain ⟨result⟩  := completes (registry := registry) definitions registered extension uninitialized semantic selectedBodies tree entry
   have same := evaluation_deterministic result.evaluated completed
   exact ⟨result,same⟩
 
-include definitions registered extension uninitialized semantic wellFormed in
+include definitions registered extension uninitialized semantic selectedBodies in
 theorem preserves {context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError (.initial checked) invocation.source
       (CellAwareLexicalBodyExpressions.Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt))
@@ -109,7 +109,7 @@ theorem preserves {context scope mode statements expected type code}
       statements finalContext outcome after) :
     ∃ result : Result entry registry faults mode statements expected type code,
       finalContext = result.finalContext ∧ outcome = result.outcome.embed ∧ after = result.after := by
-  obtain ⟨result⟩ := completes (registry := registry) definitions registered extension uninitialized semantic wellFormed tree entry
+  obtain ⟨result⟩ := completes (registry := registry) definitions registered extension uninitialized semantic selectedBodies tree entry
   exact ⟨result,result.determines trace⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareLexicalBodyCompletion

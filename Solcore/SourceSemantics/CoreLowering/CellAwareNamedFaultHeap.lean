@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
@@ -14,6 +15,7 @@ open CallableIndexedOwnedAdmittedBodyEntries
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+  (support : SelectedCompilationNamedSupport.Support compiled)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {scope : Staging.Recursive.Scope}
   (selected : (SelectedCompilationPhysicalProgramSupport.stages compiled).Closure header.function scope)
@@ -22,13 +24,13 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
   (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
 
-include wellFormed selected heapTyped argumentsTyped allocated in
-theorem after_fault {size : Nat} {finalContext : SourceSemantics.Context} {failure : Staging.Recursive.Failure}
+include support selected heapTyped argumentsTyped allocated in
+theorem after_fault_selected {size : Nat} {finalContext : SourceSemantics.Context} {failure : Staging.Recursive.Failure}
     (trace : Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram)
       (SelectedCompilationPhysicalProgramSupport.stages compiled) size scope header.context environment bound
       header.function.body finalContext (.fault failure) after) :
     Dynamic.HeapWellTyped header.context after := by
-  have receipt := SourceReceipt.of_named wellFormed header.frame header.extended allocated heapTyped argumentsTyped
+  have receipt := SelectedCompilationNamedAdmission.parameter_source (support.certified header) allocated heapTyped argumentsTyped
   have sourceEq := (SelectedCompilationPhysicalProgramSupport.stages compiled).source selected
   have runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) header.context scope.source := by
     simpa only [sourceEq] using receipt.runtime
@@ -38,7 +40,16 @@ theorem after_fault {size : Nat} {finalContext : SourceSemantics.Context} {failu
   have actualTyped : StatementsHaveType scope.source { returnType := header.function.resultType }
       header.context header.function.body final facts := by
     simpa only [sourceEq] using typed
-  exact (Staging.Recursive.FaultPreservation.statements wellFormed
-    runtime covers receipt.locals receipt.heapTyped actualTyped trace).1
+  exact (Staging.Recursive.SelectedPreservation.statements support.registryBodies
+    runtime covers receipt.locals receipt.heapTyped actualTyped trace).heap_typed
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include wellFormed selected heapTyped argumentsTyped allocated in
+theorem after_fault {size : Nat} {finalContext : SourceSemantics.Context} {failure : Staging.Recursive.Failure}
+    (trace : Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram)
+      (SelectedCompilationPhysicalProgramSupport.stages compiled) size scope header.context environment bound
+      header.function.body finalContext (.fault failure) after) :
+    Dynamic.HeapWellTyped header.context after := by
+  apply after_fault_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (selected := selected) (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (allocated := allocated) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedFaultHeap

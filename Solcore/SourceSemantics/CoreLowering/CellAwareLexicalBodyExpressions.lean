@@ -24,7 +24,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
     CompatibleExpressionReads.LoweredRead fuel (.initial checked) invocation.source context reasonAt scope id lowered →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
-  (wellFormed : ProgramWellFormed program)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
 local notation "model" => CompatibleAmbientHeap.payloadModel checked rawRegistry functions
 local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel model instances
@@ -41,7 +41,7 @@ abbrev Certificate (context : SourceSemantics.Context) (scope : SourceCoreLocalC
     (id : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr) : Prop :=
   StaticCertificate checked invocation.source reasonAt context scope id lowered
 
-include extension uninitialized semantic wellFormed in
+include extension uninitialized semantic selectedBodies in
 theorem expression {context scope id lowered node}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (certificate : Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt) context scope id lowered)
@@ -62,13 +62,13 @@ theorem expression {context scope id lowered node}
   cases Option.some.inj (otherFound.symm.trans found)
   obtain ⟨size,outcome,after,value,finalStore,trace,evaluated,represented,heaps,preserved,_,effect,determines⟩ :=
     CellAwareReadProductCompletion.completes functions extension GeneralizedLocalDescriptorHeap.ordinary_cells
-      (uninitialized context fuel) semantic entry.runtime.graph.nodeOccurrencesUnique wellFormed entry.runtime entry.covers
+      (uninitialized context fuel) semantic entry.runtime.graph.nodeOccurrencesUnique selectedBodies entry.runtime entry.covers
       certificate found typed entry.environments entry.heaps entry.heapTyped entry.locals entry.agrees
   refine ⟨size,outcome,after,value,finalStore,trace,evaluated,represented,heaps,preserved,effect,?_,determines⟩
   intro sourceValue same
   subst outcome
-  have result := wellFormed.wholeLanguagePreservation.expression _ _ _ _ _ _ _ _ _
-    entry.runtime entry.covers entry.locals entry.heapTyped typed trace.sound.value_plain
-  exact ⟨result.heap_typed,result.value_typed⟩
+  have result := Staging.Recursive.SelectedPreservation.expression selectedBodies
+    entry.runtime entry.covers entry.locals entry.heapTyped typed trace
+  exact ⟨result.heap_typed,result.value_typed sourceValue rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareLexicalBodyExpressions

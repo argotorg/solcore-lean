@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedExpressionTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedGeneralizedReadBounds
@@ -28,6 +30,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
   (sourceEq : invocation.source = CallableIndexedNamedGeneration.source named)
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) (SelectedCompilationPhysicalProgramSupport.stages compiled))
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (covers : invocation.evidence.Covers context)
 
@@ -36,19 +39,26 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "stages" => SelectedCompilationPhysicalProgramSupport.stages compiled
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include sourceEq runtime wellFormed covers in
+include sourceEq runtime selectedBodies covers in
 /-- Every accepted expression in the bounded compiler profile preserves its
 original Source execution, including reached mixed cells and public failures. -/
-theorem preserves (size : Nat) :
+theorem preserves_selected (size : Nat) :
     CellAwareMaterializedScopeBounds.PreservesAt bridge context model named stages invocation
       (CellAwareMaterializedBodyProducer.Certificate generation context) callFaults size := by
   intro scope id lowered certificate node
   obtain ⟨rootFuel, tree⟩ := certificate
   rw [← sourceEq] at tree
-  have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ wellFormed.signatures
+  have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ selectedBodies.signatures
   exact CellAwareMaterializedExpressionTreeBounds.preserves_tree (bodyRegistry := bodyRegistry)
     (semanticFaults := semanticFaults) generation bridge profile runtime.graph.nodeOccurrencesUnique
     (CellAwareNamedGeneralizedReadBounds.preserves bridge profile runtime.graph.nodeOccurrencesUnique
       runtime.requirements.idsUnique covers catalog) tree size ⟨rfl, rfl, rfl⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include sourceEq runtime wellFormed covers in
+theorem preserves (size : Nat) :
+    CellAwareMaterializedScopeBounds.PreservesAt bridge context model named stages invocation
+      (CellAwareMaterializedBodyProducer.Certificate generation context) callFaults size := by
+  apply preserves_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (sourceEq := sourceEq) (runtime := runtime) (covers := covers) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedExpressionMeaning

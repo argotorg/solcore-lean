@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueOrigins
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedBodyProducer
@@ -36,6 +38,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
   (sameLedger : context.solvedRequirements = (CallableIndexedNamedGeneration.context compiled.indexed named).solvedRequirements)
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) (SelectedCompilationPhysicalProgramSupport.stages compiled))
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (covers : invocation.evidence.Covers context)
 
@@ -44,18 +47,18 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "stages" => SelectedCompilationPhysicalProgramSupport.stages compiled
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+include receiver extension authority sourceEq issuer record sameLedger runtime selectedBodies covers in
 /-- Every accepted expression in the bounded compiler profile preserves its
 original Source execution, including reached mixed cells and public failures. -/
-theorem preserves (size : Nat) :
+theorem preserves_selected (size : Nat) :
     CellAwareScopeExpressionBounds.PreservesAt bridge context model named stages invocation
       (CellAwareNamedBodyProducer.Certificate generation context) callFaults size := by
   intro scope id lowered certificate node
   obtain ⟨rootFuel, tree⟩ := certificate
   rw [← sourceEq] at tree
-  have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ wellFormed.signatures
-  exact CellAwareNamedExpressionTreeBounds.preserves_tree (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) generation bridge profile receiver
-    (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) authority wellFormed runtime covers
+  have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ selectedBodies.signatures
+  exact CellAwareNamedExpressionTreeBounds.preserves_tree_selected (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) generation bridge profile receiver
+    (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) authority selectedBodies runtime covers
     runtime.graph.nodeOccurrencesUnique extension sameLedger runtime.requirements
     (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
     (CellAwarePhysicalFunctionOrigins.observations profile) (CellAwarePhysicalFunctionOrigins.runtime_views profile)
@@ -66,21 +69,21 @@ theorem preserves (size : Nat) :
     (CellAwareBuiltinValueOrigins.included profile)
     (CellAwareNamedGeneralizedReadBounds.preserves bridge profile runtime.graph.nodeOccurrencesUnique
       runtime.requirements.idsUnique covers catalog)
-    (CellAwareNamedGeneralizedApplicationBounds.preserves bridge functions receiver extension runtime wellFormed)
+    (CellAwareNamedGeneralizedApplicationBounds.preserves_selected bridge functions receiver extension runtime selectedBodies)
     tree size ⟨rfl, rfl, rfl⟩
 
-include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+include receiver extension authority sourceEq issuer record sameLedger runtime selectedBodies covers in
 /-- Finite Core completion reconstructs the independent Source grade and the
 same returned state through the actual accepted compiler tree. -/
-theorem reflects (size : Nat) :
+theorem reflects_selected (size : Nat) :
     CellAwareScopeExpressionBounds.ReflectsAt bridge context model named stages invocation
       (CellAwareNamedBodyProducer.Certificate generation context) callFaults size := by
   intro scope id lowered certificate node
   obtain ⟨rootFuel, tree⟩ := certificate
   rw [← sourceEq] at tree
-  have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ wellFormed.signatures
-  exact CellAwareNamedExpressionTreeBounds.reflects_tree (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) generation bridge profile receiver
-    (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) authority wellFormed runtime covers
+  have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ selectedBodies.signatures
+  exact CellAwareNamedExpressionTreeBounds.reflects_tree_selected (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) generation bridge profile receiver
+    (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) authority selectedBodies runtime covers
     runtime.graph.nodeOccurrencesUnique extension sameLedger runtime.requirements
     (CallableIndexedLambdaValues.identity_faithful compiled.indexed)
     (CellAwarePhysicalFunctionOrigins.observations profile) (CellAwarePhysicalFunctionOrigins.runtime_views profile)
@@ -91,7 +94,20 @@ theorem reflects (size : Nat) :
     (CellAwareBuiltinValueOrigins.included profile)
     (CellAwareNamedGeneralizedReadBounds.reflects bridge profile runtime.graph.nodeOccurrencesUnique
       runtime.requirements.idsUnique covers catalog)
-    (CellAwareNamedGeneralizedApplicationBounds.reflects bridge functions receiver extension runtime wellFormed)
+    (CellAwareNamedGeneralizedApplicationBounds.reflects_selected bridge functions receiver extension runtime selectedBodies)
     tree size ⟨rfl, rfl, rfl⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+theorem preserves (size : Nat) :
+    CellAwareScopeExpressionBounds.PreservesAt bridge context model named stages invocation
+      (CellAwareNamedBodyProducer.Certificate generation context) callFaults size := by
+  apply preserves_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)  <;> assumption
+
+include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+theorem reflects (size : Nat) :
+    CellAwareScopeExpressionBounds.ReflectsAt bridge context model named stages invocation
+      (CellAwareNamedBodyProducer.Certificate generation context) callFaults size := by
+  apply reflects_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)  <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionMeaning

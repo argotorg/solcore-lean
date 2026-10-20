@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexSourceInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexOutcomes
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeExpressionBounds
@@ -51,6 +53,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {context : SourceSemantics.Context} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   (faults : RecursiveStageMeaning.FaultRep)
   (unique : NodeOccurrencesUnique invocation.source)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
   (wellFormed : ProgramWellFormed program)
   (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
   (covers : invocation.evidence.Covers context)
@@ -72,8 +75,8 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "headCode" => SourceCoreBasic.LoweredExpr.mk layout.valueType
   (SourceCoreCompatibleDataExpressions.index layout comparison.expression first.expression second.expression reason)
 
-include bridge functions faults unique wellFormed runtime covers header keyFound form sourceType faithful functionLeaves functionTypes in
-theorem preserves {children : GenericExpressionMeaning.Certificate}
+include bridge functions faults unique selectedBodies runtime covers header keyFound form sourceType faithful functionLeaves functionTypes in
+theorem preserves_selected {children : GenericExpressionMeaning.Certificate}
     (firstChild : children scope base first) (secondChild : children scope key second)
     (missing : ∀ mapping world baseSource keySource baseValue,
       MissingPolicy (keyNode := keyNode) (registry := receiving) header
@@ -163,11 +166,11 @@ theorem preserves {children : GenericExpressionMeaning.Certificate}
     frame, metadata, effect, reached, related⟩ := raw
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
     frame, metadata, effect, reached, related,
-    CallableIndexedOwnedAdmittedStagedExpressionBounds.after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped trace frame⟩
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals sourceTyped trace frame⟩
 
 
-include bridge functions faults unique wellFormed runtime covers header keyFound form sourceType faithful functionLeaves functionTypes in
-theorem reflects {children : GenericExpressionMeaning.Certificate}
+include bridge functions faults unique selectedBodies runtime covers header keyFound form sourceType faithful functionLeaves functionTypes in
+theorem reflects_selected {children : GenericExpressionMeaning.Certificate}
     (firstChild : children scope base first) (secondChild : children scope key second)
     (missing : ∀ mapping world baseSource keySource baseValue,
       MissingPolicy (keyNode := keyNode) (registry := receiving) header
@@ -267,6 +270,31 @@ theorem reflects {children : GenericExpressionMeaning.Certificate}
     frame, metadata, effect, reached, related⟩ := raw
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
     frame, metadata, effect, reached, related,
-    CallableIndexedOwnedAdmittedStagedExpressionBounds.after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped trace frame⟩
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals sourceTyped trace frame⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include bridge functions faults unique wellFormed runtime covers header keyFound form sourceType faithful functionLeaves functionTypes in
+theorem preserves {children : GenericExpressionMeaning.Certificate}
+    (firstChild : children scope base first) (secondChild : children scope key second)
+    (missing : ∀ mapping world baseSource keySource baseValue,
+      MissingPolicy (keyNode := keyNode) (registry := receiving) header
+        functions mapping world baseSource keySource baseValue reason
+        (fun error token => faults (.semantic error) token))
+    (size : Nat)
+    (childMeaning : PreservesBelow bridge context model named registry invocation children faults size) :
+    PreservesAt bridge context model named registry invocation (Point scope id headCode) faults size := by
+  apply preserves_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (bridge := bridge) (functions := functions) (faults := faults) (unique := unique) (runtime := runtime) (covers := covers) (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType) (faithful := faithful) (functionLeaves := functionLeaves) (functionTypes := functionTypes) <;> assumption
+
+include bridge functions faults unique wellFormed runtime covers header keyFound form sourceType faithful functionLeaves functionTypes in
+theorem reflects {children : GenericExpressionMeaning.Certificate}
+    (firstChild : children scope base first) (secondChild : children scope key second)
+    (missing : ∀ mapping world baseSource keySource baseValue,
+      MissingPolicy (keyNode := keyNode) (registry := receiving) header
+        functions mapping world baseSource keySource baseValue reason
+        (fun error token => faults (.semantic error) token))
+    (size : Nat)
+    (childMeaning : ReflectsBelow bridge context model named registry invocation children faults size) :
+    ReflectsAt bridge context model named registry invocation (Point scope id headCode) faults size := by
+  apply reflects_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (bridge := bridge) (functions := functions) (faults := faults) (unique := unique) (runtime := runtime) (covers := covers) (header := header) (keyFound := keyFound) (form := form) (sourceType := sourceType) (faithful := faithful) (functionLeaves := functionLeaves) (functionTypes := functionTypes) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndexBounds

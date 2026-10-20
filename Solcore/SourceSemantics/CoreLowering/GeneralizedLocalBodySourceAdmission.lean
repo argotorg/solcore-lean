@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryBodyMeaning
-import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
+import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 
 /-! Independent body execution supplies successful Source admission at the
@@ -13,10 +13,10 @@ variable {program : Program} {registry : Staging.Recursive.Registry} {invocation
   {before after : Dynamic.Heap} {statements : List StatementId} {type : TypeSystem.Ty} {facts : BodyFacts}
   {size : Nat} {bodyOutcome : Staging.Recursive.BodyOutcome} {outcome : Staging.Recursive.Outcome}
 
-/-- The genuine Source return rule and whole-language preservation authenticate
+/-- The genuine Source return rule and selected-registry preservation authenticate
 values and deep heap typing. Semantic and staged failures assert no success. -/
 theorem successful
-    (wellFormed : ProgramWellFormed program)
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
     (covers : invocation.evidence.Covers context)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
@@ -30,15 +30,10 @@ theorem successful
       Dynamic.ValueHasType context after value type ∧ Dynamic.HeapWellTyped context after := by
   intro value same
   subst outcome
+  have preserved := Staging.Recursive.SelectedPreservation.statements selectedBodies
+    runtime covers locals heapTyped typed trace
   cases matched with
-  | returned =>
-    have preserved := Dynamic.FunctionStatementsExecute.preserved wellFormed
-      runtime covers locals heapTyped typed completes (Staging.Recursive.Statements.returned_plain trace.sound)
-    cases preserved.outcome_typed with
-    | returned related => exact ⟨related, preserved.heap_typed⟩
-  | unit =>
-    have preserved := Dynamic.FunctionStatementsExecute.preserved wellFormed
-      runtime covers locals heapTyped typed completes (Staging.Recursive.Statements.fallthrough_plain trace.sound)
-    exact ⟨.unit, preserved.heap_typed⟩
+  | returned => exact ⟨preserved.returned (fun _ => completes) value rfl, preserved.heap_typed⟩
+  | unit => exact ⟨.unit, preserved.heap_typed⟩
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodySourceAdmission

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorSourceBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositionsBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequence
@@ -68,8 +70,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 /-- Strict Source children preserve the exact staged result and owned state. -/
-theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
-    (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
+theorem preserves_at_selected (budget size : Nat) (bounded : size ≤ budget)
+    (unique : NodeOccurrencesUnique invocation.source) (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program stages)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : PreservesBelow bridge context model named stages invocation certificate faults budget) :
     PreservesAt bridge context model named stages invocation (Head compiled.compatible.checked invocation.source certificate) faults size := by
@@ -263,11 +265,11 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
     maps, worlds, frame, metadata, effect, reached, related⟩ := raw
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
     maps, worlds, frame, metadata, effect, reached, related,
-    CallableIndexedOwnedAdmittedStagedExpressionBounds.after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped trace frame⟩
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals sourceTyped trace frame⟩
 
 /-- Completed native children produce their own staged grades and exact state. -/
-theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
-    (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
+theorem reflects_at_selected (budget size : Nat) (bounded : size ≤ budget)
+    (unique : NodeOccurrencesUnique invocation.source) (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program stages)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : ReflectsBelow bridge context model named stages invocation certificate faults budget) :
     ReflectsAt bridge context model named stages invocation (Head compiled.compatible.checked invocation.source certificate) faults size := by
@@ -439,6 +441,21 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
     maps, worlds, frame, metadata, effect, reached, related⟩ := raw
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
     maps, worlds, frame, metadata, effect, reached, related,
-    CallableIndexedOwnedAdmittedStagedExpressionBounds.after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped trace frame⟩
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals sourceTyped trace frame⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
+    (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
+    (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
+    (meaning : PreservesBelow bridge context model named stages invocation certificate faults budget) :
+    PreservesAt bridge context model named stages invocation (Head compiled.compatible.checked invocation.source certificate) faults size := by
+  apply preserves_at_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)  <;> assumption
+
+theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
+    (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
+    (meaning : ReflectsBelow bridge context model named stages invocation certificate faults budget) :
+    ReflectsAt bridge context model named stages invocation (Head compiled.compatible.checked invocation.source certificate) faults size := by
+  apply reflects_at_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)  <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareScopeOperatorBounds

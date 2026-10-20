@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
@@ -21,9 +22,9 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
 
 include aligned in
-theorem of_header
+theorem of_header_selected
     (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
-    (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
+    (bodyTyping : SelectedCompilationBodyTyping.Bodies whole)
     {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
     (member : entry ∈ whole.indexed.entries)
     (profile : CellAwareLexicalNamedBodyProducer.Profile whole.indexed prepared.named
@@ -48,7 +49,7 @@ theorem of_header
     (ambient := CallableIndexedAmbient.ambientDefinitions whole.indexed)
     (values := SourceCoreCompatibleValues.Context.initial whole.compatible.checked)
     (prepared := whole.indexed.ancestry) (program := Program.ofChecked whole.sourceProgram) header
-  obtain ⟨final, facts, typed, _⟩ := RecursiveNamedHeaderSourceTyping.statements header wellFormed
+  obtain ⟨final, facts, typed, _⟩ := (SelectedCompilationHeaderCertificates.certified bodyTyping header).statements
   rw [sourceEq, statementsEq] at typed
   apply CellAwareLexicalNamedBodyProducer.of_compilation prepared.compilation record
     (by simpa only [resultEq] using profile) (sourceEq ▸ header.unique) rfl typed
@@ -56,5 +57,20 @@ theorem of_header
       CellAwareLexicalNamedBodySupport.scope] using declarations
   · simpa only [CallableIndexedOwnedPreparedStagedNamedLexicalReceipts.parameterScope,
       aligned.bindings, aligned.body, CellAwareLexicalNamedBodySupport.scope] using native
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include aligned in
+theorem of_header
+    (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
+    (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
+    {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
+    (member : entry ∈ whole.indexed.entries)
+    (profile : CellAwareLexicalNamedBodyProducer.Profile whole.indexed prepared.named
+      prepared.compilation.statements prepared.named.specialized.function.inferredBodyType) :
+    Nonempty (CellAwareLexicalNamedBodySupport.Body prepared.compilation
+      (CellAwareLexicalNamedBodyProducer.Certificate prepared.compilation)
+      (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial whole.compatible.checked) header)
+      header.context header.function.resultType) := by
+  apply of_header_selected (bodyTyping := SelectedCompilationBodyTyping.Bodies.of_program wellFormed) (aligned := aligned) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedBodyReceipt

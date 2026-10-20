@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectApplicationDispatch
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectFaultDispatch
 
@@ -79,6 +81,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
 variable
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) stages)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
   (covers : invocation.evidence.Covers context)
@@ -87,8 +90,8 @@ variable
 include positive prepared sourceEq occurrence calleeCertificate calleeRecipe found sourceTyped
   environments heaps locals agrees typed admitted authority physical ownerFrame
   caller view originalUnique guardFrame sourceParent tree unique parentTyped stagePrepared receiver
-  wellFormed runtime covers actualFunctionType in
-theorem preserves (budget : Nat)
+  selectedBodies runtime covers actualFunctionType in
+theorem preserves_selected (budget : Nat)
     (calleeMeaning : CellAwareScopeGeneralizedReadBounds.PreservesBelow
       bridge context model named stages invocation callFaults budget)
     (children : CellAwareScopeExpressionBounds.PreservesBelow
@@ -110,16 +113,16 @@ theorem preserves (budget : Nat)
   · exact failed
   · obtain ⟨calleeSize, argumentsSize, applicationSize, sourceValue, calleeHeap, argumentsHeap, sources,
       _size, strict, child, accepted, arguments, called, prefixResult⟩ := applied
-    exact CellAwareScopeIndirectApplicationDispatch.preserves_application
+    exact CellAwareScopeIndirectApplicationDispatch.preserves_application_selected
       bridge profile compiler prepared sourceEq occurrence found locals initial authority physical owner ownerFrame
-      guardFrame sourceParent tree unique parentTyped stagePrepared receiver wellFormed runtime covers actualFunctionType
+      guardFrame sourceParent tree unique parentTyped stagePrepared receiver selectedBodies runtime covers actualFunctionType
       budget applicationMeaning child accepted arguments called strict prefixResult
 
 include positive prepared sourceEq occurrence calleeCertificate calleeRecipe found sourceTyped
   environments heaps locals agrees typed admitted authority physical ownerFrame
   caller view originalUnique guardFrame sourceParent tree unique parentTyped stagePrepared receiver
-  wellFormed runtime covers actualFunctionType in
-theorem reflects (budget : Nat)
+  selectedBodies runtime covers actualFunctionType in
+theorem reflects_selected (budget : Nat)
     (calleeMeaning : CellAwareScopeGeneralizedReadBounds.ReflectsBelow
       bridge context model named stages invocation callFaults budget)
     (children : CellAwareScopeExpressionBounds.ReflectsBelow
@@ -142,9 +145,50 @@ theorem reflects (budget : Nat)
       _evaluated, represented, rest⟩ := failed
     rw [valueEq]
     exact ⟨sourceSize, .fault failure, after, finalMap, finalWorld, trace, represented, rest⟩
-  · exact CellAwareScopeIndirectApplicationDispatch.reflects_application
+  · exact CellAwareScopeIndirectApplicationDispatch.reflects_application_selected
       bridge profile compiler prepared sourceEq occurrence found sourceTyped locals initial admitted authority physical
-      owner ownerFrame sourceParent tree unique parentTyped stagePrepared receiver wellFormed runtime covers actualFunctionType
+      owner ownerFrame sourceParent tree unique parentTyped stagePrepared receiver selectedBodies runtime covers actualFunctionType
       budget applicationMeaning completed applied
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include positive prepared sourceEq occurrence calleeCertificate calleeRecipe found sourceTyped
+  environments heaps locals agrees typed admitted authority physical ownerFrame
+  caller view originalUnique guardFrame sourceParent tree unique parentTyped stagePrepared receiver
+  wellFormed runtime covers actualFunctionType in
+theorem preserves (budget : Nat)
+    (calleeMeaning : CellAwareScopeGeneralizedReadBounds.PreservesBelow
+      bridge context model named stages invocation callFaults budget)
+    (children : CellAwareScopeExpressionBounds.PreservesBelow
+      bridge context model named stages invocation certificate callFaults budget)
+    (applicationMeaning : CellAwareScopeApplicationBounds.PreservesBelow
+      bridge context model named stages invocation callFaults budget)
+    {size : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages size
+      invocation context environment before id outcome after)
+    (within : size ≤ budget) :
+    CellAwareScopeIndirectSourcePrefixDispatch.NativeResultAt (functionModel := functionModel)
+      (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+      (context := context) (actual := actual) (ξ := ξ) bridge profile compiler initial outcome after := by
+  apply preserves_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (positive := positive) (prepared := prepared) (sourceEq := sourceEq) (occurrence := occurrence) (calleeCertificate := calleeCertificate) (calleeRecipe := calleeRecipe) (found := found) (sourceTyped := sourceTyped) (environments := environments) (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed) (admitted := admitted) (authority := authority) (physical := physical) (ownerFrame := ownerFrame) (caller := caller) (view := view) (originalUnique := originalUnique) (guardFrame := guardFrame) (sourceParent := sourceParent) (tree := tree) (unique := unique) (parentTyped := parentTyped) (stagePrepared := stagePrepared) (receiver := receiver) (runtime := runtime) (covers := covers) (actualFunctionType := actualFunctionType) <;> assumption
+
+include positive prepared sourceEq occurrence calleeCertificate calleeRecipe found sourceTyped
+  environments heaps locals agrees typed admitted authority physical ownerFrame
+  caller view originalUnique guardFrame sourceParent tree unique parentTyped stagePrepared receiver
+  wellFormed runtime covers actualFunctionType in
+theorem reflects (budget : Nat)
+    (calleeMeaning : CellAwareScopeGeneralizedReadBounds.ReflectsBelow
+      bridge context model named stages invocation callFaults budget)
+    (children : CellAwareScopeExpressionBounds.ReflectsBelow
+      bridge context model named stages invocation certificate callFaults budget)
+    (applicationMeaning : CellAwareScopeApplicationBounds.ReflectsBelow
+      bridge context model named stages invocation callFaults budget)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
+    (within : size ≤ budget) :
+    CellAwareScopeIndirectApplicationDispatch.ReflectedResult (functionModel := functionModel)
+      (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+      (context := context) (stages := stages) (invocation := invocation) (environment := environment)
+      bridge profile compiler initial value finalStore := by
+  apply reflects_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (positive := positive) (prepared := prepared) (sourceEq := sourceEq) (occurrence := occurrence) (calleeCertificate := calleeCertificate) (calleeRecipe := calleeRecipe) (found := found) (sourceTyped := sourceTyped) (environments := environments) (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed) (admitted := admitted) (authority := authority) (physical := physical) (ownerFrame := ownerFrame) (caller := caller) (view := view) (originalUnique := originalUnique) (guardFrame := guardFrame) (sourceParent := sourceParent) (tree := tree) (unique := unique) (parentTyped := parentTyped) (stagePrepared := stagePrepared) (receiver := receiver) (runtime := runtime) (covers := covers) (actualFunctionType := actualFunctionType) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectBounds

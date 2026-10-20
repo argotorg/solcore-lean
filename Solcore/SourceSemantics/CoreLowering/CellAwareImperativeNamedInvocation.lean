@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedEntry
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeNamedBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CellAwareOwnedBodyRestoration
@@ -50,6 +53,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
     (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.administrative)
     header.context header.function.resultType)
   (projection : whole.compatible.checked.catalog.project header.function.resultType = .ok header.named.signature.resultType)
+  (support : SelectedCompilationNamedSupport.Support whole)
   (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
   {arguments : List Dynamic.Value} {payloads : List Value}
 
@@ -76,10 +80,10 @@ private theorem statements : generation.statements = header.function.body := by
     (header.agreement.source ▸ header.agreement.roots)
   exact (List.map_inj_right (fun _ _ same => NodeId.statement.inj same)).mp same
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection support in
 /-- The Source allocation and body trace are independent inputs. Every native
 entry, body step and saved-caller restoration is constructed from the compiler. -/
-theorem preserves
+theorem preserves_selected
     (stable : StableRows caller)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -98,7 +102,7 @@ theorem preserves
   obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,
       entryEmbedding, entryAllocated, environments, entryHeaps, sourceReceipt, agrees, actualTyped,
       prefixFrame, prefixEffect, lexical, reached, related, rows, physical, frameEq, wrap, _unwrap⟩ :=
-    CellAwareNamedEntry.prepare owner caller header capture sameLayouts sameGlobals record wellFormed
+    CellAwareNamedEntry.prepare_selected owner caller header capture sameLayouts sameGlobals record (support.certified header)
       heapTyped argumentsTyped represented heaps stable
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entryAllocated allocated
   rw [← sameEnvironment, ← sameHeap] at trace
@@ -134,9 +138,9 @@ theorem preserves
     intro index state read
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
-  have meaning := CellAwareImperativeNamedBodyMeaning.preserves bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+  have meaning := CellAwareImperativeNamedBodyMeaning.preserves_selected bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
     (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
-    generation record profile receiver extension authority wellFormed producer
+    generation record profile receiver extension authority support.registryBodies producer
     (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body functionTyped rfl projection issuer issued (Nat.le_refl size)
     (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
@@ -163,10 +167,10 @@ theorem preserves
   exact ⟨by simpa only [header.resultType] using result, restoredHeaps, fullEffect.maps, fullEffect.worlds,
     restoredFrame, fullEffect.metadata, returned, restoredRelated, post⟩
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection support in
 /-- Actual native completion is unwrapped through the same named entry. Its
 independent Source grade and concrete saved-caller post are returned together. -/
-theorem reflects
+theorem reflects_selected
     (stable : StableRows caller)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -188,7 +192,7 @@ theorem reflects
   obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,
       entryEmbedding, entryAllocated, environments, entryHeaps, sourceReceipt, agrees, actualTyped,
       prefixFrame, prefixEffect, lexical, reached, related, rows, physical, frameEq, _wrap, unwrap⟩ :=
-    CellAwareNamedEntry.prepare owner caller header capture sameLayouts sameGlobals record wellFormed
+    CellAwareNamedEntry.prepare_selected owner caller header capture sameLayouts sameGlobals record (support.certified header)
       heapTyped argumentsTyped represented heaps stable
   obtain ⟨bodyStore, bodyEvaluation, finalEq⟩ := unwrap completed
   have compiledEvaluation : Evaluates entryActual entryStore (generation.body.rename entryEmbedding) value bodyStore := by
@@ -225,9 +229,9 @@ theorem reflects
     intro index state read
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
-  have meaning := CellAwareImperativeNamedBodyMeaning.reflects bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+  have meaning := CellAwareImperativeNamedBodyMeaning.reflects_selected bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
     (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
-    generation record profile receiver extension authority wellFormed producer
+    generation record profile receiver extension authority support.registryBodies producer
     (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body functionTyped rfl projection issuer issued (Nat.le_refl nativeSize)
     (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
@@ -257,5 +261,47 @@ theorem reflects
       restoredFrame, fullEffect.metadata, returned, restoredRelated, post⟩
   · rw [finalEq]
     exact restoredEffect
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
+theorem preserves
+    (stable : StableRows caller)
+    (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+    (represented : CallableIndexedParameterMeaning.Arguments model mapping world header.bindings arguments payloads)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {outcome : Staging.Recursive.BodyOutcome}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size invocation
+      header.context environment bound header.function.body finalContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        functions cells owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults ∧
+      CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld after finalStore := by
+  apply preserves_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (body := body) (record := record) (receiver := receiver) (extension := extension) (sameLayouts := sameLayouts) (sameGlobals := sameGlobals) (sameBindings := sameBindings) (sameBody := sameBody) (sameSolved := sameSolved) (selected := selected) (authority := authority) (issuer := issuer) (issued := issued) (projection := projection) <;> assumption
+
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer issued projection wellFormed in
+theorem reflects
+    (stable : StableRows caller)
+    (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+    (represented : CallableIndexedParameterMeaning.Arguments model mapping world header.bindings arguments payloads)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
+    {value : Value} {finalStore : Store}
+    (completed : Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
+      (header.code.rename capture.embedding.lift) value finalStore) :
+    ∃ size environment bound finalContext outcome after finalMap finalWorld,
+      Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound ∧
+      Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size invocation
+        header.context environment bound header.function.body finalContext outcome after ∧
+      Staging.Recursive.BodyResult header.function.resultType outcome
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        functions cells owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults ∧
+      CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld after finalStore := by
+  apply reflects_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (body := body) (record := record) (receiver := receiver) (extension := extension) (sameLayouts := sameLayouts) (sameGlobals := sameGlobals) (sameBindings := sameBindings) (sameBody := sameBody) (sameSolved := sameSolved) (selected := selected) (authority := authority) (issuer := issuer) (issued := issued) (projection := projection) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareImperativeNamedInvocation

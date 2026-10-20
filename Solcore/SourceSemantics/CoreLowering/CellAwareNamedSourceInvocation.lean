@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedInvocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedSourceBodyLifting
 
@@ -45,6 +48,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   (body : CellAwareNamedBodySupport.Body generation (CellAwareNamedBodyProducer.Certificate generation)
     (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.administrative)
     header.context header.function.resultType)
+  (support : SelectedCompilationNamedSupport.Support whole)
   (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
   {arguments : List Dynamic.Value} {payloads : List Value}
 
@@ -72,8 +76,8 @@ private theorem statements : generation.statements = header.function.body := by
   exact (List.map_inj_right (fun _ _ same => NodeId.statement.inj same)).mp same
 
 
-include body record receiver extension sameLayouts sameGlobals sameBindings sameSolved selected authority issuer wellFormed in
-theorem lift
+include body record receiver extension sameLayouts sameGlobals sameBindings sameSolved selected authority issuer support in
+theorem lift_selected
     (stable : StableRows caller)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -91,7 +95,7 @@ theorem lift
   obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,
       entryEmbedding, entryAllocated, environments, entryHeaps, sourceReceipt, agrees, actualTyped,
       _prefixFrame, _prefixEffect, lexical, reached, _related, rows, physical, frameEq, _wrap, _unwrap⟩ :=
-    CellAwareNamedEntry.prepare owner caller header capture sameLayouts sameGlobals record wellFormed
+    CellAwareNamedEntry.prepare_selected owner caller header capture sameLayouts sameGlobals record (support.certified header)
       heapTyped argumentsTyped represented heaps stable
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entryAllocated allocated
   rw [← sameEnvironment, ← sameHeap] at trace
@@ -124,8 +128,8 @@ theorem lift
     intro index state read
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
-  have meaning := CellAwareNamedSourceBodyLifting.lifts bridge generation record profile receiver extension authority
-    wellFormed producer (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body issuer
+  have meaning := CellAwareNamedSourceBodyLifting.lifts_selected bridge generation record profile receiver extension authority
+    support.registryBodies producer (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body issuer
     (size := size) (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
     (before := entryHeap) (store := entryStore) (embedding := entryEmbedding)
@@ -138,6 +142,52 @@ theorem lift
     simpa only [sameEnvironment, sameHeap, statements header generation] using lifted
   obtain ⟨stagedSize, measured⟩ := Staging.Recursive.Size.Statements.of_trace actual
   exact ⟨stagedSize, stagedContext, stagedOutcome, reachedHeap, measured, adapted⟩
+
+include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer support in
+theorem preserves_selected
+    (stable : StableRows caller)
+    (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+    (represented : CallableIndexedParameterMeaning.Arguments model mapping world header.bindings arguments payloads)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size
+      header.context invocation.evidence invocation.source environment bound header.function.body finalContext outcome after) :
+    ∃ stagedContext stagedOutcome reached value finalStore finalMap finalWorld,
+      SelectedCompilationStageBodyLiftBounds.BodyAdapted finalContext outcome after stagedContext stagedOutcome reached ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        functions cells owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result stagedOutcome) reached value finalStore finalMap finalWorld faults ∧
+      CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld reached finalStore := by
+  obtain ⟨stageSize, stagedContext, stagedOutcome, reached, measured, adapted⟩ :=
+    lift_selected profile receiver extension owner caller header capture generation record sameLayouts sameGlobals sameBindings
+      sameSolved selected authority issuer body support stable heapTyped argumentsTyped represented heaps allocated trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, result, effect⟩ :=
+    CellAwareNamedInvocation.preserves_selected profile receiver extension owner caller header capture generation record sameLayouts
+      sameGlobals sameBindings sameBody sameSolved selected authority issuer body support stable heapTyped argumentsTyped
+      represented heaps allocated measured
+  exact ⟨stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld, adapted, result, effect⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include body record receiver extension sameLayouts sameGlobals sameBindings sameSolved selected authority issuer wellFormed in
+theorem lift
+    (stable : StableRows caller)
+    (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+    (represented : CallableIndexedParameterMeaning.Arguments model mapping world header.bindings arguments payloads)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size
+      header.context invocation.evidence invocation.source environment bound header.function.body finalContext outcome after) :
+    ∃ stagedSize stagedContext stagedOutcome reached,
+      Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages stagedSize invocation
+        header.context environment bound header.function.body stagedContext stagedOutcome reached ∧
+      SelectedCompilationStageBodyLiftBounds.BodyAdapted finalContext outcome after stagedContext stagedOutcome reached := by
+  apply lift_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (body := body) (record := record) (receiver := receiver) (extension := extension) (sameLayouts := sameLayouts) (sameGlobals := sameGlobals) (sameBindings := sameBindings) (sameSolved := sameSolved) (selected := selected) (authority := authority) (issuer := issuer) <;> assumption
 
 include body record receiver extension sameLayouts sameGlobals sameBindings sameBody sameSolved selected authority issuer wellFormed in
 theorem preserves
@@ -157,13 +207,6 @@ theorem preserves
         functions cells owner caller header capture payloads header.context
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result stagedOutcome) reached value finalStore finalMap finalWorld faults ∧
       CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld reached finalStore := by
-  obtain ⟨stageSize, stagedContext, stagedOutcome, reached, measured, adapted⟩ :=
-    lift profile receiver extension owner caller header capture generation record sameLayouts sameGlobals sameBindings
-      sameSolved selected authority issuer body wellFormed stable heapTyped argumentsTyped represented heaps allocated trace
-  obtain ⟨value, finalStore, finalMap, finalWorld, result, effect⟩ :=
-    CellAwareNamedInvocation.preserves profile receiver extension owner caller header capture generation record sameLayouts
-      sameGlobals sameBindings sameBody sameSolved selected authority issuer body wellFormed stable heapTyped argumentsTyped
-      represented heaps allocated measured
-  exact ⟨stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld, adapted, result, effect⟩
+  apply preserves_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (body := body) (record := record) (receiver := receiver) (extension := extension) (sameLayouts := sameLayouts) (sameGlobals := sameGlobals) (sameBindings := sameBindings) (sameBody := sameBody) (sameSolved := sameSolved) (selected := selected) (authority := authority) (issuer := issuer) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedSourceInvocation

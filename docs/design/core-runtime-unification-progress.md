@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected bodies drive named starts and retained closures (2026-10-20)
+
+Public named calls and materialized closures now use the selected original body typings and preservation for the actual prepared registry. Named parameters, captured environments, mixed expressions and imperative bodies carry the same selected certificate through Source lifting, Core execution and public completion. Existing whole-program APIs are proved adapters.
+
+The complete three-function example derives the selected certificate from its actual checked program, original declarative body typings and cached substitution ranges. It starts make and capture, runs the intervening tick call, then reuses Word, Bool and captured handles. Each independent Source plan is built before the corresponding public resume and uses the previous reached history. Heap sizes are 4 / 10 / 16 / 19 / 22 / 25 / 28 / 31. The lexical closure regression also retains 2 / 26 / 50 / 74. The complete original failure fixture constructs Source faults before both public executions, then reflects the actual failure, reached heap and first reusable history. Its heap sizes are 2 / 17 / 2 / 17.
+
+Validation: 118 changed modules in a coherent graph of 8,725 modules, 62 retained runtime invocations and 6,461 endpoint audits. Full build (8,765 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+Automatic production of selected Bodies for generalized original source still requires the general checker proof. Complete compiler-pass preservation and goal two remain unfinished. The failure runtime covers initial histories; later-history continuation theorems and dedicated ordinary/lexical adapters are kernel checked but have no additional runtime fixture in this change.
+
 ## Finite lexical closure bodies reach retained public execution (2026-10-20)
 
 Materialized local lambda bodies now support finite sequences of initialized and uninitialized declarations, discarded expressions, scoped blocks, conditionals, returns and fallthrough. The actual accepted compiler traversal supplies their body certificates. Independent ordinary Source execution reaches the same value or semantic fault and the same corresponding heap. Allocated cells, captured descriptors and native administrative state remain linked through completion, preservation and reflection.

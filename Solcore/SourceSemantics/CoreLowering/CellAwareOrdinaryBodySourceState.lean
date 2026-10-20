@@ -49,7 +49,7 @@ theorem expression {checked : SourceCoreCompatibleCatalog.Checked} {reasonAt con
   obtain ⟨_,_,_,_,_,tree⟩ := certificate
   exact CellAwareSourceReadProductLifting.exact_trace tree unique trace.sound
 
-theorem expression_typed (wellFormed : ProgramWellFormed program)
+theorem expression_typed (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {checked : SourceCoreCompatibleCatalog.Checked} {reasonAt context scope id lowered node}
     (certificate : CellAwareLexicalBodyExpressions.StaticCertificate checked invocation.source reasonAt context scope id lowered)
     (found : invocation.source.lookupExpression? id = some node)
@@ -60,13 +60,14 @@ theorem expression_typed (wellFormed : ProgramWellFormed program)
     Dynamic.ValueHasType context after value node.type ∧
       State (program := program) (invocation := invocation) context environment after ∧
       Dynamic.HeapTypesExtend before after := by
+  have lifted := expression (registry := registry) certificate state.runtime.graph.nodeOccurrencesUnique trace
+  obtain ⟨_, graded⟩ := Staging.Recursive.Size.Expression.of_trace lifted
   obtain ⟨_,_,actual,actualFound,typed,_⟩ := certificate
   cases Option.some.inj (actualFound.symm.trans found)
-  cases trace with
-  | value evaluated =>
-    have preserved := wellFormed.wholeLanguagePreservation.expression _ _ _ _ _ _ _ _ _
-      state.runtime state.covers state.locals state.heapTyped typed evaluated.sound
-    exact ⟨preserved.value_typed,⟨state.runtime,state.covers,state.locals.mono preserved.heap_extends,preserved.heap_typed⟩,
-      preserved.heap_extends⟩
+  have preserved := Staging.Recursive.SelectedPreservation.expression selectedBodies
+    state.runtime state.covers state.locals state.heapTyped typed graded
+  exact ⟨preserved.value_typed value rfl,
+    ⟨state.runtime,state.covers,state.locals.mono preserved.heap_extends,preserved.heap_typed⟩,
+    preserved.heap_extends⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySourceState

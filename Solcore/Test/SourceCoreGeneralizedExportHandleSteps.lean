@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreGeneralizedSelectedHandleObserved
 import Solcore.Test.SourceCoreGeneralizedExportNamedSteps
 
 /-! Each concrete retained handle receives its own Source call plan. Actual
@@ -49,7 +50,7 @@ theorem IdentityPlan.retained {history : FullHistory context session wordHandle 
     {executionFuel outputFuel : Nat} {returned : SourceCoreExecution.Completion artifact}
     (resumed : call.checkpoint.ResumeAt executionFuel outputFuel (.succeeded returned)) :
     Nonempty (FullHistory context returned.session wordHandle boolHandle captureHandle seed) := by
-  obtain ⟨continued,heapEq,origins⟩ := planned.plan.observed_retained observed.typing history.pair.origins resumed
+  obtain ⟨continued,heapEq,origins⟩ := planned.plan.observed_selected_retained observed.typing observed.cache history.pair.origins resumed
   have allocated : Dynamic.Heap.Allocates history.pair.retained.state.heap
       (identity.shape.principal.parameter.applySubstitution identity.substitution).scheme.body (some sourceArgument)
       ⟨history.pair.retained.state.heap.cells.length⟩
@@ -84,7 +85,7 @@ theorem CapturedPlan.retained {history : FullHistory context session wordHandle 
     {executionFuel outputFuel : Nat} {returned : SourceCoreExecution.Completion artifact}
     (resumed : call.checkpoint.ResumeAt executionFuel outputFuel (.succeeded returned)) :
     Nonempty (FullHistory context returned.session wordHandle boolHandle captureHandle seed) := by
-  obtain ⟨continued,heapEq,origins⟩ := planned.plan.observed_retained observed.typing history.pair.origins resumed
+  obtain ⟨continued,heapEq,origins⟩ := planned.plan.observed_selected_retained observed.typing observed.cache history.pair.origins resumed
   have allocated : Dynamic.Heap.Allocates history.pair.retained.state.heap
       (history.captured.shape.principal.parameter.applySubstitution history.captured.substitution).scheme.body (some (.bool flag))
       ⟨history.pair.retained.state.heap.cells.length⟩

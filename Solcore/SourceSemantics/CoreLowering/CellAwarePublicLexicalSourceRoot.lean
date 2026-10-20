@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedPreparedReceipt
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedSourceInvocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedCallAuthority
@@ -34,6 +35,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {recipe : SourceCoreIndexedSession.Recipe}
   (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
   (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+  (support : SelectedCompilationNamedSupport.Support whole)
   (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
   (bodyProfile : CellAwareLexicalNamedBodyProducer.Profile whole.indexed prepared.named prepared.compilation.statements
     prepared.named.specialized.function.inferredBodyType)
@@ -76,9 +78,9 @@ variable
         (CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults callableProfile))
       (GeneralizedLocalInstanceValues.model whole.indexed)) mapping world before store)
 
-include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
+include receiver extension aligned ready diagnostic support bodyProfile selected globalReference keyPhysical physical
   stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps in
-theorem preserves_root
+theorem preserves_root_selected
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
     {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
     (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
@@ -98,15 +100,15 @@ theorem preserves_root
   obtain ⟨capture⟩ := CallableIndexedOwnedNamedPhysicalCaptures.of_headerAt prepared aligned selected.member
     keyPhysical physical heaps.runtime_hasTypes
   obtain ⟨entry, entryMember, _shape, _first⟩ := selected.2
-  obtain ⟨packet⟩ := CellAwareLexicalNamedPreparedReceipt.of_header prepared aligned capture ready diagnostic wellFormed
+  obtain ⟨packet⟩ := CellAwareLexicalNamedPreparedReceipt.of_header_selected prepared aligned capture ready diagnostic support.bodyTyping
     entryMember bodyProfile
   have record := CallableIndexedActualNamedSourceReceipts.header_record whole header
   have sameBindings : header.bindings = header.named.inputs := by rw [aligned.bindings, aligned.named]
   have sameSolved : header.solved = header.named.specialized.function.solvedRequirements := by rw [aligned.solved, aligned.named]
   obtain ⟨stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld, adapted, result, _effect⟩ :=
-    CellAwareLexicalNamedSourceInvocation.preserves callableProfile receiver extension owner caller header capture.named
+    CellAwareLexicalNamedSourceInvocation.preserves_selected callableProfile receiver extension owner caller header capture.named
       packet.generation record aligned.layouts aligned.globals sameBindings packet.emitted sameSolved bodySelected
-      (CellAwareNamedCallAuthority.of_header header sidecarIssued) packet.issuer packet.body wellFormed
+      (CellAwareNamedCallAuthority.of_header header sidecarIssued) packet.issuer packet.body support
       stable heapTyped argumentsTyped represented heaps allocated trace
   have argumentsEvaluated := selected.arguments_evaluate represented store
   have actualReference :
@@ -137,11 +139,11 @@ variable {nativeArtifact : SourceCoreIndexedSession.Artifact}
   (started : RecursiveNamedPublicStartMeaning.StartAt nativeSession key publicArguments inputFuel
     nativeCheckpoint recipe (sameCompiled.symm ▸ root) world store payloads encodedValues)
 
-include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
+include receiver extension aligned ready diagnostic support bodyProfile selected globalReference keyPhysical physical
   stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started in
 /-- The actual public start uses the same root and captured cache. The independent
 Source body supplies sufficient execution fuel, with an explicit reached stage stop. -/
-theorem checkpoint_has_sufficient_fuel
+theorem checkpoint_has_sufficient_fuel_selected
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
     {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
     (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
@@ -158,11 +160,52 @@ theorem checkpoint_has_sufficient_fuel
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result stagedOutcome) reached value finalStore finalMap finalWorld faults := by
   cases sameCompiled
   obtain ⟨capture, stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld, required, adapted, run, result⟩ :=
-    preserves_root callableProfile receiver extension prepared aligned ready diagnostic wellFormed bodyProfile selected
+    preserves_root_selected callableProfile receiver extension prepared aligned ready diagnostic support bodyProfile selected
       owner caller globalReference keyPhysical physical stable heapTyped argumentsTyped sidecarIssued bodySelected
       represented heaps allocated trace
   exact ⟨capture, stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld, required, adapted,
     fun fuel enough => started.initial.native_done_iff.mpr (run fuel enough), result⟩
 
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps in
+theorem preserves_root
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size header.context
+      (RecursiveStageRegistry.scope sidecar [] header.function).evidence
+      (RecursiveStageRegistry.scope sidecar [] header.function).source environment bound
+      header.function.body finalContext outcome after) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+    ∃ stagedContext stagedOutcome reached value finalStore finalMap finalWorld required,
+      SelectedCompilationStageBodyLiftBounds.BodyAdapted finalContext outcome after stagedContext stagedOutcome reached ∧
+      (∀ fuel, required ≤ fuel → runStateful fuel
+        (.initial root.body (payloads.reverse ++ SourceCoreCallableIndexedTemplates.globalEnvironment whole.indexed) store) =
+        .done value finalStore) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        functions cells owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result stagedOutcome) reached value finalStore finalMap finalWorld faults := by
+  apply preserves_root_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (receiver := receiver) (extension := extension) (aligned := aligned) (ready := ready) (diagnostic := diagnostic) (bodyProfile := bodyProfile) (selected := selected) (globalReference := globalReference) (keyPhysical := keyPhysical) (physical := physical) (stable := stable) (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (sidecarIssued := sidecarIssued) (bodySelected := bodySelected) (represented := represented) (heaps := heaps) <;> assumption
+
+include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started in
+theorem checkpoint_has_sufficient_fuel
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size header.context
+      (RecursiveStageRegistry.scope sidecar [] header.function).evidence
+      (RecursiveStageRegistry.scope sidecar [] header.function).source environment bound
+      header.function.body finalContext outcome after) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+    ∃ stagedContext stagedOutcome reached value finalStore finalMap finalWorld required,
+      SelectedCompilationStageBodyLiftBounds.BodyAdapted finalContext outcome after stagedContext stagedOutcome reached ∧
+      (∀ fuel, required ≤ fuel → nativeCheckpoint.NativeDone fuel value finalStore) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        functions cells owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result stagedOutcome) reached value finalStore finalMap finalWorld faults := by
+  apply checkpoint_has_sufficient_fuel_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (receiver := receiver) (extension := extension) (aligned := aligned) (ready := ready) (diagnostic := diagnostic) (bodyProfile := bodyProfile) (selected := selected) (globalReference := globalReference) (keyPhysical := keyPhysical) (physical := physical) (stable := stable) (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (sidecarIssued := sidecarIssued) (bodySelected := bodySelected) (represented := represented) (heaps := heaps) (sameCompiled := sameCompiled) (started := started) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwarePublicLexicalSourceRoot

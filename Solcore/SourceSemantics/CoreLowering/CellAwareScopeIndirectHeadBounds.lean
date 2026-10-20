@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds
 
@@ -37,6 +39,7 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   {named : SourceCoreGeneralFunctions.Function}
   {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving headers keys bodyRegistry semanticFaults profile}
   [positive : SelectedCompilationCallableOrigins.Origins headers keys bodyRegistry semanticFaults profile functionModel]
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) stages)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
   (covers : invocation.evidence.Covers context)
@@ -47,8 +50,8 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
   completion.result.context.registry functionModel
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include positive bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique actualFunctionType in
-theorem preserves
+include positive bridge receiver stagePrepared sourceEq profile selectedBodies runtime covers unique actualFunctionType in
+theorem preserves_selected
     (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
       id callee ids metadata reasonAt lowered)
     (port : Port (compiled := compiled) (invocation := invocation) compiler)
@@ -78,15 +81,15 @@ theorem preserves
   have occurrence : Staging.Recursive.Occurrence invocation child (.call callee ids (.indirect metadata)) :=
     ⟨compiler.original, lookupExpression?_sound compiler.found, compiler.originalForm,
       port.sourceParent.requirements, port.sourceParent.coercions⟩
-  exact CellAwareScopeIndirectBounds.preserves
+  exact CellAwareScopeIndirectBounds.preserves_selected
     bridge profile compiler port.prepared rfl occurrence calleeCertificate calleeRecipe port.calleeFound sourceTyped
     environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame
     port.caller port.view port.originalUnique port.guardFrame port.sourceParent tree unique parentTyped
-    stagePrepared receiver wellFormed runtime covers actualFunctionType
+    stagePrepared receiver selectedBodies runtime covers actualFunctionType
     size calleeMeaning children applicationMeaning trace (Nat.le_refl _)
 
-include positive bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique actualFunctionType in
-theorem reflects
+include positive bridge receiver stagePrepared sourceEq profile selectedBodies runtime covers unique actualFunctionType in
+theorem reflects_selected
     (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
       id callee ids metadata reasonAt lowered)
     (port : Port (compiled := compiled) (invocation := invocation) compiler)
@@ -116,11 +119,46 @@ theorem reflects
   have occurrence : Staging.Recursive.Occurrence invocation child (.call callee ids (.indirect metadata)) :=
     ⟨compiler.original, lookupExpression?_sound compiler.found, compiler.originalForm,
       port.sourceParent.requirements, port.sourceParent.coercions⟩
-  exact CellAwareScopeIndirectBounds.reflects
+  exact CellAwareScopeIndirectBounds.reflects_selected
     bridge profile compiler port.prepared rfl occurrence calleeCertificate calleeRecipe port.calleeFound sourceTyped
     environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame
     port.caller port.view port.originalUnique port.guardFrame port.sourceParent tree unique parentTyped
-    stagePrepared receiver wellFormed runtime covers actualFunctionType
+    stagePrepared receiver selectedBodies runtime covers actualFunctionType
     size calleeMeaning children applicationMeaning completed (Nat.le_refl _)
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include positive bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique actualFunctionType in
+theorem preserves
+    (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
+      id callee ids metadata reasonAt lowered)
+    (port : Port (compiled := compiled) (invocation := invocation) compiler)
+    (calleeCertificate : GeneralizedLocalNamedReadCompilation.Certificate compiled.indexed named
+      source scope callee reasonAt compiler.calleeCode)
+    (calleeRecipe : GeneralizedLocalNamedRecipeCompilation.Receipt calleeCertificate)
+    {certificate : GenericExpressionMeaning.Certificate} {sourceTypes : List TypeSystem.Ty}
+    (tree : DataExpressionSequence.Tree invocation.source certificate scope ids sourceTypes compiler.codes)
+    (size : Nat)
+    (calleeMeaning : CellAwareScopeGeneralizedReadBounds.PreservesBelow bridge context model named stages invocation callFaults size)
+    (children : PreservesBelow bridge context model named stages invocation certificate callFaults size)
+    (applicationMeaning : CellAwareScopeApplicationBounds.PreservesBelow bridge context model named stages invocation callFaults size) :
+    PreservesAt bridge context model named stages invocation (Point scope id lowered) callFaults size := by
+  apply preserves_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (positive := positive) (bridge := bridge) (receiver := receiver) (stagePrepared := stagePrepared) (sourceEq := sourceEq) (profile := profile) (runtime := runtime) (covers := covers) (unique := unique) (actualFunctionType := actualFunctionType) <;> assumption
+
+include positive bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique actualFunctionType in
+theorem reflects
+    (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
+      id callee ids metadata reasonAt lowered)
+    (port : Port (compiled := compiled) (invocation := invocation) compiler)
+    (calleeCertificate : GeneralizedLocalNamedReadCompilation.Certificate compiled.indexed named
+      source scope callee reasonAt compiler.calleeCode)
+    (calleeRecipe : GeneralizedLocalNamedRecipeCompilation.Receipt calleeCertificate)
+    {certificate : GenericExpressionMeaning.Certificate} {sourceTypes : List TypeSystem.Ty}
+    (tree : DataExpressionSequence.Tree invocation.source certificate scope ids sourceTypes compiler.codes)
+    (size : Nat)
+    (calleeMeaning : CellAwareScopeGeneralizedReadBounds.ReflectsBelow bridge context model named stages invocation callFaults size)
+    (children : ReflectsBelow bridge context model named stages invocation certificate callFaults size)
+    (applicationMeaning : CellAwareScopeApplicationBounds.ReflectsBelow bridge context model named stages invocation callFaults size) :
+    ReflectsAt bridge context model named stages invocation (Point scope id lowered) callFaults size := by
+  apply reflects_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (positive := positive) (bridge := bridge) (receiver := receiver) (stagePrepared := stagePrepared) (sourceEq := sourceEq) (profile := profile) (runtime := runtime) (covers := covers) (unique := unique) (actualFunctionType := actualFunctionType) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectHeadBounds

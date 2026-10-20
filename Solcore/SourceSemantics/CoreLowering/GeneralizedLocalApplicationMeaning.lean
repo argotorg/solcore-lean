@@ -32,8 +32,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (stable : StableRows caller)
   {callerContext : SourceSemantics.Context} {callerSource : TypedSource}
   (runtime : Dynamic.SourceRuntimeValid program callerContext callerSource)
-  (wellFormed : ProgramWellFormed program)
-  {registry : Staging.Recursive.Registry} {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
+  {registry : Staging.Recursive.Registry}
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
+  {semanticFaults : FunctionCalls.FaultRep} {faults : RecursiveStageMeaning.FaultRep}
   (uninitialized : ∀ {id : ExpressionId} {node : ExpressionNode} {name : String} {binder : Resolved.LocalId},
     function.source.lookupExpression? id = some node → node.form = .reference name (.local binder) →
     ∀ location, semanticFaults (.uninitializedLocation location) (material.code.reasonAt id))
@@ -72,7 +73,7 @@ private theorem source_body {invocation : Staging.Recursive.Scope} {callContext 
     subst same
     exact ⟨_, _, _, _, _, _, selected, allocated, body, matched⟩
 
-include frame raw stable runtime wellFormed in
+include frame raw stable runtime selectedBodies in
 /-- Concrete body completion and actual Source execution restore the original
 caller, every reached owned record, and both kinds of represented Source cells. -/
 theorem finish
@@ -130,7 +131,7 @@ theorem finish
   have evidence := registry.evidence selected
   have typedAt : StatementsHaveType child.source {returnType := function.resultType} inputs.context
       function.body staticFinal facts := by simpa only [source] using bodyTyped
-  have successful := GeneralizedLocalBodySourceAdmission.successful wellFormed
+  have successful := GeneralizedLocalBodySourceAdmission.successful selectedBodies
     (by simpa only [source] using bodyRuntime.1) (by simpa only [evidence] using bodyRuntime.2)
     entry.entry.locals (GeneralizedLocalOrdinaryBodyMeaning.heap_typed material inputs view functions entry frame raw)
     typedAt completes trace matched
@@ -148,7 +149,7 @@ theorem finish
   exact ⟨bodyMap, bodyWorld, represented, finalHeaps, entry.entry.maps.trans bodyMaps,
     entry.entry.worlds.trans bodyWorlds, finalFrame, entry.entry.metadata.trans metadata, finalEffect, returned, finalRelated, post⟩
 
-include inputs extension atFrame frame raw stable runtime wellFormed uninitialized semantic in
+include inputs extension atFrame frame raw stable runtime selectedBodies uninitialized semantic in
 /-- Source application selects the actual body and parameter allocation. The
 native call is assembled from the concrete outer wrapper and terminal body. -/
 theorem preserves
@@ -175,14 +176,14 @@ theorem preserves
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨body,sameOutcome,sameHeap⟩ :=
     GeneralizedLocalOrdinaryBodyMeaning.preserves material inputs view functions extension entry frame raw selected
-      wellFormed uninitialized semantic bodyTrace matched
+      selectedBodies uninitialized semantic bodyTrace matched
   refine ⟨body.value, _, wrap body.evaluated, ?_⟩
-  exact finish material view inputs functions owner caller frame raw stable runtime wellFormed
+  exact finish material view inputs functions owner caller frame raw stable runtime selectedBodies
     entry reached related effect selected bodyTrace matched body.effect.maps body.effect.worlds
     (sameOutcome.symm ▸ body.represented) (sameHeap.symm ▸ body.heaps) body.preserved
     (sameHeap.symm ▸ body.effect.metadata) (sameHeap.symm ▸ body.effect)
 
-include inputs extension atFrame frame raw stable runtime wellFormed uninitialized semantic in
+include inputs extension atFrame frame raw stable runtime selectedBodies uninitialized semantic in
 /-- Native completion reflects through the same authentic view and parameters,
 returning its independent Source grade and the exact restored caller state. -/
 theorem reflects
@@ -203,8 +204,8 @@ theorem reflects
   obtain ⟨bodyStore, bodyEvaluation, finalEq⟩ := unwrap completed
   obtain ⟨body,sameValue,sameStore⟩ :=
     GeneralizedLocalOrdinaryBodyMeaning.reflects material inputs view functions extension entry frame raw selected
-      wellFormed uninitialized semantic bodyEvaluation
-  have result := finish material view inputs functions owner caller frame raw stable runtime wellFormed
+      selectedBodies uninitialized semantic bodyEvaluation
+  have result := finish material view inputs functions owner caller frame raw stable runtime selectedBodies
     entry reached related effect selected body.trace body.matched body.effect.maps body.effect.worlds
     body.represented body.heaps body.preserved body.effect.metadata body.effect
   refine ⟨_, body.outcome, body.after, .closure selected frame inputs.extended entry.entry.allocation body.trace body.matched, ?_⟩

@@ -11,7 +11,7 @@ open Core Frontend SourceInference CellAwareOrdinaryBodySourceState
 
 variable {program : Program} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
 
-theorem lifts (wellFormed : ProgramWellFormed program)
+theorem lifts (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {checked : SourceCoreCompatibleCatalog.Checked}
     {layouts owner active frame globals onError values reasonAt context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError values invocation.source
@@ -22,23 +22,23 @@ theorem lifts (wellFormed : ProgramWellFormed program)
   | nil => exact CellAwareOrdinaryBodySourceState.nil
   | returnUnit rest found form => exact returnUnit found form
   | returnValue rest found form expressionFound _ certificate =>
-      exact terminal wellFormed (.returning rest (lookupStatement?_sound found) form) certificate expressionFound
+      exact terminal selectedBodies (.returning rest (lookupStatement?_sound found) form) certificate expressionFound
   | tail found form expressionFound _ certificate =>
-      exact terminal wellFormed (.tail (lookupStatement?_sound found) form) certificate expressionFound
+      exact terminal selectedBodies (.tail (lookupStatement?_sound found) form) certificate expressionFound
   | uninitialized found form mono extended _ _ _ _ _ _ ih =>
       exact absent found form mono extended ih
   | initialized found form mono extended _ initializerFound sourceType initial _ _ _ _ ih =>
-      exact initialized wellFormed found form mono extended initializerFound sourceType initial ih
+      exact initialized selectedBodies found form mono extended initializerFound sourceType initial ih
   | discard found form _ continuing expressionFound certificate _ ih =>
-      exact discard wellFormed found form continuing expressionFound certificate ih
+      exact discard selectedBodies found form continuing expressionFound certificate ih
   | block found form _ _ inner remaining => exact block found form inner (.inl remaining)
   | ifThen found form conditionFound conditionType certificate _ _ _ thenLift elseLift remaining =>
-      apply conditional wellFormed found form conditionFound conditionType certificate
+      apply conditional selectedBodies found form conditionFound conditionType certificate
       · intro truth; cases truth <;> assumption
       · exact .inl remaining
   | terminalBlock _ found form _ stops _ inner => exact block found form inner (.inr stops)
   | terminalIf _ found form conditionFound conditionType certificate _ _ thenStops elseStops _ thenLift elseLift =>
-      apply conditional wellFormed found form conditionFound conditionType certificate
+      apply conditional selectedBodies found form conditionFound conditionType certificate
       · intro truth; cases truth <;> assumption
       · apply Or.inr
         intro truth; cases truth <;> assumption

@@ -55,7 +55,7 @@ private theorem boolean_of_typed {context : SourceSemantics.Context} {heap value
           rw [instantiation_type_eq,signatureValid.scheme_body] at typeEq
           cases typeEq
 
-theorem conditional (wellFormed : ProgramWellFormed program)
+theorem conditional (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {checked : SourceCoreCompatibleCatalog.Checked}
     {reasonAt context scope mode id node condition conditionNode conditionCode thenBody elseBody rest}
     (found : invocation.source.lookupStatement? id = some node)
@@ -77,18 +77,18 @@ theorem conditional (wellFormed : ProgramWellFormed program)
   · rcases SelectedCompilationStageConditionalSourceInversion.fault unique found form failed with
       ⟨_,_,test⟩ | ⟨_,value,_,_,rfl,test,invalid,_⟩ | ⟨_,_,truth,_,_,_,_,test,branch⟩
     · exact ⟨.ifConditionFault (lookupStatement?_sound found) form (expression certificate unique (.fault test)),trivial⟩
-    · obtain ⟨typed,_,_⟩ := expression_typed wellFormed certificate conditionFound state (.value test)
+    · obtain ⟨typed,_,_⟩ := expression_typed selectedBodies certificate conditionFound state (.value test)
       rw [conditionType] at typed
-      exact False.elim (invalid (boolean_of_typed (state.runtime.signatures.symm ▸ wellFormed.signatures) typed))
+      exact False.elim (invalid (boolean_of_typed (state.runtime.signatures.symm ▸ selectedBodies.signatures) typed))
     · have first := expression (registry := registry) certificate unique (.value test)
-      obtain ⟨_,reached,_⟩ := expression_typed wellFormed certificate conditionFound state (.value test)
+      obtain ⟨_,reached,_⟩ := expression_typed selectedBodies certificate conditionFound state (.value test)
       obtain ⟨lifted,_⟩ := branches truth reached (show PlainStatements program false _ invocation _ _ _ _ _ _ _ from .fault branch)
       exact ⟨.ifFault (lookupStatement?_sound found) form first lifted,trivial⟩
   · obtain ⟨_,_,truth,_,_,innerOutcome,_,_,sameContext,sameOutcome,test,branch⟩ :=
       SelectedCompilationStageConditionalSourceInversion.control unique found form executed
     subst finalContext outcome
     have first := expression (registry := registry) certificate unique (.value test)
-    obtain ⟨_,reached,extension⟩ := expression_typed wellFormed certificate conditionFound state (.value test)
+    obtain ⟨_,reached,extension⟩ := expression_typed selectedBodies certificate conditionFound state (.value test)
     obtain ⟨lifted,post⟩ := branches truth reached (show PlainStatements program false _ invocation _ _ _ _ _ _ _ from .control branch)
     cases innerOutcome with
     | returned value => exact ⟨.ifReturned (lookupStatement?_sound found) form first lifted,post.trans extension⟩
@@ -107,7 +107,7 @@ theorem conditional (wellFormed : ProgramWellFormed program)
       simp only [Dynamic.restoreControl,Dynamic.ControlOutcome.fallthrough.injEq] at restored
       subst nextEnvironment
       have first := expression (registry := registry) certificate unique (.value test)
-      obtain ⟨_,reached,extension⟩ := expression_typed wellFormed certificate conditionFound state (.value test)
+      obtain ⟨_,reached,extension⟩ := expression_typed selectedBodies certificate conditionFound state (.value test)
       obtain ⟨lifted,post⟩ := branches truth reached (show PlainStatements program false _ invocation _ _ _ _ _ _ _ from .control branch)
       rcases remaining with remaining | stopped
       · have nextState : State (program := program) (invocation := invocation) context environment middle :=

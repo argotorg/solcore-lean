@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicLexicalSourceRoot
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedForward
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedOutput
@@ -33,6 +34,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {recipe : SourceCoreIndexedSession.Recipe}
   (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
   (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+  (support : SelectedCompilationNamedSupport.Support whole)
   (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
   (bodyProfile : CellAwareLexicalNamedBodyProducer.Profile whole.indexed prepared.named prepared.compilation.statements
     prepared.named.specialized.function.inferredBodyType)
@@ -92,6 +94,62 @@ variable {publicArtifact : SourceCoreExecution.Artifact}
   (exactRegistry : completion.result.context.registry = encodedValues.registry)
   (exportsReady : nativeSession.ExportsReady)
 
+include receiver extension aligned ready diagnostic support bodyProfile selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started
+  atCheckpoint exactRegistry exportsReady in
+theorem first_value_selected
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {source : Dynamic.Value}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size
+      header.context (RecursiveStageRegistry.scope sidecar [] header.function).evidence
+      (RecursiveStageRegistry.scope sidecar [] header.function).source environment bound
+      header.function.body finalContext (.returned source) after) :
+    (∃ capture : NamedCapture headers owner.key header mapping world,
+      ∃ value finalStore finalMap finalWorld requiredExecution requiredOutput,
+        CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+          rootFunctions rootCells owner caller header capture payloads header.context
+          (.value source) after value finalStore finalMap finalWorld faults ∧
+        ∀ executionFuel outputFuel (outcome : SourceCoreExecution.Outcome publicArtifact),
+          requiredExecution ≤ executionFuel → requiredOutput ≤ outputFuel →
+          publicCheckpoint.ResumeAt executionFuel outputFuel outcome →
+          ∃ (returned : SourceCoreExecution.Completion publicArtifact)
+            (actual : SourceCoreIndexedSession.Completion nativeArtifact)
+            (generation : SourceCorePublicValues.ExportGeneration)
+            (reached : RecursiveNamedPublicFunctionHistory.Caller headers keys finalMap finalWorld after finalStore),
+            outcome = .succeeded returned ∧
+            nativeCheckpoint.SucceededResultAt executionFuel outputFuel generation value finalStore actual ∧
+            returned.IndexedAt actual ∧ CallableIndexedOwnedFunctionState.Relates caller reached ∧
+            CellAwarePublicPhysicalHistory.History (functions := rootFunctions) (cells := rootCells)
+              (receiving := completion.result.context.registry) (anchor := header)
+              actual.session finalMap finalWorld after finalStore reached [] ∧
+            actual.session.RegistryAt completion.result.context.registry ∧ actual.session.ExportsReady) ∨
+    (∃ origin call reason reached,
+      ∃ capture : NamedCapture headers owner.key header mapping world,
+      ∃ value finalStore finalMap finalWorld required,
+        (∀ fuel, required ≤ fuel → nativeCheckpoint.NativeDone fuel value finalStore) ∧
+        CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+          rootFunctions rootCells owner caller header capture payloads header.context
+          (.fault (.stage origin call reason)) reached value finalStore finalMap finalWorld faults) := by
+  cases sameCompiled
+  obtain ⟨capture, stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld,
+      required, adapted, run, result⟩ :=
+    CellAwarePublicLexicalSourceRoot.checkpoint_has_sufficient_fuel_selected callableProfile receiver extension prepared aligned
+      ready diagnostic support bodyProfile selected owner caller globalReference keyPhysical physical stable
+      heapTyped argumentsTyped sidecarIssued bodySelected represented heaps rfl started allocated trace
+  cases adapted with
+  | completed matched =>
+    cases matched
+    have publicResult := result.context
+      (SelectedCompilationPublicReturnedValues.header_context_supports header header
+        support.bodyTyping).2
+    obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.first_success _ _ selected started
+      exactRegistry exportsReady atCheckpoint publicResult run physical
+    exact .inl ⟨capture, value, finalStore, finalMap, finalWorld, required, requiredOutput, result, output⟩
+  | rejected origin call reason stagedContext reached =>
+    exact .inr ⟨origin, call, reason, reached, capture, value, finalStore, finalMap, finalWorld, required, run, result⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
 include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
   stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started
   atCheckpoint exactRegistry exportsReady in
@@ -129,22 +187,6 @@ theorem first_value
         CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
           rootFunctions rootCells owner caller header capture payloads header.context
           (.fault (.stage origin call reason)) reached value finalStore finalMap finalWorld faults) := by
-  cases sameCompiled
-  obtain ⟨capture, stagedContext, stagedOutcome, reached, value, finalStore, finalMap, finalWorld,
-      required, adapted, run, result⟩ :=
-    CellAwarePublicLexicalSourceRoot.checkpoint_has_sufficient_fuel callableProfile receiver extension prepared aligned
-      ready diagnostic wellFormed bodyProfile selected owner caller globalReference keyPhysical physical stable
-      heapTyped argumentsTyped sidecarIssued bodySelected represented heaps rfl started allocated trace
-  cases adapted with
-  | completed matched =>
-    cases matched
-    have publicResult := result.context
-      (SelectedCompilationPublicReturnedValues.header_context_supports header header
-        (SelectedCompilationBodyTyping.Bodies.of_program wellFormed)).2
-    obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.first_success _ _ selected started
-      exactRegistry exportsReady atCheckpoint publicResult run physical
-    exact .inl ⟨capture, value, finalStore, finalMap, finalWorld, required, requiredOutput, result, output⟩
-  | rejected origin call reason stagedContext reached =>
-    exact .inr ⟨origin, call, reason, reached, capture, value, finalStore, finalMap, finalWorld, required, run, result⟩
+  apply first_value_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (receiver := receiver) (extension := extension) (aligned := aligned) (ready := ready) (diagnostic := diagnostic) (bodyProfile := bodyProfile) (selected := selected) (globalReference := globalReference) (keyPhysical := keyPhysical) (physical := physical) (stable := stable) (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (sidecarIssued := sidecarIssued) (bodySelected := bodySelected) (represented := represented) (heaps := heaps) (sameCompiled := sameCompiled) (started := started) (atCheckpoint := atCheckpoint) (exactRegistry := exactRegistry) (exportsReady := exportsReady) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwarePublicLexicalForward

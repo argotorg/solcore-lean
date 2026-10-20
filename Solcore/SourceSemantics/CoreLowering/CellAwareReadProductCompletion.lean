@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareSelectedReadBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSelectedLiteralBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSelectedPairBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareStagedGroupBounds
-import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
+import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
 
 /-! The actual finite ordinary expression tree completes in a mixed heap.
 Every child keeps its original compiler receipt and actual reached state;
@@ -38,14 +38,14 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
   (unique : NodeOccurrencesUnique invocation.source)
-  (wellFormed : ProgramWellFormed program)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
   (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
   (covers : invocation.evidence.Covers context)
 
 local notation "model" => CompatibleAmbientHeap.payloadModel checked rawRegistry functions
 local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel model instances
 
-include extension ordinaryCells uninitialized semantic unique wellFormed runtime covers in
+include extension ordinaryCells uninitialized semantic unique selectedBodies runtime covers in
 theorem completes {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (certificate : Certificate readFuel (.initial checked) invocation.source context solved reasonAt scope id lowered)
     {node : ExpressionNode} (found : invocation.source.lookupExpression? id = some node)
@@ -173,8 +173,8 @@ theorem completes {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lower
     | value firstSource =>
       cases firstRep with
       | @value _ firstNative firstPayload =>
-        have preserved := wellFormed.wholeLanguagePreservation.expression _ _ _ _ _ _ _ _ _
-          runtime covers locals heapTyped leftTyped firstTrace.sound.value_plain
+        have preserved := Staging.Recursive.SelectedPreservation.expression selectedBodies
+          runtime covers locals heapTyped leftTyped firstTrace
         obtain ⟨secondSize, secondOutcome, after, secondValue, finalStore, secondTrace, secondEval, secondRep,
           finalHeaps, secondFrame, secondMetadata, secondEffect, secondDetermines⟩ :=
           rightIH rightFound rightTyped middleHeaps preserved.heap_typed (locals.mono firstMetadata)

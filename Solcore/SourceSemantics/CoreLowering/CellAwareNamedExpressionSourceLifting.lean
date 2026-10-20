@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceIndexLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceOperatorLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceConditionalLifting
@@ -40,6 +42,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok named.specialized)
   (sameLedger : context.solvedRequirements = (CallableIndexedNamedGeneration.context compiled.indexed named).solvedRequirements)
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) (SelectedCompilationPhysicalProgramSupport.stages compiled))
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (covers : invocation.evidence.Covers context)
 
@@ -62,7 +65,7 @@ private def Three (scope : SourceCoreLocalCell.Scope) (test yes no : ExpressionI
   fun current child code => current = scope ∧
     ((child = test ∧ code = a) ∨ (child = yes ∧ code = b) ∨ (child = no ∧ code = c))
 
-include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+include receiver extension authority sourceEq issuer record sameLedger runtime selectedBodies covers in
 private theorem preserve_tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr}
     (tree : Tree generation rootFuel invocation.source context (diagnostics.reasonAt named.signature.key) scope id lowered)
@@ -70,11 +73,11 @@ private theorem preserve_tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scop
       (Point scope id lowered) callFaults size := by
   intro current expression code point
   obtain ⟨rfl, rfl, rfl⟩ := point
-  exact CellAwareNamedExpressionMeaning.preserves generation bridge profile receiver extension authority sourceEq issuer
-    record sameLedger runtime wellFormed covers size ⟨rootFuel, by simpa only [sourceEq] using tree⟩
+  exact CellAwareNamedExpressionMeaning.preserves_selected generation bridge profile receiver extension authority sourceEq issuer
+    record sameLedger runtime selectedBodies covers size ⟨rootFuel, by simpa only [sourceEq] using tree⟩
 
-include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
-theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+include receiver extension authority sourceEq issuer record sameLedger runtime selectedBodies covers in
+theorem tree_selected {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr}
     (certificate : Tree generation rootFuel invocation.source context (diagnostics.reasonAt named.signature.key) scope id lowered)
     (size : Nat) : LiftsAt bridge context model named stages invocation (Point scope id lowered) size := by
@@ -120,11 +123,11 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
       | inl left =>
         obtain ⟨rfl, rfl⟩ := left
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers leftTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers leftTree childSize ⟨rfl, rfl, rfl⟩
       | inr right =>
         obtain ⟨rfl, rfl⟩ := right
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers rightTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers rightTree childSize ⟨rfl, rfl, rfl⟩
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeSourceProductLifting.pair bridge model unique children preservation size
@@ -147,11 +150,11 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
       | inl first =>
         obtain ⟨rfl, rfl⟩ := first
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers firstTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers firstTree childSize ⟨rfl, rfl, rfl⟩
       | inr second =>
         obtain ⟨rfl, rfl⟩ := second
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers secondTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers secondTree childSize ⟨rfl, rfl, rfl⟩
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeSourceIndexLifting.index bridge (reason := diagnostics.reasonAt named.signature.key expression) header keyFound form unique
@@ -182,11 +185,11 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
       | inl first =>
         obtain ⟨rfl, rfl⟩ := first
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers leftTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers leftTree childSize ⟨rfl, rfl, rfl⟩
       | inr second =>
         obtain ⟨rfl, rfl⟩ := second
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers rightTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers rightTree childSize ⟨rfl, rfl, rfl⟩
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeSourceOperatorLifting.binary bridge size
@@ -211,13 +214,13 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
       rcases alternative with test | yes | no
       · obtain ⟨rfl, rfl⟩ := test
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers testTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers testTree childSize ⟨rfl, rfl, rfl⟩
       · obtain ⟨rfl, rfl⟩ := yes
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers yesTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers yesTree childSize ⟨rfl, rfl, rfl⟩
       · obtain ⟨rfl, rfl⟩ := no
         exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-          runtime wellFormed covers noTree childSize ⟨rfl, rfl, rfl⟩
+          runtime selectedBodies covers noTree childSize ⟨rfl, rfl, rfl⟩
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeSourceConditionalLifting.conditional bridge functions size
@@ -237,22 +240,35 @@ theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : Expressi
       intro childSize current expression code entry
       obtain ⟨rfl, member⟩ := entry
       exact preserve_tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger
-        runtime wellFormed covers (children expression code member) childSize ⟨rfl, rfl, rfl⟩
+        runtime selectedBodies covers (children expression code member) childSize ⟨rfl, rfl, rfl⟩
     obtain ⟨port⟩ := CellAwareNamedCallPorts.port generation compiler authority rfl parent calleeReceipt
-    have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ wellFormed.signatures
+    have catalog : SignatureCatalogWellFormed context.signatures := runtime.signatures.symm ▸ selectedBodies.signatures
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeSourceIndirectLifting.indirect (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) bridge profile compiler port runtime unique wellFormed covers size
+    exact CellAwareScopeSourceIndirectLifting.indirect_selected (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) bridge profile compiler port runtime unique selectedBodies covers size
       calleeReceipt calleeRecipe sequence childLift preservation
       (CellAwareNamedGeneralizedReadBounds.preserves bridge profile unique runtime.requirements.idsUnique covers catalog) ⟨rfl, rfl, rfl⟩
 
-include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
-theorem lifts (size : Nat) : LiftsAt bridge context model named stages invocation
+include receiver extension authority sourceEq issuer record sameLedger runtime selectedBodies covers in
+theorem lifts_selected (size : Nat) : LiftsAt bridge context model named stages invocation
     (CellAwareNamedBodyProducer.Certificate generation context) size := by
   intro scope id lowered certificate
   obtain ⟨rootFuel, actual⟩ := certificate
   rw [← sourceEq] at actual
-  exact tree generation bridge profile receiver extension authority sourceEq issuer record sameLedger runtime
-    wellFormed covers actual size ⟨rfl, rfl, rfl⟩
+  exact tree_selected generation bridge profile receiver extension authority sourceEq issuer record sameLedger runtime
+    selectedBodies covers actual size ⟨rfl, rfl, rfl⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+theorem tree {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+    {lowered : SourceCoreBasic.LoweredExpr}
+    (certificate : Tree generation rootFuel invocation.source context (diagnostics.reasonAt named.signature.key) scope id lowered)
+    (size : Nat) : LiftsAt bridge context model named stages invocation (Point scope id lowered) size := by
+  apply tree_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (receiver := receiver) (extension := extension) (authority := authority) (sourceEq := sourceEq) (issuer := issuer) (record := record) (sameLedger := sameLedger) (runtime := runtime) (covers := covers) <;> assumption
+
+include receiver extension authority sourceEq issuer record sameLedger runtime wellFormed covers in
+theorem lifts (size : Nat) : LiftsAt bridge context model named stages invocation
+    (CellAwareNamedBodyProducer.Certificate generation context) size := by
+  apply lifts_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (receiver := receiver) (extension := extension) (authority := authority) (sourceEq := sourceEq) (issuer := issuer) (record := record) (sameLedger := sameLedger) (runtime := runtime) (covers := covers) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionSourceLifting

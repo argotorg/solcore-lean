@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndexBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedIndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeOperatorBounds
@@ -42,6 +44,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     completion.result.context.registry completion.result.extension completion.result.diagnostics)
   (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
   (authority : CellAwareNamedCallPorts.Authority (compiled := compiled) named invocation)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram) stages)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
   (covers : invocation.evidence.Covers context)
@@ -84,9 +87,9 @@ private theorem product_values : CallableIndexedOwnedPreparedStagedPairBounds.Pr
   intro mapping world leftType rightType left right first second firstType secondType firstValue secondValue
   exact .product firstValue secondValue
 
-include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
+include positive bridge profile receiver stagePrepared authority selectedBodies runtime covers unique
   extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
-theorem preserves_tree
+theorem preserves_tree_selected
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
@@ -142,7 +145,7 @@ theorem preserves_tree
     obtain ⟨port⟩ := indices header
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeIndexBounds.preserves bridge functionModel callFaults unique wellFormed runtime covers
+    exact CellAwareScopeIndexBounds.preserves_selected bridge functionModel callFaults unique selectedBodies runtime covers
       header keyFound form sourceType faithful functionLeaves functionTypes
       ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩
       (port.missing receiver functionModel keyFound form) size children ⟨rfl, rfl, rfl⟩
@@ -153,8 +156,8 @@ theorem preserves_tree
       fun childSize _smaller => ih childSize
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeOperatorBounds.preserves_at bridge functionModel size size (Nat.le_refl _)
-      unique wellFormed runtime covers children
+    exact CellAwareScopeOperatorBounds.preserves_at_selected bridge functionModel size size (Nat.le_refl _)
+      unique selectedBodies runtime covers children
       (.unary metadata form childFound inputType outputType operatorProfile ⟨rfl, rfl, rfl⟩)
   | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
       metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
@@ -167,8 +170,8 @@ theorem preserves_tree
       | inr second => obtain ⟨rfl, rfl⟩ := second; exact rightIH childSize ⟨rfl, rfl, rfl⟩
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeOperatorBounds.preserves_at bridge functionModel size size (Nat.le_refl _)
-      unique wellFormed runtime covers children
+    exact CellAwareScopeOperatorBounds.preserves_at_selected bridge functionModel size size (Nat.le_refl _)
+      unique selectedBodies runtime covers children
       (.binary metadata form leftFound rightFound leftType rightType outputType operatorProfile
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
   | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
@@ -183,8 +186,8 @@ theorem preserves_tree
       · obtain ⟨rfl, rfl⟩ := no; exact noIH childSize ⟨rfl, rfl, rfl⟩
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeOperatorBounds.preserves_at bridge functionModel size size (Nat.le_refl _)
-      unique wellFormed runtime covers children
+    exact CellAwareScopeOperatorBounds.preserves_at_selected bridge functionModel size size (Nat.le_refl _)
+      unique selectedBodies runtime covers children
       (.conditional metadata form testFound yesFound noFound testType yesType noType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩)
   | @call id callee ids metadata fuel lowered types compiler calleeReceipt calleeRecipe parent sequence children ih =>
@@ -196,15 +199,15 @@ theorem preserves_tree
     obtain ⟨port⟩ := CellAwareNamedCallPorts.port generation compiler authority rfl parent calleeReceipt
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeIndirectHeadBounds.preserves bridge receiver stagePrepared rfl profile
-      wellFormed runtime covers unique (CellAwareNamedCallPorts.function_type generation)
+    exact CellAwareScopeIndirectHeadBounds.preserves_selected bridge receiver stagePrepared rfl profile
+      selectedBodies runtime covers unique (CellAwareNamedCallPorts.function_type generation)
       compiler port calleeReceipt calleeRecipe sequence size
       (fun childSize _smaller => generalized childSize) childMeaning
       (fun childSize _smaller => applications childSize) ⟨rfl, rfl, rfl⟩
 
-include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
+include positive bridge profile receiver stagePrepared authority selectedBodies runtime covers unique
   extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
-theorem reflects_tree
+theorem reflects_tree_selected
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
@@ -258,7 +261,7 @@ theorem reflects_tree
     obtain ⟨port⟩ := indices header
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeIndexBounds.reflects bridge functionModel callFaults unique wellFormed runtime covers
+    exact CellAwareScopeIndexBounds.reflects_selected bridge functionModel callFaults unique selectedBodies runtime covers
       header keyFound form sourceType faithful functionLeaves functionTypes
       ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩
       (port.missing receiver functionModel keyFound form) size children ⟨rfl, rfl, rfl⟩
@@ -269,8 +272,8 @@ theorem reflects_tree
       fun childSize _smaller => ih childSize
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeOperatorBounds.reflects_at bridge functionModel size size (Nat.le_refl _)
-      unique wellFormed runtime covers children
+    exact CellAwareScopeOperatorBounds.reflects_at_selected bridge functionModel size size (Nat.le_refl _)
+      unique selectedBodies runtime covers children
       (.unary metadata form childFound inputType outputType operatorProfile ⟨rfl, rfl, rfl⟩)
   | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
       metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
@@ -283,8 +286,8 @@ theorem reflects_tree
       | inr second => obtain ⟨rfl, rfl⟩ := second; exact rightIH childSize ⟨rfl, rfl, rfl⟩
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeOperatorBounds.reflects_at bridge functionModel size size (Nat.le_refl _)
-      unique wellFormed runtime covers children
+    exact CellAwareScopeOperatorBounds.reflects_at_selected bridge functionModel size size (Nat.le_refl _)
+      unique selectedBodies runtime covers children
       (.binary metadata form leftFound rightFound leftType rightType outputType operatorProfile
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
   | @conditional id node test yes no testNode yesNode noNode type testCode yesCode noCode
@@ -299,8 +302,8 @@ theorem reflects_tree
       · obtain ⟨rfl, rfl⟩ := no; exact noIH childSize ⟨rfl, rfl, rfl⟩
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeOperatorBounds.reflects_at bridge functionModel size size (Nat.le_refl _)
-      unique wellFormed runtime covers children
+    exact CellAwareScopeOperatorBounds.reflects_at_selected bridge functionModel size size (Nat.le_refl _)
+      unique selectedBodies runtime covers children
       (.conditional metadata form testFound yesFound noFound testType yesType noType
         ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩)
   | @call id callee ids metadata fuel lowered types compiler calleeReceipt calleeRecipe parent sequence children ih =>
@@ -312,10 +315,35 @@ theorem reflects_tree
     obtain ⟨port⟩ := CellAwareNamedCallPorts.port generation compiler authority rfl parent calleeReceipt
     intro current child code point
     obtain ⟨rfl, rfl, rfl⟩ := point
-    exact CellAwareScopeIndirectHeadBounds.reflects bridge receiver stagePrepared rfl profile
-      wellFormed runtime covers unique (CellAwareNamedCallPorts.function_type generation)
+    exact CellAwareScopeIndirectHeadBounds.reflects_selected bridge receiver stagePrepared rfl profile
+      selectedBodies runtime covers unique (CellAwareNamedCallPorts.function_type generation)
       compiler port calleeReceipt calleeRecipe sequence size
       (fun childSize _smaller => generalized childSize) childMeaning
       (fun childSize _smaller => applications childSize) ⟨rfl, rfl, rfl⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
+  extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
+theorem preserves_tree
+    (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
+    (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
+    (applications : ∀ size, CellAwareScopeApplicationBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
+    {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Tree generation rootFuel invocation.source context reasonAt scope id lowered)
+    (size : Nat) :
+    PreservesAt bridge context valueModel named stages invocation (Point scope id lowered) callFaults size := by
+  apply preserves_tree_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (positive := positive) (bridge := bridge) (profile := profile) (receiver := receiver) (stagePrepared := stagePrepared) (authority := authority) (runtime := runtime) (covers := covers) (unique := unique) (extension := extension) (sameLedger := sameLedger) (runtimeLedger := runtimeLedger) (faithful := faithful) (functionLeaves := functionLeaves) (functionTypes := functionTypes) (indices := indices) (uninitialized := uninitialized) (semantic := semantic) <;> assumption
+
+include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
+  extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
+theorem reflects_tree
+    (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
+    (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
+    (applications : ∀ size, CellAwareScopeApplicationBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
+    {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Tree generation rootFuel invocation.source context reasonAt scope id lowered)
+    (size : Nat) :
+    ReflectsAt bridge context valueModel named stages invocation (Point scope id lowered) callFaults size := by
+  apply reflects_tree_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (positive := positive) (bridge := bridge) (profile := profile) (receiver := receiver) (stagePrepared := stagePrepared) (authority := authority) (runtime := runtime) (covers := covers) (unique := unique) (extension := extension) (sameLedger := sameLedger) (runtimeLedger := runtimeLedger) (faithful := faithful) (functionLeaves := functionLeaves) (functionTypes := functionTypes) (indices := indices) (uninitialized := uninitialized) (semantic := semantic) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionTreeBounds

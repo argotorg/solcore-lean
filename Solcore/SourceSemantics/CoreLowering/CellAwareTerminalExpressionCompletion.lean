@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareSelectedReadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalSourceBodyInversion
 
-/-! The actual ordinary expression terminal body completes in a mixed heap.
+/-! The actual ordinary-read terminal body completes in a mixed heap.
 Its Source trace, native result and descriptor-preserving effect are constructed
 from the literal compiler receipts without a body execution hypothesis. -/
 set_option autoImplicit false
@@ -72,7 +72,7 @@ theorem completes :
   obtain ⟨size, outcome, after, childValue, finalStore, staged, evaluated, represented,
       finalHeaps, preserved, metadata, effect, determines⟩ :=
     CellAwareReadProductCompletion.completes functions extension ordinaryCells uninitialized semantic unique
-      wellFormed runtime covers certificate found typed environments heaps heapTyped locals agrees
+      (Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) runtime covers certificate found typed environments heaps heapTyped locals agrees
   have flow : ∃ flowValue,
       Evaluates actual store ((LocalLoop.returnValue receipt.child.type receipt.child.expression).rename embedding)
         flowValue finalStore ∧

@@ -118,7 +118,7 @@ theorem completed_reflects {executionFuel : Nat} {value : Core.Value} {finalStor
   rw [callableEq] at measured
   obtain ⟨sources, packing, arity, sourceSize, outcome, after, finalMap, finalWorld, trace, resultAt⟩ :=
     CellAwareMaterializedPackedApplication.reflects functions profile receiver extension caller stable
-      (anchor_runtime bodyTyping) wellFormed heapTyped association owner atFrame calleeTyped packedTyped packedRelated heaps measured
+      (anchor_runtime bodyTyping) (Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) heapTyped association owner atFrame calleeTyped packedTyped packedRelated heaps measured
   exact ⟨sources, packing, arity, sourceSize, outcome, after, finalMap, finalWorld,
     by simpa only [sourceEq] using trace, resultAt⟩
 
@@ -143,7 +143,7 @@ theorem has_sufficient_fuel {invocation : Staging.Recursive.Scope} {sources : Li
   rw [sourceEq] at trace
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, resultAt⟩ :=
     CellAwareMaterializedPackedApplication.preserves functions profile receiver extension caller stable
-      (anchor_runtime bodyTyping) wellFormed heapTyped association owner atFrame calleeTyped packedTyped packedRelated heaps
+      (anchor_runtime bodyTyping) (Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) heapTyped association owner atFrame calleeTyped packedTyped packedRelated heaps
       (tail := SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed) packing arity trace
   rw [← callableEq] at evaluated
   obtain ⟨required, enough⟩ := evaluation_runStateful_complete_with_sufficient_fuel evaluated
@@ -174,7 +174,7 @@ theorem source_has_sufficient_fuel {invocation : Staging.Recursive.Scope}
   have staged : Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages invocation
       anchor.function.context before entry.source sources (Staging.Recursive.Lifting.embed outcome) after := by
     rw [sourceEq] at trace ⊢
-    exact GeneralizedLocalSourceApplicationLifting.selected_association_exact association frame wellFormed
+    exact GeneralizedLocalSourceApplicationLifting.selected_association_exact association frame (Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)
       (source_arguments functions bodyTyping history entry inHistory entryType sourceEq input started parameterView metadata packing arity) arity.symm trace
   obtain ⟨size, measured⟩ := Staging.Recursive.Size.Applies.of_trace staged
   exact has_sufficient_fuel functions profile receiver extension bodyTyping wellFormed history entry inHistory

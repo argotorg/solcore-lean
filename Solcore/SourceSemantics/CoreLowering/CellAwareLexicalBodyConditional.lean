@@ -28,9 +28,9 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
     CompatibleExpressionReads.LoweredRead fuel (.initial checked) invocation.source context reasonAt scope id lowered →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
-  (wellFormed : ProgramWellFormed program)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
-include extension uninitialized semantic wellFormed in
+include extension uninitialized semantic selectedBodies in
 theorem completes {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (found : invocation.source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
@@ -49,7 +49,7 @@ theorem completes {context scope mode id node condition conditionNode thenBody e
     Nonempty (Result entry registry faults mode (id :: rest) expected type
       (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) body)) := by
   obtain ⟨testSize,outcome,middle,value,middleStore,testTrace,testEval,testRep,testHeaps,testFrame,testEffect,valueTyped,testDetermines⟩ :=
-    CellAwareLexicalBodyExpressions.expression functions extension uninitialized semantic wellFormed entry certificate conditionFound
+    CellAwareLexicalBodyExpressions.expression functions extension uninitialized semantic selectedBodies entry certificate conditionFound
   cases outcome with
   | fault reason =>
     cases testRep with

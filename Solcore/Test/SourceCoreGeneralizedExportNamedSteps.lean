@@ -30,7 +30,7 @@ theorem PairHistory.plan_capture (history : PairHistory context session wordHand
     (call : StartedCall session observed.capture.original.key [.word seed] runOptions) :
     Nonempty (CapturePlan history seed call) := by
   obtain ⟨selected⟩ := context.whole.select observed.capture
-  obtain ⟨plan⟩ := capture_plan context.first history.retained selected observed.captureShape seed observed.typing call
+  obtain ⟨plan⟩ := capture_plan_selected context.first history.retained selected observed.captureShape seed (observed.typing.checked_registry observed.cache).namedSupport call
   exact ⟨⟨selected,plan⟩⟩
 
 theorem CapturePlan.collected {history : PairHistory context session wordHandle boolHandle}
@@ -46,7 +46,7 @@ theorem CapturePlan.collected {history : PairHistory context session wordHandle 
   let selection : RecursiveNamedPublicOutputSelections.Selection selected.packet.header.function.resultType returned.value :=
     functionSelection valueEq
   obtain ⟨added,continued,payload,_handles,selectedLeaf,heapEq,maps,worlds,materialized⟩ :=
-    planned.plan.observed_materialized context.first history.retained selected observed.typing
+    planned.plan.observed_materialized_selected context.first history.retained selected (observed.typing.checked_registry observed.cache).namedSupport
       observed.captureProfile resumed selection
   have addedEq := function_selected valueEq selectedLeaf
   subst added
@@ -79,7 +79,7 @@ theorem FullHistory.plan_tick (history : FullHistory context session wordHandle 
     (call : StartedCall session observed.tick.original.key [.bool flag] runOptions) :
     Nonempty (TickPlan history flag call) := by
   obtain ⟨selected⟩ := context.whole.select observed.tick
-  obtain ⟨plan⟩ := tick_plan context.first history.pair.retained selected observed.tickShape flag observed.typing call
+  obtain ⟨plan⟩ := tick_plan_selected context.first history.pair.retained selected observed.tickShape flag (observed.typing.checked_registry observed.cache).namedSupport call
   exact ⟨⟨selected,plan⟩⟩
 
 theorem TickPlan.retained {history : FullHistory context session wordHandle boolHandle captureHandle seed}
@@ -89,7 +89,7 @@ theorem TickPlan.retained {history : FullHistory context session wordHandle bool
     (resumed : call.checkpoint.ResumeAt executionFuel outputFuel (.succeeded returned)) :
     Nonempty (FullHistory context returned.session wordHandle boolHandle captureHandle seed) := by
   obtain ⟨added,continued,payload,_handles,selectedLeaf,heapEq,maps,worlds⟩ :=
-    planned.plan.observed_collected context.first history.pair.retained planned.selected observed.typing resumed .skip
+    planned.plan.observed_collected_selected context.first history.pair.retained planned.selected (observed.typing.checked_registry observed.cache).namedSupport resumed .skip
   have addedEq := skip_selected selectedLeaf
   subst added
   have allocated : Dynamic.Heap.Allocates history.pair.retained.state.heap .bool (some (.bool flag))

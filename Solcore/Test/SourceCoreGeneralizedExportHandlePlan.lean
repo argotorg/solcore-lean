@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreGeneralizedSelectedRegistry
 import Solcore.Test.SourceCoreGeneralizedExportSelection
 import Solcore.Test.SourceCoreGeneralizedExportCalls
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicHandleStart
@@ -58,7 +59,7 @@ theorem identity_plan (member : entry ∈ entries) (entryType : entry.sourceType
   obtain ⟨ready⟩ := CellAwarePublicHandleStart.of_started retained.state entry call
     (CellAwarePublicCells.generalized_extends_registry _ _) member entryType input start
   have frame := CellAwarePublicRetainedMaterializedHandle.source_frame first.functions
-    (SelectedCompilationBodyTyping.Bodies.of_program typing.wellFormed) ready.history.semantic entry member entryType sourceEq
+    typing.selected_bodies ready.history.semantic entry member entryType sourceEq
   have trace := identity.identity_applies (context := selected.packet.header.function.context)
     captured substitution evidence [] retained.state.heap sourceArgument frame
   exact ⟨⟨member,entryType,start,ready,_,sourceEq,materialized,input,[],evidence,rfl,sourceEq.symm ▸ trace⟩⟩
@@ -84,7 +85,7 @@ theorem captured_plan (member : entry ∈ entries) (entryType : entry.sourceType
   obtain ⟨ready⟩ := CellAwarePublicHandleStart.of_started retained.state entry call
     (CellAwarePublicCells.generalized_extends_registry _ _) member entryType input start
   have frame := CellAwarePublicRetainedMaterializedHandle.source_frame first.functions
-    (SelectedCompilationBodyTyping.Bodies.of_program typing.wellFormed) ready.history.semantic entry member entryType sourceEq
+    typing.selected_bodies ready.history.semantic entry member entryType sourceEq
   have trace := capture.captured_applies (context := selected.packet.header.function.context)
     captured substitution evidence [] retained.state.heap sourceArgument saved capturedLookup capturedRead ordinary capturedValue frame
   exact ⟨⟨member,entryType,start,ready,_,sourceEq,materialized,input,[],evidence,rfl,sourceEq.symm ▸ trace⟩⟩

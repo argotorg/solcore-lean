@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingSourceTreeLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionSourceLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNamedBodySupport
@@ -28,6 +29,8 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
     completion.result.context.registry)
   {invocation : Staging.Recursive.Scope}
   (authority : CellAwareNamedCallPorts.Authority (compiled := whole) named invocation)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies
+    (Program.ofChecked whole.sourceProgram) (SelectedCompilationPhysicalProgramSupport.stages whole))
   (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
 
 local notation "functions" => CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults profile
@@ -47,8 +50,8 @@ variable
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
 
 
-include record receiver extension authority wellFormed registered in
-theorem lifts
+include record receiver extension authority selectedBodies registered in
+theorem lifts_selected
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context} {context : SourceSemantics.Context} {expected : TypeSystem.Ty}
     (body : CellAwareFaultingNamedBodySupport.Body compiled (CellAwareNamedBodyProducer.Certificate compiled)
@@ -59,11 +62,24 @@ theorem lifts
       (CellAwareFaultingNamedBodySupport.scope named) compiled.statements := by
   exact CellAwareFaultingSourceTreeLifting.lifts bridge compiled record producer registered
     (fun childContext childRuntime childCovers childLedger size =>
-      CellAwareNamedExpressionSourceLifting.lifts compiled bridge profile receiver extension authority sourceEq issuer
-        record childLedger (by simpa only [sourceEq] using childRuntime) wellFormed childCovers size)
+      CellAwareNamedExpressionSourceLifting.lifts_selected compiled bridge profile receiver extension authority sourceEq issuer
+        record childLedger (by simpa only [sourceEq] using childRuntime) selectedBodies childCovers size)
     (fun childContext childRuntime childCovers childLedger size =>
-      CellAwareNamedExpressionMeaning.preserves compiled bridge profile receiver extension authority sourceEq issuer
-        record childLedger (by simpa only [sourceEq] using childRuntime) wellFormed childCovers size)
+      CellAwareNamedExpressionMeaning.preserves_selected compiled bridge profile receiver extension authority sourceEq issuer
+        record childLedger (by simpa only [sourceEq] using childRuntime) selectedBodies childCovers size)
     sourceEq body.tree issuer
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include record receiver extension authority wellFormed registered in
+theorem lifts
+    (sourceEq : invocation.source = source named)
+    {administrative : Core.Context} {context : SourceSemantics.Context} {expected : TypeSystem.Ty}
+    (body : CellAwareFaultingNamedBodySupport.Body compiled (CellAwareNamedBodyProducer.Certificate compiled)
+      administrative context expected)
+    (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key)) :
+    CellAwareSourceBodyLiftBounds.Lifts (named := named) (administrative := administrative)
+      (registry := stages) (invocation := invocation) bridge producer context
+      (CellAwareFaultingNamedBodySupport.scope named) compiled.statements := by
+  apply lifts_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (record := record) (receiver := receiver) (extension := extension) (authority := authority) (registered := registered) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareFaultingSourceBodyLifting

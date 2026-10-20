@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedInvocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedBodyReceipt
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
@@ -75,16 +78,16 @@ structure Receipt where
     (prepared.diagnostics.reasonAt header.named.signature.key)
 
 include aligned in
-theorem of_header {recipe : SourceCoreIndexedSession.Recipe}
+theorem of_header_selected {recipe : SourceCoreIndexedSession.Recipe}
     (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
-    (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
+    (bodyTyping : SelectedCompilationBodyTyping.Bodies whole)
     {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
     (member : entry ∈ whole.indexed.entries)
     (profile : CellAwareNamedBodyProducer.Profile whole.indexed prepared.named prepared.compilation.statements
       prepared.named.specialized.function.inferredBodyType) :
     Nonempty (Receipt prepared capture) := by
-  obtain ⟨body⟩ := CellAwareNamedBodyReceipt.of_header prepared aligned ready wellFormed member profile
+  obtain ⟨body⟩ := CellAwareNamedBodyReceipt.of_header_selected prepared aligned ready bodyTyping member profile
   let generation := cast_generation aligned.named.symm prepared.compilation
   have actual := cast_body aligned.named.symm prepared.compilation body
   have prefixEq : RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial whole.compatible.checked) header =
@@ -97,5 +100,18 @@ theorem of_header {recipe : SourceCoreIndexedSession.Recipe}
     simpa only [aligned.named] using issuer
   exact ⟨⟨generation, aligned.body.trans (cast_generation_body aligned.named.symm prepared.compilation).symm,
     prefixEq ▸ actual, issuerAt⟩⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+include aligned in
+theorem of_header {recipe : SourceCoreIndexedSession.Recipe}
+    (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+    (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
+    {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
+    (member : entry ∈ whole.indexed.entries)
+    (profile : CellAwareNamedBodyProducer.Profile whole.indexed prepared.named prepared.compilation.statements
+      prepared.named.specialized.function.inferredBodyType) :
+    Nonempty (Receipt prepared capture) := by
+  apply of_header_selected (bodyTyping := SelectedCompilationBodyTyping.Bodies.of_program wellFormed) (aligned := aligned) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedPreparedReceipt

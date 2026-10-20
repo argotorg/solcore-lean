@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedFaultSource
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedFailure
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedOutput
@@ -33,6 +34,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {recipe : SourceCoreIndexedSession.Recipe}
   (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
   (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+  (support : SelectedCompilationNamedSupport.Support whole)
   (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
   (bodyProfile : CellAwareNamedBodyProducer.Profile whole.indexed prepared.named prepared.compilation.statements
     prepared.named.specialized.function.inferredBodyType)
@@ -137,6 +139,97 @@ def ValueForward (anchor : Header whole (Program.ofChecked whole.sourceProgram))
       (completion := completion) (header := header) (payloads := payloads)
       (nativeCheckpoint := nativeCheckpoint) (publicCheckpoint := publicCheckpoint) callableProfile owner caller anchor entries (.stage origin call reason) reached)
 
+include receiver extension aligned ready diagnostic support bodyProfile selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started
+  atCheckpoint exactRegistry exportsReady in
+theorem after_fault_selected
+    {anchor : Header whole (Program.ofChecked whole.sourceProgram)}
+    {entries : List RecursiveNamedPublicFunctionHistory.Entry}
+    (history : CellAwarePublicPhysicalHistory.History
+      (functions := rootFunctions) (cells := rootCells)
+      (receiving := completion.result.context.registry) (anchor := anchor)
+      nativeSession mapping world before store caller entries)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size
+      header.context (RecursiveStageRegistry.scope sidecar [] header.function).evidence
+      (RecursiveStageRegistry.scope sidecar [] header.function).source environment bound
+      header.function.body finalContext (.fault reason) after) :
+    FailureForward (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+      (completion := completion) (header := header) (payloads := payloads)
+      (nativeCheckpoint := nativeCheckpoint) (publicCheckpoint := publicCheckpoint) callableProfile owner caller anchor entries (.semantic reason) after ∨
+      ∃ origin call guard reached, FailureForward (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+      (completion := completion) (header := header) (payloads := payloads)
+      (nativeCheckpoint := nativeCheckpoint) (publicCheckpoint := publicCheckpoint) callableProfile owner caller anchor entries (.stage origin call guard) reached := by
+  cases sameCompiled
+  obtain ⟨stagedContext, stagedOutcome, reached, capture, value, finalStore, finalMap, finalWorld,
+      required, adapted, faultHeap, run, result⟩ :=
+    CellAwarePublicNamedFaultSource.checkpoint_has_sufficient_fuel_selected callableProfile receiver extension prepared aligned
+      ready diagnostic support bodyProfile selected owner caller globalReference keyPhysical physical stable
+      heapTyped argumentsTyped sidecarIssued bodySelected represented heaps rfl started allocated trace
+  have supports := (SelectedCompilationPublicReturnedValues.header_context_supports header anchor
+    support.bodyTyping).2
+  cases adapted with
+  | completed matched =>
+    cases matched
+    have publicResult := result.context supports
+    obtain ⟨token, representedFault, output⟩ := CellAwarePublicNamedFailure.after_failure _ _ selected started
+      exactRegistry exportsReady atCheckpoint ((faultHeap _ rfl).transportContext supports) publicResult run history
+    exact .inl ⟨capture, value, finalStore, finalMap, finalWorld, required, token, result, representedFault, output⟩
+  | rejected origin call guard stagedContext reached =>
+    have publicResult := result.context supports
+    obtain ⟨token, representedFault, output⟩ := CellAwarePublicNamedFailure.after_failure _ _ selected started
+      exactRegistry exportsReady atCheckpoint ((faultHeap _ rfl).transportContext supports) publicResult run history
+    exact .inr ⟨origin, call, guard, reached, capture, value, finalStore, finalMap, finalWorld,
+      required, token, result, representedFault, output⟩
+
+include receiver extension aligned ready diagnostic support bodyProfile selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started
+  atCheckpoint exactRegistry exportsReady in
+theorem after_value_selected
+    {anchor : Header whole (Program.ofChecked whole.sourceProgram)}
+    {entries : List RecursiveNamedPublicFunctionHistory.Entry}
+    (history : CellAwarePublicPhysicalHistory.History
+      (functions := rootFunctions) (cells := rootCells)
+      (receiving := completion.result.context.registry) (anchor := anchor)
+      nativeSession mapping world before store caller entries)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {source : Dynamic.Value}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.FunctionOutcome (Program.ofChecked whole.sourceProgram) size
+      header.context (RecursiveStageRegistry.scope sidecar [] header.function).evidence
+      (RecursiveStageRegistry.scope sidecar [] header.function).source environment bound
+      header.function.body finalContext (.returned source) after) :
+    ValueForward (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+      (completion := completion) (header := header) (payloads := payloads)
+      (nativeCheckpoint := nativeCheckpoint) (publicCheckpoint := publicCheckpoint) callableProfile owner caller anchor entries source after := by
+  cases sameCompiled
+  obtain ⟨stagedContext, stagedOutcome, reached, capture, value, finalStore, finalMap, finalWorld,
+      required, adapted, faultHeap, run, result⟩ :=
+    CellAwarePublicNamedFaultSource.checkpoint_has_sufficient_fuel_selected callableProfile receiver extension prepared aligned
+      ready diagnostic support bodyProfile selected owner caller globalReference keyPhysical physical stable
+      heapTyped argumentsTyped sidecarIssued bodySelected represented heaps rfl started allocated trace
+  cases adapted with
+  | completed matched =>
+    cases matched
+    have publicResult := result.context
+      (SelectedCompilationPublicReturnedValues.header_context_supports header anchor
+        support.bodyTyping).2
+    obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.after_success _ _ selected started
+      exactRegistry exportsReady atCheckpoint publicResult run history
+    exact .inl ⟨capture, value, finalStore, finalMap, finalWorld, required, requiredOutput, result, output⟩
+  | rejected origin call reason stagedContext reached =>
+    have supports := (SelectedCompilationPublicReturnedValues.header_context_supports header anchor
+      support.bodyTyping).2
+    have publicResult := result.context supports
+    obtain ⟨token, representedFault, output⟩ := CellAwarePublicNamedFailure.after_failure _ _ selected started
+      exactRegistry exportsReady atCheckpoint ((faultHeap _ rfl).transportContext supports) publicResult run history
+    exact .inr ⟨origin, call, reason, reached, capture, value, finalStore, finalMap, finalWorld,
+      required, token, result, representedFault, output⟩
+
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
 include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
   stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started
   atCheckpoint exactRegistry exportsReady in
@@ -160,27 +253,7 @@ theorem after_fault
       ∃ origin call guard reached, FailureForward (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (completion := completion) (header := header) (payloads := payloads)
       (nativeCheckpoint := nativeCheckpoint) (publicCheckpoint := publicCheckpoint) callableProfile owner caller anchor entries (.stage origin call guard) reached := by
-  cases sameCompiled
-  obtain ⟨stagedContext, stagedOutcome, reached, capture, value, finalStore, finalMap, finalWorld,
-      required, adapted, faultHeap, run, result⟩ :=
-    CellAwarePublicNamedFaultSource.checkpoint_has_sufficient_fuel callableProfile receiver extension prepared aligned
-      ready diagnostic wellFormed bodyProfile selected owner caller globalReference keyPhysical physical stable
-      heapTyped argumentsTyped sidecarIssued bodySelected represented heaps rfl started allocated trace
-  have supports := (SelectedCompilationPublicReturnedValues.header_context_supports header anchor
-    (SelectedCompilationBodyTyping.Bodies.of_program wellFormed)).2
-  cases adapted with
-  | completed matched =>
-    cases matched
-    have publicResult := result.context supports
-    obtain ⟨token, representedFault, output⟩ := CellAwarePublicNamedFailure.after_failure _ _ selected started
-      exactRegistry exportsReady atCheckpoint ((faultHeap _ rfl).transportContext supports) publicResult run history
-    exact .inl ⟨capture, value, finalStore, finalMap, finalWorld, required, token, result, representedFault, output⟩
-  | rejected origin call guard stagedContext reached =>
-    have publicResult := result.context supports
-    obtain ⟨token, representedFault, output⟩ := CellAwarePublicNamedFailure.after_failure _ _ selected started
-      exactRegistry exportsReady atCheckpoint ((faultHeap _ rfl).transportContext supports) publicResult run history
-    exact .inr ⟨origin, call, guard, reached, capture, value, finalStore, finalMap, finalWorld,
-      required, token, result, representedFault, output⟩
+  apply after_fault_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (receiver := receiver) (extension := extension) (aligned := aligned) (ready := ready) (diagnostic := diagnostic) (bodyProfile := bodyProfile) (selected := selected) (globalReference := globalReference) (keyPhysical := keyPhysical) (physical := physical) (stable := stable) (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (sidecarIssued := sidecarIssued) (bodySelected := bodySelected) (represented := represented) (heaps := heaps) (sameCompiled := sameCompiled) (started := started) (atCheckpoint := atCheckpoint) (exactRegistry := exactRegistry) (exportsReady := exportsReady) <;> assumption
 
 include receiver extension aligned ready diagnostic wellFormed bodyProfile selected globalReference keyPhysical physical
   stable heapTyped argumentsTyped sidecarIssued bodySelected represented heaps sameCompiled started
@@ -202,29 +275,6 @@ theorem after_value
     ValueForward (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (completion := completion) (header := header) (payloads := payloads)
       (nativeCheckpoint := nativeCheckpoint) (publicCheckpoint := publicCheckpoint) callableProfile owner caller anchor entries source after := by
-  cases sameCompiled
-  obtain ⟨stagedContext, stagedOutcome, reached, capture, value, finalStore, finalMap, finalWorld,
-      required, adapted, faultHeap, run, result⟩ :=
-    CellAwarePublicNamedFaultSource.checkpoint_has_sufficient_fuel callableProfile receiver extension prepared aligned
-      ready diagnostic wellFormed bodyProfile selected owner caller globalReference keyPhysical physical stable
-      heapTyped argumentsTyped sidecarIssued bodySelected represented heaps rfl started allocated trace
-  cases adapted with
-  | completed matched =>
-    cases matched
-    have publicResult := result.context
-      (SelectedCompilationPublicReturnedValues.header_context_supports header anchor
-        (SelectedCompilationBodyTyping.Bodies.of_program wellFormed)).2
-    obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.after_success _ _ selected started
-      exactRegistry exportsReady atCheckpoint publicResult run history
-    exact .inl ⟨capture, value, finalStore, finalMap, finalWorld, required, requiredOutput, result, output⟩
-  | rejected origin call reason stagedContext reached =>
-    have supports := (SelectedCompilationPublicReturnedValues.header_context_supports header anchor
-      (SelectedCompilationBodyTyping.Bodies.of_program wellFormed)).2
-    have publicResult := result.context supports
-    obtain ⟨token, representedFault, output⟩ := CellAwarePublicNamedFailure.after_failure _ _ selected started
-      exactRegistry exportsReady atCheckpoint ((faultHeap _ rfl).transportContext supports) publicResult run history
-    exact .inr ⟨origin, call, reason, reached, capture, value, finalStore, finalMap, finalWorld,
-      required, token, result, representedFault, output⟩
-
+  apply after_value_selected (support := SelectedCompilationNamedSupport.Support.of_program wellFormed) (receiver := receiver) (extension := extension) (aligned := aligned) (ready := ready) (diagnostic := diagnostic) (bodyProfile := bodyProfile) (selected := selected) (globalReference := globalReference) (keyPhysical := keyPhysical) (physical := physical) (stable := stable) (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (sidecarIssued := sidecarIssued) (bodySelected := bodySelected) (represented := represented) (heaps := heaps) (sameCompiled := sameCompiled) (started := started) (atCheckpoint := atCheckpoint) (exactRegistry := exactRegistry) (exportsReady := exportsReady) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedFailureContinuation

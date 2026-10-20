@@ -1,3 +1,7 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedAdmission
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareParameterTyped
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopePhysicalExtension
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
@@ -57,11 +61,11 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
     projects compiled.indexed.layouts.definitions}
 
 /-- This is the actual prefix result, before any body execution or completion. -/
-theorem parameters
+theorem parameters_selected
     (header : CallableIndexedOwnedFunctionValues.Header compiled program)
     (sameLayouts : header.layouts = compiled.indexed.layouts)
     (sameGlobals : header.globals = compiled.indexed.base.globals.length)
-    (wellFormed : ProgramWellFormed program)
+    (sourceTyping : SelectedCompilationNamedSourceTyping.Certified header)
     (empty : header.function.context.locals = [])
     (ownership : LocalIdentityOwnership header.function.source)
     (native : NativeFrame) (id : Word)
@@ -143,7 +147,7 @@ theorem parameters
     rw [canonicalEq, ← prefixLength, insert_at_suffix, logicalEq]
   rw [scopeLength, exactEnvironment, CallableIndexedParameters.scope_eq] at finalWithBundle
   rw [← header.parameters] at allocated
-  have sourceReceipt := SourceReceipt.of_named wellFormed header.frame header.extended allocated heapTyped argumentsTyped
+  have sourceReceipt := SelectedCompilationNamedAdmission.parameter_source sourceTyping allocated heapTyped argumentsTyped
   have metadata := GenericLexicalContext.binders_metadata allocated
   have monomorphic := monomorphic_context header.extended (by intro id scheme member; rw [empty] at member; cases member)
   have authority : CellAwareScopeAuthority.At (GeneralizedLocalInstanceValues.model compiled.indexed)
@@ -176,5 +180,71 @@ theorem parameters
   refine ⟨environment, finalHeap, finalLogical, finalActual, finalStore, finalMap, finalWorld, finalEmbedding,
     allocated, (by simpa only [List.append_nil] using finalWithBundle), finalHeaps, sourceReceipt, actualLayout, finalTyped, agreement, preservation,
     effect, authority, reached, related, physical, rfl, rfl⟩
+
+/- Compatibility adapters for callers with a whole-program receipt. -/
+theorem parameters
+    (header : CallableIndexedOwnedFunctionValues.Header compiled program)
+    (sameLayouts : header.layouts = compiled.indexed.layouts)
+    (sameGlobals : header.globals = compiled.indexed.base.globals.length)
+    (wellFormed : ProgramWellFormed program)
+    (empty : header.function.context.locals = [])
+    (ownership : LocalIdentityOwnership header.function.source)
+    (native : NativeFrame) (id : Word)
+    (selected : compiled.indexed.ancestry.graph.inputs.callable.table.idAt? (.named header.named.signature.key) = some id)
+    (carried : Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table
+      native (.named id) (some (CallableIndexedNamedGeneration.state header.named)))
+    {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+    {administrative actualContext : Core.Context} {canonical actual : Environment} {embedding : Renaming}
+    {arguments : List Dynamic.Value} {payloads : List Value}
+    (represented : Arguments model mapping world header.bindings arguments payloads)
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+      mapping world administrative [] [] canonical compiled.indexed.layouts.definitions)
+    (heaps : GenericHeap.CellHeapRepresents
+      (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalInstanceValues.model compiled.indexed))
+      mapping world heap store)
+    (heapTyped : Dynamic.HeapWellTyped header.function.context heap)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context heap arguments header.types)
+    (agrees : EnvironmentsAgree embedding (DataPatternValues.packValues payloads :: canonical) actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
+    (location : Core.Location)
+    (reference : canonical[compiled.indexed.base.globals.length]? =
+      some (.cellRef compiled.indexed.ancestry.layout.frame.type location))
+    (read : store.read? location = some (SourceCoreCallableIndexedFrames.encode compiled.indexed.ancestry.layout.frame native))
+    (unmapped : location ∉ mapping)
+    (producer : ProtectedStateTransition.CellAllocation.Producer
+      (catalog := CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+      (protocol headers keys) compiled.indexed.layouts compiled.indexed.ancestry.layout.frame
+      (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalInstanceValues.model compiled.indexed)))
+    (initial : State headers keys ⟨[], mapping, world, heap, store, canonical⟩)
+    (ready : ProtectedStateTransition.CellAllocation.ReadyAt producer location native) :
+    ∃ environment finalHeap finalCanonical finalActual finalStore finalMap finalWorld finalEmbedding,
+      Dynamic.BindersAllocate [] heap header.function.parameters arguments environment finalHeap ∧
+      DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+        finalMap finalWorld (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+        (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+        environment finalCanonical compiled.indexed.layouts.definitions ∧
+      GenericHeap.CellHeapRepresents
+        (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalInstanceValues.model compiled.indexed))
+        finalMap finalWorld finalHeap finalStore ∧
+      SourceReceipt program header.function header.context environment finalHeap ∧
+      EnvironmentsAgree finalEmbedding finalCanonical finalActual ∧
+      RuntimeEnvironmentHasTypes finalWorld finalActual (CellAwareParameterTyped.prefixContext header.bindings actualContext)
+        compiled.indexed.layouts.definitions ∧
+      ContinuationAgreement actual store (header.parameterCode.rename embedding)
+        finalActual finalStore (header.body.rename finalEmbedding) ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalInstanceValues.model compiled.indexed)
+        mapping world heap store finalMap finalWorld finalHeap finalStore ∧
+      CellAwareScopeAuthority.At (GeneralizedLocalInstanceValues.model compiled.indexed) header.named.signature.key []
+        finalMap finalWorld finalHeap finalStore environment ∧
+      ∃ reached : State headers keys
+          ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+            finalMap, finalWorld, finalHeap, finalStore, finalCanonical⟩,
+        Relates initial reached ∧
+      ∃ physical : CellAwareScopePhysical.Physical compiled header.named header.context
+          (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+          finalCanonical finalMap finalWorld finalHeap finalStore environment,
+        physical.location = location ∧ physical.native = native := by
+  apply parameters_selected (sourceTyping := RecursiveNamedHeaderSourceTyping.certificate header wellFormed)  <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedParameterEntry

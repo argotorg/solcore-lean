@@ -1,0 +1,81 @@
+import Solcore.Test.SourceCoreSelectedFaultingLocalPublic
+import Solcore.Test.SourceCoreSelectedFaultingLocalSelectedPlan
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 2000000
+namespace Tests.SourceCoreSelectedFaultingLocal
+open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
+open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
+open CallableIndexedOwnedPreparedBootstrapRootState (keys owner)
+variable {fixture : ProfiledFixture} {row : Row fixture.original}
+namespace FailureBridge
+theorem initial_from_source_selected (selected : SelectedInventory fixture row)
+    (shape : Shape row.original.function.typedBody) (flag : Bool)
+    (typing : OriginalTyping fixture.original)
+    (started : Started fixture.original row.original.key [.bool flag])
+    (callableProfile : fixture.original.recipe.compiled.compatible.checked.catalog.callableContracts = true) :
+    Nonempty (InitialForward selected shape flag started callableProfile) := by
+  obtain ⟨start⟩ := CellAwarePublicInitialStart.from_call
+    (rows := selected.rows) (prepared := fixture.ready) (header := selected.packet.header) (call := started.call)
+    fixture.original.accepted fixture.original.selected started.opened started.bootstrap started.fresh
+    started.authority (.single started.ready) (fun _ member => selected.root_selection member)
+  let actualShape := selected.shape shape
+  have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
+      selected.packet.header.function.context [.bool flag] selected.packet.header.types := by
+    rw [selected.input_types actualShape]
+    exact .cons ⟨.bool flag, by simp [SourceCoreIndexedSession.DataInput.publicValue], .bool flag⟩ .nil
+  have inputMeanings : RecursiveNamedPublicDataInputs.Meanings [.bool flag] [.bool flag] :=
+    .cons ⟨.bool flag, by simp [SourceCoreIndexedSession.DataInput.publicValue], .bool flag⟩ .nil
+  obtain ⟨origin, _contextAt, _issued, _extension⟩ := CellAwarePublicInitialStart.receiver start
+  obtain ⟨initial⟩ := CellAwarePublicInitialStart.of_started selected.distinct callableProfile
+    origin.result.context.registry (CallableIndexedOwnedPublicDecodedCallFaults.faults origin.result.diagnostics)
+    typing.selected_bodies start inputTypes inputMeanings
+  let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued selected.input.prepared selected.packet.selected
+  have diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared :=
+    ⟨selected.packet.selected.diagnostics, selected.packet.selected.found, rfl⟩
+  obtain ⟨profile⟩ := fixture.profiles.at_slot prepared.selected
+  obtain ⟨sidecar, issued, bodySelected⟩ := selected.invocation
+  obtain ⟨allocated, final, sourceTrace⟩ := selected.source_body_selected actualShape typing.selected_bodies ⟨[]⟩ flag
+  obtain ⟨sourceSize, measured⟩ := RecursiveNamedCallBounds.FunctionOutcome.has_size (.fault sourceTrace)
+  have forward := CellAwarePublicFaultingFailureForward.first_fault_selected callableProfile initial.issued initial.extension
+    prepared selected.packet.aligned fixture.ready diagnostic (typing.checked_registry selected).namedSupport
+    (profile.for_compilation prepared.compilation) start.selected
+    (owner fixture.original.recipe.compiled) initial.caller.base.val initial.globalReference initial.keyPhysical
+    initial.caller.physical initial.stable initial.heapTyped initial.argumentsTyped issued bodySelected
+    initial.represented initial.heaps rfl start.started start.atCheckpoint
+    (congrArg SourceCoreCompatibleValues.Context.registry initial.contextAt) initial.exportsReady allocated measured
+  exact ⟨⟨start, origin, initial, forward⟩⟩
+
+/-- The complete original inventory is produced from its actual declarative
+proof before the public call is resumed. -/
+theorem complete_from_source_selected (fixture : ProfiledFixture) (row : Row fixture.original)
+    (shape : Shape row.original.function.typedBody) (flag : Bool)
+    (typing : OriginalTyping fixture.original)
+    (started : Started fixture.original row.original.key [.bool flag])
+    (callableProfile : fixture.original.recipe.compiled.compatible.checked.catalog.callableContracts = true) :
+    ∃ selected : SelectedInventory fixture row, Nonempty (InitialForward selected shape flag started callableProfile) := by
+  obtain ⟨selected⟩ := fixture.inventory_selected row typing.selected_bodies
+  exact ⟨selected, initial_from_source_selected selected shape flag typing started callableProfile⟩
+
+def selectedPublicProbe : IO Unit := do
+  let fixture ← compileProfiledFixture
+  let row ← observeRow fixture.original "local"
+  let shape ← observeShape row.original.function.typedBody
+  let typing ← observeOriginalTyping fixture.original
+  let ⟨profile⟩ ← Tests.SourceCoreSelectedGeneralizedLocal.TypingValidation.observe
+    (fixture.original.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    "interleaved actual callable profile"
+  for flag in [true, false] do
+    let started ← observeStarted fixture.original row.original.key [.bool flag]
+    let _proof := complete_from_source_selected fixture row shape flag typing started profile
+    match ← started.call.checkpoint.resume runOptions.executionFuel runOptions.outputValidationFuel with
+    | .failed token returned =>
+      unless returned.heapSize > started.session.heapSize do
+        throw (IO.userError "faulting Source-first heap effects missing")
+      IO.println s!"FAULTING_LOCAL_SELECTED_PUBLIC_FAILURE: flag={flag}, token={token.toNat}, heap={returned.heapSize}"
+    | _ => throw (IO.userError "faulting Source-first call did not fail")
+  IO.println "FAULTING_LOCAL_SELECTED_COMPLETE_OUTCOME: originals1/cache1/typing1/profile1"
+  IO.println "FAULTING_LOCAL_SELECTED_COMPLETE_OUTCOME_PASS"
+
+end FailureBridge
+end Tests.SourceCoreSelectedFaultingLocal

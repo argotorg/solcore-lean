@@ -21,7 +21,7 @@ theorem returnUnit {context mode id node rest}
   obtain ⟨rfl,rfl,rfl⟩ := SelectedCompilationStageScopedTerminalInversion.return_unit state.runtime.graph.nodeOccurrencesUnique found form trace
   exact ⟨.returnUnit (lookupStatement?_sound found) form,state.heapTyped,.refl _⟩
 
-theorem terminal (wellFormed : ProgramWellFormed program)
+theorem terminal (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {checked : SourceCoreCompatibleCatalog.Checked} {reasonAt context scope id lowered node mode statements}
     (head : CallableIndexedOwnedAdmittedStagedScopedTerminalStatements.Head invocation id mode statements)
     (certificate : CellAwareLexicalBodyExpressions.StaticCertificate checked invocation.source reasonAt context scope id lowered)
@@ -33,7 +33,7 @@ theorem terminal (wellFormed : ProgramWellFormed program)
   obtain ⟨_,measured⟩ := Size.Expression.of_trace lifted
   cases plain with
   | value value =>
-    obtain ⟨_,reached,extension⟩ := expression_typed wellFormed certificate found state childTrace
+    obtain ⟨_,reached,extension⟩ := expression_typed selectedBodies certificate found state childTrace
     exact ⟨(head.trace measured).sound,reached.heapTyped,extension⟩
   | fault reason => exact ⟨(head.trace measured).sound,trivial⟩
 
@@ -69,7 +69,7 @@ theorem absent {context nextContext mode id node binder rest}
   exact ⟨.letUninitialized (lookupStatement?_sound found) form mono extended allocated lifted,
     post.restore extended (.of_allocation allocated)⟩
 
-theorem initialized (wellFormed : ProgramWellFormed program)
+theorem initialized (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {checked : SourceCoreCompatibleCatalog.Checked} {reasonAt context nextContext scope mode id node binder initializer initializerNode lowered rest}
     (found : invocation.source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some initializer))
     (mono : binder.scheme.quantified = []) (extended : BinderExtends invocation.source.owner context binder nextContext)
@@ -84,7 +84,7 @@ theorem initialized (wellFormed : ProgramWellFormed program)
     exact ⟨.letFault (lookupStatement?_sound found) form mono (expression certificate state.runtime.graph.nodeOccurrencesUnique child),trivial⟩
   · obtain ⟨_,_,_,_,_,_,_,_,child,allocated,tail⟩ := done
     have first := expression (registry := registry) certificate state.runtime.graph.nodeOccurrencesUnique child
-    obtain ⟨typed,reached,extension⟩ := expression_typed wellFormed certificate initializerFound state child
+    obtain ⟨typed,reached,extension⟩ := expression_typed selectedBodies certificate initializerFound state child
     obtain ⟨lifted,post⟩ := remaining (reached.allocate mono extended (.some (sourceType ▸ typed)) allocated) tail
     exact ⟨.letInitialized (lookupStatement?_sound found) form first mono extended allocated lifted,
       post.restore extended (extension.trans (.of_allocation allocated))⟩

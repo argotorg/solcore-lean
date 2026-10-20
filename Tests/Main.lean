@@ -1,3 +1,6 @@
+import Solcore.Test.SourceCoreGeneralizedSelectedRuntime
+import Solcore.Test.SourceCoreGeneralizedNamedSelectedRuntime
+import Solcore.Test.SourceCoreSelectedFaultingLocalSelectedRuntime
 import Solcore.Test.SourceCoreGeneralizedLexicalBodyRuntime
 import Solcore.Test.SourceCoreGeneralizedLexicalBodyProbe
 import Solcore.Test.SourceCoreGeneralizedLexicalBodyWellFormed
@@ -3844,6 +3847,9 @@ def main : IO UInt32 := do
   Tests.SourceCoreGeneralizedLexicalBody.typingProbe
   Tests.SourceCoreGeneralizedLexicalBody.nativeProbe
   Tests.SourceCoreGeneralizedLexicalBody.ObservedRuntime.run
+  Tests.SourceCoreGeneralizedExport.SourcePublicSelectedRuntime.run
+  Tests.SourceCoreGeneralizedExport.SourcePublicNamedSelectedRuntime.run
+  Tests.SourceCoreSelectedFaultingLocal.FailureBridge.selectedRuntime
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"

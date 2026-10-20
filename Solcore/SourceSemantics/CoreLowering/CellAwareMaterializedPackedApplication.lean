@@ -34,7 +34,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (stable : StableRows caller)
   {context : SourceSemantics.Context} {callerSource : TypedSource}
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context callerSource)
-  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
+      (SelectedCompilationPhysicalProgramSupport.stages compiled))
   (heapTyped : Dynamic.HeapWellTyped context before)
   {function : Dynamic.Closure} {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding}
   {parameter result : TypeSystem.Ty} {parameterCore resultCore : Core.Ty}
@@ -83,7 +84,7 @@ private theorem arguments :
     sourceTyped packing parameterEq.symm arity
   exact ⟨sources, values, packing, arity, nativeEq, represented, raw, frame⟩
 
-include profile receiver extension stable runtime wellFormed heapTyped atFrame calleeTyped packedTyped packedRelated heaps in
+include profile receiver extension stable runtime selectedBodies heapTyped atFrame calleeTyped packedTyped packedRelated heaps in
 /-- The original packed Source call constructs the actual handle payload
 execution and returns the same mixed heap and restored caller pool. -/
 theorem preserves {invocation : Staging.Recursive.Scope} {tail : Environment}
@@ -108,7 +109,7 @@ theorem preserves {invocation : Staging.Recursive.Scope} {tail : Environment}
     obtain ⟨value, finalStore, evaluated, finalMap, finalWorld, representedResult, finalHeaps,
         maps, worlds, preserved, metadata, _effect, returned, related, post⟩ :=
       GeneralizedLocalApplicationMeaning.preserves (faults := callFaults) material view inputs functions extension owner caller
-        atFrame frame raw stable runtime wellFormed (material.body_uninitialized receiver) (fun _ _ proof => proof)
+        atFrame frame raw stable runtime selectedBodies (material.body_uninitialized receiver) (fun _ _ proof => proof)
         represented heaps trace
     obtain ⟨nativeSize, measured⟩ := evaluation_has_size evaluated
     have padded : EvaluationSize nativeSize (view.native :: packedNative :: tail) store
@@ -118,7 +119,7 @@ theorem preserves {invocation : Staging.Recursive.Scope} {tail : Environment}
     exact ⟨value, finalStore, finalMap, finalWorld, padded.sound, representedResult, finalHeaps,
       maps, worlds, preserved, metadata, returned, related, post⟩
 
-include profile receiver extension stable runtime wellFormed heapTyped atFrame calleeTyped packedTyped packedRelated heaps in
+include profile receiver extension stable runtime selectedBodies heapTyped atFrame calleeTyped packedTyped packedRelated heaps in
 /-- Completion of the actual handle payload reconstructs its ordered Source
 arguments and call, even when its lexical frame belongs to a different owner. -/
 theorem reflects {invocation : Staging.Recursive.Scope} {tail : Environment}
@@ -146,7 +147,7 @@ theorem reflects {invocation : Staging.Recursive.Scope} {tail : Environment}
     obtain ⟨sourceSize, outcome, after, trace, finalMap, finalWorld, representedResult, finalHeaps,
         maps, worlds, preserved, metadata, _effect, returned, related, post⟩ :=
       GeneralizedLocalApplicationMeaning.reflects (faults := callFaults) (registry := callStages)
-        material view inputs functions extension owner caller atFrame frame raw stable runtime wellFormed
+        material view inputs functions extension owner caller atFrame frame raw stable runtime selectedBodies
         (material.body_uninitialized receiver) (fun _ _ proof => proof) represented heaps (.anonymous selected) evaluation.sound
     exact ⟨sources, packing, arity, sourceSize, outcome, after, finalMap, finalWorld, trace,
       representedResult, finalHeaps, maps, worlds, preserved, metadata, returned, related, post⟩

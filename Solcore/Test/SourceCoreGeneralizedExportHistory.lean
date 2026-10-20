@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreGeneralizedNamedSelectedMaterialized
 import Solcore.Test.SourceCoreGeneralizedExportObserved
 import Solcore.Test.SourceCoreGeneralizedExportHandleObserved
 
@@ -80,7 +81,7 @@ theorem Context.collected {executionFuel outputFuel : Nat}
   have typeEq := context.selected.result_eq.trans observed.makeResult
   let selection := pairSelection typeEq valueEq
   obtain ⟨entries,retained,payload,_handles,selectedLeaves,_heap,materialized⟩ :=
-    context.first.observed_materialized observed.typing observed.makeProfile resumed selection
+    context.first.observed_materialized_selected (observed.typing.checked_registry observed.cache).namedSupport observed.makeProfile resumed selection
   obtain ⟨firstNative,secondNative,firstType,secondType,remaining,entriesEq⟩ :=
     pair_selected typeEq valueEq selectedLeaves
   subst entries

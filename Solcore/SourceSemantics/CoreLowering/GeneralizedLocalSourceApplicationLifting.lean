@@ -47,7 +47,8 @@ theorem application_exact {registry : Registry} {child caller : Scope}
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
+      registry)
     (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
@@ -65,7 +66,7 @@ theorem application_exact {registry : Registry} {child caller : Scope}
       (Program.ofChecked compiled.sourceProgram) true childSize child inputs.context environment bound
       function.body finalContext bodyOutcome after := by
     simpa only [SelectedCompilationStageScopedLiftBounds.PlainStatements, Bool.true_eq, ↓reduceIte, source,registry.evidence selected] using bodyTrace
-  obtain ⟨lifted,_post⟩ := CellAwareOrdinaryBodySourceLifting.lifts wellFormed tree
+  obtain ⟨lifted,_post⟩ := CellAwareOrdinaryBodySourceLifting.lifts selectedBodies tree
     (parameter_state material inputs selected valid raw allocated) plain
   have matched : BodyResult function.resultType (CellAwareOrdinaryBodySourceState.embed bodyOutcome)
       (Lifting.embed outcome) := by
@@ -83,21 +84,23 @@ theorem application {registry : Registry} {child caller : Scope}
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
+      registry)
     (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
       callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
     Lifting.ApplicationLift (Program.ofChecked compiled.sourceProgram) registry caller callContext before
       (.closure function) arguments outcome after :=
-  ⟨_, _, application_exact material inputs selected wellFormed raw arity trace, .completed⟩
+  ⟨_, _, application_exact material inputs selected selectedBodies raw arity trace, .completed⟩
 
 include inputs in
 theorem selected_application_exact {caller : Scope}
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
+      (SelectedCompilationPhysicalProgramSupport.stages compiled))
     (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
@@ -106,7 +109,7 @@ theorem selected_application_exact {caller : Scope}
       caller callContext before (.closure function) arguments (Lifting.embed outcome) after := by
   obtain ⟨_sidecar, _accepted, selected⟩ := material.scope_at
   exact application_exact (registry := SelectedCompilationPhysicalProgramSupport.stages compiled)
-    material inputs (.anonymous selected) wellFormed raw arity trace
+    material inputs (.anonymous selected) selectedBodies raw arity trace
 
 include inputs in
 /-- The selected child comes from the actual compiler packet retained by the
@@ -115,7 +118,8 @@ theorem selected_application {caller : Scope}
     {callContext : SourceSemantics.Context} {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
+      (SelectedCompilationPhysicalProgramSupport.stages compiled))
     (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
@@ -124,7 +128,7 @@ theorem selected_application {caller : Scope}
       (SelectedCompilationPhysicalProgramSupport.stages compiled) caller callContext before
       (.closure function) arguments outcome after := by
   obtain ⟨_sidecar, _accepted, selected⟩ := material.scope_at
-  exact application (registry := SelectedCompilationPhysicalProgramSupport.stages compiled) material inputs (.anonymous selected) wellFormed raw arity trace
+  exact application (registry := SelectedCompilationPhysicalProgramSupport.stages compiled) material inputs (.anonymous selected) selectedBodies raw arity trace
 
 /-- Public representations expose the retained materialization directly; the
 actual Source closure frame determines its original parameter context. -/
@@ -137,7 +141,8 @@ theorem selected_association_exact
     {callerEvidence invocationEvidence : Dynamic.EvidenceEnvironment}
     {arguments : List Dynamic.Value} {before after : Dynamic.Heap}
     {size : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
+      (SelectedCompilationPhysicalProgramSupport.stages compiled))
     (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
@@ -147,6 +152,6 @@ theorem selected_association_exact
   cases association with
   | viewed material _view _typed =>
     obtain ⟨inputs⟩ := GeneralizedLocalBodyCompiler.entry_context material frame material.ownership
-    exact selected_application_exact material inputs wellFormed raw arity trace
+    exact selected_application_exact material inputs selectedBodies raw arity trace
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
