@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Initializer conditions follow actual checking and finalization (2026-10-20)
+
+All eleven mutually recursive inference operations now preserve normalized type and predicate formation. The proof follows all 76 executable cases, including generalized declarations, calls, operators, constructors, mappings, loops and match branches. The selected function check supplies the initial formation, final substitution and capture checks.
+
+The actual solver carries whole-body predicate formation to its solved rows. Exact template ownership then supplies the final predicate-formation condition for retained initialized bindings, including nested declarations and for headers. This no longer requires callers to prove formation of every issued requirement or to supply the initializer semantic typing first.
+
+For each original top-level initialized statement, one traversal of the actual prefix derives the capture origins and raw constraint rows behind older local schemes. Its exact initializer receipt supplies the allocation bounds and generalization boundary. The actual suffix and finalizer preserve the resulting quantified-variable privacy. The public compilation endpoint derives these conditions from successful checking and compilation.
+
+Validation: 61 changed modules in a coherent graph of 8,785 modules, 62 retained runtime invocations and 6,674 endpoint audits. Full build (8,824 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The final generalization barrier, freshness against earlier scheme quantifiers, semantic typing of original generalized initializers and complete compiler-pass preservation still need connections. The unconditional privacy endpoint currently selects top-level initialized statements; nested positions and for headers need the corresponding traversal.
+
+The theorem target remains successful selected compilation. An accepted checker program with a nested qualified local scheme can violate the current global solved-ledger generalization barrier. The recorded example and four nearby probes are rejected by the selected Core compiler. A general theorem from checker acceptance alone would therefore be false; excluding this case from successful selected compilation still requires proof.
+
 ## Selected bodies drive named starts and retained closures (2026-10-20)
 
 Public named calls and materialized closures now use the selected original body typings and preservation for the actual prepared registry. Named parameters, captured environments, mixed expressions and imperative bodies carry the same selected certificate through Source lifting, Core execution and public completion. Existing whole-program APIs are proved adapters.

@@ -4,6 +4,16 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Initializer conditions follow actual checking and finalization (2026-10-20)
+
+`Selected.normalizedBodyFormation` and `compile_normalized_ledger` derive formation from the actual selected original body. `Selected.normalizedSolvedLedger` and `normalizedTemplatePredicate` transport it through the same final solver and exact template owner. `FinalizedBindingEvent.finalPredicates` and `InitializerContinuation.finalPredicates` supply the existing generalized initializer certificate interface.
+
+`LiveTemplatesBacked` follows actual scope restoration, substitution extension and ledger growth. Its statement and header receipt methods recover rows before the real initializer cutoff. `BackedStatementPrivacyOccurrence` keeps prefix provenance and suffix privacy in one actual call witness. `Selected.initializedStatementPrivate` and `compile_initialized_statement_private` derive the resulting `InitializedStatementPrivate` without caller-supplied capture origins, template backing, allocation bounds or live-binder privacy.
+
+Goal two remains incomplete. The final generalization barrier, freshness against earlier scheme quantifiers, semantic typing of original generalized initializers and complete compiler-pass preservation still need connections. The unconditional privacy endpoint currently selects top-level initialized statements; nested positions and for headers need the corresponding traversal.
+
+The theorem target remains successful selected compilation. An accepted checker program with a nested qualified local scheme can violate the current global solved-ledger generalization barrier. The recorded example and four nearby probes are rejected by the selected Core compiler. A general theorem from checker acceptance alone would therefore be false; excluding this case from successful selected compilation still requires proof.
+
 ## Selected bodies drive named starts and retained closures (2026-10-20)
 
 `SelectedCompilationCheckedRegistry.Certificate` joins the actual checker receipt, selected body typings and cached replacement ranges. Its `namedSupport` projection supplies `SelectedCompilationNamedSupport.Support` to selected named roots, Source lifting and public starts. Selected closure completion and reflection consume the same registry preservation through `SelectedStagedArgumentTyping` and `SelectedStagedPostAdmission`. `CellAwarePublicNamedSource` and the materialized and imperative public roots expose selected entry points alongside compatibility adapters. The ordinary named, lexical and faulting public APIs use the same selected support for completion, failure reflection and continuation after earlier successful or failed calls. Legacy whole-program signatures remain adapters.

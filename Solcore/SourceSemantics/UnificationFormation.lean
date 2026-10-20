@@ -212,3 +212,47 @@ theorem matching_range_admissible
   simpa only [lookup, Option.getD_some] using recovered
 
 end Solcore.SourceSemantics.UnificationFormation
+
+namespace Solcore.SourceSemantics.UnificationFormation
+open Frontend TypeSystem
+
+/-- Directional matching can be checked in the final context directly. Each
+matched replacement occurs in the original formed pattern; its final type is
+recovered from the actual final normalized source. No intermediate source
+formation or whole-expression typing judgment is assumed. -/
+theorem matching_normalized_range_admissible
+    {context : Context} {left right : Ty}
+    {substitution outer : TypeSystem.Substitution}
+    (leftFormed : TypeAdmissible context left)
+    (rightFormed : TypeAdmissible context (outer.apply right))
+    (success : Unification.unify [{ left, right }] = .ok substitution)
+    (disjoint : ∀ metavariable, metavariable ∈ substitution.domain →
+      metavariable ∉ right.freeVariables) :
+    ∀ metavariable replacement, (metavariable, replacement) ∈ substitution →
+      TypeAdmissible context (outer.apply replacement) := by
+  have unchanged : substitution.apply right = right :=
+    Ty.apply_eq_self_of_domain_disjoint_freeVariables substitution right
+      (fun metavariable member occurs => disjoint metavariable member occurs)
+  have matched : substitution.apply left = right :=
+    (Unification.unifyTypes_sound success).trans unchanged
+  have solved := Unification.unifyTypes_solvedBelow
+    ((Ty.variablesBelow_nextVariable left).weaken (Nat.le_max_left _ _))
+    ((Ty.variablesBelow_nextVariable right).weaken (Nat.le_max_right _ _)) success
+  intro metavariable replacement member
+  have inDomain : metavariable ∈ substitution.domain :=
+    List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
+  obtain ⟨constraint, constraintMember, occurs⟩ :=
+    Unification.unify_domain_origin success inDomain
+  have same : constraint = { left, right } := by simpa using constraintMember
+  subst constraint
+  have occursLeft : metavariable ∈ left.freeVariables :=
+    occurs.resolve_right (disjoint metavariable inDomain)
+  have lookup := StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+    solved.domain_nodup member
+  have composed : (outer.compose substitution).apply left = outer.apply right := by
+    rw [Substitution.compose_apply, matched]
+  have recovered := admissible_at_occurrence (outer.compose substitution) leftFormed.typeWellScoped
+    occursLeft (composed.symm ▸ rightFormed)
+  simpa only [Substitution.lookup?_compose, lookup, Option.getD_some] using recovered
+
+end Solcore.SourceSemantics.UnificationFormation
