@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Nested initializer privacy follows actual cached body continuations (2026-10-20)
+
+SourceCompiledInitializerLambdaResume and SourceCompiledNestedInitializerFinalPrivacy connect actual nested source positions to finalizer privacy. SourceCachedTemplateScope derives original owner scope from full-cache preparation; SourceCachedNestedTemplatePrivacy uses it for late ordinary functions.
+
+These results retain the same body receipt, initialized binder, substitution and actual cache position. The nested theorem currently handles a lambda initializer containing an inner initialized declaration at arbitrary selected statement positions. Arbitrary nesting paths remain separate work.
+
+Goal two remains incomplete. All-syntax initializer lifetime traversal and complete initializer barriers still need their final producer. The existing StaticProfile accepts only a restricted body subset, so its completeness cannot follow every successful compilation. General pass preservation must cover accepted nested closures and generalized local binders before the final public meaning-preservation theorem can be completed.
+
 ## Actual cached bodies supply checker inputs and closed ledger predicates (2026-10-20)
 
 SourceCompiledCachedOrdinaryBody connects the actual cache to original ordinary body validity. SourceCompiledCachedMethodInputs and SourceCompiledCachedBodySelection retain original method inputs and same-source BodySelection. SourceCompiledNonTemplateLedger.cached_closed and finalized_closed derive non-template ledger closure from actual preparation and specialization.

@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Nested initializer privacy follows actual cached body continuations (2026-10-20)
+
+Actual statement positions recover the original initializer and its remaining computation. A nested lambda initializer now retains its real parameter setup, body prefix, return unification and restored outer scope, then resumes through the selected body finalizer.
+
+Complete executable preparation supplies original template scope for cached ordinary functions, including helpers first discovered while preparing implementation methods. The same template owner bounds its predicate variables; finalizer freshness and the actual outer initializer type keep a nested binder private.
+
+The retained fixtures keep both initializer positions at index one and preserve their original source. A method-to-helper call exercises initial and late cache rows. Nested continuation reaches the final substitution without assuming a closed lambda return or a source body typing law.
+
+Validation: 17 changed modules in a coherent graph of 8,991 modules, 73 retained runtime invocations and 7,351 endpoint audits. Full build (9,030 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. All-syntax initializer lifetime traversal and complete initializer barriers still need their final producer. The existing StaticProfile accepts only a restricted body subset, so its completeness cannot follow every successful compilation. General pass preservation must cover accepted nested closures and generalized local binders before the final public meaning-preservation theorem can be completed.
+
 ## Actual cached bodies supply checker inputs and closed ledger predicates (2026-10-20)
 
 Every actual cached ordinary function now supplies its original checker receipt and executable interfaces, including helper functions added during implementation-method preparation. Those interfaces feed the existing generalized body proof and full FunctionDefinition.Valid, conditional only on the exact initializer barriers.

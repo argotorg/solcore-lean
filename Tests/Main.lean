@@ -1,3 +1,5 @@
+import Solcore.Test.SourceCachedTemplateScope
+import Solcore.Test.SourceCompiledNestedInitializerPrivacy
 import Solcore.Test.SourceCompiledDirectCallPredicateOrigins
 import Solcore.Test.SourceCompiledGeneralizedBarrierConnection
 import Solcore.Test.SourceCompiledTemplateCallOrigins
@@ -3280,6 +3282,9 @@ def capturedClosureSessionTests : IO Unit := do
 
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
+  Tests.SourceCachedTemplateScope.main
+  Tests.SourceCompiledNestedInitializerPrivacy.main
+
   Tests.SourceCompiledDirectCallPredicateOrigins.main
   Tests.SourceCompiledGeneralizedBarrierConnection.main
 
