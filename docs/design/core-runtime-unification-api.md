@@ -4,6 +4,12 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected initializer occurrences reach their actual finalizer (2026-10-20)
+
+`SourceCompiledSelectedInferenceProgress` connects selected compilation to the real body inference and final solver. `SourceCompiledGeneralizedInitializerContexts` preserves local scheme formation when entering an actual initialized binder. `SourceCompiledBlockContinuations`, `SourceCompiledBranchContinuations` and `SourceCompiledMatchContinuations` compose occurrence-specific continuations through nested statements. `SourceCompiledInitializerRequirementFormation` connects actual issuance formation to retained normalized requirements. The proof-only unification, scheme allocation and pattern inference exports leave checker computation unchanged.
+
+The general selected checker theorem, original generalized initializer typing and complete compiler-pass preservation remain unfinished. Existing public semantic theorems also retain a whole-program well-formedness premise that must be derived or narrowed at the selected-compilation boundary. Goal two remains incomplete.
+
 ## Materialized local bodies preserve duplicate reads, captures and literals (2026-10-20)
 
 `GeneralizedLocalOrdinaryExpressionProfile` records the finite original expression tree. `GeneralizedLocalBodyExpressionAdmission.actual_tree` derives its certificate from actual accepted lowering and static closure typing. `CellAwareReadProductCompletion.completes` constructs the common Source/native result and reached mixed heap; `CellAwareTerminalExpressionCompletion` and `GeneralizedLocalTerminalBodyMeaning` connect that result to application preservation and reflection. `CompatibleExpressionTypedLiteralEvidence.of_typed` obtains numeric evidence from the original Source typing, unique actual requirement identities and dictionary coverage.

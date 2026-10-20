@@ -15418,3 +15418,59 @@ theorem localReadScope_bindLambdaParameters_nextLocal_le
   exact bindLambdaParameters_nextLocal_le success
 
 end Solcore.Frontend.SourceInference.Detail
+
+
+namespace Solcore.Frontend.SourceInference.Detail
+open TypeSystem
+
+/-- The actual flat-pattern entry retains arbitrary already-seen names. This
+is the public form of its existing executable inference proof. -/
+theorem inferMatchPatternFlatFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {seen : List String} {state : State} {result : InferredPattern}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (formation : ProgramSignatureFormationValidated context.signatures)
+    (accepted : inferMatchPatternFlatFuel fuel context pattern expected seen state = .ok result) :
+    state.InferenceProgress result.state ∧ result.state.InferenceReady :=
+  inferMatchPatternFlatFuel_inferenceProperties_internal fuel context pattern expected seen state
+    result ready expectedBelow formation accepted
+
+/-- The actual ordered flat-pattern fold composes the ready states and
+substitutions of its accepted head and tail calls. -/
+theorem inferMatchPatternsFlatFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {patterns : List Syntax.Pattern}
+    {expected : List Ty} {seen : List String} {state : State} {result : InferredPatterns}
+    (ready : state.InferenceReady)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow state.inference.next)
+    (formation : ProgramSignatureFormationValidated context.signatures)
+    (accepted : inferMatchPatternsFlatFuel fuel context patterns expected seen state = .ok result) :
+    state.InferenceProgress result.state ∧ result.state.InferenceReady := by
+  induction patterns generalizing expected seen state result with
+  | nil =>
+    cases expected with
+    | nil =>
+      simp only [inferMatchPatternsFlatFuel, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+      subst result
+      exact ⟨.refl ready.solved, ready⟩
+    | cons head tail => simp [inferMatchPatternsFlatFuel] at accepted
+  | cons pattern patterns ih =>
+    cases expected with
+    | nil => simp [inferMatchPatternsFlatFuel] at accepted
+    | cons expected expectedTypes =>
+      cases headRun : inferMatchPatternFlatFuel fuel context pattern expected seen state with
+      | error error => simp [inferMatchPatternsFlatFuel, headRun, bind, Except.bind] at accepted
+      | ok head =>
+        cases tailRun : inferMatchPatternsFlatFuel fuel context patterns expectedTypes head.names head.state with
+        | error error => simp [inferMatchPatternsFlatFuel, headRun, tailRun, bind, Except.bind] at accepted
+        | ok tail =>
+          simp only [inferMatchPatternsFlatFuel, headRun, tailRun, bind, Except.bind,
+            pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+          subst result
+          have first := inferMatchPatternFlatFuel_inferenceProperties ready
+            (expectedBelow _ List.mem_cons_self) formation headRun
+          have rest := ih first.2 (fun type member =>
+            (expectedBelow type (List.mem_cons_of_mem _ member)).weaken first.1.next_le) tailRun
+          exact ⟨first.1.trans rest.1, rest.2⟩
+
+end Solcore.Frontend.SourceInference.Detail

@@ -732,3 +732,16 @@ def generalize (environment : Environment) (type : Ty) : Scheme :=
 end Environment
 
 end Solcore.TypeSystem
+
+
+namespace Solcore.TypeSystem.Scheme
+
+/-- Actual instantiation covers each quantified variable even if the input
+list repeats a name. Coverage alone does not require a permutation proof. -/
+theorem instantiateWithSubstitution_substitution_domain_covers
+    (scheme : Scheme) (next : Nat) {metavariable : TypeVarId}
+    (member : metavariable ∈ scheme.quantified) :
+    metavariable ∈ (scheme.instantiateWithSubstitution next).substitution.domain :=
+  freshSubstitution_domain_covers scheme.quantified next [] metavariable (.inl member)
+
+end Solcore.TypeSystem.Scheme

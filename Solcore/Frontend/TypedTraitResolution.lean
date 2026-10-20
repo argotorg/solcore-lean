@@ -907,3 +907,62 @@ def resolve (rules : List ImplRule) (maxDepth : Nat) (goal : Predicate) :
   TraitResolution.resolve (programOfRules rules) maxDepth goal
 
 end Solcore.Frontend.TypedTraitResolution
+
+
+namespace Solcore.Frontend.TypedTraitResolution
+
+open TypeSystem
+
+private theorem parameterFresheningSubstitution_domain (parameters : List TypeParameterId)
+    (next : Nat) :
+    ((parameterFresheningSubstitution parameters next).1.map Prod.fst) = parameters := by
+  induction parameters generalizing next with
+  | nil => rfl
+  | cons parameter rest ih =>
+      simp only [parameterFresheningSubstitution, List.map_cons, ih]
+
+private theorem parameterFresheningSubstitution_variables (parameters : List TypeParameterId)
+    (next : Nat) {parameter : TypeParameterId} {replacement : Ty}
+    (member : (parameter, replacement) ∈ (parameterFresheningSubstitution parameters next).1) :
+    ∃ fresh, replacement = Ty.variable fresh := by
+  induction parameters generalizing next with
+  | nil => simp [parameterFresheningSubstitution] at member
+  | cons head rest ih =>
+      simp only [parameterFresheningSubstitution, List.mem_cons] at member
+      rcases member with same | member
+      · cases same
+        exact ⟨_, rfl⟩
+      · exact ih _ member
+
+private theorem emptySubstitution_predicate (predicate : Predicate) :
+    applySubstitution [] predicate = predicate := by
+  have empty (type : Ty) : Substitution.apply [] type = type :=
+    Ty.apply_eq_self_of_domain_disjoint_freeVariables [] type (by simp [Substitution.domain])
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [applySubstitution, empty]
+      have args : arguments.map (Substitution.apply []) = arguments := by
+        induction arguments with
+        | nil => rfl
+        | cons head tail ih => simp only [List.map_cons, empty, ih]
+      rw [args]
+
+/-- A rule with no flexible variables is freshened by the real rigid
+allocator. Its exact collected domain and variable-valued range are retained
+alongside the actual fresh head; no arbitrary renaming is assumed. -/
+theorem freshenRuleFor_head_of_no_variables
+    (rule : ImplRule) (goal : Predicate)
+    (closed : ruleVariables rule = []) :
+    ∃ substitution : ParameterSubstitution,
+      substitution.map Prod.fst = ruleParameters rule ∧
+      (∀ parameter replacement, (parameter, replacement) ∈ substitution →
+        ∃ fresh, replacement = Ty.variable fresh) ∧
+      (freshenRuleFor rule goal).head = applyParameterSubstitution substitution rule.head := by
+  let next := max (ruleNextVariable rule) (predicateNextVariable goal)
+  let substitution := (parameterFresheningSubstitution (ruleParameters rule) next).1
+  refine ⟨substitution, parameterFresheningSubstitution_domain _ _, ?_, ?_⟩
+  · exact fun _ _ member => parameterFresheningSubstitution_variables _ _ member
+  · simp only [freshenRuleFor, freshenRuleForParameters, closed, fresheningSubstitution]
+    exact emptySubstitution_predicate _
+
+end Solcore.Frontend.TypedTraitResolution

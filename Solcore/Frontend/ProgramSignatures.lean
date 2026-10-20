@@ -3877,3 +3877,49 @@ theorem instantiate_parameterSubstitution_domain_reverse
   simpa only [instantiate, List.map_nil, List.append_nil] using
     freshParameterSubstitution_domain_reverse scheme.parameters next [] unique (by simp)
 end Solcore.Frontend.ConstrainedDeclarationScheme
+
+namespace Solcore.Frontend.ConstrainedDeclarationScheme
+
+private theorem freshParameterSubstitution_range_lower
+    (parameters : List TypeSystem.TypeParameterId) (next : Nat)
+    (substitution : TypeSystem.ParameterSubstitution) (lower : Nat)
+    (bound : lower ≤ next)
+    (prior : ∀ parameter replacement, (parameter,replacement) ∈ substitution →
+      ∃ metavariable, replacement = .variable metavariable ∧ lower ≤ metavariable.index) :
+    ∀ parameter replacement,
+      (parameter,replacement) ∈ (freshParameterSubstitution parameters next substitution).1 →
+      ∃ metavariable, replacement = .variable metavariable ∧ lower ≤ metavariable.index := by
+  induction parameters generalizing next substitution with
+  | nil => exact prior
+  | cons parameter parameters ih =>
+    cases found : substitution.lookup? parameter with
+    | some existing =>
+      simp only [freshParameterSubstitution, found]
+      exact ih next substitution bound prior
+    | none =>
+      simp only [freshParameterSubstitution, found]
+      apply ih (next + 1) ((parameter, .variable ⟨next⟩) :: substitution)
+        (Nat.le_trans bound (Nat.le_succ next))
+      intro candidate replacement member
+      rcases List.mem_cons.mp member with same | old
+      · cases same
+        exact ⟨⟨next⟩, rfl, bound⟩
+      · exact prior candidate replacement old
+
+/-- Every replacement issued by the real declaration allocator belongs to
+this instantiation's fresh interval, including when parameters repeat. -/
+theorem instantiate_parameterSubstitution_range_fresh
+    (scheme : ConstrainedDeclarationScheme) (next : Nat)
+    {parameter : TypeSystem.TypeParameterId} {replacement : TypeSystem.Ty}
+    (member : (parameter,replacement) ∈ (scheme.instantiate next).parameterSubstitution) :
+    ∃ metavariable, replacement = .variable metavariable ∧
+      next ≤ metavariable.index ∧ metavariable.index < (scheme.instantiate next).next := by
+  obtain ⟨metavariable, same, lower⟩ :=
+    freshParameterSubstitution_range_lower scheme.parameters next [] next (Nat.le_refl _)
+      (by simp) parameter replacement member
+  have upper := instantiate_parameterSubstitution_range_variablesBelow scheme next member
+  rw [same] at upper
+  exact ⟨metavariable, same, lower,
+    (TypeSystem.Ty.variablesBelow_variable_iff _ _).mp upper⟩
+
+end Solcore.Frontend.ConstrainedDeclarationScheme

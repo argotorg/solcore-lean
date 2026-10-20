@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected initializer occurrences reach their actual finalizer (2026-10-20)
+
+The selected checker receipt now supplies initial inference readiness, allocator bounds and the continuation from the actual function body through return unification to the final solver. Initialized bindings inside blocks, branches, while loops, for headers and bodies, and match arms and defaults retain their original occurrence and reach that same finalizer. The proofs use the actual child inference equations, scope restoration and retained nodes. They do not take the selected body typing as an assumption.
+
+Requirement formation and privacy proofs cover actual function references, local references, operators, literals, coercion search, calls and binder generalization. Finalized initializer contexts preserve prior local schemes and recover the actual no-capture and substitution facts. Retained requirement formation still requires formation of the issued requirements; deriving that premise for every mutually recursive inference operation is the next checker connection.
+
+Validation: 48 changed modules in a coherent graph of 8,663 modules, 56 retained runtime invocations and 6,110 endpoint audits. Full build (8,703 jobs), registered tests, kernel policy and canonical endpoint audit pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The 12 unrelated workspace changes remain excluded.
+
+The general selected checker theorem, original generalized initializer typing and complete compiler-pass preservation remain unfinished. Existing public semantic theorems also retain a whole-program well-formedness premise that must be derived or narrowed at the selected-compilation boundary. Goal two remains incomplete.
+
 ## Materialized local bodies preserve duplicate reads, captures and literals (2026-10-20)
 
 Actual materialized local lambda bodies now accept finite trees of literals, ordinary reads, groups and pairs. Their certificates come from the same accepted contextual compiler and actual parameter/capture scopes. Completion follows the ordered children and retains read failures, per-occurrence diagnostics, lazy mapping reads, reached heaps, descriptor metadata and native administrative cells. Source and Core may use different execution sizes.
