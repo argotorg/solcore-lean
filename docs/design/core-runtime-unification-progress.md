@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Original template predicates retain their actual owner scope (2026-10-20)
+
+Direct-call requirements retain their raw predicate and catalog origin through all eleven inference paths. The same body finalizer pairs each raw row with its solved predicate; parameter specialization retains that exact pairing.
+
+Successful selected compilation now confines each original finalized template predicate to its original owner quantifiers. Closed emitters exclude flexible variables through the exact paired predicate. Open emitters use the actual discovered instance and qualified-read metadata.
+
+The final ledger result retains the original owner, template ID and predicate. The unchanged nested-program fixture exercises a nonempty flexible predicate and checks its original solved row after public compilation.
+
+Validation: 10 changed modules in a coherent graph of 8,967 modules, 71 retained runtime invocations and 7,275 endpoint audits. Full build (9,006 jobs), registered tests, kernel policy and canonical endpoint audit pass. The 12 unrelated workspace changes remain excluded.
+
+Goal two remains incomplete. The scope result currently covers the initial selected plan. Later cached rows and actual nested quantifier exclusion must still supply the complete initializer barriers. Generalized implementation methods, remaining compiler passes and final meaning preservation also remain open.
+
 ## Selected compilation identifies every local template owner (2026-10-20)
 
 Actual inference classifies each direct requirement issuer as an original cataloged call or a local template call. Compiler preparation preserves the original caller, occurrence and complete substitution when it discovers a local instance.

@@ -1,3 +1,9 @@
+import Solcore.Frontend.SourceInference.DirectCallPredicateCandidate
+import Solcore.Frontend.SourceInference.DirectCallPredicateInference
+import Solcore.Frontend.SourceInference.DirectCallPredicateIssuance
+import Solcore.Frontend.SourceInference.DirectCallPredicateProgress
+import Solcore.SourceSemantics.SourceCompiledDirectCallPredicateOrigins
+import Solcore.SourceSemantics.SourceCompiledGeneralizedBarrierConnection
 import Solcore.Frontend.SourceInference.ClassifiedCallHelpers
 import Solcore.Frontend.SourceInference.ClassifiedCallInference
 import Solcore.Frontend.SourceInference.ClassifiedCallProgress

@@ -6,6 +6,14 @@ Created: 2026-09-30. Updated: 2026-10-20.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
+Direct-call requirements retain their raw predicate and catalog origin through all eleven inference paths. The same body finalizer pairs each raw row with its solved predicate; parameter specialization retains that exact pairing.
+
+Successful selected compilation now confines each original finalized template predicate to its original owner quantifiers. Closed emitters exclude flexible variables through the exact paired predicate. Open emitters use the actual discovered instance and qualified-read metadata.
+
+The final ledger result retains the original owner, template ID and predicate. The unchanged nested-program fixture exercises a nonempty flexible predicate and checks its original solved row after public compilation.
+
+Goal two remains incomplete. The scope result currently covers the initial selected plan. Later cached rows and actual nested quantifier exclusion must still supply the complete initializer barriers. Generalized implementation methods, remaining compiler passes and final meaning preservation also remain open.
+
 Actual inference classifies each direct requirement issuer as an original cataloged call or a local template call. Compiler preparation preserves the original caller, occurrence and complete substitution when it discovers a local instance.
 
 An accepted prepared open call now identifies its actual lexical template owner in the original selected body. The worklist proof covers inherited calls, supplied requests, root scanning and later row scanning.

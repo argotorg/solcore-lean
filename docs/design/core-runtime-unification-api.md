@@ -4,6 +4,14 @@ Last updated: 2026-10-20.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Original template predicates retain their actual owner scope (2026-10-20)
+
+`SourceCompiledDirectCallPredicateOrigins` connects actual direct-call issuance with the same finalizer and specialization. `SourceCompiledGeneralizedBarrierConnection.original_template_scoped` and `original_solved_template_scoped` keep the original template owner and ledger predicate while proving their variable scope from successful compilation.
+
+The closed-call alternative has been discharged through actual raw predicate correspondence. The complete generalization barrier still needs exclusion against enclosing scopes, final lexical locals and other ledger rows.
+
+Goal two remains incomplete. The scope result currently covers the initial selected plan. Later cached rows and actual nested quantifier exclusion must still supply the complete initializer barriers. Generalized implementation methods, remaining compiler passes and final meaning preservation also remain open.
+
 ## Selected compilation identifies every local template owner (2026-10-20)
 
 The classified and cataloged call producers retain actual direct requirement issuance. `SourcePreparedOpenCallOwner` and `SourceCompiledTemplateCallOwner` identify the same selected template through executable preparation and worklist discovery.
