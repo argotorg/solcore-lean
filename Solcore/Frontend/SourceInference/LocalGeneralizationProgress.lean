@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceInference.LocalGeneralizationEvents
+import Solcore.Frontend.SourceInference.LocalGeneralizationBinderRetention
 
 /-! The actual read-origin progress supplies each nested initializer's entry
 invariants. Generalization events preserve exact statement forms. -/
@@ -16,6 +16,7 @@ structure ProgressFields
     beforeDirect ⊆ beforeRows.map Requirement.id →
     LocalReadEvents.OriginsFields beforeNodes beforeRows beforeNext beforeDirect →
     Origins beforeNodes → Origins afterNodes
+  retained : BindersRetained beforeNodes afterNodes
 
 abbrev Progress (before after : State) : Prop :=
   ProgressFields before.nodes before.requirements before.nextRequirement before.directCallRequirements
@@ -30,35 +31,41 @@ theorem ProgressFields.trans
   ⟨first.reads.trans second.reads, fun wf allocated reads events =>
     second.events (first.reads.ledger.wellFormed wf)
       (first.reads.ledger.allocated wf allocated) (first.reads.origins wf allocated reads)
-      (first.events wf allocated reads events)⟩
+      (first.events wf allocated reads events), first.retained.trans second.retained⟩
 
 theorem ProgressFields.statement (nodes : List Node) (rows : List Requirement)
     (next : Nat) (direct : List RequirementId) (node : StatementNode) (event : Statement node) :
     ProgressFields nodes rows next direct (nodes ++ [.statement node]) rows next direct :=
-  ⟨LocalReadEvents.ProgressFields.statement _ _ _ _ _, fun _ _ _ origins => origins.statement node event⟩
+  ⟨LocalReadEvents.ProgressFields.statement _ _ _ _ _, fun _ _ _ origins => origins.statement node event,
+    BindersRetained.append _ _⟩
 
 theorem ProgressFields.expression (nodes : List Node) (rows : List Requirement)
     (next : Nat) (direct : List RequirementId) (node : ExpressionNode)
     (nonlocal : LocalReadEvents.Nonlocal node.form) :
     ProgressFields nodes rows next direct (nodes ++ [.expression node]) rows next direct :=
-  ⟨LocalReadEvents.ProgressFields.expression _ _ _ _ _ nonlocal, fun _ _ _ origins => origins.expression node⟩
+  ⟨LocalReadEvents.ProgressFields.expression _ _ _ _ _ nonlocal, fun _ _ _ origins => origins.expression node,
+    BindersRetained.append _ _⟩
 
 namespace Progress
-theorem refl (state : State) : Progress state state := ⟨LocalReadEvents.Progress.refl _, fun _ _ _ origins => origins⟩
+theorem refl (state : State) : Progress state state :=
+  ⟨LocalReadEvents.Progress.refl _, fun _ _ _ origins => origins, .refl _⟩
 theorem trans {before middle after : State} (first : Progress before middle) (second : Progress middle after) :
     Progress before after := ProgressFields.trans first second
 
 theorem of_nodes_eq {before after : State} (same : after.nodes = before.nodes)
     (ledger : DirectRequirementsProgress before after) : Progress before after :=
-  ⟨LocalReadEvents.Progress.of_nodes_eq same ledger, fun _ _ _ origins => same.symm ▸ origins⟩
+  ⟨LocalReadEvents.Progress.of_nodes_eq same ledger, fun _ _ _ origins => same.symm ▸ origins,
+    same.symm ▸ BindersRetained.refl _⟩
 
 theorem recordStatement (state : State) (node : StatementNode) (event : Statement node) :
     Progress state (state.recordNode (.statement node)) :=
-  ⟨LocalReadEvents.Progress.recordStatement _ _, fun _ _ _ origins => origins.statement node event⟩
+  ⟨LocalReadEvents.Progress.recordStatement _ _, fun _ _ _ origins => origins.statement node event,
+    BindersRetained.append _ _⟩
 
 theorem modifyStatementNode (state : State) (id : StatementId) (modify : StatementNode → StatementNode)
     (forms : ∀ node, (modify node).form = node.form) : Progress state (state.modifyStatementNode id modify) := by
-  refine ⟨LocalReadEvents.Progress.modifyStatementNode _ _ _, ?_⟩
+  refine ⟨LocalReadEvents.Progress.modifyStatementNode _ _ _, ?_,
+    BindersRetained.modifyStatementNode state id modify forms⟩
   intro _ _ _ origins statement present
   obtain ⟨node, member, same⟩ := List.mem_map.mp present
   cases node with
@@ -120,7 +127,8 @@ theorem recordExpressionWithExpected
     (accepted : Detail.recordExpressionWithExpected context source id type form requirements expected state start = .ok result)
     (nonlocal : LocalReadEvents.Nonlocal form) : Progress state result.2 :=
   ⟨LocalReadEvents.Progress.recordExpressionWithExpected accepted nonlocal,
-    fun _ _ _ origins => origins.recordExpressionWithExpected accepted⟩
+    fun _ _ _ origins => origins.recordExpressionWithExpected accepted,
+    BindersRetained.recordExpressionWithExpected accepted⟩
 
 theorem localIdentifier {fuel : Nat} {context : Context} {expression : Syntax.Expr}
     {expected : Option Ty} {initial allocated : State} {id : ExpressionId}
@@ -130,7 +138,13 @@ theorem localIdentifier {fuel : Nat} {context : Context} {expression : Syntax.Ex
     (found : allocated.lookupBinder? name.value = some binder)
     (accepted : Detail.inferExprFuel (fuel + 1) context expression expected initial = .ok result) :
     Progress initial result.2 := by
-  refine ⟨LocalReadEvents.Progress.localIdentifier form allocation found accepted, ?_⟩
+  refine ⟨LocalReadEvents.Progress.localIdentifier form allocation found accepted, ?_, ?_⟩
+  rotate_left
+  · have kept := BindersRetained.recordExpressionWithExpected
+      (Detail.inferExprFuel_success_localIdentifier_record form allocation found accepted)
+    rw [State.addRequirementsWithIds_nodes] at kept
+    have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+    simpa only [same, State.allocateExpressionId_nodes] using kept
   intro _ _ _ origins
   apply Origins.recordExpressionWithExpected (accepted := Detail.inferExprFuel_success_localIdentifier_record form allocation found accepted)
   rw [State.addRequirementsWithIds_nodes]
@@ -140,7 +154,8 @@ theorem localIdentifier {fuel : Nat} {context : Context} {expression : Syntax.Ex
 theorem unify {state next : State} {left right : Ty}
     (accepted : unify state left right = .ok next) : Progress state next :=
   ⟨LocalReadEvents.Progress.unify accepted, fun _ _ _ origins =>
-    (unify_occurrenceState_eq accepted).1.symm ▸ origins⟩
+    (unify_occurrenceState_eq accepted).1.symm ▸ origins,
+    (unify_occurrenceState_eq accepted).1.symm ▸ BindersRetained.refl _⟩
 
 theorem withExpected
     {context : Context} {state : State} {actual : InferredExpression}
@@ -148,7 +163,8 @@ theorem withExpected
     (accepted : withExpected context state actual expected = .ok result) :
     Progress state result.state :=
   ⟨LocalReadEvents.Progress.withExpected accepted, fun _ _ _ origins =>
-    (withExpected_occurrenceState_eq accepted).1.symm ▸ origins⟩
+    (withExpected_occurrenceState_eq accepted).1.symm ▸ origins,
+    (withExpected_occurrenceState_eq accepted).1.symm ▸ BindersRetained.refl _⟩
 
 theorem selectFunctionCandidateFrom
     {context : Context} {name : String} {candidates : List ProgramFunctionSignature}
@@ -158,7 +174,8 @@ theorem selectFunctionCandidateFrom
       integerLiteralOrigins call expected state = .ok result) :
     Progress state result.state :=
   ⟨LocalReadEvents.Progress.selectFunctionCandidateFrom accepted, fun _ _ _ origins =>
-    (selectFunctionCandidateFrom_occurrenceState_eq accepted).1.symm ▸ origins⟩
+    (selectFunctionCandidateFrom_occurrenceState_eq accepted).1.symm ▸ origins,
+    (selectFunctionCandidateFrom_occurrenceState_eq accepted).1.symm ▸ BindersRetained.refl _⟩
 
 theorem inferUnaryOperator
     {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
@@ -168,7 +185,8 @@ theorem inferUnaryOperator
       integerLiterals state = .ok result) :
     Progress state result.state :=
   ⟨LocalReadEvents.Progress.inferUnaryOperator success, fun _ _ _ origins =>
-    (inferUnaryOperator_occurrenceState_eq success).1.symm ▸ origins⟩
+    (inferUnaryOperator_occurrenceState_eq success).1.symm ▸ origins,
+    (inferUnaryOperator_occurrenceState_eq success).1.symm ▸ BindersRetained.refl _⟩
 
 theorem inferBinaryOperator
     {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
@@ -178,7 +196,8 @@ theorem inferBinaryOperator
       integerLiterals state = .ok result) :
     Progress state result.state :=
   ⟨LocalReadEvents.Progress.inferBinaryOperator success, fun _ _ _ origins =>
-    (inferBinaryOperator_occurrenceState_eq success).1.symm ▸ origins⟩
+    (inferBinaryOperator_occurrenceState_eq success).1.symm ▸ origins,
+    (inferBinaryOperator_occurrenceState_eq success).1.symm ▸ BindersRetained.refl _⟩
 
 theorem applyFunctionType
     {context : Context} {call : ExpressionId} {calleeType : Ty}
@@ -188,7 +207,8 @@ theorem applyFunctionType
       state = .ok result) :
     Progress state result.state :=
   ⟨LocalReadEvents.Progress.applyFunctionType success, fun _ _ _ origins =>
-    (applyFunctionType_occurrenceState_eq success).1.symm ▸ origins⟩
+    (applyFunctionType_occurrenceState_eq success).1.symm ▸ origins,
+    (applyFunctionType_occurrenceState_eq success).1.symm ▸ BindersRetained.refl _⟩
 
 theorem bindLambdaParameters
     {context : Context} {parameters : List Syntax.LambdaParameter}
@@ -198,7 +218,8 @@ theorem bindLambdaParameters
       .ok result) :
     Progress state result.2.2 :=
   ⟨LocalReadEvents.Progress.bindLambdaParameters success, fun _ _ _ origins =>
-    (bindLambdaParameters_occurrenceState_eq success).1.symm ▸ origins⟩
+    (bindLambdaParameters_occurrenceState_eq success).1.symm ▸ origins,
+    (bindLambdaParameters_occurrenceState_eq success).1.symm ▸ BindersRetained.refl _⟩
 
 theorem inferMatchPatternFuel
     {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
@@ -206,7 +227,8 @@ theorem inferMatchPatternFuel
     (success : Detail.inferMatchPatternFuel fuel context pattern expected state = .ok result) :
     Progress state result.2 :=
   ⟨LocalReadEvents.Progress.inferMatchPatternFuel success, fun _ _ _ origins =>
-    (inferMatchPatternFuel_occurrenceState_eq success).1.symm ▸ origins⟩
+    (inferMatchPatternFuel_occurrenceState_eq success).1.symm ▸ origins,
+    (inferMatchPatternFuel_occurrenceState_eq success).1.symm ▸ BindersRetained.refl _⟩
 
 theorem freshDataConstructorInstantiation (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature) (state : State) :
@@ -221,7 +243,8 @@ theorem recordSelectedCallResult (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : Detail.CandidateAttemptResult)
     (result : InferredExpression) (trailing : List CoercionStep) (state : State) :
     Progress state (Detail.recordSelectedCallResult source callee name arguments attempt result trailing state).2 := by
-  refine ⟨LocalReadEvents.Progress.recordSelectedCallResult _ _ _ _ _ _ _ _, ?_⟩
+  refine ⟨LocalReadEvents.Progress.recordSelectedCallResult _ _ _ _ _ _ _ _, ?_,
+    BindersRetained.recordSelectedCallResult _ _ _ _ _ _ _ _⟩
   intro _ _ _ origins
   unfold Detail.recordSelectedCallResult
   exact (origins.attachExpressionCoercions _).recordExpression _ _ _ _ _ |>.recordExpression _ _ _ _ _
@@ -232,7 +255,9 @@ theorem recordSelectedCall (source callee : Syntax.Expr) (name : String)
 
 theorem recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
     (arguments : List InferredExpression) (result : Detail.IndirectApplicationResult) :
-    Progress result.state (Detail.recordIndirectCall source callee arguments result).2 := ⟨LocalReadEvents.Progress.recordIndirectCall _ _ _ _, fun _ _ _ origins => origins.recordExpression _ _ _ _ _⟩
+    Progress result.state (Detail.recordIndirectCall source callee arguments result).2 :=
+  ⟨LocalReadEvents.Progress.recordIndirectCall _ _ _ _, fun _ _ _ origins => origins.recordExpression _ _ _ _ _,
+    BindersRetained.recordExpression _ _ _ _ _ _ _⟩
 
 theorem recordBuiltinFunctionCall
     {source callee : Syntax.Expr} {name : String} {function : BuiltinFunctionId}
@@ -240,7 +265,11 @@ theorem recordBuiltinFunctionCall
     {result : InferredExpression × State}
     (accepted : Detail.recordBuiltinFunctionCall source callee name function arguments call expected state = .ok result) :
     Progress state result.2 := by
-  refine ⟨LocalReadEvents.Progress.recordBuiltinFunctionCall accepted, ?_⟩
+  refine ⟨LocalReadEvents.Progress.recordBuiltinFunctionCall accepted, ?_, ?_⟩
+  rotate_left
+  · obtain ⟨calleeId, nodes⟩ := Detail.recordBuiltinFunctionCall_success_nodes accepted
+    rw [nodes]
+    exact BindersRetained.append _ _
   intro _ _ _ origins
   obtain ⟨calleeId, nodes⟩ := Detail.recordBuiltinFunctionCall_success_nodes accepted
   rw [nodes]
@@ -252,7 +281,10 @@ theorem initializedStatement {fuel : Nat} {context : Context} {statement : Synta
     (receipt : LocalLetRequirementTiming.Receipt fuel context statement initial result)
     (accepted : inferStatementFuel (fuel + 1) context statement expected initial = .ok result)
     (child : Progress initial.allocateStatementId.2 receipt.ready) : Progress initial result.state := by
-  refine ⟨LocalReadEvents.inferStatementFuel_origins_progress accepted, ?_⟩
+  refine ⟨LocalReadEvents.inferStatementFuel_origins_progress accepted, ?_, ?_⟩
+  rotate_left
+  · rw [receipt.completed]
+    exact child.retained.trans (BindersRetained.append _ _)
   intro wf allocated reads events
   have childEvents := child.events wf allocated reads events
   rw [receipt.completed]

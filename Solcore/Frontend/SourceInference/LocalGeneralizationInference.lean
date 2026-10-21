@@ -345,14 +345,15 @@ private theorem inferFuel_origins_progress_internal :
             have condP := condIH initResult _ condRun
             have bodyP := bodyIH testState _ bodyRun
             have postP := postIH initResult bodyResult _ postRun
-            refine ⟨LocalReadEvents.inferStatementFuel_origins_progress original, ?_⟩
+            have history := allocP.trans (initP.trans (condP.trans (bodyP.trans postP)))
+            refine ⟨LocalReadEvents.inferStatementFuel_origins_progress original, ?_,
+              history.retained.trans (BindersRetained.append _ _)⟩
             intro wf direct reads events
             have ready : Ready initial := ⟨wf, direct, reads⟩
             have readyAlloc : Ready allocated := ready.progress allocP.reads
             have readyInit : Ready initResult.state := readyAlloc.progress initP.reads
             have readyTest : Ready testState := readyInit.progress condP.reads
             have readyBody : Ready afterBody := readyTest.progress bodyP.reads
-            have history := allocP.trans (initP.trans (condP.trans (bodyP.trans postP)))
             apply (history.events wf direct reads events).statement
             exact ⟨inferForItemsFuel_events initRun readyAlloc,
               inferForItemsFuel_events postRun readyBody⟩

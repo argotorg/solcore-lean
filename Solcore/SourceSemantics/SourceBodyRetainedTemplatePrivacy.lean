@@ -112,6 +112,32 @@ private theorem allocated_safe
     have quantified := templateScoped _ finalizedContains q finalizedOccurs
     exact bodySafe q (quantifiedSubset quantified) privateMember
 
+/-- The actual statement receipt needs only its ready state, final extension
+and retained binder to preserve an earlier event's private variables. -/
+theorem cached_statement_receipt {raw : Workspace.RawWorkspace} {fuel : Nat}
+    {compiled : SourceCoreCompiler.Compiled} {cached : SourceCoreUnifiedCompilation.Compiled}
+    (artifact : compiled.artifact? = some cached)
+    (checked : checkProgram raw fuel = .ok compiled.program)
+    {index : Nat} {named : SourceCoreGeneralFunctions.Function}
+    (position : cached.indexed.base.functions[index]? = some named)
+    {selected : BodySelection compiled named.specialized fuel}
+    {childFuel : Nat} {context : SourceInference.Context} {source : Syntax.Statement}
+    {entry : State} {result : Detail.StatementResult}
+    (outer : LocalLetRequirementTiming.Receipt childFuel context source entry result)
+    (ready : outer.ready.InferenceReady)
+    (extension : selected.body.finalized.substitution.SemanticallyExtends outer.ready.inference.substitution)
+    (retained : outer.binding.1 ∈ (SourceCompiledGeneralizedSoundness.evidenceSource selected).initializedLetBinders)
+    (inner : TypedBinder)
+    (innerRetained : inner ∈ (SourceCompiledGeneralizedSoundness.evidenceSource selected).initializedLetBinders)
+    (bodySafe : Safe inner.scheme.quantified outer.ready outer.value.type) :
+    BinderSafe inner.scheme.quantified result.state outer.binding.1 := by
+  apply allocated_safe selected (fun _ contains =>
+    SourceBodyTemplateScope.cached_template_scoped artifact checked position selected contains)
+    ready extension retained innerRetained
+    (congrArg InferState.substitution outer.inference_eq)
+    (Detail.generalizeValue_scheme_body _ _ _ _) ?_ bodySafe
+  exact fun _ quantified => (List.mem_filter.mp quantified).1
+
 /-- Completed-cache preparation supplies the same statement producer for
 ordinary functions and implementation methods at their actual cache position. -/
 theorem cached_statement {raw : Workspace.RawWorkspace} {fuel : Nat}
@@ -124,13 +150,9 @@ theorem cached_statement {raw : Workspace.RawWorkspace} {fuel : Nat}
     (outer : BodyInitializerOccurrence selected source) (inner : TypedBinder)
     (innerRetained : inner ∈ (SourceCompiledGeneralizedSoundness.evidenceSource selected).initializedLetBinders)
     (bodySafe : Safe inner.scheme.quantified outer.receipt.ready outer.receipt.value.type) :
-    BinderSafe inner.scheme.quantified outer.result.state outer.receipt.binding.1 := by
-  apply allocated_safe selected (fun _ contains =>
-    SourceBodyTemplateScope.cached_template_scoped artifact checked position selected contains)
-    outer.ready outer.extension outer.retained innerRetained
-    (congrArg InferState.substitution outer.receipt.inference_eq)
-    (Detail.generalizeValue_scheme_body _ _ _ _) ?_ bodySafe
-  exact fun _ quantified => (List.mem_filter.mp quantified).1
+    BinderSafe inner.scheme.quantified outer.result.state outer.receipt.binding.1 :=
+  cached_statement_receipt artifact checked position outer.receipt outer.ready
+    outer.extension outer.retained inner innerRetained bodySafe
 
 /-- Actual cache preparation also supplies method template scope for headers. -/
 theorem cached_header {raw : Workspace.RawWorkspace} {fuel : Nat}

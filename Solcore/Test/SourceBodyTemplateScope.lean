@@ -1,4 +1,6 @@
-import Solcore.SourceSemantics.SourceBodyTemplateScope
+import Solcore.SourceSemantics.SourceCompiledActualInitializerBarriers
+import Solcore.SourceSemantics.SourceCompiledActualGeneralizationOrigins
+import Solcore.SourceSemantics.SourceCompiledActualTemplateBacking
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalCatalogOrigins
 
 /-! Raw public compilation prepares a method containing nested generalized
@@ -39,16 +41,22 @@ def main : IO Unit := do
     match artifact : compiled.artifact? with
     | none => throw (IO.userError "missing completed artifact")
     | some cached =>
+      have _actualBodies := SourceCompiledActualInitializerBarriers.compile_cached_bodies compiledEq artifact
       let mut ordinary := 0
       let mut methods := 0
       let mut methodTemplates := 0
       let mut templates := 0
       let mut variables := 0
+      let mut separatedPairs := 0
       for index in List.range cached.indexed.base.functions.length do
         match position : cached.indexed.base.functions[index]? with
         | none => throw (IO.userError "missing cache position")
         | some named =>
           have _actualScope := SourceBodyTemplateScope.cached_selection_scope artifact
+            (SourceCoreCompiler.compile_checked_source compiledEq) position
+          have _actualGeneralizations := SourceCompiledLocalFinalization.BodySelection.cached_initialized_origins artifact
+            (SourceCoreCompiler.compile_checked_source compiledEq) position
+          have _actualTemplateWitnesses := SourceCompiledLocalFinalization.BodySelection.cached_liveTemplatesBacked artifact
             (SourceCoreCompiler.compile_checked_source compiledEq) position
           let original ← match compiled.program.functions.find?
               (fun function => function.declaration == named.specialized.function.declaration) with
@@ -62,6 +70,13 @@ def main : IO Unit := do
                 methods := methods + 1
                 methodTemplates := methodTemplates + (localSchemeTemplateOwners method.checked.typedBody).length
                 pure method.checked
+          for current in initializedLetBindings original.typedBody do
+            for other in initializedLetBindings original.typedBody do
+              if current.binder.id != other.binder.id &&
+                  !current.binder.scheme.quantified.isEmpty && !other.binder.scheme.quantified.isEmpty then
+                unless current.binder.scheme.quantified.all (fun q => !other.binder.scheme.quantified.contains q) do
+                  throw (IO.userError "distinct initialized owners share a quantified variable")
+                separatedPairs := separatedPairs + 1
           for owner in localSchemeTemplateOwners original.typedBody do
             let free := TypedTraitResolution.predicateVariables owner.requirement.predicate
             unless free.all owner.binder.scheme.quantified.contains do
@@ -73,8 +88,8 @@ def main : IO Unit := do
               throw (IO.userError "original body predicate changed in solved ledger")
             templates := templates + 1
             variables := variables + free.length
-      unless compiled.plan.specializations.length == 1 && ordinary > 1 && methods > 0 && methodTemplates > 0 && templates > 0 && variables > 0 do
+      unless compiled.plan.specializations.length == 1 && ordinary > 1 && methods > 0 && methodTemplates > 0 && templates > 0 && variables > 0 && separatedPairs > 0 do
         throw (IO.userError s!"method coverage changed: initial={compiled.plan.specializations.length}, ordinary={ordinary}, methods={methods}, method templates={methodTemplates}, templates={templates}, variables={variables}")
-      IO.println s!"PASS cached ordinary and method template scope: initial={compiled.plan.specializations.length}, ordinary={ordinary}, methods={methods}, method templates={methodTemplates}, templates={templates}, flexible variables={variables}"
+      IO.println s!"PASS cached ordinary and method template scope: initial={compiled.plan.specializations.length}, ordinary={ordinary}, methods={methods}, method templates={methodTemplates}, templates={templates}, flexible variables={variables}, separated owner pairs={separatedPairs}"
 
 end Tests.SourceBodyTemplateScope
