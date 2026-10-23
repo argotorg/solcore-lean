@@ -2051,6 +2051,17 @@ import Solcore.Test.RustHullDecode
 import Solcore.Test.RustHullMemory
 import Solcore.Test.RustHullKeccak
 import Solcore.Test.RustHullYul
+import Solcore.Test.RustHullAmbient
+import Solcore.Test.RustHullCreation
+import Solcore.Test.RustHullAccountLifecycle
+import Solcore.Test.RustHullAccountState
+import Solcore.Test.RustHullAccountInspection
+import Solcore.Test.RustHullCreationRuntime
+import Solcore.Test.RustHullWorld
+import Solcore.Test.RustHullCreationAccounts
+import Solcore.Test.RustHullMemorySnapshot
+import Solcore.Test.RustHullImageComparison
+import Solcore.Test.RustHullWorldEffects
 import Solcore.Test.RustHullLowering
 import Solcore.Test.RustHullCodeImage
 import Solcore.Test.RustHullObjectLinking
@@ -3849,6 +3860,17 @@ def main : IO UInt32 := do
   Tests.RustHullMemory.run
   Tests.RustHullKeccak.run
   Tests.RustHullYul.run
+  Tests.RustHullAmbient.run
+  Tests.RustHullCreation.run
+  Tests.RustHullAccountLifecycle.run
+  Tests.RustHullAccountState.run
+  Tests.RustHullAccountInspection.run
+  Tests.RustHullCreationRuntime.run
+  Tests.RustHullWorld.run
+  Tests.RustHullCreationAccounts.run
+  Tests.RustHullMemorySnapshot.run
+  Tests.RustHullImageComparison.run
+  Tests.RustHullWorldEffects.run
   Tests.RustHullLowering.run
   Tests.RustHullCodeImage.run
   Tests.RustHullObjectLinking.run

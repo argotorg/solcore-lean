@@ -49,7 +49,8 @@ private def rejected (body : List YulStmt) (scope : Scope := outer) : Bool :=
 
 private def checkStorageFunctions : IO Unit := do
   let slots : List (String × Core.Ty × Core.Expr) := [
-    ("storage", Core.WordMapping.type, Core.WordMapping.empty),
+    ("world", AccountState.type, AccountState.literal [({address := word 1}, 1)]),
+    ("worldComplete", .bool, .bool false), ("address", .word, .word (word 1)),
     ("isStatic", .bool, .bool false), ("exit", .word, .word (word 0)),
     ("returnOffset", .word, .word (word 0)), ("returnSize", .word, .word (word 0)),
     ("memorySize", .word, .word (word 0))]
@@ -62,7 +63,7 @@ private def checkStorageFunctions : IO Unit := do
   let lowered ← get (YulLowering.lowerStatements 1000 scope .word body)
   let returned ← get (scope.read "x")
   let program : Core.Program := {
-    dataDefinitions := Core.WordMapping.actualDefinitions
+    dataDefinitions := AccountState.definitions
     resultType := Core.LanguageResult.resultType .word
     body := .letE (Core.OptionalCell.allocateInitialized .word (.word (word 0)))
       (slots.foldr (fun (_, type, initial) body => .letE (.newCell type initial) body)

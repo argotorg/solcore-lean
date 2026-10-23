@@ -1,5 +1,6 @@
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.Frontend.RustHull.LoweringSafety
+import Solcore.Frontend.RustHull.ContextTyping
 import Solcore.Core.BoundedSafety
 
 /-! Core safety at the public imported-Hull contract boundary.
@@ -23,12 +24,13 @@ namespace AccountRuntime
 /-- The final public compiler guard checks the complete generated account
 runtime, including its recursive callback and shared cells. -/
 theorem compileObject_hasType {program : Program} {path : List String} {fuel : Nat}
-    {codeBytes : Option (List UInt8)} {expression : Core.Expr}
-    (accepted : compileObject program path fuel codeBytes = .ok expression) :
-    Core.HasType [] expression (.function contextType resultType) Memory.definitions := by
+    {codeBytes : Option (List UInt8)} {catalog : List CodeDefinition} {expression : Core.Expr}
+    (accepted : compileObject program path fuel codeBytes catalog = .ok expression) :
+    Core.HasType [] expression (.function contextType resultType) AccountState.definitions := by
   unfold compileObject at accepted
   obtain ⟨code, _, accepted⟩ := lower_bind_eq_ok.mp accepted
   obtain ⟨frame, _, accepted⟩ := lower_bind_eq_ok.mp accepted
+  obtain ⟨others, _, accepted⟩ := lower_bind_eq_ok.mp accepted
   obtain ⟨type, inferred, accepted⟩ := lower_bind_eq_ok.mp accepted
   obtain ⟨guard, guarded, returned⟩ := lower_bind_eq_ok.mp accepted
   cases guard
@@ -42,35 +44,39 @@ end AccountRuntime
 namespace Contract
 
 theorem compileObject_hasType {program : Program} {path : List String} {fuel : Nat}
-    {codeBytes : Option (List UInt8)} {compiled : CompiledObject}
-    (accepted : compileObject program path fuel codeBytes = .ok compiled) :
-    Core.HasType [] compiled.expression (.function contextType resultType) Memory.definitions := by
+    {codeBytes : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition}
+    {compiled : CompiledObject}
+    (accepted : compileObject program path fuel codeBytes catalog = .ok compiled) :
+    Core.HasType [] compiled.expression (.function contextType resultType) AccountState.definitions := by
   unfold compileObject at accepted
   obtain ⟨expression, checked, returned⟩ := lower_bind_eq_ok.mp accepted
   cases returned
   exact AccountRuntime.compileObject_hasType checked
 
 /-- Instantiation constructs typed literals for all host inputs, including the
-normalized address ledger, packed calldata and optional gas value. -/
+normalized account world, executable image identities, ambient inputs, packed
+calldata and optional gas value. No host account-typing premise is required. -/
 theorem CompiledObject.instantiate_hasType
     {compiled : CompiledObject}
     (typing : Core.HasType [] compiled.expression
-      (.function contextType resultType) Memory.definitions)
+      (.function contextType resultType) AccountState.definitions)
     (context : Context) :
-    Core.HasType [] (compiled.instantiate context).expression resultType Memory.definitions := by
+    Core.HasType [] (compiled.instantiate context).expression resultType AccountState.definitions := by
   cases gas : context.availableGas <;>
     simp only [CompiledObject.instantiate, gas, bundle]
   all_goals
     apply Core.HasType.apply typing
     repeat first
-      | exact Core.WordMapping.literal_hasType _ _
+      | exact ContextTyping.wordMappingLiteral_hasType _ _
+      | exact ContextTyping.accountStateLiteral_hasType _ _
+      | exact ContextTyping.ambientContextExpression_hasType _ _
       | constructor
 
 /-- A public receipt carries a typed checkpoint when fuel is exhausted, and
 can never contain an internal Core machine fault. Other outcomes are allowed. -/
 def Receipt.Safe (receipt : Receipt) : Prop :=
   match receipt.outcome with
-  | .outOfFuel checkpoint => Core.StateHasType checkpoint resultType Memory.definitions
+  | .outOfFuel checkpoint => Core.StateHasType checkpoint resultType AccountState.definitions
   | .coreFault _ => False
   | _ => True
 
@@ -100,12 +106,12 @@ theorem Receipt.Safe.never_coreFault {receipt : Receipt} (safe : receipt.Safe)
 
 theorem Receipt.Safe.checkpoint_hasType {receipt : Receipt} {checkpoint : Core.State}
     (safe : receipt.Safe) (exhausted : receipt.outcome = .outOfFuel checkpoint) :
-    Core.StateHasType checkpoint resultType Memory.definitions := by
+    Core.StateHasType checkpoint resultType AccountState.definitions := by
   simpa only [Receipt.Safe, exhausted] using safe
 
 /-- The public result adapter preserves the Core checkpoint safety invariant. -/
 theorem resumeWithReceipt_safe {state : Core.State}
-    (typing : Core.StateHasType state resultType Memory.definitions)
+    (typing : Core.StateHasType state resultType AccountState.definitions)
     (fuel maxReturnBytes : Nat) : (resumeWithReceipt state fuel maxReturnBytes).Safe := by
   cases executed : Core.runStateful fuel state with
   | done value store =>
@@ -118,7 +124,7 @@ theorem resumeWithReceipt_safe {state : Core.State}
       exact False.elim (Core.well_typed_runStateful_never_faults typing executed)
 
 theorem runWithReceipt_safe {prepared : Prepared}
-    (typing : Core.HasType [] prepared.expression resultType Memory.definitions)
+    (typing : Core.HasType [] prepared.expression resultType AccountState.definitions)
     (fuel maxReturnBytes : Nat) : (runWithReceipt prepared fuel maxReturnBytes).Safe :=
   resumeWithReceipt_safe (Core.initial_state_has_type typing) fuel maxReturnBytes
 
@@ -140,16 +146,17 @@ theorem Resumes.safe {first last : Receipt} (path : Resumes first last)
       exact resumeWithReceipt_safe (ih.checkpoint_hasType exhausted) fuel maxReturnBytes
 
 theorem compile_instantiate_hasType {program : Program} {path : List String} {compilationFuel : Nat}
-    {codeBytes : Option (List UInt8)} {compiled : CompiledObject}
-    (accepted : compileObject program path compilationFuel codeBytes = .ok compiled)
+    {codeBytes : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition}
+    {compiled : CompiledObject}
+    (accepted : compileObject program path compilationFuel codeBytes catalog = .ok compiled)
     (context : Context) :
-    Core.HasType [] (compiled.instantiate context).expression resultType Memory.definitions :=
+    Core.HasType [] (compiled.instantiate context).expression resultType AccountState.definitions :=
   compiled.instantiate_hasType (compileObject_hasType accepted) context
 
 theorem prepare_hasType {program : Program} {path : List String} {compilationFuel : Nat}
     {context : Context} {prepared : Prepared}
     (accepted : prepare program path context compilationFuel = .ok prepared) :
-    Core.HasType [] prepared.expression resultType Memory.definitions := by
+    Core.HasType [] prepared.expression resultType AccountState.definitions := by
   unfold prepare at accepted
   obtain ⟨compiled, checked, returned⟩ := lower_bind_eq_ok.mp accepted
   cases returned
@@ -158,23 +165,26 @@ theorem prepare_hasType {program : Program} {path : List String} {compilationFue
 /-- Successful compilation supplies all typing premises for the actual public
 initializer and runner; no independent host-argument typing assumption remains. -/
 theorem compile_runWithReceipt_safe {program : Program} {path : List String} {compilationFuel : Nat}
-    {codeBytes : Option (List UInt8)} {compiled : CompiledObject}
-    (accepted : compileObject program path compilationFuel codeBytes = .ok compiled)
+    {codeBytes : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition}
+    {compiled : CompiledObject}
+    (accepted : compileObject program path compilationFuel codeBytes catalog = .ok compiled)
     (context : Context) (fuel maxReturnBytes : Nat) :
     (runWithReceipt (compiled.instantiate context) fuel maxReturnBytes).Safe :=
   runWithReceipt_safe (compile_instantiate_hasType accepted context) fuel maxReturnBytes
 
 theorem compile_runWithReceipt_never_coreFault
     {program : Program} {path : List String} {compilationFuel : Nat}
-    {codeBytes : Option (List UInt8)} {compiled : CompiledObject}
-    (accepted : compileObject program path compilationFuel codeBytes = .ok compiled)
+    {codeBytes : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition}
+    {compiled : CompiledObject}
+    (accepted : compileObject program path compilationFuel codeBytes catalog = .ok compiled)
     (context : Context) (fuel maxReturnBytes : Nat) (error : Core.MachineFault) :
     (runWithReceipt (compiled.instantiate context) fuel maxReturnBytes).outcome ≠ .coreFault error :=
   (compile_runWithReceipt_safe accepted context fuel maxReturnBytes).never_coreFault error
 
 theorem compile_resumes_never_coreFault {program : Program} {path : List String} {compilationFuel : Nat}
-    {codeBytes : Option (List UInt8)} {compiled : CompiledObject}
-    (accepted : compileObject program path compilationFuel codeBytes = .ok compiled)
+    {codeBytes : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition}
+    {compiled : CompiledObject}
+    (accepted : compileObject program path compilationFuel codeBytes catalog = .ok compiled)
     (context : Context) (fuel maxReturnBytes : Nat) {last : Receipt}
     (resumed : Resumes (runWithReceipt (compiled.instantiate context) fuel maxReturnBytes) last)
     (error : Core.MachineFault) : last.outcome ≠ .coreFault error :=
@@ -195,8 +205,9 @@ theorem compileObject_hasType {program : Program} {path : List String} {images :
     {constructorArguments : List UInt8} {fuel : Nat} {compiled : Contract.CompiledObject}
     (accepted : compileObject program path images constructorArguments fuel = .ok compiled) :
     Core.HasType [] compiled.expression
-      (.function Contract.contextType Contract.resultType) Memory.definitions := by
+      (.function Contract.contextType Contract.resultType) AccountState.definitions := by
   unfold compileObject at accepted
+  obtain ⟨_, _, accepted⟩ := lower_bind_eq_ok.mp accepted
   obtain ⟨_, _, accepted⟩ := lower_bind_eq_ok.mp accepted
   obtain ⟨_, _, accepted⟩ := lower_bind_eq_ok.mp accepted
   obtain ⟨_, _, accepted⟩ := lower_bind_eq_ok.mp accepted
@@ -207,18 +218,48 @@ theorem prepare_hasType {program : Program} {path : List String} {images : List 
     {constructorArguments : List UInt8} {context : Contract.Context} {fuel : Nat}
     {prepared : Contract.Prepared}
     (accepted : prepare program path images constructorArguments context fuel = .ok prepared) :
-    Core.HasType [] prepared.expression Contract.resultType Memory.definitions := by
+    Core.HasType [] prepared.expression Contract.resultType AccountState.definitions := by
   unfold prepare at accepted
   obtain ⟨compiled, checked, returned⟩ := lower_bind_eq_ok.mp accepted
   cases returned
   exact compiled.instantiate_hasType (compileObject_hasType checked) context
 
+/-- Automatic image catalog construction feeds the same checked initializer,
+including arbitrary supplied account worlds and later public checkpoints. -/
+theorem compile_resumes_safe {program : Program} {path : List String}
+    {images : List CodeImage.Image} {constructorArguments : List UInt8}
+    {compilationFuel : Nat} {compiled : Contract.CompiledObject}
+    (accepted : compileObject program path images constructorArguments compilationFuel = .ok compiled)
+    (context : Contract.Context) (fuel maxReturnBytes : Nat) {last : Contract.Receipt}
+    (resumed : Contract.Resumes
+      (Contract.runWithReceipt (compiled.instantiate context) fuel maxReturnBytes) last) : last.Safe :=
+  resumed.safe (Contract.runWithReceipt_safe
+    (compiled.instantiate_hasType (compileObject_hasType accepted) context) fuel maxReturnBytes)
+
+/-- The public deployment guard includes appended constructor arguments. -/
+theorem prepareDeployment_initCodeSize {program : Program} {path : List String}
+    {images : List CodeImage.Image} {constructorArguments : List UInt8}
+    {context : Contract.Context} {fuel : Nat} {prepared : Contract.Prepared}
+    (accepted : prepareDeployment program path images constructorArguments context fuel = .ok prepared) :
+    ∃ image, CodeImage.select images path = .ok image ∧
+      image.bytes.length + constructorArguments.length ≤ 49152 := by
+  unfold prepareDeployment at accepted
+  obtain ⟨image, selected, accepted⟩ := lower_bind_eq_ok.mp accepted
+  split at accepted
+  · cases accepted
+  · rename_i allowed
+    exact ⟨image, mapError_eq_ok selected, Nat.le_of_not_gt allowed⟩
+
 theorem prepareDeployment_hasType {program : Program} {path : List String} {images : List CodeImage.Image}
     {constructorArguments : List UInt8} {context : Contract.Context} {fuel : Nat}
     {prepared : Contract.Prepared}
     (accepted : prepareDeployment program path images constructorArguments context fuel = .ok prepared) :
-    Core.HasType [] prepared.expression Contract.resultType Memory.definitions :=
-  prepare_hasType accepted
+    Core.HasType [] prepared.expression Contract.resultType AccountState.definitions := by
+  unfold prepareDeployment at accepted
+  obtain ⟨image, _, accepted⟩ := lower_bind_eq_ok.mp accepted
+  split at accepted
+  · cases accepted
+  · exact prepare_hasType accepted
 
 /-- Exact linked images and constructor arguments use the same checked Core
 runtime. This theorem does not validate Rust or the backend image producer. -/

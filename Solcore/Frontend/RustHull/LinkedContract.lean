@@ -16,7 +16,22 @@ def compileObject (program : Program) (path : List String) (images : List CodeIm
   let image ← lift (CodeImage.select images path)
   let bytes ← lift (CodeImage.executionBytes image constructorArguments)
   let linked ← ObjectLinking.link program image fuel
-  Contract.compileObject linked path fuel (some bytes)
+  let catalog ← images.filterMapM fun candidate => do
+    let isInit := !candidate.embeds.isEmpty
+    -- Preserve an unsuffixed init template even when it is the selected root.
+    if candidate.path == path && !isInit then pure none
+    else
+      -- An unrelated section may use symbols absent from its own image. Its
+      -- bytes remain observable, but it has no executable catalog identity.
+      match ObjectLinking.link program candidate fuel with
+      | .error _ => pure none
+      | .ok linked => pure (some ({
+          program := linked
+          path := candidate.path
+          bytes := candidate.bytes
+          isInit := isInit
+        } : AccountRuntime.CodeDefinition))
+  Contract.compileObject linked path fuel (some bytes) catalog
 
 def prepare (program : Program) (path : List String) (images : List CodeImage.Image)
     (constructorArguments : List UInt8 := []) (context : Contract.Context := {})
@@ -28,8 +43,11 @@ calldata. Calls to the constructing address see no installed runtime code.
 The caller still supplies the balance after its transaction value transfer. -/
 def prepareDeployment (program : Program) (path : List String) (images : List CodeImage.Image)
     (constructorArguments : List UInt8 := []) (context : Contract.Context := {})
-    (fuel : Nat := 4096) : LowerM Contract.Prepared :=
+    (fuel : Nat := 4096) : LowerM Contract.Prepared := do
+  let image ← (CodeImage.select images path).mapError fun message => ⟨message, none⟩
+  if image.bytes.length + constructorArguments.length > 49152 then
+    throw ⟨"deployment init code including constructor arguments exceeds 49152 bytes", none⟩
   prepare program path images constructorArguments
-    {context with calldata := [], selfCodeAvailable := false} fuel
+    {context with calldata := [], selfCodeAvailable := false, deploying := true, created := true} fuel
 
 end Solcore.Frontend.RustHull.LinkedContract

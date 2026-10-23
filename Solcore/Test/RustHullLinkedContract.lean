@@ -120,9 +120,23 @@ def runDatacopy : IO Unit := do
     (Contract.prepare noImage [deployName, runtimeName])
   pure ()
 
+def runInitCodeLimit : IO Unit := do
+  let program := source []
+  let suffix := List.replicate (49152 - 6) (0 : UInt8)
+  let prepared ← get "init code size exact boundary including arguments"
+    (LinkedContract.prepareDeployment program [deployName] images suffix)
+  require prepared.context.deploying "size boundary did not prepare a deployment"
+  rejects "init code one byte over boundary including arguments"
+    (LinkedContract.prepareDeployment program [deployName] images (0 :: suffix))
+  let oversized := images.map fun image => if image.path == [deployName] then
+    {image with bytes := image.bytes ++ List.replicate (49153 - 6) 0} else image
+  rejects "init code image itself exceeds boundary"
+    (LinkedContract.prepareDeployment program [deployName] oversized)
+
 def run : IO Unit := do
   runDeploymentContext
   runDatacopy
+  runInitCodeLimit
   let program := source initializer
   let constructor ← get "constructor" (LinkedContract.prepare program [deployName] images (wordBytes 42))
   let state ← expectBytes "constructor returns exact embedded bytes" (Contract.run constructor) runtimeBytes

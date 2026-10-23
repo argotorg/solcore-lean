@@ -58,6 +58,7 @@ private def context (json : Json) : Except String Contract.Context := do
     caller := (← wordField json "caller").getD Core.Word.zero
     address := (← wordField json "address").getD Core.Word.zero
     availableGas := (← wordField json "availableGas")
+    nonce := (← wordField json "nonce").getD (Core.Word.ofNatModulo 1)
   }
 
 private def accounts (config : Json) : Except String (Core.WordMapping.Entries × List Core.Word) := do
@@ -102,6 +103,13 @@ private def completed : Contract.Outcome → Bool
   | _ => false
 
 private def receiptFields (receipt : Contract.Receipt) : List (String × Json) :=
+  ("world", toJson (receipt.world.map fun account => Json.mkObj [
+    ("address", toJson (toString account.address.val)),
+    ("nonce", toJson (toString account.nonce.val)),
+    ("code", account.code.map (fun code => toJson (hex code)) |>.getD Json.null),
+    ("storage", toJson (account.storage.map fun (key, value) => [toString key.val, toString value.val])),
+    ("transient", toJson (account.transient.map fun (key, value) => [toString key.val, toString value.val])),
+    ("created", toJson account.created), ("destroyed", toJson account.destroyed)])) ::
   ("balances", toJson (receipt.balances.map fun (address, value) =>
     [toString address.val, toString value.val])) ::
   ("logs", toJson (receipt.logs.map fun event => Json.mkObj [
@@ -149,6 +157,7 @@ private def execute (config : Json) : IO UInt32 := do
   let compiled ← lower (LinkedContract.compileObject program.program runtimePath images)
   let mut storage := initialStorage
   let mut balances := receipt.balances
+  let mut world := receipt.world
   let mut status := 0
   for (call, index) in calls.zipIdx do
     let context ← get (context call)
@@ -158,8 +167,10 @@ private def execute (config : Json) : IO UInt32 := do
       | none => pure true
       | some value => get value.getBool?
     let entryBalances ← get (transfer balances context)
+    let nonce := (world.find? (·.address == context.address)).map (·.nonce) |>.getD context.nonce
     let receipt := Contract.runWithReceipt (compiled.instantiate {context with
       storage := storage,
+      world := world, nonce := nonce,
       accounts := entryBalances, emptyAccounts := emptyAccounts,
       balance := Core.WordMapping.lookupEntries context.address entryBalances}) fuel
     let result := receipt.outcome
@@ -170,6 +181,7 @@ private def execute (config : Json) : IO UInt32 := do
       | .returned _ nextStorage =>
           storage := nextStorage
           balances := receipt.balances
+          world := receipt.world
       | _ => pure ()
   return status
 
