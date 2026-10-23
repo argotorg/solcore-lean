@@ -2057,6 +2057,8 @@ import Solcore.Test.RustHullObjectLinking
 import Solcore.Test.RustHullLinkedContract
 import Solcore.Test.RustHullHashes
 import Solcore.Test.RustHullSecp256k1
+import Solcore.Test.RustHullPrecompiles
+import Solcore.Test.RustHullP256
 set_option autoImplicit false
 
 open Solcore
@@ -3847,6 +3849,8 @@ def main : IO UInt32 := do
   Tests.RustHullLinkedContract.run
   Tests.RustHullHashes.run
   Tests.RustHullSecp256k1.run
+  Tests.RustHullPrecompiles.run
+  Tests.RustHullP256.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run

@@ -1,0 +1,326 @@
+{
+  "source": "https://eips.ethereum.org/assets/eip-7951/test-vectors.json",
+  "sourceSha256": "6ed75dffbc0dd70defc7aceb7299df75dfb2a18184fbac229482c0a4b6601d6d",
+  "retrieved": "2026-10-24",
+  "note": "One vector per distinct test category. Input/result only; original Gas=3450 is obsolete, EIP-7951 specifies 6900.",
+  "vectors": [
+    {
+      "index": 0,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #1: signature malleability",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050232ba3a8be6b94d5ec80a6d9d1190a436effe50d85a1eee859b8cc6af9bd5c2e184cd60b855d442f5b3c7b11eb6c4e0ae7525fe710fab9aa7c77a67f79e6fadd762927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": true
+    },
+    {
+      "index": 1,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #3: Modified r or s, e.g. by adding or subtracting the order of the group",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023d45c5740946b2a147f59262ee6f5bc90bd01ed280528b62b3aed5fc93f06f739b329f479a2bbd0a5c384ee1493b1f5186a87139cac5df4087c134b49156847db2927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": false
+    },
+    {
+      "index": 4,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #9: Signature with special case values for r and s",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": false
+    },
+    {
+      "index": 53,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #58: Edge case for Shamir multiplication",
+      "input": "70239dd877f7c944c422f44dea4ed1a52f2627416faf2f072fa50c772ed6f80764a1aab5000d0e804f3e2fc02bdee9be8ff312334e2ba16d11547c97711c898e6af015971cc30be6d1a206d4e013e0997772a2f91d73286ffd683b9bb2cf4f1b2927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": true
+    },
+    {
+      "index": 54,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #59: special case hash",
+      "input": "00000000690ed426ccf17803ebe2bd0884bcd58a1bb5e7477ead3645f356e7a916aea964a2f6506d6f78c81c91fc7e8bded7d397738448de1e19a0ec580bf266252cd762130c6667cfe8b7bc47d27d78391e8e80c578d1cd38c3ff033be928e92927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": true
+    },
+    {
+      "index": 108,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #113: k*G has a large x-coordinate",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023000000000000000000000000000000004319055358e8617b0c46353d039cdaabffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254e0ad99500288d466940031d72a9f5445a4d43784640855bf0a69874d2de5fe103c5011e6ef2c42dcd50d5d3d29f99ae6eba2c80c9244f4c5422f0979ff0c3ba5e",
+      "valid": true
+    },
+    {
+      "index": 109,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #114: r too large",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023ffffffff00000001000000000000000000000000fffffffffffffffffffffffcffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254e0ad99500288d466940031d72a9f5445a4d43784640855bf0a69874d2de5fe103c5011e6ef2c42dcd50d5d3d29f99ae6eba2c80c9244f4c5422f0979ff0c3ba5e",
+      "valid": false
+    },
+    {
+      "index": 110,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #115: r,s are large",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254fffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254eab05fd9d0de26b9ce6f4819652d9fc69193d0aa398f0fba8013e09c58220455419235271228c786759095d12b75af0692dd4103f19f6a8c32f49435a1e9b8d45",
+      "valid": true
+    },
+    {
+      "index": 111,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #116: r and s^-1 have a large Hamming weight",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd909135bdb6799286170f5ead2de4f6511453fe50914f3df2de54a36383df8dd480984f39a1ff38a86a68aa4201b6be5dfbfecf876219710b07badf6fdd4c6c5611feb97390d9826e7a06dfb41871c940d74415ed3cac2089f1445019bb55ed95",
+      "valid": true
+    },
+    {
+      "index": 113,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #118: small r and s",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca60502300000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000001a71af64de5126a4a4e02b7922d66ce9415ce88a4c9d25514d91082c8725ac9575d47723c8fbe580bb369fec9c2665d8e30a435b9932645482e7c9f11e872296b",
+      "valid": true
+    },
+    {
+      "index": 117,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #126: r is larger than n",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc6325560000000000000000000000000000000000000000000000000000000000000006cbe0c29132cd738364fedd603152990c048e5e2fff996d883fa6caca7978c73770af6a8ce44cb41224b2603606f4c04d188e80bff7cc31ad5189d4ab0d70e8c1",
+      "valid": false
+    },
+    {
+      "index": 118,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #127: s is larger than n",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050230000000000000000000000000000000000000000000000000000000000000005ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc75fbd84be4178097002f0deab68f0d9a130e0ed33a6795d02a20796db83444b037e13920f13051e0eecdcfce4dacea0f50d1f247caa669f193c1b4075b51ae296d2d56",
+      "valid": false
+    },
+    {
+      "index": 119,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #128: small r and s^-1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca60502300000000000000000000000000000000000000000000000000000000000001008f1e3c7862c58b16bb76eddbb76eddbb516af4f63f2d74d76e0d28c9bb75ea88d0f73792203716afd4be4329faa48d269f15313ebbba379d7783c97bf3e890d9971f4a3206605bec21782bf5e275c714417e8f566549e6bc68690d2363c89cc1",
+      "valid": true
+    },
+    {
+      "index": 120,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #129: smallish r and s^-1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023000000000000000000000000000000000000000000000000002d9b4d347952d6ef3043e7329581dbb3974497710ab11505ee1c87ff907beebadd195a0ffe6d7a4838b2be35a6276a80ef9e228140f9d9b96ce83b7a254f71ccdebbb8054ce05ffa9cbc123c919b19e00238198d04069043bd660a828814051fcb8aac738a6c6b",
+      "valid": true
+    },
+    {
+      "index": 121,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #130: 100-bit r and small s^-1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023000000000000000000000000000000000000001033e67e37b32b445580bf4eff8b748b74000000008b748b748b748b7466e769ad4a16d3dcd87129b8e91d1b4d7393983ca30a520bbc4783dc9960746aab444ef520c0a8e771119aa4e74b0f64e9d7be1ab01a0bf626e709863e6a486dbaf32793afccf774e2c6cd27b1857526",
+      "valid": true
+    },
+    {
+      "index": 122,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #131: small r and 100 bit s^-1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050230000000000000000000000000000000000000000000000000000000000000100ef9f6ba4d97c09d03178fa20b4aaad83be3cf9cb824a879fec3270fc4b81ef5b5ac331a1103fe966697379f356a937f350588a05477e308851b8a502d5dfcdc5fe9993df4b57939b2b8da095bf6d794265204cfe03be995a02e65d408c871c0b",
+      "valid": true
+    },
+    {
+      "index": 123,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #132: 100-bit r and s^-1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca60502300000000000000000000000000000000000000062522bbd3ecbe7c39e93e7c25ef9f6ba4d97c09d03178fa20b4aaad83be3cf9cb824a879fec3270fc4b81ef5b1d209be8de2de877095a399d3904c74cc458d926e27bb8e58e5eae5767c41509dd59e04c214f7b18dce351fc2a549893a6860e80163f38cc60a4f2c9d040d8c9",
+      "valid": true
+    },
+    {
+      "index": 124,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #133: r and s^-1 are close to n",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc6324d5555555550000000055555555555555553ef7a8e48d07df81a693439654210c70083539fbee44625e3acaafa2fcb41349392cef0633a1b8fabecee0c133b10e99915c1ebe7bf00df8535196770a58047ae2a402f26326bb7d41d4d7616337911e",
+      "valid": true
+    },
+    {
+      "index": 125,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #134: s == 1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c7000000000000000000000000000000000000000000000000000000000000000018aeb368a7027a4d64abdea37390c0c1d6a26f399e2d9734de1eb3d0e1937387405bd13834715e1dbae9b875cf07bd55e1b6691c7f7536aef3b19bf7a4adf576d",
+      "valid": true
+    },
+    {
+      "index": 126,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #135: s == 0",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c7000000000000000000000000000000000000000000000000000000000000000008aeb368a7027a4d64abdea37390c0c1d6a26f399e2d9734de1eb3d0e1937387405bd13834715e1dbae9b875cf07bd55e1b6691c7f7536aef3b19bf7a4adf576d",
+      "valid": false
+    },
+    {
+      "index": 127,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #136: point at infinity during verify",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8555555550000000055555555555555553ef7a8e48d07df81a693439654210c70b533d4695dd5b8c5e07757e55e6e516f7e2c88fa0239e23f60e8ec07dd70f2871b134ee58cc583278456863f33c3a85d881f7d4a39850143e29d4eaf009afe47",
+      "valid": false
+    },
+    {
+      "index": 128,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #137: edge case for signature malleability",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a97fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8f50d371b91bfb1d7d14e1323523bc3aa8cbf2c57f9e284de628c8b4536787b86f94ad887ac94d527247cd2e7d0c8b1291c553c9730405380b14cbb209f5fa2dd",
+      "valid": true
+    },
+    {
+      "index": 130,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #139: u1 == 1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c70bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca60502369da0364734d2e530fece94019265fefb781a0f1b08f6c8897bdf6557927c8b866d2d3c7dcd518b23d726960f069ad71a933d86ef8abbcce8b20f71e2a847002",
+      "valid": true
+    },
+    {
+      "index": 131,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #140: u1 == n - 1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c7044a5ad0ad0636d9f12bc9e0a6bdd5e1cbcb012ea7bf091fcec15b0c43202d52ed8adc00023a8edc02576e2b63e3e30621a471e2b2320620187bf067a1ac1ff3233e2b50ec09807accb36131fff95ed12a09a86b4ea9690aa32861576ba2362e1",
+      "valid": true
+    },
+    {
+      "index": 132,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #141: u2 == 1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c70555555550000000055555555555555553ef7a8e48d07df81a693439654210c703623ac973ced0a56fa6d882f03a7d5c7edca02cfc7b2401fab3690dbe75ab7858db06908e64b28613da7257e737f39793da8e713ba0643b92e9bb3252be7f8fe",
+      "valid": true
+    },
+    {
+      "index": 133,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #142: u2 == n - 1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c70aaaaaaaa00000000aaaaaaaaaaaaaaaa7def51c91a0fbf034d26872ca84218e1cf04ea77e9622523d894b93ff52dc3027b31959503b6fa3890e5e04263f922f1e8528fb7c006b3983c8b8400e57b4ed71740c2f3975438821199bedeaecab2e9",
+      "valid": true
+    },
+    {
+      "index": 134,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #143: edge case for u1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffde91e1ba60fdedb76a46bcb51dc0b8b4b7e019f0a28721885fa5d3a8196623397db7a2c8a1ab573e5929dc24077b508d7e683d49227996bda3e9f78dbeff773504f417f3bc9a88075c2e0aadd5a13311730cf7cc76a82f11a36eaf08a6c99a206",
+      "valid": true
+    },
+    {
+      "index": 148,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #157: edge case for u2",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd7fffffffaaaaaaaaffffffffffffffffe9a2538f37b28a2c513dee40fecbb71a67e6f659cdde869a2f65f094e94e5b4dfad636bbf95192feeed01b0f3deb7460a37e0a51f258b7aeb51dfe592f5cfd5685bbe58712c8d9233c62886437c38ba0",
+      "valid": true
+    },
+    {
+      "index": 162,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #171: point duplication during verification",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050236f2347cab7dd76858fe0555ac3bc99048c4aacafdfb6bcbe05ea6c42c4934569bb726660235793aa9957a61e76e00c2c435109cf9a15dd624d53f4301047856b5b812fd521aafa69835a849cce6fbdeb6983b442d2444fe70e134c027fc46963838a40f2a36092e9004e92d8d940cf5638550ce672ce8b8d4e15eba5499249e9",
+      "valid": true
+    },
+    {
+      "index": 163,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #172: duplication bug",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050236f2347cab7dd76858fe0555ac3bc99048c4aacafdfb6bcbe05ea6c42c4934569bb726660235793aa9957a61e76e00c2c435109cf9a15dd624d53f4301047856b5b812fd521aafa69835a849cce6fbdeb6983b442d2444fe70e134c027fc469637c75bf0c5c9f6d17ffb16d2726bf30a9c7aaf31a8d317472b1ea145ab66db616",
+      "valid": false
+    },
+    {
+      "index": 164,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #173: point with x-coordinate 0",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050230000000000000000000000000000000000000000000000000000000000000001555555550000000055555555555555553ef7a8e48d07df81a693439654210c706adda82b90261b0f319faa0d878665a6b6da497f09c903176222c34acfef72a647e6f50dcc40ad5d9b59f7602bb222fad71a41bf5e1f9df4959a364c62e488d9",
+      "valid": false
+    },
+    {
+      "index": 165,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #175: comparison with point at infinity ",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023555555550000000055555555555555553ef7a8e48d07df81a693439654210c703333333300000000333333333333333325c7cbbc549e52e763f1f55a327a3aa9dd86d3b5f4a13e8511083b78002081c53ff467f11ebd98a51a633db76665d25045d5c8200c89f2fa10d849349226d21d8dfaed6ff8d5cb3e1b7e17474ebc18f7",
+      "valid": false
+    },
+    {
+      "index": 166,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #176: extreme value for k and edgecase s",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978555555550000000055555555555555553ef7a8e48d07df81a693439654210c704fea55b32cb32aca0c12c4cd0abfb4e64b0f5a516e578c016591a93f5a0fbcc5d7d3fd10b2be668c547b212f6bb14c88f0fecd38a8a4b2c785ed3be62ce4b280",
+      "valid": true
+    },
+    {
+      "index": 167,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #177: extreme value for k and s^-1",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978b6db6db6249249254924924924924924625bd7a09bec4ca81bcdd9f8fd6b63ccc6a771527024227792170a6f8eee735bf32b7f98af669ead299802e32d7c3107bc3b4b5e65ab887bbd343572b3e5619261fe3a073e2ffd78412f726867db589e",
+      "valid": true
+    },
+    {
+      "index": 171,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #181: extreme value for k",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050237cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc4766997816a4502e2781e11ac82cbc9d1edd8c981584d13e18411e2f6e0478c34416e3bb0d935bf9ffc115a527735f729ca8a4ca23ee01a4894adf0e3415ac84e808bb343195a3762fea29ed38912bd9ea6c4fde70c3050893a4375850ce61d82eba33c5",
+      "valid": true
+    },
+    {
+      "index": 178,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #188: testing point duplication",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023249249246db6db6ddb6db6db6db6db6dad4591868595a8ee6bf5f864ff7be0c26b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+      "valid": false
+    },
+    {
+      "index": 182,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #192: pseudorandom signature",
+      "input": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855b292a619339f6e567a305c951c0dcbcc42d16e47f219f9e98e76e09d8770b34a0177e60492c5a8242f76f07bfe3661bde59ec2a17ce5bd2dab2abebdf89a62e204aaec73635726f213fb8a9e64da3b8632e41495a944d0045b522eba7240fad587d9315798aaa3a5ba01775787ced05eaaf7b4e09fc81d6d1aa546e8365d525d",
+      "valid": true
+    },
+    {
+      "index": 186,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #196: x-coordinate of the public key has many trailing 0's",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91d434e262a49eab7781e353a3565e482550dd0fd5defa013c7f29745eff3569f19b0c0a93f267fb6052fd8077be769c2b98953195d7bc10de844218305c6ba17a4f337ccfd67726a805e4f1600ae2849df3807eca117380239fbd816900000000ed9dea124cc8c396416411e988c30f427eb504af43a3146cd5df7ea60666d685",
+      "valid": true
+    },
+    {
+      "index": 189,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #199: y-coordinate of the public key has many trailing 0's",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91664eb7ee6db84a34df3c86ea31389a5405badd5ca99231ff556d3e75a233e73a59f3c752e52eca46137642490a51560ce0badc678754b8f72e51a2901426a1bd3cf03d614d8939cfd499a07873fac281618f06b8ff87e8015c3f49726500493584fa174d791c72bf2ce3880a8960dd2a7c7a1338a82f85a9e59cdbde80000000",
+      "valid": true
+    },
+    {
+      "index": 192,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #202: y-coordinate of the public key has many trailing 1's",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f911158a08d291500b4cabed3346d891eee57c176356a2624fb011f8fbbf3466830228a8c486a736006e082325b85290c5bc91f378b75d487dda46798c18f2855193cf03d614d8939cfd499a07873fac281618f06b8ff87e8015c3f4972650049357b05e8b186e38d41d31c77f5769f22d58385ecc857d07a561a6324217fffffff",
+      "valid": true
+    },
+    {
+      "index": 195,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #205: x-coordinate of the public key has many trailing 1's",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91d82a7c2717261187c8e00d8df963ff35d796edad36bc6e6bd1c91c670d9105b43dcabddaf8fcaa61f4603e7cbac0f3c0351ecd5988efb23f680d07debd1399292829c31faa2e400e344ed94bca3fcd0545956ebcfe8ad0f6dfa5ff8effffffffa01aafaf000e52585855afa7676ade284113099052df57e7eb3bd37ebeb9222e",
+      "valid": true
+    },
+    {
+      "index": 198,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #208: x-coordinate of the public key is large",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91766456dce1857c906f9996af729339464d27e9d98edc2d0e3b760297067421f6402385ecadae0d8081dccaf5d19037ec4e55376eced699e93646bfbbf19d0b41fffffff948081e6a0458dd8f9e738f2665ff9059ad6aac0708318c4ca9a7a4f55a8abcba2dda8474311ee54149b973cae0c0fb89557ad0bf78e6529a1663bd73",
+      "valid": true
+    },
+    {
+      "index": 201,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #211: x-coordinate of the public key is small",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91b7c81457d4aeb6aa65957098569f0479710ad7f6595d5874c35a93d12a5dd4c7b7961a0b652878c2d568069a432ca18a1a9199f2ca574dad4b9e3a05c0a1cdb300000003fa15f963949d5f03a6f5c7f86f9e0015eeb23aebbff1173937ba748e1099872070e8e87c555fa13659cca5d7fadcfcb0023ea889548ca48af2ba7e71",
+      "valid": true
+    },
+    {
+      "index": 204,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #214: y-coordinate of the public key is small",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f9131230428405560dcb88fb5a646836aea9b23a23dd973dcbe8014c87b8b20eb070f9344d6e812ce166646747694a41b0aaf97374e19f3c5fb8bd7ae3d9bd0beffbcbb2914c79f045eaa6ecbbc612816b3be5d2d6796707d8125e9f851c18af015000000001352bb4a0fa2ea4cceb9ab63dd684ade5a1127bcf300a698a7193bc2",
+      "valid": true
+    },
+    {
+      "index": 207,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json EcdsaP1363Verify SHA-256 #217: y-coordinate of the public key is large",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91d7d70c581ae9e3f66dc6a480bf037ae23f8a1e4a2136fe4b03aa69f0ca25b35689c460f8a5a5c2bbba962c8a3ee833a413e85658e62a59e2af41d9127cc47224bcbb2914c79f045eaa6ecbbc612816b3be5d2d6796707d8125e9f851c18af015fffffffeecad44b6f05d15b33146549c2297b522a5eed8430cff596758e6c43d",
+      "valid": true
+    },
+    {
+      "index": 211,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_test.json EcdsaVerify SHA-256 #2: Legacy:ASN encoding of s misses leading 0",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050232ba3a8be6b94d5ec80a6d9d1190a436effe50d85a1eee859b8cc6af9bd5c2e18b329f479a2bbd0a5c384ee1493b1f5186a87139cac5df4087c134b49156847db2927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": true
+    },
+    {
+      "index": 212,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_test.json EcdsaVerify SHA-256 #3: valid",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050232ba3a8be6b94d5ec80a6d9d1190a436effe50d85a1eee859b8cc6af9bd5c2e18b329f479a2bbd0a5c384ee1493b1f5186a87139cac5df4087c134b49156847db2927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": true
+    },
+    {
+      "index": 213,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_test.json EcdsaVerify SHA-256 #118: modify first byte of integer",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca60502329a3a8be6b94d5ec80a6d9d1190a436effe50d85a1eee859b8cc6af9bd5c2e18b329f479a2bbd0a5c384ee1493b1f5186a87139cac5df4087c134b49156847db2927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": false
+    },
+    {
+      "index": 214,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_test.json EcdsaVerify SHA-256 #120: modify last byte of integer",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050232ba3a8be6b94d5ec80a6d9d1190a436effe50d85a1eee859b8cc6af9bd5c2e98b329f479a2bbd0a5c384ee1493b1f5186a87139cac5df4087c134b49156847db2927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": false
+    },
+    {
+      "index": 216,
+      "name": "wycheproof/ecdsa_secp256r1_sha256_test.json EcdsaVerify SHA-256 #124: truncated integer",
+      "input": "bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca6050232ba3a8be6b94d5ec80a6d9d1190a436effe50d85a1eee859b8cc6af9bd5c2e1800b329f479a2bbd0a5c384ee1493b1f5186a87139cac5df4087c134b491568472927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+      "valid": false
+    },
+    {
+      "index": 778,
+      "name": "invalid public key x param errors",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f9170bebe684cdcb5ca72a42f0d873879359bd1781a591809947628d313a3814f67aec03aca8f5587a4d535fa31027bbe9cc0e464b1c3577f4c2dcde6b2094798a90000000000000000000000000000000000000000000000000000000000000000fffffffeecad44b6f05d15b33146549c2297b522a5eed8430cff596758e6c43d",
+      "valid": false
+    },
+    {
+      "index": 779,
+      "name": "invalid public key y param errors",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f9170bebe684cdcb5ca72a42f0d873879359bd1781a591809947628d313a3814f67aec03aca8f5587a4d535fa31027bbe9cc0e464b1c3577f4c2dcde6b2094798a9bcbb2914c79f045eaa6ecbbc612816b3be5d2d6796707d8125e9f851c18af0150000000000000000000000000000000000000000000000000000000000000000",
+      "valid": false
+    },
+    {
+      "index": 780,
+      "name": "reference point errors",
+      "input": "2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f9170bebe684cdcb5ca72a42f0d873879359bd1781a591809947628d313a3814f67aec03aca8f5587a4d535fa31027bbe9cc0e464b1c3577f4c2dcde6b2094798a900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "valid": false
+    }
+  ]
+}
