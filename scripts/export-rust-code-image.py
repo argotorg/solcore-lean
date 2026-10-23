@@ -35,7 +35,7 @@ rust-version = "1.97.0"
 [workspace]
 
 [dependencies]
-serde_json = "=1.0.151"
+serde_json = {{ version = "=1.0.151", features = ["unbounded_depth"] }}
 sonatina-codegen = {{ git = "https://github.com/fe-lang/sonatina", rev = "{BACKEND}" }}
 sonatina-parser = {{ git = "https://github.com/fe-lang/sonatina", rev = "{BACKEND}" }}
 '''

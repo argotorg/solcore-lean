@@ -57,6 +57,53 @@ private def rejects (json : Json) (path : String) (limits : DecodeLimits := {}) 
   | .error error => require (error.path == path)
       s!"Hull decoder error path changed: expected {path}, got {reprStr error}"
 
+/-- Generated pattern matches contain statement objects inside body arrays;
+even a moderate Hull nesting depth therefore exceeds 256 JSON levels. -/
+private def nestedStatements (count : Nat) (leaf : String := "{\"tag\":\"comment\",\"text\":\"leaf\"}") : String :=
+  (List.range count).foldl (fun body _ => "{\"tag\":\"block\",\"body\":[" ++ body ++ "]}") leaf
+
+private def nestedProgram (count : Nat) (leaf : String := "{\"tag\":\"comment\",\"text\":\"leaf\"}") : String :=
+  "{\"schema\":\"" ++ schemaName ++ "\",\"upstreamCommit\":\"" ++ upstreamCommit ++
+  "\",\"program\":{\"entryPoints\":[],\"objects\":[],\"functions\":[{\"name\":\"deep\",\"args\":[]," ++
+  "\"ret\":{\"tag\":\"unit\"},\"body\":[" ++ nestedStatements count leaf ++ "]}]}}"
+
+private def blockDepth : List Stmt → Nat
+  | [{kind := .block body, ..}] => blockDepth body + 1
+  | _ => 0
+
+private def deepInputs : IO Unit := do
+  let deep := nestedProgram 140
+  let decoded ← match decodeText deep with
+    | .ok value => pure value
+    | .error error => throw (IO.userError s!"Hull decoder rejected generated-depth input: {reprStr error}")
+  match decoded.program.functions with
+  | [function] =>
+    require (blockDepth function.body == 140) "Hull decoder truncated generated nested statements"
+  | _ => throw (IO.userError "Hull decoder lost the nested function")
+  match decodeText deep {maxDepth := 256} with
+  | .error error =>
+    require (error.message == "JSON nesting or numeric token limit exceeded")
+      "Hull decoder stopped enforcing the caller's depth limit"
+  | .ok _ => throw (IO.userError "Hull decoder ignored an explicit depth limit")
+  -- Root, program, functions, function, body, comment, text have depth seven;
+  -- each enclosing block adds an object and array. The leaf reaches 511 here.
+  match decodeText (nestedProgram 252) {maxDepth := 511},
+      decodeText (nestedProgram 252) {maxDepth := 510} with
+  | .ok _, .error error =>
+    require (error.message == "JSON depth budget exceeded")
+      "Hull decoder did not count the deepest scalar leaf"
+  | _, _ => throw (IO.userError "Hull decoder changed its exact depth boundary")
+  match decodeText (nestedProgram 254) with
+  | .error error =>
+    require (error.message == "JSON nesting or numeric token limit exceeded")
+      "Hull decoder parsed text beyond its default nesting limit"
+  | .ok _ => throw (IO.userError "Hull decoder accepted excessive default nesting")
+  match decodeText (nestedProgram 140 "{\"tag\":\"future\"}") with
+  | .error error =>
+    require (error.message == "unknown statement tag: future")
+      "Hull decoder skipped validation of deeply nested statements"
+  | .ok _ => throw (IO.userError "Hull decoder accepted an unknown nested statement")
+
 def run : IO Unit := do
   let envelope ← match decodeText sample with
     | .ok value => pure value
@@ -132,5 +179,6 @@ def run : IO Unit := do
       decodeText "[[[[[]]]]]" {maxDepth := 3} with
   | .error _, .error _, .error _, .error _ => pure ()
   | _, _, _, _ => throw (IO.userError "Hull text decoder ignored byte, syntax, numeric, or nesting limits")
+  deepInputs
 
 end Tests.RustHullDecode

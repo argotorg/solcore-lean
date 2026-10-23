@@ -7,7 +7,9 @@ namespace Solcore.Frontend.RustHull
 open Lean
 
 structure DecodeLimits where
-  maxDepth : Nat := 256
+  /-- This counts JSON containers and leaves, rather than Hull statements.
+  The pinned `basic.sol` transport reaches 283 through generated match arms. -/
+  maxDepth : Nat := 512
   maxNodes : Nat := 1000000
   maxStringBytes : Nat := 16777216
   maxInputBytes : Nat := 33554432
