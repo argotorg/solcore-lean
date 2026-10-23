@@ -40,8 +40,8 @@ def reference (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Exp
 def supports (name : String) : Bool := name ∈
   ["mload", "mstore", "mstore8", "msize", "calldataload", "calldatasize",
    "callvalue", "caller", "address", "sload", "sstore", "tload", "tstore",
-   "memoryguard", "mcopy", "calldatacopy", "keccak256", "codesize", "codecopy",
-   "gas", "returndatasize", "returndatacopy", "staticcall", "call", "selfbalance",
+   "memoryguard", "mcopy", "calldatacopy", "keccak256", "codesize", "codecopy", "datacopy",
+   "gas", "returndatasize", "returndatacopy", "staticcall", "call", "selfbalance", "balance",
    "log0", "log1", "log2", "log3", "log4",
    "return", "revert", "stop", "invalid"]
 
@@ -122,7 +122,8 @@ def lowerBuiltin (scope : Scope) (name : String) (arguments : List Core.Expr) : 
         (← reference scope "memory" Core.WordMapping.type)
         (← reference scope "memorySize" .word) destination
         (.loadCell (← reference scope "calldata" Core.WordMapping.type)) source length⟩
-    | "codecopy", [destination, source, length] => pure ⟨.unit, Memory.copyPackedFrom
+    | "codecopy", [destination, source, length]
+    | "datacopy", [destination, source, length] => pure ⟨.unit, Memory.copyPackedFrom
         (← reference scope "memory" Core.WordMapping.type)
         (← reference scope "memorySize" .word) destination
         (.loadCell (← reference scope "code" Core.WordMapping.type)) source length⟩
@@ -139,6 +140,9 @@ def lowerBuiltin (scope : Scope) (name : String) (arguments : List Core.Expr) : 
     | "selfbalance", [] => pure ⟨.word, Core.WordMapping.lookup
         (.loadCell (← reference scope "balances" Core.WordMapping.type))
         (.loadCell (← reference scope "address" .word))⟩
+    | "balance", [address] => pure ⟨.word, Core.WordMapping.lookup
+        (.loadCell (← reference scope "balances" Core.WordMapping.type))
+        (.binary .wordAnd address (.word (Core.Word.ofNatModulo (2 ^ 160 - 1))))⟩
     | "log0", arguments => log scope 0 arguments
     | "log1", arguments => log scope 1 arguments
     | "log2", arguments => log scope 2 arguments

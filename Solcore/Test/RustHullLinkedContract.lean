@@ -85,8 +85,44 @@ def runDeploymentContext : IO Unit := do
     require ((Core.WordMapping.lookupEntries (Core.Word.ofNatModulo slot) storage).val = value)
       s!"deployment helper lost constructor state at {slot}"
 
+def runDatacopy : IO Unit := do
+  let init := [
+    action "datacopy" [w 0, call "datasize" [symbol deployName], w 32],
+    action "sstore" [w 0, call "mload" [w 0]],
+    action "datacopy" [w 5, call "dataoffset" [symbol runtimeName], call "datasize" [symbol runtimeName]],
+    action "return" [w 5, call "datasize" [symbol runtimeName]]]
+  let runtime := [
+    action "mstore" [w 0, w (Core.wordModulus - 1)],
+    action "datacopy" [w 3, call "add" [call "dataoffset" [symbol runtimeName], w 1], w 6],
+    action "return" [w 0, w 10]]
+  let program := source init runtime
+  let constructor ← get "datacopy linked constructor"
+    (LinkedContract.prepareDeployment program [deployName] images (wordBytes 42))
+  let storage ← expectBytes "datacopy returns exact embedded runtime at unaligned destination"
+    (Contract.run constructor) runtimeBytes
+  require ((Core.WordMapping.lookupEntries Core.Word.zero storage).val = 42)
+    "datacopy did not read appended constructor arguments"
+  let runtime ← get "datacopy linked runtime"
+    (LinkedContract.prepare program [deployName, runtimeName] images)
+  let _ ← expectBytes "datacopy selects runtime image and zero pads beyond its end"
+    (Contract.run runtime) (bytes [0xff, 0xff, 0xff, 0, 0x55, 0xf3, 0, 0, 0, 0xff])
+  let overflow := source [] [
+    action "mstore" [w 0, w (Core.wordModulus - 1)],
+    action "mstore" [w 32, w (Core.wordModulus - 1)],
+    action "datacopy" [w 31, w (Core.wordModulus - 1), w 2],
+    action "return" [w 30, w 4]]
+  let overflow ← get "datacopy source offset does not wrap"
+    (LinkedContract.prepare overflow [deployName, runtimeName] images)
+  let _ ← expectBytes "datacopy zero padding across a packed word boundary"
+    (Contract.run overflow) (bytes [0xff, 0, 0, 0xff])
+  let noImage := source [] [action "datacopy" [w 0, w 0, w 1], action "stop"]
+  rejects "datacopy requires exact code image"
+    (Contract.prepare noImage [deployName, runtimeName])
+  pure ()
+
 def run : IO Unit := do
   runDeploymentContext
+  runDatacopy
   let program := source initializer
   let constructor ← get "constructor" (LinkedContract.prepare program [deployName] images (wordBytes 42))
   let state ← expectBytes "constructor returns exact embedded bytes" (Contract.run constructor) runtimeBytes

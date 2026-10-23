@@ -130,10 +130,11 @@ private def rollbackTests : IO Unit := do
 private def balanceTests : IO Unit := do
   let body := [action "mstore" [w 0, send 0xccc 20], action "mstore" [w 32, send 0xccc 81],
     action "mstore" [w 64, call "selfbalance"], action "mstore" [w 96, call "returndatasize"],
-    action "return" [w 0, w 128]]
+    action "mstore" [w 128, call "balance" [call "address"]],
+    action "mstore" [w 160, call "balance" [w 0xccc]], action "return" [w 0, w 192]]
   let prepared ← prepare "known empty recipient and insufficient funds" body
   let receipt := Contract.runWithReceipt prepared
-  let _ ← returned "value transfers" receipt (words [1, 0, 80, 0])
+  let _ ← returned "value transfers and balance reads" receipt (words [1, 0, 80, 0, 80, 25])
   checkSlot "sender debit" receipt.balances 0xaaa 80
   checkSlot "recipient credit" receipt.balances 0xccc 25
   let unknown ← prepare "unknown account fails explicitly" [emit 10, action "pop" [send 0xddd 20], action "stop"]
@@ -154,6 +155,30 @@ private def balanceTests : IO Unit := do
   let receipt := Contract.runWithReceipt canonical
   let _ ← returned "canonical frame and account addresses" receipt (words [0xaaa, 0xbbb, 1])
   checkSlot "canonical recipient" receipt.balances 0xccc 25
+
+private def balanceReadTests : IO Unit := do
+  let high := 2 ^ 200
+  let prepared ← prepare "balance reads share the canonical ledger in static context"
+    [action "mstore" [w 0, call "balance" [call "address"]],
+      action "mstore" [w 32, call "balance" [w 0xccc]],
+      action "mstore" [w 64, call "balance" [w (high + 0xccc)]],
+      action "mstore" [w 96, call "balance" [w 0xddd]],
+      action "mstore" [w 128, call "balance" [w 0xbbb]],
+      action "return" [w 0, w 160]] {defaultContext with isStatic := true}
+  let _ ← returned "self, external, high-bit alias, absent, and unknown-code account balances"
+    (Contract.runWithReceipt prepared) (words [100, 5, 5, 0, 1000])
+  let outer := [action "mstore" [w 0, w 1], action "mstore" [w 128, selfCall],
+    action "mstore" [w 160, call "balance" [call "address"]],
+    action "mstore" [w 192, call "balance" [w 0xccc]],
+    action "mstore" [w 224, call "mload" [w 64]], action "return" [w 128, w 128]]
+  let child := [action "pop" [send 0xccc 3],
+    action "mstore" [w 0, call "balance" [w 0xccc]], action "revert" [w 0, w 32]]
+  let prepared ← prepare "balance reads observe a reverted child transfer"
+    (branches [(0, outer), (1, child)])
+  let receipt := Contract.runWithReceipt prepared
+  let _ ← returned "child sees transfer and parent sees restored balances" receipt (words [0, 100, 5, 8])
+  checkSlot "balance read sender rollback" receipt.balances 0xaaa 100
+  checkSlot "balance read recipient rollback" receipt.balances 0xccc 5
 
 private def staticTests : IO Unit := do
   let outer := [action "sstore" [w 0, w 11], emit 10, action "mstore" [w 0, w 1],
@@ -257,6 +282,7 @@ def run : IO Unit := do
   reentrantTests
   rollbackTests
   balanceTests
+  balanceReadTests
   staticTests
   precompileValueTests
   dispatchPriorityTests
