@@ -10,16 +10,16 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.RustHull
 
-private def boolLike (type : Core.Ty) : Bool :=
+def boolLike (type : Core.Ty) : Bool :=
   type == .bool || type == .sum .unit .unit
 
-private def boolean (type : Core.Ty) (condition : Core.Expr) : LowerM Core.Expr :=
+def boolean (type : Core.Ty) (condition : Core.Expr) : LowerM Core.Expr :=
   if type = .bool then pure condition
   else if type = .sum .unit .unit then
     pure (.ifE condition (.inRight .unit .unit) (.inLeft .unit .unit))
   else fail "expected a boolean or a sum of two Unit types"
 
-private def condition (value : Lowered) : LowerM Core.Expr := do
+def condition (value : Lowered) : LowerM Core.Expr := do
   if value.type = .bool then pure value.expression
   else if value.type = .sum .unit .unit then
     pure (Core.LanguageResult.bind .bool value.expression
@@ -27,7 +27,7 @@ private def condition (value : Lowered) : LowerM Core.Expr := do
         (Core.LanguageResult.success (.bool true))))
   else fail "condition is not boolean"
 
-private def primitiveName : String → String
+def primitiveName : String → String
   | "primAddWord" | "integerAdd" => "add"
   | "subWord" | "integerSub" => "sub"
   | "mulWord" | "integerMul" => "mul"
@@ -40,7 +40,7 @@ private def primitiveName : String → String
   | "bnotWord" => "not"
   | name => name
 
-private def lowerBuiltin (scope : Scope) (name : String) (expected : Core.Ty)
+def lowerBuiltin (scope : Scope) (name : String) (expected : Core.Ty)
     (arguments : List Lowered) : LowerM Lowered := do
   let packed := packArguments arguments
   let raw := (List.range arguments.length).map fun index =>
@@ -158,7 +158,7 @@ def lowerExpression : Nat → List Signature → Scope → Expr → LowerM Lower
       expectType expected result.type
       pure result
 
-private def place : Nat → Expr → LowerM (String × List Bool)
+def place : Nat → Expr → LowerM (String × List Bool)
   | 0, _ => fail "place depth exhausted"
   | fuel + 1, expression => match expression.kind with
     | .var name => pure (name, [])
@@ -166,7 +166,7 @@ private def place : Nat → Expr → LowerM (String × List Bool)
     | .snd value => do let (name, path) ← place fuel value; pure (name, path ++ [true])
     | _ => fail "assignment requires a local or product projection"
 
-private def updateProduct : List Bool → Core.Ty → Core.Expr → Core.Expr → LowerM Core.Expr
+def updateProduct : List Bool → Core.Ty → Core.Expr → Core.Expr → LowerM Core.Expr
   | [], _, _, value => pure value
   | direction :: rest, .product left right, old, value =>
       if direction then return .pair (.first old) (← updateProduct rest right (.second old) value)
@@ -174,7 +174,7 @@ private def updateProduct : List Bool → Core.Ty → Core.Expr → Core.Expr �
   | _ :: _, _, _, _ => fail "assignment projection is not a product"
 
 /-- Return a pure Option-like payload test for one match arm. -/
-private def testPattern (type : Core.Ty) (pattern : PatKind) : LowerM (Core.Ty × (Core.Expr → Core.Expr)) := do
+def testPattern (type : Core.Ty) (pattern : PatKind) : LowerM (Core.Ty × (Core.Expr → Core.Expr)) := do
   match pattern with
   | .wildcard | .var _ => pure (type, fun value => .inRight .unit value)
   | .intLit text =>
@@ -298,12 +298,12 @@ structure Compiled where
   expression : Core.Expr
   deriving Repr
 
-private def signature (fuel : Nat) (function : Function) : LowerM Signature := do
+def signature (fuel : Nat) (function : Function) : LowerM Signature := do
   if function.name.startsWith Effects.reservedPrefix then fail "reserved runtime function name"
   pure ⟨function.name, ← function.args.mapM (fun arg => lowerType fuel arg.ty),
     ← lowerType fuel function.ret⟩
 
-private def lowerFunction (fuel : Nat) (signatures : List Signature)
+def lowerFunction (fuel : Nat) (signatures : List Signature)
     (scope : Scope) (function : Function) (own : Signature) : LowerM Core.Expr := do
   unless (function.args.map (·.name)).eraseDups.length = function.args.length do
     fail s!"duplicate parameter in {function.name}"

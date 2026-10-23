@@ -128,18 +128,18 @@ private def childResult (result : Code) : Code :=
   let copyResult (ok : Bool) : Code :=
     bindResult Calls.responseType (fun depth => MemorySnapshot.extract
       (memory depth) (offset depth) (count depth)) fun data =>
-    callResult (boolean ok) data count
-  choose (binary .wordEq exit (number 3)) (callResult (boolean false) empty (number 0)) <|
+    callResult (CodeBuilder.boolean ok) data count
+  choose (binary .wordEq exit (number 3)) (callResult (CodeBuilder.boolean false) empty (number 0)) <|
   choose (binary .wordEq exit (number 2)) (copyResult false) <|
   choose (binary .wordEq exit (number 1)) (copyResult true) <|
   fun depth => .caseE (first result depth)
     (LanguageResult.failure Calls.responseType (.var 0))
-    (callResult (boolean true) empty (number 0) (depth + 1))
+    (callResult (CodeBuilder.boolean true) empty (number 0) (depth + 1))
 
 private def isPrecompile (target : Code) : Code :=
-  choose (binary .wordEq target (number 256)) (boolean true)
+  choose (binary .wordEq target (number 256)) (CodeBuilder.boolean true)
     (choose (binary .wordGt target (number 0))
-      (binary .wordGt (number 5) target) (boolean false))
+      (binary .wordGt (number 5) target) (CodeBuilder.boolean false))
 
 /-- Balance checks and transfers use the execution address even for delegated
 frames. CALLCODE checks funds without moving them; DELEGATECALL inherits value. -/
@@ -168,15 +168,15 @@ private def dispatch (shared : References) (runFrame : Code → Code → Code)
       choose (binary .wordEq (part 3 9 record) (number 0))
         (choose (part 6 9 record)
           (choose (binary .wordEq (part 5 9 record) (number 0))
-            (callResult (boolean true) empty (number 0))
+            (callResult (CodeBuilder.boolean true) empty (number 0))
             (failure Calls.responseType (number 16)))
           (failure Calls.responseType (number 15)))
         (runFrame record (packet [executionAddress, part 1 8 request, value,
           part 3 8 request, part 4 8 request, part 5 8 request, part 6 8 request, part 7 8 request]))
   checkpoint shared fun restore =>
   bindResult Calls.responseType (lookup (load (reference shared "balances")) source) fun sourceBalance =>
-  choose (choose (binary .wordEq mode (number 2)) (boolean false)
-    (binary .wordGt value sourceBalance)) (callResult (boolean false) empty (number 0)) <|
+  choose (choose (binary .wordEq mode (number 2)) (CodeBuilder.boolean false)
+    (binary .wordGt value sourceBalance)) (callResult (CodeBuilder.boolean false) empty (number 0)) <|
   bindResult Calls.responseType
     (choose (binary .wordEq mode (number 0)) (transfer shared source target value) (success unit)) fun _ =>
   fun depth => .caseE (run depth)
@@ -241,7 +241,7 @@ private def finishDeployment (shared : References) (images : List (Nat × List U
   let installation := bindResult .unit (childResult result) fun response =>
     bindResult .unit (fun depth => Memory.readMemoryByte (part 1 3 response depth) (number 0 depth)) fun leading =>
     choose (binary .wordGt (part 2 3 response) (number 24576)) (failure .unit (number 17)) <|
-    choose (choose (binary .wordEq (part 2 3 response) (number 0)) (boolean false)
+    choose (choose (binary .wordEq (part 2 3 response) (number 0)) (CodeBuilder.boolean false)
       (binary .wordEq leading (number 239))) (failure .unit (number 17)) <|
     install shared images target response
   fun depth => .caseE (installation depth)
@@ -300,9 +300,9 @@ def compileObject (program : Program) (objectPath : List String)
       templates.foldr (fun (_, index) fallback =>
         choose (binary .wordEq identity (number (index + 2)))
           (invoke (index + 1)
-            (packet [target, part 0 8 request, part 1 8 request, boolean false,
+            (packet [target, part 0 8 request, part 1 8 request, CodeBuilder.boolean false,
               part 4 8 request, part 5 8 request, empty, number 0])
-            (present (part 5 8 request)) (part 6 8 request) (part 7 8 request) (boolean true)) fallback)
+            (present (part 5 8 request)) (part 6 8 request) (part 7 8 request) (CodeBuilder.boolean true)) fallback)
         (failure Calls.responseType (number 16))
 
     let handler := lambda dispatchType (LanguageResult.resultType Calls.responseType) (dispatch shared runFrame)
@@ -316,16 +316,16 @@ def compileObject (program : Program) (objectPath : List String)
       part 8 12 context, number 0, number 0, part 0 12 context, part 1 12 context]
     allocateFrame slots shared request dispatcher creator (part 5 12 context)
       (constant (WordMapping.literal (Memory.packBytes (codeBytes.getD []))))
-      (number (codeBytes.getD []).length) (boolean codeBytes.isSome) fun cells =>
+      (number (codeBytes.getD []).length) (CodeBuilder.boolean codeBytes.isSome) fun cells =>
     bind (apply (part 0 (others.length + 1) functions) (packet cells)) fun result =>
     -- A failed top-level message exports no state. Successful completion resets
     -- transaction-local state and applies delayed SELFDESTRUCT deletion.
     let finish := choose (part 11 12 context)
       (finishDeployment shared images (part 4 12 context) result)
       (finalize shared (part 4 12 context) result)
-    let successful := choose (binary .wordEq (part 0 9 (second result)) (number 1)) (boolean true)
+    let successful := choose (binary .wordEq (part 0 9 (second result)) (number 1)) (CodeBuilder.boolean true)
       (choose (binary .wordEq (part 0 9 (second result)) (number 0))
-        (fun depth => .caseE (first result depth) (.bool false) (.bool true)) (boolean false))
+        (fun depth => .caseE (first result depth) (.bool false) (.bool true)) (CodeBuilder.boolean false))
     choose successful finish result
   let expression := expression 0
   let type ← (Core.inferDetailed [] [] expression AccountState.definitions).mapError fun error =>
