@@ -54,7 +54,7 @@ private def testSuccessfulLoad : IO Unit := do
         "parsed files did not reach the declaration environment"
       assertTrue (decide (loaded.workspace.entry =
           { library := Workspace.LibraryId.main
-            path := ⟨⟨[⟨"main", by decide⟩], by decide⟩⟩ }))
+            path := {modulePath := ⟨[⟨"main", by decide⟩], by decide⟩, extension := .solc} }))
         "validated entry identity changed while loading"
 
 private def testWorkspaceFailure : IO Unit := do
