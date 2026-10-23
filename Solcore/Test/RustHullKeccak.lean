@@ -13,8 +13,7 @@ private def require (condition : Bool) (message : String) : IO Unit :=
 private def word (value : Nat) : Expr := .word (Word.ofNatModulo value)
 private def scalar (value : Nat) : Value := .word (Word.ofNatModulo value)
 private def entries (bytes : List UInt8) (offset : Nat) : WordMapping.Entries :=
-  bytes.zipIdx.map fun (byte, index) =>
-    (Word.ofNatModulo (offset + index), Word.ofNatModulo byte.toNat)
+  Memory.packBytes bytes offset
 private def expectedHash (bytes : List UInt8) : Word :=
   let hashed := Solcore.Abi.V1.Keccak256.hash bytes.toByteArray
   Word.ofNatModulo (hashed.data.foldl (fun value byte => value * 256 + byte.toNat) 0)

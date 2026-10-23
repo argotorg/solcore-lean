@@ -13,6 +13,8 @@ structure Context where
   value : Core.Word := Core.Word.zero
   caller : Core.Word := Core.Word.zero
   address : Core.Word := Core.Word.zero
+  /-- An explicit environment input, not a gas meter for Core transitions. -/
+  availableGas : Option Core.Word := none
   deriving Repr
 
 def snapshotType : Core.Ty :=
@@ -31,7 +33,7 @@ structure CompiledObject where
   deriving Repr
 
 def contextType : Core.Ty :=
-  bundleType [Core.WordMapping.type, .word, Core.WordMapping.type, .word, .word, .word]
+  bundleType [Core.WordMapping.type, .word, Core.WordMapping.type, .word, .word, .word, .sum .unit .word]
 
 private def select : List Object → List String → LowerM CodeBlock
   | _, [] => fail "an explicit Hull object path is required"
@@ -43,28 +45,31 @@ private def select : List Object → List String → LowerM CodeBlock
       | _ => fail s!"ambiguous Hull object: {name}"
 
 private def calldataEntries (bytes : List UInt8) : Core.WordMapping.Entries :=
-  bytes.zipIdx.map fun (byte, index) =>
-    (Core.Word.ofNatModulo index, Core.Word.ofNatModulo byte.toNat)
+  Memory.packBytes bytes
 
-private def initializer (context : Core.Expr) (name : String) : Core.Expr :=
+private def initializer (context : Core.Expr) (code : Option (List UInt8)) (name : String) : Core.Expr :=
   match name with
-  | "memory" | "transient" => Core.WordMapping.empty
-  | "calldata" => projectArgument 0 6 context
-  | "calldataSize" => projectArgument 1 6 context
-  | "storage" => projectArgument 2 6 context
-  | "callvalue" => projectArgument 3 6 context
-  | "caller" => projectArgument 4 6 context
-  | "address" => projectArgument 5 6 context
+  | "memory" | "transient" | "returnData" => Core.WordMapping.empty
+  | "calldata" => projectArgument 0 7 context
+  | "calldataSize" => projectArgument 1 7 context
+  | "storage" => projectArgument 2 7 context
+  | "callvalue" => projectArgument 3 7 context
+  | "caller" => projectArgument 4 7 context
+  | "address" => projectArgument 5 7 context
+  | "availableGas" => projectArgument 6 7 context
+  | "code" => Core.WordMapping.literal (calldataEntries (code.getD []))
+  | "codeSize" => .word (Core.Word.ofNatModulo (code.getD []).length)
   | _ => .word Core.Word.zero
 
 def compileObject (program : Program) (objectPath : List String)
-    (fuel : Nat := 4096) : LowerM CompiledObject := do
+    (fuel : Nat := 4096) (codeBytes : Option (List UInt8) := none) : LowerM CompiledObject := do
   let code ← select program.objects objectPath
   let entry := "$lean$object$entry"
   if (program.functions ++ code.functions).any (·.name == entry) then
     fail "reserved runtime entry name"
   let function : Function := {name := entry, args := [], ret := .unit, body := code.stmts}
-  let runtime : Scope := Effects.slots.reverse.map fun (name, type) =>
+  let slots := Effects.slots ++ (if codeBytes.isSome then Effects.codeSlots else [])
+  let runtime : Scope := slots.reverse.map fun (name, type) =>
     ⟨some (Effects.slotName name), type, false⟩
   let (_, body) ← assemble (program.functions ++ code.functions ++ [function]) entry runtime fuel
   let scope := runtime.temporary (Core.LanguageResult.resultType .unit)
@@ -72,8 +77,8 @@ def compileObject (program : Program) (objectPath : List String)
       ("memory", Core.WordMapping.type), ("storage", Core.WordMapping.type)].mapM fun (name, type) => do
     return Core.Expr.loadCell (← Effects.reference scope name type)
   let completed := Core.Expr.letE body (.pair (.var 0) (bundle snapshot))
-  let allocated := Effects.slots.zipIdx.foldr (fun ((name, type), index) body =>
-    Core.Expr.letE (.newCell type (initializer (.var (index + 1)) name)) body) completed
+  let allocated := slots.zipIdx.foldr (fun ((name, type), index) body =>
+    Core.Expr.letE (.newCell type (initializer (.var (index + 1)) codeBytes name)) body) completed
   let expression := Core.Expr.lambda contextType resultType (.letE .unit allocated)
   let type ← (Core.inferDetailed [] [] expression Memory.definitions).mapError fun error =>
     ⟨s!"Core runtime object validation: {reprStr error}", none⟩
@@ -81,9 +86,12 @@ def compileObject (program : Program) (objectPath : List String)
   pure ⟨expression⟩
 
 def CompiledObject.instantiate (compiled : CompiledObject) (context : Context := {}) : Prepared :=
+  let availableGas := match context.availableGas with
+    | none => Core.Expr.inLeft .word .unit
+    | some gas => .inRight .unit (.word gas)
   let argument := bundle [Core.WordMapping.literal (calldataEntries context.calldata),
     .word (Core.Word.ofNatModulo context.calldata.length), Core.WordMapping.literal context.storage,
-    .word context.value, .word context.caller, .word context.address]
+    .word context.value, .word context.caller, .word context.address, availableGas]
   ⟨.apply compiled.expression argument, context⟩
 
 def prepare (program : Program) (objectPath : List String) (context : Context := {})
@@ -125,7 +133,7 @@ private def finish (maxReturnBytes : Nat) (result : Core.Value) : Outcome := Id.
     | .ok entries => pure entries
     | .error error => return .exportError error
   let bytes := (List.range count.val).map fun index =>
-    UInt8.ofNat (Core.WordMapping.lookupEntries (Core.Word.ofNatModulo (offset.val + index)) entries).val
+    UInt8.ofNat (Memory.lookupByte entries (Core.Word.ofNatModulo (offset.val + index))).val
   if exit.val = 2 then return .reverted bytes
   match mappingEntries storage with
   | .ok storage => return .returned bytes storage

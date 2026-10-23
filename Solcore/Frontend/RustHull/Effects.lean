@@ -18,7 +18,13 @@ def slots : List (String × Core.Ty) :=
    ("calldata", Core.WordMapping.type), ("calldataSize", .word),
    ("storage", Core.WordMapping.type), ("transient", Core.WordMapping.type),
    ("callvalue", .word), ("caller", .word), ("address", .word),
+   ("returnData", Core.WordMapping.type), ("returnDataSize", .word),
+   ("availableGas", .sum .unit .word),
    ("exit", .word), ("returnOffset", .word), ("returnSize", .word)]
+
+/-- Installed only when the caller supplies a concrete linked code image. -/
+def codeSlots : List (String × Core.Ty) :=
+  [("code", Core.WordMapping.type), ("codeSize", .word)]
 
 def reference (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Expr := do
   let (binding, index) ← scope.lookup (slotName name)
@@ -28,7 +34,9 @@ def reference (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Exp
 def supports (name : String) : Bool := name ∈
   ["mload", "mstore", "mstore8", "msize", "calldataload", "calldatasize",
    "callvalue", "caller", "address", "sload", "sstore", "tload", "tstore",
-   "memoryguard", "mcopy", "calldatacopy", "keccak256", "return", "revert", "stop", "invalid"]
+   "memoryguard", "mcopy", "calldatacopy", "keccak256", "codesize", "codecopy",
+   "gas", "returndatasize", "returndatacopy",
+   "return", "revert", "stop", "invalid"]
 
 private def writeMapping (reference key value : Core.Expr) : Core.Expr :=
   .letE reference
@@ -69,13 +77,34 @@ def lowerBuiltin (scope : Scope) (name : String) (arguments : List Core.Expr) : 
     | "keccak256", [offset, length] => pure ⟨.word, Keccak.hash
         (← reference scope "memory" Core.WordMapping.type)
         (← reference scope "memorySize" .word) offset length⟩
-    | "calldatacopy", [destination, source, length] => pure ⟨.unit, Memory.copyFrom
+    | "calldatacopy", [destination, source, length] => pure ⟨.unit, Memory.copyPackedFrom
         (← reference scope "memory" Core.WordMapping.type)
         (← reference scope "memorySize" .word) destination
         (.loadCell (← reference scope "calldata" Core.WordMapping.type)) source length⟩
+    | "codecopy", [destination, source, length] => pure ⟨.unit, Memory.copyPackedFrom
+        (← reference scope "memory" Core.WordMapping.type)
+        (← reference scope "memorySize" .word) destination
+        (.loadCell (← reference scope "code" Core.WordMapping.type)) source length⟩
+    | "codesize", [] => pure ⟨.word, Core.LanguageResult.success
+        (.loadCell (← reference scope "codeSize" .word))⟩
+    | "gas", [] => pure ⟨.word, .caseE
+        (.loadCell (← reference scope "availableGas" (.sum .unit .word)))
+        (Core.LanguageResult.failure .word (.word (Core.Word.ofNatModulo 9)))
+        (Core.LanguageResult.success (.var 0))⟩
+    | "returndatasize", [] => pure ⟨.word, Core.LanguageResult.success
+        (.loadCell (← reference scope "returnDataSize" .word))⟩
+    | "returndatacopy", [destination, source, length] => do
+        let size := Core.Expr.loadCell (← reference scope "returnDataSize" .word)
+        let invalid ← terminate scope 3 (.word Core.Word.zero) (.word Core.Word.zero)
+        let copy := Memory.copyPackedFrom
+          (← reference scope "memory" Core.WordMapping.type)
+          (← reference scope "memorySize" .word) destination
+          (.loadCell (← reference scope "returnData" Core.WordMapping.type)) source length
+        pure ⟨.unit, .ifE (.binary .wordGt source size) invalid
+          (.ifE (.binary .wordGt length (.binary .wordSub size source)) invalid copy)⟩
     | "msize", [] => pure ⟨.word, Core.LanguageResult.success
         (.loadCell (← reference scope "memorySize" .word))⟩
-    | "calldataload", [offset] => pure ⟨.word, Memory.readWord
+    | "calldataload", [offset] => pure ⟨.word, Memory.readMemoryWord
         (.loadCell (← reference scope "calldata" Core.WordMapping.type)) offset⟩
     | "calldatasize", [] => pure ⟨.word, Core.LanguageResult.success
         (.loadCell (← reference scope "calldataSize" .word))⟩

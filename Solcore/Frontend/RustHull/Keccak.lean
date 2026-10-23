@@ -100,7 +100,7 @@ def permute (state : Expr) : Expr :=
 
 private def paddedByte (mapping offset remaining : Expr) (index : Nat) : Expr :=
   .ifE (.binary .wordGt remaining (number index))
-    (Memory.readByte mapping (add offset (number index)))
+    (Memory.readMemoryByte mapping (add offset (number index)))
     (LanguageResult.success
       (add (.ifE (.binary .wordEq remaining (number index)) (number 1) (number 0))
         (number (if index = 135 then 128 else 0))))

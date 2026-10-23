@@ -17,6 +17,14 @@ private def memory (body : Expr) : Expr :=
   .letE (.newCell WordMapping.type WordMapping.empty)
     (.letE (.newCell .word (word 0)) body)
 
+private def initialized (bytes : List UInt8) (body : Expr) : Expr :=
+  .letE (.newCell WordMapping.type (WordMapping.literal (Memory.packBytes bytes)))
+    (.letE (.newCell .word (word 0)) body)
+
+private def bytesWord (bytes : List UInt8) : Nat :=
+  ((bytes ++ List.replicate 32 (0 : UInt8)).take 32).foldl
+    (fun (value : Nat) (byte : UInt8) => value * 256 + byte.toNat) 0
+
 private def sequence (result : Ty) (action next : Expr) : Expr :=
   LanguageResult.bind result action (next.weakenAt 0)
 
@@ -123,6 +131,56 @@ def run : IO Unit := do
     (memory (sequence .word
       (Memory.copyFrom (.var 1) (.var 0) (word 0) calldata (word 4096) (word 1))
       (Memory.msize (.var 0)))) (scalar 32)
+  let original := (List.range 96).map fun index => UInt8.ofNat (index * 7 + 3)
+  let replacement := (List.range 32).map fun index => UInt8.ofNat (index * 3 + 1)
+  for offset in List.range 32 do
+    let expected := original.take offset ++ replacement ++ original.drop (offset + 32)
+    let reads := LanguageResult.bind (.product .word .word)
+      (Memory.mload (.var 1) (.var 0) (word 0))
+      (LanguageResult.bind (.product .word .word)
+        (Memory.mload (.var 2) (.var 1) (word 32))
+        (LanguageResult.success (.pair (.var 1) (.var 0))))
+    expect s!"packed unaligned write preserves both neighbors {offset}" (.product .word .word)
+      (initialized original (sequence (.product .word .word)
+        (Memory.mstore (.var 1) (.var 0) (word offset) (word (bytesWord replacement))) reads))
+      (.pair (scalar (bytesWord expected)) (scalar (bytesWord (expected.drop 32))))
+  for (destination, source) in [(1, 0), (0, 1), (31, 1), (1, 31)] do
+    let expected := original.take destination ++ (original.drop source).take 65 ++
+      original.drop (destination + 65)
+    expect s!"packed bulk overlap {destination} {source}" .word
+      (initialized original (sequence .word
+        (Memory.mcopy (.var 1) (.var 0) (word destination) (word source) (word 65))
+        (Memory.mload (.var 1) (.var 0) (word 64))))
+      (scalar (bytesWord (expected.drop 64)))
+  let rawOriginal := WordMapping.literal (original.zipIdx.map fun (byte, index) =>
+    (Word.ofNatModulo index, Word.ofNatModulo byte.toNat))
+  let packedOriginal := WordMapping.literal (Memory.packBytes original)
+  for (label, copy, source) in [("raw", Memory.copyFrom, rawOriginal),
+      ("packed", Memory.copyPackedFrom, packedOriginal)] do
+    expect s!"{label} bulk copy with tail and padding" .word
+      (memory (sequence .word (copy (.var 1) (.var 0) (word 1) source (word 65) (word 65))
+        (Memory.mload (.var 1) (.var 0) (word 0))))
+      (scalar (bytesWord (0 :: original.drop 65)))
+  let edge := WordMapping.literal (Memory.packEntries
+    [(Word.ofNatModulo maximum, Word.ofNatModulo 0xaa), (Word.zero, Word.ofNatModulo 0xbb)])
+  expect "packed source word pads without wrapping" .word
+    (Memory.readMemoryWord edge (word maximum)) (scalar (0xaa * 256 ^ 31))
+  expect "packed copy crosses maximal source offset without wrapping" .word
+    (memory (sequence .word
+      (Memory.copyPackedFrom (.var 1) (.var 0) (word 0) edge (word maximum) (word 64))
+      (Memory.mload (.var 1) (.var 0) (word 32)))) (scalar 0)
+  let codeBytes := (List.range 1024).map fun index => UInt8.ofNat (index * 17 + 5)
+  expect "packed kilobyte copy with unaligned destination" .word
+    (memory (sequence .word
+      (Memory.copyPackedFrom (.var 1) (.var 0) (word 3)
+        (WordMapping.literal (Memory.packBytes codeBytes)) (word 0) (word 1024))
+      (Memory.mload (.var 1) (.var 0) (word 995))))
+    (scalar (bytesWord (codeBytes.drop 992)))
+  let repeated := Memory.packEntries [(Word.zero, Word.ofNatModulo 0x123), (Word.zero, Word.ofNatModulo 0xab)]
+  require (Memory.lookupByte repeated Word.zero == Word.ofNatModulo 0x23)
+    "packing changed byte masking or first-entry precedence"
+  require (Memory.lookupByte (Memory.packBytes [0xaa, 0xbb] maximum) Word.zero == Word.zero)
+    "packing bytes wrapped an overflowing suffix"
   for offset in [maximum, wordModulus - 16, wordModulus - 32] do
     let program : Program := {
       resultType := .product (LanguageResult.resultType .unit) .word
@@ -182,7 +240,7 @@ def run : IO Unit := do
   match once.runStateful 100000 with
   | .done result store =>
       require (result == .pair (.inRight .word .unit) (scalar 4)) "memory argument effects were repeated"
-      require (store[1]? == some (WordMapping.encode [(Word.zero, Word.ofNatModulo 0xab)]))
+      require (store[1]? == some (WordMapping.encode (Memory.packBytes [0xab])))
         "memory reference changed during argument capture"
   | other => throw (IO.userError s!"effectful memory arguments: {reprStr other}")
 
