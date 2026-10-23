@@ -1,0 +1,679 @@
+{
+  "upstreamCommit": "2a745e12974c373c3799fec81b48a53c7dce2ab4",
+  "scope": "All 96 fixtures using method directives, with 618 calls/sends and 96 constructors. Raw scenarios are inventoried separately.",
+  "fixtures": [
+    {
+      "id": "00answer",
+      "source": "tests/e2e/00answer/main.sol",
+      "sha256": "60ea4220ae717cfe5b75a2cd686d311b3197b73002945b80c77a2186f9b63c9c",
+      "contract": "Answer",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "01id",
+      "source": "tests/e2e/01id/main.sol",
+      "sha256": "2be539b115125745879a2d5c0641d43b53e9169512b4f582b36ae7e91c01c230",
+      "contract": "Id1",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "021not",
+      "source": "tests/e2e/021not/main.sol",
+      "sha256": "7ca2bebbb0defccfd2e5ab9710ff62102101b55fcbb3b5a3fb78f07ccd3678ac",
+      "contract": "Not",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "022add",
+      "source": "tests/e2e/022add/main.sol",
+      "sha256": "960aa5ec2c11ef2ea7b340692d1b0b431990d8488506c3b5770523ce76271f71",
+      "contract": "Add1",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "024arith",
+      "source": "tests/e2e/024arith/main.sol",
+      "sha256": "a54b5d4942c0cdac5eeb0bf2969eb504b8b3eab4edfaf45f9da29ba2030ee716",
+      "contract": "Arith",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "02nid",
+      "source": "tests/e2e/02nid/main.sol",
+      "sha256": "55e18792069c3925c2b9686eb089ec56bd009df9d057ea0aa5a6687ad2345c8a",
+      "contract": "Id1",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "031maybe",
+      "source": "tests/e2e/031maybe/main.sol",
+      "sha256": "e995794e61a59459e3f69656d809316c9f517073cc684bb55c12b94b751a2a20",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "032simplejoin",
+      "source": "tests/e2e/032simplejoin/main.sol",
+      "sha256": "9d07e92326e68befc7e6f4f968afebf845f9497aba7e513682ad40ca14eab850",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "033join",
+      "source": "tests/e2e/033join/main.sol",
+      "sha256": "fd22a1a401dc0511170de3b275d23b444e5d13fba507c598f520661fc40a5abe",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "034cojoin",
+      "source": "tests/e2e/034cojoin/main.sol",
+      "sha256": "4e54b7e6d85e23824a87af8227dd142a35392e640b80095b6cd8e522c9c3ecf0",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "035padding",
+      "source": "tests/e2e/035padding/main.sol",
+      "sha256": "af0aea9d61e8c2a2d7f131265d9ca074c5fd263b8cef07aed81b71ef06852c5e",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "036wildcard",
+      "source": "tests/e2e/036wildcard/main.sol",
+      "sha256": "aec9317637834c5882a5b37de9f859adc5cbedf1a4635dc9ada5566566f2c0ac",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "037dwarves",
+      "source": "tests/e2e/037dwarves/main.sol",
+      "sha256": "2f20e3455eec0028a908daad61be962908b33af02e362cf8de3f16899b03f39e",
+      "contract": "Dwarves",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "038food0",
+      "source": "tests/e2e/038food0/main.sol",
+      "sha256": "58fefb45441dcb9ac795ce658e72b6f76188b88b1abe195d40916365f2dc4251",
+      "contract": "FoodContract",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "039food",
+      "source": "tests/e2e/039food/main.sol",
+      "sha256": "87fc50fbb27bf8b33efae1b1c47b9ddb9865824c19f21ea7f849cf4b9895fa39",
+      "contract": "FoodContract",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "041pair",
+      "source": "tests/e2e/041pair/main.sol",
+      "sha256": "2035333e5923be3468c182c1b2688c3bd2e2bfc6070e0f6313833195fb346efb",
+      "contract": "Pair",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "042triple",
+      "source": "tests/e2e/042triple/main.sol",
+      "sha256": "21b86e66779e989150eb8b3f5e85e2597ca1fd16f5721837ecb9259adbbc73d7",
+      "contract": "Triple",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "043fstsnd",
+      "source": "tests/e2e/043fstsnd/main.sol",
+      "sha256": "543110064ad51205c7df0c76c2277bc9695b7a53f6110439deeb412deefbbbbe",
+      "contract": "FstSnd",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "047rgb",
+      "source": "tests/e2e/047rgb/main.sol",
+      "sha256": "59d66d3bfef096453834356eb29c9886dae262ece1c4b42e1cc01f35171ed59a",
+      "contract": "RGB",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "048rgb2",
+      "source": "tests/e2e/048rgb2/main.sol",
+      "sha256": "caaf505d94619277d546cdf66015082370dc5bee5279c5f759a30123e0499bae",
+      "contract": "RGB",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "049rgb3",
+      "source": "tests/e2e/049rgb3/main.sol",
+      "sha256": "bfce8415e604a27764fd79e3ca8029112e7d4db8fae9f299b9d15a1d1c8f4c31",
+      "contract": "RGB3",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "06comp",
+      "source": "tests/e2e/06comp/main.sol",
+      "sha256": "a779fd1f12664c3d4d552fb9ccde5c053ed9efd41a0aa2f9f6d0aa18a4387cd1",
+      "contract": "Compose",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "09not",
+      "source": "tests/e2e/09not/main.sol",
+      "sha256": "7ca2bebbb0defccfd2e5ab9710ff62102101b55fcbb3b5a3fb78f07ccd3678ac",
+      "contract": "Not",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "10negBool",
+      "source": "tests/e2e/10negBool/main.sol",
+      "sha256": "e78b73ae73bdbe3a769441e6bd20adec31b8d2897af60b5585185f750f7c6f4a",
+      "contract": "NegBool",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "11negPair",
+      "source": "tests/e2e/11negPair/main.sol",
+      "sha256": "ab794e0267fb9c17034c640ee2c8036d129a71c53e8f9c530aca658428c6c009",
+      "contract": "NegPair",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "120basicCounter",
+      "source": "tests/e2e/120basicCounter/main.sol",
+      "sha256": "d6b60440a2688432fbf3c9a504c47399bfb1c125fd2ed68615a65ac68d9274fc",
+      "contract": "Counter",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "121counter",
+      "source": "tests/e2e/121counter/main.sol",
+      "sha256": "a95b2ffc6b30605bcdc4ea5c0dea50978dd375df13d0992263582a0f053ebaef",
+      "contract": "Counter",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "122counters",
+      "source": "tests/e2e/122counters/main.sol",
+      "sha256": "af8f0c772ea1ec57041017aed21dd0b4b3d4453c8a4381c42f30182ad98ed13f",
+      "contract": "Counter",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "123stackAndStorage",
+      "source": "tests/e2e/123stackAndStorage/main.sol",
+      "sha256": "972c7ee192378892d3e9f82776654ee7eefd9e26fca0f3d28d26cea401f0fdeb",
+      "contract": "Counter",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "126nanoerc20",
+      "source": "tests/e2e/126nanoerc20/main.sol",
+      "sha256": "a0f2e17922956523e9b4e43e2e788391623623595a078308d7ca277c0d627a33",
+      "contract": "Uint",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "127microerc20",
+      "source": "tests/e2e/127microerc20/main.sol",
+      "sha256": "e1bc427d4accb700d79e3bd4ba16a2a012a2bce4ce985fc5888169bd5d642386",
+      "contract": "Mini",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "128minierc20",
+      "source": "tests/e2e/128minierc20/main.sol",
+      "sha256": "bb62cfe3e565d074a1dd621ad9672bc8b07331bd501a2377f105a9de3d7ae559",
+      "contract": "MiniERC20",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "903badassign",
+      "source": "tests/e2e/903badassign/main.sol",
+      "sha256": "38b84884b7b9084230d3f36c0f42961c2559134e9da9263ecb4eef41f8224a42",
+      "contract": "Option",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "939badfood",
+      "source": "tests/e2e/939badfood/main.sol",
+      "sha256": "d79d8dccaf1e9cec08ae46b9764b7de6a1ee3cfddf65a1a65accde8036456fff",
+      "contract": "FoodContract",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "SimpleField",
+      "source": "tests/e2e/SimpleField/main.sol",
+      "sha256": "d3fb0dfa7dbb4fb752e6403c14d36c57b099baef9a023e6215253231649f57ed",
+      "contract": "Simple",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "abi-boundaries",
+      "source": "tests/e2e/abi-boundaries/main.sol",
+      "sha256": "c5080c02bc29bdbc9f23709eb8955a56a4807c2d41a3c09b1fdc8357d4234766",
+      "contract": "AbiBoundaries",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "abi-byte-memory",
+      "source": "tests/e2e/abi-byte-memory/main.sol",
+      "sha256": "e672ec284ebbf47d859c3ae5c37670296f742e265fd76c2a973262f0cd50ab72",
+      "contract": "AbiByteMemory",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "abi-codec-memory",
+      "source": "tests/e2e/abi-codec-memory/main.sol",
+      "sha256": "583de9ee09c2be4e773ddcd4477d7c6b52feddff78b63195b6cd16f9aa708d8f",
+      "contract": "AbiCodecMemory",
+      "expectedCallCount": 9
+    },
+    {
+      "id": "abi-raw-default-codec",
+      "source": "tests/e2e/abi-raw-default-codec/main.sol",
+      "sha256": "fa4e02a5de1a9129564756aadc6d436a38353937d0184434941202f23754e8df",
+      "contract": "DefaultRawCodec",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "abi-word-custom-codec",
+      "source": "tests/e2e/abi-word-custom-codec/main.sol",
+      "sha256": "e5e459d72bdd3ab038b0218e99f0f4136372949aa26ab5ec84fd56d2aa68d8e8",
+      "contract": "CustomWordCodec",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "abi-word-memory",
+      "source": "tests/e2e/abi-word-memory/main.sol",
+      "sha256": "3156412c0e8fa2d5fe9bd8b7d0f76f1e9dad48219dcf9bfd6f8f001cf67ab904",
+      "contract": "AbiWordMemory",
+      "expectedCallCount": 9
+    },
+    {
+      "id": "aggregate-closure-captures",
+      "source": "tests/e2e/aggregate-closure-captures/main.sol",
+      "sha256": "830516740869e022631c3ac619a2b9b3e5e4fd511a65d8f48ac6819a5d314073",
+      "contract": "AggregateClosureCaptures",
+      "expectedCallCount": 38
+    },
+    {
+      "id": "allocator-bounds",
+      "source": "tests/e2e/allocator-bounds/main.sol",
+      "sha256": "49ba076e300974a3c04f99021922aff9edde3885643cbbeaf84ef4be9fd3d22e",
+      "contract": "AllocatorBounds",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "arithmetic",
+      "source": "tests/e2e/arithmetic/main.sol",
+      "sha256": "41c7013e7863964d58922d38f6e6eaf79248c61c79f27b587ea0c6a892412523",
+      "contract": "Arithmetic",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "audit-constructor-suffix",
+      "source": "tests/e2e/audit-constructor-suffix/main.sol",
+      "sha256": "d34a603b88cbaf47f3cbba7a7575382643a61ba40ee6faa273271e1882d9e566",
+      "contract": "ConstructorSuffix",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "audit-nested-pair-tail",
+      "source": "tests/e2e/audit-nested-pair-tail/main.sol",
+      "sha256": "5ec40e4bac6c852e3f91bb03e67f46c352d62402308957061cdaf797ec472361",
+      "contract": "NestedPairTail",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "closure-parameters",
+      "source": "tests/e2e/closure-parameters/main.sol",
+      "sha256": "1284d72f490fb9659a90c77dac0205a07f3901c9336b7caebf46ccb6098c60c3",
+      "contract": "ClosureParameters",
+      "expectedCallCount": 36
+    },
+    {
+      "id": "composite-values",
+      "source": "tests/e2e/composite-values/main.sol",
+      "sha256": "766f6cdd6ff5147302719db7315be529f6c3f42f4b33ba5a75cf63386e8ad3e2",
+      "contract": "CompositeValues",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "compound-assignment-class-method",
+      "source": "tests/e2e/compound-assignment-class-method/main.sol",
+      "sha256": "451e4d2beefac6497298dd0cb36cf9b74289c88e0d390c0a902728928f98741c",
+      "contract": "CompoundAssignmentClassMethod",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "comptime-materialize",
+      "source": "tests/e2e/comptime-materialize/main.sol",
+      "sha256": "d4271514d53219f54a6b4699735ddd7992ccd19deb4632a23454d80c5c806176",
+      "contract": "ComptimeMaterialize",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "comptime-pattern-scopes",
+      "source": "tests/e2e/comptime-pattern-scopes/main.sol",
+      "sha256": "22997c94a3ec7156e32a054f72935f4198a3bb9053fd09607145195be3be03a2",
+      "contract": "ComptimePatternScopes",
+      "expectedCallCount": 18
+    },
+    {
+      "id": "comptime-trait-arguments",
+      "source": "tests/e2e/comptime-trait-arguments/main.sol",
+      "sha256": "59bf9566047bbea3ecaf5e1131616bb84fda99707cb1bc39f8dd14e0cbfe6456",
+      "contract": "ComptimeTraitArguments",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "contract-method-shadowing",
+      "source": "tests/e2e/contract-method-shadowing/main.sol",
+      "sha256": "2d0ae78df21679ec46755ac61b37263944a48f547c59c28b0b93266800c613b6",
+      "contract": "ScopedCalls",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "control-flow-capture-identity",
+      "source": "tests/e2e/control-flow-capture-identity/main.sol",
+      "sha256": "3134f55c8aa3d98267e927515bcd982a0ef8ea2efe9fcf671747199228b4f0c5",
+      "contract": "ControlFlowCaptureIdentity",
+      "expectedCallCount": 10
+    },
+    {
+      "id": "control-flow-local-lifetimes",
+      "source": "tests/e2e/control-flow-local-lifetimes/main.sol",
+      "sha256": "34dbba558131312e6ba80047005ea5d178d629b980e296a1a2e74d0a5a36dd81",
+      "contract": "ControlFlowLocalLifetimes",
+      "expectedCallCount": 37
+    },
+    {
+      "id": "control-flow-scope-restoration",
+      "source": "tests/e2e/control-flow-scope-restoration/main.sol",
+      "sha256": "d597df9762471b1d92a52fb13f81676fb9cc1f084cb03e4461e9a2134b6810bd",
+      "contract": "ControlFlowScopeRestoration",
+      "expectedCallCount": 28
+    },
+    {
+      "id": "derive-class",
+      "source": "tests/e2e/derive-class/main.sol",
+      "sha256": "edfbc33d520d4ccbd3baad4066f5cb70a99b05e182a4bf6af022320575da4bc1",
+      "contract": "DeriveClass",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "derived-method-constraints",
+      "source": "tests/e2e/derived-method-constraints/main.sol",
+      "sha256": "a2f9853a3371bbab27275e1dd061f290c07d8e56f57ac23a8e29ef698c5b6394",
+      "contract": "DerivedMethodConstraints",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "erc7201-comptime",
+      "source": "tests/e2e/erc7201-comptime/main.sol",
+      "sha256": "777ee09634682aa41dd2aada1c50f7ce82fa018a49f2c5cda7108faa2c9e80aa",
+      "contract": "Erc7201Comptime",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "folded-match-scope",
+      "source": "tests/e2e/folded-match-scope/main.sol",
+      "sha256": "1a5e902d31999d87a2429b504919e13d7df01acf62672d5daf2886643528d99b",
+      "contract": "FoldedMatchScope",
+      "expectedCallCount": 15
+    },
+    {
+      "id": "incremental-reachability",
+      "source": "tests/e2e/incremental-reachability/main.sol",
+      "sha256": "f6c3bca1c378311c53694c937f044e8f92e3c4c6bf8d38e565d4bd14ff7b7e76",
+      "contract": "IncrementalReachability",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "inferred-local-lambdas",
+      "source": "tests/e2e/inferred-local-lambdas/main.sol",
+      "sha256": "5d9e6d386b737c84dbbd62d94f77aabe7b5eed9ad23e778cb8ec6ee948e77ce6",
+      "contract": "InferredLocalLambdas",
+      "expectedCallCount": 13
+    },
+    {
+      "id": "known-if-binding-order",
+      "source": "tests/e2e/known-if-binding-order/main.sol",
+      "sha256": "d86fd47c2dacd1d1359328b456197c25a3aa37a5f8fa4342b2f9f582e8317edf",
+      "contract": "KnownIfBindingOrder",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "lexical-control-flow-scopes",
+      "source": "tests/e2e/lexical-control-flow-scopes/main.sol",
+      "sha256": "6f1d8c0cac7dcba8eb27b77e13a15a4b9435c16bf8cae123ffd76be884a49d1c",
+      "contract": "LexicalControlFlowScopes",
+      "expectedCallCount": 25
+    },
+    {
+      "id": "loop-post-reachability",
+      "source": "tests/e2e/loop-post-reachability/main.sol",
+      "sha256": "7f23f05a4e6695226278c85e8812042b225f34598d4352c9af4a52c0da102887",
+      "contract": "LoopPostReachability",
+      "expectedCallCount": 33
+    },
+    {
+      "id": "loop-static-bindings",
+      "source": "tests/e2e/loop-static-bindings/main.sol",
+      "sha256": "2fb40013713a93911a0124deaa7bacd3d15b29ac024408268d4b23bcadf5f242",
+      "contract": "LoopStaticBindings",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "loop-value-copies",
+      "source": "tests/e2e/loop-value-copies/main.sol",
+      "sha256": "1c2d7cd8697745656c88d11c81aa74ed1c6f1537a7374eaa5c3fdbb2148f1c2c",
+      "contract": "LoopValueCopies",
+      "expectedCallCount": 15
+    },
+    {
+      "id": "ltimp",
+      "source": "tests/e2e/ltimp/main.sol",
+      "sha256": "8608352c4cec56df1225453dbb643b4896c100ce2ac043b4249c480f944935d0",
+      "contract": "LtImp",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "module-local-function-evidence",
+      "source": "tests/e2e/module-local-function-evidence/main.sol",
+      "sha256": "78578c9fe6e50d2e421bff31fa794e96c786909acff688a0ccc540788ec39fbc",
+      "contract": "ModuleLocalEvidence",
+      "expectedCallCount": 5
+    },
+    {
+      "id": "mutable-pattern-bindings",
+      "source": "tests/e2e/mutable-pattern-bindings/main.sol",
+      "sha256": "8d8f37e04af1c32bda2ca7484f40e66d1af519bd933c7dc678bf664ee63a878f",
+      "contract": "MutablePatternBindings",
+      "expectedCallCount": 30
+    },
+    {
+      "id": "nested-aggregate-layouts",
+      "source": "tests/e2e/nested-aggregate-layouts/main.sol",
+      "sha256": "acaba8b4b7cf57eeb660ff402b5a1c1bca405c2a6362da1cafd5d77183bd3029",
+      "contract": "NestedLayouts",
+      "expectedCallCount": 12
+    },
+    {
+      "id": "operator-function-evidence",
+      "source": "tests/e2e/operator-function-evidence/main.sol",
+      "sha256": "bfbfb62e5b7567065f29b4532b9a66be3f403767e3d71f7a1af3fea144c96110",
+      "contract": "OperatorFunctionEvidence",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "pattern-binding-order",
+      "source": "tests/e2e/pattern-binding-order/main.sol",
+      "sha256": "a558326db739983cb5474199404e5c822508da8314f726045a8f7fd4425d1795",
+      "contract": "PatternBindingOrder",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "persistent-storage",
+      "source": "tests/e2e/persistent-storage/main.sol",
+      "sha256": "eb4a1c47cf8c45d707e445e57f15d6f49a996099b39c5e1eef51299e78d7168b",
+      "contract": "PersistentStorage",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "repeated-pattern-bindings",
+      "source": "tests/e2e/repeated-pattern-bindings/main.sol",
+      "sha256": "ceba17f72fced65ea970237ed28cc3179928901c0cc7442ebc4aea5774931909",
+      "contract": "RepeatedPatternBindings",
+      "expectedCallCount": 10
+    },
+    {
+      "id": "returned-closure-assembly-capture",
+      "source": "tests/e2e/returned-closure-assembly-capture/main.sol",
+      "sha256": "e4857ba553d4fea3defd648d448a3a4e1ae74da7fcc05e9eb574288a4fca91b7",
+      "contract": "ReturnedClosureAssemblyCapture",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "returned-closure-assembly-substitution",
+      "source": "tests/e2e/returned-closure-assembly-substitution/main.sol",
+      "sha256": "bc33f208d8e3a05be69baa804965286b5c6ba4d681410cc1c45c0a0de5b0df0b",
+      "contract": "ReturnedClosureAssemblySubstitution",
+      "expectedCallCount": 12
+    },
+    {
+      "id": "returned-closure-binding-collision",
+      "source": "tests/e2e/returned-closure-binding-collision/main.sol",
+      "sha256": "d5d6c0a736f256e2b62912ccfba9a80df31a752569c7051361323d8188a07253",
+      "contract": "CaptureCollision",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "returned-closure-pattern-captures",
+      "source": "tests/e2e/returned-closure-pattern-captures/main.sol",
+      "sha256": "ab46e0361464787603736b4697c46e17dcef236383cb3c546e5be819693809cf",
+      "contract": "ReturnedClosurePatternCaptures",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "returned-closure-substitution",
+      "source": "tests/e2e/returned-closure-substitution/main.sol",
+      "sha256": "cb3aecce485f6d8b3c7f5c2e88952320f14d4f471fddc86de6e72b707cad4b9d",
+      "contract": "ReturnedClosureSubstitution",
+      "expectedCallCount": 24
+    },
+    {
+      "id": "revert",
+      "source": "tests/e2e/revert/main.sol",
+      "sha256": "e1f41040336d8f98b6f2d1681d2a638cf050dfefc0ca047cb4beba2f8f58486f",
+      "contract": "RevertExpectation",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "shortcircuit",
+      "source": "tests/e2e/shortcircuit/main.sol",
+      "sha256": "6d7476d30904e30c45a09814bcda34a1cf83114477ad1f3bbcd325f40f5f76f1",
+      "contract": "Answer",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "std-word-correctness",
+      "source": "tests/e2e/std-word-correctness/main.sol",
+      "sha256": "cf20ab48265b4ae2d0445e94d32db18ddc911a0d01c3c6b96fcfef842d42e038",
+      "contract": "StdWordCorrectness",
+      "expectedCallCount": 7,
+      "availableGas": "30000000"
+    },
+    {
+      "id": "storage-array-layout",
+      "source": "tests/e2e/storage-array-layout/main.sol",
+      "sha256": "3b1f15e25c9dee096013f9939f6f5a3ac110288ff5a9e6a654fb7f69964a5c46",
+      "contract": "StorageArrayLayout",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "storage-index-order",
+      "source": "tests/e2e/storage-index-order/main.sol",
+      "sha256": "20cb42b02aecc0b368425b465299434043df37887e8a456551589a88b85e9a51",
+      "contract": "StorageIndexOrder",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "string-crlf-roundtrip",
+      "source": "tests/e2e/string-crlf-roundtrip/main.sol",
+      "sha256": "9bf9eaaedbb0dd8f092ef45f6c91f7f6a6b2a695bcb202bba078d835e1222a8b",
+      "contract": "StringCrLfRoundtrip",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "struct-compound",
+      "source": "tests/e2e/struct-compound/main.sol",
+      "sha256": "12503f653105c6fc4477c10a54fd7c8438caeb913b193f2c382ca744abf22097",
+      "contract": "StructCompound",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "struct-fields",
+      "source": "tests/e2e/struct-fields/main.sol",
+      "sha256": "5be3ebcce00ebd85243777afd482e3e3cd905313bd65087915ceda9580158a92",
+      "contract": "StructFields",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "struct-load-once",
+      "source": "tests/e2e/struct-load-once/main.sol",
+      "sha256": "f1001c64af2cff3a81f208e2665f65431e95cb39d3d0888b285d6f50f807cf9a",
+      "contract": "StructLoadOnce",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "struct-shadowed-namespace",
+      "source": "tests/e2e/struct-shadowed-namespace/main.sol",
+      "sha256": "fc65ec16fa8b9ac329bb4fb20d40493d294e9b64870cc24845b4fa78a559a9a9",
+      "contract": "StructShadowedNamespace",
+      "expectedCallCount": 5
+    },
+    {
+      "id": "superclass-dictionaries",
+      "source": "tests/e2e/superclass-dictionaries/main.sol",
+      "sha256": "3ccb75235a8dd21b4308d67c0568116848d2d3b4e61fc6427c7a134745d58d52",
+      "contract": "SuperclassDictionaries",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "trait-method-generics",
+      "source": "tests/e2e/trait-method-generics/main.sol",
+      "sha256": "308125198f703c05053812dfecd773c2e852a9826ad4f595f23bc97e772fc672",
+      "contract": "TraitMethodGenerics",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "tuple-open-tail",
+      "source": "tests/e2e/tuple-open-tail/main.sol",
+      "sha256": "aa10f8d8c48348534d4128a2ccc3163686bedd18a0704f3a17f65ee0f9ced163",
+      "contract": "TupleOpenTail",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "tuple-patterns",
+      "source": "tests/e2e/tuple-patterns/main.sol",
+      "sha256": "3b386a21557583bb31102e060c5c19be5a2cff86a32bf2bd0bac2423faa46162",
+      "contract": "TuplePatterns",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "yul-special-identifiers",
+      "source": "tests/e2e/yul-special-identifiers/main.sol",
+      "sha256": "bf9202f1a099572ee72d56f14b826d4e1c77e5afa48c51000fb3cb5751fe0694",
+      "contract": "YulSpecialIdentifiers",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "zeroize-memory-range",
+      "source": "tests/e2e/zeroize-memory-range/main.sol",
+      "sha256": "9b2bf4d768b066d802b898fca66d5ddf4e8f1c4123d8d6ecb5e179e3c422f2e8",
+      "contract": "ZeroizeMemoryRange",
+      "expectedCallCount": 6
+    }
+  ]
+}

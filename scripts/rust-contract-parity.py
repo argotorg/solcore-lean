@@ -325,7 +325,8 @@ def main() -> int:
         fixture_observations = []
         for case in cases:
             observation = {**case, "scope": "runtimeOnly", "deploymentTested": False,
-                "constructorTested": False, "export": str(exported)}
+                "constructorTested": False, "export": str(exported),
+                "availableGas": fixture.get("availableGas"), "evmGasMetering": False}
             try:
                 if preparation_error:
                     observation.update(stage=preparation_stage, status="rejected", detail=preparation_error)
@@ -366,8 +367,10 @@ def main() -> int:
                 with tempfile.TemporaryDirectory(prefix="solcore-runtime-calls-") as temporary:
                     inputs = Path(temporary) / "inputs.json"
                     inputs.write_text(json.dumps([row["calldata"] for row in pending]))
-                    command = ["lake", "env", "lean", "--run", "Tests/RustHullContractRun.lean",
-                        str(exported), pending[0]["object"], "--batch", str(inputs)]
+                    command = ["lake", "env", "lean", "--run", "Tests/RustHullContractRun.lean"]
+                    if fixture.get("availableGas") is not None:
+                        command += ["--gas", fixture["availableGas"]]
+                    command += [str(exported), pending[0]["object"], "--batch", str(inputs)]
                     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=args.timeout)
                 for row, actual in zip(pending, batch_results(result.stdout, result.stderr, result.returncode, len(pending))):
                     record_result(row, actual, result.returncode, len(pending))

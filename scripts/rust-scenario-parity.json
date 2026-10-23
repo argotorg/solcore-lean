@@ -1,0 +1,533 @@
+{
+  "upstreamCommit": "2a745e12974c373c3799fec81b48a53c7dce2ab4",
+  "scope": "All 72 raw scenarios selected by upstream source_e2e_scenario; 96 method-directive fixtures remain a separate inventory.",
+  "gasPolicy": "Absent unless explicitly configured per fixture. 30m is a fixed available-gas input, not metered EVM execution.",
+  "fixtures": [
+    {
+      "id": "abi-address-array",
+      "source": "tests/e2e/abi-address-array/main.sol",
+      "sha256": "3fb48698c690ef97b5b9ba4b8dca2ea6216938f3974fb45bd5ae57c5bcc488b8",
+      "contract": "AddressArr",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "abi-array-sum",
+      "source": "tests/e2e/abi-array-sum/main.sol",
+      "sha256": "426b0ffa3ad730a1d9e1014a6e29d1defc38d811ac7eef261ceaa80abd49dcd8",
+      "contract": "Batch",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "abi-batch-adt",
+      "source": "tests/e2e/abi-batch-adt/main.sol",
+      "sha256": "b2257f2de1156a2d8cbc58aab6dc0dc1a3f83083dc871e52c567c8ad8b54bdd3",
+      "contract": "BatchDecoder",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "abi-bytes-array",
+      "source": "tests/e2e/abi-bytes-array/main.sol",
+      "sha256": "5da971a1e62165f94fa9f2ee87c0830edcf8c3615469c16141acfb6219c60ade",
+      "contract": "BytesArray",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "abi-constructor-bounds",
+      "source": "tests/e2e/abi-constructor-bounds/main.sol",
+      "sha256": "87801dc6f2c4ef859ac49556352dc79c7bba873b359cc95469713af34928f371",
+      "contract": "ConstructorBounds",
+      "expectedCallCount": 0
+    },
+    {
+      "id": "abi-dyn-sum",
+      "source": "tests/e2e/abi-dyn-sum/main.sol",
+      "sha256": "99e77a55210b66c966ac4395c9ea517c6fb415ccafab22df183ad4362142155a",
+      "contract": "DynSumArr",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "abi-dyn-sum-return",
+      "source": "tests/e2e/abi-dyn-sum-return/main.sol",
+      "sha256": "daebb54639c8ec042db94c9c7d83a03623ed73d32ff8d11150eea76fcfc9b4b0",
+      "contract": "DynSumRet",
+      "expectedCallCount": 7
+    },
+    {
+      "id": "abi-encode-adt",
+      "source": "tests/e2e/abi-encode-adt/main.sol",
+      "sha256": "5b82b4a7a7560183a0e44b54846e39b9afb2dc3d1a85f6fcdee9842307b83fe7",
+      "contract": "AbiEncodeAdt",
+      "expectedCallCount": 5
+    },
+    {
+      "id": "abi-encode-types",
+      "source": "tests/e2e/abi-encode-types/main.sol",
+      "sha256": "e2f229c9bd72584cb65b46f265c0a002dd67c1a538342041a920afcfff20d4b2",
+      "contract": "AbiEncodeTypes",
+      "expectedCallCount": 9
+    },
+    {
+      "id": "abi-input-bounds",
+      "source": "tests/e2e/abi-input-bounds/main.sol",
+      "sha256": "419adb4517c7dd1db8abede54f5a07588e0cbda614057e0c700094fd0d952845",
+      "contract": "AbiInputBounds",
+      "expectedCallCount": 25
+    },
+    {
+      "id": "abi-sum-roundtrip",
+      "source": "tests/e2e/abi-sum-roundtrip/main.sol",
+      "sha256": "5f44a881365b3ac849d5f44284278eb48a719be30a2b40a86e965f9552cd2bd0",
+      "contract": "SumRoundtrip",
+      "expectedCallCount": 12
+    },
+    {
+      "id": "abi-tuple-array",
+      "source": "tests/e2e/abi-tuple-array/main.sol",
+      "sha256": "e65d807c277f64d6ca44ffaa149c8d70660f19a69354b67ed4021d649d0390ce",
+      "contract": "AbiTupleArray",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "abi-tuple-offset",
+      "source": "tests/e2e/abi-tuple-offset/main.sol",
+      "sha256": "6469012bf3cbe530f7bc70782bb9b204c008805dac0c037b48e752d76faaa201",
+      "contract": "AbiTupleOffset",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "abi-unit-array",
+      "source": "tests/e2e/abi-unit-array/main.sol",
+      "sha256": "9f498ab4374ae90ddbe1f7a21ab3cdd9f2eb35408a4b6091894abcd7c208a589",
+      "contract": "UnitArrays",
+      "expectedCallCount": 14
+    },
+    {
+      "id": "array-copy",
+      "source": "tests/e2e/array-copy/main.sol",
+      "sha256": "182de0aada1dacaf8b67fdc45260a18ee321a11196c258170ebd0cf319969336",
+      "contract": "ArrayCopy",
+      "expectedCallCount": 26
+    },
+    {
+      "id": "array-implicit",
+      "source": "tests/e2e/array-implicit/main.sol",
+      "sha256": "72741c206d59fb8814b37bb941711b7bcd236a9e9c10d8b2cf8beaef21ebbaa2",
+      "contract": "ArrayImplicitRuntime",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "array-literals",
+      "source": "tests/e2e/array-literals/main.sol",
+      "sha256": "1a438452f3c9955d05a3449d3c7d54a1989e9f9c26487b336e35a43503b33c43",
+      "contract": "ArrayLit",
+      "expectedCallCount": 23
+    },
+    {
+      "id": "array-nested",
+      "source": "tests/e2e/array-nested/main.sol",
+      "sha256": "cf4583c65238479012494c7290fc6e666a32cffacc7f31674f9e31c7602b4d26",
+      "contract": "NestedArray",
+      "expectedCallCount": 21
+    },
+    {
+      "id": "array-ops",
+      "source": "tests/e2e/array-ops/main.sol",
+      "sha256": "8ed01aae3f93c092bec8a10361760e12b2ef6a70f9b3cf2174722f20e257cb39",
+      "contract": "ArrayOps",
+      "expectedCallCount": 20
+    },
+    {
+      "id": "array-string",
+      "source": "tests/e2e/array-string/main.sol",
+      "sha256": "026f0f0b01a4ea1967c467a5bf19dfb3df96879aa975d89abe71c3e22128e8aa",
+      "contract": "ArrayString",
+      "expectedCallCount": 16
+    },
+    {
+      "id": "arraylit",
+      "source": "tests/e2e/arraylit/main.sol",
+      "sha256": "1a438452f3c9955d05a3449d3c7d54a1989e9f9c26487b336e35a43503b33c43",
+      "contract": "ArrayLit",
+      "expectedCallCount": 23
+    },
+    {
+      "id": "asm-break-continue-leave",
+      "source": "tests/e2e/asm-break-continue-leave/main.sol",
+      "sha256": "824c66e87d0587e3bdb65a4b504474e2d6372d9d4d7e0e117c8587212dcfaad5",
+      "contract": "C",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "asm-scope",
+      "source": "tests/e2e/asm-scope/main.sol",
+      "sha256": "ad8750adbe9e51cfc1e2bba0ec38599428075e18e798b64fcf7a88251ab0ae33",
+      "contract": "AssemblyScope",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "asm-string-escapes",
+      "source": "tests/e2e/asm-string-escapes/main.sol",
+      "sha256": "95fdb9e3e29906e8321f812624c3e84be3019ce7593fabf0188bf4c437972d4d",
+      "contract": "AssemblyStringEscapes",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "asm-substitution",
+      "source": "tests/e2e/asm-substitution/main.sol",
+      "sha256": "81d421d5606532fa47221a792795ed5608ce7fb6492c81843ca11add0dfb7c11",
+      "contract": "C",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "assembly",
+      "source": "tests/e2e/assembly/main.sol",
+      "sha256": "27de95b613b3226a08bd8119ca86b2672a675d7df5208f26f39b851461f47290",
+      "contract": "C",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "basic",
+      "source": "tests/e2e/basic/main.sol",
+      "sha256": "8579f879d1b1b7c0b8f283bbc08ac29ae6462ba190afeebb08330f296459dda3",
+      "contract": "C",
+      "expectedCallCount": 44,
+      "coreFuel": 15000000,
+      "availableGas": "30000000",
+      "capabilityNotes": [
+        "Constructor measured at 11,032,131 Core transitions with the scenario account context, returning the exact 11,674-byte runtime; this fixture uses an explicit 15m transition limit. Self raw_call vectors require a fixed available-gas input."
+      ]
+    },
+    {
+      "id": "concat",
+      "source": "tests/e2e/concat/main.sol",
+      "sha256": "8e8f7d6c4ba80de3075b48bae031bfbd052c5574984cf1f81acb912c043a2492",
+      "contract": "C",
+      "expectedCallCount": 20
+    },
+    {
+      "id": "deposit",
+      "source": "tests/e2e/deposit/main.sol",
+      "sha256": "8fe65b20205bd783cf34b8e46733e4922691762b0a1a96fedcd845ae1902a38d",
+      "contract": "DepositContract",
+      "expectedCallCount": 15,
+      "availableGas": "30000000",
+      "coreFuel": 25000000,
+      "capabilityNotes": [
+        "Constructor measured at 16,525,108 Core transitions with the scenario account context; this fixture uses an explicit 25m transition limit. Other fixtures except basic keep the 10m default. Available gas is an independent fixed environment input."
+      ]
+    },
+    {
+      "id": "derive-contract-local",
+      "source": "tests/e2e/derive-contract-local/main.sol",
+      "sha256": "5e589f30f8a44bb7bcf7ac54fde85210ac533e9bd10c3c62610149fe10dadb61",
+      "contract": "DeriveContractLocal",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "derive-ord",
+      "source": "tests/e2e/derive-ord/main.sol",
+      "sha256": "7d9e5f9f3a67a103650fcde1be7fd0ae88b347206021d0eee7816d0eaf5a8cfd",
+      "contract": "DeriveOrd",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "ecrecover",
+      "source": "tests/e2e/ecrecover/main.sol",
+      "sha256": "66b6e00d7a4cb947eab1031747a7db5f60ae003d5d1960206bd814c6d9ce92f3",
+      "contract": "EcrecoverTest",
+      "expectedCallCount": 3,
+      "availableGas": "30000000"
+    },
+    {
+      "id": "eip712",
+      "source": "tests/e2e/eip712/main.sol",
+      "sha256": "f93b6e82680efbd863ef42c7449d77c810a901024cd0fd8519ce35d203d3ee4e",
+      "contract": "EIP712Mail",
+      "expectedCallCount": 4,
+      "availableGas": "30000000"
+    },
+    {
+      "id": "fallback",
+      "source": "tests/e2e/fallback/main.sol",
+      "sha256": "76d95d6c5ac088f2d1d49d128cb5911c9ff3e4078609963a8b3926560d12649d",
+      "contract": "WithFallback",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "field-access-in-tuple",
+      "source": "tests/e2e/field-access-in-tuple/main.sol",
+      "sha256": "b62e4e7a2bdbec2acfac8cedd5e6d1550f1ce06ebd6b623cf013515c25c44079",
+      "contract": "C",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "forloops",
+      "source": "tests/e2e/forloops/main.sol",
+      "sha256": "8181507a50acf2c6f69c49d95554c6b9fa0fc37e20653d9fa573ce00eab2ae92",
+      "contract": "C",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "generic-product",
+      "source": "tests/e2e/generic-product/main.sol",
+      "sha256": "7e4213e4469312c5b21f52a84e14a0df8cd27293cc401abd425fc57269889ba9",
+      "contract": "GenericProduct",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "generic-sum",
+      "source": "tests/e2e/generic-sum/main.sol",
+      "sha256": "7be6cdd9be2856b10b4b699b4ee43616b7045a4ddce9cd56ab7d2762c7c0e81a",
+      "contract": "GenericSum",
+      "expectedCallCount": 5
+    },
+    {
+      "id": "hashes",
+      "source": "tests/e2e/hashes/main.sol",
+      "sha256": "62da80e973536faa7a229fa08e6985f5f09bd264d87f0352ff3fcfbb4452e48e",
+      "contract": "C",
+      "expectedCallCount": 7,
+      "availableGas": "30000000"
+    },
+    {
+      "id": "ignored-builtin-effects",
+      "source": "tests/e2e/ignored-builtin-effects/main.sol",
+      "sha256": "9c56b8c058fe99d90c27e21becd3fba7374d2999baaa6bc062f2b34251893e50",
+      "contract": "IgnoredBuiltinEffects",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "ignored-call-effects",
+      "source": "tests/e2e/ignored-call-effects/main.sol",
+      "sha256": "17056ae531965717136cbfbe66de9d5359c7a4f6bb3b1d86fc79d937dc00057a",
+      "contract": "IgnoredCallEffects",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "manual-sigstring-table",
+      "source": "tests/e2e/manual-sigstring-table/main.sol",
+      "sha256": "25815e51321c652e9cd8d6e186fe04ea0a7ed260faf561a0bb254c08100fdd32",
+      "contract": "C",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "memory",
+      "source": "tests/e2e/memory/main.sol",
+      "sha256": "922c3d3662c4264ee0681ba752f3351824cfbcd53169be2645bd5130565ae19b",
+      "contract": "C",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "mini-erc20",
+      "source": "tests/e2e/mini-erc20/main.sol",
+      "sha256": "6ab364da8eb53854e50260c6a2ebd57b708180da77911169ad3fee7ce4eacf02",
+      "contract": "MiniERC20",
+      "expectedCallCount": 3
+    },
+    {
+      "id": "msg-context",
+      "source": "tests/e2e/msg-context/main.sol",
+      "sha256": "2267855e74e1f97d37acd833f5d31297e1493743ae2be5f80298b8ce3c27115d",
+      "contract": "MsgContext",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "neg",
+      "source": "tests/e2e/neg/main.sol",
+      "sha256": "0cdeb6f30f4b33134fd1a46999e883a64d57acc60c40319ecc38e2b8b1bc8d93",
+      "contract": "NegPair",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "nonpayable-ctor",
+      "source": "tests/e2e/nonpayable-ctor/main.sol",
+      "sha256": "933f1f55408203b807a651ecc21947189b821d89768626325cdad8717ba225aa",
+      "contract": "NonPayableCtor",
+      "expectedCallCount": 0
+    },
+    {
+      "id": "ownable",
+      "source": "tests/e2e/ownable/main.sol",
+      "sha256": "0b48bf46751c49a1921e69657401ea2e1a1d1435ebe5785a46105dcb9dc41101",
+      "contract": "Ownable",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "p256verify",
+      "source": "tests/e2e/p256verify/main.sol",
+      "sha256": "17f098c69f6f5c007c24300dc4391f388fd183070f9c45a18951355f6bb8745f",
+      "contract": "P256Test",
+      "expectedCallCount": 2,
+      "availableGas": "30000000",
+      "capabilityNotes": [
+        "Requires P256VERIFY precompile at address 0x100; any unsupported effect remains a failing observation."
+      ]
+    },
+    {
+      "id": "payable",
+      "source": "tests/e2e/payable/main.sol",
+      "sha256": "b637ac5595929d4821ecd054debed118439620083eee3c5a1a3ead2608d12928",
+      "contract": "PayableTest",
+      "expectedCallCount": 7
+    },
+    {
+      "id": "payable-ctor",
+      "source": "tests/e2e/payable-ctor/main.sol",
+      "sha256": "912016c881d0d2f79e3321e8e6f828b6ec7c1d695b553a59b90e0048f5041f58",
+      "contract": "PayableCtor",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "proxy-variant",
+      "source": "tests/e2e/proxy-variant/main.sol",
+      "sha256": "d374ccb6015a3ccc69542f24827684930ed5dbaefc48e3838d42e43560c720fb",
+      "contract": "ProxyVariant",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "raw-vector",
+      "source": "tests/e2e/raw-vector/main.sol",
+      "sha256": "e06d18f59535f2577771b2457b227c8ef2d5ece0a60dcf3ebe3afe7921b6b5ae",
+      "contract": "RawVector",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "revert-raw",
+      "source": "tests/e2e/revert-raw/main.sol",
+      "sha256": "2b3f71688e31dce4595305d9e6ca045d1e74dd2caadb9a46221ffba0fbbf62e6",
+      "contract": "Foo",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "slices",
+      "source": "tests/e2e/slices/main.sol",
+      "sha256": "c111e7d5f4f3081df5578304302ef79cd13bd3291109b47b9a2f6d79f3f73fb6",
+      "contract": "C",
+      "expectedCallCount": 34,
+      "availableGas": "30000000"
+    },
+    {
+      "id": "specialise-sum-of-product",
+      "source": "tests/e2e/specialise-sum-of-product/main.sol",
+      "sha256": "c83561c7cc55b9de6210fb9db86f56e713032e6341858a979fa5b347a04f8112",
+      "contract": "SpecialiseSumOfProduct",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "std-storage-bytes",
+      "source": "tests/e2e/std-storage-bytes/main.sol",
+      "sha256": "03f0335f154f5655f3c301c079558a633bf7ffeb97f6531ee058f085031aa857",
+      "contract": "StorageBytes",
+      "expectedCallCount": 16
+    },
+    {
+      "id": "storage",
+      "source": "tests/e2e/storage/main.sol",
+      "sha256": "ee8f971d122004cb55d19e9ba555412b96ec7c0e2be1c53fd8e2dac20557bc5a",
+      "contract": "C",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "storage-adt-abi",
+      "source": "tests/e2e/storage-adt-abi/main.sol",
+      "sha256": "abf61b62b6cc33423cdb3a9e86832284b9c7b95c374a207d922128b71698844e",
+      "contract": "C",
+      "expectedCallCount": 10
+    },
+    {
+      "id": "storage-adt-bool",
+      "source": "tests/e2e/storage-adt-bool/main.sol",
+      "sha256": "1c982f19462c057b55a6da4303fc621c3cee14ea96689ec36987dabaf7b8d5b9",
+      "contract": "C",
+      "expectedCallCount": 26
+    },
+    {
+      "id": "storage-adt-enum",
+      "source": "tests/e2e/storage-adt-enum/main.sol",
+      "sha256": "f3172dfe2bcd5c98b6bac50bfdad43098f33e68b8ee1094847fccad12913d36c",
+      "contract": "C",
+      "expectedCallCount": 18
+    },
+    {
+      "id": "storage-adt-field",
+      "source": "tests/e2e/storage-adt-field/main.sol",
+      "sha256": "31d48e4114fb78535f0c431c60237f105efc84cdf39ff188f186af8cee830804",
+      "contract": "C",
+      "expectedCallCount": 19
+    },
+    {
+      "id": "storage-adt-mapping",
+      "source": "tests/e2e/storage-adt-mapping/main.sol",
+      "sha256": "cf5e8de0966fe4c44b62c60705231a938fdce538821ce97d2b04e7d4fbbf469c",
+      "contract": "C",
+      "expectedCallCount": 20
+    },
+    {
+      "id": "storage-adt-recursive-ok",
+      "source": "tests/e2e/storage-adt-recursive-ok/main.sol",
+      "sha256": "892119d8f2cf849944b4290e2904b40746a4c27f35ddaa4ba8d96a03a0e05709",
+      "contract": "C",
+      "expectedCallCount": 0
+    },
+    {
+      "id": "storage-array",
+      "source": "tests/e2e/storage-array/main.sol",
+      "sha256": "c16dd5135194175fa657cc23b7fe47350435043af114a50daadcc4148f96a2f2",
+      "contract": "MemberRegistry",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "storage-dynamic-field",
+      "source": "tests/e2e/storage-dynamic-field/main.sol",
+      "sha256": "52d2a566e96a353d25788c240f963bda14da85add26e0e165eb6f19088e63869",
+      "contract": "C",
+      "expectedCallCount": 21
+    },
+    {
+      "id": "stringlit",
+      "source": "tests/e2e/stringlit/main.sol",
+      "sha256": "ac2e9fee8b0b876bc4f817d653b0b8d88c6c51fcc73483615f560243ad13526c",
+      "contract": "C",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "struct-storage",
+      "source": "tests/e2e/struct-storage/main.sol",
+      "sha256": "3dfe3632883db67b969f6f9b73547aa9dbbcd551e9bf2b9b3b826402e68f39c8",
+      "contract": "C",
+      "expectedCallCount": 9
+    },
+    {
+      "id": "struct-storage-updates",
+      "source": "tests/e2e/struct-storage-updates/main.sol",
+      "sha256": "fea79cdd9e062923579e2d1f190e046797ec9b52cba3a5b67ecffe53bd4e0ebb",
+      "contract": "StructStorageUpdates",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "sum-wide-product",
+      "source": "tests/e2e/sum-wide-product/main.sol",
+      "sha256": "83f543556e0034fc33d5a1ca64ad568323eca9266e9bb20868fbc0357c8d88b2",
+      "contract": "C",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "ufcs-array",
+      "source": "tests/e2e/ufcs-array/main.sol",
+      "sha256": "accaf7817273479ac1541a0eb30740b11becba82baa30fde2bbcaa325f8cee15",
+      "contract": "MemberRegistry",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "weth9",
+      "source": "tests/e2e/weth9/main.sol",
+      "sha256": "aee4c670ee4fe9e85264f3179dccba2fc2e1daf65b6b8568aadd54c8dcebdafe",
+      "contract": "WETH9",
+      "expectedCallCount": 15,
+      "availableGas": "30000000",
+      "capabilityNotes": [
+        "Requires account balance and external value-transfer call effects beyond single-contract storage; no external world is fabricated."
+      ]
+    }
+  ]
+}

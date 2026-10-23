@@ -98,7 +98,8 @@
       "source": "tests/e2e/std-word-correctness/main.sol",
       "sha256": "cf20ab48265b4ae2d0445e94d32db18ddc911a0d01c3c6b96fcfef842d42e038",
       "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
-      "expectedCallCount": 7
+      "expectedCallCount": 7,
+      "availableGas": "30000000"
     },
     {
       "id": "storage-array-layout",
