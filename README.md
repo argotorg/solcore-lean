@@ -50,8 +50,9 @@ The [Rust Hull importer](Solcore/Frontend/RustHull/) accepts typed output from
 It checks the imported annotations, translates Hull and inline Yul into Core,
 and checks the resulting Core expression before execution.
 
-This path supports contract constructors, dynamic ABI values, byte memory,
-storage, logs, self-calls and transfers to explicitly listed empty accounts.
+This path supports all 81 standard opcode wrappers, contract constructors,
+dynamic ABI values, byte memory, storage, logs, and calls between imported
+accounts. CREATE/CREATE2 and SELFDESTRUCT update an explicit account world.
 Keccak, SHA-256, RIPEMD-160, ECRECOVER and P256 verification execute in Core.
 Exact linked Sonatina code images supply observable code bytes and object
 offsets; execution uses the Core machine.
@@ -70,9 +71,10 @@ Import the library with `import Solcore.Frontend.RustHull`. The entry points are
 `RustHull.decodeText`, `RustHull.ScalarExecution.prepare`,
 `RustHull.LinkedContract.prepareDeployment` and `RustHull.Contract.runWithReceipt`.
 [RustHullScenarioRun.lean](Tests/RustHullScenarioRun.lean) shows artifact loading,
-deployment, account balances and sequential calls. A context supplies entry
-balances and an optional gas value; Core fuel counts transitions, and EVM gas
-consumption is not metered.
+deployment, account balances and sequential calls. A context supplies account
+state, transaction/block observations, and an optional gas value. Executable
+code comes from a checked Hull catalogue with exact linked images. Core fuel
+counts transitions; EVM gas consumption is not metered.
 
 The pinned contract inventory covers 168 fixtures. The checked Rust driver
 accepts 165; their 1,382 constructor and call observations match the fixture
@@ -86,9 +88,11 @@ fault is excluded; a language failure, revert or exhausted fuel budget remains
 a possible result.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the
-native Lean source checker to every Rust feature. Some opcodes and recursive
-Hull layouts remain unsupported. The compatibility decisions, coverage and
-unresolved upstream issues are recorded in
+native Lean source checker to every Rust feature. Recursive references use the
+Rust backends’ Word layout; aggregate construction and unfolding cases that fail
+in both backends remain explicit errors. Arbitrary EVM bytecode and additional
+precompiles are outside the executable code catalogue. Compatibility decisions,
+coverage, and unresolved upstream issues are recorded in
 [questions.md](questions.md).
 
 ## Code layout

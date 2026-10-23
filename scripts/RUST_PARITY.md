@@ -116,3 +116,66 @@ receipt causes rejection or a fresh export. Temporary JSON inputs and compiler
 outputs are removed after use. Keep exporter binaries and receipts for reuse;
 completed Cargo incremental directories and superseded reports can be removed.
 Current gaps and policy decisions are recorded in [questions.md](../questions.md).
+
+
+## Account and recursive-layout gates
+
+The Core runtime lowers all 81 wrappers in the pinned `std/opcodes.sol`.
+`Contract.Context.ambient` supplies transaction and block observations;
+`Context.world` supplies account storage, nonce, and code. A complete world
+makes omitted accounts empty; an incomplete world diagnoses unknown accounts.
+Executable byte images must have corresponding checked Hull frames in the
+catalogue. Arbitrary bytecode and unsupported precompiles produce explicit
+failures. Gas is not metered. Q009–Q012 in `questions.md` specify these boundaries.
+
+The aggregate Lean test executable includes ambient reads, account inspection,
+CALL/CALLCODE/DELEGATECALL/STATICCALL, CREATE/CREATE2, delayed SELFDESTRUCT,
+transaction rollback, world persistence, and repeated fuel resumption. Large
+image comparisons preserve exact byte equality, including sparse mappings and
+first-duplicate semantics. The maximum deployed image is tested within the
+existing fuel budget; aligned snapshots traverse the source mapping once.
+
+For focused public API tests:
+
+```sh
+lake env lean --run Tests/RustHullWorldRun.lean
+lake env lean --run Tests/RustHullCreationAccountsRun.lean
+python3 scripts/evm-account-reference.py --help
+python3 scripts/test-rust-recursive-layouts.py --evm-reference
+python3 scripts/test-rust-opcode-wrappers.py
+```
+
+The opcode wrapper gate exports fresh checked Hull from a source fixture that
+calls all 20 added standard-library wrappers. It verifies that the calls and
+standard assembly bodies survive export, then checks actual Core results and
+state changes, missing ambient inputs, and static restrictions. It reuses the
+pinned exporter and removes its temporary files after execution.
+
+The account reference gate uses actual solc/Anvil Osaka execution. Its 67
+observations and 11 address vectors are checked in under
+`Tests/Fixtures/EvmAccounts/`; the Lean tests use the same exact target/init
+images and expected account behavior. The recursive gate checks the pinned
+finite layouts, an executable dynamic constructor/relay/match fixture, and two
+checked-Hull cases that fail in both upstream backends. It records those
+failures as layout inconsistencies rather than counting them as execution.
+
+Successful contract compilation, including explicit code catalogues, is checked
+under `AccountState.definitions`. Public initialization typing covers the actual
+world and ambient literals. Run/resume safety excludes Core machine faults while
+allowing revert, language failure, export limits, and exhausted fuel. These
+safety results do not establish Rust source-to-Hull preservation, Hull/EVM
+semantic equivalence, or consensus gas accounting.
+
+
+The 2026-10-24 account-runtime validation completed the 18,816-job build and the
+aggregate Lean test executable. The retained final reports are
+`.upstream/scalars-world-final-31.json` (31/31),
+`.upstream/contracts-world-final-172.json` (172/172),
+`.upstream/scenarios-world-final-698.json` (674 executed expectations), and
+`.upstream/methods-world-final-714.json` (708 executed expectations). The latter
+two inventories retain 24 and 6 upstream source rejections respectively; they
+are not clean whole-inventory passes. All 1,382 observations from the 165
+source-accepted fixtures match, without execution failures or exhausted fuel.
+The opcode-wrapper gate and recursive-layout gate also passed. Full build and
+test logs are `.upstream/world-final-build.log` and
+`.upstream/world-final-tests.log`.
