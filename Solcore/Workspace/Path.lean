@@ -171,22 +171,31 @@ theorem render_injective : Function.Injective render := by
 
 end ModulePath
 
-/-- A canonical source path represented by its module path. -/
+/-- Canonical Rust source spelling and the retained legacy source suffix. -/
+inductive SourceExtension where
+  | sol
+  | solc
+  deriving Repr, BEq, DecidableEq
+
+/-- A source path retains its suffix while sharing module identity with either spelling. -/
 structure CanonicalSourcePath where
   modulePath : ModulePath
+  extension : SourceExtension := .solc
   deriving Repr, DecidableEq
 
 namespace CanonicalSourcePath
 
 instance : BEq CanonicalSourcePath :=
-  ⟨fun left right => left.modulePath == right.modulePath⟩
+  ⟨fun left right => left.modulePath == right.modulePath && left.extension == right.extension⟩
 
-private def suffix : List Char := ['.', 's', 'o', 'l', 'c']
+private def suffix : SourceExtension → List Char
+  | .sol => ['.', 's', 'o', 'l']
+  | .solc => ['.', 's', 'o', 'l', 'c']
 
 private def renderChars (path : CanonicalSourcePath) : List Char :=
-  path.modulePath.render.toList ++ suffix
+  path.modulePath.render.toList ++ suffix path.extension
 
-/-- Render a canonical source path with one lowercase `.solc` suffix. -/
+/-- Render the exact accepted `.sol` or legacy `.solc` source spelling. -/
 def render (path : CanonicalSourcePath) : String :=
   String.ofList path.renderChars
 
@@ -298,55 +307,60 @@ private theorem parseModuleChars_sound
 
 namespace CanonicalSourcePath
 
-private def parseChars (characters : List Char) : Option CanonicalSourcePath :=
-  let stem := characters.take (characters.length - suffix.length)
+private def parseCharsWithExtension (extension : SourceExtension)
+    (characters : List Char) : Option CanonicalSourcePath :=
+  let stem := characters.take (characters.length - (suffix extension).length)
   match parseModuleChars stem with
   | none => none
   | some modulePath =>
-      let path : CanonicalSourcePath := { modulePath }
+      let path : CanonicalSourcePath := { modulePath, extension }
       if path.renderChars == characters then some path else none
 
-/-- Parse an exact canonical source path. -/
+private def parseChars (characters : List Char) : Option CanonicalSourcePath :=
+  parseCharsWithExtension
+    (if characters.getLast? == some 'l' then .sol else .solc) characters
+
+/-- Parse `.sol` and legacy `.solc` paths without changing their source spelling. -/
 def parse (text : String) : Option CanonicalSourcePath :=
   parseChars text.toList
 
 @[simp] theorem parse_render (path : CanonicalSourcePath) :
     parse path.render = some path := by
   cases path with
-  | mk modulePath =>
-      unfold parse parseChars
-      rw [render_toList]
-      simp only [renderChars]
-      have takeStem :
-          (modulePath.render.toList ++ suffix).take
-              ((modulePath.render.toList ++ suffix).length - suffix.length) =
-            modulePath.render.toList := by
-        simp [suffix]
-      rw [takeStem, parseModuleChars_render]
-      simp
+  | mk modulePath extension =>
+      have parsed : parseModuleChars modulePath.renderChars = some modulePath := by
+        simpa only [ModulePath.render_toList] using parseModuleChars_render modulePath
+      cases extension <;>
+        simp [parse, parseChars, parseCharsWithExtension, renderChars, suffix, parsed]
 
-theorem text_eq_render_of_parse_eq_some
-    {text : String} {path : CanonicalSourcePath}
-    (parsed : parse text = some path) :
+private theorem parseCharsWithExtension_sound
+    (extension : SourceExtension) {text : String} {path : CanonicalSourcePath}
+    (parsed : parseCharsWithExtension extension text.toList = some path) :
     text = path.render := by
-  unfold parse parseChars at parsed
+  unfold parseCharsWithExtension at parsed
   dsimp only at parsed
   cases parsedModule : parseModuleChars
-      (text.toList.take (text.toList.length - suffix.length)) with
+      (text.toList.take (text.toList.length - (suffix extension).length)) with
   | none => simp [parsedModule] at parsed
   | some modulePath =>
     simp only [parsedModule] at parsed
     split at parsed
     · rename_i equal
-      have pathEqual : ({ modulePath } : CanonicalSourcePath) = path :=
+      have pathEqual : ({ modulePath, extension } : CanonicalSourcePath) = path :=
         Option.some.inj parsed
-      have charsEqual : ({ modulePath } : CanonicalSourcePath).renderChars =
+      have charsEqual : ({ modulePath, extension } : CanonicalSourcePath).renderChars =
           text.toList := by
         exact beq_iff_eq.mp equal
       subst path
       apply String.toList_inj.mp
       simpa using charsEqual.symm
     · simp at parsed
+
+theorem text_eq_render_of_parse_eq_some
+    {text : String} {path : CanonicalSourcePath}
+    (parsed : parse text = some path) :
+    text = path.render :=
+  parseCharsWithExtension_sound _ parsed
 
 theorem render_injective : Function.Injective render := by
   intro left right equality

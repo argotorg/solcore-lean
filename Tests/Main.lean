@@ -2045,6 +2045,7 @@ import Solcore.Test.SourceCoreMethodDirectEvidenceSequenceForward
 import Solcore.Test.SourceCoreSelectedGeneralizedLocalObservedRuntime
 import Solcore.Test.SourceCoreSelectedInterleavedLocalCompleteOutcome
 import Solcore.Test.SourceCoreSelectedFaultingLocalPublic
+import Solcore.Test.SourcePathExtensions
 set_option autoImplicit false
 
 open Solcore
@@ -2401,6 +2402,10 @@ def expectExternalLibraryName
 
 def testWorkspacePathIdentity : IO Unit := do
   let acceptedPaths := [
+    "a.sol",
+    "A0_b.sol",
+    "a/B2_c.sol",
+    "function.sol",
     "a.solc",
     "A0_b.solc",
     "a/B2_c.solc",
@@ -2426,7 +2431,12 @@ def testWorkspacePathIdentity : IO Unit := do
     "a:b.solc",
     nulPath,
     "λ.solc",
-    "a.sol",
+    "a.SOL",
+    "a.sol.sol",
+    "a.solc.sol",
+    "a.sol.solc",
+    "a.sol?query",
+    "a.sol#fragment",
     "a.SOLC",
     "a.solc.solc",
     "a.solc?query",
@@ -3814,6 +3824,7 @@ def run : IO Unit := do
 end Tests
 
 def main : IO UInt32 := do
+  Tests.SourcePathExtensions.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run

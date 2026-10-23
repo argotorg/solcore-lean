@@ -324,20 +324,27 @@ theorem le_antisymm {left right : SourceId}
   exact Std.OrientedCmp.isLE_antisymm (cmp := SourceId.compare)
     forward backward
 
-/-- Removing the source suffix wrapper does not merge source identities. -/
-theorem toModuleId_injective : Function.Injective toModuleId := by
+/-- Module identity deliberately identifies `.sol` and `.solc` with the same stem. -/
+theorem toModuleId_eq_iff {left right : SourceId} :
+    left.toModuleId = right.toModuleId ↔
+      left.library = right.library ∧ left.path.modulePath = right.path.modulePath := by
+  cases left
+  cases right
+  simp [toModuleId]
+
+/-- Keeping the suffix alongside module identity recovers the exact source identity. -/
+theorem toModuleId_with_extension_injective :
+    Function.Injective (fun source : SourceId => (source.toModuleId, source.path.extension)) := by
   intro left right equality
   cases left with
   | mk leftLibrary leftPath =>
       cases right with
       | mk rightLibrary rightPath =>
           cases leftPath with
-          | mk leftModulePath =>
+          | mk leftModulePath leftExtension =>
               cases rightPath with
-              | mk rightModulePath =>
-                  simp only [toModuleId] at equality
-                  cases equality
-                  rfl
+              | mk rightModulePath rightExtension =>
+                  simpa [toModuleId, and_assoc] using equality
 
 end SourceId
 
