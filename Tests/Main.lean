@@ -2059,6 +2059,8 @@ import Solcore.Test.RustHullHashes
 import Solcore.Test.RustHullSecp256k1
 import Solcore.Test.RustHullPrecompiles
 import Solcore.Test.RustHullP256
+import Solcore.Test.RustHullLogs
+import Solcore.Test.RustHullCalls
 set_option autoImplicit false
 
 open Solcore
@@ -3851,6 +3853,8 @@ def main : IO UInt32 := do
   Tests.RustHullSecp256k1.run
   Tests.RustHullPrecompiles.run
   Tests.RustHullP256.run
+  Tests.RustHullLogs.run
+  Tests.RustHullCalls.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
