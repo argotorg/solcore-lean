@@ -2063,6 +2063,8 @@ import Solcore.Test.RustHullLogs
 import Solcore.Test.RustHullCalls
 import Solcore.Test.RustHullEffectReceipts
 import Solcore.Test.RustHullAccounts
+import Solcore.Test.RustHullScalarExecution
+import Solcore.Frontend.RustHull.Safety
 set_option autoImplicit false
 
 open Solcore
@@ -3859,6 +3861,7 @@ def main : IO UInt32 := do
   Tests.RustHullCalls.run
   Tests.RustHullEffectReceipts.run
   Tests.RustHullAccounts.run
+  Tests.RustHullScalarExecution.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run

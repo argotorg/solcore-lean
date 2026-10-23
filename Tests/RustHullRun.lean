@@ -1,6 +1,6 @@
 import Lean.Data.Json
 import Solcore.Frontend.RustHull.Decode
-import Solcore.Frontend.RustHull.Lowering
+import Solcore.Frontend.RustHull.ScalarExecution
 
 /-! Command-line execution of a versioned checked-Hull export through Core. -/
 set_option autoImplicit false
@@ -36,33 +36,16 @@ def main (args : List String) : IO UInt32 := do
       | entries => do
           report "entry" "rejected" [("detail", "select one entry"), ("entries", toJson entries)]
           return 1
-  let compiled ← match compile envelope.program entry with
-    | .ok compiled => pure compiled
-    | .error error => do
+  let prepared ← match ScalarExecution.prepare envelope.program entry inputs with
+    | .ok prepared => pure prepared
+    | .error (.lowering error) => do
         report "lowering" "rejected" [("detail", toJson (reprStr error))]
         return 1
-  unless inputs.length = compiled.parameters.length do
-    report "input" "rejected" [("detail", "argument count mismatch")]
-    return 1
-  let mut values := []
-  for (input, type) in inputs.zip compiled.parameters do
-    let value : LowerM Core.Expr := match type with
-      | .word => return .word (← parseWord input)
-      | .bool => if input = "true" then pure (.bool true)
-          else if input = "false" then pure (.bool false)
-          else fail "Boolean input must be true or false"
-      | .sum .unit .unit => if input = "true" then pure (.inRight .unit .unit)
-          else if input = "false" then pure (.inLeft .unit .unit)
-          else fail "Boolean input must be true or false"
-      | .unit => if input = "unit" then pure .unit else fail "Unit input must be unit"
-      | _ => fail "CLI input supports Word, Bool and Unit"
-    match value with
-    | .error error =>
-        report "input" "rejected" [("detail", toJson (reprStr error))]
+    | .error (.input error) => do
+        let detail := if error.message = "argument count mismatch" then error.message else reprStr error
+        report "input" "rejected" [("detail", toJson detail)]
         return 1
-    | .ok value => values := values ++ [value]
-  let expression := Core.Expr.apply compiled.expression (bundle values)
-  match Core.runStateful 10000000 (.initial expression) with
+  match ScalarExecution.run prepared with
   | .done (.inRight _ value) store =>
       report "execution" "succeeded" [("value", resultJson value), ("heapCells", toJson store.length)]
       return 0
