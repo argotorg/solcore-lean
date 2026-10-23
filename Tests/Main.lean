@@ -2050,6 +2050,8 @@ import Solcore.Test.RustYulPrimitives
 import Solcore.Test.RustHullDecode
 import Solcore.Test.RustHullMemory
 import Solcore.Test.RustHullKeccak
+import Solcore.Test.RustHullYul
+import Solcore.Test.RustHullLowering
 set_option autoImplicit false
 
 open Solcore
@@ -3833,6 +3835,8 @@ def main : IO UInt32 := do
   Tests.RustHullDecode.run
   Tests.RustHullMemory.run
   Tests.RustHullKeccak.run
+  Tests.RustHullYul.run
+  Tests.RustHullLowering.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
