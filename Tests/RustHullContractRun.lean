@@ -25,11 +25,12 @@ private def encodeHex (bytes : List UInt8) : String :=
 private def report (stage status : String) (fields : List (String × Json)) : IO Unit :=
   IO.println ((Json.mkObj ([("stage", toJson stage), ("status", toJson status)] ++ fields)).compress)
 
-private def runCall (compiled : Contract.CompiledObject) (data : String) : IO UInt32 := do
+private def runCall (compiled : Contract.CompiledObject) (data : String)
+    (availableGas : Option Core.Word) : IO UInt32 := do
   let calldata ← match hexBytes (data.dropPrefix "0x").toString.toList with
     | some bytes => pure bytes
     | none => do report "input" "rejected" [("detail", "invalid calldata hex")]; return 1
-  match Contract.run (compiled.instantiate {calldata}) with
+  match Contract.run (compiled.instantiate {calldata, availableGas}) with
   | .returned bytes storage =>
       report "execution" "returned" [("output", toJson (encodeHex bytes)),
         ("storage", toJson (storage.map fun (key, value) => [toString key.val, toString value.val]))]
@@ -42,6 +43,12 @@ private def runCall (compiled : Contract.CompiledObject) (data : String) : IO UI
   | .exportError error => report "execution" "export-error" [("detail", toJson error)]; return 1
 
 def main (args : List String) : IO UInt32 := do
+  let (availableGas, args) ← match args with
+    | "--gas" :: text :: rest =>
+        match text.toNat? >>= Core.Word.ofNat? with
+        | some word => pure (some word, rest)
+        | none => do report "input" "rejected" [("detail", "invalid explicit gas input")]; return 1
+    | _ => pure (none, args)
   let (path, object, inputs) ← match args with
     | [path, object, data] => pure (path, object, [data])
     | [path, object, "--batch", inputPath] =>
@@ -59,5 +66,5 @@ def main (args : List String) : IO UInt32 := do
     | .error error => do report "lowering" "rejected" [("detail", toJson (reprStr error))]; return 1
   let mut status := 0
   for data in inputs do
-    if (← runCall compiled data) != 0 then status := 1
+    if (← runCall compiled data availableGas) != 0 then status := 1
   return status

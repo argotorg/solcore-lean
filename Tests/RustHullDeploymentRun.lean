@@ -56,7 +56,7 @@ def main (args : List String) : IO UInt32 := do
   let some valueNat := valueText.toNat? | do report "input" "rejected" [("detail", "invalid call value")]; return 1
   let some value := Core.Word.ofNat? valueNat | do report "input" "rejected" [("detail", "call value exceeds a word")]; return 1
   let constructorArguments ← decodeHex constructorHex
-  let prepared ← match LinkedContract.prepare program (deployPath.splitOn "/") images constructorArguments {value} with
+  let prepared ← match LinkedContract.prepareDeployment program (deployPath.splitOn "/") images constructorArguments {value, balance := value, selfCodeAvailable := false} with
     | .ok value => pure value
     | .error error => do report "deployment-lowering" "rejected" [("detail", toJson (reprStr error))]; return 1
   let result := Contract.run prepared

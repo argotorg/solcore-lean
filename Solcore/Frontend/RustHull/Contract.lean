@@ -1,8 +1,8 @@
-import Solcore.Frontend.RustHull.Lowering
+import Solcore.Frontend.RustHull.AccountRuntime
 
-/-! Execute a selected Hull runtime object on Core with byte calldata and
-contract-local storage. Deployment, account transactions and external calls
-remain separate from this runtime-object boundary. -/
+/-! Execute a selected Hull object on Core with byte calldata, shared message
+state and explicit account context. The transaction caller supplies the entry
+balance after transferring call value; the receipt exports committed balances. -/
 set_option autoImplicit false
 
 namespace Solcore.Frontend.RustHull.Contract
@@ -15,12 +15,20 @@ structure Context where
   address : Core.Word := Core.Word.zero
   /-- An explicit environment input, not a gas meter for Core transitions. -/
   availableGas : Option Core.Word := none
+  /-- Balance on entry, including the value transferred by this message. -/
+  balance : Core.Word := Core.Word.zero
+  /-- Explicit balances of other accounts; the current address is overwritten by `balance`. -/
+  accounts : Core.WordMapping.Entries := []
+  /-- Accounts known to have no executable code. Unknown call targets are rejected. -/
+  emptyAccounts : List Core.Word := []
+  isStatic : Bool := false
+  /-- False while init code is running, before runtime code is installed. -/
+  selfCodeAvailable : Bool := true
   deriving Repr
 
-def snapshotType : Core.Ty :=
-  bundleType [.word, .word, .word, Core.WordMapping.type, Core.WordMapping.type]
+def snapshotType : Core.Ty := AccountRuntime.snapshotType
 
-def resultType : Core.Ty := .product (Core.LanguageResult.resultType .unit) snapshotType
+def resultType : Core.Ty := AccountRuntime.resultType
 
 structure Prepared where
   expression : Core.Expr
@@ -32,66 +40,30 @@ structure CompiledObject where
   expression : Core.Expr
   deriving Repr
 
-def contextType : Core.Ty :=
-  bundleType [Core.WordMapping.type, .word, Core.WordMapping.type, .word, .word, .word, .sum .unit .word]
-
-private def select : List Object → List String → LowerM CodeBlock
-  | _, [] => fail "an explicit Hull object path is required"
-  | objects, name :: rest =>
-      let candidates := objects.filter fun (.object candidate _ _ _) => candidate == name
-      match candidates with
-      | [.object _ code children _] => if rest.isEmpty then pure code else select children rest
-      | [] => fail s!"unknown Hull object: {name}"
-      | _ => fail s!"ambiguous Hull object: {name}"
+def contextType : Core.Ty := AccountRuntime.contextType
 
 private def calldataEntries (bytes : List UInt8) : Core.WordMapping.Entries :=
   Memory.packBytes bytes
 
-private def initializer (context : Core.Expr) (code : Option (List UInt8)) (name : String) : Core.Expr :=
-  match name with
-  | "memory" | "transient" | "returnData" => Core.WordMapping.empty
-  | "calldata" => projectArgument 0 7 context
-  | "calldataSize" => projectArgument 1 7 context
-  | "storage" => projectArgument 2 7 context
-  | "callvalue" => projectArgument 3 7 context
-  | "caller" => projectArgument 4 7 context
-  | "address" => projectArgument 5 7 context
-  | "availableGas" => projectArgument 6 7 context
-  | "code" => Core.WordMapping.literal (calldataEntries (code.getD []))
-  | "codeSize" => .word (Core.Word.ofNatModulo (code.getD []).length)
-  | _ => .word Core.Word.zero
-
 def compileObject (program : Program) (objectPath : List String)
     (fuel : Nat := 4096) (codeBytes : Option (List UInt8) := none) : LowerM CompiledObject := do
-  let code ← select program.objects objectPath
-  let entry := "$lean$object$entry"
-  if (program.functions ++ code.functions).any (·.name == entry) then
-    fail "reserved runtime entry name"
-  let function : Function := {name := entry, args := [], ret := .unit, body := code.stmts}
-  let slots := Effects.slots ++ (if codeBytes.isSome then Effects.codeSlots else [])
-  let runtime : Scope := slots.reverse.map fun (name, type) =>
-    ⟨some (Effects.slotName name), type, false⟩
-  let (_, body) ← assemble (program.functions ++ code.functions ++ [function]) entry runtime fuel
-  let scope := runtime.temporary (Core.LanguageResult.resultType .unit)
-  let snapshot ← [("exit", Core.Ty.word), ("returnOffset", .word), ("returnSize", .word),
-      ("memory", Core.WordMapping.type), ("storage", Core.WordMapping.type)].mapM fun (name, type) => do
-    return Core.Expr.loadCell (← Effects.reference scope name type)
-  let completed := Core.Expr.letE body (.pair (.var 0) (bundle snapshot))
-  let allocated := slots.zipIdx.foldr (fun ((name, type), index) body =>
-    Core.Expr.letE (.newCell type (initializer (.var (index + 1)) codeBytes name)) body) completed
-  let expression := Core.Expr.lambda contextType resultType (.letE .unit allocated)
-  let type ← (Core.inferDetailed [] [] expression Memory.definitions).mapError fun error =>
-    ⟨s!"Core runtime object validation: {reprStr error}", none⟩
-  expectType (.function contextType resultType) type
-  pure ⟨expression⟩
+  return ⟨← AccountRuntime.compileObject program objectPath fuel codeBytes⟩
 
 def CompiledObject.instantiate (compiled : CompiledObject) (context : Context := {}) : Prepared :=
+  let address (value : Core.Word) := Core.Word.ofNatModulo (value.val % 2 ^ 160)
+  let context := {context with
+    address := address context.address, caller := address context.caller,
+    accounts := context.accounts.map fun (key, value) => (address key, value),
+    emptyAccounts := context.emptyAccounts.map address}
   let availableGas := match context.availableGas with
     | none => Core.Expr.inLeft .word .unit
     | some gas => .inRight .unit (.word gas)
   let argument := bundle [Core.WordMapping.literal (calldataEntries context.calldata),
     .word (Core.Word.ofNatModulo context.calldata.length), Core.WordMapping.literal context.storage,
-    .word context.value, .word context.caller, .word context.address, availableGas]
+    .word context.value, .word context.caller, .word context.address, availableGas,
+    Core.WordMapping.literal (Core.WordMapping.insertEntries context.address context.balance context.accounts),
+    Core.WordMapping.literal (context.emptyAccounts.map fun address => (address, Core.Word.ofNatModulo 1)),
+    .bool context.isStatic, .bool context.selfCodeAvailable]
   ⟨.apply compiled.expression argument, context⟩
 
 def prepare (program : Program) (objectPath : List String) (context : Context := {})
@@ -117,7 +89,13 @@ inductive Outcome where
   | exportError (message : String)
   deriving Repr
 
-private def finish (maxReturnBytes : Nat) (result : Core.Value) : Outcome := Id.run do
+structure Receipt where
+  outcome : Outcome
+  logs : List Logs.Event := []
+  balances : Core.WordMapping.Entries := []
+  deriving Repr
+
+private def finishOutcome (maxReturnBytes : Nat) (result : Core.Value) : Outcome := Id.run do
   let .pair status (.pair (.word exit) (.pair (.word offset) (.pair (.word count)
       (.pair memory storage)))) := result | return .exportError "invalid runtime result shape"
   if exit.val = 3 then return .invalid
@@ -139,11 +117,32 @@ private def finish (maxReturnBytes : Nat) (result : Core.Value) : Outcome := Id.
   | .ok storage => return .returned bytes storage
   | .error error => return .exportError error
 
-def resume (state : Core.State) (fuel : Nat := 10000000) (maxReturnBytes : Nat := 1048576) : Outcome :=
+private def finish (maxReturnBytes : Nat) (result : Core.Value) : Receipt := Id.run do
+  let .pair status (.pair exit (.pair offset (.pair count
+      (.pair memory (.pair storage (.pair logs (.pair cursor balances))))))) := result |
+    return ⟨.exportError "invalid runtime receipt shape", [], []⟩
+  let outcome := finishOutcome maxReturnBytes
+    (.pair status (.pair exit (.pair offset (.pair count (.pair memory storage)))))
+  match outcome with
+  | .returned _ _ =>
+      match Logs.decodeValues logs cursor 4096 maxReturnBytes, mappingEntries balances with
+      | .ok events, .ok balances => return ⟨outcome, events, balances⟩
+      | .error error, _ | _, .error error => return ⟨.exportError error, [], []⟩
+  | _ => return ⟨outcome, [], []⟩
+
+def resumeWithReceipt (state : Core.State) (fuel : Nat := 10000000)
+    (maxReturnBytes : Nat := 1048576) : Receipt :=
   match Core.runStateful fuel state with
   | .done value _ => finish maxReturnBytes value
-  | .outOfFuel state => .outOfFuel state
-  | .fault error _ => .coreFault error
+  | .outOfFuel state => ⟨.outOfFuel state, [], []⟩
+  | .fault error _ => ⟨.coreFault error, [], []⟩
+
+def runWithReceipt (prepared : Prepared) (fuel : Nat := 10000000)
+    (maxReturnBytes : Nat := 1048576) : Receipt :=
+  resumeWithReceipt (.initial prepared.expression) fuel maxReturnBytes
+
+def resume (state : Core.State) (fuel : Nat := 10000000) (maxReturnBytes : Nat := 1048576) : Outcome :=
+  (resumeWithReceipt state fuel maxReturnBytes).outcome
 
 def run (prepared : Prepared) (fuel : Nat := 10000000) (maxReturnBytes : Nat := 1048576) : Outcome :=
   resume (.initial prepared.expression) fuel maxReturnBytes

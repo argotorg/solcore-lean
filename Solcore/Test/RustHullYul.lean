@@ -48,7 +48,13 @@ private def rejected (body : List YulStmt) (scope : Scope := outer) : Bool :=
   | .ok _ => false
 
 private def checkStorageFunctions : IO Unit := do
-  let scope : Scope := ⟨some (Effects.slotName "storage"), Core.WordMapping.type, false⟩ :: outer
+  let slots : List (String × Core.Ty × Core.Expr) := [
+    ("storage", Core.WordMapping.type, Core.WordMapping.empty),
+    ("isStatic", .bool, .bool false), ("exit", .word, .word (word 0)),
+    ("returnOffset", .word, .word (word 0)), ("returnSize", .word, .word (word 0)),
+    ("memorySize", .word, .word (word 0))]
+  let scope : Scope := (slots.reverse.map fun (name, type, _) =>
+    ⟨some (Effects.slotName name), type, false⟩) ++ outer
   let body := [set "x" (call "sub" [call "tick" [], call "tick" []]),
     set "x" (add (call "mul" [ref "x", num 10]) (call "sload" [num 0])),
     function "tick" [] ["r"] [set "r" (call "sload" [num 0]),
@@ -59,7 +65,7 @@ private def checkStorageFunctions : IO Unit := do
     dataDefinitions := Core.WordMapping.actualDefinitions
     resultType := Core.LanguageResult.resultType .word
     body := .letE (Core.OptionalCell.allocateInitialized .word (.word (word 0)))
-      (.letE (.newCell Core.WordMapping.type Core.WordMapping.empty)
+      (slots.foldr (fun (_, type, initial) body => .letE (.newCell type initial) body)
         (Core.LocalControl.finish .word (Core.LocalLoop.toControl .word lowered (word 2)) returned.expression))
   }
   require program.check "Yul function storage effects generated ill-typed Core"

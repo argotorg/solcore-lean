@@ -60,6 +60,32 @@ private def context (json : Json) : Except String Contract.Context := do
     availableGas := (← wordField json "availableGas")
   }
 
+private def accounts (config : Json) : Except String (Core.WordMapping.Entries × List Core.Word) := do
+  let some value ← optionalField config "accounts" | pure ([], [])
+  let values ← value.getArr?
+  values.toList.foldlM (init := ([], [])) fun (balances, empty) value => do
+    let some address ← wordField value "address" | throw "account address required"
+    let balance := (← wordField value "balance").getD Core.Word.zero
+    if balances.any (fun entry => entry.1 == address) then throw "duplicate account address"
+    let isEmpty ← match ← optionalField value "empty" with
+      | none => pure false
+      | some flag => flag.getBool?
+    pure (balances ++ [(address, balance)], if isEmpty then address :: empty else empty)
+
+/-- Top-level transaction preparation. Failed transactions and non-persistent
+test calls discard the prepared ledger together with their execution receipt. -/
+private def transfer (balances : Core.WordMapping.Entries) (context : Contract.Context) :
+    Except String Core.WordMapping.Entries := do
+  let source := Core.WordMapping.lookupEntries context.caller balances
+  let target := Core.WordMapping.lookupEntries context.address balances
+  if source.val < context.value.val then throw "transaction sender has insufficient balance"
+  if context.caller == context.address then return balances
+  let some credited := Core.Word.ofNat? (target.val + context.value.val) |
+    throw "transaction balance overflow"
+  return Core.WordMapping.insertEntries context.address credited
+    (Core.WordMapping.insertEntries context.caller
+      (Core.Word.ofNatModulo (source.val - context.value.val)) balances)
+
 private def fields (result : Contract.Outcome) : List (String × Json) :=
   match result with
   | .returned data storage => [("status", "returned"), ("output", toJson (hex data)),
@@ -75,6 +101,14 @@ private def completed : Contract.Outcome → Bool
   | .returned _ _ | .reverted _ | .invalid => true
   | _ => false
 
+private def receiptFields (receipt : Contract.Receipt) : List (String × Json) :=
+  ("balances", toJson (receipt.balances.map fun (address, value) =>
+    [toString address.val, toString value.val])) ::
+  ("logs", toJson (receipt.logs.map fun event => Json.mkObj [
+    ("address", toJson (toString event.address.val)),
+    ("topics", toJson (event.topics.map (fun topic => toString topic.val))),
+    ("data", toJson (hex event.data))])) :: fields receipt.outcome
+
 private def report (stage : String) (data : List (String × Json)) : IO Unit :=
   IO.println ((Json.mkObj (("stage", toJson stage) :: data)).compress)
 
@@ -87,34 +121,55 @@ private def execute (config : Json) : IO UInt32 := do
   let images ← get (CodeImage.decode (← IO.FS.readFile imagePath))
   let deployPath ← get (config.getObjValAs? (List String) "deployPath")
   let runtimePath ← get (config.getObjValAs? (List String) "runtimePath")
+  let (initialBalances, emptyAccounts) ← get (accounts config)
+  let fuel ← match ← get (optionalField config "fuel") with
+    | none => pure 10000000
+    | some value => do
+        let fuel ← get value.getNat?
+        unless fuel > 0 && fuel ≤ 1000000000 do throw (IO.userError "fuel must be between 1 and 1000000000")
+        pure fuel
   let constructor ← get (context (← get (config.getObjVal? "constructor")))
-  let prepared ← lower (LinkedContract.prepare program.program deployPath images constructor.calldata
-    {constructor with calldata := []})
-  let result := Contract.run prepared
+  let entryBalances ← get (transfer initialBalances constructor)
+  let prepared ← lower (LinkedContract.prepareDeployment program.program deployPath images constructor.calldata
+    {constructor with
+      calldata := [], selfCodeAvailable := false, accounts := entryBalances, emptyAccounts := emptyAccounts,
+      balance := Core.WordMapping.lookupEntries constructor.address entryBalances})
+  let receipt := Contract.runWithReceipt prepared fuel
+  let result := receipt.outcome
   let .returned deployed initialStorage := result | do
-    report "deployment" (fields result)
+    report "deployment" (receiptFields receipt)
     return if completed result then 0 else 1
   let runtimeImage ← get (CodeImage.select images runtimePath)
   unless deployed == runtimeImage.bytes do
     report "deployment" [("status", "code-mismatch"), ("output", toJson (hex deployed))]
     return 1
-  report "deployment" (("codeBytes", toJson deployed.length) :: fields result)
+  report "deployment" (("codeBytes", toJson deployed.length) :: receiptFields receipt)
   let calls ← get (config.getObjValAs? (List Json) "calls")
   if calls.isEmpty then return 0
   let compiled ← lower (LinkedContract.compileObject program.program runtimePath images)
   let mut storage := initialStorage
+  let mut balances := receipt.balances
   let mut status := 0
   for (call, index) in calls.zipIdx do
     let context ← get (context call)
+    unless context.address == constructor.address do
+      throw (IO.userError "scenario call address differs from the deployed contract")
     let persist ← match ← get (optionalField call "persist") with
       | none => pure true
       | some value => get value.getBool?
-    let result := Contract.run (compiled.instantiate {context with storage})
-    report "execution" (("index", toJson index) :: fields result)
+    let entryBalances ← get (transfer balances context)
+    let receipt := Contract.runWithReceipt (compiled.instantiate {context with
+      storage := storage,
+      accounts := entryBalances, emptyAccounts := emptyAccounts,
+      balance := Core.WordMapping.lookupEntries context.address entryBalances}) fuel
+    let result := receipt.outcome
+    report "execution" (("index", toJson index) :: receiptFields receipt)
     if !completed result then status := 1
     if persist then
       match result with
-      | .returned _ nextStorage => storage := nextStorage
+      | .returned _ nextStorage =>
+          storage := nextStorage
+          balances := receipt.balances
       | _ => pure ()
   return status
 

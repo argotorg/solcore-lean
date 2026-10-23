@@ -61,7 +61,32 @@ private def expectBytes (label : String) (outcome : Contract.Outcome) (expected 
       pure storage
   | other => throw (IO.userError s!"{label}: {reprStr other}")
 
+def runDeploymentContext : IO Unit := do
+  let program := source [
+    action "sstore" [w 0, call "calldatasize"],
+    action "sstore" [w 1, call "callvalue"],
+    action "sstore" [w 2, call "selfbalance"],
+    action "sstore" [w 3, call "call" [w 0, call "address", w 0, w 0, w 0, w 0, w 0]],
+    action "codecopy" [w 0, call "datasize" [symbol deployName], w 32],
+    action "sstore" [w 4, call "mload" [w 0]],
+    action "codecopy" [w 0, call "dataoffset" [symbol runtimeName], call "datasize" [symbol runtimeName]],
+    action "return" [w 0, call "datasize" [symbol runtimeName]]]
+  let prepared ← get "deployment context helper" (LinkedContract.prepareDeployment program [deployName]
+    images (wordBytes 42) {
+      calldata := bytes [0xaa, 0xbb]
+      address := Core.Word.ofNatModulo 0xaaa
+      value := Core.Word.ofNatModulo 17
+      balance := Core.Word.ofNatModulo 117})
+  require (prepared.context.calldata.isEmpty && !prepared.context.selfCodeAvailable)
+    "deployment helper retained runtime-only frame context"
+  let storage ← expectBytes "deployment helper preserves linked constructor arguments"
+    (Contract.run prepared) runtimeBytes
+  for (slot, value) in [(0, 0), (1, 17), (2, 117), (3, 1), (4, 42)] do
+    require ((Core.WordMapping.lookupEntries (Core.Word.ofNatModulo slot) storage).val = value)
+      s!"deployment helper lost constructor state at {slot}"
+
 def run : IO Unit := do
+  runDeploymentContext
   let program := source initializer
   let constructor ← get "constructor" (LinkedContract.prepare program [deployName] images (wordBytes 42))
   let state ← expectBytes "constructor returns exact embedded bytes" (Contract.run constructor) runtimeBytes

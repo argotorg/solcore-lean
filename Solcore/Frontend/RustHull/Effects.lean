@@ -1,9 +1,12 @@
 import Solcore.Frontend.RustHull.LoweringSupport
 import Solcore.Frontend.RustHull.Memory
 import Solcore.Frontend.RustHull.Keccak
+import Solcore.Frontend.RustHull.Precompiles
+import Solcore.Frontend.RustHull.Logs
+import Solcore.Frontend.RustHull.Calls
 
-/-! Contract-local EVM effects expressed with ordinary Core cells. External
-calls and deployment require the contract runner and are rejected at this layer.
+/-! EVM effects expressed with ordinary Core cells. Message calls use an
+explicit callback installed by the contract runner.
 Termination records a byte range and propagates through the language-result
 envelope, so no later Hull or Yul instruction executes. -/
 set_option autoImplicit false
@@ -19,6 +22,9 @@ def slots : List (String × Core.Ty) :=
    ("storage", Core.WordMapping.type), ("transient", Core.WordMapping.type),
    ("callvalue", .word), ("caller", .word), ("address", .word),
    ("returnData", Core.WordMapping.type), ("returnDataSize", .word),
+   ("logs", Core.WordMapping.type), ("logSize", .word),
+   ("balances", Core.WordMapping.type), ("isStatic", .bool), ("callDepth", .word),
+   ("callHandler", Core.OptionalCell.cellType Calls.callbackType),
    ("availableGas", .sum .unit .word),
    ("exit", .word), ("returnOffset", .word), ("returnSize", .word)]
 
@@ -35,7 +41,8 @@ def supports (name : String) : Bool := name ∈
   ["mload", "mstore", "mstore8", "msize", "calldataload", "calldatasize",
    "callvalue", "caller", "address", "sload", "sstore", "tload", "tstore",
    "memoryguard", "mcopy", "calldatacopy", "keccak256", "codesize", "codecopy",
-   "gas", "returndatasize", "returndatacopy",
+   "gas", "returndatasize", "returndatacopy", "staticcall", "call", "selfbalance",
+   "log0", "log1", "log2", "log3", "log4",
    "return", "revert", "stop", "invalid"]
 
 private def writeMapping (reference key value : Core.Expr) : Core.Expr :=
@@ -56,6 +63,40 @@ private def terminate (scope : Scope) (kind : Nat) (offset size : Core.Expr) : L
     .letE store (next.weakenAt 0))
       (Core.LanguageResult.failure .unit (.word Core.Word.maximum))
   pure (Core.LocalSequence.discard .unit (Memory.touch memorySize offset size) finish)
+
+private def log (scope : Scope) (count : Nat) (arguments : List Core.Expr) : LowerM Lowered := do
+  let offset :: length :: topics := arguments | fail "log requires memory offset and size"
+  unless topics.length = count do fail "wrong number of log topics"
+  let append := Logs.append
+    (← reference scope "memory" Core.WordMapping.type) (← reference scope "memorySize" .word)
+    (← reference scope "logs" Core.WordMapping.type) (← reference scope "logSize" .word)
+    (.loadCell (← reference scope "address" .word)) topics offset length
+  pure ⟨.unit, .ifE (.loadCell (← reference scope "isStatic" .bool))
+    (← terminate scope 3 (.word Core.Word.zero) (.word Core.Word.zero)) append⟩
+
+private def call (scope : Scope) (staticCall : Bool)
+    (gas target value inputOffset inputLength outputOffset outputLength : Core.Expr) : LowerM Lowered := do
+  let isStatic := Core.Expr.loadCell (← reference scope "isStatic" .bool)
+  let zeroValue := Core.Expr.binary .wordEq value (.word Core.Word.zero)
+  let suppliedGas := if staticCall then gas else Core.Expr.ifE zeroValue gas
+    (.binary .wordAdd gas (.word (Core.Word.ofNatModulo 2300)))
+  let invoke := Calls.invoke
+    (← reference scope "memory" Core.WordMapping.type) (← reference scope "memorySize" .word)
+    (← reference scope "returnData" Core.WordMapping.type) (← reference scope "returnDataSize" .word)
+    (← reference scope "callHandler" (Core.OptionalCell.cellType Calls.callbackType))
+    (.loadCell (← reference scope "address" .word))
+    (.loadCell (← reference scope "callDepth" .word))
+    (if staticCall then .bool true else isStatic)
+    suppliedGas target value inputOffset inputLength outputOffset outputLength
+  if staticCall then pure ⟨.word, invoke⟩
+  else
+    let invalid ← terminate scope 3 (.word Core.Word.zero) (.word Core.Word.zero)
+    let invalidWord := Core.LanguageResult.bind .word invalid
+      (Core.LanguageResult.success (.word Core.Word.zero))
+    let withStipend := Core.Expr.ifE zeroValue invoke
+      (.ifE (.binary .wordGt gas (.word (Core.Word.ofNatModulo (Core.wordModulus - 2301))))
+        (Core.LanguageResult.failure .word (.word (Core.Word.ofNatModulo 13))) invoke)
+    pure ⟨.word, .ifE isStatic (.ifE zeroValue invoke invalidWord) withStipend⟩
 
 /-- Arguments are already evaluated word values in `scope`; the caller owns
 the Hull or Yul argument order and failure propagation. -/
@@ -91,6 +132,18 @@ def lowerBuiltin (scope : Scope) (name : String) (arguments : List Core.Expr) : 
         (.loadCell (← reference scope "availableGas" (.sum .unit .word)))
         (Core.LanguageResult.failure .word (.word (Core.Word.ofNatModulo 9)))
         (Core.LanguageResult.success (.var 0))⟩
+    | "staticcall", [gas, target, inputOffset, inputLength, outputOffset, outputLength] =>
+        call scope true gas target (.word Core.Word.zero) inputOffset inputLength outputOffset outputLength
+    | "call", [gas, target, value, inputOffset, inputLength, outputOffset, outputLength] =>
+        call scope false gas target value inputOffset inputLength outputOffset outputLength
+    | "selfbalance", [] => pure ⟨.word, Core.WordMapping.lookup
+        (.loadCell (← reference scope "balances" Core.WordMapping.type))
+        (.loadCell (← reference scope "address" .word))⟩
+    | "log0", arguments => log scope 0 arguments
+    | "log1", arguments => log scope 1 arguments
+    | "log2", arguments => log scope 2 arguments
+    | "log3", arguments => log scope 3 arguments
+    | "log4", arguments => log scope 4 arguments
     | "returndatasize", [] => pure ⟨.word, Core.LanguageResult.success
         (.loadCell (← reference scope "returnDataSize" .word))⟩
     | "returndatacopy", [destination, source, length] => do
@@ -113,7 +166,9 @@ def lowerBuiltin (scope : Scope) (name : String) (arguments : List Core.Expr) : 
     | "sload", [key] | "tload", [key] => pure ⟨.word, Core.WordMapping.lookup
         (.loadCell (← reference scope (if name = "sload" then "storage" else "transient") Core.WordMapping.type)) key⟩
     | "sstore", [key, value] | "tstore", [key, value] => pure ⟨.unit,
-        writeMapping (← reference scope (if name = "sstore" then "storage" else "transient") Core.WordMapping.type) key value⟩
+        .ifE (.loadCell (← reference scope "isStatic" .bool))
+          (← terminate scope 3 (.word Core.Word.zero) (.word Core.Word.zero))
+          (writeMapping (← reference scope (if name = "sstore" then "storage" else "transient") Core.WordMapping.type) key value)⟩
     | "return", [offset, size] => pure ⟨.unit, ← terminate scope 1 offset size⟩
     | "revert", [offset, size] => pure ⟨.unit, ← terminate scope 2 offset size⟩
     | "stop", [] => pure ⟨.unit, ← terminate scope 1 (.word Core.Word.zero) (.word Core.Word.zero)⟩

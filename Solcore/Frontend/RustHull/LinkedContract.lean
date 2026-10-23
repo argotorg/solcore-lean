@@ -23,4 +23,13 @@ def prepare (program : Program) (path : List String) (images : List CodeImage.Im
     (fuel : Nat := 4096) : LowerM Contract.Prepared := do
   return (← compileObject program path images constructorArguments fuel).instantiate context
 
+/-- Prepare init code with constructor arguments in the code suffix and empty
+calldata. Calls to the constructing address see no installed runtime code.
+The caller still supplies the balance after its transaction value transfer. -/
+def prepareDeployment (program : Program) (path : List String) (images : List CodeImage.Image)
+    (constructorArguments : List UInt8 := []) (context : Contract.Context := {})
+    (fuel : Nat := 4096) : LowerM Contract.Prepared :=
+  prepare program path images constructorArguments
+    {context with calldata := [], selfCodeAvailable := false} fuel
+
 end Solcore.Frontend.RustHull.LinkedContract
