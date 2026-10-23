@@ -2047,6 +2047,7 @@ import Solcore.Test.SourceCoreSelectedInterleavedLocalCompleteOutcome
 import Solcore.Test.SourceCoreSelectedFaultingLocalPublic
 import Solcore.Test.SourcePathExtensions
 import Solcore.Test.RustYulPrimitives
+import Solcore.Test.RustHullDecode
 set_option autoImplicit false
 
 open Solcore
@@ -3827,6 +3828,7 @@ end Tests
 def main : IO UInt32 := do
   Tests.SourcePathExtensions.run
   Tests.RustYulPrimitives.run
+  Tests.RustHullDecode.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
