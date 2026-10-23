@@ -148,6 +148,52 @@ private def productsAndMatches : IO Unit := do
       {pat := {kind := .intLit "0x10"}, binder := "x", body := [ret (w 1)]},
       {pat := {kind := .wildcard}, binder := "x", body := [ret (v "x")]}])]]) 17
 
+private def recursiveLayouts : IO Unit := do
+  let reference : Ty := .namedRef "Chain"
+  let payload : Ty := .product .word reference
+  let chain : Ty := .named "Chain" (.sum .word payload)
+  let inspect : Function := {
+    name := "inspect", args := [{name := "chain", ty := chain}], ret := .word,
+    body := [stmt (.matchStmt chain (v "chain" chain) [
+      {pat := {kind := .con .inl}, binder := "end", body := [ret (v "end")]},
+      {pat := {kind := .con .inr}, binder := "link", body := [
+        ret ⟨.word, .fst (v "link" payload), none⟩]}])]}
+  let relay : Function := {
+    name := "relay", args := [{name := "chain", ty := chain}], ret := chain,
+    body := [ret (v "chain" chain)]}
+  let leaf : Expr := ⟨chain, .inl chain (w 42), none⟩
+  wordResult "recursive sum construction, named relay and payload match"
+    (program [inspect, relay, fn "main" [] [
+      declareLocal "chain" chain, assign "chain" leaf,
+      ret (call "inspect" [call "relay" [v "chain" chain] chain])]]) 42
+  wordResult "recursive layout zero initialization"
+    (program [inspect, fn "main" [] [declareLocal "chain" chain,
+      ret (call "inspect" [v "chain" chain])]]) 0
+  let referenceRelay : Function := {
+    name := "referenceRelay", args := [{name := "ref", ty := reference}], ret := reference,
+    body := [ret (v "ref" reference)]}
+  let extractReference : Function := {
+    name := "extractReference", args := [{name := "chain", ty := chain}], ret := reference,
+    body := [stmt (.matchStmt chain (v "chain" chain) [
+      {pat := {kind := .con .inr}, binder := "link", body := [
+        ret (call "referenceRelay" [⟨reference, .snd (v "link" payload), none⟩] reference)]}])]}
+  let link : Expr := ⟨chain, .inr chain
+    ⟨payload, .pair (w 7) (v "ref" reference), none⟩, none⟩
+  let main : Function := {
+    name := "main", args := [{name := "ref", ty := reference}], ret := reference,
+    body := [declareLocal "chain" chain, assign "chain" link,
+      ret (call "extractReference" [call "relay" [v "chain" chain] chain] reference)]}
+  wordResult "opaque recursive reference survives construction, relay and extraction"
+    (program [relay, referenceRelay, extractReference, main]) 99 [99]
+  let nested : Expr := ⟨chain, .inr chain ⟨payload, .pair (w 7) leaf, none⟩, none⟩
+  rejects "recursive reference does not implicitly box a complete value"
+    (program [inspect, fn "main" [] [ret (call "inspect" [nested])]])
+  let invalid : Function := {
+    name := "main", args := [{name := "ref", ty := reference}], ret := .word,
+    body := [ret (call "inspect" [v "ref" chain])]}
+  rejects "recursive reference does not implicitly unfold to a complete value"
+    (program [inspect, invalid])
+
 private def malformed : IO Unit := do
   rejects "wrong word annotation" (program [fn "main" [] [ret ⟨.bool, .word "7", none⟩]])
   rejects "wrong injection annotation" (program [fn "main" [] [ret
@@ -171,8 +217,9 @@ private def malformed : IO Unit := do
   rejects "function return mismatch" (program [fn "main" [] [ret ⟨.unit, .unit, none⟩]])
   rejects "callee result annotation mismatch" (program [fn "helper" [] [ret (w 1)],
     fn "main" [] [ret (call "helper" [] .bool)]])
-  rejects "recursive type reference is explicit" (program [fn "main" [] [
-    declareLocal "list" (.namedRef "List"), ret (w 0)]])
+  rejects "opaque recursive reference cannot be projected" (program [fn "main" [] [
+    declareLocal "list" (.namedRef "List"),
+    ret ⟨.word, .fst (v "list" (.namedRef "List")), none⟩]])
   rejects "residual function layout is explicit" (program [fn "main" [] [
     declareLocal "closure" (.function [.word] .word), ret (w 0)]])
   rejects "unbound local" (program [fn "main" [] [ret (v "missing")]])
@@ -329,6 +376,7 @@ def run : IO Unit := do
   callsAndRecursion
   localsAndLoops
   productsAndMatches
+  recursiveLayouts
   malformed
   yulHullBridge
   objectSelection

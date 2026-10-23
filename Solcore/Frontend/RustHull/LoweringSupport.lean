@@ -73,8 +73,9 @@ def parseWord (text : String) : LowerM Core.Word := do
       else fail s!"invalid word literal: {text}") 0
     pure (Core.Word.ofNatModulo value)
 
-/-- Transparent named layouts are expanded here; recursive references need the
-named-data layout pass and are rejected until that pass is available. -/
+/-- Named layouts are transparent. A recursive back-reference occupies one
+opaque word in both pinned Rust backends. It can be retained and passed around,
+but it is not a boxed value: no implicit fold, unfold or heap access is added. -/
 def lowerType : Nat → Ty → LowerM Core.Ty
   | 0, _ => fail "type expansion depth exhausted"
   | fuel + 1, type => match type with
@@ -84,7 +85,7 @@ def lowerType : Nat → Ty → LowerM Core.Ty
     | .product left right => return .product (← lowerType fuel left) (← lowerType fuel right)
     | .sum left right => return .sum (← lowerType fuel left) (← lowerType fuel right)
     | .named _ inner | .located _ inner => lowerType fuel inner
-    | .namedRef name => fail s!"recursive named layout is not implemented: {name}"
+    | .namedRef _ => pure .word
     | .function _ _ => fail "residual Hull function type requires closure conversion"
 
 def bundleType : List Core.Ty → Core.Ty
