@@ -1,0 +1,76 @@
+{
+  "schema": "solcore-lean.creation-address-vectors.v1",
+  "reference": "cast compute-address 1.5.1-stable; independently checked using Python RLP and cast keccak",
+  "vectors": [
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "0",
+      "address": "0xf2048c36a5536fea3bc71d49ed59f2c65c546eea"
+    },
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "1",
+      "address": "0x054dd934335ea61232ae4c051f8bf20e540f8291"
+    },
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "127",
+      "address": "0x7feb088e1893d4a1087288d386c07252abb3c02e"
+    },
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "128",
+      "address": "0x2297787b25b800d655071345a1d3a7951404b50c"
+    },
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "255",
+      "address": "0xc8d17a8bdb6001525f8594e3ca4413d4bd644605"
+    },
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "256",
+      "address": "0xa0ddf5980551b5ec83721bcf168785ac3cedb183"
+    },
+    {
+      "kind": "create",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "nonce": "18446744073709551615",
+      "address": "0x66e93872e94cc56d1da3bb63f81dabd9c1d6c125"
+    },
+    {
+      "kind": "create2",
+      "creator": "0x0000000000000000000000000000000000000000",
+      "salt": "0",
+      "init": "0x00",
+      "address": "0x4d1a2e2bb4f88f0250f26ffff098b0b30b26bf38"
+    },
+    {
+      "kind": "create2",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "salt": "0",
+      "init": "0x00",
+      "address": "0xb928f69bb1d91cd65274e3c79d8986362984fda3"
+    },
+    {
+      "kind": "create2",
+      "creator": "0xdeadbeef00000000000000000000000000000000",
+      "salt": "22207167547627365064083290255604625247830016",
+      "init": "0x00",
+      "address": "0xf2a2934e8506d97a2cee99962533f9729676ae24"
+    },
+    {
+      "kind": "create2",
+      "creator": "0x00000000000000000000000000000000deadbeef",
+      "salt": "3405691582",
+      "init": "0xdeadbeef",
+      "address": "0x60f3f640a8508fc6a86d45df051962668e1e8ac7"
+    }
+  ]
+}

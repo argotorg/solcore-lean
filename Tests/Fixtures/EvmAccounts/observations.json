@@ -1,0 +1,503 @@
+{
+  "schema": "solcore-lean.evm-account-reference.v1",
+  "hardfork": "osaka",
+  "tools": {
+    "anvil": "anvil Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf",
+    "cast": "cast Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf",
+    "solc": "solc, the solidity compiler commandline interface\nVersion: 0.8.35+commit.47b9dedd.Darwin.appleclang"
+  },
+  "fixtures": {
+    "Probe": {
+      "sourceSha256": "6064f01115de95e874f349ebdaff2e6ecc8433701237e296561722ff5f392771",
+      "init": "600a6007556101ea806100115f395ff3fe5f35600c81148060058310831515161761011e575060058114610102576009811060058211166100b0576009811461005157600a811461004c57600b1461004257005b6007545f5260205ff35b602035ff5b36607f19018060805f376040359081815f602035f59160603580156100a9575b60035f526020525f8060408180875af1833b90843f928531948060805f375f80f5945f5260205260405260605260805260a05260c05ff35b5082610071565b600836605f19018060605f37826007146100f3575f602035f0915b3d92805f5283602052803b6040523f606052825f60803e146100ed576080015ff35b6080015ffd5b604035905f602035f5916100cb565b602035803b5f52803f6020526040803581833c3160805260a05ff35b36605f19016040356020358260605f375f94806001146101d457806002146101bf57806003146101aa578060041461019457600c14610180575b5050503d915f5281602052815f60403e60075482604001524782606001526100ed576080015ff35b5f93945083929183915af1905f8080610158565b505f9394508392915082905afa905f8080610158565b505f93945083929183915af1905f8080610158565b505f93945083929183915af2905f8080610158565b505f9394508392915082905af4905f808061015856"
+    },
+    "Target": {
+      "sourceSha256": "dc679d70d1f5350f2cc87ede05d05986d4a9e322f292cbd219475164994fd9ae",
+      "init": "6063600755303b600855303f60095560518060195f395ff3fe5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f526004601cfd5b50602035600755601656"
+    }
+  },
+  "initial": {
+    "sender": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    "beneficiary": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+    "probe": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+    "target": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+    "targetRuntime": "5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f526004601cfd5b50602035600755601656"
+  },
+  "checks": [
+    {
+      "name": "constructor.self.extcodesize",
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "name": "constructor.self.extcodehash",
+      "expected": 89477152217924674838424037953991966239322087453347756267410168184682657981552,
+      "passed": true
+    },
+    {
+      "name": "delegate.context.bytes",
+      "expected": [
+        1,
+        192,
+        546584486846459126461364135121053344201067465379,
+        1390849295786071768276380950238675083608645509734,
+        13,
+        77,
+        1013,
+        81,
+        77,
+        1013
+      ],
+      "passed": true
+    },
+    {
+      "name": "delegate.storage.owner",
+      "expected": [
+        77,
+        99
+      ],
+      "passed": true
+    },
+    {
+      "name": "delegate.balance.owner",
+      "expected": [
+        1013,
+        1111
+      ],
+      "passed": true
+    },
+    {
+      "name": "callcode.context.bytes",
+      "expected": [
+        1,
+        192,
+        546584486846459126461364135121053344201067465379,
+        546584486846459126461364135121053344201067465379,
+        17,
+        88,
+        1005,
+        81,
+        88,
+        1005
+      ],
+      "passed": true
+    },
+    {
+      "name": "callcode.no.transfer",
+      "expected": [
+        1005,
+        1111
+      ],
+      "passed": true
+    },
+    {
+      "name": "callcode.storage.owner",
+      "expected": [
+        88,
+        99
+      ],
+      "passed": true
+    },
+    {
+      "name": "callcode.insufficient.balance",
+      "expected": [
+        0,
+        0,
+        88,
+        1005
+      ],
+      "passed": true
+    },
+    {
+      "name": "delegate.revert.bytes.and.rollback",
+      "expected": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004deadbeef000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000003e8",
+      "passed": true
+    },
+    {
+      "name": "delegate.revert.storage",
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "name": "static.callcode.nonzero.value.allowed",
+      "expected": [
+        1,
+        320,
+        1,
+        192,
+        546584486846459126461364135121053344201067465379,
+        546584486846459126461364135121053344201067465379,
+        17
+      ],
+      "passed": true
+    },
+    {
+      "name": "static.state.write.rejected",
+      "expected": [
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "inspect.nonexistent",
+      "expected": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "passed": true
+    },
+    {
+      "name": "inspect.funded.no.code",
+      "expected": "0x0000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+      "passed": true
+    },
+    {
+      "name": "inspect.nonce.no.code",
+      "expected": "0x0000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "passed": true
+    },
+    {
+      "name": "inspect.empty",
+      "expected": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "passed": true
+    },
+    {
+      "name": "inspect.contract",
+      "expected": "0x0000000000000000000000000000000000000000000000000000000000000051366147b3c3df6f9aace51c05459b1930e078caff486539242113f3359c9141af5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f0000000000000000000000000000000000000000000000000000000000000457",
+      "passed": true
+    },
+    {
+      "name": "inspect.address.low160",
+      "expected": "0x0000000000000000000000000000000000000000000000000000000000000051366147b3c3df6f9aace51c05459b1930e078caff486539242113f3359c9141af5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f0000000000000000000000000000000000000000000000000000000000000457",
+      "passed": true
+    },
+    {
+      "name": "extcodecopy.right.zero.padding",
+      "expected": "0x16560000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "passed": true
+    },
+    {
+      "name": "extcodecopy.huge.offset.zero",
+      "expected": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "passed": true
+    },
+    {
+      "name": "create.address.return.data",
+      "expected": [
+        921600849408656576225127304129841157239410643646,
+        0,
+        81,
+        24596772859228776897597776315957861543088296053554660548954152741573508546991
+      ],
+      "passed": true
+    },
+    {
+      "name": "create.installed.runtime",
+      "expected": "0x5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f526004601cfd5b50602035600755601656",
+      "passed": true
+    },
+    {
+      "name": "create.account.state",
+      "expected": [
+        2,
+        1,
+        983,
+        17,
+        99
+      ],
+      "passed": true
+    },
+    {
+      "name": "create.next.nonce.address",
+      "expected": 1048441399354366663447528331587451327875741636968,
+      "passed": true
+    },
+    {
+      "name": "create.prefunded.permitted",
+      "expected": 921600849408656576225127304129841157239410643646,
+      "passed": true
+    },
+    {
+      "name": "create.prefunded.balance",
+      "expected": 26,
+      "passed": true
+    },
+    {
+      "name": "create.revert.returndata",
+      "expected": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000deadbeef",
+      "passed": true
+    },
+    {
+      "name": "create.revert.rollback",
+      "expected": [
+        2,
+        0,
+        1000,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "create.invalid.returndata",
+      "expected": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "passed": true
+    },
+    {
+      "name": "create.invalid.rollback",
+      "expected": [
+        2,
+        0,
+        1000,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "create.insufficient.balance.result",
+      "expected": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "create.insufficient.balance.nonce",
+      "expected": 1,
+      "passed": true
+    },
+    {
+      "name": "create2.address.hash",
+      "expected": 447527489632961457121190404063573941416755847492,
+      "passed": true
+    },
+    {
+      "name": "create2.collision.result",
+      "expected": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "create2.collision.creator.nonce",
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "name": "create2.collision.original.unchanged",
+      "expected": [
+        1,
+        17,
+        99
+      ],
+      "passed": true
+    },
+    {
+      "name": "create2.nonce.only.collision",
+      "expected": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "create2.code.only.collision",
+      "expected": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "parent.revert.receipt",
+      "expected": "0x0",
+      "passed": true
+    },
+    {
+      "name": "parent.revert.creation.state",
+      "expected": [
+        1,
+        0,
+        1000,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "parent.revert.creation.code",
+      "expected": "0x",
+      "passed": true
+    },
+    {
+      "name": "static.create6.rejected",
+      "expected": [
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "static.create7.rejected",
+      "expected": [
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "static.create.creator.nonce",
+      "expected": 1,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.other.balance",
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.other.recipient",
+      "expected": 10000000000000000001111,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.other.code",
+      "expected": "0x5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f526004601cfd5b50602035600755601656",
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.other.storage.nonce",
+      "expected": [
+        99,
+        1
+      ],
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.self.balance",
+      "expected": 1111,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.self.recipient",
+      "expected": 1111,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.self.code",
+      "expected": "0x5f3580600114604657806002146039576003146034575b305f523360205234604052600754606052476080523860a05260c05ff35b602035ff5b63deadbeef5f526004601cfd5b50602035600755601656",
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.existing.self.storage.nonce",
+      "expected": [
+        99,
+        1
+      ],
+      "passed": true
+    },
+    {
+      "name": "static.selfdestruct.rejected",
+      "expected": [
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "static.selfdestruct.balance",
+      "expected": 1111,
+      "passed": true
+    },
+    {
+      "name": "parent.revert.selfdestruct.receipt",
+      "expected": "0x0",
+      "passed": true
+    },
+    {
+      "name": "parent.revert.selfdestruct.balances",
+      "expected": [
+        1111,
+        10000000000000000000000
+      ],
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.other.same.tx.visibility.and.collision",
+      "expected": [
+        447527489632961457121190404063573941416755847492,
+        1,
+        81,
+        24596772859228776897597776315957861543088296053554660548954152741573508546991,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.other.final.code",
+      "expected": "0x",
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.other.final.state",
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.other.recipient.balance",
+      "expected": 10000000000000000000017,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.other.parent.balance",
+      "expected": 983,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.self.same.tx.visibility.and.collision",
+      "expected": [
+        447527489632961457121190404063573941416755847492,
+        1,
+        81,
+        24596772859228776897597776315957861543088296053554660548954152741573508546991,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.self.final.code",
+      "expected": "0x",
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.self.final.state",
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.self.recipient.balance",
+      "expected": 10000000000000000000000,
+      "passed": true
+    },
+    {
+      "name": "selfdestruct.created.self.parent.balance",
+      "expected": 983,
+      "passed": true
+    }
+  ]
+}
