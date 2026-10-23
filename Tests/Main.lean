@@ -2052,6 +2052,9 @@ import Solcore.Test.RustHullMemory
 import Solcore.Test.RustHullKeccak
 import Solcore.Test.RustHullYul
 import Solcore.Test.RustHullLowering
+import Solcore.Test.RustHullCodeImage
+import Solcore.Test.RustHullObjectLinking
+import Solcore.Test.RustHullLinkedContract
 set_option autoImplicit false
 
 open Solcore
@@ -3837,6 +3840,9 @@ def main : IO UInt32 := do
   Tests.RustHullKeccak.run
   Tests.RustHullYul.run
   Tests.RustHullLowering.run
+  Tests.RustHullCodeImage.run
+  Tests.RustHullObjectLinking.run
+  Tests.RustHullLinkedContract.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
