@@ -1,0 +1,118 @@
+{
+  "reference": "Anvil Ethereum ecrecover precompile via eth_call",
+  "anvilVersion": "anvil Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf",
+  "vectors": [
+    {
+      "label": "upstream",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 27,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0x3523e7d34da277c59af090e44cebddb10b73be11780f028d02cf5ae5f24109fc",
+      "output": "0x0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf"
+    },
+    {
+      "label": "upstream_high_s",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 28,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0xcadc182cb25d883a650f6f1bb314224daf3b1ed537399daebd0303a6ddf53745",
+      "output": "0x0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf"
+    },
+    {
+      "label": "nonce_one",
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "v": 27,
+      "r": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "s": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81799",
+      "output": "0x0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf"
+    },
+    {
+      "label": "infinity",
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "v": 27,
+      "r": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "s": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "output": "0x"
+    },
+    {
+      "label": "nonsquare",
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "v": 27,
+      "r": "0x0000000000000000000000000000000000000000000000000000000000000005",
+      "s": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_5",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 1,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0x3523e7d34da277c59af090e44cebddb10b73be11780f028d02cf5ae5f24109fc",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_6",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 29,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0x3523e7d34da277c59af090e44cebddb10b73be11780f028d02cf5ae5f24109fc",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_7",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 283,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0x3523e7d34da277c59af090e44cebddb10b73be11780f028d02cf5ae5f24109fc",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_8",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 27,
+      "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "s": "0x3523e7d34da277c59af090e44cebddb10b73be11780f028d02cf5ae5f24109fc",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_9",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 27,
+      "r": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+      "s": "0x3523e7d34da277c59af090e44cebddb10b73be11780f028d02cf5ae5f24109fc",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_10",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 27,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "output": "0x"
+    },
+    {
+      "label": "invalid_11",
+      "hash": "0xaabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      "v": 27,
+      "r": "0xb3ba6dd3757d18f28736e84b1296af85362b7bdf4548710733c6325abf95311d",
+      "s": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+      "output": "0x"
+    },
+    {
+      "label": "key_2",
+      "hash": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "v": 28,
+      "r": "0x270c504ade45b9bf70ed7dd54f2f253671c4568e3b2a2319d2efc6942b58f796",
+      "s": "0x076b9b8b0449bc498635d324e2f50365964e65ef0fcbcec9b9941e69f91b0aaa",
+      "output": "0x0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf"
+    },
+    {
+      "label": "key_3",
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "v": 27,
+      "r": "0xe95058f48325b8b37415edd898822fcfc83d8fdc5e257d3c370c0304c42dd5f2",
+      "s": "0x6836450f27b3ccd9d0e86629627b28b61fcdaeab49d9099f4170ccd3b3258e81",
+      "output": "0x0000000000000000000000006813eb9362372eef6200f3b1dbc3f819671cba69"
+    }
+  ]
+}
