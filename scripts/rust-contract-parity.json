@@ -1,0 +1,160 @@
+{
+  "upstream_commit": "2a745e12974c373c3799fec81b48a53c7dce2ab4",
+  "scope": "runtimeOnly",
+  "fixtures": [
+    {
+      "id": "00answer",
+      "source": "tests/e2e/00answer/main.sol",
+      "sha256": "60ea4220ae717cfe5b75a2cd686d311b3197b73002945b80c77a2186f9b63c9c",
+      "expectedCallCount": 1,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "01id",
+      "source": "tests/e2e/01id/main.sol",
+      "sha256": "2be539b115125745879a2d5c0641d43b53e9169512b4f582b36ae7e91c01c230",
+      "expectedCallCount": 1,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "arithmetic",
+      "source": "tests/e2e/arithmetic/main.sol",
+      "sha256": "41c7013e7863964d58922d38f6e6eaf79248c61c79f27b587ea0c6a892412523",
+      "expectedCallCount": 4,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "composite-values",
+      "source": "tests/e2e/composite-values/main.sol",
+      "sha256": "766f6cdd6ff5147302719db7315be529f6c3f42f4b33ba5a75cf63386e8ad3e2",
+      "expectedCallCount": 4,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "control-flow-capture-identity",
+      "source": "tests/e2e/control-flow-capture-identity/main.sol",
+      "sha256": "3134f55c8aa3d98267e927515bcd982a0ef8ea2efe9fcf671747199228b4f0c5",
+      "expectedCallCount": 10,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "control-flow-local-lifetimes",
+      "source": "tests/e2e/control-flow-local-lifetimes/main.sol",
+      "sha256": "34dbba558131312e6ba80047005ea5d178d629b980e296a1a2e74d0a5a36dd81",
+      "expectedCallCount": 37,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "control-flow-scope-restoration",
+      "source": "tests/e2e/control-flow-scope-restoration/main.sol",
+      "sha256": "d597df9762471b1d92a52fb13f81676fb9cc1f084cb03e4461e9a2134b6810bd",
+      "expectedCallCount": 28,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "revert",
+      "source": "tests/e2e/revert/main.sol",
+      "sha256": "e1f41040336d8f98b6f2d1681d2a638cf050dfefc0ca047cb4beba2f8f58486f",
+      "expectedCallCount": 1,
+      "initialStateReview": "No constructor state is required. Constructors, where present, are empty; each call is valid from empty storage."
+    },
+    {
+      "id": "abi-byte-memory",
+      "source": "tests/e2e/abi-byte-memory/main.sol",
+      "sha256": "e672ec284ebbf47d859c3ae5c37670296f742e265fd76c2a973262f0cd50ab72",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 8
+    },
+    {
+      "id": "abi-codec-memory",
+      "source": "tests/e2e/abi-codec-memory/main.sol",
+      "sha256": "583de9ee09c2be4e773ddcd4477d7c6b52feddff78b63195b6cd16f9aa708d8f",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 9
+    },
+    {
+      "id": "abi-word-memory",
+      "source": "tests/e2e/abi-word-memory/main.sol",
+      "sha256": "3156412c0e8fa2d5fe9bd8b7d0f76f1e9dad48219dcf9bfd6f8f001cf67ab904",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 9
+    },
+    {
+      "id": "allocator-bounds",
+      "source": "tests/e2e/allocator-bounds/main.sol",
+      "sha256": "49ba076e300974a3c04f99021922aff9edde3885643cbbeaf84ef4be9fd3d22e",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 6
+    },
+    {
+      "id": "nested-aggregate-layouts",
+      "source": "tests/e2e/nested-aggregate-layouts/main.sol",
+      "sha256": "acaba8b4b7cf57eeb660ff402b5a1c1bca405c2a6362da1cafd5d77183bd3029",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 12
+    },
+    {
+      "id": "std-word-correctness",
+      "source": "tests/e2e/std-word-correctness/main.sol",
+      "sha256": "cf20ab48265b4ae2d0445e94d32db18ddc911a0d01c3c6b96fcfef842d42e038",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 7
+    },
+    {
+      "id": "storage-array-layout",
+      "source": "tests/e2e/storage-array-layout/main.sol",
+      "sha256": "3b1f15e25c9dee096013f9939f6f5a3ac110288ff5a9e6a654fb7f69964a5c46",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 11
+    },
+    {
+      "id": "storage-index-order",
+      "source": "tests/e2e/storage-index-order/main.sol",
+      "sha256": "20cb42b02aecc0b368425b465299434043df37887e8a456551589a88b85e9a51",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 1
+    },
+    {
+      "id": "string-crlf-roundtrip",
+      "source": "tests/e2e/string-crlf-roundtrip/main.sol",
+      "sha256": "9bf9eaaedbb0dd8f092ef45f6c91f7f6a6b2a695bcb202bba078d835e1222a8b",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "struct-compound",
+      "source": "tests/e2e/struct-compound/main.sol",
+      "sha256": "12503f653105c6fc4477c10a54fd7c8438caeb913b193f2c382ca744abf22097",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 2
+    },
+    {
+      "id": "struct-load-once",
+      "source": "tests/e2e/struct-load-once/main.sol",
+      "sha256": "f1001c64af2cff3a81f208e2665f65431e95cb39d3d0888b285d6f50f807cf9a",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "struct-shadowed-namespace",
+      "source": "tests/e2e/struct-shadowed-namespace/main.sol",
+      "sha256": "fc65ec16fa8b9ac329bb4fb20d40493d294e9b64870cc24845b4fa78a559a9a9",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 5
+    },
+    {
+      "id": "erc7201-comptime",
+      "source": "tests/e2e/erc7201-comptime/main.sol",
+      "sha256": "777ee09634682aa41dd2aada1c50f7ce82fa018a49f2c5cda7108faa2c9e80aa",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 4
+    },
+    {
+      "id": "zeroize-memory-range",
+      "source": "tests/e2e/zeroize-memory-range/main.sol",
+      "sha256": "9b2bf4d768b066d802b898fca66d5ddf4e8f1c4123d8d6ecb5e179e3c422f2e8",
+      "initialStateReview": "No explicit constructor; each directive is a call from empty storage. Storage-dependent methods initialize their own state or intentionally rely on zeroed storage.",
+      "expectedCallCount": 6
+    }
+  ]
+}

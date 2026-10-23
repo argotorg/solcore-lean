@@ -1,0 +1,534 @@
+{
+  "upstream_url": "https://github.com/argotorg/solcore-rs",
+  "upstream_commit": "2a745e12974c373c3799fec81b48a53c7dce2ab4",
+  "scope": "Unmodified std-free top-level source execution. E2E contract coverage is tracked separately. Expected values are taken from upstream specialization assertions or direct scalar inputs.",
+  "cases": [
+    {
+      "id": "constant-conditional-001",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/001/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "4bd50f764e243eab397c205f9d3d37d14e4dc9e974724925691597bfd964d7cd"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-002",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/002/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "9fc7717e2b48ca74fa191b8b8d603f17814981c692aa81a34739445c30701e20"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-003",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/003/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "4bfa8b96e52c6294826af93f363df5763ef4ce32a56a18a954870582f826dd2d"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-004",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/004/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "b06315fde31ef2c7b283ff987fb2e473389c1608872537b071deba7a1f9b44e5"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-005",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/005/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "5cbc8598db7767ab98aaf524e2a89a5708025f0a934c978b6dfbf6e7a00a7960"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-006",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/006/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "a5bda0df46b0318b51807f5edf93fcd1dd59e9f4aa21514a2273f685b3b24b2e"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-007",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/007/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "e7327b7db74e46378848477f5bc44653aa458aa1ba1d30f0f80f832b0d5253b0"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-008",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/008/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "b8b5441ecc0a5b6788f3832ad209c38bfe64dda6ce76338b9e0b7b4f22bc57c2"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-009",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/009/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "2b71a22e9b2cedbc444ce0e8e714e4e1bc80d5f499f6c16e7baa27f478ea8489"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "constant-conditional-010",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/010/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "75840d1651bf9d88ccc8dc2f76f2db1275f1b7ca735b8667de72e45a1f421875"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "folded-scope-001",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/001/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "a2457951caab8deada3ea38a2235c8b661ef989948b7b99dcd4004553105def6"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "folded-scope-003",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/003/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "01db78f78f976ef11e32b11639720d9a5a06d8c14f21dc369c7a7dad49624b2e"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "3"
+      }
+    },
+    {
+      "id": "folded-scope-005",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/005/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "2061a38981023074fa76deecd9a260c765bc0fbcd054d621133ca22b42496b8a"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "6"
+      }
+    },
+    {
+      "id": "folded-scope-007",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/007/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "f4bbb8822036b68a5c522d9887c06e60e7768ab8fd5588ca6a2a852aebb2725f"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "3"
+      }
+    },
+    {
+      "id": "folded-scope-009",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/009/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "e46ba9442e26c9527c476d01fa5d881a8b71883ab7a6b7df5933c83305fc9fd8"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "3"
+      }
+    },
+    {
+      "id": "folded-scope-011",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/011/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "053c0f77cd7609216841e8d08bff9e34f7cc9812f765ef983a7f83daad5d97db"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "3"
+      }
+    },
+    {
+      "id": "folded-scope-013",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/013/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "79601deb9aecd48fe746f63ebd4b93a041aa0fb12efb8a6bff846cf77ab77055"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "5"
+      }
+    },
+    {
+      "id": "folded-scope-015",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/015/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "51c693e0f1b93d4a3bfa7174ec16f60c302f4f822fbf10650580eb7d54b2db9b"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "2"
+      }
+    },
+    {
+      "id": "closure-capture-false",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/callable_capture/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "48f0057852733e86ce3d49e517d4f9b92829fb5248512f6db056f4a608a3712c"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "false"
+        },
+        {
+          "kind": "word",
+          "value": "17"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "17"
+      }
+    },
+    {
+      "id": "initializer-scope-false",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/initializer_read/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "9f0067cefc676634ca88758b5b3c4380fc74a4e28431e66497fa10199805daa8"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "false"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "0"
+      }
+    },
+    {
+      "id": "known-match-false",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/known_match/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "49505395ab8b137178f369e5792db11d41ca415cdd5bcc9efe27a44ce1c7edce"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "false"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "7"
+      }
+    },
+    {
+      "id": "repeated-pattern-false",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/repeated_pattern_names_residualize_only_the_visible_declaration/001/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "407e6218d5eca5cae8e44376316c5785c0d91aab2a025588be221e035a2ede1a"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "false"
+        }
+      ],
+      "expected": {
+        "kind": "bool",
+        "value": "false"
+      }
+    },
+    {
+      "id": "closure-capture-true",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/callable_capture/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "48f0057852733e86ce3d49e517d4f9b92829fb5248512f6db056f4a608a3712c"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "true"
+        },
+        {
+          "kind": "word",
+          "value": "17"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "17"
+      }
+    },
+    {
+      "id": "initializer-scope-true",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/initializer_read/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "9f0067cefc676634ca88758b5b3c4380fc74a4e28431e66497fa10199805daa8"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "true"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "7"
+      }
+    },
+    {
+      "id": "known-match-true",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/known_match/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "49505395ab8b137178f369e5792db11d41ca415cdd5bcc9efe27a44ce1c7edce"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "true"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "7"
+      }
+    },
+    {
+      "id": "repeated-pattern-true",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/repeated_pattern_names_residualize_only_the_visible_declaration/001/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "407e6218d5eca5cae8e44376316c5785c0d91aab2a025588be221e035a2ede1a"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "bool",
+          "value": "true"
+        }
+      ],
+      "expected": {
+        "kind": "bool",
+        "value": "true"
+      }
+    },
+    {
+      "id": "returned-closure",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/known_if_binding_order/known_return_closure/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "4d0c6f8c39bc7e95e53b2767530583b10d8289e1bb96e8ac5308b6cff9e9f4cb"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "7"
+      }
+    },
+    {
+      "id": "unused-method-generic",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/trait_methods_allow_unused_method_type_parameters/001/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "bb86b5dbc0f515fb0ad1374f18d41ae8c3eec827db0cbf7d2164e6d4e73a578f"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "word",
+          "value": "12"
+        },
+        {
+          "kind": "word",
+          "value": "34"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "34"
+      }
+    },
+    {
+      "id": "cyclic-superclasses",
+      "sources": [
+        {
+          "upstream_path": "crates/specialize/tests/fixtures/audit/cyclic_superclass_dictionaries_preserve_repeated_projections/001/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "98bb340bc274aa006b26a24574ab45225ebad2c8b039c9d2fa39abd7da643dd0"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "1"
+      }
+    },
+    {
+      "id": "hull-known-match",
+      "sources": [
+        {
+          "upstream_path": "crates/hull/tests/fixtures/regressions/read_only_known_match_comptime/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "936800c5632454752f15b3035ae5b7ccba101bc0357048a78f31332d8f190564"
+        }
+      ],
+      "arguments": [],
+      "expected": {
+        "kind": "word",
+        "value": "7"
+      }
+    },
+    {
+      "id": "hull-nested-layout",
+      "sources": [
+        {
+          "upstream_path": "crates/hull/tests/fixtures/layouts/nested_box_inline/main.sol",
+          "workspace_path": "main.sol",
+          "sha256": "7721c16fc6a6032a9542115f4b7c296738be1ea42df73181bba102a772800df9"
+        }
+      ],
+      "arguments": [
+        {
+          "kind": "word",
+          "value": "42"
+        }
+      ],
+      "expected": {
+        "kind": "word",
+        "value": "42"
+      }
+    }
+  ]
+}
