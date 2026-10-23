@@ -19,7 +19,8 @@ open GeneralizedLocalLambdaGeneration (Indexed)
 open GeneralizedLocalDescriptorOrigin (Origin)
 
 structure Materialization (compiled : SourceCoreUnifiedCompilation.Compiled)
-    (mapping : LocationMap) (world : StoreTyping) (function : Dynamic.Closure) where
+    (mapping : LocationMap) (world : StoreTyping) (function : Dynamic.Closure)
+    (viewRelation : TypedSource → TypedSource → Prop := LambdaMetadataViews.MetadataView) where
   descriptor : Dynamic.GeneralizedClosure
   binding : SourceCoreLocalPolymorphism.Binding
   lexical : TypeSystem.Substitution
@@ -54,7 +55,7 @@ structure Materialization (compiled : SourceCoreUnifiedCompilation.Compiled)
   frameLocation : Core.Location
   frameReference : captured.canonical[GeneralizedLocalInstanceValues.referenceIndex indexed]? =
     some (.cellRef compiled.indexed.ancestry.layout.frame.type frameLocation)
-  code : Code compiled.indexed function inputs.scope captured.administrative
+  code : Code compiled.indexed function inputs.scope captured.administrative viewRelation
   compilation : code.compilation = GeneralizedLocalLambdaCompilation.context inputs packet.original.emission.prepared
   active : code.active = packet.original.emission.prepared.substitution
   lowered : code.lowered = packet.original.lowered
@@ -75,14 +76,22 @@ structure Materialization (compiled : SourceCoreUnifiedCompilation.Compiled)
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {mapping futureMapping : LocationMap} {world futureWorld : StoreTyping}
   {function : Dynamic.Closure}
+  {viewRelation : TypedSource → TypedSource → Prop}
 
-def Materialization.extend (material : Materialization compiled mapping world function)
+def Materialization.extend (material : Materialization compiled mapping world function viewRelation)
     (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
-    Materialization compiled futureMapping futureWorld function :=
+    Materialization compiled futureMapping futureWorld function viewRelation :=
   { material with captured := material.captured.extend maps worlds
                   rawTyped := material.rawTyped.weaken worlds }
 
-theorem Materialization.frame_reference (material : Materialization compiled mapping world function) :
+/-- Weakening view evidence retains the same stored packet and every capture. -/
+def Materialization.weaken_view {after : TypedSource → TypedSource → Prop}
+    (material : Materialization compiled mapping world function viewRelation)
+    (weaken : ∀ source view, viewRelation source view → after source view) :
+    Materialization compiled mapping world function after :=
+  { material with code := material.code.weaken_view weaken }
+
+theorem Materialization.frame_reference (material : Materialization compiled mapping world function viewRelation) :
     material.captured.canonical[material.code.referenceIndex]? =
       some (.cellRef compiled.indexed.ancestry.layout.frame.type material.frameLocation) := by
   simpa only [Code.referenceIndex, material.compilation, GeneralizedLocalInstanceValues.referenceIndex]
@@ -90,7 +99,7 @@ theorem Materialization.frame_reference (material : Materialization compiled map
 
 /-- Canonical provenance belongs to the compiler view. The independently
 substituted runtime Source is carried by the actual paired history. -/
-theorem Materialization.compiler_source_receipt (material : Materialization compiled mapping world function) :
+theorem Materialization.compiler_source_receipt (material : Materialization compiled mapping world function viewRelation) :
     LambdaSourceAlignment.SourceReceipt compiled.indexed.base.sourceProgram compiled.indexed.base.plan
       material.code.compilation.owner material.code.active material.code.view := by
   have authentic : LambdaSourceAlignment.SourceReceipt material.inputs.program material.inputs.current.plan
@@ -102,7 +111,7 @@ theorem Materialization.compiler_source_receipt (material : Materialization comp
 
 /-- Compatibility for clients whose actual source is the canonical compiler
 view. General applied origins use the independent paired-source producer. -/
-theorem Materialization.source_receipt_of_eq (material : Materialization compiled mapping world function)
+theorem Materialization.source_receipt_of_eq (material : Materialization compiled mapping world function viewRelation)
     (same : function.source = material.code.view) :
     LambdaSourceAlignment.SourceReceipt compiled.indexed.base.sourceProgram compiled.indexed.base.plan
       material.code.compilation.owner material.code.active function.source := by
@@ -111,7 +120,7 @@ theorem Materialization.source_receipt_of_eq (material : Materialization compile
 
 abbrev Materialization.source_receipt := @Materialization.source_receipt_of_eq
 
-theorem Materialization.native_type (material : Materialization compiled mapping world function) :
+theorem Materialization.native_type (material : Materialization compiled mapping world function viewRelation) :
     material.candidate.type = CallableContract.functionType material.code.receipt.parameterCore material.code.receipt.resultCore := by
   have same := GeneralizedLocalMaterializedCode.value_eq material.indexed material.code material.lowered
     material.captured.embedding material.origin.native material.actual
@@ -122,7 +131,7 @@ theorem Materialization.native_type (material : Materialization compiled mapping
 
 /-- The compiler-selected read wrapper and the captured reference remain
 available after the read has returned and the caller has changed. -/
-structure View (material : Materialization compiled mapping world function) where
+structure View (material : Materialization compiled mapping world function viewRelation) where
   owner : SourceCoreLocalPolymorphism.Key
   active : TypeSystem.Substitution
   source : TypedSource
@@ -155,7 +164,7 @@ structure View (material : Materialization compiled mapping world function) wher
   lexicalReference : material.captured.canonical[material.code.referenceIndex]? =
     some (.cellRef compiled.indexed.ancestry.layout.frame.type location)
 
-theorem View.materialized_pair {material : Materialization compiled mapping world function} (view : View material) :
+theorem View.materialized_pair {material : Materialization compiled mapping world function viewRelation} (view : View material) :
     CallableAppliedDynamicSourceMaterialization.Pair compiled.indexed.ancestry.graph.inputs
       (.appliedView view.id material.code.descriptor.id view.callerGhost material.origin.ghost)
       (view.recipe.read.after material.origin.metadata) function.source := by
@@ -168,7 +177,7 @@ theorem View.materialized_pair {material : Materialization compiled mapping worl
     material.instantiation view.scheme view.actualType
   simpa only [← material.materialized] using result.1
 
-def View.native {material : Materialization compiled mapping world function} (view : View material) : Value :=
+def View.native {material : Materialization compiled mapping world function viewRelation} (view : View material) : Value :=
   GeneralizedLocalReadView.value compiled.indexed.ancestry.layout.frame
     material.code.receipt.parameterCore material.code.receipt.resultCore view.id material.code.descriptor.id
     view.referenceIndex view.embedding view.callerNative (.inLeft .word .unit)
@@ -177,53 +186,73 @@ def View.native {material : Materialization compiled mapping world function} (vi
       (SourceCoreCallableIndexedFrames.encode compiled.indexed.ancestry.layout.frame material.origin.native :: material.actual))
     view.environment
 
-def View.extend {material : Materialization compiled mapping world function} (view : View material)
+def View.extend {material : Materialization compiled mapping world function viewRelation} (view : View material)
     (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
     View (material.extend maps worlds) :=
   { view with }
 
+def View.weaken_view {after : TypedSource → TypedSource → Prop}
+    {material : Materialization compiled mapping world function viewRelation} (view : View material)
+    (weaken : ∀ source target, viewRelation source target → after source target) :
+    View (material.weaken_view weaken) := { view with }
+
+theorem View.weaken_view_native {after : TypedSource → TypedSource → Prop}
+    {material : Materialization compiled mapping world function viewRelation} (view : View material)
+    (weaken : ∀ source target, viewRelation source target → after source target) :
+    (view.weaken_view weaken).native = view.native := rfl
+
 inductive Association (compiled : SourceCoreUnifiedCompilation.Compiled)
-    (mapping : LocationMap) (world : StoreTyping) :
+    (mapping : LocationMap) (world : StoreTyping)
+    {viewRelation : optParam (TypedSource → TypedSource → Prop) LambdaMetadataViews.MetadataView} :
     Dynamic.Closure → Value → List CallableIndexedParameterCertificates.Binding → Ty → Ty → Type where
-  | viewed {function : Dynamic.Closure} (material : Materialization compiled mapping world function)
+  | viewed {function : Dynamic.Closure} (material : Materialization compiled mapping world function viewRelation)
       (view : View material)
       (typed : RuntimeValueHasType world view.native
         (CallableContract.functionType material.code.receipt.parameterCore material.code.receipt.resultCore)
         compiled.indexed.layouts.definitions) :
-      Association compiled mapping world function view.native material.code.receipt.loweredParameters
+      Association compiled mapping world (viewRelation := viewRelation) function view.native material.code.receipt.loweredParameters
         material.code.receipt.parameterCore material.code.receipt.resultCore
 
 variable {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
 
 def Association.AtFrame
-    (member : Association compiled mapping world function native bindings parameter result)
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result)
     (location : Core.Location) : Prop :=
   match member with
   | .viewed _ view _ => view.location = location
 
 theorem Association.projection
-    (member : Association compiled mapping world function native bindings parameter result) :
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result) :
     compiled.compatible.checked.catalog.project (FunctionValues.sourceType function) =
       .ok (CallableContract.functionType parameter result) := by
   cases member with
   | viewed material _ _ => exact material.code.projection
 
 theorem Association.runtime_hasType
-    (member : Association compiled mapping world function native bindings parameter result) :
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result) :
     RuntimeValueHasType world native (CallableContract.functionType parameter result) compiled.indexed.layouts.definitions := by
   cases member with
   | viewed _ _ typed => exact typed
 
 def Association.extend
-    (member : Association compiled mapping world function native bindings parameter result)
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result)
     (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
-    Association compiled futureMapping futureWorld function native bindings parameter result := by
+    Association compiled futureMapping futureWorld (viewRelation := viewRelation) function native bindings parameter result := by
   cases member with
   | viewed material view typed =>
     exact .viewed (material.extend maps worlds) (view.extend maps worlds) (typed.weaken worlds)
 
+def Association.weaken_view {after : TypedSource → TypedSource → Prop}
+    (member : Association compiled mapping world (viewRelation := viewRelation)
+      function native bindings parameter result)
+    (weaken : ∀ source view, viewRelation source view → after source view) :
+    Association compiled mapping world (viewRelation := after) function native bindings parameter result := by
+  cases member with
+  | viewed material view typed =>
+    exact .viewed (material.weaken_view weaken) (view.weaken_view weaken) typed
+
 theorem Association.stage_origin
-    (member : Association compiled mapping world function native bindings parameter result) :
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result) :
     CallableLedger.OriginRep compiled.indexed.base.plan compiled.indexed.ancestry.graph.inputs.callable.table
       (.closure function) native := by
   cases member with
@@ -242,7 +271,7 @@ theorem Association.stage_origin
 
 
 theorem Association.observation
-    (member : Association compiled mapping world function native bindings parameter result)
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result)
     {registry : SourceCoreRawMetadata.Registry} {identities : Dynamic.Value → Word → Prop}
     (profile : compiled.compatible.checked.catalog.callableContracts = true) :
     CompatibleEquality.Observation compiled.compatible.checked.catalog registry identities
@@ -251,7 +280,7 @@ theorem Association.observation
   | viewed _ _ _ => exact .contractedAnonymous _ _ _ _ _ profile
 
 theorem Association.source_binders
-    (member : Association compiled mapping world function native bindings parameter result) :
+    (member : Association compiled mapping world (viewRelation := viewRelation) function native bindings parameter result) :
     bindings.map (fun binding => binding.1.scheme.body) =
       function.parameters.map (fun binder => binder.scheme.body) := by
   cases member with

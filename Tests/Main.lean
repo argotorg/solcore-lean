@@ -1,3 +1,4 @@
+import Solcore.Test.SourceNodeGraphAutomation
 import Solcore.Test.SourceBodyTemplateScope
 import Solcore.Test.SourceCachedTemplateScope
 import Solcore.Test.SourceCompiledNestedInitializerPrivacy

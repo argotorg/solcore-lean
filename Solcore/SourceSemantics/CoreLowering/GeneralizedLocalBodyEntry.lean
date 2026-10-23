@@ -40,7 +40,8 @@ structure Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
     {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
     {capturedActual : Environment}
     (captured : Captures prepared mapping world scope function.captured capturedActual)
-    (code : Code prepared function scope captured.administrative) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope captured.administrative viewRelation) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
     (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
     (registry : SourceCoreRawMetadata.Registry)
     (cells : GenericHeap.CellModel prepared.layouts.definitions)
@@ -78,13 +79,15 @@ structure Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
 
 namespace Stateful
 
-theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+theorem entry_exists_with_spine_of_input_ids {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {descriptor : Dynamic.GeneralizedClosure} {binding : SourceCoreLocalPolymorphism.Binding}
     {lexical : TypeSystem.Substitution} (origin : Origin prepared descriptor binding lexical)
     {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
     {capturedActual : Environment}
     (captured : Captures prepared mapping world scope function.captured capturedActual)
-    (code : Code prepared function scope captured.administrative) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope captured.administrative viewRelation) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    (inputIds : function.source.inputs.map TypedBinder.id = code.view.inputs.map TypedBinder.id)
     (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
     {registry : SourceCoreRawMetadata.Registry} {cells : GenericHeap.CellModel prepared.layouts.definitions}
     (ordinaryCells : GenericHeap.OrdinaryCells
@@ -153,8 +156,8 @@ theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {p
     captured.represented actualLayout manifestDescriptor fields code.receipt.allocatedBody
       (store.set location (encode layout next))
   obtain ⟨entry, added, prefixLength, canonicalEq, transition⟩ :=
-    CellAwareLambdaViewPrefix.Stateful.entry_of_accepted_with_spine functions ordinaryCells code.allocationError
-      protocol producer code.viewOfSource (prefix_accepted code) (parameters code) inputs.kinds inputs.extended
+    CellAwareLambdaViewPrefix.Stateful.entry_of_accepted_with_spine_of_input_ids functions ordinaryCells code.allocationError
+      protocol producer inputIds (prefix_accepted code) (parameters code) inputs.kinds inputs.extended
       rfl registered represented captured.represented installedHeaps locals
       (GenericExpressionMeaning.agree_prefix actualLayout manifest) (.cons manifestTyped actualTyped)
       (inputs.referenceIndex ▸ reference) installedRead unmapped initial readyAt
@@ -171,6 +174,55 @@ theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {p
       obtain ⟨bodyStore, bodyEval, finalEq⟩ := frame.2 evaluated
       exact ⟨bodyStore, agreement.unwrap bodyEval, finalEq⟩,
     unmapped, refTyped, read⟩, added, prefixLength, canonicalEq, transition⟩
+
+/-- Compatibility with full-table view evidence. -/
+theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {descriptor : Dynamic.GeneralizedClosure} {binding : SourceCoreLocalPolymorphism.Binding}
+    {lexical : TypeSystem.Substitution} (origin : Origin prepared descriptor binding lexical)
+    {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
+    {capturedActual : Environment}
+    (captured : Captures prepared mapping world scope function.captured capturedActual)
+    (code : Code prepared function scope captured.administrative) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
+    {registry : SourceCoreRawMetadata.Registry} {cells : GenericHeap.CellModel prepared.layouts.definitions}
+    (ordinaryCells : GenericHeap.OrdinaryCells
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) cells)
+    {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
+    (producer : ProtectedStateTransition.CellAllocation.Producer
+      (catalog := CompatibleEquality.storageCatalog values.checked.catalog) protocol prepared.layouts
+      prepared.ancestry.layout.frame cells)
+    {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world code.receipt.loweredParameters arguments nativeArguments)
+    {before : Dynamic.Heap} {store : Store} {location : Location}
+    {callerNative : NativeFrame} {callerGhost : GhostFrame} {caller : MetadataState} {id : Word}
+    (callerCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table
+      callerNative callerGhost (some caller))
+    (recipe : CallableAppliedViewProvenance.Recipe prepared.ancestry.graph.inputs callerGhost
+      origin.ghost caller origin.metadata id code.descriptor.id)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+    (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
+    (read : store.read? location = some (encode prepared.ancestry.layout.frame
+      (SourceCoreCallableIndexedDispatch.readFrame id code.descriptor.id callerNative)))
+    (unmapped : location ∉ mapping)
+    (initial : protocol.State ⟨scope, mapping, world, before,
+      store.set location (encode prepared.ancestry.layout.frame
+        (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id origin.native
+          (SourceCoreCallableIndexedDispatch.readFrame id code.descriptor.id callerNative))), captured.canonical⟩)
+    (readyAt : ProtectedStateTransition.CellAllocation.ReadyAt producer location
+      (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id origin.native
+        (SourceCoreCallableIndexedDispatch.readFrame id code.descriptor.id callerNative))) :
+    ∃ entry : Entry origin captured code inputs functions registry cells arguments nativeArguments before store
+      location callerNative callerGhost caller id recipe,
+      ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
+        entry.entry.canonical = added ++ captured.canonical ∧
+        ProtectedStateTransition.Transition protocol initial
+          ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
+            entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := by
+  exact entry_exists_with_spine_of_input_ids origin captured code inputs
+    (congrArg (List.map TypedBinder.id) code.viewOfSource.inputs) functions ordinaryCells protocol producer
+    represented callerCarried recipe heaps locals reference read unmapped initial readyAt
 
 end Stateful
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyEntry

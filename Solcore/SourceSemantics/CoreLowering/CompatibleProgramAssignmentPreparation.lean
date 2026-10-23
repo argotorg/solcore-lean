@@ -86,7 +86,7 @@ private theorem expression_resume {capacity next : Nat} {owner : Key} {source : 
         throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression node.id))
       pure (.yield (next, indices, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, none, keyType, node.type, node.span, reason⟩],
-        fixed, node.id :: seen))) = Except.ok outcome) :
+        fixed, node.id :: seen))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated, outcome = .yield updated ∧
       Inventory capacity updated.1 updated.2.1 updated.2.2.1 updated.2.2.2.1
         original updated.2.2.2.2.1 := by
@@ -117,7 +117,7 @@ private theorem place_resume {capacity next : Nat} {owner : Key} {source : Typed
         | none => throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression key))
       pure (.yield (next, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, some assignment.target.root,
-          keyNode.type, valueType, node.span, reason⟩]))) = Except.ok outcome) :
+          keyNode.type, valueType, node.span, reason⟩]))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated, outcome = .yield updated ∧
       Inventory capacity updated.1 indices updated.2.1 updated.2.2 original fixed := by
   split at ran

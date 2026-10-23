@@ -97,7 +97,8 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
 
 /-- The actual code and inventory determine the same descriptor, full source
 node, ordered lambda parameters and native header. -/
-theorem selected (code : Code prepared function scope administrative) :
+theorem selected {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) :
     ∃ template, prepared.ancestry.graph.inputs.templates.lambdaAt? code.descriptor.id = some template ∧
       PreparedTemplate prepared.base template ∧
       template.owner = code.compilation.owner ∧ template.id = code.id ∧ template.active = code.active ∧

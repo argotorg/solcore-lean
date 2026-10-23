@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmPrefix
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMarkedAllocation
@@ -17,6 +18,70 @@ def request (source : TypedSource) (scope : SourceCoreSourceCells.Scope)
 
 /-- The erased marker metadata does not retype the independent hidden heap
 cell. Actual captures and payloads still come from their real typed slots. -/
+theorem preserves_cells_with_state {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    {allocationSource : TypedSource} {scope : SourceCoreSourceCells.Scope} {binder : TypedBinder} {payload : Ty}
+    (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (request allocationSource scope binder payload))
+    (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+      (layouts.allocatorAt owner active onError) (request allocationSource scope binder payload))
+    (same : annotation.original = allocation.expression)
+    (ordinary : allocationSource.inputs.any (fun input => decide (input.id = binder.id)) = false)
+    (fresh : scope.any (fun binding => decide (binding.1 = binder.id)) = false)
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects definitions}
+    {cells : GenericHeap.CellModel definitions}
+    (ordinaryCells : GenericHeap.OrdinaryCells model cells)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (producer : ProtectedStateTransition.CellAllocation.Producer (catalog := catalog) protocol layouts frame cells)
+    (definitionsEq : layouts.definitions = definitions) (registered : frame.Registered definitions)
+    {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+    {before after : Dynamic.Heap} {store : Store} {sourceType : TypeSystem.Ty}
+    {sourceValue : Dynamic.Value} {value : Value} {location : Dynamic.Location}
+    {contextLocation : Location} {native : NativeFrame}
+    (represented : model.Represents mapping world sourceType sourceValue value payload)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical definitions)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (ready : producer.Ready initial contextLocation native)
+    (allocated : Dynamic.Heap.Allocates before sourceType (some sourceValue) location after) :
+    ∃ captured,
+      let nextStore := store ++ [SourceCoreCallableIndexedFrames.encode frame native,
+        SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, .inRight .unit value]
+      let nextWorld := world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]
+      let nextMap := mapping ++ [store.length + 2]
+      let nextRef := Value.cellRef (OptionalCell.cellType payload) (store.length + 2)
+      Evaluates (value :: actual) store (annotation.expression.rename ξ.lift) nextRef nextStore ∧
+      DataHeap.EnvRepresents catalog nextMap nextWorld administrative ((binder.id, payload) :: scope)
+        environment (nextRef :: canonical) definitions ∧
+      GenericHeap.CellHeapRepresents cells nextMap nextWorld after nextStore ∧
+      AdministrativePreserved mapping store nextMap nextStore ∧
+      nextStore.read? (store.length + 2) = some (.inRight .unit value) ∧
+      ProtectedStateTransition.Transition protocol initial
+        ⟨(binder.id, payload) :: scope, nextMap, nextWorld, after, nextStore, nextRef :: canonical⟩ := by
+  have canonicalLayout : EnvironmentsAgree (request allocationSource scope binder payload).references canonical (value :: canonical) :=
+    fun found => found
+  have referenceAt : (value :: canonical)[SourceCoreCallableIndexedAllocationFrames.referenceIndex globals
+      (request allocationSource scope binder payload)]? = some (.cellRef frame.type contextLocation) := by
+    have kind : SourceCoreCallableIndexedAllocationFrames.isNamedInput (request allocationSource scope binder payload) = false := ordinary
+    simp only [SourceCoreCallableIndexedAllocationFrames.referenceIndex, kind]
+    exact canonicalLayout reference
+  obtain ⟨captured, _captures, _captureTyped, evaluated, nextHeaps, nextReference, preserved, transition⟩ :=
+    producer.complete allocation annotation same definitionsEq registered
+      environments canonicalLayout heaps referenceAt read (PayloadAt.initialized rfl rfl)
+      (ordinaryCells.inject (GenericHeap.CellRepresents.initialized represented)) (.ordinary allocated) initial ready
+  refine ⟨captured, CallableIndexedAllocationRenaming.transport allocation annotation same (Or.inr rfl)
+    evaluated (agrees.lift value),
+    .internal nextReference (environments.fresh_absent fresh) (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩),
+    nextHeaps, preserved, ?_, transition⟩
+  simp [Store.read?]
+
+/-- Compatibility with the original ordinary heap uses the same cell proof. -/
 theorem preserves_with_state {layouts : SourceCoreAllocationLayouts.Prepared}
     {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
     {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -61,22 +126,12 @@ theorem preserves_with_state {layouts : SourceCoreAllocationLayouts.Prepared}
       nextStore.read? (store.length + 2) = some (.inRight .unit value) ∧
       ProtectedStateTransition.Transition protocol initial
         ⟨(binder.id, payload) :: scope, nextMap, nextWorld, after, nextStore, nextRef :: canonical⟩ := by
-  have canonicalLayout : EnvironmentsAgree (request source scope binder payload).references canonical (value :: canonical) :=
-    fun found => found
-  have referenceAt : (value :: canonical)[SourceCoreCallableIndexedAllocationFrames.referenceIndex globals
-      (request source scope binder payload)]? = some (.cellRef frame.type contextLocation) := by
-    have kind : SourceCoreCallableIndexedAllocationFrames.isNamedInput (request source scope binder payload) = false := ordinary
-    simp only [SourceCoreCallableIndexedAllocationFrames.referenceIndex, kind]
-    exact canonicalLayout reference
-  obtain ⟨captured, _captures, _captureTyped, evaluated, nextHeaps, nextReference, preserved, transition⟩ :=
-    producer.complete allocation annotation same definitionsEq registered
-      environments canonicalLayout heaps referenceAt read (PayloadAt.initialized rfl rfl)
-      (GenericHeap.CellRepresents.initialized represented) allocated initial ready
-  refine ⟨captured, CallableIndexedAllocationRenaming.transport allocation annotation same (Or.inr rfl)
-    evaluated (agrees.lift value),
-    .internal nextReference (environments.fresh_absent fresh) (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩),
-    nextHeaps, preserved, ?_, transition⟩
-  simp [Store.read?]
+  obtain ⟨captured, evaluated, nextEnvironments, nextHeaps, preservation, payloadRead, transition⟩ :=
+    preserves_cells_with_state (allocationSource := source) allocation annotation same ordinary fresh
+      (GenericHeap.OrdinaryCells.ordinary model) protocol producer.toCells definitionsEq registered
+      represented environments (GenericHeap.ordinaryHeap_iff.mpr heaps) agrees reference read initial ready allocated
+  exact ⟨captured, evaluated, nextEnvironments, GenericHeap.ordinaryHeap_iff.mp nextHeaps,
+    preservation, payloadRead, transition⟩
 
 /-- The original API forgets only the reached state. -/
 theorem preserves {layouts : SourceCoreAllocationLayouts.Prepared}

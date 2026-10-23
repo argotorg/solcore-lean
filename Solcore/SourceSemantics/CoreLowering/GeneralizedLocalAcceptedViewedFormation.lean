@@ -9,7 +9,8 @@ open Core Frontend SourceInference GeneralHeap ReadOnly
 open CallableIndexedHistory CallableIndexedLambdaValues
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationMap} {world : StoreTyping}
-  {function : Dynamic.Closure} {material : Materialization compiled mapping world function}
+  {function : Dynamic.Closure} {viewRelation : SourceInference.TypedSource → SourceInference.TypedSource → Prop}
+  {material : Materialization compiled mapping world function viewRelation}
 
 theorem View.formation (view : View material) {store : Store}
     (read : Evaluates view.environment store (view.original.expression.rename view.embedding)
@@ -43,7 +44,7 @@ theorem View.represents (view : View material) {store : Store} {context : Core.C
         material.code.receipt.resultCore)) compiled.indexed.layouts.definitions)
     (environments : RuntimeEnvironmentHasTypes world view.environment context compiled.indexed.layouts.definitions)
     (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
-    Nonempty (Association compiled mapping world function view.native material.code.receipt.loweredParameters
+    Nonempty (Association (viewRelation := viewRelation) compiled mapping world function view.native material.code.receipt.loweredParameters
       material.code.receipt.parameterCore material.code.receipt.resultCore) := by
   have evaluated := view.formation read snapshot
   obtain ⟨future, _, finalStored, outputTyped⟩ := evaluation_preserves_type evaluated typed environments stored

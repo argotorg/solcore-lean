@@ -43,7 +43,8 @@ abbrev Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepared 
 /-- The parameter scope is extracted from the real lambda binder action. -/
 theorem body_scope {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) :
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) :
     code.receipt.bodyScope = code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope := by
   simpa only [List.map_reverse] using (FunctionCode.Parameters.of_accepted code.receipt.parametersCompiled).scope
 
@@ -51,7 +52,8 @@ theorem body_scope {values : SourceCoreCompatibleValues.Context} {prepared : Pre
 loop-body API; the accepted source argument remains the real view. -/
 theorem loops_accepted {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) (policy : SourceCoreLoops.Policy)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) (policy : SourceCoreLoops.Policy)
     (callback : code.lowerBody (FunctionCode.children code.policy code.lowerBody code.fuel code.compilation) =
       SourceCoreLoops.lowerStatementsWithPolicy policy) :
     SourceCoreLoops.lowerStatementsWithPolicy policy code.fuel code.view

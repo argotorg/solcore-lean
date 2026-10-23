@@ -15,7 +15,8 @@ theorem Entry.scope_effect {values : SourceCoreCompatibleValues.Context} {prepar
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
     {capturedActual : Environment}
     (captured : Captures prepared mapping world scope function.captured capturedActual)
-    (code : Code prepared function scope captured.administrative) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope captured.administrative viewRelation) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
     (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
     (registry : SourceCoreRawMetadata.Registry)
     (cells : GenericHeap.CellModel prepared.layouts.definitions)

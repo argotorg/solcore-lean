@@ -18,7 +18,8 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
 
 theorem value_eq (indexed : Indexed prepared packet)
     {function : Dynamic.Closure} {administrative : Core.Context}
-    (code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative viewRelation)
     (lowered : code.lowered = packet.original.lowered)
     (embedding : Renaming) (native : NativeFrame) (actual : Core.Environment) :
     CallableIndexedLambdaValues.value code embedding native actual =
@@ -45,7 +46,8 @@ theorem value_eq (indexed : Indexed prepared packet)
 provenance for the actual materialized source and its full child key. -/
 theorem source_receipt (indexed : Indexed prepared packet)
     {function : Dynamic.Closure} {administrative : Core.Context}
-    (code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative viewRelation)
     (compilation : code.compilation = GeneralizedLocalLambdaCompilation.context inputs packet.original.emission.prepared)
     (active : code.active = packet.original.emission.prepared.substitution)
     (sourceEq : function.source = packet.original.emission.prepared.source) :

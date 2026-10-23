@@ -14,7 +14,11 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedFlowOutcomes (Represents Post)
 universe u
 
-variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+  {bodyRelation : ActualBodyInvocation.BodyRelation} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
   {protocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
@@ -22,10 +26,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (context : SourceSemantics.Context)
   {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
   (model : GenericHeap.PayloadModel catalog projects compiled.indexed.layouts.definitions)
-  (index : ActualBodyInvocation.Index compiled)
+  (index : ActualBodyInvocation.Index compiled bodyRelation)
   (producer : ProtectedStateTransition.CellAllocation.Producer (catalog := catalog) protocol compiled.indexed.layouts
     compiled.indexed.ancestry.layout.frame
-    (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)))
+    (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)))
   (registry : Staging.Recursive.Registry) (invocation : Staging.Recursive.Scope)
   (faults : RecursiveStageMeaning.FaultRep) (administrative : Core.Context)
   (scope : SourceCoreLocalCell.Scope) (mode : Bool) (statements : List StatementId)
@@ -37,7 +41,7 @@ def PreservesAt (size : Nat) : Prop :=
   ∀ {mapping world actualContext environment canonical actual before store embedding},
     DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical compiled.indexed.layouts.definitions →
     GenericHeap.CellHeapRepresents
-      (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)) mapping world before store →
+      (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree embedding canonical actual →
     RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions →
@@ -47,9 +51,9 @@ def PreservesAt (size : Nat) : Prop :=
     ProtectedStateImperativeTypedSourceSites.Statements index.source context statements →
     ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
       Admission bridge context initial →
-      CellAwareScopeAuthority.At (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+      CellAwareScopeAuthority.At (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         index.owner index.active mapping world before store environment →
-    ∀ physical : CellAwareInvocationPhysical.Physical compiled index context scope canonical mapping world before store environment,
+    ∀ physical : CellAwareInvocationPhysical.Physical (attachment := attachment) compiled index context scope canonical mapping world before store environment,
     ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys,
       owner.key.frameLocation = physical.location →
       ProtectedStateTransition.CellAllocation.ReadyAt producer physical.location physical.native →
@@ -60,11 +64,11 @@ def PreservesAt (size : Nat) : Prop :=
       Evaluates actual store (code.rename embedding) value finalStore ∧
       Represents model finalMap finalWorld mode expected type faults outcome value ∧
       GenericHeap.CellHeapRepresents
-        (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed))
+        (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment))
         finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
-      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         mapping world before store finalMap finalWorld after finalStore ∧
       ∃ reached : protocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ Post bridge context expected outcome reached
@@ -75,7 +79,7 @@ def ReflectsAt (size : Nat) : Prop :=
   ∀ {mapping world actualContext environment canonical actual before store embedding value finalStore},
     DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical compiled.indexed.layouts.definitions →
     GenericHeap.CellHeapRepresents
-      (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)) mapping world before store →
+      (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree embedding canonical actual →
     RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions →
@@ -85,9 +89,9 @@ def ReflectsAt (size : Nat) : Prop :=
     ProtectedStateImperativeTypedSourceSites.Statements index.source context statements →
     ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
       Admission bridge context initial →
-      CellAwareScopeAuthority.At (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+      CellAwareScopeAuthority.At (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         index.owner index.active mapping world before store environment →
-    ∀ physical : CellAwareInvocationPhysical.Physical compiled index context scope canonical mapping world before store environment,
+    ∀ physical : CellAwareInvocationPhysical.Physical (attachment := attachment) compiled index context scope canonical mapping world before store environment,
     ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys,
       owner.key.frameLocation = physical.location →
       ProtectedStateTransition.CellAllocation.ReadyAt producer physical.location physical.native →
@@ -97,25 +101,25 @@ def ReflectsAt (size : Nat) : Prop :=
         statements finalContext outcome after ∧
       Represents model finalMap finalWorld mode expected type faults outcome value ∧
       GenericHeap.CellHeapRepresents
-        (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed))
+        (GeneralizedLocalDescriptorHeap.cellModel model (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment))
         finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
-      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         mapping world before store finalMap finalWorld after finalStore ∧
       ∃ reached : protocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ Post bridge context expected outcome reached
 
 def PreservesAtMost (budget : Nat) : Prop :=
-  ∀ size, size ≤ budget → PreservesAt bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
+  ∀ size, size ≤ budget → PreservesAt (attachment := attachment) bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
 
 def PreservesBelow (budget : Nat) : Prop :=
-  ∀ size, size < budget → PreservesAt bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
+  ∀ size, size < budget → PreservesAt (attachment := attachment) bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
 
 def ReflectsAtMost (budget : Nat) : Prop :=
-  ∀ size, size ≤ budget → ReflectsAt bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
+  ∀ size, size ≤ budget → ReflectsAt (attachment := attachment) bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
 
 def ReflectsBelow (budget : Nat) : Prop :=
-  ∀ size, size < budget → ReflectsAt bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
+  ∀ size, size < budget → ReflectsAt (attachment := attachment) bridge context model index producer registry invocation faults administrative scope mode statements expected type code size
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationFlowBounds

@@ -45,7 +45,7 @@ private theorem roots_of_map {source : TypedSource} {statements : List Statement
     | expression id => cases accepted
     | statement id =>
       simp only [List.mapM_cons, pure, Except.pure, bind, Except.bind] at accepted
-      cases lowered : List.mapM (fun x => match x with
+      cases lowered : List.mapM (m := Except SourceCoreGeneralFunctions.Error) (fun x => match x with
         | .statement id => Except.ok id
         | .expression id => throw (SourceCoreGeneralFunctions.Error.expectedStatementRoot id)) rest with
       | error error => simp only [lowered] at accepted; cases accepted

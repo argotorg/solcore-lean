@@ -10,14 +10,18 @@ open Core Frontend SourceInference TypeSystem GeneralHeap
 open GeneralizedLocalLocatedRows GeneralizedLocalBundleContexts CallableIndexedHistory
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {index : ActualBodyInvocation.Index compiled} {context nextContext : SourceSemantics.Context}
+  {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+  {bodyRelation : ActualBodyInvocation.BodyRelation}
+  {index : ActualBodyInvocation.Index compiled bodyRelation} {context nextContext : SourceSemantics.Context}
 
 theorem Entry.recontext {frameLocation id location mapping world heap store binder}
     {sourceOwner : Resolved.DeclarationId}
-    (entry : Entry compiled index context frameLocation id location mapping world heap store)
+    (entry : Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store)
     (extended : BinderExtends sourceOwner context binder nextContext)
     (different : binder.id ≠ id) :
-    Entry compiled index nextContext frameLocation id location mapping world heap store := by
+    Entry (attachment := attachment) compiled index nextContext frameLocation id location mapping world heap store := by
   cases entry with
   | ordinary read descriptor => exact .ordinary read descriptor
   | generalized located owner binderId lexical frames fields requirements =>
@@ -31,7 +35,7 @@ private theorem monomorphic_entries {frameLocation mapping world heap store envi
     (typed : Dynamic.HeapWellTyped context heap)
     (monomorphic : ∀ id scheme, (id, scheme) ∈ scope → scheme.quantified = []) :
     ∀ {id location}, Dynamic.Environment.LooksUp environment id location →
-      Entry compiled index context frameLocation id location mapping world heap store := by
+      Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store := by
   induction agrees with
   | nil => intro id location lookup; cases lookup
   | @cons scope environment headId scheme headLocation cell read _ storage tail ih =>
@@ -60,19 +64,19 @@ def Physical.of_monomorphic {scope canonical mapping world heap store environmen
     (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
     (typed : Dynamic.HeapWellTyped context heap)
     (monomorphic : ∀ id scheme, (id, scheme) ∈ context.locals → scheme.quantified = []) :
-    Physical compiled index context scope canonical mapping world heap store environment :=
+    Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment :=
   ⟨frame, declarations, ownership, sourceDeclarations, location, reference, read, unmapped,
     monomorphic_entries locals typed monomorphic⟩
 
 def Physical.cons {scope canonical mapping world heap store environment binder payload sourceLocation}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment)
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment)
     (extended : BinderExtends index.source.owner context binder nextContext)
     (declarations : CompatibleExpressionReads.ScopeDeclarations index.source
       ((binder.id, payload) :: scope) nextContext)
     (member : binder ∈ SourceCoreDataPlaces.declaredBinders index.source)
     (reference : Core.Value)
-    (head : Entry compiled index nextContext physical.location binder.id sourceLocation mapping world heap store) :
-    Physical compiled index nextContext ((binder.id, payload) :: scope) (reference :: canonical)
+    (head : Entry (attachment := attachment) compiled index nextContext physical.location binder.id sourceLocation mapping world heap store) :
+    Physical (attachment := attachment) compiled index nextContext ((binder.id, payload) :: scope) (reference :: canonical)
       mapping world heap store ((binder.id, sourceLocation) :: environment) := by
   refine ⟨physical.frame, declarations, physical.ownership,
     CellAwareScopeDeclarations.scope_bind payload member physical.sourceDeclarations extended, physical.location, ?_, physical.read, physical.unmapped, ?_⟩

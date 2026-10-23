@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedCall
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalCallPrefix
+import Solcore.SourceSemantics.CoreLowering.CallableBodyMetadataViews
 
 /-! One body index retains its actual compiler action and invocation origin.
 Named cache calls and materialized local calls share the body interface. The
@@ -15,33 +16,42 @@ open GeneralizedLocalAcceptedMaterialization
 
 /-- Both constructors retain the accepted compiler receipt. The contextual
 constructor also keeps the actual stored closure, read and lexical frame. -/
-inductive Index (compiled : SourceCoreUnifiedCompilation.Compiled) where
+abbrev BodyRelation := TypedSource → TypedSource → List StatementId → Prop
+
+abbrev FullView : BodyRelation := fun source view _ => LambdaMetadataViews.MetadataView source view
+
+abbrev ReachedView : BodyRelation := fun source view body =>
+  CallableBodyMetadataViews.BodyView source view (body.map NodeId.statement)
+
+inductive Index (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (bodyRelation : BodyRelation := FullView) where
   | named {named : SourceCoreGeneralFunctions.Function}
       {diagnostics : SourceCoreDataPlaceFaultSites.Program} {output : Expr}
       (receipt : CallableIndexedNamedGeneration.Compilation compiled.indexed named diagnostics output)
       (selected : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan
         named.signature.key = .ok named.specialized)
   | contextual {mapping : LocationMap} {world : StoreTyping} {function : Dynamic.Closure}
-      (material : Materialization compiled mapping world function) (view : View material)
+      (material : Materialization compiled mapping world function
+        (fun source view => bodyRelation source view function.body)) (view : View material)
 
-variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {bodyRelation : BodyRelation}
 
-def Index.owner : Index compiled → SourceCompilationPlan.Key
-  | @Index.named _ callable _ _ _ _ => callable.signature.key
+def Index.owner : Index compiled bodyRelation → SourceCompilationPlan.Key
+  | @Index.named _ _ callable _ _ _ _ => callable.signature.key
   | .contextual material _ => material.code.compilation.owner
 
-def Index.active : Index compiled → TypeSystem.Substitution
+def Index.active : Index compiled bodyRelation → TypeSystem.Substitution
   | .named _ _ => []
   | .contextual material _ => material.code.active
 
-def Index.source : Index compiled → TypedSource
-  | @Index.named _ callable _ _ _ _ => CallableIndexedNamedGeneration.source callable
-  | @Index.contextual _ _ _ function _ _ => function.source
+def Index.source : Index compiled bodyRelation → TypedSource
+  | @Index.named _ _ callable _ _ _ _ => CallableIndexedNamedGeneration.source callable
+  | @Index.contextual _ _ _ _ function _ _ => function.source
 
 /-- The actual native body is compiled against this view. Runtime Source
 history remains a distinct index, even when only requirement metadata differs. -/
-def Index.compilerSource : Index compiled → TypedSource
-  | @Index.named _ callable _ _ _ _ => CallableIndexedNamedGeneration.source callable
+def Index.compilerSource : Index compiled bodyRelation → TypedSource
+  | @Index.named _ _ callable _ _ _ _ => CallableIndexedNamedGeneration.source callable
   | .contextual material _ => material.code.view
 
 theorem Index.source_view (index : Index compiled) :
@@ -50,51 +60,84 @@ theorem Index.source_view (index : Index compiled) :
   | named _ _ => exact .refl _
   | contextual material _ => exact material.code.viewOfSource
 
-def Index.compilation : Index compiled → SourceCoreFunctions.Context
-  | @Index.named _ callable _ _ _ _ => CallableIndexedNamedGeneration.context compiled.indexed callable
+def Index.compilation : Index compiled bodyRelation → SourceCoreFunctions.Context
+  | @Index.named _ _ callable _ _ _ _ => CallableIndexedNamedGeneration.context compiled.indexed callable
   | .contextual material _ => material.code.compilation
 
-def Index.policy : Index compiled → SourceCoreLoops.Policy
-  | @Index.named _ callable diagnostics _ receipt _ =>
+def Index.policy : Index compiled bodyRelation → SourceCoreLoops.Policy
+  | @Index.named _ _ callable diagnostics _ receipt _ =>
       AcceptedNamedBodyFlow.namedPolicy compiled.indexed callable diagnostics receipt.parents receipt.own
   | .contextual material _ => GeneralizedLocalAcceptedBodyCompiler.policy material
 
-def Index.fuel : Index compiled → Nat
+def Index.fuel : Index compiled bodyRelation → Nat
   | .named _ _ => compiled.indexed.fuel
   | .contextual material _ => material.code.fuel
 
-def Index.scope : Index compiled → SourceCoreLocalCell.Scope
-  | @Index.named _ callable _ _ _ _ => callable.inputs.reverse.map fun binding => (binding.1.id, binding.2)
+def Index.scope : Index compiled bodyRelation → SourceCoreLocalCell.Scope
+  | @Index.named _ _ callable _ _ _ _ => callable.inputs.reverse.map fun binding => (binding.1.id, binding.2)
   | .contextual material _ => material.code.receipt.loweredParameters.reverse.map
       (fun binding => (binding.1.id, binding.2)) ++ material.inputs.scope
 
-def Index.statements : Index compiled → List StatementId
+def Index.statements : Index compiled bodyRelation → List StatementId
   | .named receipt _ => receipt.statements
-  | @Index.contextual _ _ _ function _ _ => function.body
+  | @Index.contextual _ _ _ _ function _ _ => function.body
 
-def Index.result : Index compiled → Ty
-  | @Index.named _ callable _ _ _ _ => callable.signature.resultType
+theorem Index.reached_view (index : Index compiled ReachedView) :
+    CallableBodyMetadataViews.BodyView index.source index.compilerSource
+      (index.statements.map NodeId.statement) := by
+  cases index with
+  | named _ _ => exact .refl _ _
+  | contextual material _ => exact material.code.viewOfSource
+
+/-- All code, compiler receipts, stored values and frames are shared when only
+the required source-view evidence is weakened. -/
+def Index.weaken_view {before after : BodyRelation} (index : Index compiled before)
+    (weaken : ∀ source view body, before source view body → after source view body) :
+    Index compiled after :=
+  match index with
+  | .named receipt selected => .named receipt selected
+  | .contextual material view => .contextual
+      (material.weaken_view (fun source target => weaken source target _))
+      (view.weaken_view (fun source target => weaken source target _))
+
+def Index.restrict_view (index : Index compiled) : Index compiled ReachedView :=
+  index.weaken_view (fun _ _ body related =>
+    CallableBodyMetadataViews.BodyView.of_metadata related (body.map NodeId.statement))
+
+def Index.result : Index compiled bodyRelation → Ty
+  | @Index.named _ _ callable _ _ _ _ => callable.signature.resultType
   | .contextual material _ => material.code.receipt.resultCore
 
-def Index.reasonAt : Index compiled → ExpressionId → Word
-  | @Index.named _ callable diagnostics _ _ _ => diagnostics.reasonAt callable.signature.key
+def Index.reasonAt : Index compiled bodyRelation → ExpressionId → Word
+  | @Index.named _ _ callable diagnostics _ _ _ => diagnostics.reasonAt callable.signature.key
   | .contextual material _ => material.code.reasonAt
 
-def Index.fellThrough : Index compiled → Word
+def Index.fellThrough : Index compiled bodyRelation → Word
   | .named receipt _ => receipt.own.fellThroughReason
   | .contextual material _ => material.code.compilation.internalReason
 
-def Index.escaped : Index compiled → Word
+def Index.escaped : Index compiled bodyRelation → Word
   | .named receipt _ => receipt.own.table.escapedReason
   | .contextual material _ => material.code.compilation.internalReason
 
-def Index.body : Index compiled → Expr
+def Index.body : Index compiled bodyRelation → Expr
   | .named receipt _ => receipt.body
   | .contextual material _ => material.code.receipt.body
 
+theorem Index.weaken_view_fields {before after : BodyRelation} (index : Index compiled before)
+    (weaken : ∀ source view body, before source view body → after source view body) :
+    (index.weaken_view weaken).source = index.source ∧
+    (index.weaken_view weaken).compilerSource = index.compilerSource ∧
+    (index.weaken_view weaken).owner = index.owner ∧
+    (index.weaken_view weaken).active = index.active ∧
+    (index.weaken_view weaken).policy = index.policy ∧
+    (index.weaken_view weaken).statements = index.statements ∧
+    (index.weaken_view weaken).body = index.body := by
+  cases index <;> exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
 /-- The complete actual body, with the compiler's original fuel, policy,
 parameter scope, diagnostics and statement order. -/
-theorem Index.body_receipt (index : Index compiled) :
+theorem Index.body_receipt (index : Index compiled bodyRelation) :
     Nonempty (AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope
       index.statements index.result index.reasonAt index.fellThrough index.escaped index.body) := by
   cases index with
@@ -104,7 +147,7 @@ theorem Index.body_receipt (index : Index compiled) :
     simpa only [Index.policy, Index.fuel, Index.compilerSource, Index.scope, Index.statements,
       Index.result, Index.reasonAt, Index.fellThrough, Index.escaped, Index.body] using receipt
 
-theorem Index.compilation_owner (index : Index compiled) :
+theorem Index.compilation_owner (index : Index compiled bodyRelation) :
     index.compilation.owner = index.owner := by cases index <;> rfl
 
 private theorem entry_of_id (table : SourceCoreStageCodebook.Table)
@@ -124,7 +167,8 @@ private theorem entry_of_id (table : SourceCoreStageCodebook.Table)
 /-- Descriptor selection makes the native cumulative substitution agree with
 the actual candidate compiler. This does not identify semantic substitutions. -/
 theorem view_native_active {mapping world function}
-    {material : Materialization compiled mapping world function} (view : View material) :
+    {viewRelation : TypedSource → TypedSource → Prop}
+    {material : Materialization compiled mapping world function viewRelation} (view : View material) :
     (view.recipe.read.after material.origin.metadata).nativeActive = material.code.active := by
   obtain ⟨entry, found, origin⟩ := entry_of_id _ material.indexed.descriptor.found
   rw [← material.descriptorId] at found
@@ -136,14 +180,15 @@ theorem view_native_active {mapping world function}
   exact active.symm.trans material.active.symm
 
 theorem view_metadata_owner {mapping world function}
-    {material : Materialization compiled mapping world function} (view : View material) :
+    {viewRelation : TypedSource → TypedSource → Prop}
+    {material : Materialization compiled mapping world function viewRelation} (view : View material) :
     (view.recipe.read.after material.origin.metadata).metadata.owner = material.code.compilation.owner := by
   change material.origin.metadata.metadata.owner = material.code.compilation.owner
   rw [material.compilation]
   exact material.origin.owner.trans material.owner.symm
 
 /-- The real frame history and independently substituted source at body entry. -/
-structure Frame (index : Index compiled) where
+structure Frame (index : Index compiled bodyRelation) where
   native : NativeFrame
   ghost : GhostFrame
   metadata : MetadataState
@@ -154,8 +199,15 @@ structure Frame (index : Index compiled) where
   owner : metadata.metadata.owner = index.owner
   active : metadata.nativeActive = index.active
 
+def Frame.weaken_view {before after : BodyRelation} {index : Index compiled before}
+    (frame : Frame index)
+    (weaken : ∀ source view body, before source view body → after source view body) :
+    Frame (index.weaken_view weaken) := by
+  cases index <;> exact { frame with }
+
 def Frame.contextual {mapping world function}
-    (material : Materialization compiled mapping world function) (view : View material) :
+    (material : Materialization compiled mapping world function
+      (fun source view => bodyRelation source view function.body)) (view : View material) :
     Frame (.contextual material view) where
   native := view.selected
   ghost := .appliedView view.id material.code.descriptor.id view.callerGhost material.origin.ghost
@@ -165,7 +217,7 @@ def Frame.contextual {mapping world function}
   owner := view_metadata_owner view
   active := view_native_active view
 
-theorem Index.frame (index : Index compiled) : Nonempty (Frame index) := by
+theorem Index.frame (index : Index compiled bodyRelation) : Nonempty (Frame index) := by
   cases index with
   | named receipt selected =>
     obtain ⟨id, chosen, carried, _⟩ := receipt.history selected

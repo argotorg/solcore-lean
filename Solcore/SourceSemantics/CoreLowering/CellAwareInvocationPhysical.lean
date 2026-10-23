@@ -17,31 +17,38 @@ open GeneralizedLocalLocatedRows GeneralizedLocalBundleContexts CallableIndexedH
 open GeneralizedLocalAcceptedLocatedRows ActualBodyInvocation
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {index : Index compiled} {context : SourceSemantics.Context}
+  {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+  {bodyRelation : ActualBodyInvocation.BodyRelation}
+  {index : Index compiled bodyRelation} {context : SourceSemantics.Context}
 
-inductive Entry (compiled : SourceCoreUnifiedCompilation.Compiled)
-    (index : Index compiled) (context : SourceSemantics.Context)
+inductive Entry {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+    (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (index : Index compiled bodyRelation) (context : SourceSemantics.Context)
     (frameLocation : Core.Location) (id : Resolved.LocalId) (location : Dynamic.Location)
     (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (store : Store) : Prop where
   | ordinary {cell : Dynamic.Cell} (read : Dynamic.Heap.Reads heap location cell)
       (descriptor : cell.generalized = none) :
-      Entry compiled index context frameLocation id location mapping world heap store
+      Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store
   | generalized {function : Dynamic.GeneralizedClosure} {binding : SourceCoreLocalPolymorphism.Binding}
       {lexical : Substitution}
-      (located : Located (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+      (located : Located (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         function binding lexical location mapping world heap store)
       (owner : binding.caller = index.owner) (binder : binding.binder.id = id)
       (lexicalContext : ContextExtension lexical index.active)
-      (frames : GeneralizedLocalAcceptedLocatedRows.Located.FramesWith (fun _ _ _ => True) located frameLocation)
+      (frames : GeneralizedLocalAcceptedLocatedRows.Located.FramesWith attachment located frameLocation)
       (fields : Dynamic.RuntimeContextFields function.definitionContext context)
       (requirements : context.LocalSchemeRequirementsLookup function.binder.id function.binder.schemeRequirements) :
-      Entry compiled index context frameLocation id location mapping world heap store
+      Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store
 
 theorem Entry.transport {frameLocation id location mapping world heap store nextMap nextWorld after finalStore}
-    (entry : Entry compiled index context frameLocation id location mapping world heap store)
-    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+    (entry : Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store)
+    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
       mapping world heap store nextMap nextWorld after finalStore) :
-    Entry compiled index context frameLocation id location nextMap nextWorld after finalStore := by
+    Entry (attachment := attachment) compiled index context frameLocation id location nextMap nextWorld after finalStore := by
   cases entry with
   | ordinary read descriptor =>
     obtain ⟨cell, updated, _, same⟩ := effect.metadata _ _ read
@@ -52,15 +59,30 @@ theorem Entry.transport {frameLocation id location mapping world heap store next
       (GeneralizedLocalAcceptedLocatedRows.Located.FramesWith.transport frames effect.maps effect.worlds same) fields requirements
 
 theorem Entry.authority {frameLocation id location mapping world heap store}
-    (entry : Entry compiled index context frameLocation id location mapping world heap store) :
-    CellAwareScopeAuthority.Entry (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+    (entry : Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store) :
+    CellAwareScopeAuthority.Entry (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
       index.owner index.active id location mapping world heap store := by
   cases entry with
   | ordinary read descriptor => exact .ordinary read descriptor
   | generalized located owner binder lexical _ _ _ => exact .generalized owner binder lexical ⟨located⟩
 
-structure Physical (compiled : SourceCoreUnifiedCompilation.Compiled)
-    (index : Index compiled) (context : SourceSemantics.Context)
+theorem Entry.weaken_view {before after : BodyRelation} {index : Index compiled before}
+    {frameLocation id location mapping world heap store}
+    (entry : Entry (attachment := attachment) compiled index context frameLocation id location mapping world heap store)
+    (weaken : ∀ source view body, before source view body → after source view body) :
+    Entry (attachment := attachment) compiled (index.weaken_view weaken) context frameLocation id location mapping world heap store := by
+  cases entry with
+  | ordinary read descriptor => exact .ordinary read descriptor
+  | generalized located owner binder lexical frames fields requirements =>
+    have same := index.weaken_view_fields weaken
+    exact .generalized located (owner.trans same.2.2.1.symm) binder
+      (same.2.2.2.1.symm ▸ lexical) frames fields requirements
+
+structure Physical {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+    (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (index : Index compiled bodyRelation) (context : SourceSemantics.Context)
     (scope : SourceCoreLocalCell.Scope) (canonical : Core.Environment)
     (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (store : Store)
     (environment : Dynamic.Environment) where
@@ -76,24 +98,33 @@ structure Physical (compiled : SourceCoreUnifiedCompilation.Compiled)
     some (SourceCoreCallableIndexedFrames.encode compiled.indexed.ancestry.layout.frame frame.native)
   unmapped : location ∉ mapping
   entries : ∀ {id sourceLocation}, Dynamic.Environment.LooksUp environment id sourceLocation →
-    Entry compiled index context location id sourceLocation mapping world heap store
+    Entry (attachment := attachment) compiled index context location id sourceLocation mapping world heap store
+
+def Physical.weaken_view {before after : BodyRelation} {index : Index compiled before}
+    {scope canonical mapping world heap store environment}
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment)
+    (weaken : ∀ source view body, before source view body → after source view body) :
+    Physical (attachment := attachment) compiled (index.weaken_view weaken) context scope canonical mapping world heap store environment := by
+  cases index <;>
+    exact { physical with frame := physical.frame.weaken_view weaken
+                          entries := fun found => (physical.entries found).weaken_view weaken }
 
 
 abbrev Physical.native {scope canonical mapping world heap store environment}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment) : NativeFrame :=
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment) : NativeFrame :=
   physical.frame.native
 
 abbrev Physical.ghost {scope canonical mapping world heap store environment}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment) : GhostFrame :=
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment) : GhostFrame :=
   physical.frame.ghost
 
 
 def Physical.transport {scope canonical mapping world heap store environment nextMap nextWorld after finalStore}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment)
-    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment)
+    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
       mapping world heap store nextMap nextWorld after finalStore)
     (preserved : AdministrativePreserved mapping store nextMap finalStore) :
-    Physical compiled index context scope canonical nextMap nextWorld after finalStore environment :=
+    Physical (attachment := attachment) compiled index context scope canonical nextMap nextWorld after finalStore environment :=
   { frame := physical.frame
     declarations := physical.declarations
     ownership := physical.ownership
@@ -107,27 +138,27 @@ def Physical.transport {scope canonical mapping world heap store environment nex
     entries := fun lookup => (physical.entries lookup).transport effect }
 
 @[simp] theorem Physical.transport_location {scope canonical mapping world heap store environment nextMap nextWorld after finalStore}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment)
-    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment)
+    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
       mapping world heap store nextMap nextWorld after finalStore)
     (preserved : AdministrativePreserved mapping store nextMap finalStore) :
     (physical.transport effect preserved).location = physical.location := rfl
 
 @[simp] theorem Physical.transport_native {scope canonical mapping world heap store environment nextMap nextWorld after finalStore}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment)
-    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment)
+    (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
       mapping world heap store nextMap nextWorld after finalStore)
     (preserved : AdministrativePreserved mapping store nextMap finalStore) :
     (physical.transport effect preserved).native = physical.native := rfl
 
 theorem Physical.generalized {scope canonical mapping world heap store environment id location cell function}
-    (physical : Physical compiled index context scope canonical mapping world heap store environment)
+    (physical : Physical (attachment := attachment) compiled index context scope canonical mapping world heap store environment)
     (lookup : Dynamic.Environment.LooksUp environment id location)
     (read : Dynamic.Heap.Reads heap location cell) (descriptor : cell.generalized = some function) :
-    ∃ binding lexical, ∃ located : Located (GeneralizedLocalAcceptedInstances.trackedModel compiled.indexed)
+    ∃ binding lexical, ∃ located : Located (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         function binding lexical location mapping world heap store,
       binding.caller = index.owner ∧ binding.binder.id = id ∧ ContextExtension lexical index.active ∧
-      GeneralizedLocalAcceptedLocatedRows.Located.FramesWith (fun _ _ _ => True) located physical.location ∧ Dynamic.RuntimeContextFields function.definitionContext context ∧
+      GeneralizedLocalAcceptedLocatedRows.Located.FramesWith attachment located physical.location ∧ Dynamic.RuntimeContextFields function.definitionContext context ∧
       context.LocalSchemeRequirementsLookup function.binder.id function.binder.schemeRequirements := by
   cases physical.entries lookup with
   | ordinary previous empty =>

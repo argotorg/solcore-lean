@@ -1,5 +1,5 @@
 import Lean
-import Solcore.SourceSemantics.SourceInferenceActualGeneralizationProgress
+import Solcore.SourceSemantics.SourceInferenceRelativeReadProgress
 
 /-! Collect only kernel-checkable child-path evidence whose exact original
 prefix equations are already present in the proof context. Failed constructor
@@ -50,7 +50,7 @@ elab "actual_invoke" : tactic => withMainContext do
           unless reachedType.isAppOf ``CallOccurrence do throwError "Not an actual path"
           let (arguments, _, resultType) ← forallMetaTelescopeReducing hypothesis.type
           let resultType ← whnf resultType
-          unless resultType.isAppOf ``ProgressFields do throwError "Not a progress hypothesis"
+          unless resultType.isAppOf ``ProgressFields || resultType.isAppOf ``RelativeReadProgressFields do throwError "Not a progress hypothesis"
           let mut matched := false
           for argument in arguments do
             let type ← whnf (← inferType argument)

@@ -253,7 +253,7 @@ private theorem expression_growth {next : Nat} {owner : Key} {source : TypedSour
         throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression node.id))
       pure (.yield (next, indices, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, none, keyType, node.type, node.span, reason⟩],
-        fixed, node.id :: seen))) = Except.ok outcome) :
+        fixed, node.id :: seen))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated, outcome = .yield updated ∧ Growth places updated.2.2.1 missing updated.2.2.2.1 := by
   split at ran
   · try dsimp only [pure, Except.pure, bind, Except.bind] at ran

@@ -12,7 +12,8 @@ open GeneralizedLocalAcceptedMaterialization
 open GeneralizedLocalLambdaCompilation (representation binder)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationMap} {world : StoreTyping}
-  {function : Dynamic.Closure} (material : Materialization compiled mapping world function)
+  {function : Dynamic.Closure} {viewRelation : TypedSource → TypedSource → Prop}
+  (material : Materialization compiled mapping world function viewRelation)
 
 def policy : SourceCoreLoops.Policy :=
   let actual := representation material.inputs material.packet.original.emission.prepared

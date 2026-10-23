@@ -18,7 +18,8 @@ open SourceCoreCallableIndexedFrames
 Body syntax, compilation and execution are independent of these inputs. -/
 structure Context {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) where
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) where
   context : SourceSemantics.Context
   types : List TypeSystem.Ty
   extended : MonoBindersExtend function.source.owner function.context function.parameters types context
@@ -28,13 +29,15 @@ structure Context {values : SourceCoreCompatibleValues.Context} {prepared : Prep
 
 theorem parameters {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) :
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) :
     function.parameters = code.receipt.loweredParameters.map Prod.fst :=
   (FunctionCode.Parameters.of_accepted code.receipt.parametersCompiled).binders.symm
 
 theorem prefix_accepted {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) :
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) :
     SourceCoreSourceCells.bindParameters
       (SourceCoreCallableIndexedAllocationFrames.allocator prepared.ancestry.layout.frame prepared.base.globals.length
         (prepared.layouts.allocatorAt code.compilation.owner code.active code.allocationError))

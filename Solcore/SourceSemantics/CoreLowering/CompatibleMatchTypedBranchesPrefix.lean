@@ -44,6 +44,126 @@ private theorem case_left {environment : Environment} {before middle : Store}
 /-- The entire attempted-arm fold has no other finite result than execution
 of its selected, related continuation. The initial store may contain arbitrary
 typed administrative functions, and the body itself is unrestricted syntax. -/
+theorem Stateful.Decision.prefix_cells_sized {compilation : SourceCoreCompatibleDataMatches.Context} {context : SourceSemantics.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : CompatiblePayload.FunctionModel compilation.checked.catalog ambient}
+    {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+    {active : TypeSystem.Substitution} {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    {cells : GenericHeap.CellModel ambient.definitions}
+    (ordinaryCells : GenericHeap.OrdinaryCells (CompatibleAmbientHeap.payloadModel compilation.checked registry functions) cells)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (producer : ProtectedStateTransition.CellAllocation.Producer (catalog := CompatibleEquality.storageCatalog compilation.checked.catalog) protocol layouts layout cells)
+    (stateBindings : ProtectedStateTransition.Bindings protocol)
+    (definitions : layouts.definitions = ambient.definitions) (registered : layout.Registered ambient.definitions)
+    (allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator layout globals
+      (layouts.allocatorAt owner active onError)))
+    {mapping : LocationMap} {world : StoreTyping}
+    {allocationSource : TypedSource} {site : StatementId} {scope : Scope} {expected : TypeSystem.Ty}
+    {bodyCertificate : BodyCertificate} {resultType : Ty}
+    {sourceValue : Dynamic.Value} {value : Value} {cases : List TypedMatchCase} {arms : List (Pattern × Expr)}
+    {fallback : Option (List StatementId)} {fallbackCode : Expr} {selection : Dynamic.MatchCaseSelection}
+    (decision : Decision compilation context registry functions mapping world scope bodyCertificate resultType sourceValue value
+      cases arms fallback fallbackCode selection)
+    (certificates : Arms compilation allocationSource site scope expected bodyCertificate cases arms)
+    {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {heap : Dynamic.Heap} {store : Store} {ξ : Renaming} {branches : Expr}
+    (branchesCompiled : Branches compilation allocationSource scope (LocalLoop.controlType resultType) fallbackCode arms branches)
+    (kinds : ∀ item ∈ arms, ∀ binding ∈ item.1.bindings, allocationSource.inputs.any (fun input => decide (input.id = binding.1.id)) = false)
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
+    (unmapped : contextLocation ∉ mapping)
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical ambient.definitions)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    (actualLayout : EnvironmentsAgree ξ (value :: canonical) actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
+    (readyAt : ProtectedStateTransition.CellAllocation.ReadyAt producer contextLocation native) :
+    ∃ finalScope finalEnvironment finalHeap finalCanonical finalActual finalStore finalMap finalWorld finalEmbedding finalContext body,
+      SelectedBody bodyCertificate scope environment heap resultType selection finalScope finalEnvironment finalHeap body ∧
+      DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compilation.checked.catalog) finalMap finalWorld administrativeContext
+        finalScope finalEnvironment finalCanonical ambient.definitions ∧
+      GenericHeap.CellHeapRepresents cells finalMap finalWorld finalHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧
+      EnvironmentsAgree finalEmbedding finalCanonical finalActual ∧
+      RuntimeEnvironmentHasTypes finalWorld finalActual finalContext ambient.definitions ∧
+      finalCanonical[finalScope.length + 1 + globals]? = some (.cellRef layout.type contextLocation) ∧
+      finalStore.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native) ∧
+      contextLocation ∉ finalMap ∧
+      CanonicalPrefix scope canonical finalScope finalCanonical ∧
+      ContinuationSize false actual store
+        (branches.rename ξ)
+        finalActual finalStore (body.rename finalEmbedding) ∧
+      ∃ final : protocol.State ⟨finalScope, finalMap, finalWorld, finalHeap, finalStore, finalCanonical⟩,
+        protocol.Relates initial final ∧ Nonempty (ProtectedStateTransition.ReturnTo protocol scope canonical
+          finalScope finalCanonical) := by
+  induction decision generalizing actual ξ branches actualContext with
+  | @head arm rest pattern body arms fallback fallbackCode bindings values matched bindingsRepresented runs certified =>
+    cases certificates with
+    | cons certificate matcherTyped bodyCertified tail =>
+      have matchedCore : Evaluates actual store ((Expr.apply pattern.matcher (.var 0)).rename ξ)
+          (.inRight .unit (packValues values)) store := by
+        rw [Expr.rename, closed_rename matcherTyped ξ]
+        exact runs actual store (.var (ξ 0)) (.var (actualLayout (index := 0) rfl))
+      cases branchesCompiled with
+      | cons allocation tailBranches =>
+        obtain ⟨finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
+          finalEmbedding, allocated, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, agreement, finalState, related, restoration⟩ :=
+          CompatibleMatchTypedArmPrefix.Stateful.bindArm_prefix_cells_sized ordinaryCells (bindings_arguments bindingsRepresented) protocol producer stateBindings definitions registered allocator allocation
+            (named := false) (kinds (pattern, body) (by simp)) reference read unmapped
+            environments heaps (actualLayout.lift (packValues values))
+            (.cons (Arguments.pack_typed (bindings_arguments bindingsRepresented)) actualTyped) initial readyAt
+        have bindings := bindings_identical bindingsRepresented
+        rw [bindings] at allocated
+        exact ⟨_, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
+          finalEmbedding, _, body, .arm bindings allocated certified,
+          finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, ((ContinuationSize.case_right matchedCore).trans agreement).weak, finalState, related, restoration⟩
+  | @tail arm rest pattern body arms fallback fallbackCode selection notMatched fails next ih =>
+    cases certificates with
+    | cons certificate matcherTyped bodyCertified tail =>
+      have failedCore : Evaluates actual store ((Expr.apply pattern.matcher (.var 0)).rename ξ)
+          (.inLeft (bundleType pattern.bindingTypes) .unit) store := by
+        rw [Expr.rename, closed_rename matcherTyped ξ]
+        exact fails actual store (.var (ξ 0)) (.var (actualLayout (index := 0) rfl))
+      have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ)
+          (value :: canonical) (.unit :: actual) := by
+        intro index foundValue found
+        exact actualLayout found
+      cases branchesCompiled with
+      | cons allocation tailBranches =>
+        obtain ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
+          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, agreement, finalState, related, restoration⟩ :=
+          ih tail tailBranches (fun item member => kinds item (List.mem_cons_of_mem _ member)) nextLayout (.cons .unit actualTyped)
+        refine ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
+          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, ?_, finalState, related, restoration⟩
+        simp only [LoopStatements.rename_insert] at agreement
+        simp only [Expr.rename, LoopRenaming.weakenZero]
+        exact ((ContinuationSize.case_left failedCore).trans agreement).weak
+  | default certified =>
+    cases branchesCompiled
+    refine ⟨scope, environment, heap, canonical, actual, store, mapping, world,
+      Renaming.comp ξ (Renaming.insertion 0), actualContext, _, .default certified, environments, heaps,
+      .refl _, .refl _, .refl _ _, ?_, actualTyped, reference, read, unmapped, .refl _ _, ?_, initial, protocol.refl initial,
+      ⟨ProtectedStateTransition.ReturnTo.refl protocol scope canonical⟩⟩
+    · intro index foundValue found
+      exact actualLayout (index := index + 1) found
+    · simp only [← Expr.rename_insertion, Expr.rename_comp]
+      exact .refl _ _ _
+  | noBranch =>
+    cases branchesCompiled
+    refine ⟨scope, environment, heap, canonical, actual, store, mapping, world,
+      Renaming.comp ξ (Renaming.insertion 0), actualContext, _, .noBranch, environments, heaps,
+      .refl _, .refl _, .refl _ _, ?_, actualTyped, reference, read, unmapped, .refl _ _, ?_, initial, protocol.refl initial,
+      ⟨ProtectedStateTransition.ReturnTo.refl protocol scope canonical⟩⟩
+    · intro index foundValue found
+      exact actualLayout (index := index + 1) found
+    · simp only [← Expr.rename_insertion, Expr.rename_comp]
+      exact .refl _ _ _
+
+/-- The original ordinary-heap API specializes the same cell proof. -/
 theorem Stateful.Decision.prefix_sized {compilation : SourceCoreCompatibleDataMatches.Context} {context : SourceSemantics.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : CompatiblePayload.FunctionModel compilation.checked.catalog ambient}
@@ -99,68 +219,10 @@ theorem Stateful.Decision.prefix_sized {compilation : SourceCoreCompatibleDataMa
       ∃ final : protocol.State ⟨finalScope, finalMap, finalWorld, finalHeap, finalStore, finalCanonical⟩,
         protocol.Relates initial final ∧ Nonempty (ProtectedStateTransition.ReturnTo protocol scope canonical
           finalScope finalCanonical) := by
-  induction decision generalizing actual ξ branches actualContext with
-  | @head arm rest pattern body arms fallback fallbackCode bindings values matched bindingsRepresented runs certified =>
-    cases certificates with
-    | cons certificate matcherTyped bodyCertified tail =>
-      have matchedCore : Evaluates actual store ((Expr.apply pattern.matcher (.var 0)).rename ξ)
-          (.inRight .unit (packValues values)) store := by
-        rw [Expr.rename, closed_rename matcherTyped ξ]
-        exact runs actual store (.var (ξ 0)) (.var (actualLayout (index := 0) rfl))
-      cases branchesCompiled with
-      | cons allocation tailBranches =>
-        obtain ⟨finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, allocated, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, agreement, finalState, related, restoration⟩ :=
-          CompatibleMatchTypedArmPrefix.Stateful.bindArm_prefix_sized (bindings_arguments bindingsRepresented) protocol producer stateBindings definitions registered allocator allocation
-            (named := false) (kinds (pattern, body) (by simp)) reference read unmapped
-            environments heaps (actualLayout.lift (packValues values))
-            (.cons (Arguments.pack_typed (bindings_arguments bindingsRepresented)) actualTyped) initial readyAt
-        have bindings := bindings_identical bindingsRepresented
-        rw [bindings] at allocated
-        exact ⟨_, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, _, body, .arm bindings allocated certified,
-          finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, ((ContinuationSize.case_right matchedCore).trans agreement).weak, finalState, related, restoration⟩
-  | @tail arm rest pattern body arms fallback fallbackCode selection notMatched fails next ih =>
-    cases certificates with
-    | cons certificate matcherTyped bodyCertified tail =>
-      have failedCore : Evaluates actual store ((Expr.apply pattern.matcher (.var 0)).rename ξ)
-          (.inLeft (bundleType pattern.bindingTypes) .unit) store := by
-        rw [Expr.rename, closed_rename matcherTyped ξ]
-        exact fails actual store (.var (ξ 0)) (.var (actualLayout (index := 0) rfl))
-      have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ)
-          (value :: canonical) (.unit :: actual) := by
-        intro index foundValue found
-        exact actualLayout found
-      cases branchesCompiled with
-      | cons allocation tailBranches =>
-        obtain ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, agreement, finalState, related, restoration⟩ :=
-          ih tail tailBranches (fun item member => kinds item (List.mem_cons_of_mem _ member)) nextLayout (.cons .unit actualTyped)
-        refine ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, spine, ?_, finalState, related, restoration⟩
-        simp only [LoopStatements.rename_insert] at agreement
-        simp only [Expr.rename, LoopRenaming.weakenZero]
-        exact ((ContinuationSize.case_left failedCore).trans agreement).weak
-  | default certified =>
-    cases branchesCompiled
-    refine ⟨scope, environment, heap, canonical, actual, store, mapping, world,
-      Renaming.comp ξ (Renaming.insertion 0), actualContext, _, .default certified, environments, heaps,
-      .refl _, .refl _, .refl _ _, ?_, actualTyped, reference, read, unmapped, .refl _ _, ?_, initial, protocol.refl initial,
-      ⟨ProtectedStateTransition.ReturnTo.refl protocol scope canonical⟩⟩
-    · intro index foundValue found
-      exact actualLayout (index := index + 1) found
-    · simp only [← Expr.rename_insertion, Expr.rename_comp]
-      exact .refl _ _ _
-  | noBranch =>
-    cases branchesCompiled
-    refine ⟨scope, environment, heap, canonical, actual, store, mapping, world,
-      Renaming.comp ξ (Renaming.insertion 0), actualContext, _, .noBranch, environments, heaps,
-      .refl _, .refl _, .refl _ _, ?_, actualTyped, reference, read, unmapped, .refl _ _, ?_, initial, protocol.refl initial,
-      ⟨ProtectedStateTransition.ReturnTo.refl protocol scope canonical⟩⟩
-    · intro index foundValue found
-      exact actualLayout (index := index + 1) found
-    · simp only [← Expr.rename_insertion, Expr.rename_comp]
-      exact .refl _ _ _
+  simpa only [GenericHeap.ordinaryHeap_iff] using
+    Stateful.Decision.prefix_cells_sized (GenericHeap.OrdinaryCells.ordinary (CompatibleAmbientHeap.payloadModel compilation.checked registry functions))
+      protocol producer.toCells stateBindings definitions registered allocator decision certificates branchesCompiled
+      kinds reference read unmapped environments (GenericHeap.ordinaryHeap_iff.mpr heaps) actualLayout actualTyped initial readyAt
 
 
 /-- Compatibility erasure of the same actual branch decision. -/

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchHiddenPrefix
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchPrefix
@@ -22,6 +23,99 @@ private theorem case_right {environment : Environment} {before middle : Store}
     obtain ⟨_, _, body⟩ := sized.case_right evaluated
     exact body.sound
 
+theorem Stateful.success_prefix_cells_sized {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    {allocationSource : TypedSource} {scope : SourceCoreSourceCells.Scope} {binder : TypedBinder}
+    {payload outputType : Ty} {computation branches code : Expr} {internalReason : Word}
+    (ordinary : allocationSource.inputs.any (fun input => decide (input.id = binder.id)) = false)
+    (fresh : scope.any (fun binding => decide (binding.1 = binder.id)) = false)
+    (accepted : SourceCoreSourceCells.letInitialized
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)))
+      allocationSource scope Renaming.id binder outputType payload computation
+      (.caseE (.loadCell (.var 0)) (LanguageResult.failure outputType (.word internalReason)) branches) = .ok code)
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects definitions}
+    {cells : GenericHeap.CellModel definitions}
+    (ordinaryCells : GenericHeap.OrdinaryCells model cells)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (producer : ProtectedStateTransition.CellAllocation.Producer (catalog := catalog) protocol layouts frame cells)
+    (stateBindings : ProtectedStateTransition.Bindings protocol)
+    (definitionsEq : layouts.definitions = definitions) (registered : frame.Registered definitions)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+    {heap : Dynamic.Heap} {before store : Store} {sourceType : TypeSystem.Ty}
+    {sourceValue : Dynamic.Value} {value : Value} {contextLocation : Location} {native : NativeFrame}
+    (represented : model.Represents mapping world sourceType sourceValue value payload)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical definitions)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (evaluated : Evaluates actual before (computation.rename ξ) (.inRight .word value) store)
+    (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
+    (readyAt : ProtectedStateTransition.CellAllocation.ReadyAt producer contextLocation native) :
+    ∃ hiddenHeap location nextStore nextWorld nextMap nextRef,
+      Dynamic.Heap.Allocates heap sourceType (some sourceValue) location hiddenHeap ∧
+      DataHeap.EnvRepresents catalog nextMap nextWorld administrative ((binder.id, payload) :: scope)
+        environment (nextRef :: canonical) definitions ∧
+      GenericHeap.CellHeapRepresents cells nextMap nextWorld hiddenHeap nextStore ∧
+      LocationMap.Extends mapping nextMap ∧ WorldExtends world nextWorld ∧
+      AdministrativePreserved mapping store nextMap nextStore ∧
+      EnvironmentsAgree (Renaming.comp (Renaming.insertion 1) ξ.lift).lift
+        (value :: nextRef :: canonical) (value :: nextRef :: value :: actual) ∧
+      RuntimeEnvironmentHasTypes nextWorld (value :: nextRef :: value :: actual)
+        (payload :: OptionalCell.referenceType payload :: payload :: actualContext) definitions ∧
+      ContinuationSize true actual before (code.rename ξ)
+        (value :: nextRef :: value :: actual) nextStore
+        (branches.rename (Renaming.comp (Renaming.insertion 1) ξ.lift).lift) ∧
+      ∃ final : protocol.State ⟨(binder.id, payload) :: scope, nextMap, nextWorld, hiddenHeap, nextStore, nextRef :: canonical⟩,
+        protocol.Relates initial final ∧ Nonempty (ProtectedStateTransition.ReturnTo protocol scope canonical
+          ((binder.id, payload) :: scope) (nextRef :: canonical)) := by
+  unfold SourceCoreSourceCells.letInitialized at accepted
+  obtain ⟨allocationCode, compiled, sameCode⟩ := bind_ok accepted
+  obtain ⟨allocation, annotation, same, emitted⟩ := accepted_receipts onError compiled
+  cases sameCode
+  rw [emitted]
+  obtain ⟨captured, allocated, nextEnvironments, nextHeaps, framePreserved, payloadRead, transition⟩ :=
+    CompatibleMatchHiddenAllocation.preserves_cells_with_state allocation annotation same ordinary fresh ordinaryCells protocol producer definitionsEq registered
+      represented environments heaps agrees reference read initial (readyAt initial read) (Dynamic.Heap.Allocates.append (type := sourceType) (value := some sourceValue))
+  obtain ⟨nextState, related⟩ := transition
+  let nextRef := Value.cellRef (OptionalCell.cellType payload) (store.length + 2)
+  let nextStore := store ++ [SourceCoreCallableIndexedFrames.encode frame native,
+    SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, .inRight .unit value]
+  refine ⟨_, _, nextStore, _, _, nextRef, .append, nextEnvironments, nextHeaps, ⟨_, rfl⟩, ⟨_, rfl⟩,
+    framePreserved, ?_, ?_, ?_, nextState, related,
+    ⟨ProtectedStateTransition.ReturnTo.binding stateBindings scope canonical binder.id payload nextRef⟩⟩
+  · intro index foundValue found
+    cases index with
+    | zero => exact found
+    | succ index => cases index with
+      | zero => exact found
+      | succ index => exact agrees found
+  · have referenceTyped : RuntimeValueHasType
+        (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload])
+        nextRef (OptionalCell.referenceType payload) definitions := by
+      obtain ⟨reference, same, typed⟩ := nextEnvironments.runtime_hasTypes.lookup (index := 0) (by rfl)
+      have identical : nextRef = reference := Option.some.inj same
+      cases identical
+      exact typed
+    exact .cons ((model.runtime_hasType represented).weaken ⟨_, rfl⟩)
+      (.cons referenceTyped (.cons ((model.runtime_hasType represented).weaken ⟨_, rfl⟩) (actualTyped.weaken ⟨_, rfl⟩)))
+  · simp only [LanguageResult.bind, Expr.rename, LoopRenaming.weakenOne]
+    apply (ContinuationSize.bind evaluated).trans (b := true)
+    apply (ContinuationSize.letE allocated).trans (b := true)
+    have loaded : Evaluates (nextRef :: value :: actual) nextStore (.loadCell (.var 0))
+        (.inRight .unit value) nextStore := .loadCell (.var rfl) payloadRead
+    simpa [← Expr.rename_insertion, Expr.rename_comp, Expr.rename, Renaming.lift_comp,
+      Renaming.lift, Renaming.insertion] using
+      (ContinuationSize.case_right (left := (LanguageResult.failure outputType (.word internalReason)).rename
+        (Renaming.comp (Renaming.insertion 1) ξ.lift).lift)
+        (right := branches.rename (Renaming.comp (Renaming.insertion 1) ξ.lift).lift) loaded)
+
+/-- Compatibility with the original ordinary heap uses the same cell proof. -/
 theorem Stateful.success_prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
     {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
     {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -71,46 +165,14 @@ theorem Stateful.success_prefix_sized {layouts : SourceCoreAllocationLayouts.Pre
       ∃ final : protocol.State ⟨(binder.id, payload) :: scope, nextMap, nextWorld, hiddenHeap, nextStore, nextRef :: canonical⟩,
         protocol.Relates initial final ∧ Nonempty (ProtectedStateTransition.ReturnTo protocol scope canonical
           ((binder.id, payload) :: scope) (nextRef :: canonical)) := by
-  unfold SourceCoreSourceCells.letInitialized at accepted
-  obtain ⟨allocationCode, compiled, sameCode⟩ := bind_ok accepted
-  obtain ⟨allocation, annotation, same, emitted⟩ := accepted_receipts onError compiled
-  cases sameCode
-  rw [emitted]
-  obtain ⟨captured, allocated, nextEnvironments, nextHeaps, framePreserved, payloadRead, transition⟩ :=
-    CompatibleMatchHiddenAllocation.preserves_with_state allocation annotation same ordinary fresh protocol producer definitionsEq registered
-      represented environments heaps agrees reference read initial (readyAt initial read) (Dynamic.Heap.Allocates.append (type := sourceType) (value := some sourceValue))
-  obtain ⟨nextState, related⟩ := transition
-  let nextRef := Value.cellRef (OptionalCell.cellType payload) (store.length + 2)
-  let nextStore := store ++ [SourceCoreCallableIndexedFrames.encode frame native,
-    SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, .inRight .unit value]
-  refine ⟨_, _, nextStore, _, _, nextRef, .append, nextEnvironments, nextHeaps, ⟨_, rfl⟩, ⟨_, rfl⟩,
-    framePreserved, ?_, ?_, ?_, nextState, related,
-    ⟨ProtectedStateTransition.ReturnTo.binding stateBindings scope canonical binder.id payload nextRef⟩⟩
-  · intro index foundValue found
-    cases index with
-    | zero => exact found
-    | succ index => cases index with
-      | zero => exact found
-      | succ index => exact agrees found
-  · have referenceTyped : RuntimeValueHasType
-        (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload])
-        nextRef (OptionalCell.referenceType payload) definitions := by
-      obtain ⟨reference, same, typed⟩ := nextEnvironments.runtime_hasTypes.lookup (index := 0) (by rfl)
-      have identical : nextRef = reference := Option.some.inj same
-      cases identical
-      exact typed
-    exact .cons ((model.runtime_hasType represented).weaken ⟨_, rfl⟩)
-      (.cons referenceTyped (.cons ((model.runtime_hasType represented).weaken ⟨_, rfl⟩) (actualTyped.weaken ⟨_, rfl⟩)))
-  · simp only [LanguageResult.bind, Expr.rename, LoopRenaming.weakenOne]
-    apply (ContinuationSize.bind evaluated).trans (b := true)
-    apply (ContinuationSize.letE allocated).trans (b := true)
-    have loaded : Evaluates (nextRef :: value :: actual) nextStore (.loadCell (.var 0))
-        (.inRight .unit value) nextStore := .loadCell (.var rfl) payloadRead
-    simpa [← Expr.rename_insertion, Expr.rename_comp, Expr.rename, Renaming.lift_comp,
-      Renaming.lift, Renaming.insertion] using
-      (ContinuationSize.case_right (left := (LanguageResult.failure outputType (.word internalReason)).rename
-        (Renaming.comp (Renaming.insertion 1) ξ.lift).lift)
-        (right := branches.rename (Renaming.comp (Renaming.insertion 1) ξ.lift).lift) loaded)
+  obtain ⟨hiddenHeap, location, nextStore, nextWorld, nextMap, nextRef, allocated, nextEnvironments,
+    nextHeaps, maps, worlds, preservation, finalAgrees, finalTyped, continuation, finalState, related, restoration⟩ :=
+    Stateful.success_prefix_cells_sized (allocationSource := source) onError ordinary fresh accepted
+      (GenericHeap.OrdinaryCells.ordinary model) protocol producer.toCells stateBindings definitionsEq registered
+      represented environments (GenericHeap.ordinaryHeap_iff.mpr heaps) agrees actualTyped reference read evaluated initial readyAt
+  exact ⟨hiddenHeap, location, nextStore, nextWorld, nextMap, nextRef, allocated, nextEnvironments,
+    GenericHeap.ordinaryHeap_iff.mp nextHeaps, maps, worlds, preservation, finalAgrees, finalTyped,
+    continuation, finalState, related, restoration⟩
 
 
 /-- Compatibility erasure of the same actual prefix. -/

@@ -95,13 +95,13 @@ private theorem annotation_some {context : SourceInference.Context} {syntaxType 
 
 private def PreservesOrigins {alpha : Type} (stateOf : alpha → State) (indexOf : alpha → CallIndex)
     (initial : State) (computation : Except Error alpha) : Prop :=
-  ∀ result, computation = .ok result → CallOccurrence root (indexOf result) → Progress root initial (stateOf result)
+  ∀ result, computation = .ok result → CallOccurrence root (indexOf result) → RelativeReadProgress root initial (stateOf result)
 
 private theorem pair_success_origins_progress {alpha : Type}
     {operation : alpha × State} {value : alpha} {next initial : State}
-    (operationSubset : Progress root initial operation.2)
+    (operationSubset : RelativeReadProgress root initial operation.2)
     (success : operation = (value, next)) :
-    Progress root initial next := by
+    RelativeReadProgress root initial next := by
   simpa [success] using operationSubset
 
 private theorem pair_eq_property {alpha beta : Type} {result : alpha × beta}
@@ -126,46 +126,46 @@ private theorem pair_except_property {epsilon alpha beta : Type}
 private theorem allocateExpressionId_success_origins_progress
     {state next : State} {id : ExpressionId}
     (success : state.allocateExpressionId = (id, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
+    (RelativeReadProgress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
 
 private theorem allocateStatementId_success_origins_progress
     {state next : State} {id : StatementId}
     (success : state.allocateStatementId = (id, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
+    (RelativeReadProgress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
 
 private theorem state_fresh_success_origins_progress
     {state next : State} {type : Ty}
     (success : state.fresh = (type, next)) :
-    Progress root state next :=
-  pair_success_origins_progress (Progress.of_nodes_eq rfl (DirectRequirementsProgress.refl state))
+    RelativeReadProgress root state next :=
+  pair_success_origins_progress (RelativeReadProgress.of_nodes_eq rfl (DirectRequirementsProgress.refl state))
     success
 
 private theorem allocateHiddenLocal_success_origins_progress
     {state next : State} {id : Resolved.LocalId}
     (success : state.allocateHiddenLocal = (id, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
+    (RelativeReadProgress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
 
 private theorem addRequirementWithId_success_origins_progress
     {state next : State} {predicate : ProgramPredicate}
     {requirement : RequirementId}
     (success : state.addRequirementWithId predicate = (requirement, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.addRequirementWithId state predicate) success
+    (RelativeReadProgress.addRequirementWithId state predicate) success
 
 private theorem addRequirementsWithIds_success_origins_progress
     {state next : State} {predicates : List ProgramPredicate}
     {requirements : List RequirementId}
     (success : state.addRequirementsWithIds predicates = (requirements, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.addRequirementsWithIds state predicates) success
+    (RelativeReadProgress.addRequirementsWithIds state predicates) success
 
 private theorem allocateBinder_success_origins_progress
     {state next : State} {name : String} {scheme : Scheme}
@@ -173,9 +173,9 @@ private theorem allocateBinder_success_origins_progress
     {schemeRequirements : List LocalSchemeRequirement} {binder : TypedBinder}
     (success : state.allocateBinder name scheme span comptime
       schemeRequirements = (binder, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
+    (RelativeReadProgress.of_nodes_eq rfl (DirectRequirementsProgress.refl state)) success
 
 private theorem freshDataConstructorInstantiation_success_origins_progress
     {dataType : ProgramDataSignature}
@@ -183,17 +183,17 @@ private theorem freshDataConstructorInstantiation_success_origins_progress
     {state next : State} {instantiation : DataConstructorInstantiation}
     (success : freshDataConstructorInstantiation dataType constructor state =
       (instantiation, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.freshDataConstructorInstantiation dataType constructor
+    (RelativeReadProgress.freshDataConstructorInstantiation dataType constructor
       state) success
 
 private theorem freshTypes_success_origins_progress
     {count : Nat} {state next : State} {types : List Ty}
     (success : freshTypes count state = (types, next)) :
-    Progress root state next :=
+    RelativeReadProgress root state next :=
   pair_success_origins_progress
-    (Progress.freshTypes count state) success
+    (RelativeReadProgress.freshTypes count state) success
 
 private theorem syntheticTuple_result_origins_progress
     {elements : List InferredExpression} {span : Syntax.SourceSpan}
@@ -207,7 +207,7 @@ private theorem syntheticTuple_result_origins_progress
         type := Ty.productMany (elements.map (·.type))
         form := .tuple (elements.map (·.id))
       })) : Except Error (InferredExpression × State)) = .ok result) :
-    Progress root state result.snd := by
+    RelativeReadProgress root state result.snd := by
   have resultEq : ({
       id := state.allocateExpressionId.fst
       type := Ty.productMany (elements.map (·.type))
@@ -219,7 +219,7 @@ private theorem syntheticTuple_result_origins_progress
     })) = result := by
     simpa only [exceptPure_eq_ok] using success
   rw [← resultEq]
-  exact ProgressFields.expression _ _ _ _ _ (by intro _ _ impossible; cases impossible)
+  exact RelativeReadProgressFields.expression _ _ _ _ _ (by intro _ _ impossible; cases impossible)
 
 private theorem syntheticTuple_pair_origins_progress
     {elements : List InferredExpression} {span : Syntax.SourceSpan}
@@ -233,16 +233,16 @@ private theorem syntheticTuple_pair_origins_progress
         type := Ty.productMany (elements.map (·.type))
         form := .tuple (elements.map (·.id))
       })) = result) :
-    Progress root state result.snd := by
+    RelativeReadProgress root state result.snd := by
   rw [← success]
-  exact ProgressFields.expression _ _ _ _ _ (by intro _ _ impossible; cases impossible)
+  exact RelativeReadProgressFields.expression _ _ _ _ _ (by intro _ _ impossible; cases impossible)
 
 private theorem pure_pair_result_origins_progress {epsilon alpha : Type}
     {value : alpha} {next initial : State} {result : alpha × State}
-    (nextSubset : Progress root initial next)
+    (nextSubset : RelativeReadProgress root initial next)
     (success : (pure (value, next) : Except epsilon (alpha × State)) =
       .ok result) :
-    Progress root initial result.snd := by
+    RelativeReadProgress root initial result.snd := by
   have resultEq : (value, next) = result := by
     simpa only [exceptPure_eq_ok] using success
   rw [← resultEq]
@@ -251,12 +251,12 @@ private theorem pure_pair_result_origins_progress {epsilon alpha : Type}
 private theorem restored_pair_result_origins_progress {alpha : Type}
     {value : alpha} {state initial : State} {scope : LexicalScope}
     {result : alpha × State}
-    (subset : Progress root initial state)
+    (subset : RelativeReadProgress root initial state)
     (success : (value, state.restoreLexicalScope scope) = result) :
-    Progress root initial result.snd := by
+    RelativeReadProgress root initial result.snd := by
   rw [← success]
-  exact Progress.trans subset
-    (Progress.of_nodes_eq rfl (DirectRequirementsProgress.refl state))
+  exact RelativeReadProgress.trans subset
+    (RelativeReadProgress.of_nodes_eq rfl (DirectRequirementsProgress.refl state))
 
 
 set_option maxHeartbeats 2000000 in
@@ -367,7 +367,7 @@ private theorem inferFuel_origins_progress_internal :
     | error error => simp [child, bind, Except.bind] at accepted
     | ok pair =>
       have innerProgress := ih pair child (here.child (.expression_group original form allocation child))
-      have record := Progress.recordExpressionWithExpected (root := root) (by simpa only [child, bind, Except.bind] using accepted)
+      have record := RelativeReadProgress.recordExpressionWithExpected (root := root) (by simpa only [child, bind, Except.bind] using accepted)
         (by intro _ _ impossible; cases impossible)
       exact (allocateExpressionId_success_origins_progress allocation).trans (innerProgress.trans record)
   case case15 =>
@@ -377,21 +377,21 @@ private theorem inferFuel_origins_progress_internal :
       bodyResult, unified, restored, parametersAccepted, prefixFacts, bodyAccepted,
       resultUnify, restoreEq, recorded⟩ :=
       inferExprFuel_success_lambda_facts form allocation accepted
-    have prefixProgress : Progress root parameterState resultState := by
+    have prefixProgress : RelativeReadProgress root parameterState resultState := by
       cases prefixFacts with
-      | noExpectedPartsAnnotated => exact Progress.refl _
+      | noExpectedPartsAnnotated => exact RelativeReadProgress.refl _
       | noExpectedPartsFresh _ _ fresh =>
           exact state_fresh_success_origins_progress fresh
-      | expectedPartsAnnotated _ fitted => exact Progress.unify fitted
-      | expectedPartsInferred _ fitted => exact Progress.unify fitted
+      | expectedPartsAnnotated _ fitted => exact RelativeReadProgress.unify fitted
+      | expectedPartsInferred _ fitted => exact RelativeReadProgress.unify fitted
     have bodyProgress := ih resultType resultState bodyResult bodyAccepted
       (here.child (.expression_lambda_body accepted form allocation parametersAccepted prefixFacts bodyAccepted))
-    have recordProgress := Progress.recordExpressionWithExpected (root := root) recorded
+    have recordProgress := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
       (by intro _ _ impossible; cases impossible)
     rw [restoreEq] at recordProgress
     exact (allocateExpressionId_success_origins_progress allocation).trans
-      ((Progress.bindLambdaParameters parametersAccepted).trans
-        (prefixProgress.trans (bodyProgress.trans ((Progress.unify resultUnify).trans recordProgress))))
+      ((RelativeReadProgress.bindLambdaParameters parametersAccepted).trans
+        (prefixProgress.trans (bodyProgress.trans ((RelativeReadProgress.unify resultUnify).trans recordProgress))))
   case case16 =>
     intro context source expected initial fuel id allocated allocation callee arguments form constructorIH argumentsIH calleeIH
     intro result accepted here
@@ -407,11 +407,11 @@ private theorem inferFuel_origins_progress_internal :
         (here.child (.expression_call_arguments accepted form allocation nonconstructor argumentsAccepted))
       rw [← recording]
       exact allocationProgress.trans (argumentsProgress.trans
-        ((Progress.selectFunctionCandidateFrom selection).trans (Progress.recordSelectedCall _ _ _ _ _)))
+        ((RelativeReadProgress.selectFunctionCandidateFrom selection).trans (RelativeReadProgress.recordSelectedCall _ _ _ _ _)))
     | builtin nonconstructor argumentsAccepted recording =>
       have argumentsProgress := argumentsIH _ argumentsAccepted
         (here.child (.expression_call_arguments accepted form allocation nonconstructor argumentsAccepted))
-      exact allocationProgress.trans (argumentsProgress.trans (Progress.recordBuiltinFunctionCall recording))
+      exact allocationProgress.trans (argumentsProgress.trans (RelativeReadProgress.recordBuiltinFunctionCall recording))
     | indirect nonconstructor argumentsAccepted indirect calleeAccepted application recording =>
       have argumentsProgress := argumentsIH _ argumentsAccepted
         (here.child (.expression_call_arguments accepted form allocation nonconstructor argumentsAccepted))
@@ -419,7 +419,7 @@ private theorem inferFuel_origins_progress_internal :
         (here.child (.expression_call_callee accepted form allocation nonconstructor argumentsAccepted indirect calleeAccepted))
       rw [← recording]
       exact allocationProgress.trans (argumentsProgress.trans (calleeProgress.trans
-        ((Progress.applyFunctionType application).trans (Progress.recordIndirectCall _ _ _ _))))
+        ((RelativeReadProgress.applyFunctionType application).trans (RelativeReadProgress.recordIndirectCall _ _ _ _))))
   case case20 =>
     intro context source expected initial fuel id allocated allocation base dot name form ih
     intro result accepted here
@@ -459,7 +459,7 @@ private theorem inferFuel_origins_progress_internal :
     have sameInitializer : receipt.initializer = initializer := by
       have same := receipt.form.symm.trans form
       exact Option.some.inj (Syntax.StatementValue.letDecl.inj same).2.2
-    apply Progress.initializedStatement (root := root) receipt accepted here
+    apply RelativeReadProgress.initializedStatement (root := root) receipt accepted here
     have allocationState : state.allocateStatementId.2 = allocated := congrArg Prod.snd allocation
     rw [allocationState]
     exact ih _ (by simpa only [allocationState, sameInitializer, sameExpected] using receipt.child) (by
@@ -479,7 +479,7 @@ private theorem inferFuel_origins_progress_internal :
     have expectedSome : ∃ type, receipt.expected = some type := by
       exact annotation_some (sameAnnotation ▸ receipt.annotationAccepted)
     obtain ⟨type, sameExpected⟩ := expectedSome
-    apply Progress.initializedStatement (root := root) receipt accepted here
+    apply RelativeReadProgress.initializedStatement (root := root) receipt accepted here
     have allocationState : state.allocateStatementId.2 = allocated := congrArg Prod.snd allocation
     rw [allocationState]
     exact ih type _ (by simpa only [allocationState, sameInitializer, sameExpected] using receipt.child) (by
@@ -515,12 +515,14 @@ private theorem inferFuel_origins_progress_internal :
             have condP := condIH initResult _ condRun (by first | assumption | actual_descend here)
             have bodyP := bodyIH testState _ bodyRun (by first | assumption | actual_descend here)
             have postP := postIH initResult bodyResult _ postRun (by first | assumption | actual_descend here)
-            refine ⟨LocalReadEvents.inferStatementFuel_origins_progress original, ?_⟩
-            intro wf direct reads events
             have history := allocP.trans (initP.trans (condP.trans (bodyP.trans postP)))
-            apply (history.events wf direct reads events).statement
-            exact ⟨inferForItemsFuel_events initRun (by first | assumption | actual_descend here),
-              inferForItemsFuel_events postRun (by first | assumption | actual_descend here)⟩
+            refine ⟨⟨LocalReadEvents.inferStatementFuel_origins_progress original, ?_⟩, ?_⟩
+            · intro wf direct reads events
+              apply (history.events wf direct reads events).statement
+              exact ⟨inferForItemsFuel_events initRun (by first | assumption | actual_descend here),
+                inferForItemsFuel_events postRun (by first | assumption | actual_descend here)⟩
+            · intro base wf direct calls
+              exact (history.calls wf direct calls).statement _
   case case43 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources source single
@@ -556,25 +558,25 @@ private theorem inferFuel_origins_progress_internal :
     all_goals try have restoredSubset :=
       restored_pair_result_origins_progress (root := root) bodySubset (by assumption)
     all_goals try simp_all
-    all_goals try exact Progress.refl (root := root) _
-    all_goals try exact Progress.of_nodes_eq (root := root) rfl (DirectRequirementsProgress.refl _)
-    all_goals try exact Progress.recordStatement (root := root) _ _ (by trivial)
-    all_goals dsimp only [Progress,
+    all_goals try exact RelativeReadProgress.refl (root := root) _
+    all_goals try exact RelativeReadProgress.of_nodes_eq (root := root) rfl (DirectRequirementsProgress.refl _)
+    all_goals try exact RelativeReadProgress.recordStatement (root := root) _ _ (by trivial)
+    all_goals dsimp only [RelativeReadProgress,
       State.recordNode, State.allocateExpressionId, State.allocateStatementId,
       State.allocateHiddenLocal, State.allocateBinder, State.restoreLexicalScope,
       State.withLocals, State.fresh, recordExpression, recordIndirectCall]
-    all_goals dsimp only [Progress, State.recordNode, State.allocateExpressionId,
+    all_goals dsimp only [RelativeReadProgress, State.recordNode, State.allocateExpressionId,
       State.allocateStatementId, State.allocateHiddenLocal, State.allocateBinder,
       State.restoreLexicalScope, State.withLocals, State.fresh,
       Detail.recordExpression, Detail.recordIndirectCall] at *
     all_goals first
-      | apply ProgressFields.trans (second := ProgressFields.statement _ _ _ _ _ (by trivial))
-      | apply ProgressFields.trans (second := ProgressFields.expression _ _ _ _ _
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.statement _ _ _ _ _ (by trivial))
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.expression _ _ _ _ _
           (by change LocalReadEvents.Nonlocal (.call _ _ (.indirect _)); intro _ _ impossible; cases impossible))
-      | apply ProgressFields.trans (second := ProgressFields.expression _ _ _ _ _
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.expression _ _ _ _ _
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
-    all_goals grind [ProgressFields.trans]
+    all_goals grind [RelativeReadProgressFields.trans]
   case case44 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
@@ -609,25 +611,25 @@ private theorem inferFuel_origins_progress_internal :
     all_goals try have restoredSubset :=
       restored_pair_result_origins_progress (root := root) bodySubset (by assumption)
     all_goals try simp_all
-    all_goals try exact Progress.refl (root := root) _
-    all_goals try exact Progress.of_nodes_eq (root := root) rfl (DirectRequirementsProgress.refl _)
-    all_goals try exact Progress.recordStatement (root := root) _ _ (by trivial)
-    all_goals dsimp only [Progress,
+    all_goals try exact RelativeReadProgress.refl (root := root) _
+    all_goals try exact RelativeReadProgress.of_nodes_eq (root := root) rfl (DirectRequirementsProgress.refl _)
+    all_goals try exact RelativeReadProgress.recordStatement (root := root) _ _ (by trivial)
+    all_goals dsimp only [RelativeReadProgress,
       State.recordNode, State.allocateExpressionId, State.allocateStatementId,
       State.allocateHiddenLocal, State.allocateBinder, State.restoreLexicalScope,
       State.withLocals, State.fresh, recordExpression, recordIndirectCall]
-    all_goals dsimp only [Progress, State.recordNode, State.allocateExpressionId,
+    all_goals dsimp only [RelativeReadProgress, State.recordNode, State.allocateExpressionId,
       State.allocateStatementId, State.allocateHiddenLocal, State.allocateBinder,
       State.restoreLexicalScope, State.withLocals, State.fresh,
       Detail.recordExpression, Detail.recordIndirectCall] at *
     all_goals first
-      | apply ProgressFields.trans (second := ProgressFields.statement _ _ _ _ _ (by trivial))
-      | apply ProgressFields.trans (second := ProgressFields.expression _ _ _ _ _
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.statement _ _ _ _ _ (by trivial))
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.expression _ _ _ _ _
           (by change LocalReadEvents.Nonlocal (.call _ _ (.indirect _)); intro _ _ impossible; cases impossible))
-      | apply ProgressFields.trans (second := ProgressFields.expression _ _ _ _ _
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.expression _ _ _ _ _
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
-    all_goals grind [ProgressFields.trans]
+    all_goals grind [RelativeReadProgressFields.trans]
   case case70 =>
     intro fuel context target operator value initial placeInduction valueInduction
     intro result accepted here
@@ -638,12 +640,12 @@ private theorem inferFuel_origins_progress_internal :
       (here.child (.assignedValue_place accepted placeAccepted))
     have valueProgress := valueInduction place fitted _ valueAccepted
       (here.child (.assignedValue_value accepted placeAccepted fitting valueAccepted))
-    have fittingProgress : Progress root placeState fitted := by
+    have fittingProgress : RelativeReadProgress root placeState fitted := by
       cases operator <;> first
-      | exact Progress.unify fitting
+      | exact RelativeReadProgress.unify fitting
       | (simp only [pure, Pure.pure, Except.pure, Except.ok.injEq] at fitting
          cases fitting
-         exact Progress.refl _)
+         exact RelativeReadProgress.refl _)
     exact placeProgress.trans (fittingProgress.trans valueProgress)
   case case67 =>
     intro context target state fuel inner form ih
@@ -656,7 +658,7 @@ private theorem inferFuel_origins_progress_internal :
     unfold PreservesOrigins at *
     intro result success here
     have parentAccepted := here.accepted
-    try exact Progress.localIdentifier (root := root) (by assumption) (by assumption) (by assumption) success
+    try exact RelativeReadProgress.localIdentifier (root := root) (by assumption) (by assumption) (by assumption) success here
   all_goals
     first
       | unfold inferExprFuel at success
@@ -718,7 +720,7 @@ private theorem inferFuel_origins_progress_internal :
       | have ih3Subset := pair_except_property (ih3 _ _) (by assumption) (by first | assumption | actual_descend here)
       | skip
     all_goals try have unifiedSubset :=
-      Progress.unify (root := root) (by assumption)
+      RelativeReadProgress.unify (root := root) (by assumption)
     all_goals try have expressionIdSubset :=
       allocateExpressionId_success_origins_progress (root := root) (by assumption)
     all_goals try have statementIdSubset :=
@@ -739,63 +741,276 @@ private theorem inferFuel_origins_progress_internal :
     all_goals try have typesSubset :=
       freshTypes_success_origins_progress (root := root) (by assumption)
     all_goals try have recordSubset :=
-      Progress.recordExpressionWithExpected (root := root) (by assumption) (by intro _ _ impossible; cases impossible)
+      RelativeReadProgress.recordExpressionWithExpected (root := root) (by assumption) (by intro _ _ impossible; cases impossible)
     all_goals try have issuedRecord :=
-      (Progress.addRequirementWithId (root := root) _ _).trans recordSubset
+      (RelativeReadProgress.addRequirementWithId (root := root) _ _).trans recordSubset
     all_goals try have batchRecord :=
-      (Progress.addRequirementsWithIds (root := root) _ _).trans recordSubset
-    all_goals try exact ProgressFields.trans expressionIdSubset (ProgressFields.trans (Progress.addRequirementWithId (root := root) _ _) recordSubset)
-    all_goals try exact ProgressFields.trans expressionIdSubset (ProgressFields.trans (Progress.addRequirementsWithIds (root := root) _ _) recordSubset)
+      (RelativeReadProgress.addRequirementsWithIds (root := root) _ _).trans recordSubset
+    all_goals try exact RelativeReadProgressFields.trans expressionIdSubset (RelativeReadProgressFields.trans (RelativeReadProgress.addRequirementWithId (root := root) _ _) recordSubset)
+    all_goals try exact RelativeReadProgressFields.trans expressionIdSubset (RelativeReadProgressFields.trans (RelativeReadProgress.addRequirementsWithIds (root := root) _ _) recordSubset)
     all_goals try have lambdaSubset :=
-      Progress.bindLambdaParameters (root := root) (by assumption)
+      RelativeReadProgress.bindLambdaParameters (root := root) (by assumption)
     all_goals try
-      have afterLambdaSubset := Progress.trans (root := root) lambdaSubset
-        (Progress.unify (root := root) (by assumption))
+      have afterLambdaSubset := RelativeReadProgress.trans (root := root) lambdaSubset
+        (RelativeReadProgress.unify (root := root) (by assumption))
     all_goals try have patternSubset :=
-      Progress.inferMatchPatternFuel (root := root) (by assumption)
+      RelativeReadProgress.inferMatchPatternFuel (root := root) (by assumption)
     all_goals try have unarySubset :=
-      Progress.inferUnaryOperator (root := root) (by assumption)
+      RelativeReadProgress.inferUnaryOperator (root := root) (by assumption)
     all_goals try have binarySubset :=
-      Progress.inferBinaryOperator (root := root) (by assumption)
+      RelativeReadProgress.inferBinaryOperator (root := root) (by assumption)
     all_goals try have selectionSubset :=
-      Progress.selectFunctionCandidateFrom (root := root) (by assumption)
+      RelativeReadProgress.selectFunctionCandidateFrom (root := root) (by assumption)
     all_goals try have expectedSubset :=
-      Progress.withExpected (root := root) (by assumption)
+      RelativeReadProgress.withExpected (root := root) (by assumption)
     all_goals try have applicationSubset :=
-      Progress.applyFunctionType (root := root) (by assumption)
+      RelativeReadProgress.applyFunctionType (root := root) (by assumption)
     all_goals try have builtinSubset :=
-      Progress.recordBuiltinFunctionCall (root := root) (by assumption)
+      RelativeReadProgress.recordBuiltinFunctionCall (root := root) (by assumption)
     all_goals try simp_all
-    all_goals try exact Progress.addRequirementWithId (root := root) _ _
-    all_goals try exact Progress.refl (root := root) _
-    all_goals try exact Progress.of_nodes_eq (root := root) rfl (DirectRequirementsProgress.refl _)
-    all_goals try exact Progress.recordStatement (root := root) _ _ (by trivial)
-    all_goals dsimp only [Progress,
+    all_goals try exact RelativeReadProgress.addRequirementWithId (root := root) _ _
+    all_goals try exact RelativeReadProgress.refl (root := root) _
+    all_goals try exact RelativeReadProgress.of_nodes_eq (root := root) rfl (DirectRequirementsProgress.refl _)
+    all_goals try exact RelativeReadProgress.recordStatement (root := root) _ _ (by trivial)
+    all_goals dsimp only [RelativeReadProgress,
       State.recordNode, State.allocateExpressionId, State.allocateStatementId,
       State.allocateHiddenLocal, State.allocateBinder, State.restoreLexicalScope,
       State.withLocals, State.fresh, recordExpression, recordIndirectCall]
-    all_goals dsimp only [Progress, State.recordNode, State.allocateExpressionId,
+    all_goals dsimp only [RelativeReadProgress, State.recordNode, State.allocateExpressionId,
       State.allocateStatementId, State.allocateHiddenLocal, State.allocateBinder,
       State.restoreLexicalScope, State.withLocals, State.fresh,
       Detail.recordExpression, Detail.recordIndirectCall] at *
     all_goals first
-      | apply ProgressFields.trans (second := ProgressFields.statement _ _ _ _ _ (by trivial))
-      | apply ProgressFields.trans (second := ProgressFields.expression _ _ _ _ _
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.statement _ _ _ _ _ (by trivial))
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.expression _ _ _ _ _
           (by change LocalReadEvents.Nonlocal (.call _ _ (.indirect _)); intro _ _ impossible; cases impossible))
-      | apply ProgressFields.trans (second := ProgressFields.expression _ _ _ _ _
+      | apply RelativeReadProgressFields.trans (second := RelativeReadProgressFields.expression _ _ _ _ _
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
     all_goals grind
-      [ProgressFields.trans,
-        Progress.addRequirementWithId,
-        Progress.addRequirementsWithIds,
-        Progress.freshDataConstructorInstantiation,
-        Progress.freshTypes,
+      [RelativeReadProgressFields.trans,
+        RelativeReadProgress.addRequirementWithId,
+        RelativeReadProgress.addRequirementsWithIds,
+        RelativeReadProgress.freshDataConstructorInstantiation,
+        RelativeReadProgress.freshTypes,
 
-        Progress.recordSelectedCallResult,
-        Progress.recordSelectedCall,
-        Progress.recordIndirectCall, Progress.recordStatement, Progress.modifyStatementNode]
+        RelativeReadProgress.recordSelectedCallResult,
+        RelativeReadProgress.recordSelectedCall,
+        RelativeReadProgress.recordIndirectCall, RelativeReadProgress.recordStatement, RelativeReadProgress.modifyStatementNode]
 
+
+theorem inferExprFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result)
+    (here : CallOccurrence root (.expression fuel context expression expected state result.1 result.2)) :
+    RelativeReadProgress root state result.2 := by
+  exact inferFuel_origins_progress_internal.1 fuel context expression
+    expected state result success here
+
+theorem inferConstructorApplicationFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result)
+    (here : CallOccurrence root (.constructorApplication fuel context source id instantiation arguments expected state result.1 result.2)) :
+    RelativeReadProgress root state result.2 := by
+  exact inferFuel_origins_progress_internal.2.1 fuel context source id
+    instantiation arguments expected state result success here
+
+theorem inferConstructorArgumentsFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {sources : List Syntax.Expr}
+    {expected : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expected
+      state = .ok result)
+    (here : CallOccurrence root (.constructorArguments fuel context sources expected state result.1 result.2)) :
+    RelativeReadProgress root state result.2 := by
+  exact inferFuel_origins_progress_internal.2.2.1 fuel context sources
+    expected state result success here
+
+theorem inferStatementsFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result)
+    (here : CallOccurrence root (.statements fuel context statements expectedReturn state result)) :
+    RelativeReadProgress root state result.state := by
+  exact inferFuel_origins_progress_internal.2.2.2.1 fuel context
+    statements expectedReturn state result success here
+
+theorem inferStatementFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result)
+    (here : CallOccurrence root (.statement fuel context statement expectedReturn state result)) :
+    RelativeReadProgress root state result.state := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.1 fuel context
+    statement expectedReturn state result success here
+
+theorem inferForItemsFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result)
+    (here : CallOccurrence root (.forItems fuel context items state result)) :
+    RelativeReadProgress root state result.state := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.2.1 fuel context
+    items state result success here
+
+theorem inferForItemFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result)
+    (here : CallOccurrence root (.forItem fuel context item state result.1 result.2)) :
+    RelativeReadProgress root state result.2 := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.1 fuel context
+    item state result success here
+
+theorem inferPlaceFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result)
+    (here : CallOccurrence root (.place fuel context target state result.1 result.2)) :
+    RelativeReadProgress root state result.2 := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.1 fuel
+    context target state result success here
+
+theorem inferAssignedValueFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr} {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result)
+    (here : CallOccurrence root (.assignedValue fuel context target operator value state result.1 result.2.1 result.2.2)) :
+    RelativeReadProgress root state result.2.2 := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.2.1 fuel
+    context target operator value state result success here
+
+theorem inferExprsFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result)
+    (here : CallOccurrence root (.expressions fuel context expressions state result.1 result.2)) :
+    RelativeReadProgress root state result.2 := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.2.2.1 fuel
+    context expressions state result success here
+
+theorem inferMatchCasesFuel_relative_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result)
+    (here : CallOccurrence root (.matchCases fuel context scrutineeType expectedReturn outerScope cases state result)) :
+    RelativeReadProgress root state result.state := by
+  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.2.2.2 fuel
+    context scrutineeType expectedReturn outerScope cases state result success here
+
+theorem inferExprFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result)
+    (here : CallOccurrence root (.expression fuel context expression expected state result.1 result.2)) :
+    ReadProgress root state result.2 :=
+  (inferExprFuel_relative_read_progress success here).readProgress
+
+theorem inferConstructorApplicationFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result)
+    (here : CallOccurrence root (.constructorApplication fuel context source id instantiation arguments expected state result.1 result.2)) :
+    ReadProgress root state result.2 :=
+  (inferConstructorApplicationFuel_relative_read_progress success here).readProgress
+
+theorem inferConstructorArgumentsFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {sources : List Syntax.Expr}
+    {expected : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expected
+      state = .ok result)
+    (here : CallOccurrence root (.constructorArguments fuel context sources expected state result.1 result.2)) :
+    ReadProgress root state result.2 :=
+  (inferConstructorArgumentsFuel_relative_read_progress success here).readProgress
+
+theorem inferStatementsFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result)
+    (here : CallOccurrence root (.statements fuel context statements expectedReturn state result)) :
+    ReadProgress root state result.state :=
+  (inferStatementsFuel_relative_read_progress success here).readProgress
+
+theorem inferStatementFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result)
+    (here : CallOccurrence root (.statement fuel context statement expectedReturn state result)) :
+    ReadProgress root state result.state :=
+  (inferStatementFuel_relative_read_progress success here).readProgress
+
+theorem inferForItemsFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result)
+    (here : CallOccurrence root (.forItems fuel context items state result)) :
+    ReadProgress root state result.state :=
+  (inferForItemsFuel_relative_read_progress success here).readProgress
+
+theorem inferForItemFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result)
+    (here : CallOccurrence root (.forItem fuel context item state result.1 result.2)) :
+    ReadProgress root state result.2 :=
+  (inferForItemFuel_relative_read_progress success here).readProgress
+
+theorem inferPlaceFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result)
+    (here : CallOccurrence root (.place fuel context target state result.1 result.2)) :
+    ReadProgress root state result.2 :=
+  (inferPlaceFuel_relative_read_progress success here).readProgress
+
+theorem inferAssignedValueFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr} {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result)
+    (here : CallOccurrence root (.assignedValue fuel context target operator value state result.1 result.2.1 result.2.2)) :
+    ReadProgress root state result.2.2 :=
+  (inferAssignedValueFuel_relative_read_progress success here).readProgress
+
+theorem inferExprsFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result)
+    (here : CallOccurrence root (.expressions fuel context expressions state result.1 result.2)) :
+    ReadProgress root state result.2 :=
+  (inferExprsFuel_relative_read_progress success here).readProgress
+
+theorem inferMatchCasesFuel_read_progress
+    {fuel : Nat} {context : SourceInference.Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result)
+    (here : CallOccurrence root (.matchCases fuel context scrutineeType expectedReturn outerScope cases state result)) :
+    ReadProgress root state result.state :=
+  (inferMatchCasesFuel_relative_read_progress success here).readProgress
 
 theorem inferExprFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {expression : Syntax.Expr}
@@ -804,9 +1019,8 @@ theorem inferExprFuel_origins_progress
     (success : inferExprFuel fuel context expression expected state =
       .ok result)
     (here : CallOccurrence root (.expression fuel context expression expected state result.1 result.2)) :
-    Progress root state result.2 := by
-  exact inferFuel_origins_progress_internal.1 fuel context expression
-    expected state result success here
+    Progress root state result.2 :=
+  (inferExprFuel_read_progress success here).progress
 
 theorem inferConstructorApplicationFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
@@ -816,9 +1030,8 @@ theorem inferConstructorApplicationFuel_origins_progress
     (success : inferConstructorApplicationFuel fuel context source id
       instantiation arguments expected state = .ok result)
     (here : CallOccurrence root (.constructorApplication fuel context source id instantiation arguments expected state result.1 result.2)) :
-    Progress root state result.2 := by
-  exact inferFuel_origins_progress_internal.2.1 fuel context source id
-    instantiation arguments expected state result success here
+    Progress root state result.2 :=
+  (inferConstructorApplicationFuel_read_progress success here).progress
 
 theorem inferConstructorArgumentsFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {sources : List Syntax.Expr}
@@ -827,9 +1040,8 @@ theorem inferConstructorArgumentsFuel_origins_progress
     (success : inferConstructorArgumentsFuel fuel context sources expected
       state = .ok result)
     (here : CallOccurrence root (.constructorArguments fuel context sources expected state result.1 result.2)) :
-    Progress root state result.2 := by
-  exact inferFuel_origins_progress_internal.2.2.1 fuel context sources
-    expected state result success here
+    Progress root state result.2 :=
+  (inferConstructorArgumentsFuel_read_progress success here).progress
 
 theorem inferStatementsFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {statements : List Syntax.Statement}
@@ -837,9 +1049,8 @@ theorem inferStatementsFuel_origins_progress
     (success : inferStatementsFuel fuel context statements expectedReturn state =
       .ok result)
     (here : CallOccurrence root (.statements fuel context statements expectedReturn state result)) :
-    Progress root state result.state := by
-  exact inferFuel_origins_progress_internal.2.2.2.1 fuel context
-    statements expectedReturn state result success here
+    Progress root state result.state :=
+  (inferStatementsFuel_read_progress success here).progress
 
 theorem inferStatementFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {statement : Syntax.Statement}
@@ -847,36 +1058,32 @@ theorem inferStatementFuel_origins_progress
     (success : inferStatementFuel fuel context statement expectedReturn state =
       .ok result)
     (here : CallOccurrence root (.statement fuel context statement expectedReturn state result)) :
-    Progress root state result.state := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.1 fuel context
-    statement expectedReturn state result success here
+    Progress root state result.state :=
+  (inferStatementFuel_read_progress success here).progress
 
 theorem inferForItemsFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {items : List Syntax.ForItem}
     {state : State} {result : InferredForItems}
     (success : inferForItemsFuel fuel context items state = .ok result)
     (here : CallOccurrence root (.forItems fuel context items state result)) :
-    Progress root state result.state := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.2.1 fuel context
-    items state result success here
+    Progress root state result.state :=
+  (inferForItemsFuel_read_progress success here).progress
 
 theorem inferForItemFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {item : Syntax.ForItem}
     {state : State} {result : ForItemForm × State}
     (success : inferForItemFuel fuel context item state = .ok result)
     (here : CallOccurrence root (.forItem fuel context item state result.1 result.2)) :
-    Progress root state result.2 := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.1 fuel context
-    item state result success here
+    Progress root state result.2 :=
+  (inferForItemFuel_read_progress success here).progress
 
 theorem inferPlaceFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {target : Syntax.Expr}
     {state : State} {result : PlaceResolution × State}
     (success : inferPlaceFuel fuel context target state = .ok result)
     (here : CallOccurrence root (.place fuel context target state result.1 result.2)) :
-    Progress root state result.2 := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.1 fuel
-    context target state result success here
+    Progress root state result.2 :=
+  (inferPlaceFuel_read_progress success here).progress
 
 theorem inferAssignedValueFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {target : Syntax.Expr}
@@ -885,18 +1092,16 @@ theorem inferAssignedValueFuel_origins_progress
     (success : inferAssignedValueFuel fuel context target operator value state =
       .ok result)
     (here : CallOccurrence root (.assignedValue fuel context target operator value state result.1 result.2.1 result.2.2)) :
-    Progress root state result.2.2 := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.2.1 fuel
-    context target operator value state result success here
+    Progress root state result.2.2 :=
+  (inferAssignedValueFuel_read_progress success here).progress
 
 theorem inferExprsFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {expressions : List Syntax.Expr}
     {state : State} {result : List InferredExpression × State}
     (success : inferExprsFuel fuel context expressions state = .ok result)
     (here : CallOccurrence root (.expressions fuel context expressions state result.1 result.2)) :
-    Progress root state result.2 := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.2.2.1 fuel
-    context expressions state result success here
+    Progress root state result.2 :=
+  (inferExprsFuel_read_progress success here).progress
 
 theorem inferMatchCasesFuel_origins_progress
     {fuel : Nat} {context : SourceInference.Context} {scrutineeType expectedReturn : Ty}
@@ -905,9 +1110,8 @@ theorem inferMatchCasesFuel_origins_progress
     (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
       outerScope cases state = .ok result)
     (here : CallOccurrence root (.matchCases fuel context scrutineeType expectedReturn outerScope cases state result)) :
-    Progress root state result.state := by
-  exact inferFuel_origins_progress_internal.2.2.2.2.2.2.2.2.2.2 fuel
-    context scrutineeType expectedReturn outerScope cases state result success here
+    Progress root state result.state :=
+  (inferMatchCasesFuel_read_progress success here).progress
 
 /-- Successful statement inference retains each initialized declaration's
 actual generalization event, including declarations inside for headers. -/

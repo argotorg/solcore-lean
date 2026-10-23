@@ -26,7 +26,8 @@ theorem agreement {checked : SourceCoreCompatibleCatalog.Checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
     {actual : Core.Environment}
     (captured : Captures prepared mapping world scope function.captured actual)
-    (code : Code prepared function scope captured.administrative)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope captured.administrative viewRelation)
     {callerNative : NativeFrame} {callerGhost : GhostFrame} {caller : MetadataState} {id : Word}
     (callerCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table
       callerNative callerGhost (some caller))

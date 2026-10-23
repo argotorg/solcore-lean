@@ -3149,3 +3149,510 @@ theorem CallEdge.ContextualReceipt.original_body {program : CheckedProgram}
   simp only [localLambdaBodyNodes, bodyAccepted, bind, Except.bind, pure, Except.pure]
 
 end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem
+
+/-- The actual root traversal used to seed local-instance discovery. Generalized
+lambda initializers are lexical boundaries, exactly as in the existing planner. -/
+def localLambdaRootNodes (source : TypedSource) : Except Error (List Node) := do
+  let ids ← directLexicalNodeIds source
+    ((directPolymorphicLambdaBindings source).map (·.initializer)) source.roots
+  pure (selectedNodes ids source.nodes)
+
+/-- Discovery ancestry retaining the actual direct lexical body of each read.
+The substitution and binding come from that read's real scheme matcher. -/
+inductive LocalLambdaInstance.LexicalReadOrigin (source : TypedSource) :
+    LocalLambdaInstance → Prop where
+  | root {localInstance : LocalLambdaInstance}
+      (binding : localInstance.binding ∈ localLambdaBindings source)
+      (nodes : List Node) (selected : localLambdaRootNodes source = .ok nodes)
+      (expression : ExpressionNode) (present : .expression expression ∈ nodes)
+      (name : String)
+      (form : expression.form = .reference name (.local localInstance.binding.binder.id))
+      (matched : SourceSpecialization.matchClosedSchemeInstance?
+        localInstance.binding.binder.scheme expression.rawType = some localInstance.substitution) :
+      LexicalReadOrigin source localInstance
+  | contextual {localInstance parent : LocalLambdaInstance}
+      (parentOrigin : LexicalReadOrigin source parent)
+      (binding : localInstance.binding ∈ localLambdaBindings source)
+      (nodes : List Node) (selected : localLambdaBodyNodes source parent = .ok nodes)
+      (expression : ExpressionNode) (present : .expression expression ∈ nodes)
+      (name : String)
+      (form : expression.form = .reference name (.local localInstance.binding.binder.id))
+      (child : Substitution)
+      (matched : SourceSpecialization.matchClosedSchemeInstance?
+        (Scheme.apply parent.substitution localInstance.binding.binder.scheme)
+        (parent.substitution.apply expression.rawType) = some child)
+      (cumulative : localInstance.substitution = child.compose parent.substitution) :
+      LexicalReadOrigin source localInstance
+
+private theorem insertLocalLambdaInstance_lexical_origin {source : TypedSource}
+    {instances : List LocalLambdaInstance} {localInstance : LocalLambdaInstance}
+    (prior : ∀ value ∈ instances, LocalLambdaInstance.LexicalReadOrigin source value)
+    (current : LocalLambdaInstance.LexicalReadOrigin source localInstance) :
+    ∀ value ∈ insertLocalLambdaInstance instances localInstance,
+      LocalLambdaInstance.LexicalReadOrigin source value := by
+  unfold insertLocalLambdaInstance
+  split
+  · exact prior
+  · intro value member
+    rcases List.mem_append.mp member with old | added
+    · exact prior value old
+    · cases List.mem_singleton.mp added
+      exact current
+
+private theorem collectGroundLocalLambdaInstances_lexical_origins
+    {source : TypedSource} (body nodes : List Node)
+    (selected : localLambdaRootNodes source = .ok body)
+    (contained : ∀ node ∈ nodes, node ∈ body)
+    (prior result : List LocalLambdaInstance)
+    (origins : ∀ value ∈ prior, LocalLambdaInstance.LexicalReadOrigin source value)
+    (accepted : collectGroundLocalLambdaInstances
+      (directPolymorphicLambdaBindings source) nodes prior = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.LexicalReadOrigin source value := by
+  induction nodes generalizing prior with
+  | nil =>
+      cases Except.ok.inj accepted
+      exact origins
+  | cons head tail ih =>
+      have rest := fun node member => contained node (List.mem_cons_of_mem head member)
+      have current := contained head List.mem_cons_self
+      cases head with
+      | statement statement => exact ih rest prior origins accepted
+      | expression expression =>
+        cases form : expression.form <;>
+          simp only [collectGroundLocalLambdaInstances, form] at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i name resolution
+        cases resolution <;> simp only at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i id
+        cases found : exactLocalLambdaBinding? (directPolymorphicLambdaBindings source) id with
+        | none =>
+            simp only [found] at accepted
+            exact ih rest prior origins accepted
+        | some binding =>
+            simp only [found] at accepted
+            split at accepted
+            · exact ih rest prior origins accepted
+            · cases matched : SourceSpecialization.matchClosedSchemeInstance?
+                  binding.binder.scheme expression.rawType with
+              | none => simp [matched, bind, Except.bind, throw] at accepted
+              | some substitution =>
+                  simp only [matched, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+                  apply ih rest _ (insertLocalLambdaInstance_lexical_origin origins ?_) accepted
+                  exact .root (exactLocalLambdaBinding_member found) body selected
+                    expression current name
+                    (by rw [exactLocalLambdaBinding_id found]; exact form) matched
+
+private theorem collectContextualLocalLambdaInstances_lexical_origins
+    {source : TypedSource} (parent : LocalLambdaInstance)
+    (parentOrigin : LocalLambdaInstance.LexicalReadOrigin source parent)
+    (body nodes : List Node)
+    (selected : localLambdaBodyNodes source parent = .ok body)
+    (contained : ∀ node ∈ nodes, node ∈ body)
+    (prior result : List LocalLambdaInstance)
+    (origins : ∀ value ∈ prior, LocalLambdaInstance.LexicalReadOrigin source value)
+    (accepted : collectContextualLocalLambdaInstances (directPolymorphicLambdaBindings source)
+      parent nodes prior = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.LexicalReadOrigin source value := by
+  induction nodes generalizing prior with
+  | nil =>
+      cases Except.ok.inj accepted
+      exact origins
+  | cons head tail ih =>
+      have rest := fun node member => contained node (List.mem_cons_of_mem head member)
+      have current := contained head List.mem_cons_self
+      cases head with
+      | statement statement => exact ih rest prior origins accepted
+      | expression expression =>
+        cases form : expression.form <;>
+          simp only [collectContextualLocalLambdaInstances, form] at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i name resolution
+        cases resolution <;> simp only at accepted
+        all_goals try exact ih rest prior origins accepted
+        rename_i id
+        cases found : exactLocalLambdaBinding? (directPolymorphicLambdaBindings source) id with
+        | none =>
+            simp only [found] at accepted
+            exact ih rest prior origins accepted
+        | some binding =>
+            simp only [found] at accepted
+            split at accepted
+            · exact ih rest prior origins accepted
+            · cases matched : SourceSpecialization.matchClosedSchemeInstance?
+                  (Scheme.apply parent.substitution binding.binder.scheme)
+                  (parent.substitution.apply expression.rawType) with
+              | none => simp [matched, bind, Except.bind, throw] at accepted
+              | some substitution =>
+                  simp only [matched, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+                  apply ih rest _ (insertLocalLambdaInstance_lexical_origin origins ?_) accepted
+                  exact .contextual parentOrigin (exactLocalLambdaBinding_member found)
+                    body selected expression current name
+                    (by rw [exactLocalLambdaBinding_id found]; exact form) substitution matched rfl
+
+private theorem rootLocalLambdaInstances_lexical_origins {source : TypedSource}
+    {result : List LocalLambdaInstance}
+    (accepted : rootLocalLambdaInstances source (directPolymorphicLambdaBindings source) = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.LexicalReadOrigin source value := by
+  unfold rootLocalLambdaInstances at accepted
+  cases selected : directLexicalNodeIds source
+      ((directPolymorphicLambdaBindings source).map (·.initializer)) source.roots with
+  | error error => simp [selected, bind, Except.bind] at accepted
+  | ok ids =>
+      simp only [selected, bind, Except.bind] at accepted
+      exact collectGroundLocalLambdaInstances_lexical_origins
+        (selectedNodes ids source.nodes) (selectedNodes ids source.nodes)
+        (by simp only [localLambdaRootNodes, selected, bind, Except.bind, pure, Except.pure])
+        (fun _ member => member) [] result (by simp) accepted
+
+private theorem appendLocalLambdaInstances_lexical_origins {source : TypedSource}
+    (left right : List LocalLambdaInstance)
+    (prior : ∀ value ∈ left, LocalLambdaInstance.LexicalReadOrigin source value)
+    (added : ∀ value ∈ right, LocalLambdaInstance.LexicalReadOrigin source value) :
+    ∀ value ∈ appendLocalLambdaInstances left right,
+      LocalLambdaInstance.LexicalReadOrigin source value := by
+  unfold appendLocalLambdaInstances
+  induction right generalizing left with
+  | nil => exact prior
+  | cons head tail ih =>
+      simp only [List.foldl_cons]
+      exact ih _ (insertLocalLambdaInstance_lexical_origin prior (added head List.mem_cons_self))
+        (fun value member => added value (List.mem_cons_of_mem _ member))
+
+private theorem closeLocalLambdaInstancesAux_lexical_origins {source : TypedSource}
+    (fuel : Nat) (seen frontier result : List LocalLambdaInstance)
+    (known : ∀ value ∈ seen, LocalLambdaInstance.LexicalReadOrigin source value)
+    (queued : ∀ value ∈ frontier, LocalLambdaInstance.LexicalReadOrigin source value)
+    (accepted : closeLocalLambdaInstancesAux source (directPolymorphicLambdaBindings source)
+      seen frontier fuel = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.LexicalReadOrigin source value := by
+  induction fuel generalizing seen frontier with
+  | zero =>
+      cases frontier with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons head rest => simp [closeLocalLambdaInstancesAux, throw] at accepted
+  | succ fuel ih =>
+      cases frontier with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons parent rest =>
+          simp only [closeLocalLambdaInstancesAux] at accepted
+          cases bodyIds : localLambdaBodyNodeIds source
+              (directPolymorphicLambdaBindings source) parent.binding with
+          | error error => simp [bodyIds, bind, Except.bind] at accepted
+          | ok ids =>
+              simp only [bodyIds, bind, Except.bind] at accepted
+              cases discovered : collectContextualLocalLambdaInstances
+                  (directPolymorphicLambdaBindings source) parent (selectedNodes ids source.nodes) [] with
+              | error error => simp [discovered] at accepted
+              | ok found =>
+                  simp only [discovered] at accepted
+                  have foundOrigins := collectContextualLocalLambdaInstances_lexical_origins parent
+                    (queued parent List.mem_cons_self) (selectedNodes ids source.nodes)
+                    (selectedNodes ids source.nodes)
+                    (by simp only [localLambdaBodyNodes, bodyIds, bind, Except.bind, pure, Except.pure])
+                    (fun _ member => member) [] found (by simp) discovered
+                  have freshOrigins : ∀ value ∈ found.filter (fun value => !seen.contains value),
+                      LocalLambdaInstance.LexicalReadOrigin source value :=
+                    fun value member => foundOrigins value (List.mem_filter.mp member).1
+                  apply ih _ _
+                    (appendLocalLambdaInstances_lexical_origins _ _ known freshOrigins) ?_ accepted
+                  intro value member
+                  rcases List.mem_append.mp member with old | fresh
+                  · exact queued value (List.mem_cons_of_mem _ old)
+                  · exact freshOrigins value fresh
+
+/-- Every actual discovered instance retains its exact binding, scheme matcher,
+and the root or parent lexical body that emitted the read. -/
+theorem localLambdaInstances_lexical_read_origin {source : TypedSource}
+    {contextFuel : Option Nat} {result : List LocalLambdaInstance}
+    (accepted : localLambdaInstances source contextFuel = .ok result) :
+    ∀ value ∈ result, LocalLambdaInstance.LexicalReadOrigin source value := by
+  cases contextFuel <;> simp only [localLambdaInstances] at accepted
+  all_goals
+    obtain ⟨roots, initial, afterInitial⟩ := except_bind_ok _ _ _ accepted
+    obtain ⟨values, closed, afterClosed⟩ := except_bind_ok _ _ _ afterInitial
+    obtain ⟨_, _, completed⟩ := except_bind_ok _ _ _ afterClosed
+    have same : values = result := by
+      simpa only [pure, Pure.pure, Except.pure, Except.ok.injEq] using completed
+    subst result
+    have rootsOrigin := rootLocalLambdaInstances_lexical_origins initial
+    exact closeLocalLambdaInstancesAux_lexical_origins _ _ _ _ rootsOrigin rootsOrigin closed
+
+/-- Lexical provenance strengthens the existing read provenance without
+changing its scheme matcher or cumulative substitution. -/
+theorem LocalLambdaInstance.LexicalReadOrigin.read_origin {source : TypedSource}
+    {localInstance : LocalLambdaInstance} (origin : LexicalReadOrigin source localInstance) :
+    ReadOrigin source localInstance := by
+  induction origin with
+  | root _ nodes selected expression present name form matched =>
+      unfold localLambdaRootNodes at selected
+      obtain ⟨ids, _, completed⟩ := except_bind_ok _ _ _ selected
+      cases Except.ok.inj completed
+      exact .root expression (selectedNodes_subset ids source.nodes _ present) name form matched
+  | contextual _ _ nodes selected expression present name form child matched cumulative ih =>
+      unfold localLambdaBodyNodes at selected
+      obtain ⟨ids, _, completed⟩ := except_bind_ok _ _ _ selected
+      cases Except.ok.inj completed
+      exact .contextual ih expression (selectedNodes_subset ids source.nodes _ present)
+        name form child matched cumulative
+
+theorem LocalLambdaInstance.LexicalReadOrigin.binding_member {source : TypedSource}
+    {localInstance : LocalLambdaInstance} (origin : LexicalReadOrigin source localInstance) :
+    localInstance.binding ∈ localLambdaBindings source := by
+  cases origin with
+  | root binding => exact binding
+  | contextual _ binding => exact binding
+
+/-- The existing traversal's children, with all actual generalized initializers
+retained as boundaries. -/
+def localLambdaLexicalChildren (source : TypedSource) (id : NodeId) : List NodeId :=
+  directLexicalChildren source ((directPolymorphicLambdaBindings source).map (·.initializer)) id
+
+inductive LocalLambdaLexicalPath (source : TypedSource) (roots : List NodeId) :
+    NodeId → Prop where
+  | root {node : NodeId} (member : node ∈ roots) : LocalLambdaLexicalPath source roots node
+  | child {parent node : NodeId} (previous : LocalLambdaLexicalPath source roots parent)
+      (member : node ∈ localLambdaLexicalChildren source parent) :
+      LocalLambdaLexicalPath source roots node
+
+private theorem appendNodeIds_property {property : NodeId → Prop}
+    (left right : List NodeId) (before : ∀ id ∈ left, property id)
+    (added : ∀ id ∈ right, property id) :
+    ∀ id ∈ appendNodeIds left right, property id := by
+  unfold appendNodeIds
+  induction right generalizing left with
+  | nil => exact before
+  | cons head tail ih =>
+      simp only [List.foldl_cons]
+      apply ih
+      · unfold appendNodeId
+        split
+        · exact before
+        · intro id member
+          rcases List.mem_append.mp member with old | new
+          · exact before id old
+          · cases List.mem_singleton.mp new
+            exact added head List.mem_cons_self
+      · exact fun id member => added id (List.mem_cons_of_mem head member)
+
+private theorem collectDirectLexicalNodeIds_paths {source : TypedSource} {roots : List NodeId}
+    (fuel : Nat) (pending seen result : List NodeId)
+    (queued : ∀ id ∈ pending, LocalLambdaLexicalPath source roots id)
+    (known : ∀ id ∈ seen, LocalLambdaLexicalPath source roots id)
+    (accepted : collectDirectLexicalNodeIds source
+      ((directPolymorphicLambdaBindings source).map (·.initializer))
+      fuel pending seen = .ok result) :
+    ∀ id ∈ result, LocalLambdaLexicalPath source roots id := by
+  induction fuel generalizing pending seen with
+  | zero =>
+      cases pending with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons head tail => cases accepted
+  | succ fuel ih =>
+      cases pending with
+      | nil => cases Except.ok.inj accepted; exact known
+      | cons head tail =>
+          simp only [collectDirectLexicalNodeIds] at accepted
+          split at accepted
+          · exact ih tail seen (fun id member => queued id (List.mem_cons_of_mem head member))
+              known accepted
+          · have headPath := queued head List.mem_cons_self
+            refine ih (appendNodeIds tail
+              ((localLambdaLexicalChildren source head).filter fun child =>
+                !(seen ++ [head]).contains child)) (seen ++ [head]) ?_ ?_ accepted
+            · apply appendNodeIds_property
+              · exact fun id member => queued id (List.mem_cons_of_mem head member)
+              · intro id member
+                exact .child headPath (List.mem_filter.mp member).1
+            · intro id member
+              rcases List.mem_append.mp member with old | new
+              · exact known id old
+              · cases List.mem_singleton.mp new
+                exact headPath
+
+theorem localLambdaRootNodes_path {source : TypedSource} {nodes : List Node} {node : Node}
+    (accepted : localLambdaRootNodes source = .ok nodes) (member : node ∈ nodes) :
+    LocalLambdaLexicalPath source source.roots node.id := by
+  unfold localLambdaRootNodes at accepted
+  obtain ⟨ids, traversed, completed⟩ := except_bind_ok _ _ _ accepted
+  cases Except.ok.inj completed
+  exact collectDirectLexicalNodeIds_paths _ _ _ _ (fun _ member => .root member)
+    (by simp) traversed node.id (selectedNode_id member)
+
+theorem localLambdaBodyNodes_path {source : TypedSource} {localInstance : LocalLambdaInstance}
+    {nodes : List Node} {node : Node}
+    (accepted : localLambdaBodyNodes source localInstance = .ok nodes) (member : node ∈ nodes) :
+    ∃ initializer parameters resultType body,
+      source.lookupExpression? localInstance.binding.initializer = some initializer ∧
+      initializer.form = .lambda parameters resultType body ∧
+      LocalLambdaLexicalPath source (body.map NodeId.statement) node.id := by
+  unfold localLambdaBodyNodes at accepted
+  obtain ⟨ids, traversed, completed⟩ := except_bind_ok _ _ _ accepted
+  cases Except.ok.inj completed
+  have selectedId := selectedNode_id member
+  unfold localLambdaBodyNodeIds at traversed
+  cases found : source.lookupExpression? localInstance.binding.initializer with
+  | none =>
+      simp only [found, pure, Except.pure, Except.ok.injEq] at traversed
+      subst ids
+      cases selectedId
+  | some expression =>
+      cases expression with
+      | mk id span type form requirements coercions localSchemeInstantiationStart =>
+        cases form <;> simp only [found] at traversed
+        all_goals try
+          have empty : ids = [] := (Except.ok.inj traversed).symm
+          subst ids
+          cases selectedId
+        rename_i parameters resultType body
+        refine ⟨_, parameters, resultType, body, rfl, rfl, ?_⟩
+        exact collectDirectLexicalNodeIds_paths _ _ _ _ (fun _ member => .root member)
+          (by simp) traversed node.id selectedId
+
+end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference
+
+/-- Every child scheduled by the real lexical traversal comes from the same
+looked-up node and one of that node's canonical occurrence references. -/
+theorem localLambdaLexicalChildren_origin {source : TypedSource} {parent child : NodeId}
+    (member : child ∈ localLambdaLexicalChildren source parent) :
+    ∃ node, source.lookupNode? parent.occurrenceId = some node ∧ child ∈ node.references := by
+  unfold localLambdaLexicalChildren directLexicalChildren at member
+  cases found : source.lookupNode? parent.occurrenceId with
+  | none => simp only [found, List.not_mem_nil] at member
+  | some node =>
+    cases node with
+    | expression node =>
+      cases node with
+      | mk id span type form requirements coercions localStart =>
+        cases form <;> simp only [found] at member
+        all_goals try split at member
+        all_goals try contradiction
+        all_goals
+          refine ⟨_, rfl, ?_⟩
+          simpa only [Node.references, SourceSpecialization.expressionChildNodeIds_eq_references]
+            using member
+    | statement node =>
+      exact ⟨_, rfl, SourceSpecialization.statementChildNodeIds_references (by simpa only [found] using member)⟩
+
+/-- The real body traversal selects complete records from this exact source. -/
+theorem localLambdaBodyNodes_members {source : TypedSource} {localInstance : LocalLambdaInstance}
+    {nodes : List Node} (accepted : localLambdaBodyNodes source localInstance = .ok nodes) :
+    nodes ⊆ source.nodes := by
+  unfold localLambdaBodyNodes at accepted
+  obtain ⟨ids, _, completed⟩ := except_bind_ok _ _ _ accepted
+  cases Except.ok.inj completed
+  exact selectedNodes_subset ids source.nodes
+
+end Solcore.Frontend.SourceSpecializationWorklist
+
+/-! The real direct lexical traversal stops at each initializer which adds a
+new residual scope. Its internal body cannot silently extend an outer entry. -/
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem SourceSpecialization
+
+theorem localLambdaLexicalChildren_residual {source : TypedSource}
+    {parent child : NodeId} (member : child ∈ localLambdaLexicalChildren source parent)
+    (variables : List TypeVarId) :
+    ∃ childVariables, (child, childVariables) ∈ residualScopeChildren source parent variables := by
+  have present : child ∈ (residualScopeChildren source parent variables).map Prod.fst := by
+    rw [residualScopeChildren_ids]
+    unfold localLambdaLexicalChildren directLexicalChildren at member
+    cases found : source.lookupNode? parent.occurrenceId with
+    | none => simp only [found, List.not_mem_nil] at member
+    | some node =>
+      cases node with
+      | expression node =>
+        cases node with
+        | mk id span type form requirements coercions localStart =>
+          cases form <;> simp only [found] at member ⊢
+          all_goals try split at member
+          all_goals try contradiction
+          all_goals exact member
+      | statement node => simpa only [found] using member
+  obtain ⟨pair, present, same⟩ := List.mem_map.mp present
+  exact ⟨pair.2, same ▸ present⟩
+
+private theorem direct_initialized_boundary {source : TypedSource} {statement : StatementNode}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    (present : Node.statement statement ∈ source.nodes)
+    (form : statement.form = .letDecl binder (some initializer))
+    {metavariable : TypeVarId} (quantified : metavariable ∈ binder.scheme.quantified)
+    (direct : isDirectLambdaInitializer source initializer = true) :
+    localLambdaLexicalChildren source (.expression initializer) = [] := by
+  have nonempty : binder.scheme.quantified.isEmpty = false := by
+    cases q : binder.scheme.quantified with
+    | nil => simp only [q, List.not_mem_nil] at quantified
+    | cons head tail => rfl
+  have binding : { binder, initializer : LocalLambdaBinding } ∈ directPolymorphicLambdaBindings source := by
+    apply List.mem_filterMap.mpr
+    refine ⟨.statement statement, present, ?_⟩
+    cases statement with
+    | mk id span type actual =>
+      cases form
+      simp only [nonempty, direct, Bool.not_true, Bool.or_self, Bool.false_eq_true, ↓reduceIte]
+  have boundary : initializer ∈ (directPolymorphicLambdaBindings source).map (·.initializer) :=
+    List.mem_map.mpr ⟨_, binding, rfl⟩
+  unfold isDirectLambdaInitializer TypedSource.lookupExpression? at direct
+  cases found : source.lookupNode? initializer.occurrence with
+  | none => simp only [found, Bool.false_eq_true] at direct
+  | some node =>
+    cases node with
+    | statement node => simp only [found, Bool.false_eq_true] at direct
+    | expression node =>
+      have occurrence : node.id.occurrence = initializer.occurrence := by
+        have selected := List.find?_some
+          (p := fun item : Node => decide (item.occurrenceId = initializer.occurrence)) found
+        exact of_decide_eq_true selected
+      have identifier : node.id = initializer := congrArg ExpressionId.mk occurrence
+      have contained : ((directPolymorphicLambdaBindings source).map (·.initializer)).contains node.id = true := by
+        apply List.contains_iff_exists_mem_beq.mpr
+        refine ⟨initializer, boundary, ?_⟩
+        rw [identifier]
+        cases initializer
+        delta instBEqExpressionId instBEqExpressionId.beq
+        delta instBEqOccurrenceId instBEqOccurrenceId.beq
+        simp
+      cases node with
+      | mk id span type actual requirements coercions localStart =>
+        cases actual <;> simp only [found, Bool.false_eq_true] at direct
+        unfold localLambdaLexicalChildren directLexicalChildren
+        simp only at contained
+        simp only [NodeId.occurrenceId, found, contained, ↓reduceIte]
+
+theorem localLambdaLexicalChildren_scope_boundary {source : TypedSource}
+    {parent child : NodeId} {variables childVariables : List TypeVarId}
+    (edge : (child, childVariables) ∈ residualScopeChildren source parent variables)
+    {metavariable : TypeVarId} (occurs : metavariable ∈ childVariables)
+    (fresh : metavariable ∉ variables) :
+    localLambdaLexicalChildren source child = [] := by
+  obtain ⟨statement, binder, initializer, found, form, same, quantified, direct⟩ :=
+    residualScopeChildren_new_quantifier_direct edge occurs fresh
+  subst child
+  exact direct_initialized_boundary (List.mem_of_find?_eq_some found) form quantified direct
+
+end Solcore.Frontend.SourceSpecializationWorklist
+
+namespace Solcore.Frontend.SourceSpecializationWorklist
+open SourceInference TypeSystem SourceSpecialization
+
+theorem localLambdaLexicalChildren_initialized {source : TypedSource}
+    {id : StatementId} {statement : StatementNode} {binder : TypedBinder}
+    {initializer : ExpressionId}
+    (found : source.lookupNode? id.occurrence = some (.statement statement))
+    (form : statement.form = .letDecl binder (some initializer)) :
+    .expression initializer ∈ localLambdaLexicalChildren source (.statement id) := by
+  unfold localLambdaLexicalChildren directLexicalChildren
+  simp only [NodeId.occurrenceId, found]
+  cases statement with
+  | mk statementId span type actual =>
+    cases form
+    change NodeId.expression initializer ∈ [NodeId.expression initializer]
+    exact List.mem_cons_self
+
+end Solcore.Frontend.SourceSpecializationWorklist

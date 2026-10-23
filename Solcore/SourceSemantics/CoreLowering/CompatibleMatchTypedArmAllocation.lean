@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterTyped
@@ -32,17 +33,19 @@ private theorem agree_insert {canonical actual : Environment} {ξ : Renaming}
 /-- Prefix completion constructs independent binder allocation, the represented
 heap, and a two-way finite continuation agreement. Source arguments may contain
 closures and the initial store may contain arbitrary typed administrative cells. -/
-theorem Stateful.prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
+theorem Stateful.prefix_cells_sized {layouts : SourceCoreAllocationLayouts.Prepared}
     {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
     {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
     {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
-    {source : TypedSource} {types : List Ty} {output : Ty} {body : Expr}
+    {allocationSource : TypedSource} {types : List Ty} {output : Ty} {body : Expr}
     {scope : Scope} {start : Nat} {bindings : List Binding} {code : Expr}
-    (tree : Tree layouts owner active layout globals onError source types output body scope start bindings code)
+    (tree : Tree layouts owner active layout globals onError allocationSource types output body scope start bindings code)
     {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
     {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
+    {cells : GenericHeap.CellModel nativeDefinitions}
+    (ordinaryCells : GenericHeap.OrdinaryCells model cells)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
-    (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol layouts layout model)
+    (producer : ProtectedStateTransition.CellAllocation.Producer (catalog := catalog) protocol layouts layout cells)
     (stateBindings : ProtectedStateTransition.Bindings protocol)
     (definitions : layouts.definitions = nativeDefinitions)
     (registered : layout.Registered nativeDefinitions)
@@ -52,7 +55,7 @@ theorem Stateful.prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
     {heap : Dynamic.Heap} {store : Store} {ξ : Renaming}
     {allTypes : List Ty} {allValues : List Value} {named : Bool} {contextLocation : Location} {native : NativeFrame}
     (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
-    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
     (sourceLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion (start + 1)) (Renaming.insertion start)) canonical logical)
     (actualLayout : EnvironmentsAgree ξ logical actual)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext nativeDefinitions)
@@ -60,18 +63,18 @@ theorem Stateful.prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
     (types_eq : types = allTypes)
     (bundleLength : allTypes.length = allValues.length)
     (valuesSelected : ∀ {index value}, values[index]? = some value → allValues[start + index]? = some value)
-    (kinds : ∀ binding ∈ bindings, source.inputs.any (fun input => decide (input.id = binding.1.id)) = named)
+    (kinds : ∀ binding ∈ bindings, allocationSource.inputs.any (fun input => decide (input.id = binding.1.id)) = named)
     (reference : canonical[scope.length + (if named then 0 else 1) + globals]? = some (.cellRef layout.type contextLocation))
     (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
     (unmapped : contextLocation ∉ mapping)
     (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
-    (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary contextLocation native) :
+    (readyAt : ProtectedStateTransition.CellAllocation.ReadyAt producer contextLocation native) :
     ∃ finalEnvironment finalHeap finalCanonical finalLogical finalActual finalStore finalMap finalWorld finalEmbedding,
       Dynamic.BindersAllocate environment heap (bindings.map Prod.fst) sources finalEnvironment finalHeap ∧
       DataHeap.EnvRepresents catalog finalMap finalWorld administrative
         (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope)
         finalEnvironment finalCanonical nativeDefinitions ∧
-      GenericHeap.HeapRepresents model finalMap finalWorld finalHeap finalStore ∧
+      GenericHeap.CellHeapRepresents cells finalMap finalWorld finalHeap finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧
       EnvironmentsAgree (DataMatchCoreAllocation.liftMany bindings.length (Renaming.comp (Renaming.insertion (start + 1)) (Renaming.insertion start)))
@@ -100,19 +103,19 @@ theorem Stateful.prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
       have initializer : Evaluates actual store
           ((LanguageResult.success (SourceCoreDataExpressions.projectPacked start types (.var start))).rename ξ)
           (.inRight .word value) store := .inRight ((selects_rename projection actualLayout).evaluates store)
-      have canonicalLayout : EnvironmentsAgree (request source scope start (binder, payload)).references
+      have canonicalLayout : EnvironmentsAgree (request allocationSource scope start (binder, payload)).references
           canonical (value :: logical) := agree_insert sourceLayout value
       have referenceAt : (value :: logical)[SourceCoreCallableIndexedAllocationFrames.referenceIndex globals
-          (request source scope start (binder, payload))]? = some (.cellRef layout.type contextLocation) := by
+          (request allocationSource scope start (binder, payload))]? = some (.cellRef layout.type contextLocation) := by
         have found := canonicalLayout reference
         have kind := kinds (binder, payload) (by simp)
-        change source.inputs.any (fun input => decide (input.id = binder.id)) = named at kind
-        have isNamed : SourceCoreCallableIndexedAllocationFrames.isNamedInput (request source scope start (binder, payload)) = named := kind
+        change allocationSource.inputs.any (fun input => decide (input.id = binder.id)) = named at kind
+        have isNamed : SourceCoreCallableIndexedAllocationFrames.isNamedInput (request allocationSource scope start (binder, payload)) = named := kind
         simp only [SourceCoreCallableIndexedAllocationFrames.referenceIndex, isNamed]
         exact found
       obtain ⟨captured, _captures, _captureTyped, allocationEval, nextHeaps, nextReference, frame, allocationState⟩ :=
-        producer.toOrdinary.complete allocation annotation same definitions registered environments
-          canonicalLayout heaps referenceAt read (.initialized rfl rfl) (.initialized head) Dynamic.Heap.Allocates.append initial (readyAt initial read)
+        producer.complete allocation annotation same definitions registered environments
+          canonicalLayout heaps referenceAt read (.initialized rfl rfl) (ordinaryCells.inject (.initialized head)) (.ordinary Dynamic.Heap.Allocates.append) initial (readyAt initial read)
       obtain ⟨nextState, allocationRelated⟩ := allocationState
       let nextRef := Value.cellRef (OptionalCell.cellType payload) (store.length + 2)
       have nextEnvironments := CallableIndexedOrdinaryAllocation.bind_environment (id := binder.id) environments nextReference
@@ -173,6 +176,72 @@ theorem Stateful.prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
         apply ContinuationSize.trans (a := false) (b := false) ?_ agreement
         simpa only [LanguageResult.bind, Expr.rename, Renaming.lift, LoopRenaming.weakenOne, nextRef, request] using
           ((ContinuationSize.bind initializer).trans (ContinuationSize.letE renamedAllocation)).weak
+
+/-- Compatibility with the original ordinary heap uses the same cell proof. -/
+theorem Stateful.prefix_sized {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    {source : TypedSource} {types : List Ty} {output : Ty} {body : Expr}
+    {scope : Scope} {start : Nat} {bindings : List Binding} {code : Expr}
+    (tree : Tree layouts owner active layout globals onError source types output body scope start bindings code)
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol layouts layout model)
+    (stateBindings : ProtectedStateTransition.Bindings protocol)
+    (definitions : layouts.definitions = nativeDefinitions)
+    (registered : layout.Registered nativeDefinitions)
+    {mapping : LocationMap} {world : StoreTyping} {sources : List Dynamic.Value} {values : List Value}
+    (represented : Arguments model mapping world bindings sources values)
+    {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {canonical logical actual : Environment}
+    {heap : Dynamic.Heap} {store : Store} {ξ : Renaming}
+    {allTypes : List Ty} {allValues : List Value} {named : Bool} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (sourceLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion (start + 1)) (Renaming.insertion start)) canonical logical)
+    (actualLayout : EnvironmentsAgree ξ logical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext nativeDefinitions)
+    (bundleSlot : logical[start]? = some (DataPatternValues.packValues allValues))
+    (types_eq : types = allTypes)
+    (bundleLength : allTypes.length = allValues.length)
+    (valuesSelected : ∀ {index value}, values[index]? = some value → allValues[start + index]? = some value)
+    (kinds : ∀ binding ∈ bindings, source.inputs.any (fun input => decide (input.id = binding.1.id)) = named)
+    (reference : canonical[scope.length + (if named then 0 else 1) + globals]? = some (.cellRef layout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
+    (unmapped : contextLocation ∉ mapping)
+    (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
+    (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary contextLocation native) :
+    ∃ finalEnvironment finalHeap finalCanonical finalLogical finalActual finalStore finalMap finalWorld finalEmbedding,
+      Dynamic.BindersAllocate environment heap (bindings.map Prod.fst) sources finalEnvironment finalHeap ∧
+      DataHeap.EnvRepresents catalog finalMap finalWorld administrative
+        (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope)
+        finalEnvironment finalCanonical nativeDefinitions ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld finalHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧
+      EnvironmentsAgree (DataMatchCoreAllocation.liftMany bindings.length (Renaming.comp (Renaming.insertion (start + 1)) (Renaming.insertion start)))
+        finalCanonical finalLogical ∧
+      EnvironmentsAgree finalEmbedding finalLogical finalActual ∧
+      (∃ added : Environment, added.length = bindings.length ∧
+        finalCanonical = added ++ canonical ∧ finalLogical = added ++ logical) ∧
+      RuntimeEnvironmentHasTypes finalWorld finalActual (prefixContext bindings actualContext) nativeDefinitions ∧
+      ContinuationSize false actual store (code.rename ξ) finalActual finalStore (body.rename finalEmbedding) ∧
+      ∃ final : protocol.State
+          ⟨bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope,
+            finalMap, finalWorld, finalHeap, finalStore, finalCanonical⟩,
+        protocol.Relates initial final ∧ Nonempty (ProtectedStateTransition.ReturnTo protocol scope canonical
+          (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope) finalCanonical) := by
+  obtain ⟨finalEnvironment, finalHeap, finalCanonical, finalLogical, finalActual, finalStore, finalMap,
+    finalWorld, finalEmbedding, allocated, finalEnvironments, finalHeaps, maps, worlds, preservation,
+    finalSourceLayout, finalActualLayout, spine, finalTyped, continuation, finalState, related, restoration⟩ :=
+    Stateful.prefix_cells_sized (allocationSource := source) tree (GenericHeap.OrdinaryCells.ordinary model) protocol
+      producer.toCells stateBindings definitions registered represented environments (GenericHeap.ordinaryHeap_iff.mpr heaps)
+      sourceLayout actualLayout actualTyped bundleSlot types_eq bundleLength valuesSelected kinds reference read unmapped initial readyAt
+  exact ⟨finalEnvironment, finalHeap, finalCanonical, finalLogical, finalActual, finalStore, finalMap,
+    finalWorld, finalEmbedding, allocated, finalEnvironments, GenericHeap.ordinaryHeap_iff.mp finalHeaps,
+    maps, worlds, preservation, finalSourceLayout, finalActualLayout, spine, finalTyped, continuation,
+    finalState, related, restoration⟩
 
 
 /-- The original API erases only the reached witness and future restoration. -/

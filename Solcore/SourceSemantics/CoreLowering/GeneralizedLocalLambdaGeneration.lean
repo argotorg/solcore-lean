@@ -170,17 +170,20 @@ theorem projector (indexed : Indexed prepared packet) :
 
 /-- Only an actual read supplies the source closure and its metadata view.
 The native code retains the original creation packet and full active key. -/
-theorem code_at_read (indexed : Indexed prepared packet)
+theorem code_at_read_with_view (indexed : Indexed prepared packet)
     (function : Dynamic.Closure) (administrative : Core.Context)
     (parameters : function.parameters = packet.parameters)
     (result : function.resultType = packet.result)
     (body : function.body = packet.statements)
     (profile : checked.catalog.callableContracts = true)
-    (viewOfSource : LambdaMetadataViews.MetadataView function.source packet.original.emission.prepared.source)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (viewOfSource : viewRelation function.source packet.original.emission.prepared.source)
+    (sourceHeader : ∃ sourceNode, function.source.lookupExpression? inputs.initializer = some sourceNode ∧
+      sourceNode.form = packet.node.form)
     (typed : HasType (SourceCoreLocalCell.coreContext inputs.scope ++ administrative)
       packet.original.lowered.expression (LanguageResult.resultType packet.original.lowered.type)
       prepared.layouts.definitions) :
-    ∃ code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative,
+    ∃ code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative viewRelation,
       code.compilation = context inputs packet.original.emission.prepared ∧
       code.active = packet.original.emission.prepared.substitution ∧
       code.id = inputs.initializer ∧ code.lowered = packet.original.lowered ∧
@@ -191,9 +194,9 @@ theorem code_at_read (indexed : Indexed prepared packet)
       code.view = packet.original.emission.prepared.source ∧ code.reasonAt = inputs.reasonAt := by
   cases function with
   | mk functionParameters functionResult functionBody source captured sourceContext evidence =>
-    simp only at parameters result body viewOfSource
+    simp only at parameters result body viewOfSource sourceHeader
     subst functionParameters functionResult functionBody
-    obtain ⟨sourceNode, sourceFound, _, sourceForm⟩ := viewOfSource.expression packet.found
+    obtain ⟨sourceNode, sourceFound, sourceForm⟩ := sourceHeader
     have parameterProjected := packet.certificate.parameterProjected
     have resultProjected := packet.certificate.resultProjected
     rw [indexed.projector] at parameterProjected resultProjected
@@ -214,7 +217,7 @@ theorem code_at_read (indexed : Indexed prepared packet)
       exact typed
     let code : CallableIndexedLambdaValues.Code prepared
         ⟨packet.parameters, packet.result, packet.statements, source, captured, sourceContext, evidence⟩
-        inputs.scope administrative := {
+        inputs.scope administrative viewRelation := {
       policy := policy inputs packet.original.emission.prepared packet.fuel
       lowerBody := lowerBody inputs packet.original.emission.prepared
       fuel := packet.fuel
@@ -243,6 +246,30 @@ theorem code_at_read (indexed : Indexed prepared packet)
       projection
       typed }
     exact ⟨code, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.refl packet.certificate, rfl, rfl⟩
+
+/-- The original global-view API is the specialization of the shared compiler constructor. -/
+theorem code_at_read (indexed : Indexed prepared packet)
+    (function : Dynamic.Closure) (administrative : Core.Context)
+    (parameters : function.parameters = packet.parameters)
+    (result : function.resultType = packet.result)
+    (body : function.body = packet.statements)
+    (profile : checked.catalog.callableContracts = true)
+    (viewOfSource : LambdaMetadataViews.MetadataView function.source packet.original.emission.prepared.source)
+    (typed : HasType (SourceCoreLocalCell.coreContext inputs.scope ++ administrative)
+      packet.original.lowered.expression (LanguageResult.resultType packet.original.lowered.type)
+      prepared.layouts.definitions) :
+    ∃ code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative,
+      code.compilation = context inputs packet.original.emission.prepared ∧
+      code.active = packet.original.emission.prepared.substitution ∧
+      code.id = inputs.initializer ∧ code.lowered = packet.original.lowered ∧
+      code.policy = policy inputs packet.original.emission.prepared packet.fuel ∧
+      code.lowerBody = lowerBody inputs packet.original.emission.prepared ∧
+      code.fuel = packet.fuel ∧ code.descriptor.id = indexed.descriptor.id ∧
+      HEq code.receipt packet.certificate ∧
+      code.view = packet.original.emission.prepared.source ∧ code.reasonAt = inputs.reasonAt := by
+  obtain ⟨sourceNode, sourceFound, _, sourceForm⟩ := viewOfSource.expression packet.found
+  exact indexed.code_at_read_with_view function administrative parameters result body profile viewOfSource
+    ⟨sourceNode, sourceFound, sourceForm⟩ typed
 
 end Indexed
 

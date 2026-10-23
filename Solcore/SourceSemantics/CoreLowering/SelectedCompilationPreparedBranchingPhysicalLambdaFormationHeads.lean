@@ -85,8 +85,7 @@ theorem forms {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
   let actualHistory : History code :=
     @PreparedLambdaBodyPhysicalFormation.history_at compiled headers keys mapping world (head.function environment) scope actual canonical before store
       captured code support owner initial.val initial.property
-  refine ⟨@value compiled.compatible.checked compiled.indexed (head.function environment) scope
-    captured.administrative code captured.embedding actualHistory.native actual, ?_, ?_⟩
+  refine ⟨value code captured.embedding actualHistory.native actual, ?_, ?_⟩
   · simpa only [code, PreparedLambdaBodyFormation.Formation.code, recaptureCode, head, receipt.produced.emitted, captured, CallableIndexedOwnedPhysicalLambdaCaptures.captures_for, actualHistory] using native
   have sourceType : receipt.produced.site.code.sourceNode.type = FunctionValues.sourceType (head.function environment) := receipt.sourceType
   have nativeType := CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type

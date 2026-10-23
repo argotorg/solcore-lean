@@ -1372,3 +1372,912 @@ theorem canonicalSubstitution_concrete_replacements
                   · exact ih remaining entry member
 
 end Solcore.Frontend.SourceSpecialization
+
+/-! The accepted residual validator records the lexical quantifiers along the
+actual source graph. These receipts expose that existing check to body-view
+proofs; they do not run another validator or change specialization. -/
+namespace Solcore.Frontend.SourceSpecialization
+open SourceInference TypeSystem
+
+/-- The exact children scheduled by the executable residual-scope traversal. -/
+def residualScopeChildren (source : TypedSource) (node : NodeId)
+    (variables : List TypeVarId) : List (NodeId × List TypeVarId) :=
+  (residualChildTasks source { node, variables }).map fun task =>
+    (task.node, task.variables)
+
+/-- A lexical scope comes from an actual root and actual child tasks. Entering
+an accepted polymorphic let initializer is the only operation that adds keys. -/
+inductive ResidualScopePath (source : TypedSource) : NodeId → List TypeVarId → Prop
+  | root {node} (member : node ∈ source.roots) : ResidualScopePath source node []
+  | child {node variables child childVariables}
+      (parent : ResidualScopePath source node variables)
+      (member : (child, childVariables) ∈ residualScopeChildren source node variables) :
+      ResidualScopePath source child childVariables
+
+/-- Types checked at a node by the actual residual validator. -/
+def residualNodeTypes (node : Node) : List Ty := nodeTypes node
+
+/-- Binder types are checked under the lexical scope plus their own quantified
+variables. This includes local requirement predicates. -/
+def residualBinderTypes (binder : TypedBinder) : List Ty :=
+  binder.scheme.body :: binder.schemeRequirements.flatMap fun requirement =>
+    predicateTypes requirement.predicate
+
+def residualNodeBinders (node : Node) : List TypedBinder := nodeBinders node
+
+private theorem residual_first_nonlexical {variables : List TypeVarId} (type : Ty)
+    (accepted : firstNonLexical variables type = none) :
+    ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables := by
+  induction type with
+  | «variable» metavariable =>
+      simp only [firstNonLexical] at accepted
+      split at accepted
+      · intro candidate member
+        simp only [Ty.freeVariables, List.mem_singleton] at member
+        subst candidate
+        simpa using ‹variables.contains metavariable = true›
+      · contradiction
+  | parameter | error => cases accepted
+  | constructor => simp [Ty.freeVariables]
+  | application left right ihLeft ihRight
+  | function left right ihLeft ihRight
+  | product left right ihLeft ihRight
+  | mapping left right ihLeft ihRight =>
+      have leftAccepted : firstNonLexical variables left = none := by
+        cases found : firstNonLexical variables left <;>
+          simp_all only [firstNonLexical, Option.orElse_some]
+      have rightAccepted : firstNonLexical variables right = none := by
+        simpa only [firstNonLexical, leftAccepted, Option.orElse_none] using accepted
+      intro metavariable member
+      simp at member
+      exact member.elim (ihLeft leftAccepted metavariable) (ihRight rightAccepted metavariable)
+  | proxy inner ih | comptime inner ih => exact ih accepted
+
+private theorem residual_lexical_types {variables : List TypeVarId} {types : List Ty}
+    (accepted : validateLexicalTypes variables types = .ok ()) :
+    ∀ type ∈ types, ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables := by
+  have none : types.findSome? (firstNonLexical variables) = none := by
+    unfold validateLexicalTypes at accepted
+    split at accepted <;> simp_all
+  clear accepted
+  induction types with
+  | nil => simp
+  | cons first rest ih =>
+      cases found : firstNonLexical variables first with
+      | some reason => simp [List.findSome?, found] at none
+      | none =>
+          have tail : rest.findSome? (firstNonLexical variables) = Option.none := by
+            simpa only [List.findSome?, found] using none
+          intro type member
+          rcases List.mem_cons.mp member with same | member
+          · subst type
+            exact residual_first_nonlexical first found
+          · exact ih tail type member
+
+private theorem residual_append_variables {left right : List TypeVarId}
+    {metavariable : TypeVarId} :
+    metavariable ∈ appendVariables left right ↔ metavariable ∈ left ∨ metavariable ∈ right := by
+  induction right generalizing left with
+  | nil => simp [appendVariables]
+  | cons head tail ih =>
+      simp only [appendVariables, List.foldl_cons]
+      change metavariable ∈ appendVariables (if left.contains head then left else left ++ [head]) tail ↔ _
+      rw [ih]
+      by_cases present : head ∈ left
+      · simp only [List.contains_iff_mem.mpr present, if_true, List.mem_cons]
+        constructor
+        · intro member
+          exact member.elim Or.inl (fun later => Or.inr (Or.inr later))
+        · intro member
+          rcases member with old | same | later
+          · exact Or.inl old
+          · exact Or.inl (same ▸ present)
+          · exact Or.inr later
+      · have absent : left.contains head = false := Bool.eq_false_iff.mpr (by simpa using present)
+        simp only [absent, Bool.false_eq_true, if_false, List.mem_append, List.mem_cons, List.not_mem_nil, or_false]
+        constructor
+        · intro member
+          rcases member with old | later
+          · exact old.elim Or.inl (fun same => Or.inr (Or.inl same))
+          · exact Or.inr (Or.inr later)
+        · intro member
+          rcases member with old | same | later
+          · exact Or.inl (Or.inl old)
+          · exact Or.inl (Or.inr same)
+          · exact Or.inr later
+
+private theorem residual_binder {variables : List TypeVarId} {binder : TypedBinder}
+    (accepted : validateLexicalBinder variables binder = .ok ()) :
+    ∀ type ∈ residualBinderTypes binder, ∀ metavariable ∈ type.freeVariables,
+      metavariable ∈ variables ∨ metavariable ∈ binder.scheme.quantified := by
+  intro type member metavariable occurs
+  exact residual_append_variables.mp (residual_lexical_types accepted type member metavariable occurs)
+
+private theorem residual_binders {variables : List TypeVarId} {binders : List TypedBinder}
+    (accepted : validateLexicalBinderSchemes variables binders = .ok ()) :
+    ∀ binder ∈ binders, ∀ type ∈ residualBinderTypes binder, ∀ metavariable ∈ type.freeVariables,
+      metavariable ∈ variables ∨ metavariable ∈ binder.scheme.quantified := by
+  induction binders with
+  | nil => simp
+  | cons binder rest ih =>
+      simp only [validateLexicalBinderSchemes] at accepted
+      cases first : validateLexicalBinder variables binder with
+      | error error => simp [first, bind, Except.bind] at accepted
+      | ok done =>
+          cases done
+          have later : validateLexicalBinderSchemes variables rest = .ok () := by
+            simpa only [first, bind, Except.bind] using accepted
+          intro selected member
+          rcases List.mem_cons.mp member with rfl | member
+          · exact residual_binder first
+          · exact ih later selected member
+
+private theorem residual_node_binders {source : TypedSource} {variables : List TypeVarId}
+    {node : Node} (accepted : validateNodeBinderSchemes source variables node = .ok ()) :
+    ∀ binder ∈ residualNodeBinders node, ∀ type ∈ residualBinderTypes binder,
+      ∀ metavariable ∈ type.freeVariables,
+        metavariable ∈ variables ∨ metavariable ∈ binder.scheme.quantified := by
+  cases node with
+  | expression node =>
+      cases form : node.form <;>
+        simp only [validateNodeBinderSchemes, form, residualNodeBinders, nodeBinders,
+          expressionFormBinders] at accepted ⊢ <;> try simp
+      exact residual_binders accepted
+  | statement node =>
+      cases form : node.form <;>
+        simp only [validateNodeBinderSchemes, form, residualNodeBinders, nodeBinders] at accepted ⊢
+      all_goals try exact residual_binders accepted
+      simp only [statementFormBinders, List.mem_singleton]
+      intro binder same
+      subst binder
+      exact residual_binder accepted
+
+private theorem residual_collect_paths {source : TypedSource} {fuel : Nat}
+    {tasks : List ResidualScopeTask} {initial final : List ResidualScope}
+    (accepted : collectResidualScopes source fuel tasks initial = .ok final)
+    (pending : ∀ task ∈ tasks, ResidualScopePath source task.node task.variables)
+    (prior : ∀ scope ∈ initial, ResidualScopePath source scope.node scope.variables) :
+    ∀ scope ∈ final, ResidualScopePath source scope.node scope.variables := by
+  induction fuel generalizing tasks initial with
+  | zero =>
+      cases tasks with
+      | nil => cases accepted; exact prior
+      | cons => cases accepted
+  | succ fuel ih =>
+      cases tasks with
+      | nil => cases accepted; exact prior
+      | cons task rest =>
+          simp only [collectResidualScopes] at accepted
+          split at accepted
+          · split at accepted
+            · exact ih accepted (fun next member => pending next (List.mem_cons_of_mem task member)) prior
+            · contradiction
+          · apply ih accepted
+            · intro child member
+              rcases List.mem_append.mp member with new | old
+              · exact .child (pending task (List.mem_cons_self)) (List.mem_map.mpr ⟨child,new,rfl⟩)
+              · exact pending child (List.mem_cons_of_mem task old)
+            · intro scope member
+              rcases List.mem_append.mp member with old | new
+              · exact prior scope old
+              · cases List.mem_singleton.mp new
+                exact pending task (List.mem_cons_self)
+
+private theorem residual_scopes_paths {source : TypedSource} {scopes : List ResidualScope}
+    (accepted : residualScopes source = .ok scopes) :
+    ∀ scope ∈ scopes, ResidualScopePath source scope.node scope.variables := by
+  apply residual_collect_paths accepted
+  · intro task member
+    obtain ⟨node, rootMember, same⟩ := List.mem_map.mp member
+    cases same
+    exact .root rootMember
+  · simp
+
+/-- Every stored node is either outside the traversal and closed, or carries
+its actual lexical scope path. Node and binder types retain that exact scope. -/
+def ResidualNodeSupported (source : TypedSource) (node : Node) : Prop :=
+  ∃ variables,
+    (variables = [] ∨ ResidualScopePath source node.id variables) ∧
+    (∀ type ∈ residualNodeTypes node, ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables) ∧
+    (∀ binder ∈ residualNodeBinders node, ∀ type ∈ residualBinderTypes binder,
+      ∀ metavariable ∈ type.freeVariables,
+        metavariable ∈ variables ∨ metavariable ∈ binder.scheme.quantified)
+
+private theorem residual_validated_node {source : TypedSource} {scopes : List ResidualScope}
+    {nodes : List Node} (paths : ∀ scope ∈ scopes, ResidualScopePath source scope.node scope.variables)
+    (accepted : validateScopedNodes source scopes nodes = .ok ()) :
+    ∀ node ∈ nodes, ResidualNodeSupported source node := by
+  induction nodes with
+  | nil => simp
+  | cons node rest ih =>
+      simp only [validateScopedNodes] at accepted
+      cases types : validateLexicalTypes (residualVariablesFor scopes node.id) (nodeTypes node) with
+      | error error => simp [types, bind, Except.bind] at accepted
+      | ok done =>
+          cases done
+          cases binders : validateNodeBinderSchemes source (residualVariablesFor scopes node.id) node with
+          | error error => simp [types, binders, bind, Except.bind] at accepted
+          | ok done =>
+              cases done
+              have later : validateScopedNodes source scopes rest = .ok () := by
+                simpa only [types, binders, bind, Except.bind] using accepted
+              intro selected member
+              rcases List.mem_cons.mp member with same | member
+              · subst selected
+                refine ⟨residualVariablesFor scopes node.id, ?_, residual_lexical_types types,
+                  residual_node_binders binders⟩
+                unfold residualVariablesFor
+                cases found : scopes.find? (fun scope => decide (scope.node = node.id)) with
+                | none => exact Or.inl rfl
+                | some scope =>
+                    have chosen : decide (scope.node = node.id) = true := List.find?_some (p := fun (entry : ResidualScope) => decide (entry.node = node.id)) found
+                    have equal : scope.node = node.id := of_decide_eq_true chosen
+                    exact Or.inr (equal ▸ paths scope (List.mem_of_find?_eq_some found))
+              · exact ih later selected member
+
+/-- This is a consequence of the existing successful source validator. -/
+theorem validateTypedSourceResiduals_node_support {source : TypedSource}
+    (accepted : validateTypedSourceResiduals source = .ok ()) :
+    ∀ node ∈ source.nodes, ResidualNodeSupported source node := by
+  unfold validateTypedSourceResiduals at accepted
+  cases positions : validatePolymorphicBinderPositions source with
+  | error error => simp [positions, bind, Except.bind] at accepted
+  | ok done =>
+    cases done
+    cases qualified : validateQualifiedBinderPositions source with
+    | error error => simp [positions, qualified, bind, Except.bind] at accepted
+    | ok done =>
+      cases done
+      cases inputs : validateLexicalBinderSchemes [] source.inputs with
+      | error error => simp [positions, qualified, inputs, bind, Except.bind] at accepted
+      | ok done =>
+        cases done
+        cases scopes : residualScopes source with
+        | error error => simp [positions, qualified, inputs, scopes, bind, Except.bind] at accepted
+        | ok actualScopes =>
+          apply residual_validated_node (residual_scopes_paths scopes)
+          simpa only [positions, qualified, inputs, scopes, bind, Except.bind] using accepted
+
+private theorem residual_reject_ok {α : Type} {condition : Prop} [Decidable condition]
+    {action : Except Error α} {error : Error} {value : α}
+    (accepted : (if condition then .error error else action) = .ok value) :
+    action = .ok value := by
+  split at accepted
+  · cases accepted
+  · exact accepted
+
+/-- Every node of the actual specialized output passed the existing scoped
+validator. No body-typing or execution premise is needed. -/
+theorem specializeFunction_residual_node_support {signature : ProgramFunctionSignature}
+    {function : CheckedFunction} {supplied : ParameterSubstitution}
+    {specialized : SpecializedFunction}
+    (accepted : specializeFunction signature function supplied = .ok specialized) :
+    ∀ node ∈ specialized.function.typedBody.nodes,
+      ResidualNodeSupported specialized.function.typedBody node := by
+  unfold specializeFunction at accepted
+  iterate 5 have accepted := residual_reject_ok accepted
+  iterate 4 obtain ⟨_, _, accepted⟩ := bind_ok accepted
+  obtain ⟨canonical, _, accepted⟩ := bind_ok accepted
+  obtain ⟨_, residuals, accepted⟩ := bind_ok accepted
+  iterate 3 obtain ⟨_, _, accepted⟩ := bind_ok accepted
+  cases analysis : SourceStageAnalysis.analyzeFunction (applyCheckedFunction canonical function) with
+  | error error => simp only [analysis] at accepted; cases accepted
+  | ok stages =>
+      simp only [analysis, pure, Except.pure, bind, Except.bind, Except.ok.injEq] at accepted
+      subst specialized
+      exact validateTypedSourceResiduals_node_support residuals
+
+private theorem residual_expression_task_variables {variables : List TypeVarId}
+    {node : ExpressionNode} {task : ResidualScopeTask}
+    (member : task ∈ expressionChildTasks variables node) : task.variables = variables := by
+  cases form : node.form <;>
+    simp only [expressionChildTasks, form, expressionTasks, statementTasks] at member
+  all_goals try contradiction
+  all_goals
+    obtain ⟨_, _, same⟩ := List.mem_map.mp member
+    cases same
+    rfl
+
+private theorem residual_projection_task_variables {variables : List TypeVarId}
+    {projections : List PlaceProjection} {task : ResidualScopeTask}
+    (member : task ∈ projectionTasks variables projections) : task.variables = variables := by
+  obtain ⟨projection, _, found⟩ := List.mem_filterMap.mp member
+  cases projection with
+  | index key =>
+      cases Option.some.inj found
+      rfl
+  | member name index => cases found
+
+private theorem residual_for_item_task_variables {variables : List TypeVarId}
+    {item : ForItemForm} {task : ResidualScopeTask}
+    (member : task ∈ forItemTasks variables item) : task.variables = variables := by
+  cases item with
+  | letDecl binder initializer =>
+      obtain ⟨_, _, same⟩ := List.mem_map.mp member
+      cases same
+      rfl
+  | expression expression =>
+      cases List.mem_singleton.mp member
+      rfl
+  | assignValue assignment operator value =>
+      rcases List.mem_append.mp member with projected | value
+      · exact residual_projection_task_variables projected
+      · cases List.mem_singleton.mp value
+        rfl
+  | assignBitNot assignment => exact residual_projection_task_variables member
+
+private theorem residual_statement_task_variables {source : TypedSource}
+    {variables : List TypeVarId} {node : StatementNode} {task : ResidualScopeTask}
+    (member : task ∈ statementChildTasks source variables node) :
+    task.variables = variables ∨ ∃ binder initializer,
+      node.form = .letDecl binder (some initializer) ∧
+      task.node = .expression initializer ∧
+      task.variables = appendVariables variables binder.scheme.quantified := by
+  cases form : node.form with
+  | letDecl binder initializer =>
+      simp only [statementChildTasks, form] at member
+      obtain ⟨value, present, same⟩ := List.mem_map.mp member
+      cases same
+      cases initializer with
+      | none => cases present
+      | some initializer =>
+          have sameValue : value = initializer := List.mem_singleton.mp present
+          subst value
+          split
+          · exact Or.inr ⟨binder, initializer, rfl, rfl, rfl⟩
+          · exact Or.inl rfl
+  | returnStmt value =>
+      obtain ⟨_, _, same⟩ := List.mem_map.mp (show task ∈ expressionTasks variables value.toList by simpa only [statementChildTasks, form] using member)
+      cases same
+      exact Or.inl rfl
+  | expression value tail =>
+      obtain ⟨_, _, same⟩ := List.mem_map.mp (show task ∈ expressionTasks variables [value] by simpa only [statementChildTasks, form] using member)
+      cases same
+      exact Or.inl rfl
+  | assignValue assignment operator value =>
+      simp only [statementChildTasks, form] at member
+      rcases List.mem_append.mp member with projected | value
+      · exact Or.inl (residual_projection_task_variables projected)
+      · obtain ⟨_, _, same⟩ := List.mem_map.mp value
+        cases same
+        exact Or.inl rfl
+  | assignBitNot assignment =>
+      exact Or.inl (residual_projection_task_variables (show task ∈ projectionTasks variables assignment.target.projections by simpa only [statementChildTasks, form, assignmentTasks] using member))
+  | ifThen condition thenBody elseBody =>
+      simp only [statementChildTasks, form, List.mem_append] at member
+      rcases member with (condition | thenBody) | elseBody
+      all_goals
+        obtain ⟨_, _, same⟩ := List.mem_map.mp (by assumption)
+        cases same
+        exact Or.inl rfl
+  | block body =>
+      obtain ⟨_, _, same⟩ := List.mem_map.mp (show task ∈ statementTasks variables body by simpa only [statementChildTasks, form] using member)
+      cases same
+      exact Or.inl rfl
+  | matchWith resolution =>
+      simp only [statementChildTasks, form, List.mem_append] at member
+      rcases member with (scrutinee | arms) | defaultBody
+      · obtain ⟨_, _, same⟩ := List.mem_map.mp scrutinee
+        cases same
+        exact Or.inl rfl
+      · obtain ⟨_, _, taskMember⟩ := List.mem_flatMap.mp arms
+        obtain ⟨_, _, same⟩ := List.mem_map.mp taskMember
+        cases same
+        exact Or.inl rfl
+      · obtain ⟨_, _, same⟩ := List.mem_map.mp defaultBody
+        cases same
+        exact Or.inl rfl
+  | forLoop initializer condition post body =>
+      simp only [statementChildTasks, form, List.mem_append] at member
+      rcases member with ((initializers | test) | body) | post
+      · obtain ⟨_, _, taskMember⟩ := List.mem_flatMap.mp initializers
+        exact Or.inl (residual_for_item_task_variables taskMember)
+      · obtain ⟨_, _, same⟩ := List.mem_map.mp test
+        cases same
+        exact Or.inl rfl
+      · obtain ⟨_, _, same⟩ := List.mem_map.mp body
+        cases same
+        exact Or.inl rfl
+      · obtain ⟨_, _, taskMember⟩ := List.mem_flatMap.mp post
+        exact Or.inl (residual_for_item_task_variables taskMember)
+  | whileLoop condition body =>
+      simp only [statementChildTasks, form, List.mem_append] at member
+      rcases member with test | body
+      all_goals
+        obtain ⟨_, _, same⟩ := List.mem_map.mp (by assumption)
+        cases same
+        exact Or.inl rfl
+  | breakStmt | continueStmt => simp [statementChildTasks, form] at member
+
+/-- A newly introduced scope key belongs to the actual let binder on this
+edge. All expression, control-flow and header edges preserve the scope. -/
+theorem residualScopeChildren_new_quantifier {source : TypedSource}
+    {parent child : NodeId} {variables childVariables : List TypeVarId}
+    (member : (child, childVariables) ∈ residualScopeChildren source parent variables)
+    {metavariable : TypeVarId} (occurs : metavariable ∈ childVariables)
+    (fresh : metavariable ∉ variables) :
+    ∃ statement binder initializer,
+      source.lookupNode? parent.occurrenceId = some (.statement statement) ∧
+      statement.form = .letDecl binder (some initializer) ∧
+      child = .expression initializer ∧ metavariable ∈ binder.scheme.quantified := by
+  obtain ⟨task, taskMember, pair⟩ := List.mem_map.mp member
+  have childSame := congrArg Prod.fst pair
+  have variablesSame := congrArg Prod.snd pair
+  simp only at childSame variablesSame
+  unfold residualChildTasks at taskMember
+  cases found : source.lookupNode? parent.occurrenceId with
+  | none => simp only [found] at taskMember; cases taskMember
+  | some node =>
+      cases node with
+      | expression expression =>
+          have same := residual_expression_task_variables (by simpa only [found] using taskMember)
+          exact False.elim (fresh ((variablesSame.symm.trans same) ▸ occurs))
+      | statement statement =>
+          rcases residual_statement_task_variables (by simpa only [found] using taskMember) with same | ⟨binder, initializer, form, childForm, variablesForm⟩
+          · exact False.elim (fresh ((variablesSame.symm.trans same) ▸ occurs))
+          · refine ⟨statement, binder, initializer, rfl, form, childSame.symm.trans childForm, ?_⟩
+            have supported := residual_append_variables.mp ((variablesSame.symm.trans variablesForm) ▸ occurs)
+            exact supported.resolve_left fresh
+
+/-- Every key in a reached lexical scope has a genuine ancestor declaration.
+This relates the validator scope to the original binder used by inference
+lifetime receipts, including nested generalized declarations. -/
+theorem ResidualScopePath.quantifier_origin {source : TypedSource}
+    {node : NodeId} {variables : List TypeVarId}
+    (path : ResidualScopePath source node variables)
+    {metavariable : TypeVarId} (occurs : metavariable ∈ variables) :
+    ∃ parent parentVariables statement binder initializer,
+      ResidualScopePath source parent parentVariables ∧
+      source.lookupNode? parent.occurrenceId = some (.statement statement) ∧
+      statement.form = .letDecl binder (some initializer) ∧
+      metavariable ∈ binder.scheme.quantified := by
+  induction path with
+  | root member => cases occurs
+  | @child parent variables child childVariables prior edge ih =>
+      by_cases present : metavariable ∈ variables
+      · exact ih present
+      · obtain ⟨statement, binder, initializer, found, form, _, quantified⟩ :=
+          residualScopeChildren_new_quantifier edge occurs present
+        exact ⟨parent, variables, statement, binder, initializer, prior, found, form, quantified⟩
+
+/-- A genuine table lookup uses the support derived from specialization. -/
+theorem specializeFunction_residual_lookup_support {signature : ProgramFunctionSignature}
+    {function : CheckedFunction} {supplied : ParameterSubstitution}
+    {specialized : SpecializedFunction}
+    (accepted : specializeFunction signature function supplied = .ok specialized)
+    {id : OccurrenceId} {node : Node}
+    (found : specialized.function.typedBody.lookupNode? id = some node) :
+    ResidualNodeSupported specialized.function.typedBody node :=
+  specializeFunction_residual_node_support accepted node (List.mem_of_find?_eq_some found)
+
+/-- Every flexible variable inspected by the validator belongs to a genuine
+ancestor let binder, recovered from the actual scope traversal. -/
+theorem ResidualNodeSupported.quantifier_origin {source : TypedSource} {node : Node}
+    (supported : ResidualNodeSupported source node) {type : Ty}
+    (inspected : type ∈ residualNodeTypes node) {metavariable : TypeVarId}
+    (occurs : metavariable ∈ type.freeVariables) :
+    ∃ parent parentVariables statement binder initializer,
+      ResidualScopePath source parent parentVariables ∧
+      source.lookupNode? parent.occurrenceId = some (.statement statement) ∧
+      statement.form = .letDecl binder (some initializer) ∧
+      metavariable ∈ binder.scheme.quantified := by
+  obtain ⟨variables, path, types, _⟩ := supported
+  have member := types type inspected metavariable occurs
+  rcases path with empty | path
+  · cases empty
+    cases member
+  · exact path.quantifier_origin member
+
+/-- A suffix of the actual validator traversal, preserving every intermediate
+scope. It ties a quantifier's declaration to the particular inspected node. -/
+inductive ResidualScopeTail (source : TypedSource) (first : NodeId)
+    (firstVariables : List TypeVarId) : NodeId → List TypeVarId → Prop
+  | refl : ResidualScopeTail source first firstVariables first firstVariables
+  | child {parent parentVariables node variables}
+      (prior : ResidualScopeTail source first firstVariables parent parentVariables)
+      (edge : (node, variables) ∈ residualScopeChildren source parent parentVariables) :
+      ResidualScopeTail source first firstVariables node variables
+
+theorem ResidualScopePath.quantifier_ancestor {source : TypedSource}
+    {node : NodeId} {variables : List TypeVarId}
+    (path : ResidualScopePath source node variables)
+    {metavariable : TypeVarId} (occurs : metavariable ∈ variables) :
+    ∃ parent parentVariables statement binder initializer initializerVariables,
+      ResidualScopePath source parent parentVariables ∧
+      source.lookupNode? parent.occurrenceId = some (.statement statement) ∧
+      statement.form = .letDecl binder (some initializer) ∧
+      (.expression initializer, initializerVariables) ∈
+        residualScopeChildren source parent parentVariables ∧
+      ResidualScopeTail source (.expression initializer) initializerVariables node variables ∧
+      metavariable ∈ binder.scheme.quantified := by
+  induction path with
+  | root member => cases occurs
+  | @child parent variables child childVariables prior edge ih =>
+      by_cases present : metavariable ∈ variables
+      · obtain ⟨ancestor, ancestorVariables, statement, binder, initializer,
+          initializerVariables, path, found, form, entered, tail, quantified⟩ := ih present
+        exact ⟨ancestor, ancestorVariables, statement, binder, initializer,
+          initializerVariables, path, found, form, entered, .child tail edge, quantified⟩
+      · obtain ⟨statement, binder, initializer, found, form, same, quantified⟩ :=
+          residualScopeChildren_new_quantifier edge occurs present
+        subst child
+        exact ⟨parent, variables, statement, binder, initializer, childVariables,
+          prior, found, form, edge, .refl, quantified⟩
+
+/-- The actual source validator determines both the owner and the path from
+that owner's initializer to this precise node. -/
+theorem ResidualNodeSupported.quantifier_ancestor {source : TypedSource} {node : Node}
+    (supported : ResidualNodeSupported source node) {type : Ty}
+    (inspected : type ∈ residualNodeTypes node) {metavariable : TypeVarId}
+    (occurs : metavariable ∈ type.freeVariables) :
+    ∃ parent parentVariables statement binder initializer initializerVariables variables,
+      ResidualScopePath source parent parentVariables ∧
+      source.lookupNode? parent.occurrenceId = some (.statement statement) ∧
+      statement.form = .letDecl binder (some initializer) ∧
+      (.expression initializer, initializerVariables) ∈
+        residualScopeChildren source parent parentVariables ∧
+      ResidualScopeTail source (.expression initializer) initializerVariables node.id variables ∧
+      metavariable ∈ binder.scheme.quantified := by
+  obtain ⟨variables, path, types, _⟩ := supported
+  have member := types type inspected metavariable occurs
+  rcases path with empty | path
+  · cases empty
+    cases member
+  · obtain ⟨parent, parentVariables, statement, binder, initializer, initializerVariables,
+        path, found, form, entered, tail, quantified⟩ := path.quantifier_ancestor member
+    exact ⟨parent, parentVariables, statement, binder, initializer, initializerVariables,
+      variables, path, found, form, entered, tail, quantified⟩
+
+end Solcore.Frontend.SourceSpecialization
+
+namespace Solcore.Frontend.SourceSpecialization
+open SourceInference
+
+/-- The executable expression scheduler preserves every canonical child edge. -/
+theorem expressionChildNodeIds_eq_references (node : ExpressionNode) :
+    expressionChildNodeIds node = node.form.references := by
+  cases node with
+  | mk id span type form requirements coercions localStart =>
+    cases form <;> simp [expressionChildNodeIds, expressionChildTasks,
+      expressionTasks, statementTasks, ExpressionForm.references, List.map_map,
+      Function.comp_def]
+
+private theorem projectionTasks_nodes (variables : List TypeSystem.TypeVarId)
+    (projections : List PlaceProjection) :
+    (projectionTasks variables projections).map (·.node) =
+      projections.flatMap PlaceProjection.references := by
+  induction projections with
+  | nil => rfl
+  | cons head tail ih =>
+    cases head <;> simp_all [projectionTasks, PlaceProjection.references]
+
+private theorem forItemTasks_nodes (variables : List TypeSystem.TypeVarId) (item : ForItemForm) :
+    (forItemTasks variables item).map (·.node) = item.references := by
+  cases item with
+  | letDecl binder initializer => cases initializer <;> rfl
+  | expression value => rfl
+  | assignValue assignment operator value =>
+    simp [forItemTasks, assignmentTasks, projectionTasks_nodes, ForItemForm.references,
+      AssignmentResolution.references, PlaceResolution.references]
+  | assignBitNot assignment => exact projectionTasks_nodes _ _
+
+/-- Statement scheduling may reorder loop body and post items; every scheduled
+child still belongs to the same canonical statement edge set. -/
+theorem statementChildNodeIds_references {source : TypedSource} {node : StatementNode}
+    {child : NodeId} (member : child ∈ statementChildNodeIds source node) :
+    child ∈ node.form.references := by
+  cases node with
+  | mk id span type form =>
+    cases form <;>
+      simp only [statementChildNodeIds, statementChildTasks, expressionTasks,
+        statementTasks, assignmentTasks, projectionTasks_nodes, forItemTasks_nodes,
+        StatementForm.references, AssignmentResolution.references, PlaceResolution.references,
+        MatchResolution.references, List.map_map,
+        List.map_flatMap, List.map_append, Function.comp_def] at member ⊢
+    all_goals simp_all [or_left_comm, or_comm, TypedMatchCase.references]
+
+end Solcore.Frontend.SourceSpecialization
+
+/-! An accepted residual traversal gives one exact scope for every actual path.
+The same executable conflict check establishes this agreement. -/
+namespace Solcore.Frontend.SourceSpecialization
+open SourceInference TypeSystem
+
+private def ResidualRecorded (scopes : List ResidualScope) (node : NodeId)
+    (variables : List TypeVarId) : Prop :=
+  scopes.find? (fun scope => decide (scope.node = node)) = some { node, variables }
+
+private theorem residual_recorded_append {scopes : List ResidualScope}
+    {node : NodeId} {variables : List TypeVarId}
+    (recorded : ResidualRecorded scopes node variables) (extra : List ResidualScope) :
+    ResidualRecorded (scopes ++ extra) node variables := by
+  unfold ResidualRecorded at *
+  rw [List.find?_append, recorded]
+  rfl
+
+private theorem residual_collect_recorded {source : TypedSource} {fuel : Nat}
+    {tasks : List ResidualScopeTask} {initial final : List ResidualScope}
+    (accepted : collectResidualScopes source fuel tasks initial = .ok final) :
+    (∀ node variables, ResidualRecorded initial node variables → ResidualRecorded final node variables) ∧
+    (∀ task ∈ tasks, ResidualRecorded final task.node task.variables) := by
+  induction fuel generalizing tasks initial with
+  | zero =>
+    cases tasks with
+    | nil => cases accepted; exact ⟨fun _ _ present => present, by simp⟩
+    | cons => cases accepted
+  | succ fuel ih =>
+    cases tasks with
+    | nil => cases accepted; exact ⟨fun _ _ present => present, by simp⟩
+    | cons task rest =>
+      cases found : initial.find? (fun scope => decide (scope.node = task.node)) with
+      | some scope =>
+        simp only [collectResidualScopes, found] at accepted
+        split at accepted
+        next same =>
+          obtain ⟨old, remaining⟩ := ih accepted
+          have head : ResidualRecorded final task.node task.variables := by
+            apply old
+            have sameNode : scope.node = task.node := by
+              simpa only [decide_eq_true_eq] using List.find?_some found
+            have scopeEq : scope = { node := task.node, variables := task.variables } := by
+              cases scope
+              simp_all
+            simpa only [ResidualRecorded, scopeEq] using found
+          refine ⟨old, ?_⟩
+          intro pending member
+          rcases List.mem_cons.mp member with sameTask | later
+          · simpa only [sameTask] using head
+          · exact remaining pending later
+        next different => contradiction
+      | none =>
+        simp only [collectResidualScopes, found] at accepted
+        obtain ⟨old, remaining⟩ := ih accepted
+        have head : ResidualRecorded final task.node task.variables := by
+          apply old
+          unfold ResidualRecorded
+          rw [List.find?_append, found]
+          simp
+        refine ⟨fun node variables present => old node variables (residual_recorded_append present _), ?_⟩
+        intro pending member
+        rcases List.mem_cons.mp member with sameTask | later
+        · simpa only [sameTask] using head
+        · exact remaining pending (List.mem_append_right _ later)
+
+
+private theorem residual_collect_new_children {source : TypedSource} {fuel : Nat}
+    {tasks : List ResidualScopeTask} {initial final : List ResidualScope}
+    (accepted : collectResidualScopes source fuel tasks initial = .ok final) :
+    ∀ scope ∈ final, scope ∉ initial →
+      ∀ task ∈ residualChildTasks source { node := scope.node, variables := scope.variables },
+        ResidualRecorded final task.node task.variables := by
+  induction fuel generalizing tasks initial with
+  | zero =>
+    cases tasks with
+    | nil => cases accepted; intro scope member absent; exact (absent member).elim
+    | cons => cases accepted
+  | succ fuel ih =>
+    cases tasks with
+    | nil => cases accepted; intro scope member absent; exact (absent member).elim
+    | cons task rest =>
+      cases found : initial.find? (fun scope => decide (scope.node = task.node)) with
+      | some scope =>
+        simp only [collectResidualScopes, found] at accepted
+        split at accepted
+        · exact ih accepted
+        · contradiction
+      | none =>
+        simp only [collectResidualScopes, found] at accepted
+        intro scope member absent
+        by_cases entered : scope ∈ initial ++ [{ node := task.node, variables := task.variables }]
+        · rcases List.mem_append.mp entered with old | fresh
+          · exact (absent old).elim
+          · have same := List.mem_singleton.mp fresh
+            subst scope
+            intro child selected
+            exact (residual_collect_recorded accepted).2 child
+              (List.mem_append_left _ selected)
+        · exact ih accepted scope member entered
+
+private theorem residual_scopes_record_path {source : TypedSource} {scopes : List ResidualScope}
+    (accepted : residualScopes source = .ok scopes) {node : NodeId} {variables : List TypeVarId}
+    (path : ResidualScopePath source node variables) : ResidualRecorded scopes node variables := by
+  have completed := residual_collect_recorded accepted
+  have children := residual_collect_new_children accepted
+  induction path with
+  | root member =>
+    exact completed.2 { node := _, variables := [] }
+      (List.mem_map.mpr ⟨_, member, rfl⟩)
+  | @child parent variables child childVariables prior edge ih =>
+    have member : ({ node := parent, variables } : ResidualScope) ∈ scopes :=
+      List.mem_of_find?_eq_some ih
+    obtain ⟨task, selected, same⟩ := List.mem_map.mp edge
+    have known := children _ member (by simp) task selected
+    have nodeEq := congrArg Prod.fst same
+    have variablesEq := congrArg Prod.snd same
+    change task.node = child at nodeEq
+    change task.variables = childVariables at variablesEq
+    simpa only [nodeEq, variablesEq] using known
+
+private theorem residual_validated_path_data {source : TypedSource} {scopes : List ResidualScope}
+    {nodes : List Node} (accepted : validateScopedNodes source scopes nodes = .ok ()) :
+    ∀ node ∈ nodes,
+      (∀ type ∈ residualNodeTypes node, ∀ metavariable ∈ type.freeVariables,
+        metavariable ∈ residualVariablesFor scopes node.id) ∧
+      (∀ binder ∈ residualNodeBinders node, ∀ type ∈ residualBinderTypes binder,
+        ∀ metavariable ∈ type.freeVariables,
+          metavariable ∈ residualVariablesFor scopes node.id ∨ metavariable ∈ binder.scheme.quantified) := by
+  induction nodes with
+  | nil => simp
+  | cons node rest ih =>
+    simp only [validateScopedNodes] at accepted
+    obtain ⟨done, types, accepted⟩ := bind_ok accepted
+    cases done
+    obtain ⟨done, binders, accepted⟩ := bind_ok accepted
+    cases done
+    intro selected member
+    rcases List.mem_cons.mp member with same | later
+    · subst selected
+      exact ⟨residual_lexical_types types, residual_node_binders binders⟩
+    · exact ih accepted selected later
+
+private theorem residual_validated_scopes {source : TypedSource}
+    (accepted : validateTypedSourceResiduals source = .ok ()) :
+    ∃ scopes, residualScopes source = .ok scopes ∧ validateScopedNodes source scopes source.nodes = .ok () := by
+  unfold validateTypedSourceResiduals at accepted
+  iterate 3 obtain ⟨_, _, accepted⟩ := bind_ok accepted
+  obtain ⟨scopes, actual, accepted⟩ := bind_ok accepted
+  exact ⟨scopes, actual, accepted⟩
+
+/-- Two real paths to the same node use the same scope. The successful
+executable validator has already rejected conflicting scopes. -/
+theorem validateTypedSourceResiduals_scope_unique {source : TypedSource}
+    (accepted : validateTypedSourceResiduals source = .ok ())
+    {node : NodeId} {left right : List TypeVarId}
+    (first : ResidualScopePath source node left)
+    (second : ResidualScopePath source node right) : left = right := by
+  obtain ⟨scopes, actual, _⟩ := residual_validated_scopes accepted
+  have a := residual_scopes_record_path actual first
+  have b := residual_scopes_record_path actual second
+  exact congrArg ResidualScope.variables (Option.some.inj (a.symm.trans b))
+
+/-- Support belongs to the scope of the supplied actual path, rather than an
+unrelated existential path through the same table. -/
+theorem validateTypedSourceResiduals_path_support {source : TypedSource}
+    (accepted : validateTypedSourceResiduals source = .ok ())
+    {node : Node} (member : node ∈ source.nodes) {variables : List TypeVarId}
+    (path : ResidualScopePath source node.id variables) :
+    (∀ type ∈ residualNodeTypes node, ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables) ∧
+    (∀ binder ∈ residualNodeBinders node, ∀ type ∈ residualBinderTypes binder,
+      ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables ∨ metavariable ∈ binder.scheme.quantified) := by
+  obtain ⟨scopes, actual, validated⟩ := residual_validated_scopes accepted
+  have recorded := residual_scopes_record_path actual path
+  have exactScope : residualVariablesFor scopes node.id = variables := by
+    unfold residualVariablesFor
+    rw [recorded]
+    rfl
+  exact exactScope ▸ residual_validated_path_data validated node member
+
+private theorem specializeFunction_residual_acceptance {signature : ProgramFunctionSignature}
+    {function : CheckedFunction} {supplied : ParameterSubstitution}
+    {specialized : SpecializedFunction}
+    (accepted : specializeFunction signature function supplied = .ok specialized) :
+    validateTypedSourceResiduals specialized.function.typedBody = .ok () := by
+  unfold specializeFunction at accepted
+  iterate 5 have accepted := residual_reject_ok accepted
+  iterate 4 obtain ⟨_, _, accepted⟩ := bind_ok accepted
+  obtain ⟨canonical, _, accepted⟩ := bind_ok accepted
+  obtain ⟨_, residuals, accepted⟩ := bind_ok accepted
+  iterate 3 obtain ⟨_, _, accepted⟩ := bind_ok accepted
+  cases analysis : SourceStageAnalysis.analyzeFunction (applyCheckedFunction canonical function) with
+  | error error => simp only [analysis] at accepted; cases accepted
+  | ok stages =>
+    simp only [analysis, pure, Except.pure, bind, Except.bind, Except.ok.injEq] at accepted
+    subst specialized
+    exact residuals
+
+/-- Exact scope agreement follows from the actual specialization receipt. -/
+theorem specializeFunction_residual_scope_unique {signature : ProgramFunctionSignature}
+    {function : CheckedFunction} {supplied : ParameterSubstitution}
+    {specialized : SpecializedFunction}
+    (accepted : specializeFunction signature function supplied = .ok specialized)
+    {node : NodeId} {left right : List TypeVarId}
+    (first : ResidualScopePath specialized.function.typedBody node left)
+    (second : ResidualScopePath specialized.function.typedBody node right) : left = right :=
+  validateTypedSourceResiduals_scope_unique (specializeFunction_residual_acceptance accepted) first second
+
+/-- Every inspected type is supported by the exact path chosen in the actual
+specialized body. This also preserves each nested binder's own quantifiers. -/
+theorem specializeFunction_residual_path_support {signature : ProgramFunctionSignature}
+    {function : CheckedFunction} {supplied : ParameterSubstitution}
+    {specialized : SpecializedFunction}
+    (accepted : specializeFunction signature function supplied = .ok specialized)
+    {node : Node} (member : node ∈ specialized.function.typedBody.nodes) {variables : List TypeVarId}
+    (path : ResidualScopePath specialized.function.typedBody node.id variables) :
+    (∀ type ∈ residualNodeTypes node, ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables) ∧
+    (∀ binder ∈ residualNodeBinders node, ∀ type ∈ residualBinderTypes binder,
+      ∀ metavariable ∈ type.freeVariables, metavariable ∈ variables ∨ metavariable ∈ binder.scheme.quantified) :=
+  validateTypedSourceResiduals_path_support (specializeFunction_residual_acceptance accepted) member path
+
+end Solcore.Frontend.SourceSpecialization
+
+/-! Actual lexical child selection changes scope only at a generalized lambda
+boundary. The following facts expose existing scheduling, without another pass. -/
+namespace Solcore.Frontend.SourceSpecialization
+open SourceInference TypeSystem
+
+private theorem residual_expression_child_ids (variables : List TypeVarId)
+    (expression : ExpressionNode) :
+    (expressionChildTasks variables expression).map (·.node) =
+      expressionChildNodeIds expression := by
+  cases expression with
+  | mk id span type form requirements coercions localStart =>
+    cases form <;> simp [expressionChildTasks, expressionChildNodeIds,
+      expressionTasks, statementTasks, List.map_map, Function.comp_def]
+
+private theorem residual_projection_child_ids (variables : List TypeVarId)
+    (projections : List PlaceProjection) :
+    (projectionTasks variables projections).map (·.node) =
+      (projectionTasks [] projections).map (·.node) := by
+  induction projections with
+  | nil => rfl
+  | cons head tail ih =>
+    cases head <;> simpa [projectionTasks] using ih
+
+private theorem residual_item_child_ids (variables : List TypeVarId) (item : ForItemForm) :
+    (forItemTasks variables item).map (·.node) =
+      (forItemTasks [] item).map (·.node) := by
+  cases item <;> simp [forItemTasks, assignmentTasks, List.map_map,
+    Function.comp_def, residual_projection_child_ids]
+
+private theorem residual_statement_child_ids (source : TypedSource)
+    (variables : List TypeVarId) (statement : StatementNode) :
+    (statementChildTasks source variables statement).map (·.node) =
+      statementChildNodeIds source statement := by
+  cases statement with
+  | mk id span type form =>
+    cases form <;> simp [statementChildTasks, statementChildNodeIds,
+      expressionTasks, statementTasks, assignmentTasks, List.map_map,
+      List.map_flatMap, Function.comp_def, residual_projection_child_ids,
+      residual_item_child_ids]
+
+theorem residualScopeChildren_ids (source : TypedSource) (node : NodeId)
+    (variables : List TypeVarId) :
+    (residualScopeChildren source node variables).map Prod.fst =
+      match source.lookupNode? node.occurrenceId with
+      | some (.expression expression) => expressionChildNodeIds expression
+      | some (.statement statement) => statementChildNodeIds source statement
+      | none => [] := by
+  unfold residualScopeChildren residualChildTasks
+  cases source.lookupNode? node.occurrenceId with
+  | none => rfl
+  | some found =>
+    cases found <;> simp only [List.map_map, Function.comp_def]
+    · exact residual_expression_child_ids _ _
+    · exact residual_statement_child_ids _ _ _
+
+theorem residualScopeChildren_new_quantifier_direct {source : TypedSource}
+    {parent child : NodeId} {variables childVariables : List TypeVarId}
+    (member : (child, childVariables) ∈ residualScopeChildren source parent variables)
+    {metavariable : TypeVarId} (occurs : metavariable ∈ childVariables)
+    (fresh : metavariable ∉ variables) :
+    ∃ statement binder initializer,
+      source.lookupNode? parent.occurrenceId = some (.statement statement) ∧
+      statement.form = .letDecl binder (some initializer) ∧
+      child = .expression initializer ∧ metavariable ∈ binder.scheme.quantified ∧
+      isDirectLambdaInitializer source initializer = true := by
+  obtain ⟨statement, binder, initializer, found, form, same, quantified⟩ :=
+    residualScopeChildren_new_quantifier member occurs fresh
+  refine ⟨statement, binder, initializer, found, form, same, quantified, ?_⟩
+  by_cases allowed : polymorphicLetAllowed source binder (some initializer) = true
+  · have parts : (!binder.scheme.quantified.isEmpty) = true ∧
+        isDirectLambdaInitializer source initializer = true := by
+      simpa only [polymorphicLetAllowed, Option.any_some, Bool.and_eq_true] using allowed
+    exact parts.2
+  · have disabled : polymorphicLetAllowed source binder (some initializer) = false :=
+      Bool.eq_false_iff.mpr allowed
+    simp only [residualScopeChildren, residualChildTasks, found, statementChildTasks,
+      form, disabled, Bool.false_eq_true, ↓reduceIte, Option.toList_some,
+      List.map_cons, List.map_nil, List.mem_singleton, Prod.mk.injEq] at member
+    exact False.elim (fresh (member.2 ▸ occurs))
+
+end Solcore.Frontend.SourceSpecialization

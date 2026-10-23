@@ -152,7 +152,8 @@ theorem lowered_parameter_kinds
     {values : SourceCoreCompatibleValues.Context}
     {prepared : CallableIndexedLambdaValues.Prepared values.checked}
     {function : Dynamic.Closure} {scope : SourceCoreBasic.Scope} {administrative : Core.Context}
-    (code : CallableIndexedLambdaValues.Code prepared function scope administrative)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : CallableIndexedLambdaValues.Code prepared function scope administrative viewRelation)
     {id : ExpressionId} {node : ExpressionNode}
     (ownership : LocalIdentityOwnership function.source)
     (contains : ContainsExpression function.source id node)

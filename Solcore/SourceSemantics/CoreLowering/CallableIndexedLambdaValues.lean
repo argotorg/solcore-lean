@@ -15,14 +15,15 @@ abbrev Identity := @CallableIndexedRetainedNamedValues.Identity
 abbrev identity_faithful := @CallableIndexedRetainedNamedValues.identity_faithful
 
 structure Code {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
-    (function : Dynamic.Closure) (scope : SourceCoreLocalCell.Scope) (administrative : Core.Context) where
+    (function : Dynamic.Closure) (scope : SourceCoreLocalCell.Scope) (administrative : Core.Context)
+    (viewRelation : TypedSource → TypedSource → Prop := LambdaMetadataViews.MetadataView) where
   policy : SourceCoreFunctions.Policy
   lowerBody : SourceCoreFunctions.BodyLowerer
   fuel : Nat
   compilation : SourceCoreFunctions.Context
   active : TypeSystem.Substitution
   view : TypedSource
-  viewOfSource : LambdaMetadataViews.MetadataView function.source view
+  viewOfSource : viewRelation function.source view
   id : ExpressionId
   sourceNode : ExpressionNode
   sourceFound : function.source.lookupExpression? id = some sourceNode
@@ -52,19 +53,22 @@ structure Code {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepa
 
 def Code.referenceIndex {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) : Nat :=
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) : Nat :=
   SourceCoreCallableIndexedAncestry.creationReferenceIndex code.compilation scope
 
 def Code.body {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) : Expr :=
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) : Expr :=
   SourceCoreCallableIndexedFrames.withFrame (.var (code.referenceIndex + 2))
     (SourceCoreCallableIndexedDispatch.lambdaFrame prepared.ancestry.graph.table prepared.ancestry.layout.frame
       code.descriptor.id (.var 1) (.loadCell (.var (code.referenceIndex + 2)))) (code.receipt.rawBody.weakenAt 1)
 
 theorem Code.emitted {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) :
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) :
     code.lowered.expression = LanguageResult.success (code.descriptor.wrap (TaggedFunction.anonymous
       (.letE (.loadCell (.var code.referenceIndex))
         (.lambda code.receipt.parameterCore (LanguageResult.resultType code.receipt.resultCore) code.body)))) := by
@@ -86,6 +90,23 @@ theorem Code.emitted {checked : SourceCoreCompatibleCatalog.Checked} {prepared :
   change code.receipt.expression = _
   rw [decoration, emitted, sameOrigin, ← bodyEq]
   rfl
+
+/-- Change only the evidence required for the source view. The emitted code,
+capture layout, actual compiler receipt and native callable stay identical. -/
+def Code.weaken_view {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {before after : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative before)
+    (weaken : ∀ source view, before source view → after source view) :
+    Code prepared function scope administrative after :=
+  { code with viewOfSource := weaken _ _ code.viewOfSource }
+
+theorem Code.weaken_view_body {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {before after : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative before)
+    (weaken : ∀ source view, before source view → after source view) :
+    (code.weaken_view weaken).body = code.body := rfl
 
 /-- The full actual environment is retained. Only lexical cell references are
 compared with canonical slots; extra native captures are not discarded. -/
@@ -114,7 +135,8 @@ An index that merely decodes successfully does not supply this receipt. Source
 context and evidence remain the exact inputs stored in `function`. -/
 structure History {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) where
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) where
   native : NativeFrame
   ghost : GhostFrame
   metadata : MetadataState
@@ -125,12 +147,21 @@ structure History {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
 
 def value {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
-    (code : Code prepared function scope administrative) (embedding : Renaming)
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) (embedding : Renaming)
     (native : NativeFrame) (actual : Core.Environment) : Core.Value :=
   .pair (.pair (.inLeft .word .unit)
     (.closure code.receipt.parameterCore (LanguageResult.resultType code.receipt.resultCore)
       (code.body.rename embedding.lift.lift)
       (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame native :: actual))) (.word code.descriptor.id)
+
+theorem weaken_view_value {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {before after : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative before)
+    (weaken : ∀ source view, before source view → after source view)
+    (embedding : Renaming) (native : NativeFrame) (actual : Core.Environment) :
+    value (code.weaken_view weaken) embedding native actual = value code embedding native actual := rfl
 
 inductive Represents {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
     (mapping : LocationMap) (world : StoreTyping) : TypeSystem.Ty → Dynamic.Value → Core.Value → Core.Ty → Prop where

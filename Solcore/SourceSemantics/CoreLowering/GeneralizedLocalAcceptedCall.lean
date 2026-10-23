@@ -10,7 +10,8 @@ open CallableIndexedHistory CallableIndexedLambdaValues
 open GeneralizedLocalAcceptedMaterialization
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationMap} {world : StoreTyping}
-  {function : Dynamic.Closure} {material : Materialization compiled mapping world function}
+  {function : Dynamic.Closure} {viewRelation : TypedSource → TypedSource → Prop}
+  {material : Materialization compiled mapping world function viewRelation}
 
 def View.transient (view : View material) : NativeFrame :=
   SourceCoreCallableIndexedDispatch.readFrame view.id material.code.descriptor.id view.callerNative

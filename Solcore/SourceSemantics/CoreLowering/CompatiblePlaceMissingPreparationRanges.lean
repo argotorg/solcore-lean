@@ -249,7 +249,7 @@ private theorem expression_receipt {capacity next : Nat} {owner : Key} {source :
         throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression node.id))
       pure (.yield (next, indices, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, none, keyType, node.type, node.span, reason⟩],
-        fixed, node.id :: seen))) = Except.ok outcome) :
+        fixed, node.id :: seen))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated row, outcome = .yield updated ∧
       Inventory capacity updated.1 updated.2.1 updated.2.2.1 updated.2.2.2.1
         (original ++ updated.2.2.2.2.1.map Prod.fst) ∧
@@ -292,7 +292,7 @@ private theorem expression_resume {capacity next : Nat} {owner : Key} {source : 
         throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression node.id))
       pure (.yield (next, indices, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, none, keyType, node.type, node.span, reason⟩],
-        fixed, node.id :: seen))) = Except.ok outcome) :
+        fixed, node.id :: seen))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated, outcome = .yield updated ∧
       Inventory capacity updated.1 updated.2.1 updated.2.2.1 updated.2.2.2.1
         (original ++ updated.2.2.2.2.1.map Prod.fst) := by
@@ -313,7 +313,7 @@ private theorem place_receipt {capacity next : Nat} {owner : Key} {source : Type
         | none => throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression key))
       pure (.yield (next, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, some assignment.target.root,
-          keyNode.type, valueType, node.span, reason⟩]))) = Except.ok outcome) :
+          keyNode.type, valueType, node.span, reason⟩]))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated keyNode, outcome = .yield updated ∧
       Inventory capacity updated.1 indices updated.2.1 updated.2.2 (original ++ fixed.map Prod.fst) ∧ source.lookupExpression? key = some keyNode ∧
       updated = (next, places, missing ++ [⟨owner, .occurrence node.id.occurrence,
@@ -339,7 +339,7 @@ private theorem place_resume {capacity next : Nat} {owner : Key} {source : Typed
         | none => throw (SourceCoreCompatibleDataPlaceFaultSites.Error.lowering (.missingExpression key))
       pure (.yield (next, places,
         missing ++ [⟨owner, .occurrence node.id.occurrence, some assignment.target.root,
-          keyNode.type, valueType, node.span, reason⟩]))) = Except.ok outcome) :
+          keyNode.type, valueType, node.span, reason⟩]))) = (Except.ok outcome : Except SourceCoreCompatibleDataPlaceFaultSites.Error _)) :
     ∃ updated, outcome = .yield updated ∧
       Inventory capacity updated.1 indices updated.2.1 updated.2.2 (original ++ fixed.map Prod.fst) := by
   obtain ⟨updated, keyNode, same, numeric, _found, _tuple⟩ := place_receipt inventory issued ran
