@@ -43,6 +43,54 @@ out. They also cover recursive functions, closures with mutable captures, and
 mappings. See the [API guide](docs/design/core-runtime-unification-api.md) for
 values, handles, snapshots, and execution options.
 
+## Running solcore-rs output
+
+The [Rust Hull importer](Solcore/Frontend/RustHull/) accepts typed output from
+`argotorg/solcore-rs` at commit `2a745e12974c373c3799fec81b48a53c7dce2ab4`.
+It checks the imported annotations, translates Hull and inline Yul into Core,
+and checks the resulting Core expression before execution.
+
+This path supports contract constructors, dynamic ABI values, byte memory,
+storage, logs, self-calls and transfers to explicitly listed empty accounts.
+Keccak, SHA-256, RIPEMD-160, ECRECOVER and P256 verification execute in Core.
+Exact linked Sonatina code images supply observable code bytes and object
+offsets; execution uses the Core machine.
+
+The export scripts require a checkout of the pinned Rust revision. They patch
+only the isolated checkout supplied to `--upstream` and record source and tool
+hashes beside each artifact. Run each script with `--help` for build and path
+options:
+
+- [export-rust-hull.py](scripts/export-rust-hull.py): checked Hull transport.
+- [export-rust-code-image.py](scripts/export-rust-code-image.py): linked code images.
+- [rust-scenario-parity.py](scripts/rust-scenario-parity.py): constructor and
+  stateful execution against upstream fixture expectations.
+
+Import the library with `import Solcore.Frontend.RustHull`. The entry points are
+`RustHull.decodeText`, `RustHull.ScalarExecution.prepare`,
+`RustHull.LinkedContract.prepareDeployment` and `RustHull.Contract.runWithReceipt`.
+[RustHullScenarioRun.lean](Tests/RustHullScenarioRun.lean) shows artifact loading,
+deployment, account balances and sequential calls. A context supplies entry
+balances and an optional gas value; Core fuel counts transitions, and EVM gas
+consumption is not metered.
+
+The pinned contract inventory covers 168 fixtures. The checked Rust driver
+accepts 165; their 1,382 constructor and call observations match the fixture
+expectations on Core. Three fixtures fail upstream source checks before export.
+[RUST_PARITY.md](scripts/RUST_PARITY.md) lists the gates and how to reproduce them.
+
+`import Solcore.Frontend.RustHull.Safety` provides the execution safety proofs.
+Successful preparation supplies the typing conditions for actual input parsing,
+contract initialization, execution and checkpoint resumption. A Core machine
+fault is excluded; a language failure, revert or exhausted fuel budget remains
+a possible result.
+
+Importing Rust Hull does not prove the Rust compiler correct or extend the
+native Lean source checker to every Rust feature. Some opcodes and recursive
+Hull layouts remain unsupported. The compatibility decisions, coverage and
+unresolved upstream issues are recorded in
+[questions.md](questions.md).
+
 ## Code layout
 
 | Module | Contents |
@@ -50,6 +98,7 @@ values, handles, snapshots, and execution options.
 | [Syntax](Solcore/Syntax.lean) | AST, lexer, parser, and parser proofs. |
 | [TypeSystem](Solcore/TypeSystem.lean) | Types, substitutions, unification, and inference. |
 | [Frontend.Current](Solcore/Frontend/Current.lean) | Source checking, staging, specialization, and compilation to Core. |
+| [Frontend/RustHull](Solcore/Frontend/RustHull/) | Checked Rust Hull import, contract effects and Core execution. |
 | [Core](Solcore/Core.lean) | Typed syntax, mutable cells, evaluator, execution machines, and safety proofs. |
 | [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. |
 | [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. |
@@ -68,10 +117,11 @@ proof. Correspondence between source execution and generated Core code has
 been proved for parts of the language; the theorem covering the complete
 compiler is still in progress.
 
-Compilation currently handles closed entry points with a finite specialization
-plan. Source contract members, persistent storage, and external calls have yet
-to be connected to `ContractRuntime`. ABI support is limited to static Word
-values.
+The native source compiler handles closed entry points with a finite
+specialization plan. Its source contract members, persistent storage and
+external calls have yet to be connected to `ContractRuntime`; its ABI wrapper
+is limited to static Word values. The Rust Hull execution path above has a
+separate import boundary and supports generated dynamic ABI code.
 
 The [Core runtime unification design](docs/design/core-runtime-unification.md)
 records the compiler design and the remaining proof work.
