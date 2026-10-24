@@ -2077,6 +2077,8 @@ import Solcore.Test.RustHullAccounts
 import Solcore.Test.RustHullScalarExecution
 import Solcore.Test.RustHullPureCorrespondence
 import Solcore.Test.RustHullRankedCorrespondence
+import Solcore.Test.RustHullRecursiveCorrespondence
+import Solcore.Test.RustHullLocalCallsCorrespondence
 import Solcore.Frontend.RustHull.Safety
 set_option autoImplicit false
 
@@ -3888,6 +3890,8 @@ def main : IO UInt32 := do
   Tests.RustHullScalarExecution.run
   Tests.RustHullPureCorrespondence.run
   Tests.RustHullRankedCorrespondence.run
+  Tests.RustHullRecursiveCorrespondence.run
+  Tests.RustHullLocalCallsCorrespondence.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
