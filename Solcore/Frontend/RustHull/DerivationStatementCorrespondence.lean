@@ -29,7 +29,7 @@ theorem assign_variable {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name 
       obtain ⟨lowered, binding, index, rightCompiled, looked, _, sameType, rfl⟩ :=
         assign_variable_components compiled
       obtain ⟨extension, value, middleStore, valueRelated, evaluated, middleHeap, middleInstalled, firstFrame⟩ :=
-        right rfl rightCompiled environmentRelated globalsRelated heapRelated installed
+        right.value rfl rightCompiled environmentRelated globalsRelated heapRelated installed
       rw [sameType] at valueRelated
       obtain ⟨sourceLocation, old, found, read, rfl⟩ := assign_variable_source assigned
       obtain ⟨location, entry, _, targetFound⟩ :=
@@ -60,7 +60,7 @@ theorem returned {statement : Stmt} {value : Expr} {initial final : Semantics.St
       cases checked
       have sameType := expectType_eq_of_ok matched
       obtain ⟨extension, targetValue, finalStore, valueRelated, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        preserves rfl valueCompiled environmentRelated globalsRelated heapRelated installed
+        preserves.value rfl valueCompiled environmentRelated globalsRelated heapRelated installed
       exact ⟨extension, Core.LocalLoop.returnedValue targetValue, finalStore,
         .returned (sameType ▸ valueRelated), return_success compiled valueCompiled evaluated,
         finalHeap, finalInstalled, lastFrame⟩
@@ -80,11 +80,88 @@ theorem expression_statement {statement : Stmt} {value : Expr} {initial final : 
       obtain ⟨lowered, valueCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨extension, targetValue, finalStore, _, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        preserves rfl valueCompiled environmentRelated globalsRelated heapRelated installed
+        preserves.value rfl valueCompiled environmentRelated globalsRelated heapRelated installed
       refine ⟨extension, _, finalStore, .fallthrough, ?_, finalHeap, finalInstalled, lastFrame⟩
       apply Core.LanguageResult.bind_success _ evaluated
       simpa only [← Core.Expr.rename_insertion, rename_fallthrough] using
         Core.LocalLoop.fallthrough_evaluates type (targetValue :: environment) finalStore
+
+/-- A failed RHS leaves the target untouched and skips its cell read/write. -/
+theorem assign_fault {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name : String}
+    {leftSpan : Option Span} {initial final : Semantics.State σ} {reason : Semantics.Fault}
+    (kind : statement.kind = .assign ⟨sourceType, .var name, leftSpan⟩ rhs)
+    (right : ExprSimulation signatures codes locations captured sourceEnvironment rhs initial (.fault reason) final) :
+    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro safe fuel scope result loops expression compiled world mapping environment store locals globals heap installed
+  obtain ⟨reason, rfl⟩ := (safeControl_fault_iff reason).mp safe
+  cases statement with | mk statementKind span =>
+  cases kind
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel =>
+      obtain ⟨lowered, binding, index, rightCompiled, _, _, _, rfl⟩ := assign_variable_components compiled
+      obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
+        right trivial rightCompiled locals globals heap installed
+      cases related
+      exact ⟨extension, _, finalStore, .language reason,
+        Core.LanguageResult.bind_failure _ executed, finalHeap, finalInstalled, frame⟩
+
+theorem return_fault {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
+    {reason : Semantics.Fault} (kind : statement.kind = .returnStmt value)
+    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment value initial (.fault reason) final) :
+    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro safe fuel scope type loops expression compiled world mapping environment store locals globals heap installed
+  obtain ⟨reason, rfl⟩ := (safeControl_fault_iff reason).mp safe
+  cases statement with | mk statementKind span =>
+  cases kind
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel =>
+      simp only [lowerStatement] at compiled
+      obtain ⟨lowered, valueCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
+      obtain ⟨checked, matched, returned⟩ := lower_bind_eq_ok.mp compiled
+      cases checked
+      cases returned
+      have sameType := expectType_eq_of_ok matched
+      obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
+        preserves trivial valueCompiled locals globals heap installed
+      cases related
+      exact ⟨extension, _, finalStore, .language reason,
+        Core.LanguageResult.bind_failure _ executed, finalHeap, finalInstalled, frame⟩
+
+theorem expression_fault {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
+    {reason : Semantics.Fault} (kind : statement.kind = .expression value)
+    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment value initial (.fault reason) final) :
+    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro safe fuel scope type loops expression compiled world mapping environment store locals globals heap installed
+  obtain ⟨reason, rfl⟩ := (safeControl_fault_iff reason).mp safe
+  cases statement with | mk statementKind span =>
+  cases kind
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel =>
+      simp only [lowerStatement] at compiled
+      obtain ⟨lowered, valueCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
+      cases returned
+      obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
+        preserves trivial valueCompiled locals globals heap installed
+      cases related
+      exact ⟨extension, _, finalStore, .language reason,
+        Core.LanguageResult.bind_failure _ executed, finalHeap, finalInstalled, frame⟩
+
+theorem assignment_not_language {τ : Type} (env : Semantics.Environment) (state : Semantics.State τ)
+    (lhs : Expr) (value : Semantics.Value) (reason : Core.Word) :
+    Semantics.assignResult env state lhs value ≠ .fault (.language reason) := by
+  unfold Semantics.assignResult
+  split
+  · simp
+  · split
+    · simp
+    · split
+      · simp
+      · split
+        · simp
+        · split <;> simp
 
 theorem comment {statement : Stmt} {text : String} {state : Semantics.State σ}
     (kind : statement.kind = .comment text) :
@@ -202,7 +279,7 @@ theorem stop {statement : Stmt} {rest : List Stmt} {initial final : Semantics.St
       | returned valueRelated => exact Core.LocalLoop.sequence_returned type evaluated
       | breaking => exact Core.LocalLoop.sequence_transfer type evaluated
       | continuing => exact Core.LocalLoop.sequence_transfer type evaluated
-      | language => contradiction
+      | language => exact Core.LocalLoop.sequence_failure type evaluated
 
 /-- The standalone declaration compiler delegates to its actual singleton
 statement-list compiler. The new local remains represented in the final heap. -/

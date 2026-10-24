@@ -106,25 +106,30 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     cases expression with | mk type expressionKind span =>
     cases kind
     exact ExprSimulation.of_pure (effects := effects) (.word rfl)
-      (SignatureNames.compiled signaturesCompiled) (.word type text span)
+      (SignatureNames.compiled signaturesCompiled) (.word type text span) (by
+        intro reason; unfold Semantics.literalResult; split <;> simp)
   case bool =>
     intro env expression state value kind _
     cases expression with | mk type expressionKind span =>
     cases kind
     exact ExprSimulation.of_pure (effects := effects) (.bool rfl)
-      (SignatureNames.compiled signaturesCompiled) (.bool type value span)
+      (SignatureNames.compiled signaturesCompiled) (.bool type value span) (by
+        intro reason; unfold Semantics.booleanResult; split <;> simp)
   case unit =>
     intro env expression state kind _
     cases expression with | mk type expressionKind span =>
     cases kind
     exact ExprSimulation.of_pure (effects := effects) (.unit rfl)
-      (SignatureNames.compiled signaturesCompiled) (.unit type span)
+      (SignatureNames.compiled signaturesCompiled) (.unit type span) (by intros; simp)
   case var =>
     intro env expression state name kind _
     cases expression with | mk type expressionKind span =>
     cases kind
     exact ExprSimulation.of_pure (effects := effects) (.var rfl)
-      (SignatureNames.compiled signaturesCompiled) (.var type name span)
+      (SignatureNames.compiled signaturesCompiled) (.var type name span) (by
+        intro reason; unfold Semantics.readResult; split
+        · simp
+        · split <;> simp)
   case pair =>
     intro env expression initial middle final left right leftValue rightResult kind first second firstIH secondIH accepted
     cases expression with | mk type expressionKind span =>
@@ -168,9 +173,8 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     cases kind
     have argumentsAccepted : ∀ argument ∈ arguments, RecursiveExpression functions argument := by
       cases accepted <;> assumption
-    intro source normal
     exact DerivationCallCorrespondence.call signaturesCompiled codesCompiled accepted called
-      (argumentsIH argumentsAccepted) callIH normal
+      (argumentsIH argumentsAccepted) callIH
   case ifTrue =>
     intro env expression initial middle final target condition yes no value result kind tested truth selected conditionIH branchIH accepted
     cases expression with | mk type expressionKind span =>
@@ -209,12 +213,63 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
       compiledFunction_at signaturesCompiled codesCompiled unique selected signatureSelected codeFound
     exact DerivationFunctionCorrespondence.function_simulation signatureCompiled functionCompiled globals bound
       (continued (eligible function (List.mem_of_find?_eq_some selected)))
-  case pairFault | callFault | ifFault | ifInvalid | fault | arity |
-      declareInvalid | assignFault | assignInvalid | expressionFault | returnFault | matchFault | declareInvalid_1 =>
+  case pairFault =>
+    intro env expression initial final left right reason kind first firstIH accepted
+    cases expression with | mk type expressionKind span =>
+    cases kind
+    cases accepted with
+    | pair leftAccepted _ => exact pair_fault (firstIH leftAccepted) type span
+  case callFault =>
+    intro env expression initial final name arguments reason kind evaluated argumentsIH accepted
+    cases expression with | mk type expressionKind span =>
+    cases kind
+    have argumentsAccepted : ∀ argument ∈ arguments, RecursiveExpression functions argument := by
+      cases accepted <;> assumption
+    exact DerivationCallCorrespondence.call_fault signaturesCompiled codesCompiled accepted
+      (argumentsIH argumentsAccepted)
+  case ifFault =>
+    intro env expression initial final target condition yes no reason kind tested testIH accepted
+    cases expression with | mk type expressionKind span =>
+    cases kind
+    cases accepted with
+    | conditional testAccepted _ _ => exact conditional_fault (testIH testAccepted) type target span
+  case fault =>
+    intro env expression rest initial final reason evaluated headIH accepted
+    exact DerivationCallCorrespondence.arguments_fault (headIH (accepted expression (List.mem_cons_self ..)))
+  case ifInvalid | arity | declareInvalid | declareInvalid_1 =>
     intros
-    simp [ExprMotive, ExprsMotive, FunctionMotive, StmtMotive, StatementsMotive,
-      ExprSimulation, ExprsSimulation, FunctionSimulation, StmtSimulation, StatementsSimulation,
-      SafeControl]
+    simp [ExprMotive, FunctionMotive, StmtMotive, StatementsMotive,
+      ExprSimulation, FunctionSimulation, StmtSimulation, StatementsSimulation, SafeResult, SafeControl]
+  case assignFault =>
+    intro env statement lhs rhs initial final reason kind evaluated rhsIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    cases lhs with | mk sourceType lhsKind leftSpan =>
+    cases lhsKind <;> simp only [RecursiveStatement] at accepted
+    all_goals first
+      | exact False.elim accepted
+      | exact DerivationStatementCorrespondence.assign_fault rfl (rhsIH accepted)
+  case assignInvalid =>
+    intro env statement lhs rhs initial middle value reason kind evaluated invalid rhsIH accepted safe
+    obtain ⟨word, rfl⟩ := (safeControl_fault_iff reason).mp safe
+    exact False.elim (DerivationStatementCorrespondence.assignment_not_language env middle lhs value word invalid)
+  case expressionFault =>
+    intro env statement value initial final reason kind evaluated valueIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    exact DerivationStatementCorrespondence.expression_fault rfl
+      (valueIH (by simpa only [RecursiveStatement] using accepted))
+  case returnFault =>
+    intro env statement value initial final reason kind evaluated valueIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    exact DerivationStatementCorrespondence.return_fault rfl
+      (valueIH (by simpa only [RecursiveStatement] using accepted))
+  case matchFault =>
+    intro env statement target expression alternatives initial final reason kind evaluated exprIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    simp only [RecursiveStatement] at accepted
   case nil_2 | matched | next_1 =>
     intros
     trivial
@@ -277,11 +332,11 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env test post body initial final value tested truth testIH testEligible _ _
     exact LoopDerivationCorrespondence.done (testIH testEligible) truth
   case conditionFault =>
-    intro env test post body initial final reason tested testIH _ _ _
-    exact LoopDerivationCorrespondence.fault test post body initial final reason
+    intro env test post body initial final reason tested testIH testEligible _ _
+    exact LoopDerivationCorrespondence.condition_fault (testIH testEligible)
   case conditionInvalid =>
-    intro env test post body initial final value tested invalid testIH _ _ _
-    exact LoopDerivationCorrespondence.fault test post body initial final (.invalidValue "condition")
+    intro env test post body initial final value tested invalid testIH _ _ _ safe
+    cases safe
   case step =>
     intro env test post body initial testedState bodyState postState final value bodyControl postControl control
       tested truth bodyEvaluated bodyContinues postEvaluated postContinues next

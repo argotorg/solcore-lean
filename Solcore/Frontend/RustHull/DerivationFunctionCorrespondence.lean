@@ -67,9 +67,11 @@ theorem function_body {σ : Type} {signatures : List Signature}
   · simpa only [parameterCode, values.length.2] using initialized
   · simpa only [List.append_assoc] using finalHeap
 
-theorem finish_success_normal {type : Ty} {control : Semantics.Control} {value : Semantics.Value}
-    (finished : Semantics.finishFunction type control = .value value) : NormalControl control := by
-  cases control <;> first | trivial | simp [Semantics.finishFunction] at finished
+theorem finish_safe_control {type : Ty} {control : Semantics.Control}
+    (safe : SafeResult (Semantics.finishFunction type control)) : SafeControl control := by
+  cases control <;> try trivial
+  rename_i reason
+  cases reason <;> exact safe
 
 /-- The function constructor in the mutual source derivation uses the body
 IH at its specific allocated state and preserves the exact installed closure. -/
@@ -87,8 +89,7 @@ theorem function_simulation {σ : Type} {signatures : List Signature}
       function.body allocated control final) :
     FunctionSimulation codes locations captured code index sources initial
       (Semantics.finishFunction function.ret control) final := by
-  intro source finished targets values world store heap installed
-  have normal := finish_success_normal finished
+  intro safe targets values world store heap installed
   have capturedGlobals : GlobalEnvironmentRel codes locations scope (globalShift index)
       (installationEnvironment captured index) := by
     change GlobalEnvironmentRel codes locations scope (fun slot => index + slot)
@@ -96,11 +97,8 @@ theorem function_simulation {σ : Type} {signatures : List Signature}
     simpa only [List.length_replicate, Core.Renaming.id]
       using globals.prepend (List.replicate index Core.Value.unit)
   obtain ⟨extension, value, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-    function_body signatureCompiled compiled values bound (continued (normalControl_safe normal))
+    function_body signatureCompiled compiled values bound (continued (finish_safe_control safe))
       capturedGlobals heap installed
-  rw [finished] at related
-  cases related with
-  | value valueRelated =>
-      exact ⟨extension, _, finalStore, valueRelated, evaluated, finalHeap, finalInstalled, lastFrame⟩
+  exact ⟨extension, _, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩
 
 end Solcore.Frontend.RustHull.DerivationFunctionCorrespondence

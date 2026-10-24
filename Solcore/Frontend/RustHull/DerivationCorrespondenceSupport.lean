@@ -57,11 +57,34 @@ def RecursiveStatement (functions : List Function) : Stmt → Prop
   | _ => False
 termination_by statement => sizeOf statement
 
-/-- Break and continue are normal internal loop transfers. Fault outcomes
-remain outside the current public normal-execution theorem. -/
+/-- Language failures are executable outcomes. Malformed source observations
+have no representation in the Core language result. -/
+def SafeResult {α : Type} : Semantics.Result α → Prop
+  | .value _ | .fault (.language _) => True
+  | .fault _ => False
+
+/-- Normal transfers and language failures can leave a statement or loop. -/
 def SafeControl : Semantics.Control → Prop
+  | .fault (.language _) => True
   | .fault _ => False
   | _ => True
+
+theorem safeResult_fault_iff {α : Type} (reason : Semantics.Fault) :
+    SafeResult (α := α) (.fault reason) ↔ ∃ word, reason = .language word := by
+  cases reason <;> simp [SafeResult]
+
+theorem safeControl_fault_iff (reason : Semantics.Fault) :
+    SafeControl (.fault reason) ↔ ∃ word, reason = .language word := by
+  cases reason <;> simp [SafeControl]
+
+inductive ArgumentsResultRel (arguments : List Lowered) :
+    Semantics.Result (List Semantics.Value) → Core.Value → Prop where
+  | value {sources : List Semantics.Value} {targets : List Core.Value}
+      (related : ArgumentsRel arguments sources targets) :
+      ArgumentsResultRel arguments (.value sources) (.inRight .word (bundleValues targets))
+  | language (reason : Core.Word) :
+      ArgumentsResultRel arguments (.fault (.language reason))
+        (.inLeft (packArguments arguments).type (.word reason))
 
 theorem normalControl_safe {control : Semantics.Control} (normal : NormalControl control) :
     SafeControl control := by cases control <;> simp_all [NormalControl, SafeControl]
@@ -69,22 +92,22 @@ theorem normalControl_safe {control : Semantics.Control} (normal : NormalControl
 def RecursiveProgram (functions : List Function) : Prop :=
   ∀ function ∈ functions, ∀ statement ∈ function.body, RecursiveStatement functions statement
 
-/-- The actual source result is an index. A fault branch has no normal-result
-obligation; normal branches must preserve the exact emitted Core expression. -/
+/-- Preserve the indexed source result through the exact emitted Core expression,
+including the reason and heap at a language failure. -/
 def ExprSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (expression : Expr)
     (initial : Semantics.State σ) (result : Semantics.Result Semantics.Value) (final : Semantics.State σ) : Prop :=
-  ∀ {sourceValue}, result = .value sourceValue →
+  SafeResult result →
     ∀ {fuel scope lowered}, lowerExpression fuel signatures scope expression = .ok lowered →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
       GlobalEnvironmentRel codes locations scope mapping environment →
       HeapRel world initial.heap store → InstalledGlobals codes locations captured store →
       ∃ extension targetValue finalStore,
-        ValueRel lowered.type sourceValue targetValue ∧
+        ResultRel lowered.type result targetValue ∧
         Core.Evaluates environment store (lowered.expression.rename mapping)
-          (.inRight .word targetValue) finalStore ∧
+          targetValue finalStore ∧
         HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 def ExprsSimulation {σ : Type} (signatures : List Signature)
@@ -92,16 +115,16 @@ def ExprsSimulation {σ : Type} (signatures : List Signature)
     (sourceEnvironment : Semantics.Environment) (expressions : List Expr)
     (initial : Semantics.State σ) (result : Semantics.Result (List Semantics.Value))
     (final : Semantics.State σ) : Prop :=
-  ∀ {sources}, result = .value sources →
+  SafeResult result →
     ∀ {fuel scope arguments}, expressions.mapM (lowerExpression fuel signatures scope) = .ok arguments →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
       GlobalEnvironmentRel codes locations scope mapping environment →
       HeapRel world initial.heap store → InstalledGlobals codes locations captured store →
       ∃ extension targets finalStore,
-        ArgumentsRel arguments sources targets ∧
+        ArgumentsResultRel arguments result targets ∧
         Core.Evaluates environment store ((packArguments arguments).expression.rename mapping)
-          (.inRight .word (bundleValues targets)) finalStore ∧
+          targets finalStore ∧
         HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 def StmtSimulation {σ : Type} (signatures : List Signature)
@@ -140,14 +163,61 @@ def FunctionSimulation {σ : Type} (codes : List GlobalCode) (locations : Nat �
     (captured : Core.Environment) (code : GlobalCode) (index : Nat)
     (sources : List Semantics.Value) (initial : Semantics.State σ)
     (result : Semantics.Result Semantics.Value) (final : Semantics.State σ) : Prop :=
-  ∀ {source}, result = .value source →
+  SafeResult result →
     ∀ {targets}, ValuesRel code.own.parameters sources targets →
     ∀ {world store}, HeapRel world initial.heap store → InstalledGlobals codes locations captured store →
       ∃ extension target finalStore,
-        ValueRel code.own.result source target ∧
+        ResultRel code.own.result result target ∧
         Core.Evaluates (bundleValues targets :: installationEnvironment captured index) store
-          (code.body.rename (globalShift index).lift) (.inRight .word target) finalStore ∧
+          (code.body.rename (globalShift index).lift) target finalStore ∧
         HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
+
+theorem ExprSimulation.value {σ : Type} {signatures : List Signature}
+    {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
+    {env : Semantics.Environment} {expression : Expr} {initial final : Semantics.State σ}
+    {result : Semantics.Result Semantics.Value}
+    (simulation : ExprSimulation signatures codes locations captured env expression initial result final)
+    {source : Semantics.Value} (normal : result = .value source)
+    {fuel : Nat} {scope : Scope} {lowered : Lowered}
+    (compiled : lowerExpression fuel signatures scope expression = .ok lowered)
+    {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
+    (locals : EnvironmentRel world env scope mapping environment)
+    (globals : GlobalEnvironmentRel codes locations scope mapping environment)
+    (heap : HeapRel world initial.heap store) (installed : InstalledGlobals codes locations captured store) :
+    ∃ extension target finalStore,
+      ValueRel lowered.type source target ∧
+      Core.Evaluates environment store (lowered.expression.rename mapping) (.inRight .word target) finalStore ∧
+      HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧
+      ClosuresPreserved store finalStore := by
+  subst result
+  obtain ⟨extension, target, finalStore, related, evaluated, heap, installed, frame⟩ :=
+    simulation trivial compiled locals globals heap installed
+  cases related with
+  | value related => exact ⟨extension, _, finalStore, related, evaluated, heap, installed, frame⟩
+
+theorem ExprsSimulation.value {σ : Type} {signatures : List Signature}
+    {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
+    {env : Semantics.Environment} {expressions : List Expr} {initial final : Semantics.State σ}
+    {result : Semantics.Result (List Semantics.Value)}
+    (simulation : ExprsSimulation signatures codes locations captured env expressions initial result final)
+    {sources : List Semantics.Value} (normal : result = .value sources)
+    {fuel : Nat} {scope : Scope} {arguments : List Lowered}
+    (compiled : expressions.mapM (lowerExpression fuel signatures scope) = .ok arguments)
+    {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
+    (locals : EnvironmentRel world env scope mapping environment)
+    (globals : GlobalEnvironmentRel codes locations scope mapping environment)
+    (heap : HeapRel world initial.heap store) (installed : InstalledGlobals codes locations captured store) :
+    ∃ extension targets finalStore,
+      ArgumentsRel arguments sources targets ∧
+      Core.Evaluates environment store ((packArguments arguments).expression.rename mapping)
+        (.inRight .word (bundleValues targets)) finalStore ∧
+      HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧
+      ClosuresPreserved store finalStore := by
+  subst result
+  obtain ⟨extension, target, finalStore, related, evaluated, heap, installed, frame⟩ :=
+    simulation trivial compiled locals globals heap installed
+  cases related with
+  | value related => exact ⟨extension, _, finalStore, related, evaluated, heap, installed, frame⟩
 
 /-- Only named calls use the function IH. Primitive dispatch is proved at the
 expression boundary from its actual argument pack and independent computation. -/
@@ -198,44 +268,5 @@ def StatementsMotive {σ : Type} (functions : List Function) (signatures : List 
     (initial : Semantics.State σ) (control : Semantics.Control) (final : Semantics.State σ) : Prop :=
   (∀ statement ∈ statements, RecursiveStatement functions statement) →
     StatementsSimulation signatures codes locations captured sourceEnvironment statements initial control final
-
-theorem ExprSimulation.fault {σ : Type} (signatures : List Signature)
-    (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
-    (sourceEnvironment : Semantics.Environment) (expression : Expr)
-    (initial final : Semantics.State σ) (reason : Semantics.Fault) :
-    ExprSimulation signatures codes locations captured sourceEnvironment expression initial (.fault reason) final := by
-  intro source impossible
-  cases impossible
-
-theorem ExprsSimulation.fault {σ : Type} (signatures : List Signature)
-    (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
-    (sourceEnvironment : Semantics.Environment) (expressions : List Expr)
-    (initial final : Semantics.State σ) (reason : Semantics.Fault) :
-    ExprsSimulation signatures codes locations captured sourceEnvironment expressions initial (.fault reason) final := by
-  intro sources impossible
-  cases impossible
-
-theorem StmtSimulation.fault {σ : Type} (signatures : List Signature)
-    (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
-    (sourceEnvironment : Semantics.Environment) (statement : Stmt)
-    (initial final : Semantics.State σ) (reason : Semantics.Fault) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
-  intro impossible
-  cases impossible
-
-theorem StatementsSimulation.fault {σ : Type} (signatures : List Signature)
-    (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
-    (sourceEnvironment : Semantics.Environment) (statements : List Stmt)
-    (initial final : Semantics.State σ) (reason : Semantics.Fault) :
-    StatementsSimulation signatures codes locations captured sourceEnvironment statements initial (.fault reason) final := by
-  intro impossible
-  cases impossible
-
-theorem FunctionSimulation.fault {σ : Type} (codes : List GlobalCode)
-    (locations : Nat → Nat) (captured : Core.Environment) (code : GlobalCode) (index : Nat)
-    (sources : List Semantics.Value) (initial final : Semantics.State σ) (reason : Semantics.Fault) :
-    FunctionSimulation codes locations captured code index sources initial (.fault reason) final := by
-  intro source impossible
-  cases impossible
 
 end Solcore.Frontend.RustHull.DerivationCorrespondence

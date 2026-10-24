@@ -451,7 +451,7 @@ private theorem public_fixture {σ : Type} (effects : Semantics.ExternalSemantic
   rw [types.1] at inputs
   cases inputs
   obtain ⟨world, target, finalStore, required, related, relatedHeap, completed⟩ :=
-    execute _ _ source ⟨_, rfl⟩
+    execute _ _ source trivial
   rw [types.2] at related
   cases related with
   | value related =>

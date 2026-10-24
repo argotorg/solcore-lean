@@ -67,7 +67,7 @@ theorem test_at {test : Expr} {initial final : Semantics.State σ} {value : Sema
       HeapRel (world ++ extension) final.heap finalStore ∧
       InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore := by
   obtain ⟨extension, target, finalStore, related, execution, finalHeap, finalInstalled, frame⟩ :=
-    evaluated rfl compiled (locals.prepend extra) (globals.prepend extra) heap installed
+    evaluated.value rfl compiled (locals.prepend extra) (globals.prepend extra) heap installed
   have conditionExecution := ExpressionCorrespondence.condition_evaluates converted related tested execution
   exact ⟨extension, finalStore,
     by rw [Core.Expr.rename_comp]; exact conditionExecution,
@@ -144,11 +144,29 @@ theorem initialized_statement {statement : Stmt} {test : Expr} {init post body :
   | zero => simp [lowerStatement, fail] at compiled
   | succ fuel => exact continued safe (LoopLoweringStructure.nonempty_init nonempty compiled)
 
-theorem fault (test : Expr) (post body : List Stmt) (initial final : Semantics.State σ)
-    (reason : Semantics.Fault) :
-    LoopSimulation signatures codes locations captured sourceEnvironment test post body initial (.fault reason) final := by
-  intro impossible
-  cases impossible
+/-- A failed condition skips both loop stages while retaining its exact reason
+and store after conversion to the Core boolean carrier. -/
+theorem condition_fault {test : Expr} {post body : List Stmt}
+    {initial final : Semantics.State σ} {reason : Semantics.Fault}
+    (tested : ExprSimulation signatures codes locations captured sourceEnvironment test
+      initial (.fault reason) final) :
+    LoopSimulation signatures codes locations captured sourceEnvironment test post body
+      initial (.fault reason) final := by
+  intro safe scope result loops compiled world mapping environment store location locals globals heap installed _
+  obtain ⟨reason, rfl⟩ := (safeControl_fault_iff _).mp safe
+  let extra := Core.LocalLoop.conditionPrefix result location
+  obtain ⟨extension, target, finalStore, related, evaluated, finalHeap, finalInstalled, frame⟩ :=
+    tested trivial compiled.conditionCompiled (locals.prepend extra) (globals.prepend extra) heap installed
+  cases related
+  have converted := ExpressionCorrespondence.condition_failure compiled.conditionConverted evaluated
+  have execution : Core.Evaluates (extra ++ environment) store
+      ((compiled.conditionCore.rename mapping).rename (Core.LocalLoop.shift extra.length))
+      (.inLeft .bool (.word reason)) finalStore := by
+    rw [Core.Expr.rename_comp]
+    exact converted
+  exact ⟨extension, _, finalStore, .language reason,
+    Core.LocalLoop.loopBody_conditionFailure result (Core.Word.ofNatModulo 3) location execution,
+    finalHeap, finalInstalled, frame⟩
 
 theorem done {test : Expr} {post body : List Stmt} {initial final : Semantics.State σ}
     {value : Semantics.Value}
@@ -190,20 +208,25 @@ theorem body_stop {test : Expr} {post body : List Stmt}
     (stopped : (∃ value, control = .returned value) ∨ (∃ reason, control = .fault reason)) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial control final := by
   intro safe scope result loops compiled world mapping environment store location locals globals heap installed _
+  obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+      (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
+  obtain ⟨bodyExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, bodyFrame⟩ :=
+    statements_at executed safe compiled.bodyCompiled (Core.LocalLoop.bodyPrefix result location)
+      (locals.extendWorld testExtension) globals testedHeap testedInstalled
   rcases stopped with ⟨source, rfl⟩ | ⟨reason, rfl⟩
-  · obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-      test_at tested truth compiled.conditionCompiled compiled.conditionConverted
-        (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
-    obtain ⟨bodyExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, bodyFrame⟩ :=
-      statements_at executed safe compiled.bodyCompiled (Core.LocalLoop.bodyPrefix result location)
-        (locals.extendWorld testExtension) globals testedHeap testedInstalled
-    cases related with
+  · cases related with
     | returned valueRelated =>
         exact ⟨testExtension ++ bodyExtension, _, finalStore, .returned valueRelated,
           Core.LocalLoop.loopBody_bodyReturn result (Core.Word.ofNatModulo 3) location testEvaluation bodyEvaluation,
           by simpa only [List.append_assoc] using finalHeap,
           finalInstalled, ClosuresPreserved.trans testFrame bodyFrame⟩
-  · cases safe
+  · cases related with
+    | language reason =>
+        exact ⟨testExtension ++ bodyExtension, _, finalStore, .language reason,
+          Core.LocalLoop.loopBody_bodyFailure result (Core.Word.ofNatModulo 3) location testEvaluation bodyEvaluation,
+          by simpa only [List.append_assoc] using finalHeap,
+          finalInstalled, ClosuresPreserved.trans testFrame bodyFrame⟩
 
 private theorem progress_safe {control : Semantics.Control}
     (progress : control = .fallthrough ∨ control = .continuing) : SafeControl control := by
@@ -296,27 +319,33 @@ theorem post_stop {test : Expr} {post body : List Stmt}
     (stopped : (∃ value, control = .returned value) ∨ (∃ reason, control = .fault reason)) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial control final := by
   intro safe scope result loops compiled world mapping environment store location locals globals heap installed _
+  obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+      (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
+  obtain ⟨bodyExtension, bodyTarget, bodyStore, bodyRelated, bodyEvaluation, bodyHeap, bodyInstalled, bodyFrame⟩ :=
+    statements_at bodyExecuted (progress_safe bodyContinues) compiled.bodyCompiled
+      (Core.LocalLoop.bodyPrefix result location)
+      (locals.extendWorld testExtension) globals testedHeap testedInstalled
+  obtain ⟨bodyFlag, rfl⟩ := progress_value bodyRelated bodyContinues
+  obtain ⟨postExtension, postTarget, finalStore, postRelated, postEvaluation, finalHeap, finalInstalled, postFrame⟩ :=
+    statements_at postExecuted safe compiled.postCompiled
+      (Core.LocalLoop.postPrefix result location bodyFlag)
+      ((locals.extendWorld testExtension).extendWorld bodyExtension) globals bodyHeap bodyInstalled
+  simp only [Core.LocalLoop.postPrefix_length] at postEvaluation
   rcases stopped with ⟨source, rfl⟩ | ⟨reason, rfl⟩
-  · obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-      test_at tested truth compiled.conditionCompiled compiled.conditionConverted
-        (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
-    obtain ⟨bodyExtension, bodyTarget, bodyStore, bodyRelated, bodyEvaluation, bodyHeap, bodyInstalled, bodyFrame⟩ :=
-      statements_at bodyExecuted (progress_safe bodyContinues) compiled.bodyCompiled
-        (Core.LocalLoop.bodyPrefix result location)
-        (locals.extendWorld testExtension) globals testedHeap testedInstalled
-    obtain ⟨bodyFlag, rfl⟩ := progress_value bodyRelated bodyContinues
-    obtain ⟨postExtension, postTarget, finalStore, postRelated, postEvaluation, finalHeap, finalInstalled, postFrame⟩ :=
-      statements_at postExecuted safe compiled.postCompiled
-        (Core.LocalLoop.postPrefix result location bodyFlag)
-        ((locals.extendWorld testExtension).extendWorld bodyExtension) globals bodyHeap bodyInstalled
-    simp only [Core.LocalLoop.postPrefix_length] at postEvaluation
-    cases postRelated with
+  · cases postRelated with
     | returned related =>
         exact ⟨testExtension ++ bodyExtension ++ postExtension, _, finalStore, .returned related,
           Core.LocalLoop.loopBody_postReturn result (Core.Word.ofNatModulo 3) location bodyFlag
             testEvaluation bodyEvaluation postEvaluation,
           by simpa only [List.append_assoc] using finalHeap, finalInstalled,
           ClosuresPreserved.trans testFrame (ClosuresPreserved.trans bodyFrame postFrame)⟩
-  · cases safe
+  · cases postRelated with
+    | language reason =>
+        exact ⟨testExtension ++ bodyExtension ++ postExtension, _, finalStore, .language reason,
+          Core.LocalLoop.loopBody_postFailure result (Core.Word.ofNatModulo 3) location bodyFlag
+            testEvaluation bodyEvaluation postEvaluation,
+          by simpa only [List.append_assoc] using finalHeap, finalInstalled,
+          ClosuresPreserved.trans testFrame (ClosuresPreserved.trans bodyFrame postFrame)⟩
 
 end Solcore.Frontend.RustHull.LoopDerivationCorrespondence
