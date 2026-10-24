@@ -2,14 +2,15 @@ import Solcore.Frontend.RustHull.DerivationProgramCorrespondence
 import Solcore.Frontend.RustHull.PublicProgramCorrespondence
 
 /-! Public meaning preservation for finite normal source executions, including
-recursive named calls. The induction follows the independent source derivation;
-no syntactic function rank or assumed body-preservation premise is required. -/
+recursive named calls and structured loops. The induction follows the independent
+source derivation; no syntactic function rank or assumed body-preservation
+premise is required. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.Correspondence
 open NamedCallCorrespondence ScalarExecution DerivationCorrespondence
 
 /-- Compile, allocate, install and invoke the selected entry of a recursive
-program. Named function calls and nested builtin calls retain the independent
+program. Named calls, builtins and structured loops retain the independent
 normal source result and heap, including all callee parameter allocations. -/
 theorem compile_recursive_program {σ : Type} {effects : Semantics.ExternalSemantics σ}
     {program : Program} {function : Function} {entry : String} {fuel : Nat} {compiled : Compiled}

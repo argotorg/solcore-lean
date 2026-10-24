@@ -49,7 +49,7 @@ theorem arguments_nil {σ : Type} (signatures : List Signature) (codes : List Gl
   intro sources same fuel scope arguments compiled world mapping environment store locals globals heap installed
   cases same
   cases compiled
-  exact ⟨[], [], store, .nil, .inRight .unit, by simpa using heap, installed⟩
+  exact ⟨[], [], store, .nil, .inRight .unit, by simpa using heap, installed, ClosuresPreserved.refl store⟩
 
 theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semantics.ExternalSemantics σ}
     {signatures : List Signature} {codes : List GlobalCode} {locations : Nat → Nat}
@@ -72,17 +72,17 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
       obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
       obtain ⟨tailCode, tailCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
-      obtain ⟨headExtension, target, middleStore, related, headEvaluation, middleHeap, middleInstalled⟩ :=
+      obtain ⟨headExtension, target, middleStore, related, headEvaluation, middleHeap, middleInstalled, headFrame⟩ :=
         head rfl headCompiled locals globals heap installed
       cases rest with
       | nil =>
           cases tailCompiled
           cases tailEvaluated
           exact ⟨headExtension, [target], middleStore, .cons related .nil,
-            headEvaluation, middleHeap, middleInstalled⟩
+            headEvaluation, middleHeap, middleInstalled, headFrame⟩
       | cons next rest =>
           have tailLocals := (locals.extendWorld headExtension).prepend [target]
-          obtain ⟨tailExtension, targets, finalStore, tailRelated, tailEvaluation, finalHeap, finalInstalled⟩ :=
+          obtain ⟨tailExtension, targets, finalStore, tailRelated, tailEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
             tail rfl tailCompiled tailLocals (globals.prepend [target]) middleHeap middleInstalled
           have nonempty : tailCode ≠ [] := by
             intro empty
@@ -97,7 +97,7 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
             cases tailRelated
             exact nonempty rfl
           refine ⟨headExtension ++ tailExtension, target :: targets, finalStore,
-            .cons related tailRelated, ?_, ?_, finalInstalled⟩
+            .cons related tailRelated, ?_, ?_, finalInstalled, headFrame.trans tailFrame⟩
           · have renamed : ((packArguments tailCode).expression.rename mapping).weakenAt 0 =
                 (packArguments tailCode).expression.rename (fun index => 1 + mapping index) := by
               simp only [← Core.Expr.rename_insertion, Core.Expr.rename_comp]
@@ -177,11 +177,11 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
           obtain ⟨rfl, computed⟩ := primitive_call_result classified notFunction called
           obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
             builtin_components notSignature compiled
-          obtain ⟨extension, targets, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled⟩ :=
+          obtain ⟨extension, targets, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
             argumentsIH rfl argumentsCompiled locals globals heap installed
           obtain ⟨target, resultRelated, resultEvaluation⟩ :=
             builtin_preserves classified typeCompiled builtinCompiled computed related argumentsEvaluation
-          exact ⟨extension, target, finalStore, resultRelated, resultEvaluation, finalHeap, finalInstalled⟩
+          exact ⟨extension, target, finalStore, resultRelated, resultEvaluation, finalHeap, finalInstalled, tailFrame⟩
       | named selected argumentsEligible =>
           obtain ⟨index, code, foundSignature, foundCode, _, _⟩ :=
             compiledFunction_resolve signaturesCompiled codesCompiled selected
@@ -195,14 +195,14 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
             (Core.LanguageResult.resultType code.own.result) (code.body.rename (globalShift index).lift)
             (installationEnvironment captured index)
           obtain ⟨argumentExtension, targets, argumentStore, argumentsRelated,
-              argumentsEvaluation, argumentHeap, argumentInstalled⟩ :=
+              argumentsEvaluation, argumentHeap, argumentInstalled, argumentFrame⟩ :=
             argumentsIH rfl argumentsCompiled (locals.prepend [closure]) (globals.prepend [closure]) heap installed
           have values : ValuesRel code.own.parameters sources targets :=
             argumentTypes ▸ ArgumentsRel.values argumentsRelated
-          obtain ⟨callExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled⟩ :=
+          obtain ⟨callExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
             callIH selected foundSignature foundCode rfl values argumentHeap argumentInstalled
           exact ⟨argumentExtension ++ callExtension, target, finalStore, related,
             call_evaluates functionEvaluation argumentsEvaluation bodyEvaluation,
-            by simpa only [List.append_assoc] using finalHeap, finalInstalled⟩
+            by simpa only [List.append_assoc] using finalHeap, finalInstalled, argumentFrame.trans tailFrame⟩
 
 end Solcore.Frontend.RustHull.DerivationCallCorrespondence

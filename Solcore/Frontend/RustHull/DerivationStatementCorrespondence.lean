@@ -28,7 +28,7 @@ theorem assign_variable {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name 
   | succ fuel =>
       obtain ⟨lowered, binding, index, rightCompiled, looked, _, sameType, rfl⟩ :=
         assign_variable_components compiled
-      obtain ⟨extension, value, middleStore, valueRelated, evaluated, middleHeap, middleInstalled⟩ :=
+      obtain ⟨extension, value, middleStore, valueRelated, evaluated, middleHeap, middleInstalled, firstFrame⟩ :=
         right rfl rightCompiled environmentRelated globalsRelated heapRelated installed
       rw [sameType] at valueRelated
       obtain ⟨sourceLocation, old, found, read, rfl⟩ := assign_variable_source assigned
@@ -39,7 +39,8 @@ theorem assign_variable {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name 
           some (middleStore.set location (.inRight .unit value)) :=
         Core.Store.write?_eq_some_iff.mpr ⟨middleHeap.location_bound entry, rfl⟩
       exact ⟨extension, _, _, .fallthrough, assign_variable_core evaluated targetFound targetRead written,
-        middleHeap.write entry valueRelated written, middleInstalled.write middleHeap entry written⟩
+        middleHeap.write entry valueRelated written, middleInstalled.write middleHeap entry written,
+        firstFrame.trans (ClosuresPreserved.write middleHeap entry written)⟩
 
 theorem returned {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
     {sourceValue : Semantics.Value} (kind : statement.kind = .returnStmt value)
@@ -58,11 +59,11 @@ theorem returned {statement : Stmt} {value : Expr} {initial final : Semantics.St
       obtain ⟨checked, matched, _⟩ := lower_bind_eq_ok.mp components
       cases checked
       have sameType := expectType_eq_of_ok matched
-      obtain ⟨extension, targetValue, finalStore, valueRelated, evaluated, finalHeap, finalInstalled⟩ :=
+      obtain ⟨extension, targetValue, finalStore, valueRelated, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
         preserves rfl valueCompiled environmentRelated globalsRelated heapRelated installed
       exact ⟨extension, Core.LocalLoop.returnedValue targetValue, finalStore,
         .returned (sameType ▸ valueRelated), return_success compiled valueCompiled evaluated,
-        finalHeap, finalInstalled⟩
+        finalHeap, finalInstalled, lastFrame⟩
 
 theorem expression_statement {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
     {sourceValue : Semantics.Value} (kind : statement.kind = .expression value)
@@ -78,9 +79,9 @@ theorem expression_statement {statement : Stmt} {value : Expr} {initial final : 
       simp only [lowerStatement] at compiled
       obtain ⟨lowered, valueCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
-      obtain ⟨extension, targetValue, finalStore, _, evaluated, finalHeap, finalInstalled⟩ :=
+      obtain ⟨extension, targetValue, finalStore, _, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
         preserves rfl valueCompiled environmentRelated globalsRelated heapRelated installed
-      refine ⟨extension, _, finalStore, .fallthrough, ?_, finalHeap, finalInstalled⟩
+      refine ⟨extension, _, finalStore, .fallthrough, ?_, finalHeap, finalInstalled, lastFrame⟩
       apply Core.LanguageResult.bind_success _ evaluated
       simpa only [← Core.Expr.rename_insertion, rename_fallthrough] using
         Core.LocalLoop.fallthrough_evaluates type (targetValue :: environment) finalStore
@@ -98,14 +99,14 @@ theorem comment {statement : Stmt} {text : String} {state : Semantics.State σ}
       simp only [lowerStatement] at compiled
       cases compiled
       exact ⟨[], _, store, .fallthrough, Core.LocalLoop.fallthrough_evaluates _ _ _,
-        by simpa only [List.append_nil] using heapRelated, installed⟩
+        by simpa only [List.append_nil] using heapRelated, installed, ClosuresPreserved.refl store⟩
 
 theorem nil {state : Semantics.State σ} :
     StatementsSimulation signatures codes locations captured sourceEnvironment [] state .fallthrough state := by
   intro _ fuel scope type loops expression compiled world mapping environment store
     _ _ heapRelated installed
   exact ⟨[], _, store, .fallthrough, empty compiled mapping environment store,
-    by simpa only [List.append_nil] using heapRelated, installed⟩
+    by simpa only [List.append_nil] using heapRelated, installed, ClosuresPreserved.refl store⟩
 
 theorem declare {statement : Stmt} {rest : List Stmt} {name : String} {sourceType : Ty}
     {sourceValue : Semantics.Value} {initial final : Semantics.State σ} {control : Semantics.Control}
@@ -136,10 +137,10 @@ theorem declare {statement : Stmt} {rest : List Stmt} {name : String} {sourceTyp
           name (coreType shape) initial.heap.length store.length entry
       have globalsExtended := globalsRelated.addLocal name (coreType shape)
         (.cellRef (Core.OptionalCell.cellType (coreType shape)) store.length) allowed
-      obtain ⟨extension, targetValue, finalStore, related, bodyEvaluated, finalHeap, finalInstalled⟩ :=
+      obtain ⟨extension, targetValue, finalStore, related, bodyEvaluated, finalHeap, finalInstalled, lastFrame⟩ :=
         tail normal bodyCompiled environmentExtended globalsExtended allocated (installed.append _)
       refine ⟨[(coreType shape, store.length)] ++ extension, targetValue, finalStore,
-        related, ?_, ?_, finalInstalled⟩
+        related, ?_, ?_, finalInstalled, ClosuresPreserved.trans (ClosuresPreserved.append _ _) lastFrame⟩
       · have initialized := Core.OptionalCell.allocateInitialized_evaluates (type := coreType shape) evaluated
         have same := zeroValue_rename shape zeroCompiled mapping
         simpa only [Core.Expr.rename, Core.OptionalCell.allocateInitialized, same] using
@@ -158,7 +159,7 @@ theorem next {statement : Stmt} {rest : List Stmt} {initial middle final : Seman
   | zero => simp [lowerStatements, fail] at compiled
   | succ fuel =>
       obtain ⟨first, next, firstCompiled, nextCompiled, rfl⟩ := sequence_components notDeclaration compiled
-      obtain ⟨firstExtension, firstValue, middleStore, firstRelated, firstEvaluated, middleHeap, middleInstalled⟩ :=
+      obtain ⟨firstExtension, firstValue, middleStore, firstRelated, firstEvaluated, middleHeap, middleInstalled, firstFrame⟩ :=
         head trivial firstCompiled environmentRelated globalsRelated heapRelated installed
       cases firstRelated
       have nextEnvironment : EnvironmentRel (world ++ firstExtension) sourceEnvironment scope
@@ -174,11 +175,11 @@ theorem next {statement : Stmt} {rest : List Stmt} {initial middle final : Seman
         simpa only [List.length_cons, List.length_nil, Nat.zero_add, Nat.add_comm, List.cons_append,
           List.nil_append] using globalsRelated.prepend
             [.unit, .inLeft type .unit, .inLeft Core.LocalLoop.transferType (.inLeft type .unit)]
-      obtain ⟨extension, targetValue, finalStore, related, nextEvaluated, finalHeap, finalInstalled⟩ :=
+      obtain ⟨extension, targetValue, finalStore, related, nextEvaluated, finalHeap, finalInstalled, lastFrame⟩ :=
         tail normal nextCompiled nextEnvironment nextGlobals middleHeap middleInstalled
       exact ⟨firstExtension ++ extension, targetValue, finalStore, related,
         sequence_fallthrough firstEvaluated nextEvaluated,
-        by simpa only [List.append_assoc] using finalHeap, finalInstalled⟩
+        by simpa only [List.append_assoc] using finalHeap, finalInstalled, firstFrame.trans lastFrame⟩
 
 theorem stop {statement : Stmt} {rest : List Stmt} {initial final : Semantics.State σ}
     {control : Semantics.Control}
@@ -192,15 +193,15 @@ theorem stop {statement : Stmt} {rest : List Stmt} {initial final : Semantics.St
   | zero => simp [lowerStatements, fail] at compiled
   | succ fuel =>
       obtain ⟨first, next, firstCompiled, _, rfl⟩ := sequence_components notDeclaration compiled
-      obtain ⟨extension, targetValue, finalStore, related, evaluated, finalHeap, finalInstalled⟩ :=
+      obtain ⟨extension, targetValue, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
         head normal firstCompiled environmentRelated globalsRelated heapRelated installed
-      refine ⟨extension, targetValue, finalStore, related, ?_, finalHeap, finalInstalled⟩
+      refine ⟨extension, targetValue, finalStore, related, ?_, finalHeap, finalInstalled, lastFrame⟩
       rw [rename_sequence]
       cases related with
       | fallthrough => exact False.elim (stopped rfl)
       | returned valueRelated => exact Core.LocalLoop.sequence_returned type evaluated
-      | breaking => contradiction
-      | continuing => contradiction
+      | breaking => exact Core.LocalLoop.sequence_transfer type evaluated
+      | continuing => exact Core.LocalLoop.sequence_transfer type evaluated
       | language => contradiction
 
 /-- The standalone declaration compiler delegates to its actual singleton
@@ -219,5 +220,51 @@ theorem declared {statement : Stmt} {name : String} {type : Ty}
   | succ fuel =>
       simp only [lowerStatement] at compiled
       exact declare rfl zero nil normal compiled locals globals heap installed
+
+theorem block {statement : Stmt} {body : List Stmt}
+    {initial final : Semantics.State σ} {control : Semantics.Control}
+    (kind : statement.kind = .block body)
+    (continued : StatementsSimulation signatures codes locations captured sourceEnvironment body initial control final) :
+    StmtSimulation signatures codes locations captured sourceEnvironment statement initial control final := by
+  intro safe fuel scope result loops expression compiled
+  cases statement with | mk statementKind span =>
+  cases kind
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel => exact continued safe compiled
+
+theorem breaking {statement : Stmt} {state : Semantics.State σ}
+    (kind : statement.kind = .breakStmt) :
+    StmtSimulation signatures codes locations captured sourceEnvironment statement state .breaking state := by
+  intro _ fuel scope result loops expression compiled world mapping environment store _ _ heap installed
+  cases statement with | mk statementKind span =>
+  cases kind
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel =>
+      cases loops with
+      | zero => simp [lowerStatement, fail] at compiled
+      | succ loops =>
+          simp only [lowerStatement, Nat.add_one_ne_zero, ↓reduceIte] at compiled
+          cases compiled
+          exact ⟨[], _, store, .breaking, Core.LocalLoop.breaking_evaluates _ _ _,
+            by simpa only [List.append_nil] using heap, installed, ClosuresPreserved.refl store⟩
+
+theorem continuing {statement : Stmt} {state : Semantics.State σ}
+    (kind : statement.kind = .continueStmt) :
+    StmtSimulation signatures codes locations captured sourceEnvironment statement state .continuing state := by
+  intro _ fuel scope result loops expression compiled world mapping environment store _ _ heap installed
+  cases statement with | mk statementKind span =>
+  cases kind
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel =>
+      cases loops with
+      | zero => simp [lowerStatement, fail] at compiled
+      | succ loops =>
+          simp only [lowerStatement, Nat.add_one_ne_zero, ↓reduceIte] at compiled
+          cases compiled
+          exact ⟨[], _, store, .continuing, Core.LocalLoop.continuing_evaluates _ _ _,
+            by simpa only [List.append_nil] using heap, installed, ClosuresPreserved.refl store⟩
 
 end Solcore.Frontend.RustHull.DerivationStatementCorrespondence

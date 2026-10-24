@@ -30,14 +30,14 @@ theorem function_body {σ : Type} {signatures : List Signature}
       ∃ extension targetValue finalStore,
         ControlRel result control targetValue ∧
         Core.Evaluates environment store (expression.rename mapping) targetValue finalStore ∧
-        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore)
+        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore)
     {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
     (globalsRelated : GlobalEnvironmentRel codes locations scope mapping environment)
     (heapRelated : HeapRel world initial.heap store) (installed : InstalledGlobals codes locations captured store) :
     ∃ extension targetValue finalStore,
       ResultRel own.result (Semantics.finishFunction function.ret control) targetValue ∧
       Core.Evaluates (bundleValues targets :: environment) store (body.rename mapping.lift) targetValue finalStore ∧
-      HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore := by
+      HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore := by
   have allowed := ContextualStatementCorrespondence.lowerFunction_parameters_allowed compiled
   obtain ⟨arity, resultCompiled⟩ := signature_components signatureCompiled
   obtain ⟨statements, statementsCompiled, bodyShape⟩ := lowerFunction_components compiled
@@ -50,19 +50,20 @@ theorem function_body {σ : Type} {signatures : List Signature}
   obtain ⟨parameterExtension, sourceEnvironment', allocated', environment', store',
       sourceBound, cells, parametersRelated, allocatedHeap, allocatedGlobals⟩ :=
     initialize_parameters_renamed
-      (external := fun (_ : σ) targetStore => InstalledGlobals codes locations captured targetStore)
-      values arity emptyEnvironment heapRelated installed
-      (fun _ _ _ _ hypothesis => hypothesis.append _)
+      (external := fun (_ : σ) targetStore => InstalledGlobals codes locations captured targetStore ∧
+        ClosuresPreserved store targetStore)
+      values arity emptyEnvironment heapRelated ⟨installed, ClosuresPreserved.refl store⟩
+      (fun _ _ _ _ hypothesis => ⟨hypothesis.1.append _, ClosuresPreserved.trans hypothesis.2 (ClosuresPreserved.append _ _)⟩)
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj (bound.symm.trans sourceBound))
   have parameterGlobals := cells.globalEnvironment arity allowed
     (globalsRelated.temporary (bundleType own.parameters) (bundleValues targets))
-  obtain ⟨extension, controlValue, finalStore, related, executed, finalHeap, finalInstalled⟩ :=
-    continued statementsCompiled parametersRelated parameterGlobals allocatedHeap allocatedGlobals
+  obtain ⟨extension, controlValue, finalStore, related, executed, finalHeap, finalInstalled, lastFrame⟩ :=
+    continued statementsCompiled parametersRelated parameterGlobals allocatedHeap allocatedGlobals.1
   obtain ⟨targetValue, resultRelated, finished⟩ := finish_preserves resultCompiled related executed
   have initialized := cells.evaluates_renamed (allValues := targets) (start := 0)
     (mapping := mapping.lift) rfl
     (fun index value found => by simpa only [Nat.zero_add] using found) finished
-  refine ⟨parameterExtension ++ extension, targetValue, finalStore, resultRelated, ?_, ?_, finalInstalled⟩
+  refine ⟨parameterExtension ++ extension, targetValue, finalStore, resultRelated, ?_, ?_, finalInstalled, ClosuresPreserved.trans allocatedGlobals.2 lastFrame⟩
   · simpa only [parameterCode, values.length.2] using initialized
   · simpa only [List.append_assoc] using finalHeap
 
@@ -94,12 +95,12 @@ theorem function_simulation {σ : Type} {signatures : List Signature}
       (List.replicate index Core.Value.unit ++ captured)
     simpa only [List.length_replicate, Core.Renaming.id]
       using globals.prepend (List.replicate index Core.Value.unit)
-  obtain ⟨extension, value, finalStore, related, evaluated, finalHeap, finalInstalled⟩ :=
-    function_body signatureCompiled compiled values bound (continued normal)
+  obtain ⟨extension, value, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
+    function_body signatureCompiled compiled values bound (continued (normalControl_safe normal))
       capturedGlobals heap installed
   rw [finished] at related
   cases related with
   | value valueRelated =>
-      exact ⟨extension, _, finalStore, valueRelated, evaluated, finalHeap, finalInstalled⟩
+      exact ⟨extension, _, finalStore, valueRelated, evaluated, finalHeap, finalInstalled, lastFrame⟩
 
 end Solcore.Frontend.RustHull.DerivationFunctionCorrespondence

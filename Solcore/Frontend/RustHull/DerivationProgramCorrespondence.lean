@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.DerivationExpressionCorrespondence
 import Solcore.Frontend.RustHull.DerivationCallCorrespondence
 import Solcore.Frontend.RustHull.DerivationFunctionCorrespondence
+import Solcore.Frontend.RustHull.LoopDerivationCorrespondence
 
 /-! Finite independent Hull execution drives the mutual simulation proof.
 Recursive function calls use their actual finite child derivations, without
@@ -34,7 +35,9 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
       StmtMotive functions signatures codes locations captured env statement initial control final)
     (motive_6 := fun env statements initial control final _ =>
       StatementsMotive functions signatures codes locations captured env statements initial control final)
-    (motive_7 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_7 := fun env test post body initial control final _ =>
+      LoopDerivationCorrespondence.LoopMotive functions signatures codes locations captured
+        env test post body initial control final)
     (motive_8 := fun _ _ _ _ _ _ _ _ => True)
     ?word
     ?bool
@@ -102,26 +105,26 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env expression state text kind _
     cases expression with | mk type expressionKind span =>
     cases kind
-    exact ExprSimulation.of_contextual (.word rfl)
-      (ContextualExpressionCorrespondence.pure effects (SignatureNames.compiled signaturesCompiled) (.word type text span))
+    exact ExprSimulation.of_pure (effects := effects) (.word rfl)
+      (SignatureNames.compiled signaturesCompiled) (.word type text span)
   case bool =>
     intro env expression state value kind _
     cases expression with | mk type expressionKind span =>
     cases kind
-    exact ExprSimulation.of_contextual (.bool rfl)
-      (ContextualExpressionCorrespondence.pure effects (SignatureNames.compiled signaturesCompiled) (.bool type value span))
+    exact ExprSimulation.of_pure (effects := effects) (.bool rfl)
+      (SignatureNames.compiled signaturesCompiled) (.bool type value span)
   case unit =>
     intro env expression state kind _
     cases expression with | mk type expressionKind span =>
     cases kind
-    exact ExprSimulation.of_contextual (.unit rfl)
-      (ContextualExpressionCorrespondence.pure effects (SignatureNames.compiled signaturesCompiled) (.unit type span))
+    exact ExprSimulation.of_pure (effects := effects) (.unit rfl)
+      (SignatureNames.compiled signaturesCompiled) (.unit type span)
   case var =>
     intro env expression state name kind _
     cases expression with | mk type expressionKind span =>
     cases kind
-    exact ExprSimulation.of_contextual (.var rfl)
-      (ContextualExpressionCorrespondence.pure effects (SignatureNames.compiled signaturesCompiled) (.var type name span))
+    exact ExprSimulation.of_pure (effects := effects) (.var rfl)
+      (SignatureNames.compiled signaturesCompiled) (.var type name span)
   case pair =>
     intro env expression initial middle final left right leftValue rightResult kind first second firstIH secondIH accepted
     cases expression with | mk type expressionKind span =>
@@ -211,37 +214,125 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intros
     simp [ExprMotive, ExprsMotive, FunctionMotive, StmtMotive, StatementsMotive,
       ExprSimulation, ExprsSimulation, FunctionSimulation, StmtSimulation, StatementsSimulation,
-      StatementCorrespondence.NormalControl]
-  case done | conditionFault | conditionInvalid | step | bodyBreak | bodyStop | postBreak | postStop |
-      nil_2 | matched | next_1 =>
+      SafeControl]
+  case nil_2 | matched | next_1 =>
     intros
     trivial
-  case block | forInit | forLoop | matchStmt | assembly | revert =>
-    intros
-    simp_all [StmtMotive, RecursiveStatement]
-  case breaking | continuing =>
-    intros
-    simp [StmtMotive, StmtSimulation, StatementCorrespondence.NormalControl]
+  case matchStmt =>
+    intro env statement target expression alternatives initial middle final value control
+      kind evaluated selected exprIH altIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    simp only [RecursiveStatement] at accepted
+  case assembly =>
+    intro env statement body initial final control kind executed accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    simp only [RecursiveStatement] at accepted
+  case revert =>
+    intro env statement message state external control kind executed accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    simp only [RecursiveStatement] at accepted
+  case block =>
+    intro env statement body initial final control kind evaluated bodyIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    exact DerivationStatementCorrespondence.block rfl
+      (bodyIH (by simpa only [RecursiveStatement] using accepted))
+  case forInit =>
+    intro env statement init test post body initial final control kind nonempty evaluated initIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    have parts : (∀ statement ∈ init, RecursiveStatement functions statement) ∧
+        RecursiveExpression functions test ∧
+        (∀ statement ∈ post, RecursiveStatement functions statement) ∧
+        (∀ statement ∈ body, RecursiveStatement functions statement) := by
+      simpa only [RecursiveStatement] using accepted
+    apply LoopDerivationCorrespondence.initialized_statement rfl nonempty
+    apply initIH
+    intro member selected
+    rcases List.mem_append.mp selected with selected | selected
+    · exact parts.1 member selected
+    · simp only [List.mem_singleton] at selected
+      subst member
+      simpa only [RecursiveStatement, List.not_mem_nil, false_implies, implies_true, true_and] using parts.2
+  case forLoop =>
+    intro env statement test post body initial final control kind evaluated loopIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
+    have parts : (∀ statement ∈ ([] : List Stmt), RecursiveStatement functions statement) ∧
+        RecursiveExpression functions test ∧
+        (∀ statement ∈ post, RecursiveStatement functions statement) ∧
+        (∀ statement ∈ body, RecursiveStatement functions statement) := by
+      simpa only [RecursiveStatement] using accepted
+    exact LoopDerivationCorrespondence.statement rfl (loopIH parts.2.1 parts.2.2.1 parts.2.2.2)
+  case breaking =>
+    intro env statement state kind _
+    exact DerivationStatementCorrespondence.breaking kind
+  case continuing =>
+    intro env statement state kind _
+    exact DerivationStatementCorrespondence.continuing kind
+  case done =>
+    intro env test post body initial final value tested truth testIH testEligible _ _
+    exact LoopDerivationCorrespondence.done (testIH testEligible) truth
+  case conditionFault =>
+    intro env test post body initial final reason tested testIH _ _ _
+    exact LoopDerivationCorrespondence.fault test post body initial final reason
+  case conditionInvalid =>
+    intro env test post body initial final value tested invalid testIH _ _ _
+    exact LoopDerivationCorrespondence.fault test post body initial final (.invalidValue "condition")
+  case step =>
+    intro env test post body initial testedState bodyState postState final value bodyControl postControl control
+      tested truth bodyEvaluated bodyContinues postEvaluated postContinues next
+      testIH bodyIH postIH nextIH testEligible postEligible bodyEligible
+    exact LoopDerivationCorrespondence.step (testIH testEligible) truth
+      (bodyIH bodyEligible) bodyContinues (postIH postEligible) postContinues
+      (nextIH testEligible postEligible bodyEligible)
+  case bodyBreak =>
+    intro env test post body initial testedState final value tested truth bodyEvaluated
+      testIH bodyIH testEligible _ bodyEligible
+    exact LoopDerivationCorrespondence.body_break (testIH testEligible) truth (bodyIH bodyEligible)
+  case bodyStop =>
+    intro env test post body initial testedState final value control tested truth bodyEvaluated stopped
+      testIH bodyIH testEligible _ bodyEligible
+    exact LoopDerivationCorrespondence.body_stop (testIH testEligible) truth (bodyIH bodyEligible) stopped
+  case postBreak =>
+    intro env test post body initial testedState bodyState final value bodyControl tested truth
+      bodyEvaluated bodyContinues postEvaluated testIH bodyIH postIH testEligible postEligible bodyEligible
+    exact LoopDerivationCorrespondence.post_break (testIH testEligible) truth
+      (bodyIH bodyEligible) bodyContinues (postIH postEligible)
+  case postStop =>
+    intro env test post body initial testedState bodyState final value bodyControl control tested truth
+      bodyEvaluated bodyContinues postEvaluated stopped testIH bodyIH postIH testEligible postEligible bodyEligible
+    exact LoopDerivationCorrespondence.post_stop (testIH testEligible) truth
+      (bodyIH bodyEligible) bodyContinues (postIH postEligible) stopped
   case declare =>
     intro env statement initial name type value kind zero _
     exact DerivationStatementCorrespondence.declared kind zero
   case assign =>
     intro env statement lhs rhs initial middle final value kind evaluated assigned rhsIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
     cases lhs with | mk sourceType lhsKind leftSpan =>
-    cases lhsKind <;> simp only [RecursiveStatement, kind] at accepted
+    cases lhsKind <;> simp only [RecursiveStatement] at accepted
     all_goals first
       | exact False.elim accepted
-      | exact DerivationStatementCorrespondence.assign_variable kind (rhsIH accepted) assigned
+      | exact DerivationStatementCorrespondence.assign_variable rfl (rhsIH accepted) assigned
   case expression =>
     intro env statement value initial final sourceValue kind evaluated valueIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
     have valueAccepted : RecursiveExpression functions value := by
-      simpa only [RecursiveStatement, kind] using accepted
-    exact DerivationStatementCorrespondence.expression_statement kind (valueIH valueAccepted)
+      simpa only [RecursiveStatement] using accepted
+    exact DerivationStatementCorrespondence.expression_statement rfl (valueIH valueAccepted)
   case returned =>
     intro env statement value initial final sourceValue kind evaluated valueIH accepted
+    cases statement with | mk statementKind span =>
+    cases kind
     have valueAccepted : RecursiveExpression functions value := by
-      simpa only [RecursiveStatement, kind] using accepted
-    exact DerivationStatementCorrespondence.returned kind (valueIH valueAccepted)
+      simpa only [RecursiveStatement] using accepted
+    exact DerivationStatementCorrespondence.returned rfl (valueIH valueAccepted)
   case comment =>
     intro env statement state text kind _
     exact DerivationStatementCorrespondence.comment kind

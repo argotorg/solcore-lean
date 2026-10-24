@@ -1,4 +1,5 @@
 import Solcore.Frontend.RustHull.NamedCallCorrespondence
+import Solcore.Frontend.RustHull.ClosureFrameCorrespondence
 
 /-! Pointwise simulation statements for induction on a finite, independent Hull
 execution derivation. No statement assumes the simulation of every execution
@@ -40,14 +41,30 @@ inductive RecursiveExpression (functions : List Function) : Expr → Prop where
       (argumentsEligible : ∀ argument ∈ arguments, RecursiveExpression functions argument)
       (type span) : RecursiveExpression functions ⟨type, .call name arguments, span⟩
 
-/-- The current statement fragment permits local declarations, direct local
-assignment, expression statements and return. Recursion occurs in expressions. -/
-def RecursiveStatement (functions : List Function) (statement : Stmt) : Prop :=
-  match statement.kind with
-  | .letDecl _ _ | .comment _ => True
-  | .assign ⟨_, .var _, _⟩ value | .expression value | .returnStmt value =>
+/-- Structured local control includes blocks, loops and loop transfers.
+External effects and pattern alternatives have separate proof obligations. -/
+def RecursiveStatement (functions : List Function) : Stmt → Prop
+  | ⟨.letDecl _ _, _⟩ | ⟨.comment _, _⟩ => True
+  | ⟨.assign ⟨_, .var _, _⟩ value, _⟩ | ⟨.expression value, _⟩ | ⟨.returnStmt value, _⟩ =>
       RecursiveExpression functions value
+  | ⟨.block body, _⟩ => ∀ statement ∈ body, RecursiveStatement functions statement
+  | ⟨.forLoop init condition post body, _⟩ =>
+      (∀ statement ∈ init, RecursiveStatement functions statement) ∧
+      RecursiveExpression functions condition ∧
+      (∀ statement ∈ post, RecursiveStatement functions statement) ∧
+      (∀ statement ∈ body, RecursiveStatement functions statement)
+  | ⟨.breakStmt, _⟩ | ⟨.continueStmt, _⟩ => True
   | _ => False
+termination_by statement => sizeOf statement
+
+/-- Break and continue are normal internal loop transfers. Fault outcomes
+remain outside the current public normal-execution theorem. -/
+def SafeControl : Semantics.Control → Prop
+  | .fault _ => False
+  | _ => True
+
+theorem normalControl_safe {control : Semantics.Control} (normal : NormalControl control) :
+    SafeControl control := by cases control <;> simp_all [NormalControl, SafeControl]
 
 def RecursiveProgram (functions : List Function) : Prop :=
   ∀ function ∈ functions, ∀ statement ∈ function.body, RecursiveStatement functions statement
@@ -68,7 +85,7 @@ def ExprSimulation {σ : Type} (signatures : List Signature)
         ValueRel lowered.type sourceValue targetValue ∧
         Core.Evaluates environment store (lowered.expression.rename mapping)
           (.inRight .word targetValue) finalStore ∧
-        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore
+        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 def ExprsSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
@@ -85,13 +102,13 @@ def ExprsSimulation {σ : Type} (signatures : List Signature)
         ArgumentsRel arguments sources targets ∧
         Core.Evaluates environment store ((packArguments arguments).expression.rename mapping)
           (.inRight .word (bundleValues targets)) finalStore ∧
-        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore
+        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 def StmtSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (statement : Stmt)
     (initial : Semantics.State σ) (control : Semantics.Control) (final : Semantics.State σ) : Prop :=
-  NormalControl control →
+  SafeControl control →
     ∀ {fuel scope result loops expression}, lowerStatement fuel signatures scope result loops statement = .ok expression →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
@@ -100,13 +117,13 @@ def StmtSimulation {σ : Type} (signatures : List Signature)
       ∃ extension targetValue finalStore,
         ControlRel result control targetValue ∧
         Core.Evaluates environment store (expression.rename mapping) targetValue finalStore ∧
-        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore
+        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 def StatementsSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (statements : List Stmt)
     (initial : Semantics.State σ) (control : Semantics.Control) (final : Semantics.State σ) : Prop :=
-  NormalControl control →
+  SafeControl control →
     ∀ {fuel scope result loops expression}, lowerStatements fuel signatures scope result loops statements = .ok expression →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
@@ -115,7 +132,7 @@ def StatementsSimulation {σ : Type} (signatures : List Signature)
       ∃ extension targetValue finalStore,
         ControlRel result control targetValue ∧
         Core.Evaluates environment store (expression.rename mapping) targetValue finalStore ∧
-        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore
+        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 /-- The exact closure body installed at a real global slot. The source function
 is tracked by the mutual induction motive and its compiler lookup premises. -/
@@ -130,7 +147,7 @@ def FunctionSimulation {σ : Type} (codes : List GlobalCode) (locations : Nat �
         ValueRel code.own.result source target ∧
         Core.Evaluates (bundleValues targets :: installationEnvironment captured index) store
           (code.body.rename (globalShift index).lift) (.inRight .word target) finalStore ∧
-        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore
+        HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
 /-- Only named calls use the function IH. Primitive dispatch is proved at the
 expression boundary from its actual argument pack and independent computation. -/
@@ -142,10 +159,9 @@ def CallSimulation {σ : Type} (functions : List Function) (signatures : List Si
     signatures.find? (·.name == name) = some code.own → codes[index]? = some code →
     FunctionSimulation codes locations captured code index sources initial result final
 
-/- The six nontrivial motives below ignore proof identity. They can be supplied
-to the generated mutual recursor by adding a final `fun _ => ...` argument.
-Loop and pattern-alternative motives are `True` because their enclosing
-statement forms are outside RecursiveStatement. -/
+/- These motives ignore proof identity. The mutual recursor uses the separate
+LoopMotive for installed loop closures. Pattern alternatives remain outside
+RecursiveStatement and therefore have no simulation obligation here. -/
 def ExprMotive {σ : Type} (functions : List Function) (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (expression : Expr)
