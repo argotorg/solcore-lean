@@ -77,7 +77,7 @@ def lowerBuiltin (scope : Scope) (name : String) (expected : Core.Ty)
     pure ⟨expected, Core.LanguageResult.bind expected packed.expression
       (Core.LanguageResult.success value)⟩
 
-private def inject (index : Nat) : Core.Ty → Core.Ty → Core.Expr → LowerM Core.Expr
+def inject (index : Nat) : Core.Ty → Core.Ty → Core.Expr → LowerM Core.Expr
   | .sum left right, payload, value =>
       if index = 0 then do
         expectType left payload
