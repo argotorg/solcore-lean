@@ -455,6 +455,8 @@ theorem selectedUnary_argumentTypingBasesValid_under_covered_retained_bounded
     (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (success : Detail.inferExprFuel fuel inferenceContext operand expected
       initial = .ok (inferred, final))
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerSubset : final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset :
       final.requirements ⊆ evidenceState.requirements)
@@ -480,6 +482,7 @@ theorem selectedUnary_argumentTypingBasesValid_under_covered_retained_bounded
     initialNodesBelow := initialBelow
     success
     sourceExtension := TypingSourceExtends.refl _
+    integerPatternsSubset
     integerLiteralsSubset := integerSubset
     requirementsSubset
   } initialReady expectedBelow initialInvariant initialBindersBelow retained
@@ -517,10 +520,14 @@ theorem selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
     (rightInitialBindersBelow : leftState.LocalBindersBelowNextLocal)
     (rightSuccess : Detail.inferExprFuel fuel inferenceContext right none
       leftState = .ok (rightResult, rightState))
+    (leftIntegerPatternsSubset :
+      leftState.integerPatterns ⊆ evidenceState.integerPatterns)
     (leftIntegerSubset :
       leftState.integerLiterals ⊆ evidenceState.integerLiterals)
     (leftRequirementsSubset :
       leftState.requirements ⊆ evidenceState.requirements)
+    (rightIntegerPatternsSubset :
+      rightState.integerPatterns ⊆ evidenceState.integerPatterns)
     (rightIntegerSubset :
       rightState.integerLiterals ⊆ evidenceState.integerLiterals)
     (rightRequirementsSubset :
@@ -554,6 +561,7 @@ theorem selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
     initialNodesBelow := initialBelow
     success := leftSuccess
     sourceExtension := leftToRight
+    integerPatternsSubset := leftIntegerPatternsSubset
     integerLiteralsSubset := leftIntegerSubset
     requirementsSubset := leftRequirementsSubset
   } leftInitialReady (by
@@ -573,6 +581,7 @@ theorem selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
     initialNodesBelow := rightBelow
     success := rightSuccess
     sourceExtension := TypingSourceExtends.refl _
+    integerPatternsSubset := rightIntegerPatternsSubset
     integerLiteralsSubset := rightIntegerSubset
     requirementsSubset := rightRequirementsSubset
   } rightInitialReady (by
@@ -630,6 +639,8 @@ theorem
     (initialInvariant : ActiveLocalContextInvariant initial
       later.inference.substitution active)
     (initialBindersBelow : initial.LocalBindersBelowNextLocal)
+    (operandIntegerPatternsSubset :
+      operandState.integerPatterns ⊆ evidenceState.integerPatterns)
     (operandIntegerSubset :
       operandState.integerLiterals ⊆ evidenceState.integerLiterals)
     (operandRequirementsSubset :
@@ -770,7 +781,7 @@ theorem
         intro expectedType member
         simp at member)
       initialBelow initialInvariant initialBindersBelow operandSuccess
-      operandIntegerSubset
+      operandIntegerPatternsSubset operandIntegerSubset
       operandRequirementsSubset operandRetained operandChildrenRetained
       operandCovered childSound
   exact
@@ -841,6 +852,8 @@ theorem
     (initialInvariant : ActiveLocalContextInvariant initial
       later.inference.substitution active)
     (initialBindersBelow : initial.LocalBindersBelowNextLocal)
+    (rightIntegerPatternsSubset :
+      rightState.integerPatterns ⊆ evidenceState.integerPatterns)
     (rightIntegerSubset :
       rightState.integerLiterals ⊆ evidenceState.integerLiterals)
     (rightRequirementsEvidenceSubset :
@@ -1085,6 +1098,11 @@ theorem
     List.Subset.trans
       (Detail.inferExprFuel_integerLiterals_subset rightSuccess)
       rightIntegerSubset
+  have leftIntegerPatternsSubset :
+      leftState.integerPatterns ⊆ evidenceState.integerPatterns :=
+    List.Subset.trans
+      (Detail.inferExprFuel_integerPatterns_subset rightSuccess)
+      rightIntegerPatternsSubset
   have leftRequirementsSubset :
       leftState.requirements ⊆ evidenceState.requirements :=
     List.Subset.trans (Detail.inferExprFuel_requirements_subset rightSuccess)
@@ -1102,7 +1120,8 @@ theorem
       fuel_lt initialReady initialInvariant initialBindersBelow initialBelow
       leftSuccess leftToRight leftBelow leftProperties.2.1 leftInvariant
       leftBindersBelow rightSuccess
-      leftIntegerSubset leftRequirementsSubset rightIntegerSubset
+      leftIntegerPatternsSubset leftIntegerSubset leftRequirementsSubset
+      rightIntegerPatternsSubset rightIntegerSubset
       rightRequirementsEvidenceSubset
       leftRetained
       (retainedAtRight right (by simp))
@@ -1191,6 +1210,8 @@ theorem
     (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (outerExtension : outer.SemanticallyExtends
       final.inference.substitution)
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -1300,6 +1321,13 @@ theorem
                       (Detail.inferConstructorArgumentsFuel_integerLiterals_subset
                         tailSuccess)
                       integerLiteralsSubset
+                  have headIntegerPatternsSubset :
+                      headState.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferConstructorArgumentsFuel_integerPatterns_subset
+                        tailSuccess)
+                      integerPatternsSubset
                   have headRequirementsSubset :
                       headState.requirements ⊆
                         evidenceState.requirements :=
@@ -1320,6 +1348,7 @@ theorem
                     initialNodesBelow := initialBelow
                     success := headSuccess
                     sourceExtension := headToFinal
+                    integerPatternsSubset := headIntegerPatternsSubset
                     integerLiteralsSubset := headIntegerLiteralsSubset
                     requirementsSubset := headRequirementsSubset
                   }
@@ -1389,8 +1418,8 @@ theorem
                     exact headType
                   have tailTyping := induction
                     headProperties.2.1 tailExpectedBelow headBelow headInvariant
-                    headBindersBelow outerExtension integerLiteralsSubset
-                    requirementsSubset
+                    headBindersBelow outerExtension integerPatternsSubset
+                    integerLiteralsSubset requirementsSubset
                     (retained := by
                       intro argument member
                       exact retained argument
@@ -1580,6 +1609,8 @@ theorem
     (substitutionExtends : later.inference.substitution.SemanticallyExtends
       resultState.inference.substitution)
     (requirementsSubset : resultState.requirements ⊆ later.requirements)
+    (parentIntegerPatternsSubset :
+      resultState.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentIntegerLiteralsSubset :
       resultState.integerLiterals ⊆ evidenceState.integerLiterals)
     (parentRequirementsEvidenceSubset :
@@ -1688,6 +1719,12 @@ theorem
       apply parentIntegerLiteralsSubset
       rw [Detail.recordExpressionWithExpected_integerLiterals_eq recordSuccess]
       exact member
+    have argumentsIntegerPatternsSubset :
+        argumentsState.integerPatterns ⊆ evidenceState.integerPatterns := by
+      intro origin member
+      apply parentIntegerPatternsSubset
+      rw [recordExpressionWithExpected_integerPatterns_eq recordSuccess]
+      exact member
     have argumentsRequirementsSubset :
         argumentsState.requirements ⊆ evidenceState.requirements :=
       List.Subset.trans
@@ -1711,9 +1748,10 @@ theorem
         fuel_lt argumentInitialReady signatureFormation functionsCanonical
         payloadAtArgumentInitial nodesAtArgumentInitial
         argumentInitialInvariant argumentInitialBindersBelow outerArguments
-        argumentsIntegerLiteralsSubset argumentsRequirementsSubset
-        evidence.retained evidence.childrenRetained evidence.covered
-        evidence.preserved childSound payloadAdmissible argumentsSuccess
+        argumentsIntegerPatternsSubset argumentsIntegerLiteralsSubset
+        argumentsRequirementsSubset evidence.retained evidence.childrenRetained
+        evidence.covered evidence.preserved childSound payloadAdmissible
+        argumentsSuccess
     exact
       recordExpressionWithExpected_success_constructor_expressionTypingBase_scoped_of_retained
         recordSuccess outerArguments argumentsType activeBinders
