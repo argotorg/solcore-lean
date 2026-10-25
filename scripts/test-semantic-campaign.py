@@ -388,17 +388,18 @@ class ManifestTests(unittest.TestCase):
                 campaign.validate_manifest({**other, 'requiredHelperCounts': [1]})
 
     def test_mutation_templates_have_independent_version_provenance(self):
-        value = {**self.function_manifest(), 'profile': 'runtime-mutation',
-                 'templateVersion': 'mutable-template-test'}
-        del value['abstractionVersion']
-        campaign.validate_manifest(value)
-        missing = {**value, 'abstractionVersion': 'unrelated-literal-abstraction'}
-        del missing['templateVersion']
-        with self.assertRaisesRegex(ValueError, 'templateVersion'):
-            campaign.validate_manifest(missing)
-        case = function_case(3)
-        case['schema'] = campaign.m2.MUTATION_CASE_SCHEMA
-        self.assertEqual(campaign.helper_counts(case), {3})
+        for profile in ('runtime-mutation', 'runtime-aggregates'):
+            value = {**self.function_manifest(), 'profile': profile,
+                     'templateVersion': 'template-test'}
+            del value['abstractionVersion']
+            campaign.validate_manifest(value)
+            missing = {**value, 'abstractionVersion': 'unrelated-literal-abstraction'}
+            del missing['templateVersion']
+            with self.assertRaisesRegex(ValueError, 'templateVersion'):
+                campaign.validate_manifest(missing)
+            case = function_case(3)
+            case['schema'] = campaign.PROFILE_SCHEMAS[profile]
+            self.assertEqual(campaign.helper_counts(case), {3})
 
     def test_partial_materialization_preserves_generated_helper_coverage(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -429,7 +430,8 @@ class ManifestTests(unittest.TestCase):
     def test_generation_profile_selects_native_generator(self):
         for profile, command in (('closed-g0', 'generate'), ('runtime-word', 'input-generate'),
                                  ('runtime-functions', 'function-generate'),
-                                 ('runtime-mutation', 'mutation-generate')):
+                                 ('runtime-mutation', 'mutation-generate'),
+                                 ('runtime-aggregates', 'aggregate-generate')):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
                 config = options(directory)
                 config.profile = profile
@@ -497,13 +499,30 @@ class RecipeCoverageTests(unittest.TestCase):
 
     def test_recipe_inventory_uses_only_generated_mutation_metadata(self):
         case = mutation_policy_case(3, 4)
-        self.assertEqual(campaign.mutation_recipes(case), {'Templates': {3}, 'Updates': {4}})
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': {4}})
         for kind in ('mutation-imported', 'mutation-reduced', 'function-generated'):
             changed = copy.deepcopy(case)
             changed['provenance']['origin']['kind'] = kind
-            self.assertEqual(campaign.mutation_recipes(changed), {'Templates': set(), 'Updates': set()})
+            self.assertEqual(campaign.generation_recipes(changed), {'Templates': set(), 'Updates': set()})
         case['schema'] = campaign.m2.FUNCTION_CASE_SCHEMA
-        self.assertEqual(campaign.mutation_recipes(case), {'Templates': set(), 'Updates': set()})
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': set(), 'Updates': set()})
+
+    def test_aggregate_recipes_require_only_templates_and_cannot_use_mutation_origins(self):
+        manifest = {**self.manifest(), 'profile': 'runtime-aggregates',
+            'generationRecipeRequirements': {'templates': [0, 1, 2, 3], 'updates': []}}
+        campaign.validate_manifest(manifest)
+        with self.assertRaisesRegex(ValueError, 'no update-count'):
+            campaign.validate_manifest({**manifest,
+                'generationRecipeRequirements': {'templates': [0], 'updates': [1]}})
+        case = mutation_policy_case(3, 4)
+        case['schema'] = campaign.m2.AGGREGATE_CASE_SCHEMA
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': set(), 'Updates': set()})
+        case['provenance']['origin'] = {'kind': 'aggregate-generated', 'helpers': [{'template': 3}]}
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+        for invalid in (False, 4, -1, '0'):
+            case['provenance']['origin']['helpers'][0]['template'] = invalid
+            with self.assertRaises(ValueError):
+                campaign.generation_recipes(case)
 
     def test_malformed_generated_metadata_is_rejected(self):
         for helpers in (None, [], [None], [{}], [{'template': 0, 'updates': 1}] * 4,
@@ -512,7 +531,7 @@ class RecipeCoverageTests(unittest.TestCase):
             case = mutation_policy_case()
             case['provenance']['origin']['helpers'] = helpers
             with self.subTest(helpers=helpers), self.assertRaises(ValueError):
-                campaign.mutation_recipes(case)
+                campaign.generation_recipes(case)
 
     def test_nonmatched_policy_outcomes_do_not_satisfy_recipe_requirements(self):
         with tempfile.TemporaryDirectory() as directory:

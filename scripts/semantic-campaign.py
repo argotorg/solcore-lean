@@ -34,13 +34,15 @@ PROFILE_SCHEMAS = {profile: schema for schema, profile in m2.CASE_PROFILES.items
 PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-word": ("input-generate", "input-emit", "input-generated"),
                     "runtime-functions": ("function-generate", "function-emit", "function-generated"),
-                    "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated")}
-HELPER_PROFILES = ("runtime-functions", "runtime-mutation")
+                    "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated"),
+                    "runtime-aggregates": ("aggregate-generate", "aggregate-emit", "aggregate-generated")}
+HELPER_PROFILES = ("runtime-functions", "runtime-mutation", "runtime-aggregates")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
 PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-functions": INPUT_VERSIONS,
-                          "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion")}
+                          "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion"),
+                          "runtime-aggregates": ("profileVersion", "functionVersion", "templateVersion")}
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
@@ -124,34 +126,42 @@ def recipe_requirements(manifest: dict) -> dict:
             raise ValueError(f"recipe {key} must contain integers from {lower} to {upper}")
         if len(values) != len(set(values)):
             raise ValueError(f"recipe {key} must not contain duplicates")
-    if manifest.get("profile", "closed-g0") != "runtime-mutation" and any(requirements.values()):
-        raise ValueError("only mutation corpora can require generation recipes")
+    profile = manifest.get("profile", "closed-g0")
+    if profile not in ("runtime-mutation", "runtime-aggregates") and any(requirements.values()):
+        raise ValueError("only mutation and aggregate corpora can require generation recipes")
+    if profile == "runtime-aggregates" and requirements["updates"]:
+        raise ValueError("aggregate recipes have no update-count dimension")
     return requirements
 
 
-def mutation_recipes(case: dict) -> dict[str, set[int]]:
+def generation_recipes(case: dict) -> dict[str, set[int]]:
     """Read claimed generator metadata; native replay authenticates matched cases."""
     result = {"Templates": set(), "Updates": set()}
-    if case.get("schema") != m2.MUTATION_CASE_SCHEMA:
+    schema = case.get("schema")
+    if schema not in (m2.MUTATION_CASE_SCHEMA, m2.AGGREGATE_CASE_SCHEMA):
         return result
+    origin_kind = "mutation-generated" if schema == m2.MUTATION_CASE_SCHEMA else "aggregate-generated"
     provenance = case.get("provenance")
     if not isinstance(provenance, dict):
-        raise ValueError("mutation case provenance must be an object")
+        raise ValueError("recipe case provenance must be an object")
     origin = provenance.get("origin", {})
     if not isinstance(origin, dict):
-        raise ValueError("mutation case origin must be an object")
-    if origin.get("kind") != "mutation-generated":
+        raise ValueError("recipe case origin must be an object")
+    if origin.get("kind") != origin_kind:
         return result
     helpers = origin.get("helpers")
     if not isinstance(helpers, list) or not 1 <= len(helpers) <= 3:
-        raise ValueError("generated mutation recipes require one to three helper records")
+        raise ValueError("generated recipes require one to three helper records")
     for helper in helpers:
         if not isinstance(helper, dict):
-            raise ValueError("mutation helper recipe must be an object")
-        for field, destination, lower, upper in (("template", "Templates", 0, 3), ("updates", "Updates", 1, 4)):
+            raise ValueError("helper recipe must be an object")
+        dimensions = [("template", "Templates", 0, 3)]
+        if schema == m2.MUTATION_CASE_SCHEMA:
+            dimensions.append(("updates", "Updates", 1, 4))
+        for field, destination, lower, upper in dimensions:
             value = helper.get(field)
             if type(value) is not int or not lower <= value <= upper:
-                raise ValueError(f"mutation helper {field} must be an integer from {lower} to {upper}")
+                raise ValueError(f"recipe helper {field} must be an integer from {lower} to {upper}")
             result[destination].add(value)
     return result
 
@@ -348,7 +358,7 @@ class Campaign:
         save_json(self.args.output / "summary.json", self.summary)
 
     def record_recipes(self, case: dict, *, matched: bool = False) -> None:
-        for dimension, values in mutation_recipes(case).items():
+        for dimension, values in generation_recipes(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["recipeCoverage"][key] = sorted(set(self.summary["recipeCoverage"][key]) | values)
 
@@ -687,7 +697,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 192 for local mutation, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 256 for aggregates, 192 for local mutation, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
@@ -723,7 +733,7 @@ def main() -> int:
     except (OSError, ValueError, KeyError, TypeError, m2.Finding) as error:
         parser.error(str(error))
     if args.nodes is None:
-        args.nodes = 192 if args.profile == "runtime-mutation" else 32
+        args.nodes = {"runtime-mutation": 192, "runtime-aggregates": 256}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

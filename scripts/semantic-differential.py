@@ -31,10 +31,13 @@ CASE_SCHEMA = "solcore-lean.semantic-case.v1"
 INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
+AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
-                 FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation"}
+                 FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
+                 AGGREGATE_CASE_SCHEMA: "runtime-aggregates"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
-                  FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation"}
+                  FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
+                  AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -444,7 +447,8 @@ def execute(args, report: dict) -> None:
         CASE_SCHEMA: "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word",
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
-        MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word"
+        MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
+        AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word"
     }[case["schema"]]
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))

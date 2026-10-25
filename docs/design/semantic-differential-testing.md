@@ -380,12 +380,35 @@ The local-mutation slice is delivered:
   Template and update-count coverage is reported separately as replay-verified
   generator metadata, not as executed branch or opcode coverage.
 
-Aggregates, matches and bounded loops remain open within M4. M5 and M6 remain
-planned. The next slice adds internal Word pairs and sums with case payload
-bindings, while preserving the Word-only ABI/helpers and private mutable cells.
-Keep aggregate evaluation order and payload scope explicit in source emission
-and checked reduction. Validate mixed cases through all three paths before
-extending the profile further.
+The internal aggregate and match slice is delivered:
+
+- A new checked profile admits Word pairs and Word sums inside functions while
+  preserving the Word-only ABI/helpers and private Word cells. Nested aggregate
+  types, aggregate cells and escaping cell references remain excluded. It uses
+  existing Core forms; no Core primitive or evaluator change was needed.
+- Pair operands retain left-to-right snapshots. Projections and match
+  scrutinees execute once. Match payloads extend the Core binding context;
+  generated source uses fresh pattern names and typed branch-result locals.
+  Native regressions cover Word, Bool, Unit, pair and sum results from branches.
+- All 32 fixed cases matched across actual original Core, imported Hull and
+  EVM execution. Eight graphs cover eighteen AST feature kinds, all four
+  boundary inputs, helper counts one through three, and all four generation
+  templates. A separate sixteen-case external suite and exact replay passed.
+- Reduction preserves both typed let binders and distinct left/right payload
+  scopes. It rechecks the whole graph and requires strict decrease. Controlled
+  mismatch reduction, matching real replay and synthetic replay passed, as did
+  explicit generation fuel exhaustion.
+- All five fixed corpora passed deterministic native validation. Thirty-two
+  saved cases from the four older profiles retained exactly the same generated
+  artifacts and observations. Full build/tests, kernel policy and focused
+  protocol/campaign regressions passed. Feature and recipe coverage retain
+  their AST/metadata scope; emitter preservation is still unproved.
+
+Bounded loops remain open within M4. M5 and M6 remain planned. The next slice
+will compare actual source loops with an explicitly bounded Core reference,
+including zero iterations and mixed helper/aggregate/local-mutation cases.
+Keep termination bounds, input coverage and canonical reference reconstruction
+explicit in saved cases and replay, without adding a new Core primitive.
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

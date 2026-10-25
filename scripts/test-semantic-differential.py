@@ -71,7 +71,7 @@ class CaseProfileTests(unittest.TestCase):
             runner.validate_case({**case, "contract": []})
 
     def test_named_function_profile_retains_the_runtime_argument(self):
-        for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA):
+        for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA, runner.AGGREGATE_CASE_SCHEMA):
             name = runner.CASE_CONTRACTS[schema]
             for value in (0, 1, 2**255, 2**256 - 1):
                 case = self.input_case(value)

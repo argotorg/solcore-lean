@@ -160,8 +160,11 @@ named helpers, including shared callees, with checked generation and reduction
 of the complete Core function graph. The local-mutation profile compares private
 Word cells, ordered reads and writes, Unit sequencing, and helper-local state.
 Its fixed 28-case corpus matches across all three paths, including cases where
-a read must retain its value before a later write. Aggregates, matches and
-bounded loops remain to be added to generated comparisons.
+a read must retain its value before a later write. The aggregate profile adds
+internal Word pairs and sums, projections and matches, mixed with mutable locals
+and helper calls. All 32 fixed aggregate cases agree across the three paths.
+The ABI and helper arguments/results remain Word-only; bounded loops are the
+remaining M4 extension.
 
 ## Code layout
 

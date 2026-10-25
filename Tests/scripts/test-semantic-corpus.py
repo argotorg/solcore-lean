@@ -5,8 +5,8 @@ Coverage counts Core AST features and literal values. Runtime-input cases count
 features in the function body, independently of the applied input literal, and
 require completed observations for input coverage. Function DAGs include all
 helper bodies and the entry; helper counts describe declarations in completed
-cases, not the number of dynamic calls. Mutation template/update labels are
-reported separately as replayed generation recipes, not execution coverage. This does not measure
+cases, not the number of dynamic calls. Template/update labels are reported
+separately as replayed generation recipes, not execution coverage. This does not measure
 executed EVM opcodes or prove source-emitter meaning preservation.
 """
 
@@ -24,6 +24,7 @@ VERSIONS = ("generatorVersion", "emitterVersion", "wrapperVersion")
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
 MUTATION_VERSIONS = ("profileVersion", "functionVersion", "templateVersion")
 MUTATION_FEATURES = {"newCell", "loadCell", "storeCell", "unitLiteral"}
+AGGREGATE_FEATURES = {"pair", "first", "second", "inLeft", "inRight", "case"}
 FEATURES = {"wordLiteral", "boolLiteral", "local", "let", "if"} | {
     f"unary:Solcore.Core.Wire.UnaryOp.{operation}"
     for operation in ("boolNot", "wordNot")
@@ -50,7 +51,7 @@ def run(tool: Path, *arguments: str) -> dict:
 
 
 def ast_coverage(value: object, function_calls: bool = False,
-                 mutable_cells: bool = False) -> tuple[set[str], set[int]]:
+                 mutable_cells: bool = False, aggregates: bool = False) -> tuple[set[str], set[int]]:
     features, literals = set(), set()
     if isinstance(value, dict):
         tag = value.get("tag")
@@ -60,6 +61,8 @@ def ast_coverage(value: object, function_calls: bool = False,
             features.add(simple[tag])
         if mutable_cells and tag == "unit":
             features.add("unitLiteral")
+        if aggregates and tag in AGGREGATE_FEATURES:
+            features.add(tag)
         if tag == "word":
             literals.add(int(value["value"], 16))
         if tag in ("unary", "binary"):
@@ -88,7 +91,7 @@ def ast_coverage(value: object, function_calls: bool = False,
     else:
         children = []
     for child in children:
-        child_features, child_literals = ast_coverage(child, function_calls, mutable_cells)
+        child_features, child_literals = ast_coverage(child, function_calls, mutable_cells, aggregates)
         features.update(child_features)
         literals.update(child_literals)
     return features, literals
@@ -138,8 +141,10 @@ def function_parts(expression: dict) -> tuple[list[dict], dict]:
     return helpers, expression["body"]
 
 
-def function_case_parts(case: dict, mutation: bool = False) -> tuple[list[dict], dict]:
-    schema = "solcore-lean.semantic-mutation-case.v1" if mutation else "solcore-lean.semantic-function-case.v1"
+def function_case_parts(case: dict, profile: str) -> tuple[list[dict], dict]:
+    schema = {"runtime-functions": "solcore-lean.semantic-function-case.v1",
+              "runtime-mutation": "solcore-lean.semantic-mutation-case.v1",
+              "runtime-aggregates": "solcore-lean.semantic-aggregate-case.v1"}[profile]
     require(case["schema"] == schema, "unexpected function case schema")
     program = case["program"]
     application = program["body"]
@@ -171,7 +176,8 @@ def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
                 f"{entry['id']}: invalid node budget")
         count = 4 if runtime_input else 1
         command = {"closed-g0": "generate", "runtime-word": "input-generate",
-                   "runtime-functions": "function-generate", "runtime-mutation": "mutation-generate"}[profile]
+                   "runtime-functions": "function-generate", "runtime-mutation": "mutation-generate",
+                   "runtime-aggregates": "aggregate-generate"}[profile]
         corpus = run(tool, command, seed,
                      str(nodes), str(count), "1", str(fuel))
         require(corpus["status"] == "complete" and corpus["attempted"] == 1
@@ -193,6 +199,7 @@ def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
     path.write_text(json.dumps(entry["program"]))
     if runtime_input:
         command = {"runtime-functions": "function-emit", "runtime-mutation": "mutation-emit",
+                   "runtime-aggregates": "aggregate-emit",
                    "runtime-word": "input-emit"}[profile]
         return run(tool, command, str(path), entry["input"], str(fuel))
     return run(tool, "emit", str(path), str(fuel))
@@ -202,11 +209,13 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     require(isinstance(manifest, dict), "manifest must be an object")
     require(manifest["schema"] == MANIFEST_SCHEMA, "unexpected corpus manifest schema")
     profile = manifest.get("profile", "closed-g0")
-    require(profile in ("closed-g0", "runtime-word", "runtime-functions", "runtime-mutation"),
+    require(profile in ("closed-g0", "runtime-word", "runtime-functions", "runtime-mutation", "runtime-aggregates"),
             "unsupported corpus profile")
     runtime_input = profile != "closed-g0"
-    function_profile = profile in ("runtime-functions", "runtime-mutation")
+    function_profile = profile in ("runtime-functions", "runtime-mutation", "runtime-aggregates")
     mutation_profile = profile == "runtime-mutation"
+    aggregate_profile = profile == "runtime-aggregates"
+    template_profile = mutation_profile or aggregate_profile
     require(manifest["coverageKind"] == "core-ast-features", "coverage scope changed")
     for name in ("requiredFeatures", "requiredWordLiterals") + (("requiredInputs",) if runtime_input else ()):
         require(isinstance(manifest.get(name), list) and
@@ -217,13 +226,14 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
                        if runtime_input else set())
     required_helper_counts = set()
     required_templates, required_updates = set(), set()
-    if mutation_profile:
+    if template_profile:
         recipe = manifest.get("generationRecipeRequirements")
-        require(isinstance(recipe, dict), "mutation corpus must declare generation recipe requirements")
-        for key, expected in (("templates", {0, 1, 2, 3}), ("updates", {1, 2, 3, 4})):
+        require(isinstance(recipe, dict), "template corpus must declare generation recipe requirements")
+        for key, expected in (("templates", {0, 1, 2, 3}), ("updates", {1, 2, 3, 4} if mutation_profile else set())):
             values = recipe.get(key)
             require(isinstance(values, list) and all(type(value) is int for value in values)
-                    and set(values) == expected, f"mutation recipe requirements must include all four {key}")
+                    and len(values) == len(set(values)) and set(values) == expected,
+                    f"recipe requirements must declare the exact {key} domain")
         required_templates, required_updates = set(recipe["templates"]), set(recipe["updates"])
     if function_profile:
         values = manifest.get("requiredHelperCounts")
@@ -232,8 +242,10 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
         required_helper_counts = set(values)
     if runtime_input:
         allowed_features = FEATURES | ({"functionCall"} if function_profile else set())
-        if mutation_profile:
+        if template_profile:
             allowed_features |= MUTATION_FEATURES
+        if aggregate_profile:
+            allowed_features |= AGGREGATE_FEATURES
         require(required_features and required_features <= allowed_features, "unsupported runtime body features")
         if function_profile:
             require("functionCall" in required_features, "function corpus must require helper calls")
@@ -255,15 +267,16 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
             case = materialize(entry, tool, directory, fuel, profile)
             require(case == materialize(entry, tool, directory, fuel, profile),
                     f"{entry['id']}: materialization is not deterministic")
-            versions = VERSIONS + (MUTATION_VERSIONS if mutation_profile else INPUT_VERSIONS if runtime_input else ())
+            versions = VERSIONS + (MUTATION_VERSIONS if template_profile else INPUT_VERSIONS if runtime_input else ())
             for version in versions:
                 require(case["provenance"][version] == manifest[version],
                         f"{entry['id']}: {version} changed")
             if function_profile:
-                helpers, body = function_case_parts(case, mutation=mutation_profile)
+                helpers, body = function_case_parts(case, profile)
                 feature_body = helpers + [body]
                 actual_features, actual_literals = ast_coverage(feature_body, function_calls=True,
-                                                                mutable_cells=mutation_profile)
+                                                                mutable_cells=template_profile,
+                                                                aggregates=aggregate_profile)
             else:
                 body = scalar_body(case, runtime_input)
                 feature_body = body
@@ -286,21 +299,25 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
             path.write_text(json.dumps(case))
             require(run(tool, "replay", str(path), str(fuel)) == case,
                     f"{entry['id']}: native checked replay changed the case")
-            if mutation_profile and "generation" in entry:
+            if template_profile and "generation" in entry:
                 # Exact replay above regenerates and checks this metadata. It
                 # classifies the generator recipe, not dynamic instruction use.
                 origin = case["provenance"]["origin"]
                 metadata = origin["helpers"]
-                require(origin["kind"] == "mutation-generated" and
+                origin_kind = "mutation-generated" if mutation_profile else "aggregate-generated"
+                require(origin["kind"] == origin_kind and
                         origin["helperCount"] == len(helpers) == len(metadata),
-                        "mutation helper metadata differs from actual Core declarations")
+                        "template helper metadata differs from actual Core declarations")
                 for helper in metadata:
-                    template, updates = helper["template"], helper["updates"]
-                    require(type(template) is int and template in {0, 1, 2, 3} and
-                            type(updates) is int and updates in {1, 2, 3, 4},
-                            "replayed mutation recipe is outside the fixed profile")
+                    template = helper["template"]
+                    require(type(template) is int and template in {0, 1, 2, 3},
+                            "replayed template is outside the fixed profile")
                     recipe_templates.add(template)
-                    recipe_updates.add(updates)
+                    if mutation_profile:
+                        updates = helper["updates"]
+                        require(type(updates) is int and updates in {1, 2, 3, 4},
+                                "replayed update count is outside the fixed profile")
+                        recipe_updates.add(updates)
             covered_features.update(actual_features)
             covered_literals.update(actual_literals)
             if function_profile:
@@ -335,7 +352,7 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     if function_profile:
         report.update(requiredHelperCounts=sorted(required_helper_counts),
                       completedHelperCounts=sorted(covered_helper_counts))
-    if mutation_profile:
+    if template_profile:
         report["generationRecipe"] = {"classification": "replayed-generator-metadata",
                                       "templates": sorted(recipe_templates), "updates": sorted(recipe_updates)}
     return report

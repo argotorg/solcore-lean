@@ -313,8 +313,8 @@ The external input regression executes two unchanged source functions at all
 four boundary inputs, checks three-way agreement and varying results, and
 replays a saved input-dependent run. The input profile also supports automatic
 reduction of its function body and input while retaining the checked application
-form. Named functions and private mutable locals extend this workflow below;
-products/sums, matches and bounded loops remain later M4 work.
+form. Named functions, private mutable locals and aggregates extend this
+workflow below; bounded loops remain later M4 work.
 
 ## Compare acyclic named functions
 
@@ -354,8 +354,8 @@ wrapper lambdas as source function definitions.
 Reduction keeps helper declarations in their original order and checks the
 complete graph after every candidate body or input change. The first reducer
 keeps the number of helpers fixed; it can remove calls or simplify bodies but
-does not delete and reindex declarations. Private mutable locals extend this
-workflow below; aggregates, matches and bounded loops remain later M4 work.
+does not delete and reindex declarations. Private mutable locals and aggregates
+extend this workflow below; bounded loops remain later M4 work.
 
 ## Compare private mutable locals
 
@@ -399,3 +399,44 @@ agreement; it measures generator metadata, not dynamic branches or instructions.
 The fixed manifest's recipe requirements are enforced alongside AST/input/helper
 coverage. A separate twelve-case external regression checks read-before-write
 snapshots, independent cells and callee isolation, followed by exact replay.
+
+## Compare internal pairs, sums and matches
+
+The `runtime-aggregates` profile admits internal `(word, word)` pairs and
+`sum<word, word>` values, projections, and two-way matches. It combines them
+with the existing scalar operations, private Word cells and acyclic helpers.
+The ABI remains `SynthesizedAggregates.run(uint256)` with Word-only arguments
+and results. Nested aggregate types, aggregate cells and escaping cell values
+are outside this profile.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-aggregates --seed 21 --nodes 256 --cases 4 --attempts 256 \
+  --output .upstream/semantic-aggregates
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-aggregate-corpus.json \
+  --output .upstream/semantic-aggregate-ci
+python3 scripts/test-source-aggregate-rust.py
+```
+
+Native commands are `aggregate-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`aggregate-emit FUNCTION.json INPUT [FUEL]`. The campaign defaults to 256 nodes
+for this profile; its hard limit remains 512 nodes for the complete applied
+graph. Fixed seeds use individual budgets within that limit. Unsupported G0
+scalar operations still produce explicit exclusions.
+
+Pair operands evaluate left to right and retain their values across later
+writes. Projections and sum scrutinees evaluate once. The emitter uses tuple
+patterns for projection and sum patterns for branch selection. It retains Core
+payload, Unit and local binding positions independently of fresh source names.
+Reduction preserves distinct left/right payload markers as well as typed let
+bindings. It cannot extract a branch body and silently drop its payload binder.
+
+The fixed 32-case corpus has eight graphs at all four boundary inputs. All
+cases agree across the three actual paths. Eighteen AST feature kinds, helper
+counts one through three and all four generator templates are covered. Recipe
+requirements use `templates: [0, 1, 2, 3]` and `updates: []`; this profile has no
+update-count recipe dimension. Coverage is still AST/metadata coverage.
+The separate sixteen-case external suite checks retained aggregate snapshots,
+single evaluation of projections, nested payload/helper effects and typed
+pair/sum branch results, then replays a saved run exactly.
