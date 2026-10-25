@@ -54,8 +54,8 @@ is the actual receipt decoder applied to the source-derived message value, so
 export limits and cumulative execution fuel retain their public behavior.
 
 The contract theorems use an empty code catalog, no supplied code image and a
-context with `deploying = false`. They do not yet cover deployment, environment
-reads, logs or calls to other contracts.
+context with `deploying = false`. They do not yet cover deployment, logs or
+calls to other contracts.
 
 `Tests.RustHullMemoryCorrespondence.public_resumes` supplies complete independent
 source derivations for unaligned memory access and a fault after a write, then
@@ -77,6 +77,22 @@ write. Executable checks also verify committed persistent storage, cleared
 transient storage, retained failure snapshots and empty exported worlds on
 failure.
 
+`ContractEnvironmentCorrespondence.prepare_resumes_exact` adds message and
+block observations to the same public connection. It covers address, caller,
+call value, calldata and return-data size, calldata word reads, supplied gas,
+ten optional ambient words, block hashes and blob hashes. The actual context
+normalization and shared/frame initializers establish their observations;
+memory and storage operations preserve them. Missing optional inputs retain
+their language-fault reasons. The `codesize` implementation also has a builtin
+and frame correspondence proof, but its public connection requires the
+remaining code-image support.
+
+`Tests.RustHullEnvironmentCorrespondence.public_resumes` supplies independent
+derivations for calldata-driven memory writes, timestamp-driven storage writes,
+block/blob hash reads and a missing-gas fault after writes. Runtime checks cover
+address normalization, transient-state finalization, checkpoints and the
+snapshots retained before a fault.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -84,7 +100,7 @@ failure.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory and storage reach public receipts and resumptions; environment and logs remain to be connected. | In progress |
+| 3 | Concrete external state is preserved. | Memory, storage and environment reads reach public receipts and resumptions; logs and further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -95,8 +111,8 @@ delay those connections.
 
 ## Next public milestone
 
-Connect environment reads and logs to public contract execution. Then cover
-explicit return/revert/stop/invalid, memory copying, hashing and account
+Connect logs to public contract execution. Then cover explicit
+return/revert/stop/invalid, memory copying, hashing and account
 inspection through the same state relations. The remaining work includes code
 images and catalogs, external calls, creation, rollback and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
