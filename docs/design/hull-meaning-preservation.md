@@ -184,6 +184,20 @@ zero padding, range overflow and zero-length ranges at the largest address.
 Runtime checks compare public receipts and retained Core snapshots after
 multiple resumptions.
 
+`ContractReturnDataCorrespondence.compileObject_resumes_exact` connects
+`returndatacopy` and `memoryguard` through actual compilation, initialization
+and public resumptions. It covers both layouts, with and without code slots,
+and `prepare_resumes_exact` covers the default preparation path. Return-data
+contents and size are mutable resources, ready for call responses.
+
+`Tests.RustHullReturnDataCorrespondence.public_resumes` supplies six source
+derivations combining storage, logs, account observations, optional code copies
+and return-data operations. They cover empty copies and both source-range
+checks, including invalid termination before destination overflow. Runtime
+checks confirm public rollback and retained internal snapshots. Two additional
+direct-copy cases cover nonempty return data across memory words and destination
+overflow. `memoryguard` preserves its evaluated argument.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -206,6 +220,23 @@ Connect external calls and their return data, shared state and rollback through
 actual dispatch and public execution. Then cover creation and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
 theorem consumer.
+
+## Remaining public connections
+
+The current effect dispatcher has seven builtins outside the connected fragment:
+`call`, `staticcall`, `callcode`, `delegatecall`, `create`, `create2` and
+`selfdestruct`.
+
+| Order | Connection | Required public evidence |
+| --- | --- | --- |
+| 1 | Contract calls | Derive the installed callback and code identity from actual compilation and initialization. Relate copied calldata, child execution, return bytes, balances, storage, logs and rollback. Start with an empty-account call, then a compiled child that returns or reverts after writes. |
+| 2 | Account destruction | Connect beneficiary transfers, static rejection and transaction-finalization rules to the actual public receipt. Reuse the mutable balance resource established for calls. |
+| 3 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
+| 4 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
+| 5 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
+
+Lower-level helpers or isolated builtin results do not complete any row without
+its actual public execution consumer.
 
 ## Verification
 
