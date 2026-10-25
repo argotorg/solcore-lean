@@ -219,7 +219,7 @@ private theorem public_fixture {σ : Type} (effects : Semantics.ExternalSemantic
     (shape : function.args = [] ∧ function.ret = .word)
     (source : Semantics.EvalFunction program.functions effects function [] ⟨[], external⟩
       sourceResult (state external heap))
-    (safe : SafeResult sourceResult) (target : ResultRel .word sourceResult expected)
+    (target : ResultRel .word sourceResult expected)
     {prepared : ScalarExecution.Prepared}
     (accepted : ScalarExecution.prepare program entry [] 96 = .ok prepared) :
     PublicResult prepared expected heap := by
@@ -243,7 +243,7 @@ private theorem public_fixture {σ : Type} (effects : Semantics.ExternalSemantic
   rw [types.1] at inputs
   cases inputs
   obtain ⟨world, actual, finalStore, required, related, heapRelated, completed⟩ :=
-    execute _ _ source safe
+    execute _ _ source
   rw [types.2] at related
   have same : actual = expected := by
     cases related <;> cases target
@@ -258,14 +258,14 @@ theorem product_update_public {σ : Type} (effects : Semantics.ExternalSemantics
     (accepted : ScalarExecution.prepare program "productUpdate" [] 96 = .ok prepared) :
     PublicResult prepared (.inRight .word (.word (word 173))) sourceHeap :=
   public_fixture effects external (function := productUpdate) rfl ⟨rfl, rfl⟩
-    (product_update_source effects external) (by trivial) (.value (.word _)) accepted
+    (product_update_source effects external) (.value (.word _)) accepted
 
 theorem product_fault_public {σ : Type} (effects : Semantics.ExternalSemantics σ) (external : σ)
     {prepared : ScalarExecution.Prepared}
     (accepted : ScalarExecution.prepare program "productFault" [] 96 = .ok prepared) :
     PublicResult prepared (.inLeft .word (.word (word 4))) faultHeap :=
   public_fixture effects external (function := productFault) rfl ⟨rfl, rfl⟩
-    (product_fault_source effects external) (by trivial) (.language _) accepted
+    (product_fault_source effects external) (.language _) accepted
 
 private def check (entry : String) (expected : Core.Value) (sourceCells : Core.Store) : IO Unit := do
   let prepared ← match ScalarExecution.prepare program entry [] 96 with

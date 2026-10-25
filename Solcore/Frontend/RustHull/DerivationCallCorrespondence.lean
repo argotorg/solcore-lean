@@ -1,7 +1,7 @@
 import Solcore.Frontend.RustHull.ContextualExpressionCorrespondence
 import Solcore.Frontend.RustHull.CompiledProgramLookup
 import Solcore.Frontend.RustHull.DerivationCorrespondenceSupport
-import Solcore.Frontend.RustHull.CallFaultCorrespondence
+import Solcore.Frontend.RustHull.BuiltinTotalCorrespondence
 
 /-! Calls and argument lists composed along one independent source execution.
 Only the operand and callee derivations already encountered by that execution
@@ -47,7 +47,7 @@ theorem arguments_nil {σ : Type} (signatures : List Signature) (codes : List Gl
     (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (state : Semantics.State σ) :
     ExprsSimulation signatures codes locations captured sourceEnvironment [] state (.value []) state := by
-  intro _ fuel scope arguments compiled world mapping environment store locals globals heap installed
+  intro fuel scope arguments compiled coverage world mapping environment store locals globals heap installed
   cases compiled
   exact ⟨[], .inRight .word .unit, store, .value .nil, .inRight .unit,
     by simpa using heap, installed, ClosuresPreserved.refl store⟩
@@ -62,16 +62,15 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
     (tail : ExprsSimulation signatures codes locations captured sourceEnvironment rest middle result final) :
     ExprsSimulation signatures codes locations captured sourceEnvironment (argument :: rest)
       initial (result.map (source :: ·)) final := by
-  intro safe
   cases result with
   | value sources =>
-      intro fuel scope lowered compiled world mapping environment store locals globals heap installed
+      intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
       simp only [List.mapM_cons] at compiled
       obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
       obtain ⟨tailCode, tailCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨headExtension, target, middleStore, related, headEvaluation, middleHeap, middleInstalled, headFrame⟩ :=
-        head.value rfl headCompiled locals globals heap installed
+        head.value rfl headCompiled coverage locals globals heap installed
       cases rest with
       | nil =>
           cases tailCompiled
@@ -81,7 +80,7 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
       | cons next rest =>
           have tailLocals := (locals.extendWorld headExtension).prepend [target]
           obtain ⟨tailExtension, targets, finalStore, tailRelated, tailEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            tail.value rfl tailCompiled tailLocals (globals.prepend [target]) middleHeap middleInstalled
+            tail.value rfl tailCompiled coverage tailLocals (globals.prepend [target]) middleHeap middleInstalled
           have nonempty : tailCode ≠ [] := by
             intro empty
             subst tailCode
@@ -123,22 +122,21 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
 
 
   | fault reason =>
-      cases reason <;> simp only [Semantics.Result.map, SafeResult] at safe
-      rename_i reason
-      intro fuel scope lowered compiled world mapping environment store locals globals heap installed
+      intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
       simp only [List.mapM_cons] at compiled
       obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
       obtain ⟨tailCode, tailCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨headExtension, target, middleStore, related, headEvaluation, middleHeap, middleInstalled, headFrame⟩ :=
-        head.value rfl headCompiled locals globals heap installed
+        head.value rfl headCompiled coverage locals globals heap installed
       cases rest with
       | nil => cases tailEvaluated
       | cons next rest =>
           have tailLocals := (locals.extendWorld headExtension).prepend [target]
           obtain ⟨tailExtension, tailTarget, finalStore, tailRelated, tailEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            tail safe tailCompiled tailLocals (globals.prepend [target]) middleHeap middleInstalled
+            tail tailCompiled coverage tailLocals (globals.prepend [target]) middleHeap middleInstalled
           cases tailRelated
+          rename_i reason
           have nonempty : tailCode ≠ [] := by
             intro empty
             subst tailCode
@@ -174,16 +172,15 @@ theorem arguments_fault {σ : Type} {signatures : List Signature}
       initial (.fault reason) final) :
     ExprsSimulation signatures codes locations captured sourceEnvironment (argument :: rest)
       initial (.fault reason) final := by
-  intro safe fuel scope lowered compiled world mapping environment store locals globals heap installed
-  cases reason <;> simp only [SafeResult] at safe
-  rename_i reason
+  intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
   simp only [List.mapM_cons] at compiled
   obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
   obtain ⟨tailCode, _, returned⟩ := lower_bind_eq_ok.mp compiled
   cases returned
   obtain ⟨extension, target, finalStore, related, evaluation, finalHeap, finalInstalled, frame⟩ :=
-    head safe headCompiled locals globals heap installed
+    head headCompiled coverage locals globals heap installed
   cases related
+  rename_i reason
   cases tailCode with
   | nil =>
       exact ⟨extension, _, finalStore, .language reason, evaluation, finalHeap, finalInstalled, frame⟩
@@ -207,7 +204,8 @@ theorem call_function {σ : Type} {functions : List Function} {signatures : List
   intro other code index sourceSelected signatureSelected codeFound
   have same := Option.some.inj (sourceSelected.symm.trans selected)
   subst other
-  exact continued selected signatureSelected codeFound
+  intro targets values world store heap installed
+  exact continued selected signatureSelected codeFound values heap installed
 
 theorem call_not_function {σ : Type} {functions : List Function} {signatures : List Signature}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
@@ -237,7 +235,7 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
     (callIH : CallSimulation functions signatures codes locations captured name sources middle result final) :
     ExprSimulation signatures codes locations captured sourceEnvironment
       ⟨type, .call name arguments, span⟩ initial result final := by
-  intro safe fuel scope lowered compiled world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
@@ -248,16 +246,14 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
           obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
             builtin_components notSignature compiled
           obtain ⟨extension, targets, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            argumentsIH.value rfl argumentsCompiled locals globals heap installed
-          cases result with
-          | value source =>
-              obtain ⟨target, resultRelated, resultEvaluation⟩ :=
-                builtin_preserves classified typeCompiled builtinCompiled computed related argumentsEvaluation
-              exact ⟨extension, .inRight .word target, finalStore, .value resultRelated,
-                resultEvaluation, finalHeap, finalInstalled, tailFrame⟩
-          | fault reason =>
-              cases reason <;> simp only [SafeResult] at safe
-              exact (primitive_not_language name type sources _ computed).elim
+            argumentsIH.value rfl argumentsCompiled coverage locals globals heap installed
+          obtain ⟨source, target, meaning, resultRelated, resultEvaluation⟩ :=
+            BuiltinTotalCorrespondence.builtin_preserves_result classified typeCompiled builtinCompiled
+              related argumentsEvaluation
+          have sameResult := Option.some.inj (computed.symm.trans meaning)
+          subst result
+          exact ⟨extension, .inRight .word target, finalStore, .value resultRelated,
+            resultEvaluation, finalHeap, finalInstalled, tailFrame⟩
       | named selected argumentsEligible =>
           obtain ⟨index, code, foundSignature, foundCode, _, _⟩ :=
             compiledFunction_resolve signaturesCompiled codesCompiled selected
@@ -272,11 +268,11 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
             (installationEnvironment captured index)
           obtain ⟨argumentExtension, targets, argumentStore, argumentsRelated,
               argumentsEvaluation, argumentHeap, argumentInstalled, argumentFrame⟩ :=
-            argumentsIH.value rfl argumentsCompiled (locals.prepend [closure]) (globals.prepend [closure]) heap installed
+            argumentsIH.value rfl argumentsCompiled coverage (locals.prepend [closure]) (globals.prepend [closure]) heap installed
           have values : ValuesRel code.own.parameters sources targets :=
             argumentTypes ▸ ArgumentsRel.values argumentsRelated
           obtain ⟨callExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            callIH selected foundSignature foundCode safe values argumentHeap argumentInstalled
+            callIH selected foundSignature foundCode values argumentHeap argumentInstalled
           exact ⟨argumentExtension ++ callExtension, target, finalStore, related,
             call_evaluates functionEvaluation argumentsEvaluation bodyEvaluation,
             by simpa only [List.append_assoc] using finalHeap, finalInstalled, argumentFrame.trans tailFrame⟩
@@ -296,9 +292,7 @@ theorem call_fault {σ : Type} {functions : List Function}
       initial (.fault reason) final) :
     ExprSimulation signatures codes locations captured sourceEnvironment
       ⟨type, .call name arguments, span⟩ initial (.fault reason) final := by
-  intro safe fuel scope lowered compiled world mapping environment store locals globals heap installed
-  cases reason <;> simp only [SafeResult] at safe
-  rename_i reason
+  intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
@@ -308,8 +302,9 @@ theorem call_fault {σ : Type} {functions : List Function}
           obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
             builtin_components notSignature compiled
           obtain ⟨extension, target, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, frame⟩ :=
-            argumentsIH safe argumentsCompiled locals globals heap installed
+            argumentsIH argumentsCompiled coverage locals globals heap installed
           cases related
+          rename_i reason
           exact ⟨extension, _, finalStore, .language reason,
             BuiltinCorrespondence.argument_failure builtinCompiled argumentsEvaluation,
             finalHeap, finalInstalled, frame⟩
@@ -326,8 +321,9 @@ theorem call_fault {σ : Type} {functions : List Function}
             (Core.LanguageResult.resultType code.own.result) (code.body.rename (globalShift index).lift)
             (installationEnvironment captured index)
           obtain ⟨extension, target, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, frame⟩ :=
-            argumentsIH safe argumentsCompiled (locals.prepend [closure]) (globals.prepend [closure]) heap installed
+            argumentsIH argumentsCompiled coverage (locals.prepend [closure]) (globals.prepend [closure]) heap installed
           cases related
+          rename_i reason
           exact ⟨extension, _, finalStore, .language reason,
             call_argument_failure functionEvaluation argumentsEvaluation,
             finalHeap, finalInstalled, frame⟩

@@ -227,7 +227,7 @@ theorem countdown_public {σ : Type} (effects : Semantics.ExternalSemantics σ) 
       | word parsed =>
           rename_i text value
           obtain ⟨world, target, finalStore, required, related, heap, completed⟩ :=
-            execute _ _ (countdown_source_word effects value ⟨[], external⟩) trivial
+            execute _ _ (countdown_source_word effects value ⟨[], external⟩)
           rw [resultType] at related
           cases related with
           | value related =>

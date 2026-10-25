@@ -180,7 +180,7 @@ theorem main_public {σ : Type} (effects : Semantics.ExternalSemantics σ) (exte
       | word parsed =>
           rename_i text value
           obtain ⟨world, target, finalStore, required, related, heap, completed⟩ :=
-            execute _ _ (main_source effects external value) trivial
+            execute _ _ (main_source effects external value)
           rw [resultType] at related
           cases related with
           | value related =>

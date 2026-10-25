@@ -1,10 +1,10 @@
 import Solcore.Frontend.RustHull.DerivationProgramCorrespondence
 import Solcore.Frontend.RustHull.PublicProgramCorrespondence
 
-/-! Public meaning preservation for finite source executions with values or language failures, including
-recursive named calls and structured loops. The induction follows the independent
-source derivation; no syntactic function rank or assumed body-preservation
-premise is required. -/
+/-! Public meaning preservation for every finite source execution of the
+accepted eligible program. Actual compilation and initialized arguments rule
+out malformed observations; result classification is a conclusion. Recursive
+calls, loops and matches follow the independent source derivation. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.Correspondence
 open NamedCallCorrespondence ScalarExecution DerivationCorrespondence
@@ -21,7 +21,6 @@ theorem compile_recursive_program {σ : Type} {effects : Semantics.ExternalSeman
     (values : ValuesRel compiled.parameters sources targets)
     {initial final : Semantics.State σ} {sourceResult : Semantics.Result Semantics.Value}
     (sourceEvaluated : Semantics.EvalFunction program.functions effects function sources initial sourceResult final)
-    (safe : SafeResult sourceResult)
     {world : World} {environment : Core.Environment} {initialStore callStore : Core.Store}
     {argument : Core.Expr}
     (argumentEvaluated : Core.Evaluates environment initialStore argument (bundleValues targets) callStore)
@@ -52,11 +51,18 @@ theorem compile_recursive_program {σ : Type} {effects : Semantics.ExternalSeman
     (fun slot closure found => globalScope_lookup unique
       (by simp only [← aligned, List.getElem?_map, found, Option.map_some]) [])
     callStore.length (bundleValues targets :: environment)
+  have covered : ScopeCoverage [] (globalScope signatures []) := by
+    apply ScopeCoverage.of_reserved
+    intro binding member name named
+    simp only [globalScope, List.append_nil, List.mem_map] at member
+    obtain ⟨signature, _, rfl⟩ := member
+    cases Option.some.inj named
+    exact slotName_reserved _
   have initializedHeap := heapRelated.initializeGlobals signatures codes (bundleValues targets :: environment)
   have installed := InstalledGlobals.initialize aligned (bundleValues targets :: environment) callStore
   obtain ⟨extension, targetValue, finalStore, related, bodyExecuted, finalHeap, _⟩ :=
-    (DerivationProgramCorrespondence.function_preserves signaturesCompiled codesCompiled unique globals eligible
-      sourceEvaluated) selected signatureSelected codeFound safe values initializedHeap installed
+    (DerivationProgramCorrespondence.function_preserves signaturesCompiled codesCompiled unique covered globals eligible
+      sourceEvaluated) selected signatureSelected codeFound values initializedHeap installed
   have invoked := globalInvocation_evaluates (runtimeValues := []) aligned codeFound installed bodyExecuted
   have assembledExecution := globalInitialization_evaluates aligned invoked
   exact ⟨extension, targetValue, finalStore, related,
@@ -74,7 +80,6 @@ theorem prepare_recursive_program {σ : Type} {effects : Semantics.ExternalSeman
       InputsRel prepared.compiled.parameters inputs sources ∧
       ∀ sourceResult final,
         Semantics.EvalFunction program.functions effects function sources ⟨[], initialExternal⟩ sourceResult final →
-        SafeResult sourceResult →
         ∃ world targetValue finalStore,
           ResultRel prepared.compiled.result sourceResult targetValue ∧
           Core.Evaluates [] [] prepared.expression targetValue finalStore ∧ HeapRel world final.heap finalStore := by
@@ -83,13 +88,14 @@ theorem prepare_recursive_program {σ : Type} {effects : Semantics.ExternalSeman
   obtain ⟨own, allocated, assembled, _⟩ := StatementCorrespondence.compile_components compiled
   obtain ⟨signatures, codes, function, code, index, _, selected, _⟩ := assemble_selection assembled
   refine ⟨function, sources, selected, inputsRelated, ?_⟩
-  intro sourceResult final evaluated safe
-  exact compile_recursive_program compiled selected eligible valuesRelated evaluated safe
+  intro sourceResult final evaluated
+  exact compile_recursive_program compiled selected eligible valuesRelated evaluated
     (arguments [] []) (HeapRel.empty [])
 
-/-- Every genuine public checkpoint chain for an eligible source
-execution with a value or language failure completes with that source result and heap exactly when its combined
-fuel reaches the actual transition count. Otherwise it remains resumable. -/
+/-- Every genuine public checkpoint chain for a finite eligible source
+execution completes with its represented result and heap exactly when combined
+fuel reaches the actual transition count. Otherwise it remains resumable.
+No premise restricts the source result to values or language failures. -/
 theorem prepare_recursive_program_resumes {σ : Type} {effects : Semantics.ExternalSemantics σ}
     {program : Program} {entry : String} {inputs : List String} {compilationFuel : Nat}
     {prepared : Prepared} (accepted : prepare program entry inputs compilationFuel = .ok prepared)
@@ -99,7 +105,6 @@ theorem prepare_recursive_program_resumes {σ : Type} {effects : Semantics.Exter
       InputsRel prepared.compiled.parameters inputs sources ∧
       ∀ sourceResult final,
         Semantics.EvalFunction program.functions effects function sources ⟨[], initialExternal⟩ sourceResult final →
-        SafeResult sourceResult →
         ∃ world targetValue finalStore required,
           ResultRel prepared.compiled.result sourceResult targetValue ∧ HeapRel world final.heap finalStore ∧
           ∀ fuel additional last, Resumes (run prepared fuel) additional last →
@@ -107,8 +112,8 @@ theorem prepare_recursive_program_resumes {σ : Type} {effects : Semantics.Exter
             ((∃ checkpoint, last = .outOfFuel checkpoint) ↔ fuel + additional < required) := by
   obtain ⟨function, sources, selected, inputsRelated, execute⟩ := prepare_recursive_program accepted eligible initialExternal
   refine ⟨function, sources, selected, inputsRelated, ?_⟩
-  intro sourceResult final evaluated safe
-  obtain ⟨world, targetValue, finalStore, related, executed, heap⟩ := execute sourceResult final evaluated safe
+  intro sourceResult final evaluated
+  obtain ⟨world, targetValue, finalStore, related, executed, heap⟩ := execute sourceResult final evaluated
   obtain ⟨required, completed⟩ := evaluation_resumes_exact executed
   exact ⟨world, targetValue, finalStore, required, related, heap, completed⟩
 
@@ -121,14 +126,13 @@ theorem prepare_recursive_program_run {σ : Type} {effects : Semantics.ExternalS
       InputsRel prepared.compiled.parameters inputs sources ∧
       ∀ sourceResult final,
         Semantics.EvalFunction program.functions effects function sources ⟨[], initialExternal⟩ sourceResult final →
-        SafeResult sourceResult →
         ∃ world targetValue finalStore required,
           ResultRel prepared.compiled.result sourceResult targetValue ∧ HeapRel world final.heap finalStore ∧
           ∀ fuel, required ≤ fuel → run prepared fuel = .done targetValue finalStore := by
   obtain ⟨function, sources, selected, inputsRelated, execute⟩ := prepare_recursive_program accepted eligible initialExternal
   refine ⟨function, sources, selected, inputsRelated, ?_⟩
-  intro sourceResult final evaluated safe
-  obtain ⟨world, targetValue, finalStore, related, executed, heap⟩ := execute sourceResult final evaluated safe
+  intro sourceResult final evaluated
+  obtain ⟨world, targetValue, finalStore, related, executed, heap⟩ := execute sourceResult final evaluated
   obtain ⟨required, completed⟩ := evaluation_run_complete executed
   exact ⟨world, targetValue, finalStore, required, related, heap, completed⟩
 

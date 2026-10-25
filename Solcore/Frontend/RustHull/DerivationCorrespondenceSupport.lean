@@ -1,5 +1,6 @@
 import Solcore.Frontend.RustHull.NamedCallCorrespondence
 import Solcore.Frontend.RustHull.ClosureFrameCorrespondence
+import Solcore.Frontend.RustHull.ScopeCoverage
 
 /-! Pointwise simulation statements for induction on a finite, independent Hull
 execution derivation. No statement assumes the simulation of every execution
@@ -68,26 +69,6 @@ decreasing_by
     omega
   omega
 
-/-- Language failures are executable outcomes. Malformed source observations
-have no representation in the Core language result. -/
-def SafeResult {α : Type} : Semantics.Result α → Prop
-  | .value _ | .fault (.language _) => True
-  | .fault _ => False
-
-/-- Normal transfers and language failures can leave a statement or loop. -/
-def SafeControl : Semantics.Control → Prop
-  | .fault (.language _) => True
-  | .fault _ => False
-  | _ => True
-
-theorem safeResult_fault_iff {α : Type} (reason : Semantics.Fault) :
-    SafeResult (α := α) (.fault reason) ↔ ∃ word, reason = .language word := by
-  cases reason <;> simp [SafeResult]
-
-theorem safeControl_fault_iff (reason : Semantics.Fault) :
-    SafeControl (.fault reason) ↔ ∃ word, reason = .language word := by
-  cases reason <;> simp [SafeControl]
-
 inductive ArgumentsResultRel (arguments : List Lowered) :
     Semantics.Result (List Semantics.Value) → Core.Value → Prop where
   | value {sources : List Semantics.Value} {targets : List Core.Value}
@@ -96,9 +77,6 @@ inductive ArgumentsResultRel (arguments : List Lowered) :
   | language (reason : Core.Word) :
       ArgumentsResultRel arguments (.fault (.language reason))
         (.inLeft (packArguments arguments).type (.word reason))
-
-theorem normalControl_safe {control : Semantics.Control} (normal : NormalControl control) :
-    SafeControl control := by cases control <;> simp_all [NormalControl, SafeControl]
 
 def RecursiveProgram (functions : List Function) : Prop :=
   ∀ function ∈ functions, ∀ statement ∈ function.body, RecursiveStatement functions statement
@@ -109,8 +87,8 @@ def ExprSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (expression : Expr)
     (initial : Semantics.State σ) (result : Semantics.Result Semantics.Value) (final : Semantics.State σ) : Prop :=
-  SafeResult result →
-    ∀ {fuel scope lowered}, lowerExpression fuel signatures scope expression = .ok lowered →
+  ∀ {fuel scope lowered}, lowerExpression fuel signatures scope expression = .ok lowered →
+    ScopeCoverage sourceEnvironment scope →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
       GlobalEnvironmentRel codes locations scope mapping environment →
@@ -126,8 +104,8 @@ def ExprsSimulation {σ : Type} (signatures : List Signature)
     (sourceEnvironment : Semantics.Environment) (expressions : List Expr)
     (initial : Semantics.State σ) (result : Semantics.Result (List Semantics.Value))
     (final : Semantics.State σ) : Prop :=
-  SafeResult result →
-    ∀ {fuel scope arguments}, expressions.mapM (lowerExpression fuel signatures scope) = .ok arguments →
+  ∀ {fuel scope arguments}, expressions.mapM (lowerExpression fuel signatures scope) = .ok arguments →
+    ScopeCoverage sourceEnvironment scope →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
       GlobalEnvironmentRel codes locations scope mapping environment →
@@ -142,8 +120,8 @@ def StmtSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (statement : Stmt)
     (initial : Semantics.State σ) (control : Semantics.Control) (final : Semantics.State σ) : Prop :=
-  SafeControl control →
-    ∀ {fuel scope result loops expression}, lowerStatement fuel signatures scope result loops statement = .ok expression →
+  ∀ {fuel scope result loops expression}, lowerStatement fuel signatures scope result loops statement = .ok expression →
+    ScopeCoverage sourceEnvironment scope →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
       GlobalEnvironmentRel codes locations scope mapping environment →
@@ -157,8 +135,8 @@ def StatementsSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (statements : List Stmt)
     (initial : Semantics.State σ) (control : Semantics.Control) (final : Semantics.State σ) : Prop :=
-  SafeControl control →
-    ∀ {fuel scope result loops expression}, lowerStatements fuel signatures scope result loops statements = .ok expression →
+  ∀ {fuel scope result loops expression}, lowerStatements fuel signatures scope result loops statements = .ok expression →
+    ScopeCoverage sourceEnvironment scope →
     ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment scope mapping environment →
       GlobalEnvironmentRel codes locations scope mapping environment →
@@ -174,8 +152,7 @@ def FunctionSimulation {σ : Type} (codes : List GlobalCode) (locations : Nat �
     (captured : Core.Environment) (code : GlobalCode) (index : Nat)
     (sources : List Semantics.Value) (initial : Semantics.State σ)
     (result : Semantics.Result Semantics.Value) (final : Semantics.State σ) : Prop :=
-  SafeResult result →
-    ∀ {targets}, ValuesRel code.own.parameters sources targets →
+  ∀ {targets}, ValuesRel code.own.parameters sources targets →
     ∀ {world store}, HeapRel world initial.heap store → InstalledGlobals codes locations captured store →
       ∃ extension target finalStore,
         ResultRel code.own.result result target ∧
@@ -191,6 +168,7 @@ theorem ExprSimulation.value {σ : Type} {signatures : List Signature}
     {source : Semantics.Value} (normal : result = .value source)
     {fuel : Nat} {scope : Scope} {lowered : Lowered}
     (compiled : lowerExpression fuel signatures scope expression = .ok lowered)
+    (covered : ScopeCoverage env scope)
     {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
     (locals : EnvironmentRel world env scope mapping environment)
     (globals : GlobalEnvironmentRel codes locations scope mapping environment)
@@ -202,7 +180,7 @@ theorem ExprSimulation.value {σ : Type} {signatures : List Signature}
       ClosuresPreserved store finalStore := by
   subst result
   obtain ⟨extension, target, finalStore, related, evaluated, heap, installed, frame⟩ :=
-    simulation trivial compiled locals globals heap installed
+    simulation compiled covered locals globals heap installed
   cases related with
   | value related => exact ⟨extension, _, finalStore, related, evaluated, heap, installed, frame⟩
 
@@ -214,6 +192,7 @@ theorem ExprsSimulation.value {σ : Type} {signatures : List Signature}
     {sources : List Semantics.Value} (normal : result = .value sources)
     {fuel : Nat} {scope : Scope} {arguments : List Lowered}
     (compiled : expressions.mapM (lowerExpression fuel signatures scope) = .ok arguments)
+    (covered : ScopeCoverage env scope)
     {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
     (locals : EnvironmentRel world env scope mapping environment)
     (globals : GlobalEnvironmentRel codes locations scope mapping environment)
@@ -226,7 +205,7 @@ theorem ExprsSimulation.value {σ : Type} {signatures : List Signature}
       ClosuresPreserved store finalStore := by
   subst result
   obtain ⟨extension, target, finalStore, related, evaluated, heap, installed, frame⟩ :=
-    simulation trivial compiled locals globals heap installed
+    simulation compiled covered locals globals heap installed
   cases related with
   | value related => exact ⟨extension, _, finalStore, related, evaluated, heap, installed, frame⟩
 

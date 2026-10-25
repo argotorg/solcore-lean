@@ -227,7 +227,7 @@ private theorem public_fixture {σ : Type} (effects : Semantics.ExternalSemantic
     (shape : function.args = [] ∧ function.ret = .word)
     (source : Semantics.EvalFunction program.functions effects function [] ⟨[], external⟩
       sourceResult (state external heap))
-    (safe : SafeResult sourceResult) (target : ResultRel .word sourceResult expected)
+    (target : ResultRel .word sourceResult expected)
     {prepared : ScalarExecution.Prepared}
     (accepted : ScalarExecution.prepare program entry [] 96 = .ok prepared) :
     PublicResult prepared expected heap := by
@@ -250,7 +250,7 @@ private theorem public_fixture {σ : Type} (effects : Semantics.ExternalSemantic
   subst sourceFunction
   rw [types.1] at inputs
   cases inputs
-  obtain ⟨world, actual, finalStore, required, related, heapRelated, completed⟩ := execute _ _ source safe
+  obtain ⟨world, actual, finalStore, required, related, heapRelated, completed⟩ := execute _ _ source
   rw [types.2] at related
   have same : actual = expected := by
     cases related <;> cases target
@@ -265,28 +265,28 @@ theorem indexed_loop_public {σ : Type} (effects : Semantics.ExternalSemantics �
     (accepted : ScalarExecution.prepare program "indexedLoop" [] 96 = .ok prepared) :
     PublicResult prepared (.inRight .word (.word (word 309))) successHeap :=
   public_fixture effects external (function := indexedLoop) rfl ⟨rfl, rfl⟩
-    (indexed_loop_source effects external) (by trivial) (.value (.word _)) accepted
+    (indexed_loop_source effects external) (.value (.word _)) accepted
 
 theorem word_wildcard_public {σ : Type} (effects : Semantics.ExternalSemantics σ) (external : σ)
     {prepared : ScalarExecution.Prepared}
     (accepted : ScalarExecution.prepare program "wordWildcard" [] 96 = .ok prepared) :
     PublicResult prepared (.inRight .word (.word (word 17))) [.word (word 17)] :=
   public_fixture effects external (function := wordWildcard) rfl ⟨rfl, rfl⟩
-    (word_wildcard_source effects external) (by trivial) (.value (.word _)) accepted
+    (word_wildcard_source effects external) (.value (.word _)) accepted
 
 theorem selected_fault_public {σ : Type} (effects : Semantics.ExternalSemantics σ) (external : σ)
     {prepared : ScalarExecution.Prepared}
     (accepted : ScalarExecution.prepare program "selectedFault" [] 96 = .ok prepared) :
     PublicResult prepared (.inLeft .word (.word (word 4))) faultHeap :=
   public_fixture effects external (function := selectedFault) rfl ⟨rfl, rfl⟩
-    (selected_fault_source effects external) (by trivial) (.language _) accepted
+    (selected_fault_source effects external) (.language _) accepted
 
 theorem scrutinee_fault_public {σ : Type} (effects : Semantics.ExternalSemantics σ) (external : σ)
     {prepared : ScalarExecution.Prepared}
     (accepted : ScalarExecution.prepare program "scrutineeFault" [] 96 = .ok prepared) :
     PublicResult prepared (.inLeft .word (.word (word 4))) [.word (word 17)] :=
   public_fixture effects external (function := scrutineeFault) rfl ⟨rfl, rfl⟩
-    (scrutinee_fault_source effects external) (by trivial) (.language _) accepted
+    (scrutinee_fault_source effects external) (.language _) accepted
 
 private def check (entry : String) (expected : Core.Value) (heap : Semantics.Heap) (loopCells : Nat) : IO Unit := do
   let prepared ← match ScalarExecution.prepare program entry [] 96 with

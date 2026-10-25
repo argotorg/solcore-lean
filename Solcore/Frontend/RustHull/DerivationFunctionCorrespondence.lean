@@ -1,5 +1,6 @@
 import Solcore.Frontend.RustHull.ContextualFunctionBodyCorrespondence
 import Solcore.Frontend.RustHull.DerivationStatementCorrespondence
+import Solcore.Frontend.RustHull.InitializationCoverage
 
 /-! Function initialization and statement steps driven by induction hypotheses
 for the particular independent source evaluation. No function rank or premise
@@ -23,6 +24,7 @@ theorem function_body {σ : Type} {signatures : List Signature}
     {control : Semantics.Control}
     (continued : ∀ {bodyFuel bodyScope result loops expression},
       lowerStatements bodyFuel signatures bodyScope result loops function.body = .ok expression →
+      ScopeCoverage sourceEnvironment bodyScope →
       ∀ {world mapping environment store},
       EnvironmentRel world sourceEnvironment bodyScope mapping environment →
       GlobalEnvironmentRel codes locations bodyScope mapping environment →
@@ -32,6 +34,7 @@ theorem function_body {σ : Type} {signatures : List Signature}
         Core.Evaluates environment store (expression.rename mapping) targetValue finalStore ∧
         HeapRel (world ++ extension) final.heap finalStore ∧ InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore)
     {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
+    (covered : ScopeCoverage [] scope)
     (globalsRelated : GlobalEnvironmentRel codes locations scope mapping environment)
     (heapRelated : HeapRel world initial.heap store) (installed : InstalledGlobals codes locations captured store) :
     ∃ extension targetValue finalStore,
@@ -58,7 +61,9 @@ theorem function_body {σ : Type} {signatures : List Signature}
   have parameterGlobals := cells.globalEnvironment arity allowed
     (globalsRelated.temporary (bundleType own.parameters) (bundleValues targets))
   obtain ⟨extension, controlValue, finalStore, related, executed, finalHeap, finalInstalled, lastFrame⟩ :=
-    continued statementsCompiled parametersRelated parameterGlobals allocatedHeap allocatedGlobals.1
+    continued statementsCompiled
+      ((covered.temporary (bundleType own.parameters)).bindArguments arity sourceBound)
+      parametersRelated parameterGlobals allocatedHeap allocatedGlobals.1
   obtain ⟨targetValue, resultRelated, finished⟩ := finish_preserves resultCompiled related executed
   have initialized := cells.evaluates_renamed (allValues := targets) (start := 0)
     (mapping := mapping.lift) rfl
@@ -67,11 +72,20 @@ theorem function_body {σ : Type} {signatures : List Signature}
   · simpa only [parameterCode, values.length.2] using initialized
   · simpa only [List.append_assoc] using finalHeap
 
-theorem finish_safe_control {type : Ty} {control : Semantics.Control}
-    (safe : SafeResult (Semantics.finishFunction type control)) : SafeControl control := by
-  cases control <;> try trivial
-  rename_i reason
-  cases reason <;> exact safe
+/-- The actual signature and represented arguments have the same arity.
+The source binder therefore returns a state, excluding the arity fault rule. -/
+theorem arity {σ : Type} {codes : List GlobalCode} {locations : Nat → Nat}
+    {captured : Core.Environment} {typeFuel : Nat} {function : Function}
+    {code : GlobalCode} {index : Nat} {sources : List Semantics.Value} {state : Semantics.State σ}
+    (signatureCompiled : signature typeFuel function = .ok code.own)
+    (mismatch : Semantics.bindArguments function.args sources [] state = none) :
+    FunctionSimulation codes locations captured code index sources state (.fault .arityMismatch) state := by
+  intro targets values
+  obtain ⟨sameLength, _⟩ := signature_components signatureCompiled
+  obtain ⟨environment, finalState, bound⟩ :=
+    bindArguments_exists (sameLength.trans values.length.1.symm) [] state
+  rw [mismatch] at bound
+  cases bound
 
 /-- The function constructor in the mutual source derivation uses the body
 IH at its specific allocated state and preserves the exact installed closure. -/
@@ -80,6 +94,7 @@ theorem function_simulation {σ : Type} {signatures : List Signature}
     {typeFuel fuel : Nat} {scope : Scope} {function : Function} {code : GlobalCode} {index : Nat}
     (signatureCompiled : signature typeFuel function = .ok code.own)
     (compiled : lowerFunction fuel signatures scope function code.own = .ok code.expression)
+    (covered : ScopeCoverage [] scope)
     (globals : GlobalEnvironmentRel codes locations scope Core.Renaming.id captured)
     {sources : List Semantics.Value} {initial allocated final : Semantics.State σ}
     {sourceEnvironment : Semantics.Environment}
@@ -89,7 +104,7 @@ theorem function_simulation {σ : Type} {signatures : List Signature}
       function.body allocated control final) :
     FunctionSimulation codes locations captured code index sources initial
       (Semantics.finishFunction function.ret control) final := by
-  intro safe targets values world store heap installed
+  intro targets values world store heap installed
   have capturedGlobals : GlobalEnvironmentRel codes locations scope (globalShift index)
       (installationEnvironment captured index) := by
     change GlobalEnvironmentRel codes locations scope (fun slot => index + slot)
@@ -97,8 +112,8 @@ theorem function_simulation {σ : Type} {signatures : List Signature}
     simpa only [List.length_replicate, Core.Renaming.id]
       using globals.prepend (List.replicate index Core.Value.unit)
   obtain ⟨extension, value, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-    function_body signatureCompiled compiled values bound (continued (finish_safe_control safe))
-      capturedGlobals heap installed
+    function_body signatureCompiled compiled values bound continued
+      covered capturedGlobals heap installed
   exact ⟨extension, _, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩
 
 end Solcore.Frontend.RustHull.DerivationFunctionCorrespondence

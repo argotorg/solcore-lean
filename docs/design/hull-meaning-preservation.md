@@ -21,16 +21,22 @@ preserves values and language faults, including all allocations and writes made
 before failure. Completion occurs exactly when cumulative fuel reaches the
 transition count; otherwise the computation remains resumable.
 
-The theorem currently requires successful preparation, `RecursiveProgram`
-syntactic eligibility and `SafeResult` for the source result. `SafeResult`
-includes values and `.fault (.language reason)`. Malformed source observations
-such as an absent variable are outside that result relation. The theorem does
-not assert termination or specify concrete external effects.
+The theorem requires successful preparation, `RecursiveProgram` syntactic
+eligibility and a finite independent source evaluation. It accepts any source
+result: value representation and exclusion of malformed source observations
+follow from the proof. Actual compilation and initialization establish scope
+coverage, parameter arity and the typed heap relation. Successful builtin
+compilation supplies the required argument constraints. No separate
+`SafeResult` premise is required.
+
+Public inputs use the existing scalar parser. The theorem does not assert
+termination or specify concrete external effects.
 
 The connected fragment includes structural values, pure builtins, recursive
 named calls, local variables, blocks, loops and control transfers, product-path
-assignments and pattern alternatives. Language fault propagation is connected through expressions, argument evaluation,
-function boundaries and every loop stage (`2b7a07347`).
+assignments and pattern alternatives. Language fault propagation is connected
+through expressions, argument evaluation, function boundaries and every loop
+stage (`2b7a07347`).
 
 ## Priorities
 
@@ -38,7 +44,7 @@ function boundaries and every loop stage (`2b7a07347`).
 | --- | --- | --- | --- |
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
-| 2 | Accepted initialization and execution exclude malformed source observations. | Derive scope coverage and representation invariants from actual globals, parameters, locals and match binders; remove the public `SafeResult` assumption where justified. | Open |
+| 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Independent memory, storage, environment and log semantics relate to the emitted Core code and public contract state. | Open |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
@@ -50,12 +56,12 @@ delay those connections.
 
 ## Next public milestone
 
-For the connected fragment, successful preparation and a finite independent
-source evaluation should suffice to obtain a related public outcome and heap.
-The caller should not have to supply `SafeResult`. Establish this by carrying
-scope coverage and typed heap invariants from actual initialization, and by
-using successful builtin compilation to derive the argument constraints.
-Keep these obligations inside the compiler-to-public-execution proof.
+Connect concrete external state to the public theorem. Start with storage and
+memory operations, then environment reads and logs. Define their independent
+Hull effects and relate them to the actual Core context and returned state.
+The proof must include writes before a language fault and state carried across
+resumptions. Once these state relations are connected, use them for external
+calls, creation, rollback and assembly.
 
 ## Verification
 

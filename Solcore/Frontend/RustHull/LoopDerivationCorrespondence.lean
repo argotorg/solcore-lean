@@ -1,5 +1,5 @@
 import Solcore.Frontend.RustHull.LoopLoweringStructure
-import Solcore.Frontend.RustHull.DerivationCorrespondenceSupport
+import Solcore.Frontend.RustHull.AtomDerivationCorrespondence
 import Solcore.Core.LocalLoopCorrespondence
 
 /-! A source loop derivation reuses the one self closure installed by the actual
@@ -15,8 +15,8 @@ def LoopSimulation {σ : Type} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (test : Expr) (post body : List Stmt)
     (initial : Semantics.State σ) (control : Semantics.Control) (final : Semantics.State σ) : Prop :=
-  SafeControl control →
   ∀ {scope result loops} (compiled : LoopLoweringStructure.Compiled signatures scope result loops test post body),
+    ScopeCoverage sourceEnvironment scope →
   ∀ {world mapping environment store location},
     EnvironmentRel world sourceEnvironment scope mapping environment →
     GlobalEnvironmentRel codes locations scope mapping environment →
@@ -55,6 +55,7 @@ theorem test_at {test : Expr} {initial final : Semantics.State σ} {value : Sema
     {fuel : Nat} {scope : Scope} {lowered : Lowered} {expression : Core.Expr}
     (compiled : lowerExpression fuel signatures scope test = .ok lowered)
     (converted : condition lowered = .ok expression)
+    (covered : ScopeCoverage sourceEnvironment scope)
     (extra : Core.Environment)
     {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
     (locals : EnvironmentRel world sourceEnvironment scope mapping environment)
@@ -67,7 +68,7 @@ theorem test_at {test : Expr} {initial final : Semantics.State σ} {value : Sema
       HeapRel (world ++ extension) final.heap finalStore ∧
       InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore := by
   obtain ⟨extension, target, finalStore, related, execution, finalHeap, finalInstalled, frame⟩ :=
-    evaluated.value rfl compiled (locals.prepend extra) (globals.prepend extra) heap installed
+    evaluated.value rfl compiled covered (locals.prepend extra) (globals.prepend extra) heap installed
   have conditionExecution := ExpressionCorrespondence.condition_evaluates converted related tested execution
   exact ⟨extension, finalStore,
     by rw [Core.Expr.rename_comp]; exact conditionExecution,
@@ -77,9 +78,9 @@ theorem test_at {test : Expr} {initial final : Semantics.State σ} {value : Sema
 theorem statements_at {statements : List Stmt} {initial final : Semantics.State σ}
     {control : Semantics.Control}
     (evaluated : StatementsSimulation signatures codes locations captured sourceEnvironment statements initial control final)
-    (safe : SafeControl control)
     {fuel : Nat} {scope : Scope} {result : Core.Ty} {loops : Nat} {expression : Core.Expr}
     (compiled : lowerStatements fuel signatures scope result loops statements = .ok expression)
+    (covered : ScopeCoverage sourceEnvironment scope)
     (extra : Core.Environment)
     {world : World} {mapping : Core.Renaming} {environment : Core.Environment} {store : Core.Store}
     (locals : EnvironmentRel world sourceEnvironment scope mapping environment)
@@ -92,7 +93,7 @@ theorem statements_at {statements : List Stmt} {initial final : Semantics.State 
       HeapRel (world ++ extension) final.heap finalStore ∧
       InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore := by
   obtain ⟨extension, target, finalStore, related, execution, finalHeap, finalInstalled, frame⟩ :=
-    evaluated safe compiled (locals.prepend extra) (globals.prepend extra) heap installed
+    evaluated compiled covered (locals.prepend extra) (globals.prepend extra) heap installed
   exact ⟨extension, target, finalStore, related,
     by rw [Core.Expr.rename_comp]; exact execution,
     finalHeap, finalInstalled, frame⟩
@@ -105,7 +106,7 @@ theorem statement {statement : Stmt} {test : Expr} {post body : List Stmt}
     (kind : statement.kind = .forLoop [] test post body)
     (continued : LoopSimulation signatures codes locations captured sourceEnvironment test post body initial control final) :
     StmtSimulation signatures codes locations captured sourceEnvironment statement initial control final := by
-  intro safe fuel scope result loops expression compiled world mapping environment store
+  intro fuel scope result loops expression compiled covered world mapping environment store
     locals globals heap installed
   cases statement with | mk statementKind span =>
   cases kind
@@ -123,7 +124,7 @@ theorem statement {statement : Stmt} {test : Expr} {post body : List Stmt}
         (Core.Word.ofNatModulo 3) store.length environment)
       have self : (store ++ [cell]).read? store.length = some cell := by simp [Core.Store.read?]
       obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
-        continued safe code locals globals (heap.appendCore [cell]) (installed.append [cell]) self
+        continued code covered locals globals (heap.appendCore [cell]) (installed.append [cell]) self
       refine ⟨extension, target, finalStore, related, ?_, finalHeap, finalInstalled,
         ClosuresPreserved.trans (ClosuresPreserved.append store [cell]) frame⟩
       rw [Core.LocalLoop.iterate_rename]
@@ -137,12 +138,12 @@ theorem initialized_statement {statement : Stmt} {test : Expr} {init post body :
     (continued : StatementsSimulation signatures codes locations captured sourceEnvironment
       (init ++ [⟨.forLoop [] test post body, statement.span⟩]) initial control final) :
     StmtSimulation signatures codes locations captured sourceEnvironment statement initial control final := by
-  intro safe fuel scope result loops expression compiled
+  intro fuel scope result loops expression compiled
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
   | zero => simp [lowerStatement, fail] at compiled
-  | succ fuel => exact continued safe (LoopLoweringStructure.nonempty_init nonempty compiled)
+  | succ fuel => exact continued (LoopLoweringStructure.nonempty_init nonempty compiled)
 
 /-- A failed condition skips both loop stages while retaining its exact reason
 and store after conversion to the Core boolean carrier. -/
@@ -152,12 +153,11 @@ theorem condition_fault {test : Expr} {post body : List Stmt}
       initial (.fault reason) final) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body
       initial (.fault reason) final := by
-  intro safe scope result loops compiled world mapping environment store location locals globals heap installed _
-  obtain ⟨reason, rfl⟩ := (safeControl_fault_iff _).mp safe
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
   let extra := Core.LocalLoop.conditionPrefix result location
   obtain ⟨extension, target, finalStore, related, evaluated, finalHeap, finalInstalled, frame⟩ :=
-    tested trivial compiled.conditionCompiled (locals.prepend extra) (globals.prepend extra) heap installed
-  cases related
+    tested compiled.conditionCompiled covered (locals.prepend extra) (globals.prepend extra) heap installed
+  cases related with | language reason =>
   have converted := ExpressionCorrespondence.condition_failure compiled.conditionConverted evaluated
   have execution : Core.Evaluates (extra ++ environment) store
       ((compiled.conditionCore.rename mapping).rename (Core.LocalLoop.shift extra.length))
@@ -168,14 +168,29 @@ theorem condition_fault {test : Expr} {post body : List Stmt}
     Core.LocalLoop.loopBody_conditionFailure result (Core.Word.ofNatModulo 3) location execution,
     finalHeap, finalInstalled, frame⟩
 
+/-- Compiler-checked conditions cannot produce an invalid source truth value. -/
+theorem condition_invalid {test : Expr} {post body : List Stmt}
+    {initial final : Semantics.State σ} {value : Semantics.Value}
+    (tested : ExprSimulation signatures codes locations captured sourceEnvironment test
+      initial (.value value) final)
+    (invalid : Semantics.condition? value = none) :
+    LoopSimulation signatures codes locations captured sourceEnvironment test post body
+      initial (.fault (.invalidValue "condition")) final := by
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
+  obtain ⟨_, _, _, related, _, _, _, _⟩ :=
+    tested.value rfl compiled.conditionCompiled covered locals globals heap installed
+  obtain ⟨truth, valid⟩ := DerivationCorrespondence.condition_valid compiled.conditionConverted related
+  rw [invalid] at valid
+  cases valid
+
 theorem done {test : Expr} {post body : List Stmt} {initial final : Semantics.State σ}
     {value : Semantics.Value}
     (tested : ExprSimulation signatures codes locations captured sourceEnvironment test initial (.value value) final)
     (truth : Semantics.condition? value = some false) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial .fallthrough final := by
-  intro _ scope result loops compiled world mapping environment store location locals globals heap installed _
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
   obtain ⟨extension, finalStore, executed, finalHeap, finalInstalled, frame⟩ :=
-    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted covered
       (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
   exact ⟨extension, _, finalStore, .fallthrough,
     Core.LocalLoop.loopBody_done result (Core.Word.ofNatModulo 3) location executed,
@@ -187,12 +202,12 @@ theorem body_break {test : Expr} {post body : List Stmt}
     (truth : Semantics.condition? value = some true)
     (executed : StatementsSimulation signatures codes locations captured sourceEnvironment body testedState .breaking final) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial .fallthrough final := by
-  intro _ scope result loops compiled world mapping environment store location locals globals heap installed _
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
   obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted covered
       (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
   obtain ⟨bodyExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, bodyFrame⟩ :=
-    statements_at executed trivial compiled.bodyCompiled (Core.LocalLoop.bodyPrefix result location)
+    statements_at executed compiled.bodyCompiled covered (Core.LocalLoop.bodyPrefix result location)
       (locals.extendWorld testExtension) globals testedHeap testedInstalled
   cases related
   exact ⟨testExtension ++ bodyExtension, _, finalStore, .fallthrough,
@@ -207,12 +222,12 @@ theorem body_stop {test : Expr} {post body : List Stmt}
     (executed : StatementsSimulation signatures codes locations captured sourceEnvironment body testedState control final)
     (stopped : (∃ value, control = .returned value) ∨ (∃ reason, control = .fault reason)) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial control final := by
-  intro safe scope result loops compiled world mapping environment store location locals globals heap installed _
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
   obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted covered
       (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
   obtain ⟨bodyExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, bodyFrame⟩ :=
-    statements_at executed safe compiled.bodyCompiled (Core.LocalLoop.bodyPrefix result location)
+    statements_at executed compiled.bodyCompiled covered (Core.LocalLoop.bodyPrefix result location)
       (locals.extendWorld testExtension) globals testedHeap testedInstalled
   rcases stopped with ⟨source, rfl⟩ | ⟨reason, rfl⟩
   · cases related with
@@ -227,10 +242,6 @@ theorem body_stop {test : Expr} {post body : List Stmt}
           Core.LocalLoop.loopBody_bodyFailure result (Core.Word.ofNatModulo 3) location testEvaluation bodyEvaluation,
           by simpa only [List.append_assoc] using finalHeap,
           finalInstalled, ClosuresPreserved.trans testFrame bodyFrame⟩
-
-private theorem progress_safe {control : Semantics.Control}
-    (progress : control = .fallthrough ∨ control = .continuing) : SafeControl control := by
-  rcases progress with rfl | rfl <;> trivial
 
 private theorem progress_value {result : Core.Ty} {control : Semantics.Control} {value : Core.Value}
     (related : ControlRel result control value)
@@ -251,24 +262,24 @@ theorem step {test : Expr} {post body : List Stmt}
     (postContinues : postControl = .fallthrough ∨ postControl = .continuing)
     (continued : LoopSimulation signatures codes locations captured sourceEnvironment test post body postState control final) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial control final := by
-  intro safe scope result loops compiled world mapping environment store location locals globals heap installed self
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed self
   obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted covered
       (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
   obtain ⟨bodyExtension, bodyTarget, bodyStore, bodyRelated, bodyEvaluation, bodyHeap, bodyInstalled, bodyFrame⟩ :=
-    statements_at bodyExecuted (progress_safe bodyContinues) compiled.bodyCompiled
+    statements_at bodyExecuted compiled.bodyCompiled covered
       (Core.LocalLoop.bodyPrefix result location)
       (locals.extendWorld testExtension) globals testedHeap testedInstalled
   obtain ⟨bodyFlag, rfl⟩ := progress_value bodyRelated bodyContinues
   obtain ⟨postExtension, postTarget, postStore, postRelated, postEvaluation, postHeap, postInstalled, postFrame⟩ :=
-    statements_at postExecuted (progress_safe postContinues) compiled.postCompiled
+    statements_at postExecuted compiled.postCompiled covered
       (Core.LocalLoop.postPrefix result location bodyFlag)
       ((locals.extendWorld testExtension).extendWorld bodyExtension) globals bodyHeap bodyInstalled
   simp only [Core.LocalLoop.postPrefix_length] at postEvaluation
   obtain ⟨postFlag, rfl⟩ := progress_value postRelated postContinues
   have retained := postFrame (bodyFrame (testFrame self))
   obtain ⟨nextExtension, target, finalStore, related, nextEvaluation, finalHeap, finalInstalled, nextFrame⟩ :=
-    continued safe compiled
+    continued compiled covered
       (((locals.extendWorld testExtension).extendWorld bodyExtension).extendWorld postExtension)
       globals postHeap postInstalled retained
   exact ⟨testExtension ++ bodyExtension ++ postExtension ++ nextExtension, target, finalStore, related,
@@ -287,17 +298,17 @@ theorem post_break {test : Expr} {post body : List Stmt}
     (bodyContinues : bodyControl = .fallthrough ∨ bodyControl = .continuing)
     (postExecuted : StatementsSimulation signatures codes locations captured sourceEnvironment post bodyState .breaking final) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial .fallthrough final := by
-  intro _ scope result loops compiled world mapping environment store location locals globals heap installed _
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
   obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted covered
       (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
   obtain ⟨bodyExtension, bodyTarget, bodyStore, bodyRelated, bodyEvaluation, bodyHeap, bodyInstalled, bodyFrame⟩ :=
-    statements_at bodyExecuted (progress_safe bodyContinues) compiled.bodyCompiled
+    statements_at bodyExecuted compiled.bodyCompiled covered
       (Core.LocalLoop.bodyPrefix result location)
       (locals.extendWorld testExtension) globals testedHeap testedInstalled
   obtain ⟨bodyFlag, rfl⟩ := progress_value bodyRelated bodyContinues
   obtain ⟨postExtension, postTarget, finalStore, postRelated, postEvaluation, finalHeap, finalInstalled, postFrame⟩ :=
-    statements_at postExecuted trivial compiled.postCompiled
+    statements_at postExecuted compiled.postCompiled covered
       (Core.LocalLoop.postPrefix result location bodyFlag)
       ((locals.extendWorld testExtension).extendWorld bodyExtension) globals bodyHeap bodyInstalled
   simp only [Core.LocalLoop.postPrefix_length] at postEvaluation
@@ -318,17 +329,17 @@ theorem post_stop {test : Expr} {post body : List Stmt}
     (postExecuted : StatementsSimulation signatures codes locations captured sourceEnvironment post bodyState control final)
     (stopped : (∃ value, control = .returned value) ∨ (∃ reason, control = .fault reason)) :
     LoopSimulation signatures codes locations captured sourceEnvironment test post body initial control final := by
-  intro safe scope result loops compiled world mapping environment store location locals globals heap installed _
+  intro scope result loops compiled covered world mapping environment store location locals globals heap installed _
   obtain ⟨testExtension, testedStore, testEvaluation, testedHeap, testedInstalled, testFrame⟩ :=
-    test_at tested truth compiled.conditionCompiled compiled.conditionConverted
+    test_at tested truth compiled.conditionCompiled compiled.conditionConverted covered
       (Core.LocalLoop.conditionPrefix result location) locals globals heap installed
   obtain ⟨bodyExtension, bodyTarget, bodyStore, bodyRelated, bodyEvaluation, bodyHeap, bodyInstalled, bodyFrame⟩ :=
-    statements_at bodyExecuted (progress_safe bodyContinues) compiled.bodyCompiled
+    statements_at bodyExecuted compiled.bodyCompiled covered
       (Core.LocalLoop.bodyPrefix result location)
       (locals.extendWorld testExtension) globals testedHeap testedInstalled
   obtain ⟨bodyFlag, rfl⟩ := progress_value bodyRelated bodyContinues
   obtain ⟨postExtension, postTarget, finalStore, postRelated, postEvaluation, finalHeap, finalInstalled, postFrame⟩ :=
-    statements_at postExecuted safe compiled.postCompiled
+    statements_at postExecuted compiled.postCompiled covered
       (Core.LocalLoop.postPrefix result location bodyFlag)
       ((locals.extendWorld testExtension).extendWorld bodyExtension) globals bodyHeap bodyInstalled
   simp only [Core.LocalLoop.postPrefix_length] at postEvaluation
