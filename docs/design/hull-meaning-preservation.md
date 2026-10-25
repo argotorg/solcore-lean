@@ -120,6 +120,20 @@ an overflowing return range. Runtime checks verify return bytes, successful
 storage and log publication, failure rollback, multiple resumptions and the
 retained failure snapshots.
 
+`ContractCopyCorrespondence.prepare_resumes_exact` adds `mcopy` and
+`calldatacopy` to the same public connection. The independent copy relation
+reads a retained source mapping, including when source and destination overlap.
+Actual calldata initialization supplies that mapping. The proof covers
+word-sized chunks and byte tails, source zero padding and address overflow,
+range checks before memory changes, and the resulting memory extent.
+
+`Tests.RustHullMemoryCopyCorrespondence.public_resumes` covers a 33-byte input
+copy followed by overlapping copies in both directions. Its four cases include
+ordinary return, a zero-length copy at the largest address, and separate
+source/destination overflow. Runtime checks compare returned bytes, final
+memory snapshots and multiple resumptions, including a source-overflow case
+that must not expand destination memory.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -127,7 +141,7 @@ retained failure snapshots.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs and explicit termination reach public receipts and resumptions; further state operations remain. | In progress |
+| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination and memory copying reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -138,7 +152,7 @@ delay those connections.
 
 ## Next public milestone
 
-Connect memory copying, hashing and account inspection through the same state relations. The remaining work includes code
+Connect hashing and account inspection through the same state relations. The remaining work includes code
 images and catalogs, external calls, creation, rollback and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
 theorem consumer.

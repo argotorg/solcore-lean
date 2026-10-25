@@ -14,9 +14,9 @@ def memoryType : Ty := .cell WordMapping.type
 def sizeType : Ty := .cell .word
 def overflowReason : Word := Word.ofNatModulo 6
 
-private def number (value : Nat) : Expr := .word (Word.ofNatModulo value)
-private def add (left right : Expr) : Expr := .binary .wordAdd left right
-private def sub (left right : Expr) : Expr := .binary .wordSub left right
+def number (value : Nat) : Expr := .word (Word.ofNatModulo value)
+def add (left right : Expr) : Expr := .binary .wordAdd left right
+def sub (left right : Expr) : Expr := .binary .wordSub left right
 private def index (offset : Expr) : Expr := .binary .wordDiv offset (number 32)
 private def position (offset : Expr) : Expr := .binary .wordMod offset (number 32)
 private def shift (offset : Expr) : Expr := .binary .wordMul (position offset) (number 8)
@@ -50,12 +50,12 @@ def packBytes (bytes : List UInt8) (offset : Nat := 0) : WordMapping.Entries :=
       some (Word.ofNatModulo (offset + index), Word.ofNatModulo byte.toNat)
     else none)
 
-private def packet : List Expr → Expr
+def packet : List Expr → Expr
   | [] => .unit
   | [value] => value
   | value :: rest => .pair value (packet rest)
 
-private def field (index : Nat) : Nat → Expr → Expr
+def field (index : Nat) : Nat → Expr → Expr
   | 0, _ => .unit
   | 1, value => value
   | count + 2, value => if index = 0 then .first value
@@ -186,16 +186,16 @@ def mstore8 (memoryReference sizeReference offset value : Expr) : Expr :=
           (field 2 4 (.var 1)) (field 3 4 (.var 1)))
         (LanguageResult.success (.storeCell (field 0 4 (.var 2)) (.var 0)))))
 
-private def validRange (offset length : Expr) : Expr :=
+def validRange (offset length : Expr) : Expr :=
   .ifE (.binary .wordEq length (number 0)) (.bool true)
     (.letE (add offset length)
       (.ifE (.binary .wordGt (offset.weakenAt 0) (.var 0)) (.bool false)
         (.unary .boolNot (.binary .wordGt (.var 0) (number (wordModulus - 32))))))
 
-private def copyParameter : Ty :=
+def copyParameter : Ty :=
   .product WordMapping.type (.product .word (.product .word (.product .word memoryType)))
 
-private def copyStep (packed : Bool) (width : Nat) : Expr :=
+def copyStep (packed : Bool) (width : Nat) : Expr :=
   let read := if packed then
     if width = 32 then readMemoryWord else readMemoryByte
     else if width = 32 then readWord else readByte
@@ -210,7 +210,7 @@ private def copyStep (packed : Bool) (width : Nat) : Expr :=
               add (field 2 5 (.var 3)) (number width),
               sub (field 3 5 (.var 3)) (number width), field 4 5 (.var 3)]))))
 
-private def copyBody (packed : Bool) : Expr :=
+def copyBody (packed : Bool) : Expr :=
   .ifE (.binary .wordEq (field 3 5 (.var 0)) (number 0))
     (LanguageResult.success .unit)
     (.ifE (.binary .wordGt (field 3 5 (.var 0)) (number 31))
