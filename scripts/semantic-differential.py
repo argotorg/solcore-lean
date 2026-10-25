@@ -575,6 +575,14 @@ def main() -> int:
     report = {"schema": REPORT_SCHEMA, "processes": [], "observations": {}, "rawObservations": {},
               "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
               "scope": "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word"}
+    previous_term = signal.getsignal(signal.SIGTERM)
+
+    def interrupted(_signal, _frame):
+        # A second termination request must not interrupt owned-process cleanup.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, interrupted)
     try:
         execute(args, report)
     except KeyboardInterrupt:
@@ -584,8 +592,11 @@ def main() -> int:
     except (ValueError, OSError, KeyError, TypeError, RpcError, subprocess.SubprocessError) as error:
         report["comparison"] = {"category": "adapter-error", "stage": "runner", "detail": str(error), "pairs": {}}
     finally:
-        report["artifacts"] = {path.name: file_digest(path) for path in args.output.iterdir() if path.is_file()}
-        (args.output / "report.json").write_bytes(json_bytes(report))
+        try:
+            report["artifacts"] = {path.name: file_digest(path) for path in args.output.iterdir() if path.is_file()}
+            (args.output / "report.json").write_bytes(json_bytes(report))
+        finally:
+            signal.signal(signal.SIGTERM, previous_term)
     category = report["comparison"]["category"]
     print(json.dumps({"category": category, "report": str(args.output / "report.json")}))
     return 0 if category == "matched" else 1

@@ -5,10 +5,16 @@ The process tests execute real bounded Python subprocesses. End-to-end compiler,
 Core and Anvil validation is performed with semantic-differential.py itself.
 """
 import importlib.util
+from contextlib import redirect_stdout
+import io
 import json
+import os
 from pathlib import Path
+import signal
+import subprocess
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -187,6 +193,88 @@ class ProcessTests(unittest.TestCase):
             instance.process("unit-guard", [sys.executable, "-c", "import time; time.sleep(10)"])
         self.assertEqual(caught.exception.stage, "campaign-disk")
         self.assertEqual(checks, 3)
+
+
+class CancellationTests(unittest.TestCase):
+    def test_sigterm_stops_owned_process_and_saves_report(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            marker = folder / "started"
+            helper = folder / "case-tool"
+            helper.write_text("#!" + sys.executable + "\nimport os, sys, time\nfrom pathlib import Path\n"
+                "if sys.argv[1:] == ['--version']:\n    print('lifecycle-test 1')\nelse:\n"
+                "    Path(" + repr(str(marker)) + ").write_text(str(os.getpid()))\n    time.sleep(20)\n")
+            helper.chmod(0o700)
+            case = folder / "case.json"
+            # This envelope reaches the sleeping process; it is not a semantic result.
+            case.write_text(json.dumps({"schema": runner.CASE_SCHEMA, "program": {},
+                "source": "lifecycle test only", "provenance": {
+                    key: "lifecycle-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+                "contract": {"name": "SynthesizedG0", "method": "run", "signature": "run()",
+                    "deployPath": ["SynthesizedG0Deploy"], "runtimePath": ["SynthesizedG0Deploy", "SynthesizedG0"],
+                    "calldata": "0xc0406226", "constructorCalldata": "0x"}}))
+            output = folder / "run"
+            process = subprocess.Popen([sys.executable, str(ROOT / "scripts/semantic-differential.py"),
+                "--case", str(case), "--output", str(output), "--case-tool", str(helper),
+                "--core-runner", str(helper), "--anvil", str(helper), "--timeout", "30",
+                "--total-timeout", "60"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            child_pid = None
+            try:
+                deadline = time.monotonic() + 10
+                while process.poll() is None and time.monotonic() < deadline:
+                    if marker.exists() and marker.read_text():
+                        child_pid = int(marker.read_text())
+                        break
+                    time.sleep(0.02)
+                self.assertIsNotNone(child_pid)
+                process.send_signal(signal.SIGTERM)
+                stdout, stderr = process.communicate(timeout=10)
+                self.assertEqual(process.returncode, 1, stderr + stdout)
+                report = json.loads((output / "report.json").read_text())
+                self.assertEqual(report["comparison"]["category"], "inconclusive-resource")
+                self.assertEqual(report["comparison"]["detail"], "interrupted")
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(child_pid, 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.communicate(timeout=5)
+                if child_pid is None and marker.exists() and marker.read_text():
+                    child_pid = int(marker.read_text())
+                if child_pid is not None:
+                    try:
+                        os.killpg(child_pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+    def test_original_sigterm_handler_is_restored(self):
+        previous = signal.getsignal(signal.SIGTERM)
+
+        def original_handler(_signal, _frame):
+            self.fail("original handler must be replaced while the CLI runs")
+
+        signal.signal(signal.SIGTERM, original_handler)
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                for interrupt in (False, True):
+                    with self.subTest(interrupt=interrupt):
+                        output = Path(temporary) / str(interrupt)
+
+                        def execute(_args, report):
+                            if interrupt:
+                                os.kill(os.getpid(), signal.SIGTERM)
+                            report["comparison"] = {"category": "matched", "pairs": {}}
+
+                        with patch.object(sys, "argv", ["semantic-differential", "--case", "unused.json",
+                                "--output", str(output)]), patch.object(runner, "execute", side_effect=execute), \
+                                redirect_stdout(io.StringIO()):
+                            self.assertEqual(runner.main(), int(interrupt))
+                        self.assertIs(signal.getsignal(signal.SIGTERM), original_handler)
+                        report = json.loads((output / "report.json").read_text())
+                        self.assertEqual(report["comparison"]["category"],
+                            "inconclusive-resource" if interrupt else "matched")
+        finally:
+            signal.signal(signal.SIGTERM, previous)
 
 
 class ArtifactTests(unittest.TestCase):
