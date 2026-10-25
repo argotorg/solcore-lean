@@ -134,6 +134,19 @@ source/destination overflow. Runtime checks compare returned bytes, final
 memory snapshots and multiple resumptions, including a source-overflow case
 that must not expand destination memory.
 
+`ContractHashCorrespondence.prepare_resumes_exact` adds `keccak256`. The
+independent source algorithm specifies the lane permutation, 24 rounds,
+136-byte absorption blocks, Ethereum padding and the final digest. Its proof
+reaches the actual Core permutation, recursive absorption helper and public
+contract execution. Hashing expands only the touched memory range and leaves
+the input bytes unchanged.
+
+`Tests.RustHullKeccakCorrespondence.public_resumes` supplies source derivations
+for empty input at the largest offset, an unaligned short input, the 136-byte
+rate boundary, a 137-byte input and memory overflow. Executable checks compare
+returned digest bytes against the separate ABI hash implementation, verify
+input preservation and memory size, and exercise repeated resumptions.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -141,7 +154,7 @@ that must not expand destination memory.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination and memory copying reach public receipts and resumptions; further state operations remain. | In progress |
+| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying and hashing reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -152,7 +165,7 @@ delay those connections.
 
 ## Next public milestone
 
-Connect hashing and account inspection through the same state relations. The remaining work includes code
+Connect account inspection through the same state relations. The remaining work includes code
 images and catalogs, external calls, creation, rollback and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
 theorem consumer.

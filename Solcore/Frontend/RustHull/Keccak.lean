@@ -8,32 +8,32 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.Keccak
 open Core
 
-private def number (value : Nat) : Expr := .word (Word.ofNatModulo value)
-private def xor (left right : Expr) : Expr := .binary .wordXor left right
-private def add (left right : Expr) : Expr := .binary .wordAdd left right
-private def shift (value : Expr) (distance : Nat) : Expr :=
+def number (value : Nat) : Expr := .word (Word.ofNatModulo value)
+def xor (left right : Expr) : Expr := .binary .wordXor left right
+def add (left right : Expr) : Expr := .binary .wordAdd left right
+def shift (value : Expr) (distance : Nat) : Expr :=
   .binary .wordShl value (number distance)
-private def move (expression : Expr) (depth : Nat) : Expr :=
+def move (expression : Expr) (depth : Nat) : Expr :=
   expression.rename fun index => index + depth
-private def packet : List Expr → Expr
+def packet : List Expr → Expr
   | [] => .unit
   | [value] => value
   | value :: rest => .pair value (packet rest)
-private def field (index : Nat) : Nat → Expr → Expr
+def field (index : Nat) : Nat → Expr → Expr
   | 0, _ => .unit
   | 1, value => value
   | count + 2, value => if index = 0 then .first value
       else field (index - 1) (count + 1) (.second value)
-private def types : List Ty → Ty
+def types : List Ty → Ty
   | [] => .unit
   | [type] => type
   | type :: rest => .product type (types rest)
 
 def stateType : Ty := types (List.replicate 25 .word)
-private def lane (index : Nat) (state : Expr) : Expr := field index 25 state
-private def zeroState : Expr := packet (List.replicate 25 (number 0))
+def lane (index : Nat) (state : Expr) : Expr := field index 25 state
+def zeroState : Expr := packet (List.replicate 25 (number 0))
 
-private def constants : List Nat := [
+def constants : List Nat := [
   0x0000000000000001, 0x0000000000008082,
   0x800000000000808a, 0x8000000080008000,
   0x000000000000808b, 0x0000000080000001,
@@ -47,27 +47,27 @@ private def constants : List Nat := [
   0x8000000080008081, 0x8000000000008080,
   0x0000000080000001, 0x8000000080008008]
 
-private def rotations : List Nat := [
+def rotations : List Nat := [
    0,  1, 62, 28, 27,
   36, 44,  6, 55, 20,
    3, 10, 43, 25, 39,
   41, 45, 15, 21,  8,
   18,  2, 61, 56, 14]
 
-private def rotate (value : Expr) (distance : Nat) : Expr :=
+def rotate (value : Expr) (distance : Nat) : Expr :=
   if distance = 0 then value
   else .binary .wordAnd
     (.binary .wordOr (shift value distance)
       (.binary .wordShr value (number (64 - distance))))
     (number (2 ^ 64 - 1))
 
-private def destination (index : Nat) : Nat :=
+def destination (index : Nat) : Nat :=
   index / 5 + 5 * ((2 * (index % 5) + 3 * (index / 5)) % 5)
 
-private def source (index : Nat) : Nat :=
+def source (index : Nat) : Nat :=
   ((List.range 25).find? (fun candidate => destination candidate = index)).getD 0
 
-private def roundBody : Expr :=
+def roundBody : Expr :=
   let parities := (List.range 5).map fun column =>
     (List.range 5).foldl (fun parity row =>
       xor parity (lane (column + 5 * row) (.first (.var column)))) (number 0)
@@ -87,7 +87,7 @@ private def roundBody : Expr :=
     if index = 0 then xor value (.second (.var 35)) else value
   (parities ++ deltas ++ rotated).foldr Expr.letE (packet lanes)
 
-private def roundCalls : Nat → List Nat → Expr
+def roundCalls : Nat → List Nat → Expr
   | _, [] => .var 0
   | depth, constant :: rest =>
       .letE (.apply (.var (depth + 1)) (.pair (.var 0) (number constant)))
@@ -98,14 +98,14 @@ def permute (state : Expr) : Expr :=
   .letE (.lambda (.product stateType .word) stateType roundBody)
     (.letE (state.weakenAt 0) (roundCalls 0 constants))
 
-private def paddedByte (mapping offset remaining : Expr) (index : Nat) : Expr :=
+def paddedByte (mapping offset remaining : Expr) (index : Nat) : Expr :=
   .ifE (.binary .wordGt remaining (number index))
     (Memory.readMemoryByte mapping (add offset (number index)))
     (LanguageResult.success
       (add (.ifE (.binary .wordEq remaining (number index)) (number 1) (number 0))
         (number (if index = 135 then 128 else 0))))
 
-private def readLane : Nat → Nat → Expr → Expr → Expr → Expr → Expr
+def readLane : Nat → Nat → Expr → Expr → Expr → Expr → Expr
   | 0, _, _, _, _, accumulator => LanguageResult.success accumulator
   | count + 1, index, mapping, offset, remaining, accumulator =>
       LanguageResult.bind .word (paddedByte mapping offset remaining index)
@@ -113,7 +113,7 @@ private def readLane : Nat → Nat → Expr → Expr → Expr → Expr → Expr
           (remaining.weakenAt 0)
           (.binary .wordOr (accumulator.weakenAt 0) (shift (.var 0) (8 * (index % 8)))))
 
-private def absorbBlock (mapping offset remaining state : Expr) : Expr :=
+def absorbBlock (mapping offset remaining state : Expr) : Expr :=
   let computations := (List.range 17).map fun index =>
     readLane 8 (8 * index) (move mapping index) (move offset index)
       (move remaining index) (number 0)
@@ -122,16 +122,16 @@ private def absorbBlock (mapping offset remaining state : Expr) : Expr :=
     else lane index (move state 17)
   computations.foldr (LanguageResult.bind stateType) (LanguageResult.success (packet lanes))
 
-private def digest (state : Expr) : Expr :=
+def digest (state : Expr) : Expr :=
   (List.range 32).foldl (fun output index =>
     .binary .wordOr output
       (shift (.binary .wordByte (number (31 - index % 8)) (lane (index / 8) state))
         (8 * (31 - index)))) (number 0)
 
-private def parameterType : Ty :=
+def parameterType : Ty :=
   types [WordMapping.type, .word, .word, stateType]
 
-private def absorbBody : Expr :=
+def absorbBody : Expr :=
   LanguageResult.bind .word
     (absorbBlock (field 0 4 (.var 0)) (field 1 4 (.var 0))
       (field 2 4 (.var 0)) (field 3 4 (.var 0)))

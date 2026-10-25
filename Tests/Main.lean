@@ -2089,6 +2089,7 @@ import Solcore.Test.RustHullEnvironmentCorrespondence
 import Solcore.Test.RustHullLogCorrespondence
 import Solcore.Test.RustHullTerminationCorrespondence
 import Solcore.Test.RustHullMemoryCopyCorrespondence
+import Solcore.Test.RustHullKeccakCorrespondence
 import Solcore.Frontend.RustHull.Safety
 set_option autoImplicit false
 
@@ -3912,6 +3913,7 @@ def main : IO UInt32 := do
   Tests.RustHullLogCorrespondence.run
   Tests.RustHullTerminationCorrespondence.run
   Tests.RustHullMemoryCopyCorrespondence.run
+  Tests.RustHullKeccakCorrespondence.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
