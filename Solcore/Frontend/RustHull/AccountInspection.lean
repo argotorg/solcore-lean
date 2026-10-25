@@ -11,7 +11,7 @@ open Core CodeBuilder
 def definitions : DataEnvironment := AccountState.definitions
 def unknownCodeReason : Word := Word.ofNatModulo 15
 
-private def known (resultType : Core.Ty) (record : Code) (body : Code) : Code :=
+def known (resultType : Core.Ty) (record : Code) (body : Code) : Code :=
   choose (part 6 9 record) body (failure resultType (constant (.word unknownCodeReason)))
 
 /-- EXTCODESIZE evaluates its input expressions once and normalizes the target. -/
@@ -53,7 +53,7 @@ def hash (worldReference complete balancesReference target : Core.Expr) : Core.E
 
 def supports (name : String) : Bool := name ∈ ["extcodesize", "extcodecopy", "extcodehash"]
 
-private def reference (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Expr := do
+def reference (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Expr := do
   let (binding, index) ← scope.lookup ("$lean$evm$" ++ name)
   expectType type binding.type
   pure (.var index)

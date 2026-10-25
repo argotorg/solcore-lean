@@ -147,6 +147,20 @@ rate boundary, a 137-byte input and memory overflow. Executable checks compare
 returned digest bytes against the separate ABI hash implementation, verify
 input preservation and memory size, and exercise repeated resumptions.
 
+
+`ContractAccountCorrespondence.prepare_resumes_exact` adds `balance`,
+`selfbalance`, `extcodesize`, `extcodecopy` and `extcodehash`. The actual
+initializers establish the balance ledger and account world. Independent
+account observations normalize target addresses, distinguish incomplete worlds
+from missing code, copy code bytes into caller memory, and hash known code in
+fresh scratch cells. Hashing preserves every existing caller cell.
+
+`Tests.RustHullAccountCorrespondence.public_resumes` supplies nine source
+cases, including unknown accounts, absent code, empty accounts and funded
+accounts with empty code. Executable checks verify address normalization,
+copying across a memory-word boundary, source zero padding, independent code
+hashes, unchanged balances and caller memory, and repeated resumptions.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -154,7 +168,7 @@ input preservation and memory size, and exercise repeated resumptions.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying and hashing reach public receipts and resumptions; further state operations remain. | In progress |
+| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing and account observations reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -165,8 +179,8 @@ delay those connections.
 
 ## Next public milestone
 
-Connect account inspection through the same state relations. The remaining work includes code
-images and catalogs, external calls, creation, rollback and assembly. Each step
+Connect supplied code images and catalogs through actual initialization and
+public execution. Then cover external calls, creation, rollback and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
 theorem consumer.
 
