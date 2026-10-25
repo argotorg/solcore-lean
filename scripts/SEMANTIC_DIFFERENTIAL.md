@@ -583,9 +583,63 @@ and rewriting a slot, fresh private cells, arbitrary entries and aggregate
 branches. Changing the input sequence leaves the original Core contract and
 source unchanged. Full repository build/tests and the kernel policy check pass.
 
-M5 remains in progress. M5a bounded campaign and fixed corpus integration are
-underway. The delivered comparison admits valid `run(uint256)` inputs, zero
+M5 remains in progress. The delivered comparison admits valid `run(uint256)` inputs, zero
 call value, initially empty literal slots zero and one, and successful Word
 returns. Rollback and external-call profiles remain separate work. This scope
 does not establish equivalence of arbitrary storage, gas, balances, nonce,
 logs, account lifecycle or the source emitter itself.
+
+## Run and reduce storage campaigns
+
+Run the fixed stateful corpus or generate a bounded batch:
+
+```sh
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-storage-corpus.json \
+  --output .upstream/semantic-storage-ci --seconds 600
+python3 scripts/semantic-storage-campaign.py \
+  --seed 3 --nodes 384 --cases 4 --attempts 256 \
+  --output .upstream/semantic-storage-search --seconds 600
+python3 Tests/scripts/test-semantic-storage-corpus.py
+python3 scripts/test-semantic-storage-campaign.py
+```
+
+All ten fixed scenarios and 27 transaction prefixes match across the actual
+three paths. The manifest requires nineteen step AST features, six boundary
+inputs, one through three declared helpers and transactions, and all four step
+generator templates. Only fully matched scenarios count toward passing
+coverage. The native corpus validator checks materialization, strict replay and
+repeat observations; it does not execute an EVM.
+
+The summary counts scenarios separately from transactions observed on any path,
+completed on all three paths, and matched ordered prefixes. Shrink executions
+are excluded from these transaction counts. The campaign enforces generation,
+case, total time, disk and reduction limits. Successful runs retain compact
+receipts and input cases; their exports are removed. Use `--case` with a saved
+case for a new experiment. Findings retain full original and final archives
+for `semantic-storage-differential.py --replay`.
+
+Reduction can simplify the checked step, reduce runtime inputs or remove
+transactions. The failure fingerprint uses a stable transaction ID rather than
+its sequence index, and preserves the differing fields/slots, disagreeing paths
+and outcome/payload forms. Candidate identity includes both the original Core
+program and the transaction sequence. Every accepted candidate has been
+rechecked and rerun on all three paths.
+
+To exercise reduction deliberately, use an explicit copied-observation adapter:
+
+```sh
+python3 scripts/semantic-storage-campaign.py \
+  --case .upstream/semantic-storage-cases/case.json \
+  --test-perturb-path importedHull --test-transaction-id tx-1 \
+  --test-field storage:1 --shrink-attempts 12 \
+  --output .upstream/semantic-storage-reducer --seconds 600
+```
+
+This changes a copied observation only after actual agreement. Raw reports
+remain unchanged, and the command exits nonzero for the synthetic mismatch.
+`--test-field` accepts `output`, `storage:0` or `storage:1`. A selected transaction
+removed by a candidate cannot preserve that synthetic finding. The integrated
+check reduced three transactions to only `tx-1`, retained the same fingerprint,
+and passed both fresh actual archive replay and synthetic replay. Genuine
+findings discovered while shrinking are retained separately.

@@ -28,7 +28,8 @@ comparison must not share the Rust frontend with its reference computation.
 | Rust artifacts | `scripts/export-rust-hull.py`, `scripts/export-rust-code-image.py` | Checked Hull and exact Sonatina O0 code images from a supplied source, with revision and hash receipts. |
 | Core contract execution | `Tests/RustHullScenarioRun.lean` | Deployment and ordered calls, with explicit account context and state observations. |
 | Generated storage scenarios | `Solcore/Synthesis/Core/StorageContract.lean`, `Source/StorageCases.lean`, `Stateful/StorageExecution.lean` | One checked host-aware contract, initially empty slots zero/one and one to three ordered zero-value transactions; fresh execution through `ContractRuntime`. |
-| Storage comparison and replay | `scripts/semantic-storage-differential.py`, `Tests/RustHullStorageScenarioRun.lean` | Actual mined EVM transactions, original Core and imported-Hull execution; initial and per-transaction committed storage comparison. Bounded campaign integration is in progress. |
+| Storage comparison and replay | `scripts/semantic-storage-differential.py`, `Tests/RustHullStorageScenarioRun.lean` | Actual mined EVM transactions, original Core and imported-Hull execution; initial and per-transaction committed storage comparison. |
+| Storage campaigns | `scripts/semantic-storage-campaign.py`, `scripts/semantic-storage-corpus.json` | Bounded execution, failure-preserving sequence reduction and ten fixed scenarios covering 27 transaction prefixes. |
 | Rust EVM reference | `scripts/rust-evm-reference.py` | Fixed upstream E2E fixtures on Anvil; Sonatina O0/O2 and Yul execution. |
 | Compatibility inventories | `scripts/RUST_PARITY.md` | Fixed expectations checked separately by the Rust and Core paths. These are not a direct comparison runner for generated inputs. |
 
@@ -507,9 +508,33 @@ Delivered M5a execution connection:
   only slots zero and one. It does not establish emitter correctness, gas or
   ledger equivalence, or the rollback/external-call profiles.
 
-M5 is still in progress. M5a bounded campaign operation, failure-preserving
-reduction and fixed corpus integration are being completed; the native shrink
-candidate API and single-scenario execution checks do not finish that slice.
+Delivered M5a campaign operation:
+
+- The separate stateful campaign records scenario counts and observed,
+  completed and matched transaction counts. Only fully matched scenarios
+  contribute to passing coverage. Time, disk, generation and shrink budgets
+  remain separate, and incomplete execution cannot pass.
+- The fixed ten-scenario corpus passed all 27 actual transaction prefixes. It
+  covers nineteen step AST features, the six boundary inputs, one through three
+  declared helpers and transactions, and all four step generator recipes.
+  This is AST and scenario metadata coverage, not opcode coverage. Native
+  materialization, replay and repeat observations also pass independently.
+- Reduction preserves the first differing transaction's stable ID, differing
+  fields and storage slots, disagreeing paths and outcome/payload forms. Case
+  identity includes both the fixed program and transaction sequence. Complete
+  original/final finding archives are retained; successful exports are removed.
+- An explicit test adapter changed a copied slot-one observation at `tx-1`
+  after actual three-way agreement. Five candidate executions accepted four
+  reductions, including deleting an earlier transaction: the same finding
+  remained at `tx-1`, now index zero. All actual candidate reports matched.
+  Exact archive replay and fresh synthetic replay reproduced their respective
+  results. Synthetic findings are kept separate from genuine discoveries.
+- Twenty campaign regressions passed, including partial-history accounting,
+  stable-ID failure preservation, coverage gates, budget exits and cleanup of
+  owned child processes on SIGTERM.
+
+M5a is complete within its documented scope. M5 remains in progress because
+rollback and bounded external calls are separate remaining slices.
 Usage and validation commands are in
 [Generated semantic comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-ordered-storage-transactions).
 

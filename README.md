@@ -178,9 +178,10 @@ covering fifteen transactions, followed by exact archive replay, pass on all
 three paths. Native generation, checked reduction candidates and strict case
 replay are available through `semantic-storage-tool`; the separate
 [storage runner](scripts/semantic-storage-differential.py) performs fresh
-three-way comparisons. M5 remains in progress: bounded storage campaigns and
-fixed corpus integration are underway, with rollback and external-call profiles
-still to follow. Gas, balances, nonce and arbitrary storage are outside this
+three-way comparisons. Bounded storage campaigns include failure-preserving
+sequence reduction; all ten fixed scenarios and 27 transaction prefixes agree.
+M5 remains in progress, with rollback and external-call profiles still to
+follow. Gas, balances, nonce and arbitrary storage are outside this
 initial comparison. Selected generics/closures/comptime/module combinations
 remain planned.
 
