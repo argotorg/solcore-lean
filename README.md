@@ -155,9 +155,10 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 A separate runtime-input profile applies checked Word-to-Word functions to
 recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
-for each function's inputs. This starts the richer pure-program milestone;
-multiple named functions, mutation, aggregates and bounded loops are still
-being added to generated comparisons.
+for each function's inputs. A further profile supports one to three acyclic
+named helpers, including shared callees, with checked generation and reduction
+of the complete Core function graph. Mutation, aggregates and bounded loops
+remain to be added to generated comparisons.
 
 ## Code layout
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Campaign policy tests; real compiler/EVM runs are checked separately."""
 import copy
+from contextlib import redirect_stdout
 import importlib.util
+import io
 import json
 import os
 import signal
@@ -12,6 +14,7 @@ import tempfile
 import time
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,6 +34,25 @@ def options(directory):
         direct_fuel=1000, core_fuel=1000, gas=100000, case_timeout=10,
         case_tool=Path('/unused/case-tool'), core_runner=Path('/unused/core-runner'),
         anvil=Path('/unused/anvil'), test_perturb_path=None, case=None, corpus=None)
+
+
+def function_case(count):
+    """A Core declaration-shape fixture, not a simulated compiler result."""
+    def function(body):
+        return {'tag': 'lambda', 'parameterType': 'word', 'resultType': 'word', 'body': body}
+
+    body = function({'tag': 'apply', 'function': {'tag': 'var', 'index': 1},
+                     'argument': {'tag': 'var', 'index': 0}})
+    for _ in range(count):
+        body = {'tag': 'let', 'initializer': function({'tag': 'var', 'index': 0}), 'body': body}
+    return {'schema': campaign.m2.FUNCTION_CASE_SCHEMA, 'input': '0', 'source': 'coverage policy fixture',
+        'program': {'schema': 'solcore-semantic-core', 'resultType': 'word', 'dataDefinitions': [],
+            'body': {'tag': 'apply', 'function': body, 'argument': {'tag': 'word', 'value': '0x' + '00' * 32}}},
+        'provenance': {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.INPUT_VERSIONS)},
+            'origin': {'kind': 'function-imported', 'helperCount': 999}, 'features': ['functionCall', 'local']},
+        'contract': {'name': 'SynthesizedFunctions', 'method': 'run', 'signature': 'run(uint256)',
+            'deployPath': ['SynthesizedFunctionsDeploy'], 'runtimePath': ['SynthesizedFunctionsDeploy', 'SynthesizedFunctions'],
+            'calldata': '0xa444f5e9' + '00' * 32, 'constructorCalldata': '0x'}}
 
 
 class AnalysisTests(unittest.TestCase):
@@ -186,6 +208,80 @@ class BudgetAndReceiptTests(unittest.TestCase):
             instance.checkpoint()
             self.assertEqual(coverage['missingInputs'], sorted(campaign.INPUT_BOUNDARIES[1:], key=int))
 
+    def test_helper_counts_come_from_declarations_and_exclude_the_entry(self):
+        for count in (1, 2, 3):
+            case = function_case(count)
+            self.assertEqual(campaign.declared_helper_count(case['program']), count)
+            # The provenance deliberately claims 999 helpers; it is not evidence.
+            self.assertEqual(campaign.helper_counts(case), {count})
+        case['schema'] = campaign.m2.INPUT_CASE_SCHEMA
+        self.assertEqual(campaign.helper_counts(case), set())
+
+    def test_malformed_function_declaration_shapes_are_rejected(self):
+        malformed = [None, {}, function_case(0)['program'], function_case(4)['program']]
+        missing_apply = function_case(1)['program']
+        missing_apply['body'] = missing_apply['body']['function']
+        malformed.append(missing_apply)
+        for part in ('argument', 'initializer', 'entry', 'parameterType'):
+            program = function_case(1)['program']
+            if part == 'argument':
+                program['body']['argument'] = {'tag': 'bool', 'value': False}
+            elif part == 'initializer':
+                program['body']['function']['initializer'] = {'tag': 'word', 'value': '0x' + '00' * 32}
+            elif part == 'entry':
+                program['body']['function']['body'] = {'tag': 'var', 'index': 0}
+            else:
+                program['body']['function']['initializer']['parameterType'] = 'bool'
+            malformed.append(program)
+        for program in malformed:
+            with self.subTest(program=program), self.assertRaises(ValueError):
+                campaign.declared_helper_count(program)
+
+    def test_declared_helper_requirements_count_only_matched_cases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-functions', 3, 0
+            instance = campaign.Campaign(config)
+            cases = [function_case(count) for count in (1, 2, 3)]
+            instance.summary['coverage']['requiredHelperCounts'] = [1, 2, 3]
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1',
+                'cases': cases, 'excluded': [], 'requested': 3, 'attempted': 3, 'status': 'complete'}
+
+            def execute_case(case):
+                count = campaign.declared_helper_count(case['program'])
+                folder = instance.work / str(count)
+                folder.mkdir()
+                report = matched()
+                if count != 1:
+                    report['comparison'] = {'category': 'inconclusive-resource' if count == 2 else 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['coverage']
+            self.assertEqual(coverage['generatedHelperCounts'], [1, 2, 3])
+            self.assertEqual(coverage['matchedHelperCounts'], [1])
+            self.assertEqual(coverage['missingHelperCounts'], [2, 3])
+
+    def test_missing_helper_counts_fail_even_when_every_executed_case_matches(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+
+            def run(instance):
+                instance.summary['status'] = 'complete'
+                instance.summary['counts'].update(generated=2, executed=2, completed=2, matched=2)
+                instance.summary['coverage'].update(requiredHelperCounts=[1, 2, 3],
+                    generatedHelperCounts=[1], matchedHelperCounts=[1])
+
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output),
+                    '--profile', 'runtime-functions', '--cases', '2']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 1)
+            summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(summary['status'], 'coverage-incomplete')
+            self.assertEqual(summary['coverage']['missingHelperCounts'], [2, 3])
+
     def test_generation_fuel_failures_have_a_separate_counter(self):
         rows = [{'category': 'excluded'}, {'category': 'inconclusive-resource'},
             {'detail': {'excluded': [{'category': 'inconclusive-resource'}]}}]
@@ -234,6 +330,7 @@ class ManifestTests(unittest.TestCase):
         for entry in value['cases']:
             entry['input'] = '0'
         campaign.validate_manifest(value)
+        campaign.validate_manifest({**value, 'profile': 'runtime-functions', 'requiredHelperCounts': [1, 2, 3]})
         for key in (*campaign.INPUT_VERSIONS, 'requiredInputs'):
             broken = copy.deepcopy(value)
             del broken[key]
@@ -249,8 +346,64 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             campaign.validate_manifest({**value, 'profile': 'unknown'})
 
+    def function_manifest(self):
+        case = function_case(1)
+        function_program = {**case['program'], 'resultType': {'tag': 'function', 'parameter': 'word', 'result': 'word'},
+            'body': case['program']['body']['function']}
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-functions',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.INPUT_VERSIONS)},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': ['0'], 'requiredHelperCounts': [1, 2, 3],
+            'cases': [{'id': str(index), 'input': '0', 'program': function_program,
+                'expectedFeatures': case['provenance']['features']} for index in range(2)]}
+
+    def test_helper_count_requirements_are_explicit_profile_specific_subsets(self):
+        value = self.function_manifest()
+        for valid in ([], [1], [3, 1], [1, 2, 3]):
+            campaign.validate_manifest({**value, 'requiredHelperCounts': valid})
+        missing = copy.deepcopy(value)
+        del missing['requiredHelperCounts']
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(missing)
+        for invalid in (None, '1', [True], [1.0], [0], [4], ['1'], [1, 1]):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'requiredHelperCounts': invalid})
+        for profile in ('closed-g0', 'runtime-word'):
+            other = self.valid() if profile == 'closed-g0' else {**value, 'profile': profile}
+            other.pop('requiredHelperCounts', None)
+            campaign.validate_manifest(other)
+            campaign.validate_manifest({**other, 'requiredHelperCounts': []})
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**other, 'requiredHelperCounts': [1]})
+
+    def test_partial_materialization_preserves_generated_helper_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile = 'runtime-functions'
+            config.corpus = Path(directory) / 'manifest.json'
+            config.corpus.write_text(json.dumps(self.function_manifest()))
+            instance = campaign.Campaign(config)
+            calls = 0
+
+            def tool(_arguments, _stage):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise campaign.m2.Finding('inconclusive-resource', 'test-budget', 'stopped during materialization')
+                return function_case(1)
+
+            instance.tool = tool
+            with self.assertRaises(campaign.m2.Finding):
+                instance.prepare_cases()
+            saved = json.loads((Path(directory) / 'summary.json').read_text())
+            self.assertEqual(saved['counts']['generated'], 1)
+            self.assertEqual(saved['coverage']['generatedHelperCounts'], [1])
+            self.assertEqual(saved['coverage']['matchedHelperCounts'], [])
+            self.assertEqual(saved['coverage']['requiredHelperCounts'], [1, 2, 3])
+            self.assertEqual(saved['coverage']['missingHelperCounts'], [1, 2, 3])
+
     def test_generation_profile_selects_native_generator(self):
-        for profile, command in (('closed-g0', 'generate'), ('runtime-word', 'input-generate')):
+        for profile, command in (('closed-g0', 'generate'), ('runtime-word', 'input-generate'),
+                                 ('runtime-functions', 'function-generate')):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
                 config = options(directory)
                 config.profile = profile

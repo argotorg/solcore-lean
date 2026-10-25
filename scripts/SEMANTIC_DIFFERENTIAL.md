@@ -313,5 +313,46 @@ The external input regression executes two unchanged source functions at all
 four boundary inputs, checks three-way agreement and varying results, and
 replays a saved input-dependent run. The input profile also supports automatic
 reduction of its function body and input while retaining the checked application
-form. Multiple named functions, mutation, products/sums, matches and bounded
-loops remain later M4 work.
+form. Named functions extend this workflow below; mutation, products/sums,
+matches and bounded loops remain later M4 work.
+
+## Compare acyclic named functions
+
+The `runtime-functions` profile adds one to three named Word-to-Word helpers.
+Each helper can call earlier helpers; an entry function receives the ABI Word
+and returns a Word. The original Core program retains the complete chain of
+helper lambdas and applies the resulting entry closure to the recorded input.
+Source emission uses top-level named functions and
+`SynthesizedFunctions.run(uint256)`. Recursive or escaping function values and
+references to host bindings are outside this profile.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-functions --seed 31 --nodes 96 --cases 8 --attempts 256 \
+  --output .upstream/semantic-functions
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-function-corpus.json \
+  --output .upstream/semantic-function-ci
+python3 scripts/test-source-function-rust.py
+```
+
+Native entry points are `function-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`function-emit FUNCTION.json INPUT [FUEL]`. Observe, replay and shrink dispatch
+by the saved schema. Node limits apply to the entire original Core application,
+including all helper definitions. Generation attempts count function graphs;
+each accepted graph supplies the same four ordered boundary inputs as the
+single-function profile. Generated graphs call every earlier helper in a
+chain; imported graphs can also share callees, as in the diamond fixture.
+
+The fixed corpus includes chains, a diamond and generated graphs with one,
+two and three helpers. It tracks `requiredHelperCounts` separately from input
+coverage. `matchedHelperCounts` records declaration counts for cases whose
+three results agree. It is not a count of runtime calls or EVM call instructions.
+Body feature coverage includes `functionCall`, without counting the compiler's
+wrapper lambdas as source function definitions.
+
+Reduction keeps helper declarations in their original order and checks the
+complete graph after every candidate body or input change. The first reducer
+keeps the number of helpers fixed; it can remove calls or simplify bodies but
+does not delete and reindex declarations. Mutable locals, aggregates, matches
+and bounded loops remain later M4 extensions.

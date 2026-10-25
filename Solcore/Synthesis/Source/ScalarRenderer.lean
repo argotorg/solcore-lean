@@ -83,8 +83,10 @@ private def bindValue (target : Target) (indent nextId : Nat) (value : String) :
     name nextId, nextId + 1⟩
 
 /-- Locals follow Core's nearest-binder-first indices. Every temporary is
-fresh across both branches, and branch computations stay inside their block. -/
-def render (target : Target) (locals : List String) (indent nextId : Nat) :
+fresh across both branches, and branch computations stay inside their block.
+The function environment is nearest first, after all Word locals. Callee lookup
+is allowed only at a direct application, and arguments are evaluated first. -/
+def renderWithFunctions (functions : List String) (target : Target) (locals : List String) (indent nextId : Nat) :
     Expr → Except EmitError Rendered
   | .word value => .ok (bindValue .word indent nextId (toString value.val))
   | .bool value => .ok (bindValue .bool indent nextId (if value then "true" else "false"))
@@ -92,15 +94,15 @@ def render (target : Target) (locals : List String) (indent nextId : Nat) :
       | some binding => .ok ⟨[], binding, nextId⟩
       | none => .error (.unboundLocal index)
   | .letE initializer body => do
-      let value ← render .word locals indent nextId initializer
+      let value ← renderWithFunctions functions .word locals indent nextId initializer
       let binding := bindValue .word indent value.nextId value.value
-      let rest ← render target (binding.value :: locals) indent binding.nextId body
+      let rest ← renderWithFunctions functions target (binding.value :: locals) indent binding.nextId body
       return ⟨value.lines ++ binding.lines ++ rest.lines, rest.value, rest.nextId⟩
   | .ifE condition yes no => do
-      let tested ← render .bool locals indent nextId condition
+      let tested ← renderWithFunctions functions .bool locals indent nextId condition
       let result := bindValue target indent tested.nextId (zero target)
-      let selected ← render target locals (indent + 4) result.nextId yes
-      let fallback ← render target locals (indent + 4) selected.nextId no
+      let selected ← renderWithFunctions functions target locals (indent + 4) result.nextId yes
+      let fallback ← renderWithFunctions functions target locals (indent + 4) selected.nextId no
       return ⟨tested.lines ++ result.lines ++
         [line indent ("if (" ++ tested.value ++ ") {")] ++ selected.lines ++
         [line (indent + 4) (result.value ++ " = " ++ selected.value ++ ";"), line indent "} else {"] ++
@@ -108,13 +110,13 @@ def render (target : Target) (locals : List String) (indent nextId : Nat) :
         result.value, fallback.nextId⟩
   | .unary operation operand => do
       let token ← unaryToken operation
-      let value ← render (if operation == .boolNot then .bool else .word) locals indent nextId operand
+      let value ← renderWithFunctions functions (if operation == .boolNot then .bool else .word) locals indent nextId operand
       let result := bindValue target indent value.nextId ("(" ++ token ++ value.value ++ ")")
       return ⟨value.lines ++ result.lines, result.value, result.nextId⟩
   | .binary operation left right => do
       let token ← binaryToken operation
-      let first ← render .word locals indent nextId left
-      let second ← render .word locals indent first.nextId right
+      let first ← renderWithFunctions functions .word locals indent nextId left
+      let second ← renderWithFunctions functions .word locals indent first.nextId right
       let result := bindValue target indent second.nextId ("(" ++ first.value ++ " " ++ token ++ " " ++ second.value ++ ")")
       return ⟨first.lines ++ second.lines ++ result.lines, result.value, result.nextId⟩
   | .ternary operation _ _ _ => .error (.unsupportedTernary operation)
@@ -124,6 +126,14 @@ def render (target : Target) (locals : List String) (indent nextId : Nat) :
   | .first _ => .error (.unsupportedExpression "first")
   | .second _ => .error (.unsupportedExpression "second")
   | .lambda _ _ _ => .error (.unsupportedExpression "lambda")
+  | .apply (.var index) argument => do
+      if functions.isEmpty || index < locals.length then
+        throw (.unsupportedExpression "apply")
+      let some callee := functions[index - locals.length]? |
+        throw (.unsupportedExpression "apply")
+      let value ← renderWithFunctions functions .word locals indent nextId argument
+      let result := bindValue .word indent value.nextId (callee ++ "(" ++ value.value ++ ")")
+      return ⟨value.lines ++ result.lines, result.value, result.nextId⟩
   | .apply _ _ => .error (.unsupportedExpression "apply")
   | .inLeft _ _ => .error (.unsupportedExpression "inLeft")
   | .inRight _ _ => .error (.unsupportedExpression "inRight")
@@ -133,6 +143,12 @@ def render (target : Target) (locals : List String) (indent nextId : Nat) :
   | .storeCell _ _ => .error (.unsupportedExpression "storeCell")
   | .construct _ _ => .error (.unsupportedExpression "construct")
   | .matchData _ _ _ _ => .error (.unsupportedExpression "matchData")
+
+
+/-- Preserve the original scalar-only renderer and its unsupported-call errors. -/
+def render (target : Target) (locals : List String) (indent nextId : Nat)
+    (expression : Expr) : Except EmitError Rendered :=
+  renderWithFunctions [] target locals indent nextId expression
 
 end ScalarRenderer
 

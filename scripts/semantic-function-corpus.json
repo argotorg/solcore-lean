@@ -1,0 +1,1584 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-functions",
+  "coverageKind": "core-ast-features",
+  "generatorVersion": "core-g0-v1/lcg64-v1",
+  "emitterVersion": "solcore-source-functions-v1",
+  "wrapperVersion": "solcore-word-functions-contract-v1",
+  "profileVersion": "runtime-functions-v1/seed-chain-v1",
+  "functionVersion": "core-word-function-dag-v1",
+  "abstractionVersion": "word-literal-preorder-v1",
+  "requiredFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "functionCall",
+    "if",
+    "let",
+    "local",
+    "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+  ],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+  ],
+  "requiredHelperCounts": [
+    1,
+    2,
+    3
+  ],
+  "cases": [
+    {
+      "id": "helper-chain-zero",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "apply",
+                "function": {
+                  "tag": "var",
+                  "index": 1
+                },
+                "argument": {
+                  "tag": "var",
+                  "index": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-chain-one",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "apply",
+                "function": {
+                  "tag": "var",
+                  "index": 1
+                },
+                "argument": {
+                  "tag": "var",
+                  "index": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-chain-maximum",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "apply",
+                "function": {
+                  "tag": "var",
+                  "index": 1
+                },
+                "argument": {
+                  "tag": "var",
+                  "index": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-chain-high-bit",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "apply",
+                "function": {
+                  "tag": "var",
+                  "index": 1
+                },
+                "argument": {
+                  "tag": "var",
+                  "index": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-diamond-zero",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "let",
+              "initializer": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "let",
+                  "initializer": {
+                    "tag": "apply",
+                    "function": {
+                      "tag": "var",
+                      "index": 2
+                    },
+                    "argument": {
+                      "tag": "var",
+                      "index": 0
+                    }
+                  },
+                  "body": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 1
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordXor",
+                      "left": {
+                        "tag": "var",
+                        "index": 1
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "body": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "apply",
+                  "function": {
+                    "tag": "var",
+                    "index": 1
+                  },
+                  "argument": {
+                    "tag": "var",
+                    "index": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-diamond-one",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "let",
+              "initializer": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "let",
+                  "initializer": {
+                    "tag": "apply",
+                    "function": {
+                      "tag": "var",
+                      "index": 2
+                    },
+                    "argument": {
+                      "tag": "var",
+                      "index": 0
+                    }
+                  },
+                  "body": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 1
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordXor",
+                      "left": {
+                        "tag": "var",
+                        "index": 1
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "body": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "apply",
+                  "function": {
+                    "tag": "var",
+                    "index": 1
+                  },
+                  "argument": {
+                    "tag": "var",
+                    "index": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-diamond-maximum",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "let",
+              "initializer": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "let",
+                  "initializer": {
+                    "tag": "apply",
+                    "function": {
+                      "tag": "var",
+                      "index": 2
+                    },
+                    "argument": {
+                      "tag": "var",
+                      "index": 0
+                    }
+                  },
+                  "body": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 1
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordXor",
+                      "left": {
+                        "tag": "var",
+                        "index": 1
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "body": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "apply",
+                  "function": {
+                    "tag": "var",
+                    "index": 1
+                  },
+                  "argument": {
+                    "tag": "var",
+                    "index": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "helper-diamond-high-bit",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "dataDefinitions": [],
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "body": {
+          "tag": "let",
+          "initializer": {
+            "tag": "lambda",
+            "parameterType": "word",
+            "resultType": "word",
+            "body": {
+              "tag": "binary",
+              "op": "wordAdd",
+              "left": {
+                "tag": "var",
+                "index": 0
+              },
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              }
+            }
+          },
+          "body": {
+            "tag": "let",
+            "initializer": {
+              "tag": "lambda",
+              "parameterType": "word",
+              "resultType": "word",
+              "body": {
+                "tag": "let",
+                "initializer": {
+                  "tag": "var",
+                  "index": 0
+                },
+                "body": {
+                  "tag": "if",
+                  "condition": {
+                    "tag": "binary",
+                    "op": "wordGt",
+                    "left": {
+                      "tag": "var",
+                      "index": 0
+                    },
+                    "right": {
+                      "tag": "word",
+                      "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    }
+                  },
+                  "thenBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordSub",
+                      "left": {
+                        "tag": "var",
+                        "index": 0
+                      },
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      }
+                    }
+                  },
+                  "elseBranch": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordAdd",
+                      "left": {
+                        "tag": "apply",
+                        "function": {
+                          "tag": "var",
+                          "index": 3
+                        },
+                        "argument": {
+                          "tag": "var",
+                          "index": 1
+                        }
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "body": {
+              "tag": "let",
+              "initializer": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "let",
+                  "initializer": {
+                    "tag": "apply",
+                    "function": {
+                      "tag": "var",
+                      "index": 2
+                    },
+                    "argument": {
+                      "tag": "var",
+                      "index": 0
+                    }
+                  },
+                  "body": {
+                    "tag": "let",
+                    "initializer": {
+                      "tag": "apply",
+                      "function": {
+                        "tag": "var",
+                        "index": 2
+                      },
+                      "argument": {
+                        "tag": "var",
+                        "index": 1
+                      }
+                    },
+                    "body": {
+                      "tag": "binary",
+                      "op": "wordXor",
+                      "left": {
+                        "tag": "var",
+                        "index": 1
+                      },
+                      "right": {
+                        "tag": "var",
+                        "index": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "body": {
+                "tag": "lambda",
+                "parameterType": "word",
+                "resultType": "word",
+                "body": {
+                  "tag": "apply",
+                  "function": {
+                    "tag": "var",
+                    "index": 1
+                  },
+                  "argument": {
+                    "tag": "var",
+                    "index": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-36-helpers-1-zero",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 96
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-36-helpers-1-one",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 96
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-36-helpers-1-maximum",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 96
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-36-helpers-1-high-bit",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 96
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-31-helpers-2-zero",
+      "generation": {
+        "seed": "31",
+        "maxProgramNodes": 96
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-31-helpers-2-one",
+      "generation": {
+        "seed": "31",
+        "maxProgramNodes": 96
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-31-helpers-2-maximum",
+      "generation": {
+        "seed": "31",
+        "maxProgramNodes": 96
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-31-helpers-2-high-bit",
+      "generation": {
+        "seed": "31",
+        "maxProgramNodes": 96
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-101-helpers-3-zero",
+      "generation": {
+        "seed": "101",
+        "maxProgramNodes": 96
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-101-helpers-3-one",
+      "generation": {
+        "seed": "101",
+        "maxProgramNodes": 96
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-101-helpers-3-maximum",
+      "generation": {
+        "seed": "101",
+        "maxProgramNodes": 96
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-101-helpers-3-high-bit",
+      "generation": {
+        "seed": "101",
+        "maxProgramNodes": 96
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "functionCall",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    }
+  ]
+}

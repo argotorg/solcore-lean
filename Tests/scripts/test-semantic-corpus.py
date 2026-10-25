@@ -3,7 +3,9 @@
 
 Coverage counts Core AST features and literal values. Runtime-input cases count
 features in the function body, independently of the applied input literal, and
-require completed observations for input coverage. This does not measure
+require completed observations for input coverage. Function DAGs include all
+helper bodies and the entry; helper counts describe declarations in completed
+cases, not the number of dynamic calls. This does not measure
 executed EVM opcodes or prove source-emitter meaning preservation.
 """
 
@@ -44,7 +46,7 @@ def run(tool: Path, *arguments: str) -> dict:
     return json.loads(result.stdout)
 
 
-def ast_coverage(value: object) -> tuple[set[str], set[int]]:
+def ast_coverage(value: object, function_calls: bool = False) -> tuple[set[str], set[int]]:
     features, literals = set(), set()
     if isinstance(value, dict):
         tag = value.get("tag")
@@ -57,13 +59,20 @@ def ast_coverage(value: object) -> tuple[set[str], set[int]]:
         if tag in ("unary", "binary"):
             constructor = "UnaryOp" if tag == "unary" else "BinaryOp"
             features.add(f"{tag}:Solcore.Core.Wire.{constructor}.{value['op']}")
-        children = value.values()
+        if function_calls and tag == "apply":
+            require(value.get("function", {}).get("tag") == "var",
+                    "a helper call must name a previously bound function")
+            features.add("functionCall")
+            # The callee's function variable is not a scalar local expression.
+            children = [value["argument"]]
+        else:
+            children = value.values()
     elif isinstance(value, list):
         children = value
     else:
         children = []
     for child in children:
-        child_features, child_literals = ast_coverage(child)
+        child_features, child_literals = ast_coverage(child, function_calls)
         features.update(child_features)
         literals.update(child_literals)
     return features, literals
@@ -98,11 +107,41 @@ def scalar_body(case: dict, runtime_input: bool) -> dict:
     return function["body"]
 
 
+def function_parts(expression: dict) -> tuple[list[dict], dict]:
+    """Read declaration lambdas in their actual Core binding order."""
+    helpers = []
+    while expression.get("tag") == "let":
+        helper = expression.get("initializer", {})
+        require(helper.get("tag") == "lambda" and helper.get("parameterType") == "word"
+                and helper.get("resultType") == "word", "helper declaration must be a Word lambda")
+        helpers.append(helper["body"])
+        expression = expression["body"]
+    require(1 <= len(helpers) <= 3, "function DAG must declare one to three helpers")
+    require(expression.get("tag") == "lambda" and expression.get("parameterType") == "word"
+            and expression.get("resultType") == "word", "DAG entry must be a Word lambda")
+    return helpers, expression["body"]
+
+
+def function_case_parts(case: dict) -> tuple[list[dict], dict]:
+    require(case["schema"] == "solcore-lean.semantic-function-case.v1", "unexpected function case schema")
+    program = case["program"]
+    application = program["body"]
+    argument = application.get("argument", {})
+    require(program["resultType"] == "word" and program["dataDefinitions"] == []
+            and application["tag"] == "apply" and argument.get("tag") == "word",
+            "function case must apply the original closed DAG to a Word literal")
+    number = canonical_word(case["input"])
+    require(int(argument["value"], 16) == number, "applied Core argument differs from runtime input")
+    require(case["contract"]["calldata"] == f"0xa444f5e9{number:064x}",
+            "ABI argument differs from runtime input")
+    return function_parts(application["function"])
+
+
 def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
                 profile: str = "closed-g0") -> dict:
     require(("generation" in entry) != ("program" in entry),
             f"{entry['id']}: choose a seed or a manual Core program")
-    runtime_input = profile == "runtime-word"
+    runtime_input = profile != "closed-g0"
     if runtime_input:
         canonical_word(entry["input"])
     if "generation" in entry:
@@ -114,7 +153,9 @@ def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
         require(type(nodes) is int and 3 <= nodes <= 512,
                 f"{entry['id']}: invalid node budget")
         count = 4 if runtime_input else 1
-        corpus = run(tool, "input-generate" if runtime_input else "generate", seed,
+        command = {"closed-g0": "generate", "runtime-word": "input-generate",
+                   "runtime-functions": "function-generate"}[profile]
+        corpus = run(tool, command, seed,
                      str(nodes), str(count), "1", str(fuel))
         require(corpus["status"] == "complete" and corpus["attempted"] == 1
                 and not corpus["excluded"] and len(corpus["cases"]) == count,
@@ -134,7 +175,8 @@ def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
     path = directory / "program.json"
     path.write_text(json.dumps(entry["program"]))
     if runtime_input:
-        return run(tool, "input-emit", str(path), entry["input"], str(fuel))
+        command = "function-emit" if profile == "runtime-functions" else "input-emit"
+        return run(tool, command, str(path), entry["input"], str(fuel))
     return run(tool, "emit", str(path), str(fuel))
 
 
@@ -142,8 +184,9 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     require(isinstance(manifest, dict), "manifest must be an object")
     require(manifest["schema"] == MANIFEST_SCHEMA, "unexpected corpus manifest schema")
     profile = manifest.get("profile", "closed-g0")
-    require(profile in ("closed-g0", "runtime-word"), "unsupported corpus profile")
-    runtime_input = profile == "runtime-word"
+    require(profile in ("closed-g0", "runtime-word", "runtime-functions"), "unsupported corpus profile")
+    runtime_input = profile != "closed-g0"
+    function_profile = profile == "runtime-functions"
     require(manifest["coverageKind"] == "core-ast-features", "coverage scope changed")
     for name in ("requiredFeatures", "requiredWordLiterals") + (("requiredInputs",) if runtime_input else ()):
         require(isinstance(manifest.get(name), list) and
@@ -152,8 +195,17 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     required_literals = {canonical_word(value) for value in manifest["requiredWordLiterals"]}
     required_inputs = ({canonical_word(value) for value in manifest["requiredInputs"]}
                        if runtime_input else set())
+    required_helper_counts = set()
+    if function_profile:
+        values = manifest.get("requiredHelperCounts")
+        require(isinstance(values, list) and all(type(value) is int for value in values)
+                and set(values) == {1, 2, 3}, "function corpus must require helper counts one, two and three")
+        required_helper_counts = set(values)
     if runtime_input:
-        require(required_features and required_features <= FEATURES, "unsupported runtime body features")
+        allowed_features = FEATURES | ({"functionCall"} if function_profile else set())
+        require(required_features and required_features <= allowed_features, "unsupported runtime body features")
+        if function_profile:
+            require("functionCall" in required_features, "function corpus must require helper calls")
         require(required_inputs == set(BOUNDARIES), "runtime corpus must require all four boundary inputs")
     else:
         require(required_features == FEATURES,
@@ -163,7 +215,7 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     entries = manifest["cases"]
     identifiers = [entry["id"] for entry in entries]
     require(entries and len(set(identifiers)) == len(identifiers), "empty corpus or duplicate case id")
-    covered_features, covered_literals, covered_inputs = set(), set(), set()
+    covered_features, covered_literals, covered_inputs, covered_helper_counts = set(), set(), set(), set()
     function_groups = {}
     with tempfile.TemporaryDirectory(prefix="semantic-corpus-") as name:
         directory = Path(name)
@@ -174,8 +226,14 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
             for version in VERSIONS + (INPUT_VERSIONS if runtime_input else ()):
                 require(case["provenance"][version] == manifest[version],
                         f"{entry['id']}: {version} changed")
-            body = scalar_body(case, runtime_input)
-            actual_features, actual_literals = ast_coverage(body)
+            if function_profile:
+                helpers, body = function_case_parts(case)
+                feature_body = helpers + [body]
+                actual_features, actual_literals = ast_coverage(feature_body, function_calls=True)
+            else:
+                body = scalar_body(case, runtime_input)
+                feature_body = body
+                actual_features, actual_literals = ast_coverage(body)
             if runtime_input:
                 # Literal inventory covers the full original program; input
                 # execution coverage remains a separate obligation below.
@@ -196,17 +254,20 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
                     f"{entry['id']}: native checked replay changed the case")
             covered_features.update(actual_features)
             covered_literals.update(actual_literals)
+            if function_profile:
+                covered_helper_counts.add(len(helpers))
             if runtime_input:
                 number = canonical_word(case["input"])
                 require(case["input"] == entry["input"], "materialized input differs from manifest")
                 covered_inputs.add(number)
-                key = json.dumps(body, sort_keys=True, separators=(",", ":"))
+                key = json.dumps(feature_body, sort_keys=True, separators=(",", ":"))
                 group = function_groups.setdefault(key, {"inputs": set(), "sources": set(), "results": set()})
                 group["inputs"].add(number)
                 group["sources"].add(case["source"])
                 group["results"].add(direct["word"])
     require(required_features <= covered_features, "fixed corpus lost required AST feature coverage")
     require(required_literals <= covered_literals, "fixed corpus lost required Word literal coverage")
+    require(required_helper_counts <= covered_helper_counts, "fixed corpus lost required completed helper counts")
     if runtime_input:
         require(covered_features == required_features, "runtime feature requirements must name exactly this corpus's union")
         require(required_inputs <= covered_inputs, "fixed corpus lost required completed runtime inputs")
@@ -220,6 +281,9 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     if runtime_input:
         report.update(requiredInputs=len(required_inputs), completedInputs=sorted(covered_inputs),
                       functionGroups=len(function_groups))
+    if function_profile:
+        report.update(requiredHelperCounts=sorted(required_helper_counts),
+                      completedHelperCounts=sorted(covered_helper_counts))
     return report
 
 

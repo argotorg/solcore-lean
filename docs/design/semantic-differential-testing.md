@@ -291,8 +291,8 @@ Delivered M3:
 
 M1 through M3 establish the initial closed G0 testing workflow. They do not
 complete the broader language profiles or the emitter's meaning-preservation
-proof. Closed computations may be constant-folded; runtime-input coverage is
-the next pure-program expansion before making backend opcode-coverage claims.
+proof. Closed computations may be constant-folded. The M4 profiles below add
+runtime inputs, while measured backend opcode coverage remains a separate task.
 
 ### M4 through M6: scope expansion
 
@@ -308,8 +308,8 @@ emission and provenance on replay. Keep the existing closed G0 profile stable.
 This first slice tests runtime input without claiming M4 completion or measured
 opcode coverage. Initially each input is a separate comparison case; the source
 function stays identical across its inputs, but compilation and deployment may
-repeat. Next add acyclic named functions and the remaining pure feature families
-listed in M4, with mixed cases and failure-preserving reduction.
+repeat. Extend this to acyclic named functions and the remaining pure feature
+families listed in M4, with mixed cases and failure-preserving reduction.
 
 The runtime-input slice is delivered:
 
@@ -333,8 +333,36 @@ The runtime-input slice is delivered:
 - Full repository build/tests, kernel policy, focused protocol regressions and
   both fixed corpora's deterministic native validation passed.
 
-Multiple named functions, mutable state within pure programs, aggregates,
-matches and bounded loops remain open within M4. M5 and M6 remain planned.
+The acyclic named-function slice is also delivered:
+
+- Original Core programs bind one to three Word helpers before their entry
+  lambda. Scope checks admit only earlier helpers as direct callees, excluding
+  recursion, escaping function values and host references. Checker admission
+  supplies typing for the graph and its applied entry.
+- Named source emission, versioned generation, strict replay and reduction are
+  connected to all three execution paths. Reduction checks the entire graph
+  and preserves helper declaration order and count. Existing G0 and runtime
+  input cases retain their previous artifacts and observations.
+- The fixed twenty-case corpus contains five distinct graphs: an imported
+  chain, an imported diamond and generated graphs with one, two and three
+  helpers, each at all four boundary inputs. All twenty cases matched across
+  actual Core, imported Hull and EVM execution. Thirteen body-feature kinds,
+  all four inputs and all three required declaration counts were covered.
+- An additional eight-case external regression and exact replay passed.
+  Controlled failure reduction preserved the function profile and helper count;
+  real replay still matched, and the explicit adapter reproduced the synthetic
+  fingerprint. Generation fuel exhaustion remained separately classified.
+- Full build/tests, kernel policy, native validation of all three corpora and
+  focused comparison/campaign tests passed. Helper declaration coverage does
+  not claim dynamic call counts or backend instruction coverage.
+
+Mutable locals within pure programs, aggregates, matches and bounded loops
+remain open within M4. M5 and M6 remain planned. Local mutation is the next slice:
+Word cells stay within their function, with no aliasing or escaping cell values.
+Every source read must capture a fresh Word temporary before evaluating later
+effects. Unit sequencing binders remain in the compiler's indexing context even
+when they emit no source declaration. Verify these evaluation-order and scope
+conditions through the full comparison before extending the profile further.
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

@@ -29,7 +29,11 @@ SCHEMA = "solcore-lean.semantic-campaign.v1"
 ANALYSIS_SCHEMA = "solcore-lean.semantic-analysis.v1"
 TEST_ADAPTER = "xor-low-bit-after-matched-execution-v1"
 PATHS = ("directCore", "importedHull", "rustEvm")
-PROFILES = ("closed-g0", "runtime-word")
+PROFILES = tuple(m2.CASE_PROFILES.values())
+PROFILE_SCHEMAS = {profile: schema for schema, profile in m2.CASE_PROFILES.items()}
+PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
+                    "runtime-word": ("input-generate", "input-emit", "input-generated"),
+                    "runtime-functions": ("function-generate", "function-emit", "function-generated")}
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
 RESOURCE = "inconclusive-resource"
@@ -68,13 +72,50 @@ def word_literals(program: dict) -> set[str]:
     return result
 
 
+def declared_helper_count(program: dict) -> int:
+    """Count original Core declarations, not calls or claimed provenance.
+
+    This checks the outer function-DAG shape only. The native case replay still
+    checks every function body, type, scope and input before any execution.
+    """
+    def word_function(value) -> bool:
+        return (isinstance(value, dict) and value.get("tag") == "lambda"
+            and value.get("parameterType") == "word" and value.get("resultType") == "word"
+            and isinstance(value.get("body"), dict))
+
+    if not isinstance(program, dict) or program.get("resultType") != "word":
+        raise ValueError("function case requires an original Core Word application")
+    application = program.get("body")
+    if not isinstance(application, dict) or application.get("tag") != "apply":
+        raise ValueError("function case requires an original Core application")
+    argument = application.get("argument")
+    if not isinstance(argument, dict) or argument.get("tag") != "word" or len(m2.hex_bytes(argument.get("value"), "Core input")) != 32:
+        raise ValueError("function case application requires a Word input")
+    body = application.get("function")
+    count = 0
+    while isinstance(body, dict) and body.get("tag") == "let":
+        if not word_function(body.get("initializer")):
+            raise ValueError("function helper declaration must bind a Word function")
+        count += 1
+        if count > 3:
+            raise ValueError("function case declares more than three helpers")
+        body = body.get("body")
+    if not 1 <= count <= 3 or not word_function(body):
+        raise ValueError("function case requires one to three helpers followed by its entry lambda")
+    return count
+
+
+def helper_counts(case: dict) -> set[int]:
+    return {declared_helper_count(case["program"])} if case.get("schema") == m2.FUNCTION_CASE_SCHEMA else set()
+
+
 def validate_manifest(manifest) -> dict:
     if not isinstance(manifest, dict) or manifest.get("schema") != "solcore-lean.semantic-corpus-manifest.v1" or not isinstance(manifest.get("cases"), list):
         raise ValueError("unsupported corpus manifest")
     profile = manifest.get("profile", "closed-g0")
     if profile not in PROFILES:
         raise ValueError("unsupported corpus profile")
-    version_keys = ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if profile == "runtime-word" else ())
+    version_keys = ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if profile != "closed-g0" else ())
     for key in version_keys:
         if not isinstance(manifest.get(key), str) or not manifest[key]:
             raise ValueError(f"missing corpus {key}")
@@ -90,6 +131,13 @@ def validate_manifest(manifest) -> dict:
         m2.word(value, "required input")
     if profile == "closed-g0" and required_inputs:
         raise ValueError("closed G0 corpus cannot require runtime inputs")
+    required_helpers = manifest.get("requiredHelperCounts", None if profile == "runtime-functions" else [])
+    if not isinstance(required_helpers, list) or any(type(value) is not int or not 1 <= value <= 3 for value in required_helpers):
+        raise ValueError("corpus requiredHelperCounts must be an array of integers from one to three")
+    if len(set(required_helpers)) != len(required_helpers):
+        raise ValueError("corpus requiredHelperCounts must not contain duplicates")
+    if profile != "runtime-functions" and required_helpers:
+        raise ValueError("only function corpora can require helper counts")
     ids = set()
     for entry in manifest["cases"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
@@ -97,7 +145,7 @@ def validate_manifest(manifest) -> dict:
         ids.add(entry["id"])
         if ("generation" in entry) == ("program" in entry):
             raise ValueError("corpus entry must specify exactly one generation request or program")
-        if profile == "runtime-word":
+        if profile != "closed-g0":
             m2.word(entry.get("input"), "corpus input")
             if "generation" in entry and entry["input"] not in INPUT_BOUNDARIES:
                 raise ValueError("generated runtime inputs must be a boundary value")
@@ -219,11 +267,12 @@ class Campaign:
                       "differentialSha256": m2.digest((ROOT / "scripts/semantic-differential.py").read_bytes())},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "cases": [], "findings": [], "secondaryFindings": [], "shrinkAttempts": 0,
-            "coverage": {"kind": "AST features and literals; not runtime opcode coverage",
+            "coverage": {"kind": "AST features, literals and declared helper counts; not runtime call or opcode coverage",
                          "generatedFeatures": [], "generatedWordLiterals": [],
                          "matchedFeatures": [], "matchedWordLiterals": [],
                          "requiredFeatures": [], "requiredWordLiterals": [],
-                         "generatedInputs": [], "matchedInputs": [], "requiredInputs": []},
+                         "generatedInputs": [], "matchedInputs": [], "requiredInputs": [],
+                         "generatedHelperCounts": [], "matchedHelperCounts": [], "requiredHelperCounts": []},
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
         self.checkpoint()
 
@@ -236,6 +285,7 @@ class Campaign:
         coverage["missingFeatures"] = sorted(set(coverage["requiredFeatures"]) - set(coverage["matchedFeatures"]))
         coverage["missingWordLiterals"] = sorted(set(coverage["requiredWordLiterals"]) - set(coverage["matchedWordLiterals"]), key=int)
         coverage["missingInputs"] = sorted(set(coverage["requiredInputs"]) - set(coverage["matchedInputs"]), key=int)
+        coverage["missingHelperCounts"] = sorted(set(coverage["requiredHelperCounts"]) - set(coverage["matchedHelperCounts"]))
         save_json(self.args.output / "summary.json", self.summary)
 
     def guard(self) -> None:
@@ -423,17 +473,20 @@ class Campaign:
             return {"schema": "solcore-lean.semantic-corpus.v1", "requested": 1,
                 "attempted": 0, "excluded": [], "cases": [case], "status": "complete"}
         if self.args.corpus is None:
-            command = "input-generate" if self.args.profile == "runtime-word" else "generate"
+            command = PROFILE_COMMANDS[self.args.profile][0]
             return self.tool([command, str(self.args.seed), str(self.args.nodes), str(self.args.cases),
                               str(self.args.attempts), str(self.args.direct_fuel)], "generation")
         manifest = validate_manifest(m2.read_json(self.args.corpus))
-        runtime_input = manifest.get("profile", "closed-g0") == "runtime-word"
+        profile = manifest.get("profile", "closed-g0")
+        runtime_input = profile != "closed-g0"
+        generate_command, emit_command, origin_kind = PROFILE_COMMANDS[profile]
         save_json(self.args.output / "corpus.json", manifest)
         self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": m2.digest(m2.json_bytes(manifest))}
         coverage = self.summary["coverage"]
         coverage["requiredFeatures"] = sorted(set(manifest.get("requiredFeatures", [])))
         coverage["requiredWordLiterals"] = sorted({m2.word(value) for value in manifest.get("requiredWordLiterals", [])}, key=int)
         coverage["requiredInputs"] = sorted(set(manifest.get("requiredInputs", [])), key=int)
+        coverage["requiredHelperCounts"] = sorted(manifest.get("requiredHelperCounts", []))
         cases, excluded, ids, accepted_ids = [], [], [], []
         attempted = 0
         for entry in manifest["cases"][:self.args.cases]:
@@ -446,7 +499,7 @@ class Campaign:
             ids.append(entry["id"])
             if "generation" in entry:
                 request = entry["generation"]
-                response = self.tool(["input-generate" if runtime_input else "generate",
+                response = self.tool([generate_command,
                     str(request["seed"]), str(request["maxProgramNodes"]),
                     "4" if runtime_input else "1", "1", str(self.args.direct_fuel)], "corpus-generation")
                 generated = response.get("cases", [])
@@ -465,7 +518,7 @@ class Campaign:
                 program = self.work / "corpus-program.json"
                 save_json(program, entry["program"])
                 try:
-                    command = ["input-emit", str(program), entry["input"]] if runtime_input else ["emit", str(program)]
+                    command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
                     case = self.tool([*command, str(self.args.direct_fuel)], "corpus-emission")
                 finally:
                     program.unlink(missing_ok=True)
@@ -476,8 +529,7 @@ class Campaign:
                 raise ValueError(f"corpus input changed for {entry['id']}")
             if "generation" in entry:
                 origin = case["provenance"].get("origin", {})
-                kind = "input-generated" if runtime_input else "generated"
-                if origin.get("kind") != kind or origin.get("seed") != entry["generation"]["seed"] or origin.get("maxProgramNodes") != entry["generation"]["maxProgramNodes"]:
+                if origin.get("kind") != origin_kind or origin.get("seed") != entry["generation"]["seed"] or origin.get("maxProgramNodes") != entry["generation"]["maxProgramNodes"]:
                     raise ValueError(f"generated corpus provenance differs for {entry['id']}")
             for key in ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if runtime_input else ()):
                 if manifest.get(key) != case["provenance"].get(key):
@@ -490,6 +542,7 @@ class Campaign:
             self.summary["counts"]["generated"] = len(cases)
             coverage["generatedFeatures"] = sorted(set(coverage["generatedFeatures"]) | set(case["provenance"]["features"]))
             coverage["generatedWordLiterals"] = sorted(set(coverage["generatedWordLiterals"]) | word_literals(case["program"]), key=int)
+            coverage["generatedHelperCounts"] = sorted(set(coverage["generatedHelperCounts"]) | helper_counts(case))
             if runtime_input:
                 coverage["generatedInputs"] = sorted(set(coverage["generatedInputs"]) | {case["input"]}, key=int)
             self.summary["generation"] = {"requested": self.args.cases, "attempted": attempted, "status": "running"}
@@ -513,16 +566,18 @@ class Campaign:
         self.summary["generation"] = {key: response.get(key) for key in ("requested", "attempted", "status")}
         self.summary["generation"]["attemptUnit"] = (
             "manifest entries" if self.args.corpus else
-            "function candidates" if self.args.profile == "runtime-word" else "program candidates")
+            "function graph candidates" if self.args.profile == "runtime-functions" else
+            "function candidates" if self.args.profile != "closed-g0" else "program candidates")
         save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
         coverage = self.summary["coverage"]
         coverage["generatedFeatures"] = sorted({feature for case in cases for feature in case["provenance"]["features"]})
         coverage["generatedWordLiterals"] = sorted({value for case in cases for value in word_literals(case["program"])}, key=int)
-        coverage["generatedInputs"] = sorted({case["input"] for case in cases if case["schema"] == m2.INPUT_CASE_SCHEMA}, key=int)
+        coverage["generatedInputs"] = sorted({case["input"] for case in cases if case["schema"] != m2.CASE_SCHEMA}, key=int)
+        coverage["generatedHelperCounts"] = sorted({count for case in cases for count in helper_counts(case)})
         for index, case in enumerate(cases):
             self.guard()
             m2.validate_case(case)
-            expected_schema = m2.INPUT_CASE_SCHEMA if self.args.profile == "runtime-word" else m2.CASE_SCHEMA
+            expected_schema = PROFILE_SCHEMAS[self.args.profile]
             if case["schema"] != expected_schema:
                 raise ValueError("case tool returned a different generation profile")
             save_json(self.args.output / "cases" / f"{index:04d}.json", case)
@@ -535,7 +590,8 @@ class Campaign:
             if category == "matched":
                 coverage["matchedFeatures"] = sorted(set(coverage["matchedFeatures"]) | set(case["provenance"]["features"]))
                 coverage["matchedWordLiterals"] = sorted(set(coverage["matchedWordLiterals"]) | word_literals(case["program"]), key=int)
-                if case["schema"] == m2.INPUT_CASE_SCHEMA:
+                coverage["matchedHelperCounts"] = sorted(set(coverage["matchedHelperCounts"]) | helper_counts(case))
+                if case["schema"] != m2.CASE_SCHEMA:
                     coverage["matchedInputs"] = sorted(set(coverage["matchedInputs"]) | {case["input"]}, key=int)
             save_json(self.args.output / "results" / f"{index:04d}.json", {"actualReport": compact_report(report), "analysis": analysis})
             case_id = self.summary.get("corpus", {}).get("acceptedIds", [f"generated-{i}" for i in range(len(cases))])[index]
@@ -589,7 +645,7 @@ def main() -> int:
         elif args.case:
             case = m2.read_json(args.case)
             m2.validate_case(case)
-            selected_profile = "runtime-word" if case["schema"] == m2.INPUT_CASE_SCHEMA else "closed-g0"
+            selected_profile = m2.CASE_PROFILES[case["schema"]]
         if args.profile and selected_profile and args.profile != selected_profile:
             parser.error("--profile disagrees with the supplied case or corpus")
         args.profile = args.profile or selected_profile or "closed-g0"
@@ -640,7 +696,7 @@ def main() -> int:
             shutil.rmtree(campaign.work, ignore_errors=True)
             campaign.checkpoint()
             coverage = campaign.summary["coverage"]
-            if campaign.summary["status"] == "complete" and (coverage["missingFeatures"] or coverage["missingWordLiterals"] or coverage["missingInputs"]):
+            if campaign.summary["status"] == "complete" and (coverage["missingFeatures"] or coverage["missingWordLiterals"] or coverage["missingInputs"] or coverage["missingHelperCounts"]):
                 campaign.summary["status"] = "coverage-incomplete"
                 campaign.checkpoint()
         finally:
@@ -649,7 +705,7 @@ def main() -> int:
     print(json.dumps({"status": campaign.summary["status"], "synthetic": campaign.summary["synthetic"],
                       "counts": counts, "summary": str(args.output / "summary.json")}))
     coverage = campaign.summary["coverage"]
-    return 0 if campaign.summary["status"] == "complete" and counts["matched"] == args.cases and not coverage["missingFeatures"] and not coverage["missingWordLiterals"] and not coverage["missingInputs"] else 1
+    return 0 if campaign.summary["status"] == "complete" and counts["matched"] == args.cases and not coverage["missingFeatures"] and not coverage["missingWordLiterals"] and not coverage["missingInputs"] and not coverage["missingHelperCounts"] else 1
 
 
 if __name__ == "__main__":
