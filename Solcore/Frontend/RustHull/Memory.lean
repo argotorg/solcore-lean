@@ -125,7 +125,7 @@ def readMemoryWord (mapping offset : Expr) : Expr :=
             (.binary .wordShl (.var 1) (shift (.second (.var 2))))
             (.binary .wordShr (.var 0) (sub (number 256) (shift (.second (.var 2))))))))))
 
-private def writeMemoryByte (mapping offset value : Expr) : Expr :=
+def writeMemoryByte (mapping offset value : Expr) : Expr :=
   .letE (packet [mapping, offset, value])
     (.letE (.binary .wordMul (sub (number 31) (position (field 1 3 (.var 0)))) (number 8))
       (LanguageResult.bind WordMapping.type
@@ -135,7 +135,7 @@ private def writeMemoryByte (mapping offset value : Expr) : Expr :=
             (.binary .wordAnd (.var 0) (.unary .wordNot (.binary .wordShl (number 255) (.var 1))))
             (.binary .wordShl (byte (field 2 3 (.var 2))) (.var 1))))))
 
-private def writeMemoryWord (mapping offset value : Expr) : Expr :=
+def writeMemoryWord (mapping offset value : Expr) : Expr :=
   .letE (packet [mapping, offset, value])
     (.ifE (.binary .wordEq (position (field 1 3 (.var 0))) (number 0))
       (WordMapping.insert (field 0 3 (.var 0)) (index (field 1 3 (.var 0))) (field 2 3 (.var 0)))

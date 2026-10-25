@@ -91,15 +91,15 @@ def writeStorage (worldReference address complete key value : Core.Expr) (transi
 
 /-- Finalization preserves persistent fields while resetting transaction-local
 state. Account removal is decided separately by both lifecycle flags. -/
-private def clearTransaction (record : Core.Expr) : Core.Expr :=
+def clearTransaction (record : Core.Expr) : Core.Expr :=
   bundle ((List.range 9).map fun index =>
     if index == 1 then WordMapping.empty
     else if index == 7 || index == 8 then .bool false
     else field index record)
 
-private def finalizeParameter : Core.Ty := .product type (.cell WordMapping.type)
+def finalizeParameter : Core.Ty := .product type (.cell WordMapping.type)
 
-private def finalizeBody : Core.Expr :=
+def finalizeBody : Core.Expr :=
   .matchData layout.dataType (LanguageResult.resultType type) (.first (.var 0))
     [LanguageResult.success empty,
       (bind (constant (bundle [.var 0, .var 1, .var 2])) fun args =>

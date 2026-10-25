@@ -53,7 +53,7 @@ def supports (name : String) : Bool := Ambient.supports name || AccountInspectio
    "log0", "log1", "log2", "log3", "log4",
    "return", "revert", "stop", "invalid"]
 
-private def terminate (scope : Scope) (kind : Nat) (offset size : Core.Expr) : LowerM Core.Expr := do
+def terminate (scope : Scope) (kind : Nat) (offset size : Core.Expr) : LowerM Core.Expr := do
   let memorySize ← reference scope "memorySize" .word
   let exit ← reference scope "exit" .word
   let returnOffset ← reference scope "returnOffset" .word

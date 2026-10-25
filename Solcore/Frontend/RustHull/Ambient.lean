@@ -40,11 +40,11 @@ def slots : List (String × Core.Ty) :=
 
 def contextType : Core.Ty := bundleType (slots.map Prod.snd)
 
-private def wordLiteral : Option Word → Core.Expr
+def wordLiteral : Option Word → Core.Expr
   | none => .inLeft .word .unit
   | some value => .inRight .unit (.word value)
 
-private def hashesLiteral : Option WordMapping.Entries → Core.Expr
+def hashesLiteral : Option WordMapping.Entries → Core.Expr
   | none => .inLeft WordMapping.type .unit
   | some entries => .inRight .unit (WordMapping.literal entries)
 
@@ -70,25 +70,25 @@ def supports (name : String) : Bool := name ∈
   ["origin", "gasprice", "coinbase", "timestamp", "number", "prevrandao",
    "gaslimit", "chainid", "basefee", "blobbasefee", "blockhash", "blobhash"]
 
-private def read (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Expr := do
+def read (scope : Scope) (name : String) (type : Core.Ty) : LowerM Core.Expr := do
   let (binding, index) ← scope.lookup ("$lean$evm$" ++ name)
   expectType type binding.type
   pure (.loadCell (.var index))
 
-private abbrev Code := Nat → Core.Expr
-private def raw (value : Core.Expr) : Code := fun depth => value.rename (· + depth)
-private def number (value : Nat) : Code := fun _ => .word (Word.ofNatModulo value)
-private def success (value : Code) : Code := fun depth => LanguageResult.success (value depth)
-private def binary (operation : BinaryOp) (left right : Code) : Code :=
+abbrev Code := Nat → Core.Expr
+def raw (value : Core.Expr) : Code := fun depth => value.rename (· + depth)
+def number (value : Nat) : Code := fun _ => .word (Word.ofNatModulo value)
+def success (value : Code) : Code := fun depth => LanguageResult.success (value depth)
+def binary (operation : BinaryOp) (left right : Code) : Code :=
   fun depth => .binary operation (left depth) (right depth)
-private def choose (condition yes no : Code) : Code :=
+def choose (condition yes no : Code) : Code :=
   fun depth => .ifE (condition depth) (yes depth) (no depth)
-private def bind (value : Code) (body : Code → Code) : Code := fun depth =>
+def bind (value : Code) (body : Code → Code) : Code := fun depth =>
   .letE (value depth) (body (fun here => .var (here - depth - 1)) (depth + 1))
-private def requireValue (option : Code) (body : Code → Code) : Code := fun depth =>
+def requireValue (option : Code) (body : Code → Code) : Code := fun depth =>
   .caseE (option depth) (LanguageResult.failure .word (.word unavailableReason))
     (body (fun here => .var (here - depth - 1)) (depth + 1))
-private def lookup (mapping key : Code) : Code :=
+def lookup (mapping key : Code) : Code :=
   fun depth => WordMapping.lookup (mapping depth) (key depth)
 
 /-- Arguments have been evaluated by Hull/Yul lowering. The hash operations
