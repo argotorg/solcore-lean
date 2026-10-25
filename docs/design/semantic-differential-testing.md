@@ -58,12 +58,12 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | Milestone | Deliverable | Status |
 | --- | --- | --- |
 | M0 | Record the scope, settle existing working-tree changes, update project documentation, and establish a tested clean baseline. | Complete, 2026-10-25 |
-| M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | Next |
+| M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | In progress |
 | M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Planned |
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Planned |
-| M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Deferred |
-| M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Deferred |
-| M6 | Add selected generics, closures, comptime and module combinations. | Deferred |
+| M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Planned |
+| M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
+| M6 | Add selected generics, closures, comptime and module combinations. | Planned |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
 basic comparison cannot reproduce and reduce its own failures.
@@ -96,9 +96,9 @@ Completed baseline:
   whitespace check passed. Validation logs and temporary proof audits were
   removed after inspection.
 
-M1 has not started. Resume with source emission and its operation-mapping
-regressions; do not treat the existing Core generator as a delivered Solcore
-source generator or generated-input comparison campaign.
+M1 is in progress. The first deliverable is source emission and its
+operation-mapping regressions; the existing Core generator alone is not a
+delivered Solcore source generator or generated-input comparison campaign.
 
 ### M1: source emission
 
