@@ -70,7 +70,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Complete, 2026-10-25 |
-| M6 | Add selected generics, closures, comptime and module combinations. | In progress: generic selection complete |
+| M6 | Add selected generics, closures, comptime and module combinations. | In progress: M6a and M6b complete |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
 basic comparison cannot reproduce and reduce its own failures.
@@ -750,6 +750,32 @@ Delivered M6a:
   46 campaign regressions passed, as did the existing stateful policy suites,
   the full repository build/tests and semantic-kernel check. No upstream
   compiler bug was found in this slice.
+
+Delivered M6b:
+
+- Sealed closure plans capture runtime Word snapshots, retain an actual Core
+  higher-order apply function, mutate the outer cell after closure creation,
+  and either reuse the first closure or construct a second independent one.
+  Thirty-two hand-checked Core applications cover boundary values, private
+  cells, arbitrary entries and constant imported steps.
+- All 24 fixed cases across six plans pass the real three-way comparison.
+  Coverage includes nineteen step AST features, all four boundary inputs,
+  all four aggregate recipes, one through three helpers and both capture
+  variants. Native validation repeats materialization and execution, checks
+  eight strictly smaller candidates and rejects fifteen tampered or bounded
+  resource cases. Separate native checks covered eight originals and 32
+  reductions; 56 saved cases from the seven earlier pure profiles were
+  byte-identical after the extension.
+- An independent-capture case reduced its step in eight accepted executions
+  while retaining its maximum-Word input, capture recipe and synthetic
+  mismatch fingerprint. Original and reduced actual archives replayed with
+  agreement; fresh synthetic replay reproduced the same fingerprint. The
+  recorded attempt limit makes no minimality claim. Actual fuel-one execution
+  remained inconclusive.
+- Thirty-one adapter and 51 campaign policy regressions passed. The full
+  repository build (9,890 jobs), test suite and semantic-kernel check passed.
+  This slice makes no claim about aggregate captures, writes through captured
+  values, escaped factories or dynamically selected callable identities.
 
 Each slice requires fresh three-way execution, strict native reconstruction,
 failure-preserving reduction, a fixed corpus and saved-run replay. M6 remains

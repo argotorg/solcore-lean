@@ -205,8 +205,14 @@ The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases
 agree across the three paths. Saved-run replay and failure-preserving reduction
 also pass, including type-preserving reduction of a runtime-input case.
-Capturing closures, comptime and module combinations are the remaining planned
-slices. See [generic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-generic-selection).
+See [generic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-generic-selection).
+
+The closure profile captures runtime Word values before outer-local assignments,
+then reuses a closure or calls two independently captured closures. All 24 fixed
+cases agree across Core, imported Hull and EVM; reduction preserves the capture
+recipe, and saved-run replay passes. See
+[captured closure comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-captured-closures).
+Comptime and module combinations are the remaining planned M6 slices.
 
 ## Code layout
 

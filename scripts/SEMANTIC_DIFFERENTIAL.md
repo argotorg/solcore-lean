@@ -913,3 +913,67 @@ zero in eight accepted candidate executions while preserving the synthetic
 failure fingerprint and type. Original/reduced archive replay and synthetic
 replay passed. A fuel-one run remained inconclusive. Capturing closures,
 comptime and module combinations remain separate M6 slices.
+
+
+## Compare captured closures
+
+The `runtime-closures` profile exercises runtime Word captures through actual
+source lambdas and a generic higher-order `sc_apply<a>`. Both variants compute
+an initial outer local with the original aggregate step, create a closure,
+increment the outer local, and then increment it again after choosing the
+second callable. `snapshot` reuses the first closure twice. `independent`
+creates a second closure after the first increment. The first call receives
+the original input, the second receives input plus one. The ABI result is
+three times the first result plus the second result plus the current outer
+local, so all captures, calls and outer assignments contribute.
+
+The Core reference loads each captured Word before constructing its lambda.
+The body uses that snapshot rather than reading the mutable outer cell. It
+executes one direct closure application and one application through a checked
+higher-order function. The entire original program passes the Core checker.
+The pinned Rust implementation supplies the capture semantics being tested;
+this profile does not claim equivalence with the separate native Lean source
+frontend or prove source-emitter correctness.
+
+```sh
+lake build semanticCaseTool rustHullScenario
+python3 scripts/semantic-campaign.py \
+  --profile runtime-closures --seed 1 --nodes 384 --cases 12 --attempts 256 \
+  --output .upstream/semantic-closures
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-closure-corpus.json --seconds 600 \
+  --output .upstream/semantic-closure-ci
+python3 Tests/scripts/test-semantic-closure-corpus.py
+```
+
+Native commands are `closure-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`closure-emit PLAN.json INPUT [FUEL]`. Schema `solcore-lean.closure-plan.v1`
+retains a checked aggregate `stepProgram` and `variant` equal to `snapshot` or
+`independent`. Cases contain both `closurePlan` and the complete applied
+original Core `program`, with a full-program 512-node limit. Generation uses
+zero, one, maximum Word and high-bit inputs and rejects constant generated
+steps/references. Imported and reduced constant cases remain admissible.
+
+Replay reconstructs the plan, source, input, original program, ABI and origin.
+Shrinking preserves the capture recipe, step helper count and typed binders,
+strictly decreases the full reference, and records a canonical parent witness.
+The common campaign compares all three actual paths before accepting a
+reduction. `closureRequirements.variants` and `closureCoverage` track the two
+prescribed capture recipes only after matched execution; they are not measured
+closure or opcode coverage. The AST feature/helper inventory describes the
+original step and excludes the fixed capture/apply/ABI wrapper.
+
+This profile is limited to fixed callable identities and Word snapshots.
+Writes through captures, aggregate captures, escaped closure factories and
+dynamic selection between different callable identities are separate scopes.
+Comptime and source-module bundles are the following M6 slices.
+
+The fixed closure corpus contains 24 cases across six plans. All matched across
+the three real execution paths, covering nineteen step AST features, four Word
+boundaries, all four aggregate recipes, one through three helpers and both
+capture variants. Native validation also checked eight smaller candidates and
+fifteen negative cases. A generated independent-capture case reduced in eight
+accepted executions while retaining its maximum-Word input and failure
+fingerprint. Original/reduced actual archive replay and synthetic replay passed;
+an actual fuel-one run remained inconclusive. The attempt limit was recorded,
+so reduction does not claim a globally minimal counterexample.

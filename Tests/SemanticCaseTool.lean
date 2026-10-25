@@ -3,6 +3,7 @@ import Solcore.Synthesis.Source.MutationCases
 import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopCases
 import Solcore.Synthesis.Source.GenericCases
+import Solcore.Synthesis.Source.ClosureCases
 
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false
@@ -35,6 +36,15 @@ private def fuelValue (rest : List String) : IO Nat := do
 
 private def execute (args : List String) : IO Json := do
   match args with
+  | ["closure-generate", seed, nodes, count, attempts, fuel] =>
+      let count ← natural "case count" count 1024
+      unless count > 0 do throw (IO.userError "case count must be positive")
+      return Closure.generateCases (Solcore.Synthesis.Core.Seed.ofNat
+        (← natural "seed" seed (2 ^ 64 - 1)))
+        (← natural "node budget" nodes 512)
+        count
+        (← natural "attempt limit" attempts 10000)
+        (← natural "execution fuel" fuel 10000000)
   | ["generic-generate", seed, nodes, count, attempts, fuel] =>
       let count ← natural "case count" count 1024
       unless count > 0 do throw (IO.userError "case count must be positive")
@@ -112,6 +122,11 @@ private def execute (args : List String) : IO Json := do
       let input ← get (Input.inputWord input)
       get (Function.emitCase function input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
+  | "closure-emit" :: file :: input :: rest =>
+      let function ← get (Closure.checkedPlan (← readJson file))
+      let input ← get (Input.inputWord input)
+      get (Closure.emitCase function input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
   | "generic-emit" :: file :: input :: rest =>
       let function ← get (Generic.checkedPlan (← readJson file))
       let input ← get (Input.inputWord input)
@@ -135,7 +150,10 @@ private def execute (args : List String) : IO Json := do
   | "observe" :: file :: rest =>
       let json ← readJson file
       let fuel ← fuelValue rest
-      if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
+      if (json.getObjValAs? String "schema").toOption == some Closure.caseSchema then
+        let checked ← get (Closure.caseProgram json)
+        return Closure.observe checked.plan checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
         let checked ← get (Generic.caseProgram json)
         return Generic.observe checked.plan checked.input fuel
       else if (json.getObjValAs? String "schema").toOption == some Loop.caseSchema then
@@ -159,7 +177,9 @@ private def execute (args : List String) : IO Json := do
   | "replay" :: file :: rest =>
       let json ← readJson file
       let fuel ← fuelValue rest
-      get (if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
+      get (if (json.getObjValAs? String "schema").toOption == some Closure.caseSchema then
+        Closure.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
         Generic.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Loop.caseSchema then
         Loop.replayCase json fuel
@@ -175,7 +195,9 @@ private def execute (args : List String) : IO Json := do
       let json ← readJson file
       let limit ← natural "shrink limit" limit 4096
       let fuel ← fuelValue rest
-      get (if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
+      get (if (json.getObjValAs? String "schema").toOption == some Closure.caseSchema then
+        Closure.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
         Generic.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Loop.caseSchema then
         Loop.shrinkCases json limit fuel
@@ -187,7 +209,7 @@ private def execute (args : List String) : IO Json := do
         Function.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Input.caseSchema then
           Input.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | input-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|generic-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | input-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|generic-emit|closure-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

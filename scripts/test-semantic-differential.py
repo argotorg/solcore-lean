@@ -72,7 +72,7 @@ class CaseProfileTests(unittest.TestCase):
 
     def test_named_function_profile_retains_the_runtime_argument(self):
         for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA,
-                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA):
+                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA, runner.CLOSURE_CASE_SCHEMA):
             name = runner.CASE_CONTRACTS[schema]
             for value in (0, 1, 2**255, 2**256 - 1):
                 case = self.input_case(value)
@@ -81,6 +81,8 @@ class CaseProfileTests(unittest.TestCase):
                     case["loopPlan"] = {"schema": "solcore-lean.loop-plan.v1", "mask": 7, "stepProgram": {}}
                 if schema == runner.GENERIC_CASE_SCHEMA:
                     case["genericPlan"] = {"schema": "solcore-lean.generic-plan.v1", "variant": "sum", "stepProgram": {}}
+                if schema == runner.CLOSURE_CASE_SCHEMA:
+                    case["closurePlan"] = {"schema": "solcore-lean.closure-plan.v1", "variant": "independent", "stepProgram": {}}
                 case["contract"].update(name=name,
                     deployPath=[name + "Deploy"], runtimePath=[name + "Deploy", name])
                 runner.validate_case(case)
@@ -110,6 +112,17 @@ class CaseProfileTests(unittest.TestCase):
         for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None}):
             with self.assertRaises(ValueError):
                 runner.validate_generic_plan(invalid)
+
+    def test_closure_plan_rejects_unknown_capture_recipes_and_missing_step(self):
+        plan = {"schema": "solcore-lean.closure-plan.v1", "variant": "snapshot", "stepProgram": {}}
+        for variant in ("snapshot", "independent"):
+            runner.validate_closure_plan({**plan, "variant": variant})
+        for variant in (True, 0, None, [], {}, "reference", "escaping", "snapshot "):
+            with self.assertRaises(ValueError):
+                runner.validate_closure_plan({**plan, "variant": variant})
+        for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_closure_plan(invalid)
 
 
 class ClassificationTests(unittest.TestCase):

@@ -1846,6 +1846,8 @@ import Solcore.Test.SourceLoopEmitter
 import Solcore.Test.SourceLoopCases
 import Solcore.Test.SourceGenericEmitter
 import Solcore.Test.SourceGenericCases
+import Solcore.Test.SourceClosureEmitter
+import Solcore.Test.SourceClosureCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -3909,6 +3911,8 @@ def run : IO Unit := do
   SourceLoopCases.testSourceLoopCases
   SourceGenericEmitter.testSourceGenericEmitter
   SourceGenericCases.testSourceGenericCases
+  SourceClosureEmitter.testSourceClosureEmitter
+  SourceClosureCases.testSourceClosureCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter
