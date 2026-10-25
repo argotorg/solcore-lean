@@ -139,9 +139,11 @@ Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
-specify source emission, seed replay, failure classification and reduction. The
-planned comparison uses the original generated Core result, Rust-produced EVM
-execution, and execution of Rust Hull on Lean Core to help locate disagreements.
+specify source emission, seed replay, failure classification and reduction. A
+single-case runner compares the original generated Core result, Rust-produced
+EVM execution, and execution of Rust Hull on Lean Core. It saves all three
+observations and verifies tools and artifact hashes during replay. Automatic
+failure reduction and bounded campaigns are the next integration step.
 Core fuel, EVM gas and process timeouts remain separate resource limits.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
 tools, supported operations and validation commands. Closed generated programs

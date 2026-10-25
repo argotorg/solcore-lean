@@ -94,3 +94,68 @@ Keep regression cases and replay metadata that explain a finding. Remove
 disposable verification exports and logs after recording the results. Never
 count source rejection, missing execution or resource exhaustion as agreement.
 Core execution fuel and EVM gas have separate meanings and budgets.
+
+## Compare one case on all three paths
+
+Install the pinned-compatible Anvil toolchain and build the Rust code-image
+exporter as described in [RUST_PARITY.md](RUST_PARITY.md). The runner starts its
+own loopback-only Anvil and needs an environment that permits local listening
+sockets. It never uses an existing chain or a remote RPC endpoint.
+
+Extract one generated case from the corpus above:
+
+```sh
+python3 - <<'PY'
+import json
+from pathlib import Path
+root = Path('.upstream/semantic-cases')
+corpus = json.loads((root / 'corpus.json').read_text())
+assert corpus['status'] == 'complete' and corpus['cases']
+(root / 'case.json').write_text(json.dumps(corpus['cases'][0], indent=2) + '\n')
+PY
+python3 scripts/semantic-differential.py \
+  --case .upstream/semantic-cases/case.json \
+  --output .upstream/semantic-cases/run
+```
+
+The output directory must be new. A run rechecks and re-emits the case, computes
+the original Core result, compiles checked Rust Hull and exact Sonatina O0
+images, deploys those bytes on Anvil, and executes the same imported contract
+through Core. Every passing run has three completed observations and three
+matching pairwise comparisons. No saved expected result is trusted.
+
+The result is `report.json`. It records tool versions and hashes, pinned
+compiler/exporter receipts, source and artifact hashes, deployment and call
+inputs, budgets, process outcomes, raw observations and normalized comparisons.
+It preserves a valid returned payload of the wrong ABI length as an observable
+semantic mismatch; malformed transport remains an adapter error.
+
+Replay the complete archive into another new directory:
+
+```sh
+python3 scripts/semantic-differential.py \
+  --replay .upstream/semantic-cases/run \
+  --output .upstream/semantic-cases/replay
+```
+
+Replay verifies all recorded archive members, rejects missing or changed files
+and tool drift, restores the saved budgets, and performs fresh executions.
+To deliberately change budgets or tools, use the saved `case.json` with
+`--case` instead. This starts a new experiment rather than an exact replay.
+
+Useful limits are `--direct-fuel`, `--core-fuel`, `--gas`, `--timeout`,
+`--total-timeout`, `--output-limit` and `--artifact-limit`; see `--help` for
+defaults. The runner exits zero only for `matched`. Rejection, compiler crashes,
+execution errors, semantic mismatches, unsupported scope and inconclusive
+resource limits remain distinct in the report. In particular, insufficient
+deployment gas does not count as a mismatched return value.
+
+Run the runner's protocol and resource regressions with:
+
+```sh
+python3 scripts/test-semantic-differential.py
+```
+
+These include real child-process timeouts/output limits and artifact tampering.
+They complement actual Anvil integration; unit tests alone do not establish
+that all three execution paths ran.

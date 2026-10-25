@@ -61,7 +61,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | --- | --- | --- |
 | M0 | Record the scope, settle existing working-tree changes, update project documentation, and establish a tested clean baseline. | Complete, 2026-10-25 |
 | M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | Complete, 2026-10-25 |
-| M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | In progress |
+| M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Complete, 2026-10-25 |
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | In progress |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Planned |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
@@ -218,6 +218,26 @@ Acceptance criteria:
 - Deliberately perturbed observations are detected and stored as mismatches.
 - Replaying a saved case restores its inputs and comparison classification.
 - Resource-limit and process-failure cases cannot be reported as passes.
+
+Delivered M2:
+
+- `scripts/semantic-differential.py` connects fresh original-Core evaluation,
+  actual checked Rust compilation, Sonatina O0 images, local Anvil deployment
+  and calls, and native imported-Hull execution. A pass requires all three
+  pairwise comparisons to agree.
+- Saved runs include source/artifact/tool receipts. Replay verifies every
+  recorded archive member and rejects tool drift before reusing the experiment.
+- Valid returned bytes with the wrong ABI length remain observable mismatches.
+  Missing observations, malformed transport and resource limits cannot pass.
+- The runner's 22 focused regressions passed, including real subprocess limits,
+  artifact tampering and classification. Actual Anvil runs covered a full-width
+  Word case, nested bindings/conditions, saved-run replay, insufficient direct
+  fuel and insufficient deployment gas. A modified archived code image was
+  rejected before execution.
+
+This is a single-case execution connection. Fixed feature coverage, automatic
+failure reduction and bounded campaigns belong to M3. It does not establish
+whole-language compiler equivalence or the source emitter's correctness.
 
 ### M3: shrinking and campaign operation
 
