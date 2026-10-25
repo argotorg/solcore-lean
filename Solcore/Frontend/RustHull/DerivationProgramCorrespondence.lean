@@ -244,11 +244,8 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env statement lhs rhs initial final reason kind evaluated rhsIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    cases lhs with | mk sourceType lhsKind leftSpan =>
-    cases lhsKind <;> simp only [RecursiveStatement] at accepted
-    all_goals first
-      | exact False.elim accepted
-      | exact DerivationStatementCorrespondence.assign_fault rfl (rhsIH accepted)
+    simp only [RecursiveStatement] at accepted
+    exact DerivationStatementCorrespondence.assign_fault rfl (rhsIH accepted)
   case assignInvalid =>
     intro env statement lhs rhs initial middle value reason kind evaluated invalid rhsIH accepted safe
     obtain ⟨word, rfl⟩ := (safeControl_fault_iff reason).mp safe
@@ -369,11 +366,8 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env statement lhs rhs initial middle final value kind evaluated assigned rhsIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    cases lhs with | mk sourceType lhsKind leftSpan =>
-    cases lhsKind <;> simp only [RecursiveStatement] at accepted
-    all_goals first
-      | exact False.elim accepted
-      | exact DerivationStatementCorrespondence.assign_variable rfl (rhsIH accepted) assigned
+    simp only [RecursiveStatement] at accepted
+    exact DerivationStatementCorrespondence.assign rfl (rhsIH accepted) assigned
   case expression =>
     intro env statement value initial final sourceValue kind evaluated valueIH accepted
     cases statement with | mk statementKind span =>

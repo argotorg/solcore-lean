@@ -1,5 +1,6 @@
 import Solcore.Frontend.RustHull.ContextualStatementCorrespondence
 import Solcore.Frontend.RustHull.DerivationCorrespondenceSupport
+import Solcore.Frontend.RustHull.ProductAssignmentCorrespondence
 
 /-! Statement steps consume simulation hypotheses for the particular source
 subderivations. They do not assume a rank on calls or a universal expression
@@ -12,12 +13,13 @@ variable {σ : Type} {signatures : List Signature}
   {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
   {sourceEnvironment : Semantics.Environment}
 
-theorem assign_variable {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name : String}
-    {leftSpan : Option Span} {initial middle final : Semantics.State σ} {sourceValue : Semantics.Value}
-    (kind : statement.kind = .assign ⟨sourceType, .var name, leftSpan⟩ rhs)
+/-- The actual compiler checks a local or nested product path. The root is
+read after the RHS finishes, and only the selected component is replaced. -/
+theorem assign {statement : Stmt} {lhs rhs : Expr}
+    {initial middle final : Semantics.State σ} {sourceValue : Semantics.Value}
+    (kind : statement.kind = .assign lhs rhs)
     (right : ExprSimulation signatures codes locations captured sourceEnvironment rhs initial (.value sourceValue) middle)
-    (assigned : Semantics.assignResult sourceEnvironment middle
-      ⟨sourceType, .var name, leftSpan⟩ sourceValue = .value final) :
+    (assigned : Semantics.assignResult sourceEnvironment middle lhs sourceValue = .value final) :
     StmtSimulation signatures codes locations captured sourceEnvironment statement initial .fallthrough final := by
   intro _ fuel scope result loops expression compiled world mapping environment store
     environmentRelated globalsRelated heapRelated installed
@@ -26,20 +28,29 @@ theorem assign_variable {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name 
   cases fuel with
   | zero => simp [lowerStatement, fail] at compiled
   | succ fuel =>
-      obtain ⟨lowered, binding, index, rightCompiled, looked, _, sameType, rfl⟩ :=
-        assign_variable_components compiled
+      obtain ⟨lowered, name, path, binding, index, updated, rightCompiled, placed,
+          looked, _, selected, updatedCompiled, rfl⟩ := assignment_components compiled
       obtain ⟨extension, value, middleStore, valueRelated, evaluated, middleHeap, middleInstalled, firstFrame⟩ :=
         right.value rfl rightCompiled environmentRelated globalsRelated heapRelated installed
-      rw [sameType] at valueRelated
-      obtain ⟨sourceLocation, old, found, read, rfl⟩ := assign_variable_source assigned
+      obtain ⟨sourceLocation, sourceOld, sourceUpdated, found, read, updateSource, rfl⟩ :=
+        assignment_source placed assigned
       obtain ⟨location, entry, _, targetFound⟩ :=
         (environmentRelated.extendWorld extension) name sourceLocation binding index found looked
-      obtain ⟨oldValue, targetRead, _⟩ := middleHeap.read entry read
-      have written : middleStore.write? location (.inRight .unit value) =
-          some (middleStore.set location (.inRight .unit value)) :=
+      obtain ⟨oldValue, targetRead, oldRelated⟩ := middleHeap.read entry read
+      have updatedRenamed : updateProduct path binding.type (.var 0) (.var 1) =
+          .ok (updated.rename (Core.Renaming.lift (Core.Renaming.lift mapping))) :=
+        updateProduct_rename updatedCompiled (Core.Renaming.lift (Core.Renaming.lift mapping))
+      have oldEvaluated : Core.Evaluates (oldValue :: value :: environment) middleStore
+          (.var 0) oldValue middleStore := .var rfl
+      have valueEvaluated : Core.Evaluates (oldValue :: value :: environment) middleStore
+          (.var 1) value middleStore := .var rfl
+      obtain ⟨newValue, newRelated, updatedEvaluated⟩ :=
+        updateProduct_evaluates updatedRenamed selected oldRelated valueRelated updateSource oldEvaluated valueEvaluated
+      have written : middleStore.write? location (.inRight .unit newValue) =
+          some (middleStore.set location (.inRight .unit newValue)) :=
         Core.Store.write?_eq_some_iff.mpr ⟨middleHeap.location_bound entry, rfl⟩
-      exact ⟨extension, _, _, .fallthrough, assign_variable_core evaluated targetFound targetRead written,
-        middleHeap.write entry valueRelated written, middleInstalled.write middleHeap entry written,
+      exact ⟨extension, _, _, .fallthrough, assignment_core evaluated targetFound targetRead updatedEvaluated written,
+        middleHeap.write entry newRelated written, middleInstalled.write middleHeap entry written,
         firstFrame.trans (ClosuresPreserved.write middleHeap entry written)⟩
 
 theorem returned {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
@@ -87,9 +98,9 @@ theorem expression_statement {statement : Stmt} {value : Expr} {initial final : 
         Core.LocalLoop.fallthrough_evaluates type (targetValue :: environment) finalStore
 
 /-- A failed RHS leaves the target untouched and skips its cell read/write. -/
-theorem assign_fault {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name : String}
-    {leftSpan : Option Span} {initial final : Semantics.State σ} {reason : Semantics.Fault}
-    (kind : statement.kind = .assign ⟨sourceType, .var name, leftSpan⟩ rhs)
+theorem assign_fault {statement : Stmt} {lhs rhs : Expr}
+    {initial final : Semantics.State σ} {reason : Semantics.Fault}
+    (kind : statement.kind = .assign lhs rhs)
     (right : ExprSimulation signatures codes locations captured sourceEnvironment rhs initial (.fault reason) final) :
     StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
   intro safe fuel scope result loops expression compiled world mapping environment store locals globals heap installed
@@ -99,7 +110,8 @@ theorem assign_fault {statement : Stmt} {rhs : Expr} {sourceType : Ty} {name : S
   cases fuel with
   | zero => simp [lowerStatement, fail] at compiled
   | succ fuel =>
-      obtain ⟨lowered, binding, index, rightCompiled, _, _, _, rfl⟩ := assign_variable_components compiled
+      obtain ⟨lowered, name, path, binding, index, updated, rightCompiled,
+          _, _, _, _, _, rfl⟩ := assignment_components compiled
       obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
         right trivial rightCompiled locals globals heap installed
       cases related

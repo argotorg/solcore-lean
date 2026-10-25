@@ -14,7 +14,8 @@ connected without a body-correctness assumption: actual input parsing,
 compilation, function installation, parameter initialization, local heap, normal
 result or language fault and every finite chain of public resumptions are covered. Expression
 eligibility is syntactic and includes structured values, conditionals and
-nested calls to pure builtins and named functions. Blocks, loop initializers,
+nested calls to pure builtins and named functions. Assignments update local
+variables or nested product fields, retaining the heap on a failed RHS. Blocks, loop initializers,
 conditions, bodies, post statements, break and continue use the actual Core loop
 closure and retain its self cell across calls and nested loops. Induction on
 the independent source execution covers loops and recursive calls whenever

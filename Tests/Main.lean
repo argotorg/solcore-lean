@@ -2081,6 +2081,7 @@ import Solcore.Test.RustHullRecursiveCorrespondence
 import Solcore.Test.RustHullLocalCallsCorrespondence
 import Solcore.Test.RustHullLoopCorrespondence
 import Solcore.Test.RustHullFaultCorrespondence
+import Solcore.Test.RustHullProductCorrespondence
 import Solcore.Frontend.RustHull.Safety
 set_option autoImplicit false
 
@@ -3896,6 +3897,7 @@ def main : IO UInt32 := do
   Tests.RustHullLocalCallsCorrespondence.run
   Tests.RustHullLoopCorrespondence.run
   Tests.RustHullFaultCorrespondence.run
+  Tests.RustHullProductCorrespondence.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run

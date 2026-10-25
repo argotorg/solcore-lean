@@ -45,7 +45,7 @@ inductive RecursiveExpression (functions : List Function) : Expr → Prop where
 External effects and pattern alternatives have separate proof obligations. -/
 def RecursiveStatement (functions : List Function) : Stmt → Prop
   | ⟨.letDecl _ _, _⟩ | ⟨.comment _, _⟩ => True
-  | ⟨.assign ⟨_, .var _, _⟩ value, _⟩ | ⟨.expression value, _⟩ | ⟨.returnStmt value, _⟩ =>
+  | ⟨.assign _ value, _⟩ | ⟨.expression value, _⟩ | ⟨.returnStmt value, _⟩ =>
       RecursiveExpression functions value
   | ⟨.block body, _⟩ => ∀ statement ∈ body, RecursiveStatement functions statement
   | ⟨.forLoop init condition post body, _⟩ =>

@@ -36,7 +36,7 @@ function boundaries and every loop stage (`2b7a07347`).
 
 | Priority | Theorem / connection | Completion evidence | Status |
 | --- | --- | --- | --- |
-| 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Next |
+| 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Next |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Derive scope coverage and representation invariants from actual globals, parameters, locals and match binders; remove the public `SafeResult` assumption where justified. | Open |
 | 3 | Concrete external state is preserved. | Independent memory, storage, environment and log semantics relate to the emitted Core code and public contract state. | Open |
