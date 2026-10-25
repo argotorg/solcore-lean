@@ -9,9 +9,9 @@ namespace Solcore.Frontend.RustHull.MemorySnapshot
 open Core CodeBuilder
 
 def definitions : DataEnvironment := Memory.definitions
-private def parameter : Core.Ty := bundleType [WordMapping.type, .word, .word, .word]
+def parameter : Core.Ty := bundleType [WordMapping.type, .word, .word, .word]
 
-private def alignedBody : Core.Expr :=
+def alignedBody : Core.Expr :=
   .matchData WordMapping.dataType (LanguageResult.resultType WordMapping.type)
     (projectArgument 0 4 (.var 0))
     [LanguageResult.success WordMapping.empty,

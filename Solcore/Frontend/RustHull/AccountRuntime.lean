@@ -143,7 +143,7 @@ private def precompile (request : Code) : Code :=
     (number 0 depth) (part 7 8 request depth) (number 0 depth) (number 0 depth)) fun flag =>
   callResult (binary .wordEq flag (number 1)) (load data) (load dataSize)
 
-private def childResult (result : Code) : Code :=
+def childResult (result : Code) : Code :=
   let snapshot := second result
   let exit := part 0 9 snapshot
   let offset := part 1 9 snapshot

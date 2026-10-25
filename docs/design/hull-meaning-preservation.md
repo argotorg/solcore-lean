@@ -173,8 +173,8 @@ about evaluation of compiled catalog bodies.
 The theorem applies when a code image is supplied or the catalog is nonempty,
 which is exactly when the compiler installs code slots. A supplied empty image
 has size zero and copies zero padding. An absent image with a nonempty catalog
-keeps its unavailable-code fault. Catalog installation is covered; executing
-another catalog entry through an external call remains the next milestone.
+keeps its unavailable-code fault. Catalog installation is covered here; the child-call theorem below also
+connects execution of selected catalog entries.
 
 
 `Tests.RustHullCodeImageCorrespondence.public_resumes` supplies nine independent
@@ -224,6 +224,34 @@ gas-stipend overflow, and both caller memory-range failures. Runtime consumers
 check normal execution, interrupted execution followed by resumption, and the
 retained Core snapshot, including storage, logs, balances and failed receipts.
 
+`ContractChildCallCorrespondence.compileObject_resumes_exact` connects compiled
+catalog children to the same public runner. The source catalog selects Hull
+programs and bodies independently. Actual catalog compilation supplies the
+closures and their indices; actual initial-world construction supplies their
+executable identities. The public assumptions concern source evaluation,
+syntactic eligibility, catalog selection and initial account code. They do not
+assume a Core evaluation or callback correctness.
+
+The child allocator supplies fresh memory, return data, message observations,
+gas and code cells, while reusing the current world, balances and logs. Captured
+ambient references remain available after intervening parent effects. Actual
+child completion extracts returned bytes, and account dispatch either commits
+the shared changes or restores its checkpoint. The proof preserves the parent's
+local cells throughout child execution and return-data extraction.
+
+This theorem permits arbitrary successfully compiled catalogs with the stated
+source-to-catalog correspondence. Selected children use the established effect
+language without further external calls (`CallFree`). Root reentry, nested child
+calls, precompiles and other call modes remain outside this instance.
+
+`Tests.RustHullChildCallCorrespondence.public_resumes` supplies four independent
+source derivations: a child returns after memory, storage, transient storage and
+log writes; the child reverts with return data; it exits invalid; or a static
+call rejects its storage write. The parent writes storage, memory and a log
+before calling, then observes call status, full return-data size and the copied
+byte. Runtime consumers check public receipts, two resumptions, shared rollback,
+parent-local preservation and transaction finalization.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -232,7 +260,7 @@ retained Core snapshot, including storage, logs, balances and failed receipts.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls without child execution reach public receipts, including transfers, rejection and dispatch rollback. Compiled children, additional call modes, destruction and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls, including compiled call-free children, reach public receipts with transfers, return data and checkpoint rollback. Nested calls, additional call modes, precompiles, destruction and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -242,22 +270,21 @@ delay those connections.
 
 ## Next public milestone
 
-Connect compiled children that return or revert after changing shared state,
-including their return data and rollback. Then cover the remaining account
-operations and assembly. Each step
-must derive runtime inputs from actual initialization and end in a public
-theorem consumer.
+Extend compiled-child execution to nested calls, then cover the remaining call
+modes, precompiles, account operations and assembly. Each step must derive
+runtime inputs from actual initialization and end in a public theorem consumer.
 
 ## Remaining public connections
 
-`call` and `staticcall` have a public connection for calls without child execution.
-Their compiled-child and precompile branches remain. Five builtins still have no
+`call` and `staticcall` have public connections for calls without child execution
+and for compiled call-free children. Nested children and precompile branches
+remain. Five builtins still have no
 public effect connection: `callcode`, `delegatecall`, `create`, `create2` and
 `selfdestruct`.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Preserve executable code identities from actual initial-world construction and catalog compilation. Connect a compiled child that returns or reverts after storage and log writes, then additional call modes and precompiles. Reuse the installed callbacks, caller transport and public connection already proved for absent targets. |
+| 1 | Contract calls | Extend the connected compiled-child theorem to finite nested calls, then additional call modes and precompiles. Reuse catalog identities, actual child allocation, checkpoint restoration and the public connection already proved for call-free children. |
 | 2 | Account destruction | Connect beneficiary transfers, static rejection and transaction-finalization rules to the actual public receipt. Reuse the mutable balance resource established for calls. |
 | 3 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 4 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
