@@ -126,6 +126,23 @@ def comptime_policy_case(variant="offset", value=1, helpers=2):
     return case
 
 
+def module_policy_case(value=1, helpers=2):
+    """Four-file transport and coverage fixture, not a compilable result oracle."""
+    case = comptime_policy_case('offset', value, helpers)
+    plan = case.pop('comptimePlan')
+    plan.pop('variant')
+    plan['schema'] = 'solcore-lean.module-plan.v1'
+    case.update(schema=campaign.m2.MODULE_CASE_SCHEMA, modulePlan=plan)
+    case['sourceBundle'] = {'schema': campaign.m2.bundle_transport.SCHEMA, 'entry': 'case.sol',
+        'files': [{'path': name, 'source': case['source'] if name == 'case.sol' else '// provider fixture'}
+                  for name in campaign.m2.bundle_transport.FILES]}
+    case['contract'].update(name='SynthesizedModules', deployPath=['SynthesizedModulesDeploy'],
+        runtimePath=['SynthesizedModulesDeploy', 'SynthesizedModules'])
+    case['provenance']['origin'].update(kind='module-generated')
+    case['provenance']['origin'].pop('variant')
+    return case
+
+
 class AnalysisTests(unittest.TestCase):
     def test_normal_analysis_never_changes_observations(self):
         report = matched()
@@ -1138,6 +1155,126 @@ class ComptimeCoverageTests(unittest.TestCase):
             summary = json.loads((output / 'summary.json').read_text())
             self.assertEqual(summary['status'], 'coverage-incomplete')
             self.assertEqual(summary['constantCoverage']['missingFeatures'], ['if'])
+
+
+class ModuleCoverageTests(unittest.TestCase):
+    def manifest(self):
+        case = module_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-modules',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS['runtime-modules'])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.INPUT_BOUNDARIES),
+            'requiredHelperCounts': [1, 2, 3], 'moduleRequirements': {'branches': ['even', 'odd']},
+            'requiredConstantFeatures': case['provenance']['constantFeatures'],
+            'cases': [{'id': 'module', 'input': '1', 'modulePlan': case['modulePlan'],
+                       'expectedConstantFeatures': case['provenance']['constantFeatures'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_bundle_profile_requires_its_plan_and_both_feature_inventories(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        for invalid in (None, {}, {'branches': ['odd', 'odd']}, {'branches': ['left']},
+                {'branches': [True]}, {'branches': ['even'], 'unknown': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'moduleRequirements': invalid})
+        for invalid in (None, ['wordLiteral', 'wordLiteral'], [True], {}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'requiredConstantFeatures': invalid})
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**value['cases'][0], 'expectedConstantFeatures': invalid}]})
+        for key in ('requiredConstantFeatures', *campaign.PROFILE_VERSION_FIELDS['runtime-modules']):
+            invalid = copy.deepcopy(value)
+            del invalid[key]
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        for profile in ('runtime-generics', 'runtime-comptime', 'closed-g0'):
+            with self.assertRaises(ValueError):
+                campaign.module_requirements({'profile': profile, 'moduleRequirements': value['moduleRequirements']})
+        entry = value['cases'][0]
+        for changed in ({**entry, 'program': {}}, {**entry, 'generation': {'seed': '0', 'maxProgramNodes': 384}},
+                {'id': 'module', 'input': '1', 'comptimePlan': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+
+    def test_original_constant_and_step_features_exclude_module_wrappers(self):
+        for value in (0, 1, 2**255, 2**256 - 1):
+            case = module_policy_case(value, 3)
+            case['program'] = {}
+            self.assertEqual(campaign.helper_counts(case), {3})
+            self.assertEqual(campaign.specified_modules(case), {'odd' if value & 1 else 'even'})
+            self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+            self.assertEqual(campaign.constant_features(case), set(case['provenance']['constantFeatures']))
+        self.assertEqual(campaign.specified_modules(comptime_policy_case()), set())
+        case['provenance']['constantFeatures'] = ['wordLiteral', 'wordLiteral']
+        self.assertEqual(campaign.constant_features(case), {'wordLiteral'})
+
+    def test_generated_manifest_requests_four_inputs_and_checks_constant_inventory(self):
+        for forged in (False, True):
+            with tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile, config.cases = 'runtime-modules', 1
+                value = self.manifest()
+                del value['cases'][0]['modulePlan']
+                value['cases'][0]['generation'] = {'seed': '0', 'maxProgramNodes': 384}
+                if forged: value['cases'][0]['expectedConstantFeatures'] = ['wordLiteral']
+                config.corpus = Path(directory) / 'manifest.json'
+                config.corpus.write_text(json.dumps(value))
+                instance = campaign.Campaign(config)
+                calls = []
+                def tool(arguments, stage):
+                    calls.append((arguments, stage))
+                    return {'cases': [module_policy_case()]}
+                instance.tool = tool
+                if forged:
+                    with self.assertRaisesRegex(ValueError, 'constant feature inventory changed'):
+                        instance.prepare_cases()
+                else:
+                    self.assertEqual(len(instance.prepare_cases()['cases']), 1)
+                    self.assertEqual(instance.summary['moduleCoverage']['generatedBranches'], ['odd'])
+                    self.assertEqual(instance.summary['constantCoverage']['generatedFeatures'], sorted(value['requiredConstantFeatures']))
+                    self.assertEqual(instance.summary['constantCoverage']['matchedFeatures'], [])
+                self.assertEqual(calls, [(['module-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+
+    def test_resource_and_rejection_cannot_satisfy_module_branch_or_constant_coverage(self):
+        for failure in ('inconclusive-resource', 'source-rejected', 'compilation-rejected'):
+            with tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile, config.cases, config.shrink_attempts = 'runtime-modules', 2, 0
+                instance = campaign.Campaign(config)
+                cases = [module_policy_case(i) for i in (0, 1)]
+                cases[0]['provenance']['constantFeatures'] = ['wordLiteral']
+                instance.summary['moduleCoverage']['requiredBranches'] = ['even', 'odd']
+                instance.summary['constantCoverage']['requiredFeatures'] = cases[1]['provenance']['constantFeatures']
+                instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                    'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+                def execute_case(case):
+                    folder = instance.work / case['input']
+                    folder.mkdir()
+                    report = matched()
+                    if case['input'] != '0': report['comparison'] = {'category': failure, 'pairs': {}}
+                    return folder, report, campaign.analyze(report)
+                instance.execute_case = execute_case
+                with redirect_stdout(io.StringIO()): instance.run()
+                self.assertEqual(instance.summary['moduleCoverage']['matchedBranches'], ['even'])
+                self.assertEqual(instance.summary['moduleCoverage']['missingBranches'], ['odd'])
+                self.assertEqual(instance.summary['constantCoverage']['matchedFeatures'], ['wordLiteral'])
+                self.assertEqual(instance.summary['constantCoverage']['missingFeatures'], ['binary:Solcore.Core.Wire.BinaryOp.wordAdd'])
+                self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_missing_module_branch_fails_an_otherwise_matched_campaign(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+            def run(instance):
+                instance.summary['status'] = 'complete'
+                instance.summary['counts'].update(generated=1, executed=1, completed=1, matched=1)
+                instance.summary['moduleCoverage'].update(requiredBranches=['even', 'odd'],
+                    generatedBranches=['odd'], matchedBranches=['odd'])
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-modules', '--cases', '1']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 1)
+            summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(summary['status'], 'coverage-incomplete')
+            self.assertEqual(summary['moduleCoverage']['missingBranches'], ['even'])
 
 
 class CancellationTests(unittest.TestCase):

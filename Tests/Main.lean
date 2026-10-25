@@ -1850,6 +1850,8 @@ import Solcore.Test.SourceClosureEmitter
 import Solcore.Test.SourceClosureCases
 import Solcore.Test.SourceComptimeEmitter
 import Solcore.Test.SourceComptimeCases
+import Solcore.Test.SourceModuleEmitter
+import Solcore.Test.SourceModuleCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -3917,6 +3919,8 @@ def run : IO Unit := do
   SourceClosureCases.testSourceClosureCases
   SourceComptimeEmitter.testSourceComptimeEmitter
   SourceComptimeCases.testSourceComptimeCases
+  SourceModuleEmitter.testSourceModuleEmitter
+  SourceModuleCases.testSourceModuleCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter

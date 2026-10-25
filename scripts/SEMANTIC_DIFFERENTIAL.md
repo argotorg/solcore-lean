@@ -912,7 +912,7 @@ negative cases. A separate generated pair case reduced its high-bit input to
 zero in eight accepted candidate executions while preserving the synthetic
 failure fingerprint and type. Original/reduced archive replay and synthetic
 replay passed. A fuel-one run remained inconclusive. Capturing closures,
-comptime and module combinations remain separate M6 slices.
+comptime and module combinations use the separate profiles below.
 
 
 ## Compare captured closures
@@ -966,7 +966,7 @@ original step and excludes the fixed capture/apply/ABI wrapper.
 This profile is limited to fixed callable identities and Word snapshots.
 Writes through captures, aggregate captures, escaped closure factories and
 dynamic selection between different callable identities are separate scopes.
-Comptime and source-module bundles are the following M6 slices.
+Comptime and source-module bundles use the separate profiles below.
 
 The fixed closure corpus contains 24 cases across six plans. All matched across
 the three real execution paths, covering nineteen step AST features, four Word
@@ -1037,8 +1037,8 @@ comptime evaluation with `SC0409`.
 
 Comptime source-emitter correctness is tested, not formally proved. This
 profile does not unify the native Lean frontend's own staging evaluator or
-claim unrestricted cross-stage persistence. Module bundles and mixed-feature
-programs are the next M6 slice.
+claim unrestricted cross-stage persistence. The module profile below combines
+this staging boundary with imported generics and captured closures.
 
 All 32 fixed comptime cases across eight plans match the three real execution
 paths. Coverage includes all fifteen enabled constant AST features, 21 step AST
@@ -1049,3 +1049,126 @@ accepted executions while keeping its maximum-Word input and synthetic
 fingerprint. Original/reduced archive replay and synthetic replay passed;
 actual fuel-one execution remained inconclusive. All 64 saved cases from the
 eight earlier pure profiles retained identical native artifacts and results.
+
+
+## Compare module bundles and mixed features
+
+The `runtime-modules` profile emits four flat files with explicit imports and
+exports. Every provider contributes to the returned Word:
+
+| File | Role |
+| --- | --- |
+| `case.sol` | ABI entry, staged constant, ordered provider calls and generic selection. |
+| `common.sol` | Original closed constant expression, comptime parameter/return, generic apply and select. |
+| `left.sol` | Original aggregate step, a Word snapshot closure and mutation of its outer local. |
+| `right.sol` | A distinct Word snapshot closure, input-dependent capture and outer mutation. |
+
+Let `k` be the original closed constant, and `x` the runtime input. The left
+provider captures `step(x + k)`, increments its outer local, and combines a
+closure call with that current local. The right provider captures `x ^ k`,
+increments its outer local by two, and likewise combines its closure result
+with the current local. Both providers pass a closure through the imported
+generic apply function. After both return, an imported generic selector chooses
+left for odd input and right for even input. The final Word is selected plus
+left plus three times right plus `k`. Both captures and every provider therefore
+remain observable even when one selector branch is not taken.
+
+The Core reference retains both original ASTs, creates actual snapshot lambdas,
+and evaluates the corresponding fixed composition. It does not parse the
+emitted files or reuse Rust's specialized constants, closures or function IDs.
+The full program is checker-sealed; the module emitter's meaning preservation
+remains unproved.
+
+```sh
+lake build semanticCaseTool rustHullScenario
+python3 scripts/semantic-campaign.py \
+  --profile runtime-modules --seed 1 --nodes 384 --cases 16 --attempts 512 \
+  --output .upstream/semantic-modules
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-module-corpus.json --seconds 900 \
+  --output .upstream/semantic-module-ci
+python3 Tests/scripts/test-semantic-module-corpus.py
+python3 scripts/test-semantic-source-bundle.py
+```
+
+Native commands are `module-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`module-emit PLAN.json INPUT [FUEL]`. A `solcore-lean.module-plan.v1` plan retains
+`constantProgram` and `stepProgram`; the composition is fixed and has no
+variant field. All 512 permitted nodes include both ASTs and the composition.
+Random generation reserves at most eight nodes for the constant and defaults
+to a 512-attempt campaign limit. All four boundary inputs are emitted per
+accepted plan. Constant/step/input shrinking retains typed step binders,
+strictly decreases the full original program, and regenerates all four files.
+
+Each `solcore-lean.semantic-module-case.v1` case has `modulePlan`, the applied
+Core `program`, the usual input/ABI/provenance fields, and `sourceBundle`:
+
+```json
+{
+  "schema": "solcore-lean.source-bundle.v1",
+  "entry": "case.sol",
+  "files": [
+    {"path": "case.sol", "source": "..."},
+    {"path": "common.sol", "source": "..."},
+    {"path": "left.sol", "source": "..."},
+    {"path": "right.sol", "source": "..."}
+  ]
+}
+```
+
+The names and ordering are fixed, and `source` is a byte-identical alias of the
+entry text. Native replay reconstructs every file and its import/export graph.
+Changed providers, missing/extra files, noncanonical names and mismatched entry
+aliases cannot pass replay.
+
+Hull's span-derived source inventory may omit a loaded provider after staging
+or optimization. The adapter therefore saves and hashes all four generated
+files independently before and after both exports. It also checks the complete
+tracked pinned standard-library source inventory. The fresh source root is
+flat; extra source files, directories and symlinks are rejected. A generated
+source URI is recognized only by its exact recorded URI, never by basename or
+suffix. Library URIs and hashes remain separate.
+
+`sourceBundleReceipt` retains all relative file hashes, their original URIs and
+the pinned library inventory. Replay verifies every archived provider even if
+it is absent from Hull spans, then compares generated hashes by canonical
+relative name. It does not read the former source directory. An archive can
+therefore be moved before replay, while the pinned library/tool identities must
+remain unchanged:
+
+```sh
+python3 scripts/semantic-differential.py --case CASE.json --output .upstream/module-run
+mv .upstream/module-run .upstream/module-archive
+python3 scripts/semantic-differential.py --replay .upstream/module-archive \
+  --output .upstream/module-replay
+```
+
+The fixed corpus requires both prescribed selection branches through
+`moduleRequirements.branches` and `moduleCoverage`. Step and original constant
+features remain separate inventories, as in the comptime profile. These are
+source recipe inventories, not measured import, specialization or opcode
+coverage. The scope is this fixed four-file graph, Word captures and ABI Word
+results; arbitrary module graphs, cyclic imports, dynamic ABI and native Lean
+frontend equivalence are outside it.
+
+All 32 fixed module cases across eight plans match the three actual execution
+paths, with no errors, rejections or inconclusive cases. Coverage includes 21
+step AST features, all fifteen closed-constant features, one through three
+helpers, four boundary inputs, four generation recipes and both prescribed
+selection branches. Native validation checks eleven smaller candidates and 31
+negative, tamper, path and fuel cases. All 72 saved cases from the nine earlier
+pure profiles retain identical native artifacts and observations.
+
+Exact archive replay passed after relocation to a path containing spaces and
+removal of the old directory. A synthetic mismatch accepted twelve reductions
+in twelve executions, reducing both constant and step while retaining its
+maximum-Word input and fingerprint. Actual reduced archive replay matched;
+synthetic replay preserved the finding. This bounded search makes no global
+minimality claim. Fuel-one execution was inconclusive. Missing archived
+provider inventory and an extra `foreign.sol` were rejected before processes
+started.
+
+The full repository build (9,900 jobs), tests and semantic-kernel check passed,
+as did 33 protocol, 61 campaign and ten source-bundle regressions. M6 is complete
+for its bounded generic, closure, comptime and module profiles. These results
+do not prove source-emitter preservation or language-wide compiler correctness.

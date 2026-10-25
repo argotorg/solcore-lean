@@ -217,7 +217,12 @@ Core execution of the original closed expression. All 32 fixed cases agree,
 including all fifteen enabled constant-expression features. Reduction and
 archive replay pass. See
 [comptime comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-comptime-expressions).
-Module bundles and mixed-feature programs are the remaining M6 slice.
+The module profile combines these features across four source files with
+explicit imports and exports. All 32 fixed cases agree across the three paths;
+reduction and archive replay also pass, including replay after moving the
+archive. See [module comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-module-bundles-and-mixed-features).
+M6 is complete within these bounded profiles. This does not establish
+language-wide coverage or prove source-emitter meaning preservation.
 
 ## Code layout
 

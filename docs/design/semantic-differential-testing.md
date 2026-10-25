@@ -70,7 +70,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Complete, 2026-10-25 |
-| M6 | Add selected generics, closures, comptime and module combinations. | In progress: M6a–M6c complete |
+| M6 | Add selected generics, closures, comptime and module combinations. | Complete within the bounded profiles, 2026-10-25 |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
 basic comparison cannot reproduce and reduce its own failures.
@@ -442,7 +442,7 @@ The bounded-loop slice completes the restricted M4 scope:
   cases from the older five profiles retained identical artifacts and
   observations. Focused protocol/campaign regressions passed.
 
-M4 and M5 are complete within the documented restrictions. M6 is in progress.
+M4 through M6 are complete within the documented restrictions.
 Stateful scenarios retain an original Core reference that does not share the
 Rust frontend.
 
@@ -697,7 +697,7 @@ M5 is complete within these fixed storage, rollback and depth-one call profiles.
 Commands are in
 [Bounded parent/child comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-parentchild-calls).
 
-M6 proceeds in four connected slices:
+M6 is delivered in four connected slices:
 
 - **M6a: generic selection.** Instantiate one source `select<a>` at Word,
   internal Word pair, and internal Word sum types. Evaluate the two step
@@ -808,10 +808,44 @@ Delivered M6c:
   Rust's comptime evaluation with `SC0409`. No upstream bug was found in this
   slice; native Lean frontend staging remains outside this profile.
 
-Each slice requires fresh three-way execution, strict native reconstruction,
-failure-preserving reduction, a fixed corpus and saved-run replay. M6 remains
-in progress until all four slices meet those requirements. None establishes
-formal correctness of the source emitter or unrestricted feature coverage.
+Delivered M6d:
+
+- A fixed four-file bundle (`case.sol`, `common.sol`, `left.sol`, `right.sol`)
+  combines genuine comptime parameters/returns, imported generic apply/select
+  functions and Word snapshot closures whose outer locals are later assigned.
+  Every provider contributes to the result. The independent Core reference
+  retains both original ASTs and actual typed closure applications; its fixed
+  composition adds 160 nodes, counted within the complete 512-node limit.
+- All 32 fixed cases across eight plans match original Core, imported Hull and
+  Rust EVM execution, with no errors, rejections or inconclusive results. The
+  corpus covers 21 step AST features, all fifteen closed-constant features,
+  helper counts one through three, all four boundary inputs and generation
+  recipes, and both prescribed input-parity selection branches. These are
+  source inventories, not measured opcode or import coverage.
+- Native validation checks eleven strictly smaller candidates and 31 negative,
+  tamper, path and fuel cases. Seventy-two saved cases from the nine earlier
+  pure profiles retain byte-identical artifacts and observations.
+- Cases and archives retain all four canonical provider texts and hashes,
+  including providers absent from optimized Hull spans. Exact replay passed
+  after moving an archive to a path containing spaces and removing its old
+  directory. Missing provider inventory and an extra `foreign.sol` are rejected
+  before starting execution processes.
+- A synthetic mismatch accepted twelve reductions in twelve candidate
+  executions, reducing both original ASTs while retaining maximum-Word input
+  and its fingerprint. The actual reduced archive replay matched all paths;
+  synthetic replay reproduced the finding. The attempt bound is recorded and
+  does not imply minimality. Actual fuel-one execution was inconclusive.
+- The full repository build (9,900 jobs), test suite and semantic-kernel check
+  passed, along with 33 protocol, 61 campaign and ten source-bundle regressions.
+
+All four M6 slices now have fresh three-way execution, strict native
+reconstruction, failure-preserving reduction, a fixed corpus and saved-run
+replay. M6 is complete within these bounded profiles. The module scope is the
+fixed flat import graph, Word captures and ABI Word results; arbitrary module
+graphs, cyclic imports and native Lean frontend equivalence remain outside it.
+None establishes formal correctness of the source emitter or unrestricted
+feature coverage. Commands are in
+[Module bundle comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-module-bundles-and-mixed-features).
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

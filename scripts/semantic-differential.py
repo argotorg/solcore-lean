@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -27,6 +28,10 @@ import urllib.request
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
+_bundle_spec = importlib.util.spec_from_file_location("semantic_source_bundle", ROOT / "scripts/semantic-source-bundle.py")
+assert _bundle_spec and _bundle_spec.loader
+bundle_transport = importlib.util.module_from_spec(_bundle_spec)
+_bundle_spec.loader.exec_module(bundle_transport)
 CASE_SCHEMA = "solcore-lean.semantic-case.v1"
 INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
@@ -36,14 +41,15 @@ LOOP_CASE_SCHEMA = "solcore-lean.semantic-loop-case.v1"
 GENERIC_CASE_SCHEMA = "solcore-lean.semantic-generic-case.v1"
 CLOSURE_CASE_SCHEMA = "solcore-lean.semantic-closure-case.v1"
 COMPTIME_CASE_SCHEMA = "solcore-lean.semantic-comptime-case.v1"
+MODULE_CASE_SCHEMA = "solcore-lean.semantic-module-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
                  AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
-                 GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime"}
+                 GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
                   AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
-                  GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime"}
+                  GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -170,6 +176,14 @@ def validate_comptime_plan(plan) -> dict:
     return plan
 
 
+def validate_module_plan(plan) -> dict:
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.module-plan.v1":
+        raise ValueError("unsupported module plan schema")
+    if not isinstance(plan.get("stepProgram"), dict) or not isinstance(plan.get("constantProgram"), dict):
+        raise ValueError("module plan requires its original constant and step programs")
+    return plan
+
+
 def validate_case(case: dict) -> None:
     if not isinstance(case, dict) or case.get("schema") not in CASE_PROFILES:
         raise ValueError("unsupported semantic case schema")
@@ -183,6 +197,11 @@ def validate_case(case: dict) -> None:
         validate_closure_plan(case.get("closurePlan"))
     if case["schema"] == COMPTIME_CASE_SCHEMA:
         validate_comptime_plan(case.get("comptimePlan"))
+    if case["schema"] == MODULE_CASE_SCHEMA:
+        validate_module_plan(case.get("modulePlan"))
+        bundle_transport.validate(case)
+    elif "sourceBundle" in case:
+        raise ValueError("source bundles are only admitted by the module profile")
     provenance = case.get("provenance")
     if not isinstance(provenance, dict):
         raise ValueError("case provenance is missing")
@@ -503,6 +522,8 @@ def execute(args, report: dict) -> None:
         original = args.replay / "case.json"
     case = read_json(original)
     validate_case(case)
+    if args.replay and case["schema"] == MODULE_CASE_SCHEMA:
+        bundle_transport.verify_archive(args.replay, case, previous)
     report["scope"] = {
         CASE_SCHEMA: "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word",
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
@@ -512,11 +533,33 @@ def execute(args, report: dict) -> None:
         LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
         GENERIC_CASE_SCHEMA: "runtime Word input, generic Word/pair/sum selection versus checked monomorphic Core, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
         CLOSURE_CASE_SCHEMA: "runtime Word capture, repeated or independent snapshot closures and outer mutation, checked Core lambdas, Sonatina O0, run(uint256) ABI Word",
-        COMPTIME_CASE_SCHEMA: "original closed G0 expression evaluated by source comptime versus Core, runtime aggregate step and Word input, Sonatina O0, run(uint256) ABI Word"
+        COMPTIME_CASE_SCHEMA: "original closed G0 expression evaluated by source comptime versus Core, runtime aggregate step and Word input, Sonatina O0, run(uint256) ABI Word",
+        MODULE_CASE_SCHEMA: "four canonical source modules combining generic selection, snapshot closures and comptime with original Core ASTs, Sonatina O0, run(uint256) ABI Word"
     }[case["schema"]]
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))
-    source.write_text(case["source"])
+    bundle_receipt = None
+    library_paths = []
+    if case["schema"] == MODULE_CASE_SCHEMA:
+        bundle_receipt = bundle_transport.write(args.output, case)
+        revision = runner.process("pinned-library-revision", ["git", "-C", str(args.upstream), "rev-parse", "HEAD"], 10)
+        dirty = runner.process("pinned-library-clean", ["git", "-C", str(args.upstream), "diff", "--quiet", "HEAD", "--", "std"], 10)
+        tracked = runner.process("pinned-library-inventory", ["git", "-C", str(args.upstream), "ls-files", "-z", "--", "std"], 10)
+        if revision["returncode"] or revision["stdout"].strip() != UPSTREAM_COMMIT or dirty["returncode"] or tracked["returncode"]:
+            raise ValueError("module profile requires the pinned unmodified standard library")
+        library_paths = [name for name in tracked["stdout"].split("\0") if name.endswith(".sol")]
+        bundle_receipt["libraries"] = bundle_transport.library_files(args.upstream, library_paths)
+        report["sourceBundleReceipt"] = bundle_receipt
+        if args.replay and bundle_receipt["libraries"] != previous["sourceBundleReceipt"]["libraries"]:
+            raise Finding("adapter-error", "replay", "pinned standard-library inventory or hashes changed")
+    else:
+        source.write_text(case["source"])
+
+    def audit_bundle():
+        if bundle_receipt is not None:
+            bundle_transport.audit_files(args.output, bundle_receipt["files"])
+            if bundle_transport.library_files(args.upstream, library_paths) != bundle_receipt["libraries"]:
+                raise ValueError("standard-library sources changed during export")
     report.update(caseSha256=file_digest(case_path), sourceSha256=file_digest(source),
                   programSha256=digest(json_bytes(case["program"])), provenance=case["provenance"],
                   replayOf=str(args.replay.resolve()) if args.replay else None)
@@ -528,6 +571,8 @@ def execute(args, report: dict) -> None:
         "leanToolchain": (ROOT / "lean-toolchain").read_text().strip(),
         "exporters": {name: file_digest(ROOT / "scripts" / name) for name in
                       ("export-rust-hull.py", "export-rust-code-image.py", "rust-hull-export.rs", "rust-code-image-export.rs")}}
+    if bundle_receipt is not None:
+        report["tools"]["bundleTransportSha256"] = file_digest(ROOT / "scripts/semantic-source-bundle.py")
     revision = runner.process("repository-revision", ["git", "rev-parse", "HEAD"], 10)
     dirty = runner.process("repository-diff", ["git", "diff", "--binary", "HEAD"], 10)
     if revision["returncode"] or dirty["returncode"]:
@@ -535,7 +580,7 @@ def execute(args, report: dict) -> None:
     report["repository"] = {"revision": revision["stdout"].strip(), "trackedDiffSha256": digest(dirty["stdout"].encode())}
     if args.replay:
         # Tool drift is an explicit finding, never silently a reproducible replay.
-        for key in ("runnerSha256", "exporters", "leanToolchain"):
+        for key in ("runnerSha256", "exporters", "leanToolchain") + (("bundleTransportSha256",) if bundle_receipt is not None else ()):
             if report["tools"][key] != previous.get("tools", {}).get(key):
                 raise Finding("adapter-error", "replay", f"{key} changed since saved run")
         for key in ("caseTool", "coreRunner", "anvil"):
@@ -545,7 +590,7 @@ def execute(args, report: dict) -> None:
         [str(args.case_tool), "replay", str(case_path), str(args.direct_fuel)])
     fresh = json.loads(refreshed["stdout"])
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "genericPlan", "closurePlan", "comptimePlan"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
     (args.output / "replayed-case.json").write_bytes(json_bytes(fresh))
@@ -556,10 +601,15 @@ def execute(args, report: dict) -> None:
         return
     hull_path, image_path = args.output / "hull.json", args.output / "images.json"
     common = [str(source), "--root", str(args.output), "--upstream", str(args.upstream), "--target-dir", str(args.target_dir)]
+    audit_bundle()
     checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *common, "--output", str(hull_path)])
+    audit_bundle()
     checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *common,
         "--output", str(image_path), "--hull-output", str(hull_path), "--timeout", str(args.timeout)], args.timeout * 3)
+    audit_bundle()
     report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit)
+    if bundle_receipt is not None:
+        bundle_transport.normalized_sources(report["exportProvenance"]["hull"].get("sources"), bundle_receipt, case)
     if args.replay and "exportProvenance" in previous:
         old = previous["exportProvenance"]
         new = report["exportProvenance"]
@@ -567,8 +617,12 @@ def execute(args, report: dict) -> None:
             raise Finding("adapter-error", "replay", "Rust compiler/exporter build changed")
         # The saved .sol path changes in a copied run; the pinned library hashes
         # must still agree. The emitted source is independently rechecked above.
-        old_sources = {key: value for key, value in old["hull"].get("sources", {}).items() if not key.endswith("/case.sol")}
-        new_sources = {key: value for key, value in new["hull"].get("sources", {}).items() if not key.endswith("/case.sol")}
+        if bundle_receipt is not None:
+            old_sources = bundle_transport.normalized_sources(old["hull"].get("sources"), previous["sourceBundleReceipt"], case)
+            new_sources = bundle_transport.normalized_sources(new["hull"].get("sources"), bundle_receipt, case)
+        else:
+            old_sources = {key: value for key, value in old["hull"].get("sources", {}).items() if not key.endswith("/case.sol")}
+            new_sources = {key: value for key, value in new["hull"].get("sources", {}).items() if not key.endswith("/case.sol")}
         if old_sources != new_sources:
             raise Finding("adapter-error", "replay", "imported source/library hashes changed")
     images = read_json(image_path, args.artifact_limit)

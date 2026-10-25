@@ -72,7 +72,7 @@ class CaseProfileTests(unittest.TestCase):
 
     def test_named_function_profile_retains_the_runtime_argument(self):
         for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA,
-                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA, runner.CLOSURE_CASE_SCHEMA, runner.COMPTIME_CASE_SCHEMA):
+                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA, runner.CLOSURE_CASE_SCHEMA, runner.COMPTIME_CASE_SCHEMA, runner.MODULE_CASE_SCHEMA):
             name = runner.CASE_CONTRACTS[schema]
             for value in (0, 1, 2**255, 2**256 - 1):
                 case = self.input_case(value)
@@ -85,10 +85,15 @@ class CaseProfileTests(unittest.TestCase):
                     case["closurePlan"] = {"schema": "solcore-lean.closure-plan.v1", "variant": "independent", "stepProgram": {}}
                 if schema == runner.COMPTIME_CASE_SCHEMA:
                     case["comptimePlan"] = {"schema": "solcore-lean.comptime-plan.v1", "variant": "offset", "stepProgram": {}, "constantProgram": {}}
+                if schema == runner.MODULE_CASE_SCHEMA:
+                    case["modulePlan"] = {"schema": "solcore-lean.module-plan.v1", "stepProgram": {}, "constantProgram": {}}
+                    case["sourceBundle"] = {"schema": runner.bundle_transport.SCHEMA, "entry": "case.sol",
+                        "files": [{"path": name, "source": case["source"] if name == "case.sol" else "// provider"}
+                                  for name in runner.bundle_transport.FILES]}
                 case["contract"].update(name=name,
                     deployPath=[name + "Deploy"], runtimePath=[name + "Deploy", name])
                 runner.validate_case(case)
-                with self.assertRaises(runner.Finding):
+                with self.assertRaises(ValueError if schema == runner.MODULE_CASE_SCHEMA else runner.Finding):
                     runner.validate_case({**case, "schema": runner.INPUT_CASE_SCHEMA})
                 with self.assertRaisesRegex(ValueError, "calldata differs"):
                     runner.validate_case({**case, "input": str(value ^ 1)})
@@ -137,6 +142,18 @@ class CaseProfileTests(unittest.TestCase):
                 {**plan, "constantProgram": "15"}, {**plan, "constantProgram": None}):
             with self.assertRaises(ValueError):
                 runner.validate_comptime_plan(invalid)
+
+    def test_module_plan_requires_both_original_programs(self):
+        plan = {"schema": "solcore-lean.module-plan.v1", "stepProgram": {}, "constantProgram": {}}
+        runner.validate_module_plan(plan)
+        for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None},
+                {**plan, "constantProgram": "15"}):
+            with self.assertRaises(ValueError):
+                runner.validate_module_plan(invalid)
+        case = self.input_case(0)
+        case['sourceBundle'] = {}
+        with self.assertRaisesRegex(ValueError, 'only admitted by the module profile'):
+            runner.validate_case(case)
 
 
 class ClassificationTests(unittest.TestCase):
