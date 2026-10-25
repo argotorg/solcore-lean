@@ -26,11 +26,11 @@ def snapshotType : Core.Ty := bundleType
   [.word, .word, .word, WordMapping.type, WordMapping.type,
    WordMapping.type, .word, WordMapping.type, AccountState.type]
 def resultType : Core.Ty := .product (LanguageResult.resultType .unit) snapshotType
-private def dispatchType : Core.Ty := bundleType [Calls.requestType, .word, .word]
+def dispatchType : Core.Ty := bundleType [Calls.requestType, .word, .word]
 def dispatchCallbackType : Core.Ty :=
   .function dispatchType (LanguageResult.resultType Calls.responseType)
-private def callResult (ok data size : Code) : Code := success (packet [ok, data, size])
-private def sharedNames : List String := ["world", "logs", "logSize", "balances"]
+def callResult (ok data size : Code) : Code := success (packet [ok, data, size])
+def sharedNames : List String := ["world", "logs", "logSize", "balances"]
 abbrev References := List (String × Code)
 def reference (references : References) (name : String) : Code :=
   (references.find? (·.1 == name)).map Prod.snd |>.getD unit
@@ -122,7 +122,7 @@ def allocateFrame (slots : List (String × Core.Ty)) (shared : References)
     (continuation : List Code → Code) : Code :=
   allocateFrameSlots shared frame dispatcher creator gas code codeSize codeKnown continuation slots []
 
-private def checkpoint (shared : References) (continuation : Code → Code) : Code :=
+def checkpoint (shared : References) (continuation : Code → Code) : Code :=
   let rec capture : List String → List (Code × Code) → Code
     | [], saved =>
       let restore := saved.foldr (fun (cell, value) next => bind (store cell value) (fun _ => next)) unit
@@ -160,14 +160,14 @@ private def childResult (result : Code) : Code :=
     (LanguageResult.failure Calls.responseType (.var 0))
     (callResult (CodeBuilder.boolean true) empty (number 0) (depth + 1))
 
-private def isPrecompile (target : Code) : Code :=
+def isPrecompile (target : Code) : Code :=
   choose (binary .wordEq target (number 256)) (CodeBuilder.boolean true)
     (choose (binary .wordGt target (number 0))
       (binary .wordGt (number 5) target) (CodeBuilder.boolean false))
 
 /-- Balance checks and transfers use the execution address even for delegated
 frames. CALLCODE checks funds without moving them; DELEGATECALL inherits value. -/
-private def transfer (shared : References) (source target value : Code) : Code :=
+def transfer (shared : References) (source target value : Code) : Code :=
   let balances := reference shared "balances"
   choose (binary .wordEq value (number 0)) (success unit) <|
   choose (binary .wordEq source target) (success unit) <|
@@ -179,7 +179,7 @@ private def transfer (shared : References) (source target value : Code) : Code :
   bindResult .unit (insert debited target (binary .wordAdd targetBalance value)) fun credited =>
   success (store balances credited)
 
-private def dispatch (shared : References) (runFrame : Code → Code → Code)
+def dispatch (shared : References) (runFrame : Code → Code → Code)
     (extended : Code) : Code :=
   let request := part 0 3 extended
   let mode := part 1 3 extended

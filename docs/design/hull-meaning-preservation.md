@@ -198,6 +198,32 @@ checks confirm public rollback and retained internal snapshots. Two additional
 direct-copy cases cover nonempty return data across memory words and destination
 overflow. `memoryguard` preserves its evaluated argument.
 
+`ContractCallCorrespondence.compileObject_resumes_exact` connects ordinary and
+static calls through actual compilation, installed callbacks, caller transport,
+account dispatch and public resumptions. `prepare_resumes_exact` covers the
+default preparation path. Callback closures and their captured shared references
+come from the real allocator; callback correctness is proved from their bodies.
+
+This first call theorem covers absent target accounts, balance transfers,
+insufficient funds, transfer overflow, incomplete world information, static-value
+rejection, gas-stipend overflow and caller memory-range checks. Caller memory,
+complete return data, balances, storage and logs remain in one state relation.
+Dispatch faults execute the actual checkpoint restoration before message
+completion applies its own commit or rollback rules.
+
+The source effect instance uses `noChildren`: an absent account in a complete
+world can succeed, but executing a compiled child is outside this instance.
+Explicitly stored empty-code accounts also need a further code-identity proof.
+`effectsWith` accepts a source child relation for the next step, where finite
+call-tree height will supply recursive child derivations.
+
+`Tests.RustHullCallCorrespondence.public_resumes` supplies independent source
+derivations for nine scenarios: ordinary and static calls, a balance transfer,
+insufficient funds, incomplete-world rollback, static-value rejection,
+gas-stipend overflow, and both caller memory-range failures. Runtime consumers
+check normal execution, interrupted execution followed by resumption, and the
+retained Core snapshot, including storage, logs, balances and failed receipts.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -205,8 +231,8 @@ overflow. `memoryguard` preserves its evaluated argument.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations and linked code images reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
+| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls without child execution reach public receipts, including transfers, rejection and dispatch rollback. Compiled children, additional call modes, destruction and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -216,20 +242,22 @@ delay those connections.
 
 ## Next public milestone
 
-Connect external calls and their return data, shared state and rollback through
-actual dispatch and public execution. Then cover creation and assembly. Each step
+Connect compiled children that return or revert after changing shared state,
+including their return data and rollback. Then cover the remaining account
+operations and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
 theorem consumer.
 
 ## Remaining public connections
 
-The current effect dispatcher has seven builtins outside the connected fragment:
-`call`, `staticcall`, `callcode`, `delegatecall`, `create`, `create2` and
+`call` and `staticcall` have a public connection for calls without child execution.
+Their compiled-child and precompile branches remain. Five builtins still have no
+public effect connection: `callcode`, `delegatecall`, `create`, `create2` and
 `selfdestruct`.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Derive the installed callback and code identity from actual compilation and initialization. Relate copied calldata, child execution, return bytes, balances, storage, logs and rollback. Start with an empty-account call, then a compiled child that returns or reverts after writes. |
+| 1 | Contract calls | Preserve executable code identities from actual initial-world construction and catalog compilation. Connect a compiled child that returns or reverts after storage and log writes, then additional call modes and precompiles. Reuse the installed callbacks, caller transport and public connection already proved for absent targets. |
 | 2 | Account destruction | Connect beneficiary transfers, static rejection and transaction-finalization rules to the actual public receipt. Reuse the mutable balance resource established for calls. |
 | 3 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 4 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |

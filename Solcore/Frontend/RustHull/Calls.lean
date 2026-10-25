@@ -28,45 +28,45 @@ def requestField (index : Nat) (value : Core.Expr) : Core.Expr := projectArgumen
 def responseField (index : Nat) (value : Core.Expr) : Core.Expr := projectArgument index 3 value
 def response (success mapping length : Core.Expr) : Core.Expr := bundle [success, mapping, length]
 
-private abbrev Code := Nat → Core.Expr
-private def number (value : Nat) : Code := fun _ => .word (Word.ofNatModulo value)
-private def arg : Code := fun depth => .var depth
-private def part (index : Nat) : Code := fun depth => projectArgument index 15 (arg depth)
-private def bind (value : Code) (body : Code → Code) : Code := fun depth =>
+abbrev Code := Nat → Core.Expr
+def number (value : Nat) : Code := fun _ => .word (Word.ofNatModulo value)
+def arg : Code := fun depth => .var depth
+def part (index : Nat) : Code := fun depth => projectArgument index 15 (arg depth)
+def bind (value : Code) (body : Code → Code) : Code := fun depth =>
   .letE (value depth) (body (fun here => .var (here - depth - 1)) (depth + 1))
-private def bindResult (value : Code) (body : Code → Code) : Code := fun depth =>
+def bindResult (value : Code) (body : Code → Code) : Code := fun depth =>
   LanguageResult.bind .word (value depth)
     (body (fun here => .var (here - depth - 1)) (depth + 1))
-private def success (value : Code) : Code := fun depth => LanguageResult.success (value depth)
-private def binary (op : BinaryOp) (left right : Code) : Code := fun depth =>
+def success (value : Code) : Code := fun depth => LanguageResult.success (value depth)
+def binary (op : BinaryOp) (left right : Code) : Code := fun depth =>
   .binary op (left depth) (right depth)
-private def choose (test yes no : Code) : Code := fun depth => .ifE (test depth) (yes depth) (no depth)
-private def load (reference : Code) : Code := fun depth => .loadCell (reference depth)
-private def store (reference value : Code) : Code := fun depth => .storeCell (reference depth) (value depth)
-private def allocate (type : Core.Ty) (value : Code) : Code := fun depth => .newCell type (value depth)
-private def empty : Code := fun _ => WordMapping.empty
-private def copy (memory size destination mapping source length : Code) : Code := fun depth =>
+def choose (test yes no : Code) : Code := fun depth => .ifE (test depth) (yes depth) (no depth)
+def load (reference : Code) : Code := fun depth => .loadCell (reference depth)
+def store (reference value : Code) : Code := fun depth => .storeCell (reference depth) (value depth)
+def allocate (type : Core.Ty) (value : Code) : Code := fun depth => .newCell type (value depth)
+def empty : Code := fun _ => WordMapping.empty
+def copy (memory size destination mapping source length : Code) : Code := fun depth =>
   Memory.copyPackedFrom (memory depth) (size depth) (destination depth)
     (mapping depth) (source depth) (length depth)
-private def touch (size offset length : Code) : Code := fun depth =>
+def touch (size offset length : Code) : Code := fun depth =>
   Memory.touch (size depth) (offset depth) (length depth)
-private def memory : Code := part 0
-private def memorySize : Code := part 1
-private def returnData : Code := part 2
-private def returnSize : Code := part 3
-private def callback : Code := part 4
-private def caller : Code := part 5
-private def depth : Code := part 6
-private def childStatic : Code := part 7
-private def gas : Code := part 8
-private def target : Code := part 9
-private def value : Code := part 10
-private def inputOffset : Code := part 11
-private def inputLength : Code := part 12
-private def outputOffset : Code := part 13
-private def outputLength : Code := part 14
+def memory : Code := part 0
+def memorySize : Code := part 1
+def returnData : Code := part 2
+def returnSize : Code := part 3
+def callback : Code := part 4
+def caller : Code := part 5
+def depth : Code := part 6
+def childStatic : Code := part 7
+def gas : Code := part 8
+def target : Code := part 9
+def value : Code := part 10
+def inputOffset : Code := part 11
+def inputLength : Code := part 12
+def outputOffset : Code := part 13
+def outputLength : Code := part 14
 
-private def finish (result : Code) : Code :=
+def finish (result : Code) : Code :=
   let returned : Code := fun depth => responseField 1 (result depth)
   let length : Code := fun depth => responseField 2 (result depth)
   bind (store returnData returned) fun _ =>
@@ -75,7 +75,7 @@ private def finish (result : Code) : Code :=
     (choose (binary .wordGt length outputLength) outputLength length)) fun _ =>
   success (choose (fun depth => responseField 0 (result depth)) (number 1) (number 0))
 
-private def dispatch : Code :=
+def dispatch : Code :=
   bind (load memory) fun snapshot =>
   bind (allocate WordMapping.type empty) fun input =>
   bind (allocate .word (number 0)) fun inputSize =>
@@ -87,7 +87,7 @@ private def dispatch : Code :=
     value depth, childStatic depth, binary .wordAdd Calls.depth (number 1) depth,
     gas depth, load input depth, inputLength depth])) finish
 
-private def callCode : Code :=
+def callCode : Code :=
   bindResult (touch memorySize inputOffset inputLength) fun _ =>
   bindResult (touch memorySize outputOffset outputLength) fun _ =>
   bind (store returnData empty) fun _ =>

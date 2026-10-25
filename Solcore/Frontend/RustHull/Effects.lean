@@ -76,11 +76,11 @@ private def log (scope : Scope) (count : Nat) (arguments : List Core.Expr) : Low
   pure ⟨.unit, .ifE (.loadCell (← reference scope "isStatic" .bool))
     (← terminate scope 3 (.word Core.Word.zero) (.word Core.Word.zero)) append⟩
 
-private inductive CallMode where
+inductive CallMode where
   | ordinary | staticCall | callCode | delegateCall
   deriving BEq
 
-private def call (scope : Scope) (mode : CallMode)
+def call (scope : Scope) (mode : CallMode)
     (gas target value inputOffset inputLength outputOffset outputLength : Core.Expr) : LowerM Lowered := do
   let isStatic := Core.Expr.loadCell (← reference scope "isStatic" .bool)
   let zeroValue := Core.Expr.binary .wordEq value (.word Core.Word.zero)
