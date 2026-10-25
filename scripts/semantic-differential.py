@@ -30,8 +30,11 @@ ROOT = Path(__file__).resolve().parent.parent
 CASE_SCHEMA = "solcore-lean.semantic-case.v1"
 INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
+MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
-                 FUNCTION_CASE_SCHEMA: "runtime-functions"}
+                 FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation"}
+CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
+                  FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -128,12 +131,12 @@ def validate_case(case: dict) -> None:
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
+    name = CASE_CONTRACTS[case["schema"]]
     if case["schema"] != CASE_SCHEMA:
-        name = "SynthesizedFunctions" if case["schema"] == FUNCTION_CASE_SCHEMA else "SynthesizedInput"
         signature = "run(uint256)"
         calldata = bytes.fromhex("a444f5e9") + int(word(case.get("input"), "input")).to_bytes(32, "big")
     else:
-        name, signature = "SynthesizedG0", "run()"
+        signature = "run()"
         calldata = bytes.fromhex("c0406226")
     if (contract.get("name"), contract.get("method"), contract.get("signature")) != (name, "run", signature):
         raise Finding("unsupported-scope", "input", "contract wrapper differs from its case profile")
@@ -440,7 +443,8 @@ def execute(args, report: dict) -> None:
     report["scope"] = {
         CASE_SCHEMA: "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word",
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
-        FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word"
+        FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
+        MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word"
     }[case["schema"]]
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))

@@ -313,8 +313,8 @@ The external input regression executes two unchanged source functions at all
 four boundary inputs, checks three-way agreement and varying results, and
 replays a saved input-dependent run. The input profile also supports automatic
 reduction of its function body and input while retaining the checked application
-form. Named functions extend this workflow below; mutation, products/sums,
-matches and bounded loops remain later M4 work.
+form. Named functions and private mutable locals extend this workflow below;
+products/sums, matches and bounded loops remain later M4 work.
 
 ## Compare acyclic named functions
 
@@ -354,5 +354,48 @@ wrapper lambdas as source function definitions.
 Reduction keeps helper declarations in their original order and checks the
 complete graph after every candidate body or input change. The first reducer
 keeps the number of helpers fixed; it can remove calls or simplify bodies but
-does not delete and reindex declarations. Mutable locals, aggregates, matches
-and bounded loops remain later M4 extensions.
+does not delete and reindex declarations. Private mutable locals extend this
+workflow below; aggregates, matches and bounded loops remain later M4 work.
+
+## Compare private mutable locals
+
+The `runtime-mutation` profile keeps the Word-only ABI and one to three acyclic
+Word helpers. Each helper may allocate private Word cells, read and update them,
+and sequence Unit results through locals and branches. Cell aliases, escaping
+cells and non-Word cells are excluded. The original Core graph retains real
+allocations, loads and stores; the source uses mutable Word locals in
+`SynthesizedMutation.run(uint256)` and its helpers.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-mutation --seed 57 --nodes 192 --cases 4 --attempts 256 \
+  --output .upstream/semantic-mutation
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-mutation-corpus.json \
+  --output .upstream/semantic-mutation-ci
+python3 scripts/test-source-mutation-rust.py
+```
+
+Native commands are `mutation-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`mutation-emit FUNCTION.json INPUT [FUEL]`. Replay and shrinking use the saved
+case schema. The campaign's default node limit is 192 for this profile; the
+512-node hard limit still applies to the complete applied function graph.
+Versioned templates combine checked G0 scalar expressions with ordered stores,
+Unit branches, two independent cells and a load followed by a later update.
+Each accepted graph must return distinct values at two or more boundary inputs.
+
+Every source read is captured before subsequent effects. Unit sequencing
+binders remain in the renderer's context even when no source declaration is
+needed. Reduction preserves the typed binder inventory and helper declarations,
+rechecks the whole graph and requires smaller candidates. It may simplify store
+values or replace a store with Unit without deleting its surrounding binder.
+
+The fixed 28-case corpus contains seven graphs at all four boundary inputs. All
+cases match across the three actual paths. Coverage includes fourteen AST
+feature kinds, helper counts one through three and all four inputs. A separate
+`recipeCoverage` section records the four generator templates and update counts
+one through four. Matched recipe coverage requires native replay and three-way
+agreement; it measures generator metadata, not dynamic branches or instructions.
+The fixed manifest's recipe requirements are enforced alongside AST/input/helper
+coverage. A separate twelve-case external regression checks read-before-write
+snapshots, independent cells and callee isolation, followed by exact replay.

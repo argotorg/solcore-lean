@@ -356,13 +356,36 @@ The acyclic named-function slice is also delivered:
   focused comparison/campaign tests passed. Helper declaration coverage does
   not claim dynamic call counts or backend instruction coverage.
 
-Mutable locals within pure programs, aggregates, matches and bounded loops
-remain open within M4. M5 and M6 remain planned. Local mutation is the next slice:
-Word cells stay within their function, with no aliasing or escaping cell values.
-Every source read must capture a fresh Word temporary before evaluating later
-effects. Unit sequencing binders remain in the compiler's indexing context even
-when they emit no source declaration. Verify these evaluation-order and scope
-conditions through the full comparison before extending the profile further.
+The local-mutation slice is delivered:
+
+- A separately versioned checked DAG admits private Word cells, direct reads
+  and writes, Unit sequencing, branches and the existing acyclic Word helpers.
+  Cell aliases and escaping cells are excluded. Core checking supplies typing
+  of the graph and its applied entry; emitter preservation remains unproved.
+- The source renderer captures each cell read in a fresh Word local before
+  evaluating later effects. Unit binders stay in the indexing context even when
+  they need no source declaration. Generation, replay and reduction preserve
+  the full checked graph; reduction also preserves the typed binder inventory.
+- All 28 fixed cases matched across actual original Core, imported Hull and
+  EVM execution. Seven graphs cover read-before-write snapshots, independent
+  cells, Unit branches, callee-local mutation and four generation templates,
+  each at four boundary inputs. Fourteen AST features and helper counts one
+  through three are covered. A separate twelve-case external regression and
+  exact saved-run replay also passed.
+- Controlled mismatch reduction retained the mutation profile, followed by
+  matching real replay and reproduction of the synthetic fingerprint.
+  Insufficient generation fuel produced an explicit resource exclusion.
+- Full repository build/tests, kernel policy, deterministic native validation
+  of all four fixed corpora and focused protocol/campaign tests passed.
+  Template and update-count coverage is reported separately as replay-verified
+  generator metadata, not as executed branch or opcode coverage.
+
+Aggregates, matches and bounded loops remain open within M4. M5 and M6 remain
+planned. The next slice adds internal Word pairs and sums with case payload
+bindings, while preserving the Word-only ABI/helpers and private mutable cells.
+Keep aggregate evaluation order and payload scope explicit in source emission
+and checked reduction. Validate mixed cases through all three paths before
+extending the profile further.
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

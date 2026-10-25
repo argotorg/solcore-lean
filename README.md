@@ -157,8 +157,11 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. A further profile supports one to three acyclic
 named helpers, including shared callees, with checked generation and reduction
-of the complete Core function graph. Mutation, aggregates and bounded loops
-remain to be added to generated comparisons.
+of the complete Core function graph. The local-mutation profile compares private
+Word cells, ordered reads and writes, Unit sequencing, and helper-local state.
+Its fixed 28-case corpus matches across all three paths, including cases where
+a read must retain its value before a later write. Aggregates, matches and
+bounded loops remain to be added to generated comparisons.
 
 ## Code layout
 

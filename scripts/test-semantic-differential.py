@@ -71,17 +71,18 @@ class CaseProfileTests(unittest.TestCase):
             runner.validate_case({**case, "contract": []})
 
     def test_named_function_profile_retains_the_runtime_argument(self):
-        for value in (0, 1, 2**255, 2**256 - 1):
-            case = self.input_case(value)
-            case["schema"] = runner.FUNCTION_CASE_SCHEMA
-            case["contract"].update(name="SynthesizedFunctions",
-                deployPath=["SynthesizedFunctionsDeploy"],
-                runtimePath=["SynthesizedFunctionsDeploy", "SynthesizedFunctions"])
-            runner.validate_case(case)
-            with self.assertRaises(runner.Finding):
-                runner.validate_case({**case, "schema": runner.INPUT_CASE_SCHEMA})
-            with self.assertRaisesRegex(ValueError, "calldata differs"):
-                runner.validate_case({**case, "input": str(value ^ 1)})
+        for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA):
+            name = runner.CASE_CONTRACTS[schema]
+            for value in (0, 1, 2**255, 2**256 - 1):
+                case = self.input_case(value)
+                case["schema"] = schema
+                case["contract"].update(name=name,
+                    deployPath=[name + "Deploy"], runtimePath=[name + "Deploy", name])
+                runner.validate_case(case)
+                with self.assertRaises(runner.Finding):
+                    runner.validate_case({**case, "schema": runner.INPUT_CASE_SCHEMA})
+                with self.assertRaisesRegex(ValueError, "calldata differs"):
+                    runner.validate_case({**case, "input": str(value ^ 1)})
 
 
 class ClassificationTests(unittest.TestCase):

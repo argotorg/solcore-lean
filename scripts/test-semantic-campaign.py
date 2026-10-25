@@ -55,6 +55,18 @@ def function_case(count):
             'calldata': '0xa444f5e9' + '00' * 32, 'constructorCalldata': '0x'}}
 
 
+def mutation_policy_case(template=0, updates=1):
+    """Recipe bookkeeping fixture only; it is never passed off as a real run."""
+    case = function_case(1)
+    case['schema'] = campaign.m2.MUTATION_CASE_SCHEMA
+    case['contract'].update(name='SynthesizedMutation', deployPath=['SynthesizedMutationDeploy'],
+        runtimePath=['SynthesizedMutationDeploy', 'SynthesizedMutation'])
+    case['provenance']['templateVersion'] = 'test'
+    case['provenance']['origin'] = {'kind': 'mutation-generated', 'seed': '0', 'maxProgramNodes': 96,
+        'helpers': [{'template': template, 'updates': updates}]}
+    return case
+
+
 class AnalysisTests(unittest.TestCase):
     def test_normal_analysis_never_changes_observations(self):
         report = matched()
@@ -375,6 +387,19 @@ class ManifestTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 campaign.validate_manifest({**other, 'requiredHelperCounts': [1]})
 
+    def test_mutation_templates_have_independent_version_provenance(self):
+        value = {**self.function_manifest(), 'profile': 'runtime-mutation',
+                 'templateVersion': 'mutable-template-test'}
+        del value['abstractionVersion']
+        campaign.validate_manifest(value)
+        missing = {**value, 'abstractionVersion': 'unrelated-literal-abstraction'}
+        del missing['templateVersion']
+        with self.assertRaisesRegex(ValueError, 'templateVersion'):
+            campaign.validate_manifest(missing)
+        case = function_case(3)
+        case['schema'] = campaign.m2.MUTATION_CASE_SCHEMA
+        self.assertEqual(campaign.helper_counts(case), {3})
+
     def test_partial_materialization_preserves_generated_helper_coverage(self):
         with tempfile.TemporaryDirectory() as directory:
             config = options(directory)
@@ -403,7 +428,8 @@ class ManifestTests(unittest.TestCase):
 
     def test_generation_profile_selects_native_generator(self):
         for profile, command in (('closed-g0', 'generate'), ('runtime-word', 'input-generate'),
-                                 ('runtime-functions', 'function-generate')):
+                                 ('runtime-functions', 'function-generate'),
+                                 ('runtime-mutation', 'mutation-generate')):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
                 config = options(directory)
                 config.profile = profile
@@ -435,6 +461,137 @@ class ManifestTests(unittest.TestCase):
             self.assertTrue((saved / 'case.json').exists())
             self.assertTrue((saved / 'report.json').exists())
             self.assertFalse(instance.summary['secondaryFindings'][0]['automaticReduction'])
+
+
+class RecipeCoverageTests(unittest.TestCase):
+    def manifest(self):
+        case = mutation_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-mutation',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.PROFILE_VERSION_FIELDS['runtime-mutation'])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': [], 'requiredHelperCounts': [],
+            'generationRecipeRequirements': {'templates': [0, 1, 2, 3], 'updates': [1, 2, 3, 4]},
+            'cases': [{'id': str(index), 'input': '0', 'generation': {'seed': '0', 'maxProgramNodes': 96},
+                'expectedFeatures': case['provenance']['features']} for index in range(2)]}
+
+    def test_recipe_requirements_are_optional_unique_bounded_and_profile_specific(self):
+        manifest = self.manifest()
+        campaign.validate_manifest(manifest)
+        omitted = copy.deepcopy(manifest)
+        del omitted['generationRecipeRequirements']
+        campaign.validate_manifest(omitted)
+        campaign.validate_manifest({**manifest, 'generationRecipeRequirements': {'templates': [], 'updates': []}})
+        for invalid in (None, [], {}, {'templates': []}, {'templates': [], 'updates': [], 'other': []},
+                {'templates': [False], 'updates': []}, {'templates': [4], 'updates': []},
+                {'templates': [0, 0], 'updates': []}, {'templates': [], 'updates': [0]},
+                {'templates': [], 'updates': [5]}, {'templates': [], 'updates': [1.0]},
+                {'templates': [], 'updates': [1, 1]}, {'templates': '0', 'updates': []}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, 'generationRecipeRequirements': invalid})
+        for profile in ('closed-g0', 'runtime-word', 'runtime-functions'):
+            with self.assertRaises(ValueError):
+                campaign.recipe_requirements({'profile': profile,
+                    'generationRecipeRequirements': {'templates': [0], 'updates': []}})
+            self.assertEqual(campaign.recipe_requirements({'profile': profile}), {'templates': [], 'updates': []})
+            self.assertEqual(campaign.recipe_requirements({'profile': profile,
+                'generationRecipeRequirements': {'templates': [], 'updates': []}}), {'templates': [], 'updates': []})
+
+    def test_recipe_inventory_uses_only_generated_mutation_metadata(self):
+        case = mutation_policy_case(3, 4)
+        self.assertEqual(campaign.mutation_recipes(case), {'Templates': {3}, 'Updates': {4}})
+        for kind in ('mutation-imported', 'mutation-reduced', 'function-generated'):
+            changed = copy.deepcopy(case)
+            changed['provenance']['origin']['kind'] = kind
+            self.assertEqual(campaign.mutation_recipes(changed), {'Templates': set(), 'Updates': set()})
+        case['schema'] = campaign.m2.FUNCTION_CASE_SCHEMA
+        self.assertEqual(campaign.mutation_recipes(case), {'Templates': set(), 'Updates': set()})
+
+    def test_malformed_generated_metadata_is_rejected(self):
+        for helpers in (None, [], [None], [{}], [{'template': 0, 'updates': 1}] * 4,
+                [{'template': True, 'updates': 1}], [{'template': 4, 'updates': 1}],
+                [{'template': 0, 'updates': 0}], [{'template': 0, 'updates': '1'}]):
+            case = mutation_policy_case()
+            case['provenance']['origin']['helpers'] = helpers
+            with self.subTest(helpers=helpers), self.assertRaises(ValueError):
+                campaign.mutation_recipes(case)
+
+    def test_nonmatched_policy_outcomes_do_not_satisfy_recipe_requirements(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-mutation', 3, 0
+            instance = campaign.Campaign(config)
+            cases = [mutation_policy_case(index, index + 1) for index in range(3)]
+            instance.summary['recipeCoverage'].update(requiredTemplates=[0, 1, 2], requiredUpdates=[1, 2, 3])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1',
+                'cases': cases, 'excluded': [], 'requested': 3, 'attempted': 3, 'status': 'complete'}
+
+            def execute_case(case):
+                index = case['provenance']['origin']['helpers'][0]['template']
+                folder = instance.work / str(index)
+                folder.mkdir()
+                report = matched()
+                if index:
+                    report['comparison'] = {'category': 'inconclusive-resource' if index == 1 else 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+
+            # This substitutes outcomes only for policy control-flow testing;
+            # actual compiler/EVM evidence is produced by the external suite.
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['recipeCoverage']
+            self.assertEqual(coverage['generatedTemplates'], [0, 1, 2])
+            self.assertEqual(coverage['generatedUpdates'], [1, 2, 3])
+            self.assertEqual(coverage['matchedTemplates'], [0])
+            self.assertEqual(coverage['matchedUpdates'], [1])
+            self.assertEqual(coverage['missingTemplates'], [1, 2])
+            self.assertEqual(coverage['missingUpdates'], [2, 3])
+
+    def test_partial_generation_saves_unverified_recipe_inventory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile = 'runtime-mutation'
+            config.corpus = Path(directory) / 'manifest.json'
+            config.corpus.write_text(json.dumps(self.manifest()))
+            instance = campaign.Campaign(config)
+            calls = 0
+
+            def tool(_arguments, _stage):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise campaign.m2.Finding('inconclusive-resource', 'test-budget', 'partial generation')
+                return {'cases': [mutation_policy_case()]}
+
+            instance.tool = tool
+            with self.assertRaises(campaign.m2.Finding):
+                instance.prepare_cases()
+            saved = json.loads((Path(directory) / 'summary.json').read_text())['recipeCoverage']
+            self.assertEqual(saved['generatedTemplates'], [0])
+            self.assertEqual(saved['generatedUpdates'], [1])
+            self.assertEqual(saved['matchedTemplates'], [])
+            self.assertEqual(saved['matchedUpdates'], [])
+            self.assertEqual(saved['missingTemplates'], [0, 1, 2, 3])
+            self.assertEqual(saved['missingUpdates'], [1, 2, 3, 4])
+            self.assertIn('matched entries verified by native replay', saved['classification'])
+
+    def test_missing_recipe_requirements_fail_an_otherwise_matched_campaign(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+
+            def run(instance):
+                instance.summary['status'] = 'complete'
+                instance.summary['counts'].update(generated=2, executed=2, completed=2, matched=2)
+                instance.summary['recipeCoverage'].update(requiredTemplates=[0, 1], requiredUpdates=[1, 2],
+                    generatedTemplates=[0, 1], generatedUpdates=[1, 2], matchedTemplates=[0], matchedUpdates=[1])
+
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output),
+                    '--profile', 'runtime-mutation', '--cases', '2']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 1)
+            summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(summary['status'], 'coverage-incomplete')
+            self.assertEqual(summary['recipeCoverage']['missingTemplates'], [1])
+            self.assertEqual(summary['recipeCoverage']['missingUpdates'], [2])
 
 
 class CancellationTests(unittest.TestCase):

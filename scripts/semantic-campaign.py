@@ -33,9 +33,14 @@ PROFILES = tuple(m2.CASE_PROFILES.values())
 PROFILE_SCHEMAS = {profile: schema for schema, profile in m2.CASE_PROFILES.items()}
 PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-word": ("input-generate", "input-emit", "input-generated"),
-                    "runtime-functions": ("function-generate", "function-emit", "function-generated")}
+                    "runtime-functions": ("function-generate", "function-emit", "function-generated"),
+                    "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated")}
+HELPER_PROFILES = ("runtime-functions", "runtime-mutation")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
+PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
+                          "runtime-functions": INPUT_VERSIONS,
+                          "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion")}
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
@@ -106,7 +111,54 @@ def declared_helper_count(program: dict) -> int:
 
 
 def helper_counts(case: dict) -> set[int]:
-    return {declared_helper_count(case["program"])} if case.get("schema") == m2.FUNCTION_CASE_SCHEMA else set()
+    return {declared_helper_count(case["program"])} if m2.CASE_PROFILES.get(case.get("schema")) in HELPER_PROFILES else set()
+
+
+def recipe_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("generationRecipeRequirements", {"templates": [], "updates": []})
+    if not isinstance(requirements, dict) or set(requirements) != {"templates", "updates"}:
+        raise ValueError("generationRecipeRequirements requires templates and updates arrays")
+    for key, lower, upper in (("templates", 0, 3), ("updates", 1, 4)):
+        values = requirements[key]
+        if not isinstance(values, list) or any(type(value) is not int or not lower <= value <= upper for value in values):
+            raise ValueError(f"recipe {key} must contain integers from {lower} to {upper}")
+        if len(values) != len(set(values)):
+            raise ValueError(f"recipe {key} must not contain duplicates")
+    if manifest.get("profile", "closed-g0") != "runtime-mutation" and any(requirements.values()):
+        raise ValueError("only mutation corpora can require generation recipes")
+    return requirements
+
+
+def mutation_recipes(case: dict) -> dict[str, set[int]]:
+    """Read claimed generator metadata; native replay authenticates matched cases."""
+    result = {"Templates": set(), "Updates": set()}
+    if case.get("schema") != m2.MUTATION_CASE_SCHEMA:
+        return result
+    provenance = case.get("provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("mutation case provenance must be an object")
+    origin = provenance.get("origin", {})
+    if not isinstance(origin, dict):
+        raise ValueError("mutation case origin must be an object")
+    if origin.get("kind") != "mutation-generated":
+        return result
+    helpers = origin.get("helpers")
+    if not isinstance(helpers, list) or not 1 <= len(helpers) <= 3:
+        raise ValueError("generated mutation recipes require one to three helper records")
+    for helper in helpers:
+        if not isinstance(helper, dict):
+            raise ValueError("mutation helper recipe must be an object")
+        for field, destination, lower, upper in (("template", "Templates", 0, 3), ("updates", "Updates", 1, 4)):
+            value = helper.get(field)
+            if type(value) is not int or not lower <= value <= upper:
+                raise ValueError(f"mutation helper {field} must be an integer from {lower} to {upper}")
+            result[destination].add(value)
+    return result
+
+
+def missing_coverage(summary: dict) -> bool:
+    return (any(summary["coverage"][key] for key in ("missingFeatures", "missingWordLiterals", "missingInputs", "missingHelperCounts"))
+        or any(summary["recipeCoverage"]["missing" + dimension] for dimension in ("Templates", "Updates")))
 
 
 def validate_manifest(manifest) -> dict:
@@ -115,7 +167,7 @@ def validate_manifest(manifest) -> dict:
     profile = manifest.get("profile", "closed-g0")
     if profile not in PROFILES:
         raise ValueError("unsupported corpus profile")
-    version_keys = ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if profile != "closed-g0" else ())
+    version_keys = ("generatorVersion", "emitterVersion", "wrapperVersion") + PROFILE_VERSION_FIELDS[profile]
     for key in version_keys:
         if not isinstance(manifest.get(key), str) or not manifest[key]:
             raise ValueError(f"missing corpus {key}")
@@ -131,13 +183,14 @@ def validate_manifest(manifest) -> dict:
         m2.word(value, "required input")
     if profile == "closed-g0" and required_inputs:
         raise ValueError("closed G0 corpus cannot require runtime inputs")
-    required_helpers = manifest.get("requiredHelperCounts", None if profile == "runtime-functions" else [])
+    required_helpers = manifest.get("requiredHelperCounts", None if profile in HELPER_PROFILES else [])
     if not isinstance(required_helpers, list) or any(type(value) is not int or not 1 <= value <= 3 for value in required_helpers):
         raise ValueError("corpus requiredHelperCounts must be an array of integers from one to three")
     if len(set(required_helpers)) != len(required_helpers):
         raise ValueError("corpus requiredHelperCounts must not contain duplicates")
-    if profile != "runtime-functions" and required_helpers:
+    if profile not in HELPER_PROFILES and required_helpers:
         raise ValueError("only function corpora can require helper counts")
+    recipe_requirements(manifest)
     ids = set()
     for entry in manifest["cases"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
@@ -273,6 +326,9 @@ class Campaign:
                          "requiredFeatures": [], "requiredWordLiterals": [],
                          "generatedInputs": [], "matchedInputs": [], "requiredInputs": [],
                          "generatedHelperCounts": [], "matchedHelperCounts": [], "requiredHelperCounts": []},
+            "recipeCoverage": {"classification": "generator recipe metadata; matched entries verified by native replay; not runtime coverage",
+                "generatedTemplates": [], "matchedTemplates": [], "requiredTemplates": [],
+                "generatedUpdates": [], "matchedUpdates": [], "requiredUpdates": []},
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
         self.checkpoint()
 
@@ -286,7 +342,15 @@ class Campaign:
         coverage["missingWordLiterals"] = sorted(set(coverage["requiredWordLiterals"]) - set(coverage["matchedWordLiterals"]), key=int)
         coverage["missingInputs"] = sorted(set(coverage["requiredInputs"]) - set(coverage["matchedInputs"]), key=int)
         coverage["missingHelperCounts"] = sorted(set(coverage["requiredHelperCounts"]) - set(coverage["matchedHelperCounts"]))
+        recipe = self.summary["recipeCoverage"]
+        for dimension in ("Templates", "Updates"):
+            recipe["missing" + dimension] = sorted(set(recipe["required" + dimension]) - set(recipe["matched" + dimension]))
         save_json(self.args.output / "summary.json", self.summary)
+
+    def record_recipes(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in mutation_recipes(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["recipeCoverage"][key] = sorted(set(self.summary["recipeCoverage"][key]) | values)
 
     def guard(self) -> None:
         if time.monotonic() >= self.deadline:
@@ -487,6 +551,9 @@ class Campaign:
         coverage["requiredWordLiterals"] = sorted({m2.word(value) for value in manifest.get("requiredWordLiterals", [])}, key=int)
         coverage["requiredInputs"] = sorted(set(manifest.get("requiredInputs", [])), key=int)
         coverage["requiredHelperCounts"] = sorted(manifest.get("requiredHelperCounts", []))
+        requirements = recipe_requirements(manifest)
+        self.summary["recipeCoverage"]["requiredTemplates"] = sorted(requirements["templates"])
+        self.summary["recipeCoverage"]["requiredUpdates"] = sorted(requirements["updates"])
         cases, excluded, ids, accepted_ids = [], [], [], []
         attempted = 0
         for entry in manifest["cases"][:self.args.cases]:
@@ -531,7 +598,7 @@ class Campaign:
                 origin = case["provenance"].get("origin", {})
                 if origin.get("kind") != origin_kind or origin.get("seed") != entry["generation"]["seed"] or origin.get("maxProgramNodes") != entry["generation"]["maxProgramNodes"]:
                     raise ValueError(f"generated corpus provenance differs for {entry['id']}")
-            for key in ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if runtime_input else ()):
+            for key in ("generatorVersion", "emitterVersion", "wrapperVersion") + PROFILE_VERSION_FIELDS[profile]:
                 if manifest.get(key) != case["provenance"].get(key):
                     raise ValueError(f"corpus {key} changed")
             if set(entry.get("expectedFeatures", [])) != set(case["provenance"]["features"]):
@@ -543,6 +610,7 @@ class Campaign:
             coverage["generatedFeatures"] = sorted(set(coverage["generatedFeatures"]) | set(case["provenance"]["features"]))
             coverage["generatedWordLiterals"] = sorted(set(coverage["generatedWordLiterals"]) | word_literals(case["program"]), key=int)
             coverage["generatedHelperCounts"] = sorted(set(coverage["generatedHelperCounts"]) | helper_counts(case))
+            self.record_recipes(case)
             if runtime_input:
                 coverage["generatedInputs"] = sorted(set(coverage["generatedInputs"]) | {case["input"]}, key=int)
             self.summary["generation"] = {"requested": self.args.cases, "attempted": attempted, "status": "running"}
@@ -566,7 +634,7 @@ class Campaign:
         self.summary["generation"] = {key: response.get(key) for key in ("requested", "attempted", "status")}
         self.summary["generation"]["attemptUnit"] = (
             "manifest entries" if self.args.corpus else
-            "function graph candidates" if self.args.profile == "runtime-functions" else
+            "function graph candidates" if self.args.profile in HELPER_PROFILES else
             "function candidates" if self.args.profile != "closed-g0" else "program candidates")
         save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
         coverage = self.summary["coverage"]
@@ -574,6 +642,8 @@ class Campaign:
         coverage["generatedWordLiterals"] = sorted({value for case in cases for value in word_literals(case["program"])}, key=int)
         coverage["generatedInputs"] = sorted({case["input"] for case in cases if case["schema"] != m2.CASE_SCHEMA}, key=int)
         coverage["generatedHelperCounts"] = sorted({count for case in cases for count in helper_counts(case)})
+        for case in cases:
+            self.record_recipes(case)
         for index, case in enumerate(cases):
             self.guard()
             m2.validate_case(case)
@@ -591,6 +661,7 @@ class Campaign:
                 coverage["matchedFeatures"] = sorted(set(coverage["matchedFeatures"]) | set(case["provenance"]["features"]))
                 coverage["matchedWordLiterals"] = sorted(set(coverage["matchedWordLiterals"]) | word_literals(case["program"]), key=int)
                 coverage["matchedHelperCounts"] = sorted(set(coverage["matchedHelperCounts"]) | helper_counts(case))
+                self.record_recipes(case, matched=True)
                 if case["schema"] != m2.CASE_SCHEMA:
                     coverage["matchedInputs"] = sorted(set(coverage["matchedInputs"]) | {case["input"]}, key=int)
             save_json(self.args.output / "results" / f"{index:04d}.json", {"actualReport": compact_report(report), "analysis": analysis})
@@ -616,7 +687,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, default=32)
+    parser.add_argument("--nodes", type=int, help="node budget; default 192 for local mutation, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
@@ -651,6 +722,8 @@ def main() -> int:
         args.profile = args.profile or selected_profile or "closed-g0"
     except (OSError, ValueError, KeyError, TypeError, m2.Finding) as error:
         parser.error(str(error))
+    if args.nodes is None:
+        args.nodes = 192 if args.profile == "runtime-mutation" else 32
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16
@@ -695,8 +768,7 @@ def main() -> int:
         try:
             shutil.rmtree(campaign.work, ignore_errors=True)
             campaign.checkpoint()
-            coverage = campaign.summary["coverage"]
-            if campaign.summary["status"] == "complete" and (coverage["missingFeatures"] or coverage["missingWordLiterals"] or coverage["missingInputs"] or coverage["missingHelperCounts"]):
+            if campaign.summary["status"] == "complete" and missing_coverage(campaign.summary):
                 campaign.summary["status"] = "coverage-incomplete"
                 campaign.checkpoint()
         finally:
@@ -704,8 +776,7 @@ def main() -> int:
     counts = campaign.summary["counts"]
     print(json.dumps({"status": campaign.summary["status"], "synthetic": campaign.summary["synthetic"],
                       "counts": counts, "summary": str(args.output / "summary.json")}))
-    coverage = campaign.summary["coverage"]
-    return 0 if campaign.summary["status"] == "complete" and counts["matched"] == args.cases and not coverage["missingFeatures"] and not coverage["missingWordLiterals"] and not coverage["missingInputs"] and not coverage["missingHelperCounts"] else 1
+    return 0 if campaign.summary["status"] == "complete" and counts["matched"] == args.cases and not missing_coverage(campaign.summary) else 1
 
 
 if __name__ == "__main__":
