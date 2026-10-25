@@ -166,8 +166,23 @@ and helper calls. All 32 fixed aggregate cases agree across the three paths.
 The ABI and helper arguments/results remain Word-only. Bounded loops use an
 actual source `while` and an independently executed finite Core reference, with
 up to seven iterations. All 48 fixed loop cases match across the three paths.
-M1 through M4 are complete for these restricted profiles; stateful scenarios
-and the selected generics/closures/comptime/module combinations are planned.
+M1 through M4 are complete for these restricted profiles.
+
+The first stateful profile compares one to three ordered transactions against
+the same two-slot storage contract. Original host-aware Core runs through
+`ContractRuntime`, retaining the committed world and using a fresh local heap
+for each call. The Rust path mines transactions and reads their actual output
+and committed storage; imported Hull supplies the third execution history.
+Initial storage and every completed prefix must agree. Six external scenarios
+covering fifteen transactions, followed by exact archive replay, pass on all
+three paths. Native generation, checked reduction candidates and strict case
+replay are available through `semantic-storage-tool`; the separate
+[storage runner](scripts/semantic-storage-differential.py) performs fresh
+three-way comparisons. M5 remains in progress: bounded storage campaigns and
+fixed corpus integration are underway, with rollback and external-call profiles
+still to follow. Gas, balances, nonce and arbitrary storage are outside this
+initial comparison. Selected generics/closures/comptime/module combinations
+remain planned.
 
 ## Code layout
 

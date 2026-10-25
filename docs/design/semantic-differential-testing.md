@@ -27,6 +27,8 @@ comparison must not share the Rust frontend with its reference computation.
 | Source emission and case replay | `Solcore/Synthesis/Source/Emitter.lean`, `Cases.lean`, `Tests/SemanticCaseTool.lean` | Restricted G0 source output, explicit exclusions, versioned cases, fresh original-Core observations and checked shrink candidates. |
 | Rust artifacts | `scripts/export-rust-hull.py`, `scripts/export-rust-code-image.py` | Checked Hull and exact Sonatina O0 code images from a supplied source, with revision and hash receipts. |
 | Core contract execution | `Tests/RustHullScenarioRun.lean` | Deployment and ordered calls, with explicit account context and state observations. |
+| Generated storage scenarios | `Solcore/Synthesis/Core/StorageContract.lean`, `Source/StorageCases.lean`, `Stateful/StorageExecution.lean` | One checked host-aware contract, initially empty slots zero/one and one to three ordered zero-value transactions; fresh execution through `ContractRuntime`. |
+| Storage comparison and replay | `scripts/semantic-storage-differential.py`, `Tests/RustHullStorageScenarioRun.lean` | Actual mined EVM transactions, original Core and imported-Hull execution; initial and per-transaction committed storage comparison. Bounded campaign integration is in progress. |
 | Rust EVM reference | `scripts/rust-evm-reference.py` | Fixed upstream E2E fixtures on Anvil; Sonatina O0/O2 and Yul execution. |
 | Compatibility inventories | `scripts/RUST_PARITY.md` | Fixed expectations checked separately by the Rust and Core paths. These are not a direct comparison runner for generated inputs. |
 
@@ -64,7 +66,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Complete, 2026-10-25 |
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
-| M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
+| M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | In progress |
 | M6 | Add selected generics, closures, comptime and module combinations. | Planned |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
@@ -437,9 +439,79 @@ The bounded-loop slice completes the restricted M4 scope:
   cases from the older five profiles retained identical artifacts and
   observations. Focused protocol/campaign regressions passed.
 
-M4 is complete within the documented restrictions. M5 and M6 remain planned.
-The next work adds ordered stateful scenarios while retaining an original Core
-reference that does not share the Rust frontend.
+M4 is complete within the documented restrictions. M5 is in progress; M6 remains
+planned. Stateful scenarios retain an original Core reference that does not
+share the Rust frontend.
+
+M5 proceeds in three connected slices:
+
+- **M5a: committed storage and ordered transactions.** A fixed contract wrapper
+  reads slots zero and one, calls a checked aggregate step with `input + old0`,
+  stores its result in slot zero, increments slot one, and returns the sum of
+  both reread slots. Initial storage is empty. Generated cases use three ordered
+  transactions; imported/reduced cases may use one through three. The original
+  host-aware Core program executes through `CheckedCoreContract` and
+  `TopLevelExecution`, retaining `finalWorld` between calls. This is contract
+  storage, not the private Core heap. The Rust path mines each transaction and
+  obtains return bytes from that transaction's trace and storage from its
+  receipt block. Compare initial state and every committed prefix, not just the
+  final result. A separate Hull runner exposes the selected committed storage
+  and stops on incomplete execution; an empty failed receipt world is not a
+  committed-state snapshot.
+- **M5b: rollback.** Add explicit language reverts and mixed success/revert
+  sequences. Compare returned/reverted bytes and retained committed storage
+  after every call. Use the existing typed outcome convention and transaction
+  checkpoints. Resource exhaustion must not become a revert or a passing
+  rollback observation.
+- **M5c: bounded external calls.** Add a finite account catalogue and the
+  existing nested runtime. Compare parent/child outcomes and relevant committed
+  storage, logs and value transfers. Record bounded call depth and scenario
+  configuration, and reduce transaction sequences without changing the
+  classified failure into a resource failure.
+
+Each slice needs actual three-path comparisons, strict replay, bounded
+failure-preserving reduction and a fixed corpus. M5a initially observes only
+literal slots zero and one, valid `run(uint256)` calldata and zero call value.
+It does not claim equivalence of arbitrary storage, gas, balances, nonce or
+account lifecycle. Exact deployed Anvil addresses and caller bindings are
+retained and supplied to both Core execution paths. An uncertain transaction
+submission is never retried automatically. Replay always starts a fresh world.
+
+Delivered M5a execution connection:
+
+- `semanticStorageTool` and `rustHullStorageScenario` build the separate native
+  storage tools. Generation, emission, strict case replay, observation and
+  checked reduction candidates are available. Every case origin reconstructs
+  the exact original host-aware Core contract from its retained aggregate step;
+  no saved execution result is trusted. Reduction preserves helper/binder scope
+  and surviving transaction IDs and strictly decreases the scenario measure.
+- The original contract runs through the public `ContractRuntime` entry points.
+  Its installed program stays fixed across the sequence, each invocation gets
+  a fresh Core heap, and the terminal committed world supplies the next call.
+  The separate Hull adapter exposes explicit committed slot snapshots and stops
+  on incomplete execution.
+- `scripts/semantic-storage-differential.py` deploys the actual linked Sonatina
+  O0 images on Anvil, mines each transaction, obtains output from its trace and
+  reads storage at its receipt block. All three paths receive the same actual
+  caller/target bindings. Agreement is required initially and at every completed
+  prefix; later resource failures preserve earlier mismatch evidence. Unknown
+  submission outcomes never trigger automatic resubmission.
+- Exact archive replay validates saved members, tools and budgets and repeats
+  all executions in fresh worlds. The external suite passed six scenarios and
+  fifteen transactions, then replayed a saved aggregate scenario. Cases cover
+  storage feedback, repeated inputs, one-call sequences, sparse zero values,
+  clearing/rewriting a slot, fresh private cells, arbitrary entries and aggregate
+  branches. Original Core and source remain unchanged across input sequences.
+- Full repository build/tests, kernel policy and 34 storage protocol regressions
+  passed. The delivered profile requires successful Word returns and observes
+  only slots zero and one. It does not establish emitter correctness, gas or
+  ledger equivalence, or the rollback/external-call profiles.
+
+M5 is still in progress. M5a bounded campaign operation, failure-preserving
+reduction and fixed corpus integration are being completed; the native shrink
+candidate API and single-scenario execution checks do not finish that slice.
+Usage and validation commands are in
+[Generated semantic comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-ordered-storage-transactions).
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

@@ -10,5 +10,7 @@ import Solcore.Synthesis.Source.AggregateEmitter
 import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopEmitter
 import Solcore.Synthesis.Source.LoopCases
+import Solcore.Synthesis.Source.StorageEmitter
+import Solcore.Synthesis.Source.StorageCases
 
 /-! Checked Core cases, deterministic Solcore source emission and replay. -/

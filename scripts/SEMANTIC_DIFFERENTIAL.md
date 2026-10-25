@@ -487,4 +487,105 @@ literal coverage remains separate.
 
 The external 24-case suite checks zero and positive iterations, arbitrary step
 entries, pair/sum branches, fresh helper-local cells per iteration and Word
-wrap, followed by exact replay. Stateful contract scenarios remain M5 work.
+wrap, followed by exact replay.
+
+## Compare ordered storage transactions
+
+The M5a execution connection uses a separate storage case format and runner.
+`SynthesizedStorage.run(uint256)` reads slots zero and one, applies a checked
+aggregate step to `input + old0`, writes its result to slot zero, increments
+slot one, and returns the sum of both reread slots. Each scenario starts with
+empty storage. Generated scenarios contain three ordered transactions;
+imported and reduced scenarios may contain one through three.
+
+Build the two native tools and generate a small corpus:
+
+```sh
+lake build semanticStorageTool rustHullStorageScenario
+mkdir -p .upstream/semantic-storage-cases
+.lake/build/bin/semantic-storage-tool generate 0 256 2 64 1000000 \
+  > .upstream/semantic-storage-cases/corpus.json
+```
+
+Generation arguments are `SEED NODES COUNT ATTEMPTS FUEL`; `COUNT` counts
+scenarios. Check that the corpus `status` is `complete` before using it as a
+completed batch. Native entry points are:
+
+```text
+semantic-storage-tool emit PLAN.json TRANSACTIONS.json [FUEL]
+semantic-storage-tool replay CASE.json [FUEL]
+semantic-storage-tool observe CASE.json BINDINGS.json [FUEL]
+semantic-storage-tool shrink CASE.json LIMIT [FUEL]
+```
+
+A plan has schema `solcore-lean.storage-plan.v1` and a `stepProgram` containing
+a checked aggregate function DAG. Transactions are an ordered JSON array of
+`{id, input, calldata, value}` objects: IDs are distinct bounded identifiers,
+inputs are canonical decimal Words, calldata is selector `0xa444f5e9` followed
+by that Word's 32-byte encoding, and value is `"0"`. The saved
+`solcore-lean.semantic-storage-case.v1` contains one original host-aware Core
+contract, its emitted source, plan, transactions and versioned provenance.
+It contains no expected execution result. Replay reconstructs the exact
+contract, checks emission and metadata, and validates generated or reduced
+origins. Shrinking preserves helper/binder scope and transaction ID order while
+simplifying the step, inputs or sequence; candidates still need execution to
+establish that they preserve a finding.
+
+`observe` executes the original checked contract through `ContractRuntime`.
+Bindings have schema `solcore-lean.storage-bindings.v1` with distinct decimal
+`caller` and `address` fields. The comparison runner records the actual Anvil
+bindings in `bindings.json` and supplies them to both Core paths. Each invocation
+uses the same installed code and a fresh local heap; only its terminal
+`finalWorld` becomes the next transaction's world.
+
+Extract and compare one scenario, then replay its archive:
+
+```sh
+python3 - <<'PY'
+import json
+from pathlib import Path
+root = Path('.upstream/semantic-storage-cases')
+corpus = json.loads((root / 'corpus.json').read_text())
+assert corpus['status'] == 'complete' and corpus['cases']
+(root / 'case.json').write_text(json.dumps(corpus['cases'][0], indent=2) + '\n')
+PY
+python3 scripts/semantic-storage-differential.py \
+  --case .upstream/semantic-storage-cases/case.json \
+  --output .upstream/semantic-storage-cases/run
+python3 scripts/semantic-storage-differential.py \
+  --replay .upstream/semantic-storage-cases/run \
+  --output .upstream/semantic-storage-cases/replay
+```
+
+Both output directories must be new. The runner compiles checked Rust Hull and
+linked Sonatina O0 images, verifies the deployed runtime bytes, and sends actual
+transactions on its owned local Anvil. Return bytes come from each mined
+transaction's trace; slot snapshots come from `eth_getStorageAt` at that
+receipt's block. The separate Hull runner reports committed slots explicitly,
+including when a receipt has no world, and stops on incomplete execution.
+An uncertain transaction submission is never retried automatically.
+
+A pass requires agreement on empty initial storage and on status, return bytes
+and committed slots after every transaction, across all three path pairs. A
+later resource failure cannot erase an already observed prefix mismatch. Exact
+replay checks archive members, tool identities and saved budgets, then starts a
+fresh deployment and recomputes all observations.
+
+```sh
+python3 scripts/test-semantic-storage-differential.py
+python3 scripts/test-source-storage-rust.py
+```
+
+The 34 protocol regressions pass. The external suite passes six scenarios and
+fifteen actual transactions, followed by exact archive replay. It covers
+feedback, repeated inputs, single-call sequences, sparse zero storage, clearing
+and rewriting a slot, fresh private cells, arbitrary entries and aggregate
+branches. Changing the input sequence leaves the original Core contract and
+source unchanged. Full repository build/tests and the kernel policy check pass.
+
+M5 remains in progress. M5a bounded campaign and fixed corpus integration are
+underway. The delivered comparison admits valid `run(uint256)` inputs, zero
+call value, initially empty literal slots zero and one, and successful Word
+returns. Rollback and external-call profiles remain separate work. This scope
+does not establish equivalence of arbitrary storage, gas, balances, nonce,
+logs, account lifecycle or the source emitter itself.

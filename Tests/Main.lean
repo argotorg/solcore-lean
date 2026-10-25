@@ -1844,6 +1844,8 @@ import Solcore.Test.SourceAggregateEmitter
 import Solcore.Test.SourceAggregateCases
 import Solcore.Test.SourceLoopEmitter
 import Solcore.Test.SourceLoopCases
+import Solcore.Test.SourceStorageEmitter
+import Solcore.Test.SourceStorageCases
 import Solcore.Test.TypeSystemInference
 import Solcore.Test.ProgramEnvironmentAndTypeResolution
 import Solcore.Test.ProgramModuleResolution
@@ -3899,6 +3901,8 @@ def run : IO Unit := do
   SourceAggregateCases.testSourceAggregateCases
   SourceLoopEmitter.testSourceLoopEmitter
   SourceLoopCases.testSourceLoopCases
+  SourceStorageEmitter.testSourceStorageEmitter
+  SourceStorageCases.testSourceStorageCases
   testDetailedCoreChecker
   testWorkspacePathIdentity
   testWorkspaceCanonicalValidation
