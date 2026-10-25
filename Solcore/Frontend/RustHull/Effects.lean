@@ -129,7 +129,7 @@ private def create (scope : Scope) (create2 : Bool)
   pure ⟨.word, .ifE isStatic invalidWord
     (.ifE (.binary .wordGt length (.word (Core.Word.ofNatModulo 49152))) invalidWord withGas)⟩
 
-private def requireCode (scope : Scope) (type : Core.Ty) (body : Core.Expr) : LowerM Core.Expr := do
+def requireCode (scope : Scope) (type : Core.Ty) (body : Core.Expr) : LowerM Core.Expr := do
   pure (.ifE (.loadCell (← reference scope "codeKnown" .bool)) body
     (Core.LanguageResult.failure type (.word AccountInspection.unknownCodeReason)))
 

@@ -53,9 +53,10 @@ preserves the final memory, including writes before failure. The public result
 is the actual receipt decoder applied to the source-derived message value, so
 export limits and cumulative execution fuel retain their public behavior.
 
-The contract theorems use an empty code catalog, no supplied code image and a
-context with `deploying = false`. They do not yet cover deployment or calls
-to other contracts.
+The base contract theorems use an empty code catalog and no supplied code
+image. The code-image theorem below removes those two restrictions. The public
+connections require `deploying = false`; calls to other contracts and deployment
+remain separate milestones.
 
 `Tests.RustHullMemoryCorrespondence.public_resumes` supplies complete independent
 source derivations for unaligned memory access and a fault after a write, then
@@ -83,9 +84,8 @@ call value, calldata and return-data size, calldata word reads, supplied gas,
 ten optional ambient words, block hashes and blob hashes. The actual context
 normalization and shared/frame initializers establish their observations;
 memory and storage operations preserve them. Missing optional inputs retain
-their language-fault reasons. The `codesize` implementation also has a builtin
-and frame correspondence proof, but its public connection requires the
-remaining code-image support.
+their language-fault reasons. The code-image theorem below also connects `codesize` through the actual
+code-slot initialization.
 
 `Tests.RustHullEnvironmentCorrespondence.public_resumes` supplies independent
 derivations for calldata-driven memory writes, timestamp-driven storage writes,
@@ -161,6 +161,29 @@ accounts with empty code. Executable checks verify address normalization,
 copying across a memory-word boundary, source zero padding, independent code
 hashes, unchanged balances and caller memory, and repeated resumptions.
 
+
+`ContractCodeCorrespondence.compileObject_resumes_exact` accepts supplied code
+images and arbitrary successfully compiled catalogs. It connects `codesize`,
+`codecopy` and `datacopy` to actual `compileObject`, object instantiation,
+`runWithReceipt` and `resumeWithReceipt`. Actual catalog compilation supplies
+all closures and their packet positions. The frame initializer supplies the
+extra code cells and their values; the entry derivation needs no assumption
+about evaluation of compiled catalog bodies.
+
+The theorem applies when a code image is supplied or the catalog is nonempty,
+which is exactly when the compiler installs code slots. A supplied empty image
+has size zero and copies zero padding. An absent image with a nonempty catalog
+keeps its unavailable-code fault. Catalog installation is covered; executing
+another catalog entry through an external call remains the next milestone.
+
+
+`Tests.RustHullCodeImageCorrespondence.public_resumes` supplies nine independent
+source derivations. They cover both copy names, code-size observations, known
+empty and unavailable images, nonempty catalogs, copies across memory words,
+zero padding, range overflow and zero-length ranges at the largest address.
+Runtime checks compare public receipts and retained Core snapshots after
+multiple resumptions.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -168,7 +191,7 @@ hashes, unchanged balances and caller memory, and repeated resumptions.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing and account observations reach public receipts and resumptions; further state operations remain. | In progress |
+| 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations and linked code images reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -179,8 +202,8 @@ delay those connections.
 
 ## Next public milestone
 
-Connect supplied code images and catalogs through actual initialization and
-public execution. Then cover external calls, creation, rollback and assembly. Each step
+Connect external calls and their return data, shared state and rollback through
+actual dispatch and public execution. Then cover creation and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public
 theorem consumer.
 
