@@ -1,11 +1,12 @@
+import Solcore.Frontend.RustHull.LifecycleBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RuntimeCallModeSupported
 import Solcore.Frontend.RustHull.RuntimeCallModeCompatibility
 import Solcore.Frontend.RustHull.CallModeBuiltinCorrespondence
 import Solcore.Frontend.RustHull.ChildCallBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RuntimeLinkedReturnDataEffectsCorrespondence
 
-/-! All four message-call operations join the existing concrete effects in
-the recursive Hull proof. Actual installation supplies each captured handler. -/
+/-! Message calls and account destruction join the existing concrete effects
+in the recursive Hull proof. Actual installation supplies captured handlers. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeEffectsCorrespondence
 open Correspondence ScalarExecution DerivationCorrespondence
@@ -97,6 +98,13 @@ theorem external_preserves (layout : Layout) (baseline : Nat → Option Core.Val
             CallModeBuiltinCorrespondence.delegate_preserves compiled computed related runtime callPassive
               memoryMember memorySizeMember dataMember dataSizeMember delegateMember callerMember valueMember callDepthMember staticMember
               state (callbacks state .delegateCall) packed
+          exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
+      | destroy computed =>
+          intro typeFuel expected typeCompiled scope arguments lowered compiled world mapping environment initialStore argumentStore targets codes locations captured related packed runtime state installed
+          obtain ⟨target, finalStore, resultRelated, evaluated, finalState, retained⟩ :=
+            LifecycleBuiltinCorrespondence.preserves compiled computed related runtime passive callPassive
+              worldMember balancesMember addressMember completeMember staticMember memorySizeMember exitMember offsetMember sizeMember
+              state packed
           exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
 
 theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value)

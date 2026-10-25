@@ -1,8 +1,10 @@
 import Solcore.Frontend.RustHull.RuntimeCallEffectsSemantics
+import Solcore.Frontend.RustHull.RuntimeLifecycleSemantics
 
 /-! Message call modes share caller transport and account checkpoints. The
 mode controls the handler, caller observation and stipend checks; account
-dispatch controls execution address and balance transfer separately. -/
+dispatch controls execution address and balance transfer separately. Account
+destruction shares the same frame state and transaction world. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeSemantics
 open Core
@@ -96,6 +98,9 @@ inductive Builtin (children : State → AccountCallSemantics.Children) (image : 
         inputOffset inputLength outputOffset outputLength state result final) :
       Builtin children image "delegatecall" type [.word gas, .word target, .word inputOffset,
         .word inputLength, .word outputOffset, .word outputLength] state result final
+  | destroy {type state result final beneficiary}
+      (computed : RuntimeLifecycleSemantics.Destroy beneficiary state result final) :
+      Builtin children image "selfdestruct" type [.word beneficiary] state result final
 
 def effectsWith (children : State → AccountCallSemantics.Children) (image : Option (List UInt8)) :
     Semantics.ExternalSemantics State where

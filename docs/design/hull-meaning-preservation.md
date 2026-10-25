@@ -286,6 +286,22 @@ DELEGATECALL. They compare the independent source result with public receipts,
 including execution address, caller, value, storage, logs, return bytes and
 balance preservation. The rollback case retains the parent's earlier changes.
 
+The same public theorem includes `selfdestruct`. Its independent account
+semantics distinguishes existing accounts from accounts created during the
+current transaction. It checks beneficiary balance overflow before committing
+updates, transfers or burns the balance as appropriate, and records pending
+removal without changing code, nonce or storage during execution. Actual public
+transaction finalization removes only the accounts scheduled for removal.
+Static rejection and lifecycle faults preserve the corresponding source result.
+Catalog identities remain valid while nested frames execute; no assumption that
+scheduled accounts survive finalization is added to the public theorem.
+
+Three concrete consumers cover an existing account, an account created during
+the transaction, and parent rollback after a successful child destruction.
+They connect source derivations to actual compilation and public resumptions,
+including beneficiary balances, storage, logs and code visibility before
+transaction finalization.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -294,7 +310,7 @@ balance preservation. The rollback case retains the parent's earlier changes.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls, including finite nested compiled children, reach public receipts with transfers, return data and checkpoint rollback. Precompiles, destruction and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. Precompiles, root reentry and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -304,26 +320,24 @@ delay those connections.
 
 ## Next public milestone
 
-Connect `selfdestruct` through beneficiary transfers, pending account removal
-and public transaction finalization. Then cover precompiles, root reentry,
-creation and assembly. Each step must derive
+Connect root reentry by carrying the actual compiled entry closure into child
+selection. Then cover precompiles, creation and assembly. Each step must derive
 runtime inputs from actual initialization and end in a public theorem consumer.
 
 ## Remaining public connections
 
 `call` and `staticcall` have public connections for calls without child execution
 and for finite nested compiled children. Root reentry and precompile branches
-remain. Three builtins still have no public effect connection: `create`,
-`create2` and `selfdestruct`. CALLCODE and DELEGATECALL are covered by the same
+remain. Two builtins still have no public effect connection: `create` and
+`create2`. CALLCODE and DELEGATECALL are covered by the same
 finite nested-child connection.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
 | 1 | Contract calls | Connect precompiles and root reentry. Reuse catalog identities, actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
-| 2 | Account destruction | Connect beneficiary transfers, static rejection and transaction-finalization rules to the actual public receipt. Reuse the mutable balance resource established for calls. |
-| 3 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
-| 4 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
-| 5 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
+| 2 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
+| 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
+| 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
 
 Lower-level helpers or isolated builtin results do not complete any row without
 its actual public execution consumer.
