@@ -302,6 +302,19 @@ They connect source derivations to actual compilation and public resumptions,
 including beneficiary balances, storage, logs and code visibility before
 transaction finalization.
 
+Root reentry is also connected. The actual entry compilation and captured
+closure supply code identity 1, alongside ordinary catalog entries. Finite
+source call trees determine each reentrant frame's execution; the public
+theorem does not assume that the Core child executes correctly. Initial root
+code links follow from the accepted compilation, supplied root image and
+context. This connection covers ordinary execution contexts; deployment is
+still a separate obligation.
+
+Two concrete consumers cover successful root reentry and parent rollback.
+They check fresh child calldata and memory, retained parent memory, shared
+storage, return bytes and repeated public resumptions. Their public proofs
+require only actual compilation success.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -310,7 +323,7 @@ transaction finalization.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. Precompiles, root reentry and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. Precompiles and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -320,21 +333,22 @@ delay those connections.
 
 ## Next public milestone
 
-Connect root reentry by carrying the actual compiled entry closure into child
-selection. Then cover precompiles, creation and assembly. Each step must derive
+Connect the identity precompile through its independent byte-copy and gas
+semantics, actual dispatch and public execution. Then cover the remaining
+precompiles, creation and assembly. Each step must derive
 runtime inputs from actual initialization and end in a public theorem consumer.
 
 ## Remaining public connections
 
-`call` and `staticcall` have public connections for calls without child execution
-and for finite nested compiled children. Root reentry and precompile branches
-remain. Two builtins still have no public effect connection: `create` and
+`call` and `staticcall` have public connections for calls without child execution,
+finite nested compiled children and root reentry. Precompile branches remain.
+Two builtins still have no public effect connection: `create` and
 `create2`. CALLCODE and DELEGATECALL are covered by the same
 finite nested-child connection.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Connect precompiles and root reentry. Reuse catalog identities, actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
+| 1 | Contract calls | Connect precompiles. Reuse actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
 | 2 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
