@@ -1,7 +1,7 @@
 # Next implementation roadmap
 
 Updated: 2026-10-26. This is the implementation order after the bounded M0–M6
-milestones, not a claim that the work below has been delivered.
+milestones. Delivery and verification are recorded separately below.
 
 ## Baseline
 
@@ -13,9 +13,11 @@ Generated EVM comparisons currently use Sonatina O0. The separate upstream
 fixture harness runs Sonatina O0/O2 and Yul, but that does not add those backends
 to generated semantic campaigns.
 
-Ten pure profiles and three stateful profiles are available locally. Fixed
-corpora and bounded random runners exist. There is no checked-in CI workflow
-or continuously scheduled campaign yet. M6d's 32 fixed cases all agreed, its
+Ten pure profiles and three stateful profiles are available locally. The
+[CI workflow](../../.github/workflows/semantic.yml) and
+[suite commands](../../scripts/SEMANTIC_CI.md) connect the fixed and random
+runners with shared limits, preparation and retained findings. Hosted execution
+still requires publishing the workflow. M6d's 32 fixed cases all agreed, its
 original and reduced archives replayed, and relocation of a four-file archive
 was verified. The completed milestone document records the earlier evidence.
 
@@ -82,11 +84,47 @@ Acceptance criteria:
    for findings, including source bundles, original Core, transactions,
    observations, tool hashes and reduction history. Set artifact retention
    limits. Demonstrate replay from a fresh checkout with restored tools.
-6. Exercise a controlled mismatch and a resource failure through CI. Confirm
+6. Exercise a controlled mismatch and a resource failure through the CI commands. Confirm
    reduction preserves the fingerprint, raw actual observations remain
    untouched by synthetic tests, and non-success outcomes produce the intended
    job result. Do not describe continuous testing as operational until the
    checked-in workflow has completed a real run.
+
+Implemented operational components:
+
+- `prepare-semantic-tools.py` verifies the installed pinned toolchains, fetches
+  only the exact Rust revision when network access is explicitly enabled,
+  builds exporters offline and eight native tools once, and records input and
+  binary hashes. A new checkout and initially absent Cargo target were tested.
+  Subsequent offline verification and preparation reuse the recorded tools.
+- `semantic-suite.py` dispatches all thirteen existing profiles. Fixed mode
+  requires complete manifests; random mode records derived profile/shard seeds.
+  Shared time/disk limits, per-profile counts and throughput, retained findings
+  and owned subprocess cleanup are independent of the comparison oracle.
+- `check-semantic-findings.py` exercises actual three-way execution, a separate
+  synthetic mismatch, accepted reduction, exact reduced replay, synthetic
+  replay and real Core fuel exhaustion. Both existing tools and the freshly
+  built Rust tools passed all four phases; actual observations remain intact.
+- The workflow uses fixed action commits and read-only repository permissions.
+  Pull requests and `main` pushes run fixed gates; daily/manual runs add new
+  recorded seeds. Reports and findings have fourteen-day retention. Local
+  workflow syntax validation does not claim a completed GitHub-hosted run.
+
+The full Lean build (9,900 jobs), registered tests, semantic-kernel policy,
+272 Python policy tests and workflow syntax validation passed. The Python
+checks include real subprocess timeout/interruption cleanup. All 312 fixed
+cases/scenarios passed across thirteen profiles, including 98 matched stateful
+transaction prefixes. Random seed `20261026`, sixteen cases per profile and
+2,048 generation attempts per profile produced 208 matches and 144 matched
+stateful prefixes. The random run recorded 1,850 generation exclusions and no
+generation resource exclusions. Both suites had zero mismatches, errors,
+rejections, inconclusive results, missing coverage or unexecuted cases.
+
+The fixed run took 1,689.136 seconds and retained 21,386,536 bytes; the random
+run took 1,115.700 seconds and retained 13,572,210 bytes. These local runs
+overlapped each other and a cold tool build, so their timings are observations,
+not CI performance guarantees. The operational implementation is complete;
+the first hosted workflow run remains to be observed after publication.
 
 ## 2. Generated Sonatina O2, then Yul
 

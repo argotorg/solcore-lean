@@ -4,6 +4,9 @@ The implementation plan and completion criteria are in
 [Semantic differential testing milestones](../docs/design/semantic-differential-testing.md).
 The reference Rust revision remains `2a745e12974c373c3799fec81b48a53c7dce2ab4`.
 
+For pinned tool preparation, all-profile fixed and random suites, CI scheduling
+and retained findings, see [Running the semantic test suite](SEMANTIC_CI.md).
+
 ## Generate and inspect source cases
 
 Build the native tools once:

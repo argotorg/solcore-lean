@@ -1,0 +1,124 @@
+name: Semantic checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 18 * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Unsigned 64-bit root seed; empty uses the recorded run number'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semantic-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_BUILD_JOBS: '2'
+  LEAN_NUM_THREADS: '2'
+  RUSTUP_TOOLCHAIN: '1.97.0'
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Free space for the complete proof build
+        if: runner.environment == 'github-hosted'
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1
+        with:
+          auto-config: 'false'
+          build: 'false'
+          test: 'false'
+          use-github-cache: 'false'
+          use-mathlib-cache: 'false'
+      - name: Kernel policy and adapter regressions
+        run: |
+          node scripts/check-kernel.mjs
+          for test in scripts/test-semantic-*.py scripts/test-prepare-semantic-tools.py; do
+            python3 "$test"
+          done
+          git diff --check
+      - name: Build and test all registered Lean modules
+        run: |
+          lake build
+          lake test
+
+  differential:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1
+        with:
+          auto-config: 'false'
+          build: 'false'
+          test: 'false'
+          use-github-cache: 'false'
+          use-mathlib-cache: 'false'
+      - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1
+        with:
+          version: v1.5.1
+          cache: 'false'
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+          lake --version
+      - name: Restore dependency downloads
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: semantic-dependencies-${{ runner.os }}-1.97.0-2a745e12974c373c3799fec81b48a53c7dce2ab4-8ee24814ea9b32c762df8ef80c796e7d48797c0f
+      - name: Prepare checked tools once
+        run: python3 scripts/prepare-semantic-tools.py --prepare --allow-network
+      - name: Verify prepared tools without network access
+        run: python3 scripts/prepare-semantic-tools.py --verify
+      - name: Run every fixed corpus
+        run: >-
+          python3 scripts/semantic-suite.py --mode fixed
+          --seconds 7200 --profile-seconds 900
+          --output .upstream/semantic-ci-fixed
+      - name: Verify mismatch reduction, replay and resource classification
+        run: >-
+          python3 scripts/check-semantic-findings.py
+          --case .upstream/semantic-ci-fixed/00-closed-g0/cases/0006.json
+          --output .upstream/semantic-ci-findings
+      - name: Run new deterministic seed cases
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+        env:
+          SEMANTIC_SEED: ${{ inputs.seed || github.run_number }}
+        run: >-
+          python3 scripts/semantic-suite.py --mode random
+          --seed "$SEMANTIC_SEED" --cases 16 --attempts 2048
+          --seconds 3600 --profile-seconds 600
+          --output .upstream/semantic-ci-random
+      - name: Retain reports, cases and replayable findings
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: semantic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .upstream/semantic-ci-fixed
+            .upstream/semantic-ci-findings
+            .upstream/semantic-ci-random
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
