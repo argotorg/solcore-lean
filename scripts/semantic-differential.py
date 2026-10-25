@@ -32,12 +32,13 @@ INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
+LOOP_CASE_SCHEMA = "solcore-lean.semantic-loop-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
-                 AGGREGATE_CASE_SCHEMA: "runtime-aggregates"}
+                 AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
-                  AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates"}
+                  AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -120,11 +121,24 @@ def word(value, label="word") -> str:
     return value
 
 
+def validate_loop_plan(plan) -> dict:
+    """Validate the envelope; native replay checks the entire canonical program."""
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.loop-plan.v1":
+        raise ValueError("unsupported loop plan schema")
+    if type(plan.get("mask")) is not int or plan["mask"] not in (0, 1, 3, 7):
+        raise ValueError("loop mask must be zero, one, three or seven")
+    if not isinstance(plan.get("stepProgram"), dict):
+        raise ValueError("loop plan requires its original step function graph")
+    return plan
+
+
 def validate_case(case: dict) -> None:
     if not isinstance(case, dict) or case.get("schema") not in CASE_PROFILES:
         raise ValueError("unsupported semantic case schema")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("case requires its original Core program and emitted source")
+    if case["schema"] == LOOP_CASE_SCHEMA:
+        validate_loop_plan(case.get("loopPlan"))
     provenance = case.get("provenance")
     if not isinstance(provenance, dict):
         raise ValueError("case provenance is missing")
@@ -448,7 +462,8 @@ def execute(args, report: dict) -> None:
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
-        AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word"
+        AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
+        LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word"
     }[case["schema"]]
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))
@@ -481,7 +496,7 @@ def execute(args, report: dict) -> None:
         [str(args.case_tool), "replay", str(case_path), str(args.direct_fuel)])
     fresh = json.loads(refreshed["stdout"])
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
     (args.output / "replayed-case.json").write_bytes(json_bytes(fresh))

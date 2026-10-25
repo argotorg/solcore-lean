@@ -37,7 +37,7 @@ structural reducer.
 
 ## Comparison architecture
 
-One checked G0 program produces three observations:
+Each checked case produces three observations:
 
 1. **Direct Core:** execute the original generated Core program.
 2. **Rust EVM:** emit a `.sol` program, compile it through the checked Rust
@@ -63,7 +63,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | Complete, 2026-10-25 |
 | M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Complete, 2026-10-25 |
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
-| M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | In progress |
+| M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
 | M6 | Add selected generics, closures, comptime and module combinations. | Planned |
 
@@ -404,11 +404,42 @@ The internal aggregate and match slice is delivered:
   protocol/campaign regressions passed. Feature and recipe coverage retain
   their AST/metadata scope; emitter preservation is still unproved.
 
-Bounded loops remain open within M4. M5 and M6 remain planned. The next slice
-will compare actual source loops with an explicitly bounded Core reference,
-including zero iterations and mixed helper/aggregate/local-mutation cases.
-Keep termination bounds, input coverage and canonical reference reconstruction
-explicit in saved cases and replay, without adding a new Core primitive.
+The bounded-loop slice completes the restricted M4 scope:
+
+- A checked plan retains an aggregate step DAG and a mask in zero, one, three
+  or seven. The source runs a counter-based `while` for `input & mask` iterations.
+  The original Core program captures the arbitrary step entry once, then checks
+  finite literal ordinals against that bound and updates a private accumulator.
+  No Core loop primitive or new evaluator is used.
+- Every case origin, including imported and reduced cases, reconstructs and
+  checks the exact original Core application from the retained plan and input.
+  Replay checks source, ABI, plan, generation metadata and dependency versions.
+  The source emits the arbitrary step entry as `sc_step`, rather than assuming
+  it is the last declared helper.
+- Generated plans use masks one, three or seven. Their steps must be input
+  sensitive, and a positive-iteration input must change its value. Imported
+  and reduced plans can be identity functions or have a zero mask. Reduction
+  simplifies the checked step, mask or input, preserves step binders and helper
+  counts, and requires a strictly smaller complete original Core program.
+- All 48 fixed cases matched across the three actual paths: eight plans at
+  inputs zero, one, three, seven, maximum Word and the high bit. They cover
+  nineteen step AST features, helper counts one through three, all four step
+  recipes, masks zero/one/three/seven and prescribed iteration counts
+  zero/one/three/seven. These counts come from the validated plan; they are not
+  measured runtime traces. Step coverage excludes `sc_step` and ABI wrappers.
+- A separate 24-case external suite and exact replay passed, including fresh
+  helper-local cells on every iteration, arbitrary entries, aggregates, zero
+  iterations and Word wrap. A positive-iteration synthetic mismatch reduced
+  successfully; real and synthetic replays retained their expected outcomes.
+  Generation fuel exhaustion remained an explicit resource exclusion.
+- Full repository build/tests and kernel policy passed. All six fixed corpora
+  (160 cases) passed deterministic native generation and replay. Forty saved
+  cases from the older five profiles retained identical artifacts and
+  observations. Focused protocol/campaign regressions passed.
+
+M4 is complete within the documented restrictions. M5 and M6 remain planned.
+The next work adds ordered stateful scenarios while retaining an original Core
+reference that does not share the Rust frontend.
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

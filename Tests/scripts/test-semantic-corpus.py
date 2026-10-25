@@ -6,8 +6,10 @@ features in the function body, independently of the applied input literal, and
 require completed observations for input coverage. Function DAGs include all
 helper bodies and the entry; helper counts describe declarations in completed
 cases, not the number of dynamic calls. Template/update labels are reported
-separately as replayed generation recipes, not execution coverage. This does not measure
-executed EVM opcodes or prove source-emitter meaning preservation.
+separately as replayed generation recipes, not execution coverage. Loop features
+and helper counts describe the checked step DAG; specified iterations are
+input & mask, not a measured execution trace. This does not measure executed
+EVM opcodes or prove source-emitter meaning preservation.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ MANIFEST_SCHEMA = "solcore-lean.semantic-corpus-manifest.v1"
 VERSIONS = ("generatorVersion", "emitterVersion", "wrapperVersion")
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
 MUTATION_VERSIONS = ("profileVersion", "functionVersion", "templateVersion")
+LOOP_STEP_VERSIONS = ("stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion")
 MUTATION_FEATURES = {"newCell", "loadCell", "storeCell", "unitLiteral"}
 AGGREGATE_FEATURES = {"pair", "first", "second", "inLeft", "inRight", "case"}
 FEATURES = {"wordLiteral", "boolLiteral", "local", "let", "if"} | {
@@ -35,6 +38,7 @@ FEATURES = {"wordLiteral", "boolLiteral", "local", "let", "if"} | {
 }
 LITERALS = {0, 1, (1 << 256) - 1, 1 << 255}
 BOUNDARIES = (0, 1, (1 << 256) - 1, 1 << 255)
+LOOP_BOUNDARIES = (0, 1, 3, 7, (1 << 256) - 1, 1 << 255)
 
 
 def require(condition: bool, message: str) -> None:
@@ -144,7 +148,8 @@ def function_parts(expression: dict) -> tuple[list[dict], dict]:
 def function_case_parts(case: dict, profile: str) -> tuple[list[dict], dict]:
     schema = {"runtime-functions": "solcore-lean.semantic-function-case.v1",
               "runtime-mutation": "solcore-lean.semantic-mutation-case.v1",
-              "runtime-aggregates": "solcore-lean.semantic-aggregate-case.v1"}[profile]
+              "runtime-aggregates": "solcore-lean.semantic-aggregate-case.v1",
+              "runtime-loops": "solcore-lean.semantic-loop-case.v1"}[profile]
     require(case["schema"] == schema, "unexpected function case schema")
     program = case["program"]
     application = program["body"]
@@ -156,13 +161,30 @@ def function_case_parts(case: dict, profile: str) -> tuple[list[dict], dict]:
     require(int(argument["value"], 16) == number, "applied Core argument differs from runtime input")
     require(case["contract"]["calldata"] == f"0xa444f5e9{number:064x}",
             "ABI argument differs from runtime input")
+    if profile == "runtime-loops":
+        plan = case["loopPlan"]
+        require(isinstance(plan, dict) and set(plan) == {"schema", "stepProgram", "mask"}
+                and plan["schema"] == "solcore-lean.loop-plan.v1"
+                and type(plan["mask"]) is int and plan["mask"] in {0, 1, 3, 7},
+                "loop case requires a canonical bounded loop plan")
+        step = plan["stepProgram"]
+        require(step["resultType"] == {"tag": "function", "parameter": "word", "result": "word"}
+                and step["dataDefinitions"] == [], "loop step must be a closed Word function DAG")
+        function = application["function"]
+        require(function.get("tag") == "let" and function.get("initializer") == step["body"],
+                "loop Core reference must capture the exact step DAG once")
+        # Native replay below reconstructs and checks the complete canonical
+        # application for every origin, including imported and reduced cases.
+        return function_parts(step["body"])
     return function_parts(application["function"])
 
 
 def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
                 profile: str = "closed-g0") -> dict:
-    require(("generation" in entry) != ("program" in entry),
-            f"{entry['id']}: choose a seed or a manual Core program")
+    manual_field = "loopPlan" if profile == "runtime-loops" else "program"
+    require(("generation" in entry) != (manual_field in entry)
+            and not ({"program", "loopPlan"} - {manual_field}) & entry.keys(),
+            f"{entry['id']}: choose a seed or a manual {manual_field}")
     runtime_input = profile != "closed-g0"
     if runtime_input:
         canonical_word(entry["input"])
@@ -174,10 +196,11 @@ def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
         nodes = generation["maxProgramNodes"]
         require(type(nodes) is int and 3 <= nodes <= 512,
                 f"{entry['id']}: invalid node budget")
-        count = 4 if runtime_input else 1
+        boundaries = LOOP_BOUNDARIES if profile == "runtime-loops" else BOUNDARIES
+        count = len(boundaries) if runtime_input else 1
         command = {"closed-g0": "generate", "runtime-word": "input-generate",
                    "runtime-functions": "function-generate", "runtime-mutation": "mutation-generate",
-                   "runtime-aggregates": "aggregate-generate"}[profile]
+                   "runtime-aggregates": "aggregate-generate", "runtime-loops": "loop-generate"}[profile]
         corpus = run(tool, command, seed,
                      str(nodes), str(count), "1", str(fuel))
         require(corpus["status"] == "complete" and corpus["attempted"] == 1
@@ -191,15 +214,15 @@ def materialize(entry: dict, tool: Path, directory: Path, fuel: int,
         require(origin["seed"] == seed and origin["maxProgramNodes"] == nodes,
                 f"{entry['id']}: generated provenance differs from the manifest")
         if runtime_input:
-            require(origin["inputIndex"] == BOUNDARIES.index(int(entry["input"]))
+            require(origin["inputIndex"] == boundaries.index(int(entry["input"]))
                     and origin["validationFuel"] == fuel,
                     f"{entry['id']}: generated input/validation budget differs from the manifest")
         return case
-    path = directory / "program.json"
-    path.write_text(json.dumps(entry["program"]))
+    path = directory / f"{manual_field}.json"
+    path.write_text(json.dumps(entry[manual_field]))
     if runtime_input:
         command = {"runtime-functions": "function-emit", "runtime-mutation": "mutation-emit",
-                   "runtime-aggregates": "aggregate-emit",
+                   "runtime-aggregates": "aggregate-emit", "runtime-loops": "loop-emit",
                    "runtime-word": "input-emit"}[profile]
         return run(tool, command, str(path), entry["input"], str(fuel))
     return run(tool, "emit", str(path), str(fuel))
@@ -209,13 +232,16 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     require(isinstance(manifest, dict), "manifest must be an object")
     require(manifest["schema"] == MANIFEST_SCHEMA, "unexpected corpus manifest schema")
     profile = manifest.get("profile", "closed-g0")
-    require(profile in ("closed-g0", "runtime-word", "runtime-functions", "runtime-mutation", "runtime-aggregates"),
+    require(profile in ("closed-g0", "runtime-word", "runtime-functions", "runtime-mutation",
+                        "runtime-aggregates", "runtime-loops"),
             "unsupported corpus profile")
     runtime_input = profile != "closed-g0"
-    function_profile = profile in ("runtime-functions", "runtime-mutation", "runtime-aggregates")
+    function_profile = profile in ("runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops")
     mutation_profile = profile == "runtime-mutation"
-    aggregate_profile = profile == "runtime-aggregates"
+    loop_profile = profile == "runtime-loops"
+    aggregate_profile = profile in ("runtime-aggregates", "runtime-loops")
     template_profile = mutation_profile or aggregate_profile
+    boundaries = LOOP_BOUNDARIES if loop_profile else BOUNDARIES
     require(manifest["coverageKind"] == "core-ast-features", "coverage scope changed")
     for name in ("requiredFeatures", "requiredWordLiterals") + (("requiredInputs",) if runtime_input else ()):
         require(isinstance(manifest.get(name), list) and
@@ -226,6 +252,18 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
                        if runtime_input else set())
     required_helper_counts = set()
     required_templates, required_updates = set(), set()
+    required_masks, required_iterations = set(), set()
+    if loop_profile:
+        loops = manifest.get("loopRequirements")
+        require(isinstance(loops, dict) and set(loops) == {"masks", "iterations"},
+                "loop corpus must declare mask and specified-iteration requirements")
+        for key in ("masks", "iterations"):
+            values = loops[key]
+            require(isinstance(values, list) and all(type(value) is int for value in values)
+                    and len(values) == len(set(values)), f"invalid loop {key} requirements")
+        required_masks, required_iterations = set(loops["masks"]), set(loops["iterations"])
+        require(required_masks in ({1, 3, 7}, {0, 1, 3, 7}) and required_iterations == {0, 1, 3, 7},
+                "loop requirements must cover all generated masks and zero/one/three/seven iterations")
     if template_profile:
         recipe = manifest.get("generationRecipeRequirements")
         require(isinstance(recipe, dict), "template corpus must declare generation recipe requirements")
@@ -249,7 +287,7 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
         require(required_features and required_features <= allowed_features, "unsupported runtime body features")
         if function_profile:
             require("functionCall" in required_features, "function corpus must require helper calls")
-        require(required_inputs == set(BOUNDARIES), "runtime corpus must require all four boundary inputs")
+        require(required_inputs == set(boundaries), "runtime corpus must require its complete boundary input set")
     else:
         require(required_features == FEATURES,
                 "required features do not cover the complete initial emitter subset")
@@ -259,6 +297,7 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     identifiers = [entry["id"] for entry in entries]
     require(entries and len(set(identifiers)) == len(identifiers), "empty corpus or duplicate case id")
     covered_features, covered_literals, covered_inputs, covered_helper_counts = set(), set(), set(), set()
+    covered_masks, specified_iterations = set(), set()
     recipe_templates, recipe_updates = set(), set()
     function_groups = {}
     with tempfile.TemporaryDirectory(prefix="semantic-corpus-") as name:
@@ -268,6 +307,8 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
             require(case == materialize(entry, tool, directory, fuel, profile),
                     f"{entry['id']}: materialization is not deterministic")
             versions = VERSIONS + (MUTATION_VERSIONS if template_profile else INPUT_VERSIONS if runtime_input else ())
+            if loop_profile:
+                versions += LOOP_STEP_VERSIONS
             for version in versions:
                 require(case["provenance"][version] == manifest[version],
                         f"{entry['id']}: {version} changed")
@@ -292,7 +333,7 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
             require(direct["stage"] == "execution" and direct["status"] == "returned",
                     f"{entry['id']}: original Core did not return within the test budget")
             canonical_word(direct["word"])
-            if body["tag"] == "word":
+            if not loop_profile and body["tag"] == "word":
                 require(int(direct["word"]) == int(body["value"], 16),
                         f"{entry['id']}: literal observation disagrees with its original Core")
             path = directory / "case.json"
@@ -303,6 +344,10 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
                 # Exact replay above regenerates and checks this metadata. It
                 # classifies the generator recipe, not dynamic instruction use.
                 origin = case["provenance"]["origin"]
+                if loop_profile:
+                    require(origin["kind"] == "loop-generated" and origin["mask"] == case["loopPlan"]["mask"],
+                            "loop recipe mask differs from its checked plan")
+                    origin = origin["stepOrigin"]
                 metadata = origin["helpers"]
                 origin_kind = "mutation-generated" if mutation_profile else "aggregate-generated"
                 require(origin["kind"] == origin_kind and
@@ -326,7 +371,11 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
                 number = canonical_word(case["input"])
                 require(case["input"] == entry["input"], "materialized input differs from manifest")
                 covered_inputs.add(number)
-                key = json.dumps(feature_body, sort_keys=True, separators=(",", ":"))
+                if loop_profile:
+                    covered_masks.add(case["loopPlan"]["mask"])
+                    specified_iterations.add(number & case["loopPlan"]["mask"])
+                group_body = case["loopPlan"] if loop_profile else feature_body
+                key = json.dumps(group_body, sort_keys=True, separators=(",", ":"))
                 group = function_groups.setdefault(key, {"inputs": set(), "sources": set(), "results": set()})
                 group["inputs"].add(number)
                 group["sources"].add(case["source"])
@@ -336,11 +385,13 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     require(required_helper_counts <= covered_helper_counts, "fixed corpus lost required completed helper counts")
     require(required_templates <= recipe_templates, "fixed corpus lost a required generator template")
     require(required_updates <= recipe_updates, "fixed corpus lost a required generator update count")
+    require(required_masks <= covered_masks, "fixed corpus lost a required completed loop mask")
+    require(required_iterations <= specified_iterations, "fixed corpus lost a required specified loop iteration count")
     if runtime_input:
         require(covered_features == required_features, "runtime feature requirements must name exactly this corpus's union")
         require(required_inputs <= covered_inputs, "fixed corpus lost required completed runtime inputs")
         for group in function_groups.values():
-            require(set(BOUNDARIES) <= group["inputs"], "a runtime function lacks a completed boundary input")
+            require(set(boundaries) <= group["inputs"], "a runtime function lacks a completed boundary input")
             require(len(group["sources"]) == 1, "one runtime function emitted input-dependent source")
             require(len(group["results"]) >= 2, "a fixed runtime function returned only one boundary result")
     report = {"status": "passed", "profile": profile, "cases": len(entries),
@@ -355,6 +406,11 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
     if template_profile:
         report["generationRecipe"] = {"classification": "replayed-generator-metadata",
                                       "templates": sorted(recipe_templates), "updates": sorted(recipe_updates)}
+    if loop_profile:
+        report["loopCoverage"] = {"classification": "specified-iterations-not-execution-trace",
+                                  "requiredMasks": sorted(required_masks), "completedMasks": sorted(covered_masks),
+                                  "requiredIterations": sorted(required_iterations),
+                                  "specifiedIterations": sorted(specified_iterations)}
     return report
 
 

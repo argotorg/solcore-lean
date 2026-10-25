@@ -8,5 +8,7 @@ import Solcore.Synthesis.Source.MutationEmitter
 import Solcore.Synthesis.Source.MutationCases
 import Solcore.Synthesis.Source.AggregateEmitter
 import Solcore.Synthesis.Source.AggregateCases
+import Solcore.Synthesis.Source.LoopEmitter
+import Solcore.Synthesis.Source.LoopCases
 
 /-! Checked Core cases, deterministic Solcore source emission and replay. -/

@@ -313,8 +313,8 @@ The external input regression executes two unchanged source functions at all
 four boundary inputs, checks three-way agreement and varying results, and
 replays a saved input-dependent run. The input profile also supports automatic
 reduction of its function body and input while retaining the checked application
-form. Named functions, private mutable locals and aggregates extend this
-workflow below; bounded loops remain later M4 work.
+form. Named functions, private mutable locals, aggregates and bounded loops
+extend this workflow below.
 
 ## Compare acyclic named functions
 
@@ -354,8 +354,8 @@ wrapper lambdas as source function definitions.
 Reduction keeps helper declarations in their original order and checks the
 complete graph after every candidate body or input change. The first reducer
 keeps the number of helpers fixed; it can remove calls or simplify bodies but
-does not delete and reindex declarations. Private mutable locals and aggregates
-extend this workflow below; bounded loops remain later M4 work.
+does not delete and reindex declarations. Private mutable locals, aggregates
+and bounded loops extend this workflow below.
 
 ## Compare private mutable locals
 
@@ -440,3 +440,51 @@ update-count recipe dimension. Coverage is still AST/metadata coverage.
 The separate sixteen-case external suite checks retained aggregate snapshots,
 single evaluation of projections, nested payload/helper effects and typed
 pair/sum branch results, then replays a saved run exactly.
+
+## Compare bounded loops
+
+The `runtime-loops` profile retains a checked aggregate step graph and a mask.
+Its source runs `while (limit > counter)` with `limit = input & mask`, updating
+an accumulator through the arbitrary step entry on each iteration. The original
+Core reference captures that entry closure once and executes a finite sequence
+of literal-ordinal guards and accumulator stores. It does not reuse the source
+counter implementation. The ABI is `SynthesizedLoops.run(uint256)`.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-loops --seed 21 --nodes 384 --cases 6 --attempts 256 \
+  --output .upstream/semantic-loops
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-loop-corpus.json --seconds 600 \
+  --output .upstream/semantic-loop-ci
+python3 scripts/test-source-loop-rust.py
+```
+
+Native commands are `loop-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`loop-emit PLAN.json INPUT [FUEL]`. A plan has schema
+`solcore-lean.loop-plan.v1`, a `stepProgram` containing a checked aggregate
+function DAG, and an integer `mask` in zero, one, three or seven. Saved cases
+contain both `loopPlan` and the actual applied original Core `program`. Native
+admission reconstructs and checks their exact correspondence for every origin.
+The complete applied reference has a 512-node limit; generation defaults to 384.
+
+Each accepted seed supplies six ordered inputs: zero, one, three, seven,
+maximum Word and the high bit. Generation selects masks one, three or seven,
+requires an input-sensitive step, and checks that at least one positive-trip
+input changes its value. Imported and reduced plans may be identity functions
+or use a zero mask. Reduction preserves step binders and helper count, rebuilds
+the complete reference, and requires strict decrease of its complexity.
+
+The fixed corpus has eight plans at all six inputs, with all 48 cases matching
+across the three actual paths. It covers nineteen step AST features, one to
+three step helpers and all four aggregate recipes. `loopRequirements` declares
+required `masks` and `iterations`; the fixed values are zero, one, three and
+seven for each. `loopCoverage` derives prescribed iterations from the validated
+input and mask and counts only three-way matches toward passing coverage. It
+does not claim measured execution traces. Helper coverage excludes the emitted
+`sc_step` and ABI wrappers. Features describe the step graph; full-program
+literal coverage remains separate.
+
+The external 24-case suite checks zero and positive iterations, arbitrary step
+entries, pair/sum branches, fresh helper-local cells per iteration and Word
+wrap, followed by exact replay. Stateful contract scenarios remain M5 work.

@@ -163,8 +163,11 @@ Its fixed 28-case corpus matches across all three paths, including cases where
 a read must retain its value before a later write. The aggregate profile adds
 internal Word pairs and sums, projections and matches, mixed with mutable locals
 and helper calls. All 32 fixed aggregate cases agree across the three paths.
-The ABI and helper arguments/results remain Word-only; bounded loops are the
-remaining M4 extension.
+The ABI and helper arguments/results remain Word-only. Bounded loops use an
+actual source `while` and an independently executed finite Core reference, with
+up to seven iterations. All 48 fixed loop cases match across the three paths.
+M1 through M4 are complete for these restricted profiles; stateful scenarios
+and the selected generics/closures/comptime/module combinations are planned.
 
 ## Code layout
 

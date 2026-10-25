@@ -4,6 +4,7 @@ import Solcore.Synthesis.Core.WordFunction
 import Solcore.Synthesis.Core.WordFunctionDAG
 import Solcore.Synthesis.Core.LocalMutationDAG
 import Solcore.Synthesis.Core.AggregateDAG
+import Solcore.Synthesis.Core.BoundedLoop
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink
 

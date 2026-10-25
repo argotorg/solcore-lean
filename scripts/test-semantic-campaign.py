@@ -67,6 +67,23 @@ def mutation_policy_case(template=0, updates=1):
     return case
 
 
+def loop_policy_case(mask=7, value=7, helpers=2):
+    """Loop envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(helpers)
+    step = {'schema': 'solcore-semantic-core', 'dataDefinitions': [],
+        'resultType': {'tag': 'function', 'parameter': 'word', 'result': 'word'},
+        'body': copy.deepcopy(case['program']['body']['function'])}
+    case.update(schema=campaign.m2.LOOP_CASE_SCHEMA, input=str(value),
+        loopPlan={'schema': 'solcore-lean.loop-plan.v1', 'mask': mask, 'stepProgram': step})
+    case['contract'].update(name='SynthesizedLoops', deployPath=['SynthesizedLoopsDeploy'],
+        runtimePath=['SynthesizedLoopsDeploy', 'SynthesizedLoops'], calldata='0xa444f5e9' + f'{value:064x}')
+    for key in campaign.PROFILE_VERSION_FIELDS['runtime-loops']:
+        case['provenance'][key] = 'test'
+    case['provenance']['origin'] = {'kind': 'loop-generated', 'seed': '0', 'maxProgramNodes': 384,
+        'mask': mask, 'stepOrigin': {'kind': 'aggregate-generated', 'helpers': [{'template': 3}]}}
+    return case
+
+
 class AnalysisTests(unittest.TestCase):
     def test_normal_analysis_never_changes_observations(self):
         report = matched()
@@ -431,7 +448,8 @@ class ManifestTests(unittest.TestCase):
         for profile, command in (('closed-g0', 'generate'), ('runtime-word', 'input-generate'),
                                  ('runtime-functions', 'function-generate'),
                                  ('runtime-mutation', 'mutation-generate'),
-                                 ('runtime-aggregates', 'aggregate-generate')):
+                                 ('runtime-aggregates', 'aggregate-generate'),
+                                 ('runtime-loops', 'loop-generate')):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
                 config = options(directory)
                 config.profile = profile
@@ -611,6 +629,118 @@ class RecipeCoverageTests(unittest.TestCase):
             self.assertEqual(summary['status'], 'coverage-incomplete')
             self.assertEqual(summary['recipeCoverage']['missingTemplates'], [1])
             self.assertEqual(summary['recipeCoverage']['missingUpdates'], [2])
+
+
+class LoopCoverageTests(unittest.TestCase):
+    def manifest(self):
+        case = loop_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-loops',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS['runtime-loops'])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.LOOP_INPUTS),
+            'requiredHelperCounts': [1, 2, 3], 'loopRequirements': {'masks': [1, 3, 7], 'iterations': [0, 1, 3, 7]},
+            'cases': [{'id': 'loop', 'input': '7', 'loopPlan': case['loopPlan'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        entry = value['cases'][0]
+        for invalid in (None, {}, {'masks': [2], 'iterations': []}, {'masks': [True], 'iterations': []},
+                {'masks': [1, 1], 'iterations': []}, {'masks': [], 'iterations': [8]},
+                {'masks': [], 'iterations': [1.0]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'loopRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'generation': {'seed': '0', 'maxProgramNodes': 384}},
+                        {'id': 'loop', 'input': '7', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        with self.assertRaises(ValueError):
+            campaign.loop_requirements({'profile': 'runtime-aggregates', 'loopRequirements': value['loopRequirements']})
+        for input_value in campaign.LOOP_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 384}, 'expectedFeatures': []}]})
+        for missing in ('stepProfileVersion', 'stepTemplateVersion', 'stepFunctionVersion'):
+            invalid = copy.deepcopy(value)
+            del invalid[missing]
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_coverage_reads_the_step_graph_and_prescribed_bound(self):
+        case = loop_policy_case(3, 7, 3)
+        case['program'] = {}  # The plan graph, not the loop scaffold, supplies helper counts.
+        self.assertEqual(campaign.helper_counts(case), {3})
+        self.assertEqual(campaign.specified_loops(case), {'Masks': {3}, 'Iterations': {3}})
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+        case['input'] = str(2**255)
+        self.assertEqual(campaign.specified_loops(case), {'Masks': {3}, 'Iterations': {0}})
+        case['loopPlan']['stepProgram']['resultType'] = 'word'
+        with self.assertRaises(ValueError):
+            campaign.helper_counts(case)
+        case['provenance']['origin']['stepOrigin']['kind'] = 'mutation-generated'
+        with self.assertRaises(ValueError):
+            campaign.generation_recipes(case)
+
+    def test_generated_manifest_requests_all_six_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases = 'runtime-loops', 1
+            value = self.manifest()
+            del value['cases'][0]['loopPlan']
+            value['cases'][0]['generation'] = {'seed': '0', 'maxProgramNodes': 384}
+            config.corpus = Path(directory) / 'manifest.json'
+            config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config)
+            calls = []
+            def tool(arguments, stage):
+                calls.append((arguments, stage))
+                return {'cases': [loop_policy_case()]}
+            instance.tool = tool
+            self.assertEqual(len(instance.prepare_cases()['cases']), 1)
+            self.assertEqual(calls, [(['loop-generate', '0', '384', '6', '1', '1000'], 'corpus-generation')])
+            self.assertEqual(instance.summary['loopCoverage']['generatedIterations'], [7])
+            self.assertEqual(instance.summary['loopCoverage']['matchedIterations'], [])
+
+    def test_nonmatching_outcomes_cannot_satisfy_loop_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-loops', 3, 0
+            instance = campaign.Campaign(config)
+            cases = [loop_policy_case(n, n) for n in (1, 3, 7)]
+            instance.summary['loopCoverage'].update(requiredMasks=[1, 3, 7], requiredIterations=[1, 3, 7])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 3, 'attempted': 3, 'status': 'complete'}
+            def execute_case(case):
+                mask = case['loopPlan']['mask']
+                folder = instance.work / str(mask)
+                folder.mkdir()
+                report = matched()
+                if mask != 1:
+                    report['comparison'] = {'category': 'inconclusive-resource' if mask == 3 else 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['loopCoverage']
+            self.assertEqual(coverage['generatedIterations'], [1, 3, 7])
+            self.assertEqual(coverage['matchedIterations'], [1])
+            self.assertEqual(coverage['missingIterations'], [3, 7])
+            self.assertEqual(coverage['missingMasks'], [3, 7])
+
+    def test_missing_loop_coverage_fails_an_otherwise_matched_campaign(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+            def run(instance):
+                instance.summary['status'] = 'complete'
+                instance.summary['counts'].update(generated=1, executed=1, completed=1, matched=1)
+                instance.summary['loopCoverage'].update(requiredMasks=[1, 3], requiredIterations=[0, 1, 3],
+                    generatedMasks=[1], matchedMasks=[1], generatedIterations=[1], matchedIterations=[1])
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-loops', '--cases', '1']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 1)
+            summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(summary['status'], 'coverage-incomplete')
+            self.assertEqual(summary['loopCoverage']['missingIterations'], [0, 3])
 
 
 class CancellationTests(unittest.TestCase):
