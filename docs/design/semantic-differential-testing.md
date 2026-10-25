@@ -24,14 +24,16 @@ comparison must not share the Rust frontend with its reference computation.
 | Reproducible Core generation | `Solcore/Synthesis/Core/Generator.lean`, `Seed.lean` | G0 Word/Bool expressions, local Word bindings, conditionals and primitive operations; seed, size limit and generator version are recorded. |
 | Checked generated programs | `Solcore/Synthesis/Core/Fragment.lean` | `CheckedWordProgram.wellTyped` establishes typing of admitted Core programs. It does not establish correctness of a source emitter. |
 | Structural shrinking | `Solcore/Synthesis/Core/Shrink.lean` | Deterministic candidates preserve the checked fragment and strictly reduce the declared complexity measure. |
+| Source emission and case replay | `Solcore/Synthesis/Source/Emitter.lean`, `Cases.lean`, `Tests/SemanticCaseTool.lean` | Restricted G0 source output, explicit exclusions, versioned cases, fresh original-Core observations and checked shrink candidates. |
 | Rust artifacts | `scripts/export-rust-hull.py`, `scripts/export-rust-code-image.py` | Checked Hull and exact Sonatina O0 code images from a supplied source, with revision and hash receipts. |
 | Core contract execution | `Tests/RustHullScenarioRun.lean` | Deployment and ordered calls, with explicit account context and state observations. |
 | Rust EVM reference | `scripts/rust-evm-reference.py` | Fixed upstream E2E fixtures on Anvil; Sonatina O0/O2 and Yul execution. |
 | Compatibility inventories | `scripts/RUST_PARITY.md` | Fixed expectations checked separately by the Rust and Core paths. These are not a direct comparison runner for generated inputs. |
 
-No Solcore source emitter or generated-input differential campaign is delivered
-by the existing G0 modules. Rust's raw UTF-8 fuzz targets exercise compiler
-robustness; they do not supply a typed semantic generator or structural reducer.
+The restricted source emitter is delivered by M1. The operational comparison and
+campaign are separate M2/M3 deliverables. Rust's raw UTF-8 fuzz targets exercise
+compiler robustness; they do not supply a typed semantic generator or
+structural reducer.
 
 ## Comparison architecture
 
@@ -58,9 +60,9 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | Milestone | Deliverable | Status |
 | --- | --- | --- |
 | M0 | Record the scope, settle existing working-tree changes, update project documentation, and establish a tested clean baseline. | Complete, 2026-10-25 |
-| M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | In progress |
-| M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Planned |
-| M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Planned |
+| M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | Complete, 2026-10-25 |
+| M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | In progress |
+| M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | In progress |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Planned |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
 | M6 | Add selected generics, closures, comptime and module combinations. | Planned |
@@ -96,9 +98,9 @@ Completed baseline:
   whitespace check passed. Validation logs and temporary proof audits were
   removed after inspection.
 
-M1 is in progress. The first deliverable is source emission and its
-operation-mapping regressions; the existing Core generator alone is not a
-delivered Solcore source generator or generated-input comparison campaign.
+M0 established the baseline for source emission and operation-mapping
+regressions. A Core generator alone does not complete the source-emission or
+comparison milestones.
 
 ### M1: source emission
 
@@ -147,6 +149,28 @@ Suggested new implementation area: `Solcore/Synthesis/Source/`, with regression
 modules under `Solcore/Test/`. Inspect `Core/Wire/Host.lean` and existing Wire
 runners before choosing the adapter for direct Core evaluation. Do not add a
 second Core evaluator.
+
+Delivered M1:
+
+- `Emitter.lean` renders the supported fragment with fresh typed locals and
+  branch-local computation. Unsupported operations remain explicit errors.
+- `Cases.lean` and the native `semantic-case-tool` provide bounded seed search,
+  original Core execution, replay validation and smaller checked candidates.
+- The emitter's 15 supported and 15 rejected regression fixtures pass. Case
+  regressions cover deterministic generation, explicit exhaustion, forged
+  expected results, provenance/source tampering, zero fuel and checked shrinking.
+- Actual checked Rust compilation and imported-Hull execution match original
+  Core in 39 cases: 27 explicit operation/scope cases and twelve generated
+  cases. Generation attempted 46 seeds and explicitly excluded 34 unsupported
+  expressions. This validation did not execute an EVM.
+- Full test-executable build (19,557 jobs), the complete test suite and the
+  semantic-kernel check passed. Native command-line checks reject oversized
+  inputs and zero requested counts, and report exhausted generation budgets.
+
+See [generated semantic comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md)
+for commands. Closed G0 cases may be constant-folded by Rust; source-feature
+coverage must not be reported as runtime opcode coverage. Source-emitter
+meaning preservation remains unproved.
 
 ### M2: direct execution comparison
 

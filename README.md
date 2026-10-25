@@ -132,13 +132,20 @@ not wait for every remaining Hull correspondence proof.
 generation and shrinking of pure Word programs with Boolean subexpressions,
 local bindings, conditionals and primitive operations. Generated and reduced
 programs pass the Core checker; accepted programs carry a proof of Core typing.
-This guarantee does not yet cover printing them as Solcore source.
+The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
+subset as a fixed Solcore contract. A native case tool records seeds and
+versions, rechecks saved inputs and recomputes the original Core result.
+Emitter regressions include actual checked Rust compilation and imported-Hull
+execution. Core typing does not establish the emitter's meaning preservation.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. The
 planned comparison uses the original generated Core result, Rust-produced EVM
 execution, and execution of Rust Hull on Lean Core to help locate disagreements.
 Core fuel, EVM gas and process timeouts remain separate resource limits.
+See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
+tools, supported operations and validation commands. Closed generated programs
+may be constant-folded; source coverage is not runtime opcode coverage.
 
 ## Code layout
 
