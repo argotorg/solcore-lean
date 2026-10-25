@@ -109,6 +109,23 @@ def closure_policy_case(variant="snapshot", value=1, helpers=2):
     return case
 
 
+def comptime_policy_case(variant="offset", value=1, helpers=2):
+    """Original-AST coverage fixture only; never a simulated compiler result."""
+    case = closure_policy_case('snapshot', value, helpers)
+    step = case.pop('closurePlan')['stepProgram']
+    constant = {'schema': 'solcore-semantic-core', 'resultType': 'word', 'dataDefinitions': [],
+        'body': {'tag': 'binary', 'op': 'wordAdd', 'left': {'tag': 'word', 'value': '0x' + f'{1:064x}'},
+                 'right': {'tag': 'word', 'value': '0x' + f'{2:064x}'}}}
+    case.update(schema=campaign.m2.COMPTIME_CASE_SCHEMA,
+        comptimePlan={'schema': 'solcore-lean.comptime-plan.v1', 'variant': variant, 'stepProgram': step,
+                      'constantProgram': constant})
+    case['contract'].update(name='SynthesizedComptime', deployPath=['SynthesizedComptimeDeploy'],
+        runtimePath=['SynthesizedComptimeDeploy', 'SynthesizedComptime'])
+    case['provenance']['origin'].update(kind='comptime-generated', variant=variant)
+    case['provenance']['constantFeatures'] = ['wordLiteral', 'binary:Solcore.Core.Wire.BinaryOp.wordAdd']
+    return case
+
+
 class AnalysisTests(unittest.TestCase):
     def test_normal_analysis_never_changes_observations(self):
         report = matched()
@@ -990,6 +1007,137 @@ class ClosureCoverageTests(unittest.TestCase):
             summary = json.loads((output / 'summary.json').read_text())
             self.assertEqual(summary['status'], 'coverage-incomplete')
             self.assertEqual(summary['closureCoverage']['missingVariants'], ['independent'])
+
+
+class ComptimeCoverageTests(unittest.TestCase):
+    def manifest(self):
+        case = comptime_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-comptime',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS['runtime-comptime'])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.INPUT_BOUNDARIES),
+            'requiredHelperCounts': [1, 2, 3], 'comptimeRequirements': {'variants': ['offset', 'scale']},
+            'requiredConstantFeatures': case['provenance']['constantFeatures'],
+            'cases': [{'id': 'comptime', 'input': '1', 'comptimePlan': case['comptimePlan'],
+                       'expectedConstantFeatures': case['provenance']['constantFeatures'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_comptime_recipes_and_original_constant_features_are_required(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        for invalid in (None, {}, {'variants': ['offset', 'offset']}, {'variants': ['runtime']},
+                {'variants': [True]}, {'variants': ['scale'], 'unknown': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'comptimeRequirements': invalid})
+        for invalid in (None, ['wordLiteral', 'wordLiteral'], [True], {}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'requiredConstantFeatures': invalid})
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**value['cases'][0], 'expectedConstantFeatures': invalid}]})
+        for key in ('requiredConstantFeatures', *campaign.PROFILE_VERSION_FIELDS['runtime-comptime']):
+            invalid = copy.deepcopy(value)
+            del invalid[key]
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        for profile in ('runtime-generics', 'runtime-closures', 'closed-g0'):
+            with self.assertRaises(ValueError):
+                campaign.comptime_requirements({'profile': profile, 'comptimeRequirements': value['comptimeRequirements']})
+            with self.assertRaises(ValueError):
+                campaign.constant_requirements({'profile': profile, 'requiredConstantFeatures': ['wordLiteral']})
+        entry = value['cases'][0]
+        for changed in ({**entry, 'program': {}}, {**entry, 'generation': {'seed': '0', 'maxProgramNodes': 384}},
+                {'id': 'comptime', 'input': '1', 'closurePlan': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+
+    def test_constant_features_and_step_helpers_are_separate(self):
+        for variant in ('offset', 'scale'):
+            case = comptime_policy_case(variant, 0, 3)
+            case['program'] = {}
+            self.assertEqual(campaign.helper_counts(case), {3})
+            self.assertEqual(campaign.specified_comptime(case), {variant})
+            self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+            self.assertEqual(campaign.constant_features(case), set(case['provenance']['constantFeatures']))
+        self.assertEqual(campaign.constant_features(closure_policy_case()), set())
+        self.assertEqual(campaign.specified_comptime(closure_policy_case()), set())
+        case['provenance']['constantFeatures'] = ['wordLiteral', 'wordLiteral', 'binary:Solcore.Core.Wire.BinaryOp.wordAdd']
+        self.assertEqual(campaign.constant_features(case), {'wordLiteral', 'binary:Solcore.Core.Wire.BinaryOp.wordAdd'})
+        for invalid in (None, {}, [True]):
+            case['provenance']['constantFeatures'] = invalid
+            with self.assertRaises(ValueError):
+                campaign.constant_features(case)
+
+    def test_generated_manifest_requests_four_inputs_and_checks_constant_inventory(self):
+        for forged in (False, True):
+            with tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile, config.cases = 'runtime-comptime', 1
+                value = self.manifest()
+                del value['cases'][0]['comptimePlan']
+                value['cases'][0]['generation'] = {'seed': '0', 'maxProgramNodes': 384}
+                if forged:
+                    value['cases'][0]['expectedConstantFeatures'] = ['wordLiteral']
+                config.corpus = Path(directory) / 'manifest.json'
+                config.corpus.write_text(json.dumps(value))
+                instance = campaign.Campaign(config)
+                calls = []
+                def tool(arguments, stage):
+                    calls.append((arguments, stage))
+                    return {'cases': [comptime_policy_case()]}
+                instance.tool = tool
+                if forged:
+                    with self.assertRaisesRegex(ValueError, 'constant feature inventory changed'):
+                        instance.prepare_cases()
+                else:
+                    self.assertEqual(len(instance.prepare_cases()['cases']), 1)
+                    self.assertEqual(instance.summary['comptimeCoverage']['generatedVariants'], ['offset'])
+                    self.assertEqual(instance.summary['constantCoverage']['generatedFeatures'], sorted(value['requiredConstantFeatures']))
+                    self.assertEqual(instance.summary['constantCoverage']['matchedFeatures'], [])
+                self.assertEqual(calls, [(['comptime-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+
+    def test_nonmatching_cases_cannot_satisfy_constant_or_variant_coverage(self):
+        for failure in ('inconclusive-resource', 'source-rejected', 'compilation-rejected'):
+            with tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile, config.cases, config.shrink_attempts = 'runtime-comptime', 2, 0
+                instance = campaign.Campaign(config)
+                cases = [comptime_policy_case(v) for v in ('offset', 'scale')]
+                cases[0]['provenance']['constantFeatures'] = ['wordLiteral']
+                instance.summary['comptimeCoverage']['requiredVariants'] = ['offset', 'scale']
+                instance.summary['constantCoverage']['requiredFeatures'] = cases[1]['provenance']['constantFeatures']
+                instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                    'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+                def execute_case(case):
+                    variant = case['comptimePlan']['variant']
+                    folder = instance.work / variant
+                    folder.mkdir()
+                    report = matched()
+                    if variant != 'offset':
+                        report['comparison'] = {'category': failure, 'pairs': {}}
+                    return folder, report, campaign.analyze(report)
+                instance.execute_case = execute_case
+                with redirect_stdout(io.StringIO()):
+                    instance.run()
+                self.assertEqual(instance.summary['comptimeCoverage']['matchedVariants'], ['offset'])
+                self.assertEqual(instance.summary['comptimeCoverage']['missingVariants'], ['scale'])
+                self.assertEqual(instance.summary['constantCoverage']['matchedFeatures'], ['wordLiteral'])
+                self.assertEqual(instance.summary['constantCoverage']['missingFeatures'], ['binary:Solcore.Core.Wire.BinaryOp.wordAdd'])
+                self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_missing_constant_coverage_fails_an_otherwise_matched_campaign(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+            def run(instance):
+                instance.summary['status'] = 'complete'
+                instance.summary['counts'].update(generated=1, executed=1, completed=1, matched=1)
+                instance.summary['constantCoverage'].update(requiredFeatures=['wordLiteral', 'if'],
+                    generatedFeatures=['wordLiteral'], matchedFeatures=['wordLiteral'])
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-comptime', '--cases', '1']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 1)
+            summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(summary['status'], 'coverage-incomplete')
+            self.assertEqual(summary['constantCoverage']['missingFeatures'], ['if'])
 
 
 class CancellationTests(unittest.TestCase):

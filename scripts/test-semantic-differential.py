@@ -72,7 +72,7 @@ class CaseProfileTests(unittest.TestCase):
 
     def test_named_function_profile_retains_the_runtime_argument(self):
         for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA,
-                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA, runner.CLOSURE_CASE_SCHEMA):
+                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA, runner.CLOSURE_CASE_SCHEMA, runner.COMPTIME_CASE_SCHEMA):
             name = runner.CASE_CONTRACTS[schema]
             for value in (0, 1, 2**255, 2**256 - 1):
                 case = self.input_case(value)
@@ -83,6 +83,8 @@ class CaseProfileTests(unittest.TestCase):
                     case["genericPlan"] = {"schema": "solcore-lean.generic-plan.v1", "variant": "sum", "stepProgram": {}}
                 if schema == runner.CLOSURE_CASE_SCHEMA:
                     case["closurePlan"] = {"schema": "solcore-lean.closure-plan.v1", "variant": "independent", "stepProgram": {}}
+                if schema == runner.COMPTIME_CASE_SCHEMA:
+                    case["comptimePlan"] = {"schema": "solcore-lean.comptime-plan.v1", "variant": "offset", "stepProgram": {}, "constantProgram": {}}
                 case["contract"].update(name=name,
                     deployPath=[name + "Deploy"], runtimePath=[name + "Deploy", name])
                 runner.validate_case(case)
@@ -123,6 +125,18 @@ class CaseProfileTests(unittest.TestCase):
         for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None}):
             with self.assertRaises(ValueError):
                 runner.validate_closure_plan(invalid)
+
+    def test_comptime_plan_requires_original_constant_ast_not_an_evaluated_word(self):
+        plan = {"schema": "solcore-lean.comptime-plan.v1", "variant": "offset", "stepProgram": {}, "constantProgram": {}}
+        for variant in ("offset", "scale"):
+            runner.validate_comptime_plan({**plan, "variant": variant})
+        for variant in (True, 0, None, [], {}, "runtime", "offset "):
+            with self.assertRaises(ValueError):
+                runner.validate_comptime_plan({**plan, "variant": variant})
+        for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None},
+                {**plan, "constantProgram": "15"}, {**plan, "constantProgram": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_comptime_plan(invalid)
 
 
 class ClassificationTests(unittest.TestCase):

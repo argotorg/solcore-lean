@@ -14,6 +14,8 @@ import Solcore.Synthesis.Source.GenericEmitter
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureEmitter
 import Solcore.Synthesis.Source.ClosureCases
+import Solcore.Synthesis.Source.ComptimeEmitter
+import Solcore.Synthesis.Source.ComptimeCases
 import Solcore.Synthesis.Source.StorageEmitter
 import Solcore.Synthesis.Source.StorageCases
 import Solcore.Synthesis.Source.StorageRollbackEmitter

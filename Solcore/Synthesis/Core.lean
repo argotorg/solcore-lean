@@ -7,6 +7,7 @@ import Solcore.Synthesis.Core.AggregateDAG
 import Solcore.Synthesis.Core.BoundedLoop
 import Solcore.Synthesis.Core.GenericPlan
 import Solcore.Synthesis.Core.ClosurePlan
+import Solcore.Synthesis.Core.ComptimePlan
 import Solcore.Synthesis.Core.StorageContract
 import Solcore.Synthesis.Core.StorageRollback
 import Solcore.Synthesis.Core.NestedCall

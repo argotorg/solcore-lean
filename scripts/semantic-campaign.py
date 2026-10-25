@@ -38,8 +38,9 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-aggregates": ("aggregate-generate", "aggregate-emit", "aggregate-generated"),
                     "runtime-loops": ("loop-generate", "loop-emit", "loop-generated"),
                     "runtime-generics": ("generic-generate", "generic-emit", "generic-generated"),
-                    "runtime-closures": ("closure-generate", "closure-emit", "closure-generated")}
-HELPER_PROFILES = ("runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures")
+                    "runtime-closures": ("closure-generate", "closure-emit", "closure-generated"),
+                    "runtime-comptime": ("comptime-generate", "comptime-emit", "comptime-generated")}
+HELPER_PROFILES = ("runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 LOOP_INPUTS = ("0", "1", "3", "7", str(2**256 - 1), str(2**255))
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
@@ -52,6 +53,8 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-generics": ("profileVersion", "functionVersion", "templateVersion",
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
                           "runtime-closures": ("profileVersion", "functionVersion", "templateVersion",
+                                               "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
+                          "runtime-comptime": ("profileVersion", "functionVersion", "templateVersion",
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion")}
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
@@ -125,7 +128,8 @@ def declared_helper_count(program: dict) -> int:
 def helper_counts(case: dict) -> set[int]:
     plans = {m2.LOOP_CASE_SCHEMA: ("loopPlan", m2.validate_loop_plan),
              m2.GENERIC_CASE_SCHEMA: ("genericPlan", m2.validate_generic_plan),
-             m2.CLOSURE_CASE_SCHEMA: ("closurePlan", m2.validate_closure_plan)}
+             m2.CLOSURE_CASE_SCHEMA: ("closurePlan", m2.validate_closure_plan),
+             m2.COMPTIME_CASE_SCHEMA: ("comptimePlan", m2.validate_comptime_plan)}
     if case.get("schema") in plans:
         key, validate = plans[case["schema"]]
         step = validate(case.get(key))["stepProgram"]
@@ -197,6 +201,46 @@ def specified_closures(case: dict) -> set[str]:
     return {m2.validate_closure_plan(case.get("closurePlan"))["variant"]}
 
 
+def comptime_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("comptimeRequirements", {"variants": []})
+    if not isinstance(requirements, dict) or set(requirements) != {"variants"}:
+        raise ValueError("comptimeRequirements requires a variants array")
+    values = requirements["variants"]
+    if (not isinstance(values, list) or any(not isinstance(v, str) or v not in ("offset", "scale") for v in values)
+            or len(values) != len(set(values))):
+        raise ValueError("invalid comptime variant requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-comptime" and values:
+        raise ValueError("only comptime corpora can require constant variants")
+    return requirements
+
+
+def constant_requirements(manifest: dict) -> list[str]:
+    values = manifest.get("requiredConstantFeatures", None if manifest.get("profile") == "runtime-comptime" else [])
+    if (not isinstance(values, list) or any(not isinstance(v, str) for v in values)
+            or len(values) != len(set(values))):
+        raise ValueError("requiredConstantFeatures must be an array of unique strings")
+    if manifest.get("profile", "closed-g0") != "runtime-comptime" and values:
+        raise ValueError("only comptime corpora can require constant features")
+    return values
+
+
+def specified_comptime(case: dict) -> set[str]:
+    if case.get("schema") != m2.COMPTIME_CASE_SCHEMA:
+        return set()
+    return {m2.validate_comptime_plan(case.get("comptimePlan"))["variant"]}
+
+
+def constant_features(case: dict) -> set[str]:
+    if case.get("schema") != m2.COMPTIME_CASE_SCHEMA:
+        return set()
+    values = case.get("provenance", {}).get("constantFeatures")
+    # Native provenance records ordered AST occurrences, including duplicates.
+    # Replay authenticates that exact list; coverage counts distinct features.
+    if not isinstance(values, list) or any(not isinstance(v, str) for v in values):
+        raise ValueError("constantFeatures must be an array of strings")
+    return set(values)
+
+
 def recipe_requirements(manifest: dict) -> dict:
     requirements = manifest.get("generationRecipeRequirements", {"templates": [], "updates": []})
     if not isinstance(requirements, dict) or set(requirements) != {"templates", "updates"}:
@@ -208,10 +252,10 @@ def recipe_requirements(manifest: dict) -> dict:
         if len(values) != len(set(values)):
             raise ValueError(f"recipe {key} must not contain duplicates")
     profile = manifest.get("profile", "closed-g0")
-    if profile not in ("runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures") and any(requirements.values()):
-        raise ValueError("only mutation, aggregate, loop, generic and closure corpora can require generation recipes")
-    if profile in ("runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures") and requirements["updates"]:
-        raise ValueError("aggregate, loop, generic and closure recipes have no update-count dimension")
+    if profile not in ("runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime") and any(requirements.values()):
+        raise ValueError("only step-based corpora can require generation recipes")
+    if profile in ("runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime") and requirements["updates"]:
+        raise ValueError("this profile has no update-count recipe dimension")
     return requirements
 
 
@@ -219,11 +263,12 @@ def generation_recipes(case: dict) -> dict[str, set[int]]:
     """Read claimed generator metadata; native replay authenticates matched cases."""
     result = {"Templates": set(), "Updates": set()}
     schema = case.get("schema")
-    if schema not in (m2.MUTATION_CASE_SCHEMA, m2.AGGREGATE_CASE_SCHEMA, m2.LOOP_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA):
+    if schema not in (m2.MUTATION_CASE_SCHEMA, m2.AGGREGATE_CASE_SCHEMA, m2.LOOP_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA, m2.COMPTIME_CASE_SCHEMA):
         return result
     origin_kind = {m2.MUTATION_CASE_SCHEMA: "mutation-generated",
                    m2.AGGREGATE_CASE_SCHEMA: "aggregate-generated", m2.LOOP_CASE_SCHEMA: "loop-generated",
-                   m2.GENERIC_CASE_SCHEMA: "generic-generated", m2.CLOSURE_CASE_SCHEMA: "closure-generated"}[schema]
+                   m2.GENERIC_CASE_SCHEMA: "generic-generated", m2.CLOSURE_CASE_SCHEMA: "closure-generated",
+                   m2.COMPTIME_CASE_SCHEMA: "comptime-generated"}[schema]
     provenance = case.get("provenance")
     if not isinstance(provenance, dict):
         raise ValueError("recipe case provenance must be an object")
@@ -232,7 +277,7 @@ def generation_recipes(case: dict) -> dict[str, set[int]]:
         raise ValueError("recipe case origin must be an object")
     if origin.get("kind") != origin_kind:
         return result
-    if schema in (m2.LOOP_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA):
+    if schema in (m2.LOOP_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA, m2.COMPTIME_CASE_SCHEMA):
         origin = origin.get("stepOrigin")
         if not isinstance(origin, dict) or origin.get("kind") != "aggregate-generated":
             raise ValueError("generated plan recipe requires its aggregate step origin")
@@ -258,7 +303,9 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["recipeCoverage"]["missing" + dimension] for dimension in ("Templates", "Updates"))
         or any(summary["loopCoverage"]["missing" + dimension] for dimension in ("Masks", "Iterations"))
         or bool(summary["genericCoverage"]["missingInstantiations"])
-        or bool(summary["closureCoverage"]["missingVariants"]))
+        or bool(summary["closureCoverage"]["missingVariants"])
+        or bool(summary["comptimeCoverage"]["missingVariants"])
+        or bool(summary["constantCoverage"]["missingFeatures"]))
 
 
 def validate_manifest(manifest) -> dict:
@@ -294,14 +341,16 @@ def validate_manifest(manifest) -> dict:
     loop_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
+    comptime_requirements(manifest)
+    constant_requirements(manifest)
     ids = set()
     for entry in manifest["cases"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "genericPlan", "closurePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "genericPlan", "closurePlan", "comptimePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -313,6 +362,11 @@ def validate_manifest(manifest) -> dict:
             raise ValueError("closed G0 corpus entries cannot specify a runtime input")
         if not isinstance(entry.get("expectedFeatures"), list) or any(not isinstance(value, str) for value in entry["expectedFeatures"]):
             raise ValueError("expectedFeatures must be an array of strings")
+        if profile == "runtime-comptime":
+            values = entry.get("expectedConstantFeatures")
+            if (not isinstance(values, list) or any(not isinstance(v, str) for v in values)
+                    or len(values) != len(set(values))):
+                raise ValueError("expectedConstantFeatures must be an array of unique strings")
         if "generation" in entry:
             request = entry["generation"]
             if not isinstance(request, dict):
@@ -327,6 +381,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
             m2.validate_closure_plan(entry["closurePlan"])
+        elif "comptimePlan" in entry:
+            m2.validate_comptime_plan(entry["comptimePlan"])
         elif not isinstance(entry["program"], dict):
             raise ValueError("corpus program must be a Core JSON object")
     return manifest
@@ -433,7 +489,7 @@ class Campaign:
                       "differentialSha256": m2.digest((ROOT / "scripts/semantic-differential.py").read_bytes())},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "cases": [], "findings": [], "secondaryFindings": [], "shrinkAttempts": 0,
-            "coverage": {"kind": "AST features, literals and declared helper counts; loop, generic and closure profiles count the step graph and exclude sc_step/ABI wrappers; not runtime call or opcode coverage",
+            "coverage": {"kind": "AST features, literals and declared helper counts; plan-based profiles count the step graph and exclude sc_step/ABI wrappers; not runtime call or opcode coverage",
                          "generatedFeatures": [], "generatedWordLiterals": [],
                          "matchedFeatures": [], "matchedWordLiterals": [],
                          "requiredFeatures": [], "requiredWordLiterals": [],
@@ -449,6 +505,10 @@ class Campaign:
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
                 "generatedVariants": [], "matchedVariants": [], "requiredVariants": []},
+            "comptimeCoverage": {"classification": "prescribed staged constant composition; matched plans verified by native replay; not measured specialization or opcode coverage",
+                "generatedVariants": [], "matchedVariants": [], "requiredVariants": []},
+            "constantCoverage": {"classification": "original closed constant AST features; matched plans verified by native replay; not runtime opcode coverage",
+                "generatedFeatures": [], "matchedFeatures": [], "requiredFeatures": []},
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
         self.checkpoint()
 
@@ -472,6 +532,10 @@ class Campaign:
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
         closure["missingVariants"] = sorted(set(closure["requiredVariants"]) - set(closure["matchedVariants"]))
+        comptime = self.summary["comptimeCoverage"]
+        comptime["missingVariants"] = sorted(set(comptime["requiredVariants"]) - set(comptime["matchedVariants"]))
+        constant = self.summary["constantCoverage"]
+        constant["missingFeatures"] = sorted(set(constant["requiredFeatures"]) - set(constant["matchedFeatures"]))
         save_json(self.args.output / "summary.json", self.summary)
 
     def record_recipes(self, case: dict, *, matched: bool = False) -> None:
@@ -491,6 +555,13 @@ class Campaign:
     def record_closures(self, case: dict, *, matched: bool = False) -> None:
         key = ("matched" if matched else "generated") + "Variants"
         self.summary["closureCoverage"][key] = sorted(set(self.summary["closureCoverage"][key]) | specified_closures(case))
+
+    def record_comptime(self, case: dict, *, matched: bool = False) -> None:
+        prefix = "matched" if matched else "generated"
+        key = prefix + "Variants"
+        self.summary["comptimeCoverage"][key] = sorted(set(self.summary["comptimeCoverage"][key]) | specified_comptime(case))
+        key = prefix + "Features"
+        self.summary["constantCoverage"][key] = sorted(set(self.summary["constantCoverage"][key]) | constant_features(case))
 
     def guard(self) -> None:
         if time.monotonic() >= self.deadline:
@@ -699,6 +770,8 @@ class Campaign:
         self.summary["loopCoverage"]["requiredIterations"] = sorted(loops["iterations"])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
+        self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
+        self.summary["constantCoverage"]["requiredFeatures"] = sorted(constant_requirements(manifest))
         cases, excluded, ids, accepted_ids = [], [], [], []
         attempted = 0
         for entry in manifest["cases"][:self.args.cases]:
@@ -727,9 +800,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "genericPlan", "closurePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "genericPlan", "closurePlan", "comptimePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -750,6 +823,8 @@ class Campaign:
                     raise ValueError(f"corpus {key} changed")
             if set(entry.get("expectedFeatures", [])) != set(case["provenance"]["features"]):
                 raise ValueError(f"corpus feature inventory changed for {entry['id']}")
+            if profile == "runtime-comptime" and set(entry["expectedConstantFeatures"]) != constant_features(case):
+                raise ValueError(f"corpus constant feature inventory changed for {entry['id']}")
             cases.append(case)
             accepted_ids.append(entry["id"])
             save_json(self.args.output / "cases" / f"{len(cases)-1:04d}.json", case)
@@ -761,6 +836,7 @@ class Campaign:
             self.record_loops(case)
             self.record_generics(case)
             self.record_closures(case)
+            self.record_comptime(case)
             if runtime_input:
                 coverage["generatedInputs"] = sorted(set(coverage["generatedInputs"]) | {case["input"]}, key=int)
             self.summary["generation"] = {"requested": self.args.cases, "attempted": attempted, "status": "running"}
@@ -797,6 +873,7 @@ class Campaign:
             self.record_loops(case)
             self.record_generics(case)
             self.record_closures(case)
+            self.record_comptime(case)
         for index, case in enumerate(cases):
             self.guard()
             m2.validate_case(case)
@@ -818,6 +895,7 @@ class Campaign:
                 self.record_loops(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
+                self.record_comptime(case, matched=True)
                 if case["schema"] != m2.CASE_SCHEMA:
                     coverage["matchedInputs"] = sorted(set(coverage["matchedInputs"]) | {case["input"]}, key=int)
             save_json(self.args.output / "results" / f"{index:04d}.json", {"actualReport": compact_report(report), "analysis": analysis})
@@ -843,12 +921,12 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 384 for loops/generics/closures, 256 for aggregates, 192 for local mutation, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 384 for loops/generics/closures/comptime, 256 for aggregates, 192 for local mutation, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
     selection.add_argument("--case", type=Path, help="re-execute one saved case, including a reduced finding")
-    parser.add_argument("--attempts", type=int, default=256)
+    parser.add_argument("--attempts", type=int, help="generation attempt limit; default 512 for comptime, otherwise 256")
     parser.add_argument("--seconds", type=float, default=300)
     parser.add_argument("--disk-bytes", type=int, default=128 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32, help="total candidate executions across all findings")
@@ -878,8 +956,10 @@ def main() -> int:
         args.profile = args.profile or selected_profile or "closed-g0"
     except (OSError, ValueError, KeyError, TypeError, m2.Finding) as error:
         parser.error(str(error))
+    if args.attempts is None:
+        args.attempts = 512 if args.profile == "runtime-comptime" else 256
     if args.nodes is None:
-        args.nodes = {"runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

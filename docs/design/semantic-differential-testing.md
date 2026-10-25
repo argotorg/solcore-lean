@@ -70,7 +70,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Complete, 2026-10-25 |
-| M6 | Add selected generics, closures, comptime and module combinations. | In progress: M6a and M6b complete |
+| M6 | Add selected generics, closures, comptime and module combinations. | In progress: M6a–M6c complete |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
 basic comparison cannot reproduce and reduce its own failures.
@@ -776,6 +776,37 @@ Delivered M6b:
   repository build (9,890 jobs), test suite and semantic-kernel check passed.
   This slice makes no claim about aggregate captures, writes through captured
   values, escaped factories or dynamically selected callable identities.
+
+Delivered M6c:
+
+- The complete original closed G0 constant and aggregate step ASTs remain in
+  the checked Core reference. Source evaluates the constant through genuine
+  comptime parameters and returns. Offset/scale variants use it with runtime
+  input; the emitter never replaces it with a Rust-derived constant. Forty-eight
+  Core applications and five standalone constant goldens cover branch-local
+  calculations, all supported scalar operations, Word wrap and private cells.
+- All 32 fixed cases across eight plans match in the real three-way campaign.
+  Coverage separates 21 step AST features from all fifteen enabled constant
+  AST features. Both variants, four boundary inputs, one through three helpers
+  and all four step recipes are present. Native validation checks eleven
+  smaller candidates and twenty negative/budget/resource cases. Separate
+  native checks cover sixteen generated, eight imported and 32 reduced cases;
+  64 saved cases from the eight prior profiles remain byte-identical.
+- Random generation reserves at most eight nodes for the constant and records
+  both original seeds and node allocations. With seed one, 384 nodes and a
+  512-attempt bound, sixteen cases were generated after 273 attempts with 269
+  explicit exclusions. Larger constant ASTs remain admitted for imported
+  cases and are covered by the fixed corpus. This is not a throughput claim.
+- A scale case reduced both its constant and step in twelve accepted real
+  executions, retaining its maximum-Word input and synthetic failure
+  fingerprint. Original/reduced actual archive replay and fresh synthetic
+  replay passed. The recorded attempt limit does not imply minimality.
+  Actual fuel-one execution remained inconclusive.
+- Thirty-two adapter and 56 campaign regressions passed. The full repository
+  build (9,895 jobs), test suite and semantic-kernel check passed. A runtime
+  value passed to a comptime parameter was independently rejected during
+  Rust's comptime evaluation with `SC0409`. No upstream bug was found in this
+  slice; native Lean frontend staging remains outside this profile.
 
 Each slice requires fresh three-way execution, strict native reconstruction,
 failure-preserving reduction, a fixed corpus and saved-run replay. M6 remains

@@ -212,7 +212,12 @@ then reuses a closure or calls two independently captured closures. All 24 fixed
 cases agree across Core, imported Hull and EVM; reduction preserves the capture
 recipe, and saved-run replay passes. See
 [captured closure comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-captured-closures).
-Comptime and module combinations are the remaining planned M6 slices.
+The comptime profile compares Rust's compile-time evaluation with independent
+Core execution of the original closed expression. All 32 fixed cases agree,
+including all fifteen enabled constant-expression features. Reduction and
+archive replay pass. See
+[comptime comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-comptime-expressions).
+Module bundles and mixed-feature programs are the remaining M6 slice.
 
 ## Code layout
 

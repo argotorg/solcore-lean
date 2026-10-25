@@ -977,3 +977,75 @@ accepted executions while retaining its maximum-Word input and failure
 fingerprint. Original/reduced actual archive replay and synthetic replay passed;
 an actual fuel-one run remained inconclusive. The attempt limit was recorded,
 so reduction does not claim a globally minimal counterexample.
+
+
+## Compare comptime expressions
+
+The `runtime-comptime` profile retains two original Core ASTs: a closed G0 Word
+expression and an aggregate step graph. Source renders the complete closed
+expression inside `sc_constant`, which returns `comptime<word>`. Its result
+passes through `sc_static(comptime value: word)`, also returning
+`comptime<word>`, before use with runtime input. The emitter never evaluates
+that expression itself or substitutes a Rust-computed result.
+
+The independent Core reference evaluates the original closed expression once
+to obtain `k`, then calls the runtime step once. The `offset` variant returns
+`step(input + k) + k`; `scale` returns `step(input) * (k | 1) + k`. The odd
+multiplier prevents a zero multiplier from discarding the step. All arithmetic
+uses Word wrap. Both retained ASTs and the wrapper count toward the full
+512-node limit and the whole-program typing check.
+
+```sh
+lake build semanticCaseTool rustHullScenario
+python3 scripts/semantic-campaign.py \
+  --profile runtime-comptime --seed 1 --nodes 384 --cases 12 --attempts 256 \
+  --output .upstream/semantic-comptime
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-comptime-corpus.json --seconds 600 \
+  --output .upstream/semantic-comptime-ci
+python3 Tests/scripts/test-semantic-comptime-corpus.py
+```
+
+Native commands are `comptime-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`comptime-emit PLAN.json INPUT [FUEL]`. Schema `solcore-lean.comptime-plan.v1`
+contains `constantProgram`, `stepProgram` and `variant` (`offset` or `scale`).
+The case carries `comptimePlan` and the full applied Core reference. Generation
+records both seeds and node allocations, reserves at most eight nodes for the
+generated constant, requires an actual operation in that AST, and uses the
+four standard boundary inputs. Random comptime campaigns default to 512
+generation attempts; other profiles retain 256. Larger imported constants
+remain supported within the full-program budget. Unsupported
+operations and fuel exhaustion remain explicit exclusions. Imported and
+reduced constants may be literals.
+
+Replay reconstructs both ASTs, source and wrapper, independently of any saved
+observation. Shrinking may reduce the closed constant, step or runtime input;
+every candidate is rechecked, keeps its variant and step binder inventory,
+and strictly decreases the full reference. A canonical parent witness supports
+replay of each reduced case. Actual three-way execution determines whether a
+candidate retains an observed failure.
+
+`provenance.features` describes the original step AST;
+`provenance.constantFeatures` describes the original closed expression. Fixed
+corpora specify `requiredConstantFeatures` and each entry's
+`expectedConstantFeatures` separately. `constantCoverage` counts only completed
+three-way agreement. `comptimeRequirements.variants` and `comptimeCoverage`
+require both composition recipes. These inventories describe source inputs,
+not measured backend opcodes. Passing a runtime value to a comptime parameter
+is outside this profile; an actual negative probe is rejected during Rust's
+comptime evaluation with `SC0409`.
+
+Comptime source-emitter correctness is tested, not formally proved. This
+profile does not unify the native Lean frontend's own staging evaluator or
+claim unrestricted cross-stage persistence. Module bundles and mixed-feature
+programs are the next M6 slice.
+
+All 32 fixed comptime cases across eight plans match the three real execution
+paths. Coverage includes all fifteen enabled constant AST features, 21 step AST
+features, both variants, four boundary inputs, one through three helpers and
+all four step recipes. Native validation checks eleven smaller candidates and
+twenty negative cases. A scale case reduced both retained ASTs in twelve
+accepted executions while keeping its maximum-Word input and synthetic
+fingerprint. Original/reduced archive replay and synthetic replay passed;
+actual fuel-one execution remained inconclusive. All 64 saved cases from the
+eight earlier pure profiles retained identical native artifacts and results.
