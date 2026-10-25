@@ -254,6 +254,7 @@ def trace_result(mined, trace):
 def verify_archive(directory, report):
     if report.get("schema") != REPORT_SCHEMA:
         raise ValueError("unsupported call archive schema")
+    common.resolve_backend(None, report)
     common.verify_archive(directory, {**report, "schema": common.REPORT_SCHEMA})
 
 
@@ -295,6 +296,8 @@ def execute(args, report):
     if args.replay:
         previous = common.read_json(args.replay / "report.json", args.artifact_limit)
         verify_archive(args.replay, previous)
+    args.backend = common.resolve_backend(getattr(args, "backend", None), previous)
+    report["backend"] = args.backend
     case = common.read_json(args.replay / "case.json" if args.replay else args.case)
     validate_case(case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
@@ -333,8 +336,9 @@ def execute(args, report):
     export_args = [str(source), "--root", str(args.output), "--upstream", str(args.upstream), "--target-dir", str(args.target_dir)]
     common.checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *export_args, "--output", str(hull)])
     common.checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *export_args,
+        "--optimization", common.optimization_for_backend(args.backend),
         "--output", str(images_path), "--hull-output", str(hull), "--timeout", str(args.timeout)], args.timeout * 3)
-    report["exportProvenance"] = common.validate_export(hull, images_path, source, args.artifact_limit)
+    report["exportProvenance"] = common.validate_export(hull, images_path, source, args.artifact_limit, backend=args.backend)
     if previous and "exportProvenance" in previous:
         old, new = previous["exportProvenance"], report["exportProvenance"]
         if old["images"].get("toolBuild") != new["images"].get("toolBuild") or old["hull"].get("binarySha256") != new["hull"].get("binarySha256") or old["hull"].get("patches") != new["hull"].get("patches"):
@@ -449,6 +453,8 @@ def main():
     choice.add_argument("--case", type=Path)
     choice.add_argument("--replay", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--backend", choices=common.BACKENDS,
+        help="default sonatina-o0; exact replay inherits its saved backend")
     parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-call-tool")
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-call-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
@@ -461,7 +467,9 @@ def main():
     args = parser.parse_args()
     try:
         validate_case(common.read_json(args.replay / "case.json" if args.replay else args.case))
-        saved = common.read_json(args.replay / "report.json", defaults["artifact_limit"]).get("budgets", {}) if args.replay else {}
+        saved_report = common.read_json(args.replay / "report.json", defaults["artifact_limit"]) if args.replay else None
+        args.backend = common.resolve_backend(args.backend, saved_report)
+        saved = saved_report.get("budgets", {}) if saved_report is not None else {}
     except (ValueError, OSError, KeyError, TypeError, Finding) as error:
         parser.error(str(error))
     for key, default in defaults.items():
@@ -478,7 +486,7 @@ def main():
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
     args.output.mkdir(parents=True, exist_ok=False)
-    report = {"schema": REPORT_SCHEMA, "processes": [], "histories": {}, "budgets": {key: getattr(args, key) for key in defaults},
+    report = {"schema": REPORT_SCHEMA, "backend": args.backend, "processes": [], "histories": {}, "budgets": {key: getattr(args, key) for key in defaults},
         "scope": "depth-one fixed Word calls; funded parent8/child0; both accounts' slots0/1, balances, root outcome and ordered committed logs; no gas/nonce equivalence"}
     previous = signal.getsignal(signal.SIGTERM)
     def interrupted(_signal, _frame):

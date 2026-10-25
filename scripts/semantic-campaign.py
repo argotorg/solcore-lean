@@ -448,7 +448,7 @@ def analyze(report: dict, perturb: str | None = None) -> dict:
             observed[perturb]["word"] = str(original ^ 1)
             synthetic = True
     result = m2.compare(observed) if synthetic else actual
-    return {"schema": ANALYSIS_SCHEMA, "synthetic": synthetic,
+    return {"schema": ANALYSIS_SCHEMA, "backend": m2.resolve_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": perturb} if perturb else None,
             "actualComparison": actual, "comparison": result, "observations": observed}
 
@@ -461,13 +461,15 @@ def fingerprint(analysis: dict) -> dict:
         row = observations.get(name, {})
         shapes[name] = {"status": row.get("status", "not-executed"),
                        "payload": "word" if "word" in row else "bytes" if "output" in row else "none"}
-    return {"category": comparison.get("category"), "stage": comparison.get("stage"),
+    return {"backend": m2.resolve_backend(None, analysis),
+            "category": comparison.get("category"), "stage": comparison.get("stage"),
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "synthetic": analysis["synthetic"], "pathShapes": shapes}
 
 
 def same_failure(expected: dict, candidate: dict) -> bool:
-    return expected.get("category") in SHRINKABLE and fingerprint(candidate) == expected
+    normalized = {**expected, "backend": m2.resolve_backend(None, expected)}
+    return expected.get("category") in SHRINKABLE and fingerprint(candidate) == normalized
 
 
 def count_outcome(counts: dict, analysis: dict) -> None:
@@ -500,6 +502,7 @@ def compact_report(report: dict) -> dict:
 
 class Campaign:
     def __init__(self, args):
+        args.backend = m2.resolve_backend(getattr(args, "backend", None))
         self.args = args
         self.started = time.monotonic()
         self.deadline = self.started + args.seconds
@@ -509,9 +512,9 @@ class Campaign:
         self.counter = 0
         self.shrink_attempts = 0
         self.summary = {
-            "schema": SCHEMA, "status": "running", "synthetic": args.test_perturb_path is not None,
+            "schema": SCHEMA, "status": "running", "backend": args.backend, "synthetic": args.test_perturb_path is not None,
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path} if args.test_perturb_path else None,
-            "configuration": {key: getattr(args, key) for key in ("profile", "seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
+            "configuration": {key: getattr(args, key) for key in ("backend", "profile", "seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
             "tools": {"caseTool": str(args.case_tool), "coreRunner": str(args.core_runner), "anvil": str(args.anvil),
                       "campaignSha256": m2.digest(Path(__file__).read_bytes()),
                       "differentialSha256": m2.digest((ROOT / "scripts/semantic-differential.py").read_bytes())},
@@ -624,7 +627,7 @@ class Campaign:
 
     def case_args(self, case_path: Path, run_dir: Path):
         left = max(0.001, self.deadline - time.monotonic())
-        return SimpleNamespace(case=case_path, replay=None, output=run_dir,
+        return SimpleNamespace(case=case_path, replay=None, output=run_dir, backend=self.args.backend,
             case_tool=self.args.case_tool, core_runner=self.args.core_runner, anvil=self.args.anvil,
             upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
@@ -642,9 +645,9 @@ class Campaign:
         input_path = self.work / f"input-{self.counter:06d}.json"
         save_json(input_path, case)
         args = self.case_args(input_path, folder)
-        report = {"schema": m2.REPORT_SCHEMA, "processes": [], "observations": {}, "rawObservations": {},
+        report = {"schema": m2.REPORT_SCHEMA, "backend": self.args.backend, "processes": [], "observations": {}, "rawObservations": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-            "scope": "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word"}
+            "scope": "gas-independent generated Word program; " + self.args.backend}
         try:
             m2.execute(args, report)
         except m2.Finding as error:
@@ -957,6 +960,7 @@ class Campaign:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--backend", choices=m2.BACKENDS, default="sonatina-o0")
     parser.add_argument("--output", type=Path, required=True, help="new campaign directory")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,

@@ -5,7 +5,7 @@ Synthetic histories test comparison policy only. RPC doubles test requests and
 receipts without simulating a chain; the cancellation test owns a real bounded
 Python subprocess. Compiler/Core/EVM agreement is tested by the actual adapter.
 """
-from contextlib import contextmanager, redirect_stdout
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
 import copy
 import importlib.util
 import io
@@ -701,6 +701,85 @@ class CancellationTests(unittest.TestCase):
                     self.assertIs(signal.getsignal(signal.SIGTERM), original_handler)
         finally:
             signal.signal(signal.SIGTERM, previous)
+
+
+
+class BackendTests(unittest.TestCase):
+    """Backend selection policy only; mocked execution is not an EVM result."""
+
+    def invoke(self, directory, *, backend=None, saved=None):
+        source = directory / "case.json"
+        source.write_text(json.dumps(case()))
+        output = directory / "run"
+        arguments = ["adapter", "--output", str(output)]
+        if saved is not None:
+            (directory / "report.json").write_text(json.dumps(saved))
+            arguments += ["--replay", str(directory)]
+        else:
+            arguments += ["--case", str(source)]
+        if backend is not None:
+            arguments += ["--backend", backend]
+        captured = []
+        def executed(args, report):
+            captured.append((args.backend, report["backend"]))
+            report["comparison"] = {"category": "matched", "pairs": {}}
+        with patch.object(sys, "argv", arguments), patch.object(runner, "execute", side_effect=executed), redirect_stdout(io.StringIO()):
+            code = runner.main()
+        return code, captured, json.loads((output / "report.json").read_text())
+
+    def test_default_and_explicit_backends_are_recorded(self):
+        for explicit, expected in ((None, "sonatina-o0"), ("sonatina-o2", "sonatina-o2")):
+            with self.subTest(backend=explicit), tempfile.TemporaryDirectory() as temporary:
+                code, captured, report = self.invoke(Path(temporary), backend=explicit)
+                self.assertEqual(code, 0)
+                self.assertEqual(captured, [(expected, expected)])
+                self.assertEqual(report["backend"], expected)
+
+    def test_exact_replay_inherits_o2_and_legacy_o0(self):
+        for saved, expected in (({}, "sonatina-o0"), ({"backend": "sonatina-o2"}, "sonatina-o2")):
+            with self.subTest(saved=saved), tempfile.TemporaryDirectory() as temporary:
+                _, captured, report = self.invoke(Path(temporary), saved=saved)
+                self.assertEqual(captured, [(expected, expected)])
+                self.assertEqual(report["backend"], expected)
+
+    def test_exact_replay_backend_change_or_null_is_rejected_before_execution(self):
+        for saved, explicit in (({}, "sonatina-o2"), ({"backend": "sonatina-o2"}, "sonatina-o0"),
+                                ({"backend": None}, None), ({"backend": "yul"}, None)):
+            with self.subTest(saved=saved, explicit=explicit), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                    self.invoke(directory, backend=explicit, saved=saved)
+                self.assertEqual(caught.exception.code, 2)
+                self.assertFalse((directory / "run").exists())
+
+    def test_o2_reaches_exporter_and_provenance_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source, output = directory / "case.json", directory / "run"
+            source.write_text(json.dumps(case())); output.mkdir()
+            args = SimpleNamespace(case=source, replay=None, backend="sonatina-o2", output=output,
+                artifact_limit=1 << 20, case_tool=Path("unused-case"), core_runner=Path("unused-core"),
+                anvil=Path("unused-anvil"), direct_fuel=1000, timeout=1,
+                upstream=directory / "upstream", target_dir=directory / "target")
+            fake = Mock()
+            fake.identity.return_value = {"sha256": "0" * 64}
+            fake.process.return_value = {"returncode": 0, "stdout": "revision"}
+            commands = []
+            def checked(_runner, stage, command, *_limits):
+                commands.append((stage, command))
+                return {"stdout": json.dumps(case()) if stage == "direct-core-replay" else ""}
+            report = {"processes": [], "histories": {}}
+            with patch.object(runner.common, "Runner", return_value=fake), \
+                 patch.object(runner.common, "checked_process", side_effect=checked), \
+                 patch.object(runner.common, "validate_export", side_effect=ValueError("test stops before execution")) as validate:
+                with self.assertRaisesRegex(ValueError, "test stops before execution"):
+                    runner.execute(args, report)
+            image_command = next(command for stage, command in commands if stage == "rust-code-images")
+            self.assertEqual(image_command[image_command.index("--optimization") + 1], "O2")
+            hull_command = next(command for stage, command in commands if stage == "rust-checked-source")
+            self.assertNotIn("--optimization", hull_command)
+            self.assertEqual(validate.call_args.kwargs["backend"], "sonatina-o2")
+            self.assertEqual(report["backend"], "sonatina-o2")
 
 
 if __name__ == "__main__":

@@ -53,6 +53,7 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
+BACKENDS = ("sonatina-o0", "sonatina-o2")
 MAX_CASE_BYTES = 4 * 1024 * 1024
 GAS_RESOURCE = re.compile(r"out[ _-]?of[ _-]?gas|intrinsic gas.{0,40}(too low|exceed)|"
                           r"gas (required|limit).{0,40}(allowance|exceed)|gas too low", re.I)
@@ -87,6 +88,32 @@ def file_digest(path: Path) -> str:
     return result.hexdigest()
 
 
+def resolve_backend(explicit: str | None, saved_report: dict | None = None) -> str:
+    """Only an absent legacy field means O0; replay cannot change compilation."""
+    if saved_report is not None and not isinstance(saved_report, dict):
+        raise ValueError("saved backend report must be an object")
+    saved = saved_report.get("backend", "sonatina-o0") if saved_report is not None else None
+    if saved_report is not None and saved not in BACKENDS:
+        raise ValueError("unsupported saved backend")
+    selected = explicit if explicit is not None else (saved if saved_report is not None else BACKENDS[0])
+    if selected not in BACKENDS:
+        raise ValueError("unsupported backend")
+    if saved_report is not None and selected != saved:
+        raise ValueError("exact replay retains the saved backend; use --case for another backend")
+    return selected
+
+
+def optimization_for_backend(backend: str) -> str:
+    return {"sonatina-o0": "O0", "sonatina-o2": "O2"}[resolve_backend(backend)]
+
+
+def validate_image_backend(images: dict, backend: str) -> None:
+    expected = {"name": "sonatina", "revision": BACKEND_COMMIT,
+                "optimization": optimization_for_backend(backend)}
+    if images.get("backend") != expected:
+        raise ValueError("code image backend differs from selected backend")
+
+
 def verify_archive(directory: Path, report: dict) -> None:
     if not isinstance(report, dict) or report.get("schema") != REPORT_SCHEMA:
         raise ValueError("unsupported saved report schema")
@@ -106,6 +133,13 @@ def verify_archive(directory: Path, report: dict) -> None:
             raise ValueError(f"saved artifact hash changed: {name}")
     if artifacts["case.json"] != report.get("caseSha256"):
         raise ValueError("saved case hash differs from the artifact inventory")
+    backend = resolve_backend(None, report)
+    if "images.json" in artifacts:
+        validate_image_backend(read_json(directory / "images.json", 64 * 1024 * 1024), backend)
+    provenance = report.get("exportProvenance", {}).get("images")
+    if provenance is not None and (provenance.get("backendRevision") != BACKEND_COMMIT or
+            provenance.get("optimization") != optimization_for_backend(backend)):
+        raise ValueError("saved export provenance differs from selected backend")
 
 
 def json_bytes(value) -> bytes:
@@ -476,9 +510,11 @@ def image_bytes(images: dict, path: list[str]) -> bytes:
     return hex_bytes(found[0].get("bytes"), "code image")
 
 
-def validate_export(hull_path: Path, image_path: Path, source: Path, limit: int) -> dict:
+def validate_export(hull_path: Path, image_path: Path, source: Path, limit: int,
+                    backend: str = "sonatina-o0") -> dict:
     hull = read_json(hull_path, limit)
     images = read_json(image_path, limit)
+    validate_image_backend(images, backend)
     hp = read_json(hull_path.with_suffix(".json.provenance.json"), limit)
     ip = read_json(image_path.with_suffix(".json.provenance.json"), limit)
     if hull.get("schema") != "solcore-rs.hull.v1" or hull.get("upstreamCommit") != UPSTREAM_COMMIT:
@@ -487,7 +523,7 @@ def validate_export(hull_path: Path, image_path: Path, source: Path, limit: int)
         raise ValueError("export artifact hash mismatch")
     if ip.get("hullProvenance") != hp or ip.get("sources") != hp.get("sources"):
         raise ValueError("Hull/image provenance differs")
-    if ip.get("backendRevision") != BACKEND_COMMIT or ip.get("optimization") != "O0":
+    if ip.get("backendRevision") != BACKEND_COMMIT or ip.get("optimization") != optimization_for_backend(backend):
         raise ValueError("backend revision/optimization differs")
     if hp.get("sources", {}).get(source.as_uri()) != file_digest(source):
         raise ValueError("source hash differs from exported artifact")
@@ -516,10 +552,13 @@ def checked_process(runner: Runner, stage: str, command: list[str], timeout=None
 def execute(args, report: dict) -> None:
     runner = Runner(args, report)
     original = args.case
+    previous = None
     if args.replay:
         previous = read_json(args.replay / "report.json", args.artifact_limit)
         verify_archive(args.replay, previous)
         original = args.replay / "case.json"
+    backend = resolve_backend(getattr(args, "backend", None), previous)
+    report["backend"] = backend
     case = read_json(original)
     validate_case(case)
     if args.replay and case["schema"] == MODULE_CASE_SCHEMA:
@@ -535,7 +574,7 @@ def execute(args, report: dict) -> None:
         CLOSURE_CASE_SCHEMA: "runtime Word capture, repeated or independent snapshot closures and outer mutation, checked Core lambdas, Sonatina O0, run(uint256) ABI Word",
         COMPTIME_CASE_SCHEMA: "original closed G0 expression evaluated by source comptime versus Core, runtime aggregate step and Word input, Sonatina O0, run(uint256) ABI Word",
         MODULE_CASE_SCHEMA: "four canonical source modules combining generic selection, snapshot closures and comptime with original Core ASTs, Sonatina O0, run(uint256) ABI Word"
-    }[case["schema"]]
+    }[case["schema"]].replace("Sonatina O0", "Sonatina " + optimization_for_backend(backend))
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))
     bundle_receipt = None
@@ -605,9 +644,10 @@ def execute(args, report: dict) -> None:
     checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *common, "--output", str(hull_path)])
     audit_bundle()
     checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *common,
-        "--output", str(image_path), "--hull-output", str(hull_path), "--timeout", str(args.timeout)], args.timeout * 3)
+        "--output", str(image_path), "--hull-output", str(hull_path), "--timeout", str(args.timeout),
+        "--optimization", optimization_for_backend(backend)], args.timeout * 3)
     audit_bundle()
-    report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit)
+    report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit, backend)
     if bundle_receipt is not None:
         bundle_transport.normalized_sources(report["exportProvenance"]["hull"].get("sources"), bundle_receipt, case)
     if args.replay and "exportProvenance" in previous:
@@ -694,6 +734,7 @@ def main() -> int:
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
+    parser.add_argument("--backend", choices=BACKENDS, help="default Sonatina O0; exact replay inherits its saved backend")
     defaults = {"direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000,
                 "timeout": 300, "startup_timeout": 30, "total_timeout": 900,
                 "output_limit": 2 * 1024 * 1024, "artifact_limit": 64 * 1024 * 1024}
@@ -701,8 +742,14 @@ def main() -> int:
         parser.add_argument("--" + key.replace("_", "-"), type=float if "timeout" in key else int)
     args = parser.parse_args()
     saved_budgets = {}
+    saved_report = None
     if args.replay:
-        saved_budgets = read_json(args.replay / "report.json", defaults["artifact_limit"]).get("budgets", {})
+        saved_report = read_json(args.replay / "report.json", defaults["artifact_limit"])
+        saved_budgets = saved_report.get("budgets", {})
+    try:
+        args.backend = resolve_backend(args.backend, saved_report)
+    except ValueError as error:
+        parser.error(str(error))
     for key, default in defaults.items():
         explicit = getattr(args, key)
         value = saved_budgets.get(key, default) if explicit is None else explicit
@@ -715,9 +762,9 @@ def main() -> int:
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
     args.output.mkdir(parents=True, exist_ok=False)
-    report = {"schema": REPORT_SCHEMA, "processes": [], "observations": {}, "rawObservations": {},
+    report = {"schema": REPORT_SCHEMA, "backend": args.backend, "processes": [], "observations": {}, "rawObservations": {},
               "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-              "scope": "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word"}
+              "scope": "pure Word ABI; selected backend " + args.backend}
     previous_term = signal.getsignal(signal.SIGTERM)
 
     def interrupted(_signal, _frame):

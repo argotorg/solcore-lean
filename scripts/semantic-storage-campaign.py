@@ -171,7 +171,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                         histories[path]["finalStorage"] = copy.deepcopy(row["committedStorage"])
                 synthetic = True
     result = adapter.compare(histories, case) if synthetic else actual
-    return {"schema": ANALYSIS_SCHEMA, "synthetic": synthetic,
+    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": path, "transactionId": selected, "field": field} if path else None,
             "actualComparison": actual, "comparison": result, "histories": histories}
 
@@ -202,14 +202,14 @@ def fingerprint(analysis):
         values = [value if isinstance(value, str) else None for value in values]
         if len(set(values)) > 1:
             slots.append(slot)
-    return {"category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
+    return {"backend": common.resolve_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "fields": sorted(comparison.get("fields", [])), "storageSlots": slots,
             "pathShapes": shapes, "synthetic": analysis["synthetic"]}
 
 
 def same_failure(expected, analysis):
-    return expected["category"] in SHRINKABLE and fingerprint(analysis) == expected
+    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": common.resolve_backend(None, expected)}
 
 
 def transaction_counts(histories, case):
@@ -261,6 +261,7 @@ def count_outcome(counts, analysis, case):
 class Campaign:
     def __init__(self, args):
         self.args, self.started = args, time.monotonic()
+        self.backend = common.resolve_backend(getattr(args, "backend", None))
         self.profile = getattr(args, "profile", "stateful-storage")
         self.specification = adapter.PROFILES[self.profile]
         self.deadline = self.started + args.seconds
@@ -269,8 +270,8 @@ class Campaign:
         self.work.mkdir()
         self.counter = self.shrink_attempts = 0
         self.materialized = []
-        self.summary = {"schema": SCHEMA, "status": "running", "synthetic": args.test_perturb_path is not None,
-            "configuration": {"profile": self.profile, **{key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")}},
+        self.summary = {"schema": SCHEMA, "backend": self.backend, "status": "running", "synthetic": args.test_perturb_path is not None,
+            "configuration": {"profile": self.profile, "backend": self.backend, **{key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")}},
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path, "transactionId": args.test_transaction_id, "field": args.test_field} if args.test_perturb_path else None,
             "tools": {"campaignSha256": common.file_digest(Path(__file__)), "differentialSha256": common.file_digest(ROOT / "scripts/semantic-storage-differential.py"), "caseTool": str(args.case_tool)},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
@@ -402,7 +403,7 @@ class Campaign:
 
     def case_args(self, case_path, folder):
         left = max(.001, self.deadline - time.monotonic())
-        return SimpleNamespace(case=case_path, replay=None, output=folder, case_tool=self.args.case_tool,
+        return SimpleNamespace(case=case_path, replay=None, backend=self.backend, output=folder, case_tool=self.args.case_tool,
             core_runner=self.args.core_runner, anvil=self.args.anvil, upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
             timeout=min(self.args.case_timeout, left), startup_timeout=min(30, left), total_timeout=min(self.args.case_timeout, left),
@@ -417,9 +418,9 @@ class Campaign:
         input_path = self.work / f"input-{self.counter:06d}.json"
         save_json(input_path, case)
         args = self.case_args(input_path, folder)
-        report = {"schema": adapter.REPORT_SCHEMA, "processes": [], "histories": {},
+        report = {"schema": adapter.REPORT_SCHEMA, "backend": self.backend, "processes": [], "histories": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-            "scope": "initially empty committed slots0/1; ordered zero-value run(uint256); Sonatina O0; no gas/balance/nonce equivalence"}
+            "scope": "initially empty committed slots0/1; ordered zero-value run(uint256); no gas/balance/nonce equivalence"}
         interrupted = False
         try:
             adapter.execute(args, report)
@@ -571,6 +572,7 @@ def missing_coverage(summary):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--backend", choices=common.BACKENDS, default="sonatina-o0")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path)
     selection.add_argument("--case", type=Path)

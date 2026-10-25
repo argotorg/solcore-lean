@@ -58,6 +58,45 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(suite.PROFILES["stateful-storage-rollback"][1], "storage")
         self.assertEqual(suite.PROFILES["stateful-calls"][1], "call")
 
+    def test_backend_selection_reaches_every_campaign_family(self):
+        self.assertEqual(self.args().backend, 'sonatina-o0')
+        for backend in suite.adapter.BACKENDS:
+            args = self.args('--backend', backend)
+            for profile in args.profile:
+                command = suite.command(args, profile, self.directory / profile, 30, 64 * 1024**2)
+                self.assertEqual(command[command.index('--backend') + 1], backend)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.args('--backend', 'yul')
+
+    def test_backend_completion_cannot_switch_or_relabel_a_legacy_run(self):
+        legacy = completed()
+        self.assertEqual(suite.classify(legacy, 'closed-g0', 4, 0), 'passed')
+        self.assertEqual(suite.classify(legacy, 'closed-g0', 4, 0, backend='sonatina-o2'), 'adapter-error')
+        optimized = {**legacy, 'backend': 'sonatina-o2'}
+        self.assertEqual(suite.classify(optimized, 'closed-g0', 4, 0, backend='sonatina-o2'), 'passed')
+        self.assertEqual(suite.classify(optimized, 'closed-g0', 4, 0), 'adapter-error')
+        for backend in (None, 'yul', 2):
+            self.assertEqual(suite.classify({**legacy, 'backend': backend}, 'closed-g0', 4, 0), 'adapter-error')
+        optimized['configuration'] = {'profile': 'closed-g0', 'backend': 'sonatina-o0'}
+        self.assertEqual(suite.classify(optimized, 'closed-g0', 4, 0, backend='sonatina-o2'), 'adapter-error')
+        optimized['configuration']['backend'] = 'sonatina-o2'
+        optimized['findings'] = [{'fingerprint': {'category': 'execution-error', 'synthetic': False}}]
+        self.assertEqual(suite.classify(optimized, 'closed-g0', 4, 1, backend='sonatina-o2'), 'adapter-error')
+        optimized['findings'][0]['fingerprint']['backend'] = 'sonatina-o2'
+        self.assertEqual(suite.classify(optimized, 'closed-g0', 4, 1, backend='sonatina-o2'), 'failed')
+
+    def test_optimized_suite_summary_records_backend_and_checks_campaign_receipt(self):
+        args = self.args('--backend', 'sonatina-o2', '--profile', 'closed-g0')
+        args.output.mkdir()
+        with patch.object(suite, 'run_process', side_effect=self.mock_campaign({})), contextlib.redirect_stdout(io.StringIO()):
+            run = suite.Suite(args)
+            run.run()
+        self.assertEqual(run.report['backend'], 'sonatina-o2')
+        self.assertEqual(run.report['profiles'][0]['backend'], 'sonatina-o2')
+        # The policy fixture deliberately returns a legacy O0 receipt.
+        self.assertEqual(run.report['profiles'][0]['status'], 'adapter-error')
+        self.assertEqual(run.report['status'], 'failed')
+
     def test_random_seeds_are_order_independent_reproducible_and_sharded(self):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, args.attempts) for p in suite.PROFILES}

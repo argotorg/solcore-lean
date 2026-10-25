@@ -47,8 +47,16 @@ def require(condition, message):
         raise CheckFailure(message)
 
 
-def actual_match(report):
+def require_backend(record, backend):
+    try:
+        m2.resolve_backend(backend, record)
+    except ValueError as error:
+        raise CheckFailure(str(error)) from error
+
+
+def actual_match(report, backend="sonatina-o0"):
     """Check the raw observations too; a saved 'matched' label is insufficient."""
+    require_backend(report, backend)
     require(report.get("schema") == m2.REPORT_SCHEMA, "unexpected actual report schema")
     raw, observed = report.get("rawObservations"), report.get("observations")
     require(isinstance(raw, dict) and isinstance(observed, dict), "missing actual observations")
@@ -74,8 +82,9 @@ def safe_member(directory, relative):
     return current
 
 
-def verify_synthetic(directory, code, require_reduction):
+def verify_synthetic(directory, code, require_reduction, backend="sonatina-o0"):
     summary = m2.read_json(directory / "summary.json")
+    require_backend(summary, backend)
     require(code == 1 and summary.get("schema") == campaign.SCHEMA and
             summary.get("status") == "complete" and summary.get("synthetic") is True,
             "synthetic campaign did not complete with a nonzero finding result")
@@ -95,7 +104,7 @@ def verify_synthetic(directory, code, require_reduction):
     for key in ("originalArchive", "finalArchive"):
         folder = safe_member(directory, finding.get(key))
         report = m2.read_json(folder / "report.json")
-        actual_match(report)
+        actual_match(report, backend)
         analysis = m2.read_json(folder / "analysis.json")
         require(analysis == campaign.analyze(report, "rustEvm"), "copied synthetic analysis was changed")
         require(campaign.fingerprint(analysis) == expected, "retained finding fingerprint changed")
@@ -125,7 +134,8 @@ def verify_synthetic(directory, code, require_reduction):
             "finalArchive": finding["finalArchive"], "finalProgramSha256": finding["finalProgramSha256"]}
 
 
-def verify_resource(report, code):
+def verify_resource(report, code, backend="sonatina-o0"):
+    require_backend(report, backend)
     require(code == 1 and report.get("schema") == m2.REPORT_SCHEMA and
             report.get("comparison", {}).get("category") == "inconclusive-resource",
             "fuel-one execution was not a nonzero inconclusive resource result")
@@ -142,7 +152,7 @@ class Verification:
         self.args = args
         self.started = time.monotonic()
         self.deadline = self.started + args.seconds
-        self.report = {"schema": SCHEMA, "status": "running", "checks": [], "unexecuted": list(PHASES),
+        self.report = {"schema": SCHEMA, "status": "running", "backend": args.backend, "checks": [], "unexecuted": list(PHASES),
                        "caseSha256": suite.digest(args.case), "validatorSha256": suite.digest(Path(__file__)),
                        "limits": {key: getattr(args, key) for key in ("seconds", "disk_bytes", "case_timeout", "cleanup_seconds")},
                        "scope": "real executions; synthetic copied observation only; not an upstream bug or opcode coverage"}
@@ -152,8 +162,11 @@ class Verification:
         self.report["elapsedSeconds"] = round(time.monotonic() - self.started, 3)
         suite.save(self.args.output / "verification.json", self.report)
 
-    def shared(self):
-        return [part for key in ("anvil", "upstream", "target_dir", "case_tool", "core_runner")
+    def shared(self, *, inherit_backend=False):
+        keys = ("anvil", "upstream", "target_dir", "case_tool", "core_runner")
+        if not inherit_backend:
+            keys += ("backend",)
+        return [part for key in keys
                 for part in ("--" + key.replace("_", "-"), str(getattr(self.args, key)))]
 
     def process(self, phase, command):
@@ -180,22 +193,22 @@ class Verification:
     def run(self):
         first = self.args.output / "synthetic"
         row, code = self.process(PHASES[0], self.campaign_command(self.args.case, first, 4))
-        result = verify_synthetic(first, code, True)
+        result = verify_synthetic(first, code, True, self.args.backend)
         row.update(status="passed", **result)
         self.checkpoint()
         archive = safe_member(first, result["finalArchive"])
 
         replay = self.args.output / "exact-replay"
         row, code = self.process(PHASES[1], [sys.executable, str(ROOT / "scripts/semantic-differential.py"),
-            "--replay", str(archive), "--output", str(replay), *self.shared()])
+            "--replay", str(archive), "--output", str(replay), *self.shared(inherit_backend=True)])
         require(code == 0, "exact archive replay exited unsuccessfully")
-        actual_match(m2.read_json(replay / "report.json"))
+        actual_match(m2.read_json(replay / "report.json"), self.args.backend)
         row.update(status="passed", reportSha256=suite.digest(replay / "report.json"))
         self.checkpoint()
 
         synthetic_replay = self.args.output / "synthetic-replay"
         row, code = self.process(PHASES[2], self.campaign_command(archive / "case.json", synthetic_replay, 0))
-        repeated = verify_synthetic(synthetic_replay, code, False)
+        repeated = verify_synthetic(synthetic_replay, code, False, self.args.backend)
         require(repeated["fingerprint"] == result["fingerprint"] and
                 repeated["finalProgramSha256"] == result["finalProgramSha256"],
                 "synthetic replay changed the reduced program or failure fingerprint")
@@ -205,7 +218,7 @@ class Verification:
         resource = self.args.output / "resource-limit"
         row, code = self.process(PHASES[3], [sys.executable, str(ROOT / "scripts/semantic-differential.py"),
             "--case", str(self.args.case), "--output", str(resource), "--direct-fuel", "1", *self.shared()])
-        verify_resource(m2.read_json(resource / "report.json"), code)
+        verify_resource(m2.read_json(resource / "report.json"), code, self.args.backend)
         row.update(status="passed", reportSha256=suite.digest(resource / "report.json"))
         self.report["status"] = "passed"
         self.checkpoint()
@@ -213,6 +226,7 @@ class Verification:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--backend", choices=m2.BACKENDS, default="sonatina-o0")
     parser.add_argument("--case", required=True, type=Path, help="reducible saved case; use fixed closed-g0 cases/0006.json")
     parser.add_argument("--output", required=True, type=Path, help="new validation directory")
     for key, default in {"anvil": Path(shutil.which("anvil") or "anvil"),

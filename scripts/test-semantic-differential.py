@@ -403,7 +403,8 @@ class ArtifactTests(unittest.TestCase):
         case = directory / "case.json"
         case.write_text('{"case": 1}')
         image = directory / "images.json"
-        image.write_text('{"image": 1}')
+        image.write_text(json.dumps({"backend": {"name": "sonatina",
+            "revision": runner.BACKEND_COMMIT, "optimization": "O0"}}))
         hashes = {path.name: runner.file_digest(path) for path in (case, image)}
         return {"schema": runner.REPORT_SCHEMA, "caseSha256": hashes["case.json"], "artifacts": hashes}
 
@@ -462,6 +463,65 @@ class ArtifactTests(unittest.TestCase):
             path.write_text('{"x":"123456789"}')
             with self.assertRaises(runner.Finding):
                 runner.read_json(path, 4)
+
+
+class BackendTests(unittest.TestCase):
+    def test_default_legacy_and_exact_replay_selection(self):
+        self.assertEqual(runner.resolve_backend(None), "sonatina-o0")
+        self.assertEqual(runner.resolve_backend(None, {}), "sonatina-o0")
+        for backend in runner.BACKENDS:
+            self.assertEqual(runner.resolve_backend(backend), backend)
+            self.assertEqual(runner.resolve_backend(None, {"backend": backend}), backend)
+            self.assertEqual(runner.resolve_backend(backend, {"backend": backend}), backend)
+            for other in set(runner.BACKENDS) - {backend}:
+                with self.assertRaisesRegex(ValueError, "retains the saved backend"):
+                    runner.resolve_backend(other, {"backend": backend})
+        for invalid in (None, [], {}, True, "O2", "sonatina-o1", "yul"):
+            with self.assertRaisesRegex(ValueError, "unsupported saved backend"):
+                runner.resolve_backend(None, {"backend": invalid})
+
+    def test_actual_image_configuration_must_match_selection(self):
+        for backend, level in (("sonatina-o0", "O0"), ("sonatina-o2", "O2")):
+            image = {"backend": {"name": "sonatina", "revision": runner.BACKEND_COMMIT,
+                                 "optimization": level}}
+            runner.validate_image_backend(image, backend)
+            for key, bad in (("name", "yul"), ("revision", "0" * 40),
+                             ("optimization", "O0" if level == "O2" else "O2")):
+                with self.assertRaisesRegex(ValueError, "code image backend differs"):
+                    runner.validate_image_backend({"backend": {**image["backend"], key: bad}}, backend)
+        with self.assertRaisesRegex(ValueError, "code image backend differs"):
+            runner.validate_image_backend({}, "sonatina-o0")
+
+    def test_saved_report_cannot_relabel_its_artifact(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            report = ArtifactTests().archive(directory)
+            with self.assertRaisesRegex(ValueError, "code image backend differs"):
+                runner.verify_archive(directory, {**report, "backend": "sonatina-o2"})
+            report["exportProvenance"] = {"images": {"backendRevision": runner.BACKEND_COMMIT,
+                                                        "optimization": "O2"}}
+            with self.assertRaisesRegex(ValueError, "saved export provenance differs"):
+                runner.verify_archive(directory, report)
+
+    def test_export_provenance_and_artifact_both_match_backend(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source, hull, image = (directory / name for name in ("case.sol", "hull.json", "images.json"))
+            source.write_text("// protocol fixture only")
+            hull.write_text(json.dumps({"schema": "solcore-rs.hull.v1", "upstreamCommit": runner.UPSTREAM_COMMIT}))
+            hp = {"sources": {source.as_uri(): runner.file_digest(source)}, "outputSha256": runner.file_digest(hull)}
+            hull.with_suffix(".json.provenance.json").write_text(json.dumps(hp))
+            for backend, level in (("sonatina-o0", "O0"), ("sonatina-o2", "O2")):
+                image.write_text(json.dumps({"backend": {"name": "sonatina", "revision": runner.BACKEND_COMMIT,
+                                                        "optimization": level}}))
+                ip = {"sources": hp["sources"], "hullProvenance": hp, "outputSha256": runner.file_digest(image),
+                      "backendRevision": runner.BACKEND_COMMIT, "optimization": level}
+                image.with_suffix(".json.provenance.json").write_text(json.dumps(ip))
+                self.assertEqual(runner.validate_export(hull, image, source, 4096, backend), {"hull": hp, "images": ip})
+                ip["optimization"] = "O0" if level == "O2" else "O2"
+                image.with_suffix(".json.provenance.json").write_text(json.dumps(ip))
+                with self.assertRaisesRegex(ValueError, "backend revision/optimization differs"):
+                    runner.validate_export(hull, image, source, 4096, backend)
 
 
 if __name__ == "__main__":

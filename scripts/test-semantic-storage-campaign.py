@@ -438,5 +438,53 @@ class CancellationTests(unittest.TestCase):
                     process.wait()
 
 
+
+class BackendTests(unittest.TestCase):
+    def test_backend_is_part_of_failure_identity_with_legacy_o0(self):
+        value = case()
+        legacy = campaign.analyze(report(value), value, "rustEvm", "tx-1")
+        optimized = campaign.analyze({**report(value), "backend": "sonatina-o2"}, value, "rustEvm", "tx-1")
+        self.assertEqual(legacy["backend"], "sonatina-o0")
+        self.assertEqual(optimized["backend"], "sonatina-o2")
+        expected = campaign.fingerprint(legacy)
+        self.assertFalse(campaign.same_failure(expected, optimized))
+        del expected["backend"]
+        self.assertTrue(campaign.same_failure(expected, legacy))
+        self.assertFalse(campaign.same_failure(expected, optimized))
+        for invalid in (None, "yul"):
+            with self.subTest(backend=invalid), self.assertRaises(ValueError):
+                campaign.analyze({**report(value), "backend": invalid}, value)
+
+    def test_each_candidate_uses_selected_backend_and_retains_it_in_report(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            instance = campaign.Campaign(options(temporary, backend="sonatina-o2"))
+            seen = []
+            def execute(args, raw):
+                seen.append((args.backend, raw["backend"]))
+                value = json.loads(args.case.read_text())
+                raw.update(report(value))
+            with patch.object(campaign.adapter, "execute", side_effect=execute):
+                for value in (case(3), case(1)):
+                    folder, raw, analysis = instance.execute_case(value)
+                    self.assertEqual(raw["backend"], "sonatina-o2")
+                    self.assertEqual(analysis["backend"], "sonatina-o2")
+                    self.assertEqual(campaign.common.read_json(folder / "report.json")["backend"], "sonatina-o2")
+            self.assertEqual(seen, [("sonatina-o2", "sonatina-o2")] * 2)
+            self.assertEqual(instance.summary["backend"], "sonatina-o2")
+            self.assertEqual(instance.summary["configuration"]["backend"], "sonatina-o2")
+
+    def test_campaign_cli_selects_backend(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "campaign"
+            def run(instance):
+                self.assertEqual(instance.backend, "sonatina-o2")
+                instance.summary["status"] = "complete"
+                instance.summary["counts"].update(generated=1, executed=1, completed=1, matched=1)
+            arguments = ["campaign", "--output", str(output), "--backend", "sonatina-o2", "--cases", "1"]
+            with patch.object(sys, "argv", arguments), patch.object(campaign.Campaign, "run", run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 0)
+            self.assertEqual(campaign.common.read_json(output / "summary.json")["backend"], "sonatina-o2")
+
+
 if __name__ == "__main__":
     unittest.main()

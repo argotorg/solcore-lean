@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -23,6 +24,10 @@ import time
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
+_adapter_spec = importlib.util.spec_from_file_location("semantic_suite_adapter", ROOT / "scripts/semantic-differential.py")
+assert _adapter_spec and _adapter_spec.loader
+adapter = importlib.util.module_from_spec(_adapter_spec)
+_adapter_spec.loader.exec_module(adapter)
 SCHEMA = "solcore-lean.semantic-suite.v1"
 SEED_VERSION = "sha256-profile-shard-v1"
 MIN_CAMPAIGN_BYTES = 16 * 1024 * 1024
@@ -97,7 +102,7 @@ def command(args, profile, output, seconds, disk_bytes):
     runner = {"pure": args.core_runner, "storage": args.storage_core_runner, "call": args.call_core_runner}[family]
     result = [sys.executable, str(ROOT / "scripts" / CAMPAIGNS[family]), "--output", str(output), "--profile", profile,
               "--seconds", str(seconds), "--disk-bytes", str(disk_bytes), "--case-tool", str(tool), "--core-runner", str(runner)]
-    for key in ("anvil", "upstream", "target_dir", "direct_fuel", "core_fuel", "gas", "case_timeout", "shrink_attempts", "shrink_candidates"):
+    for key in ("backend", "anvil", "upstream", "target_dir", "direct_fuel", "core_fuel", "gas", "case_timeout", "shrink_attempts", "shrink_candidates"):
         result += ["--" + key.replace("_", "-"), str(getattr(args, key))]
     if args.mode == "fixed":
         # Never truncate a fixed corpus and call its missing coverage complete.
@@ -115,13 +120,19 @@ def missing_coverage(summary):
             and any(key.startswith("missing") and value for key, value in values.items())}
 
 
-def classify(summary, profile, count, exit_code, stopped=None):
+def classify(summary, profile, count, exit_code, stopped=None, backend="sonatina-o0"):
     """Use both process completion and the campaign's observed completion counts."""
     if not isinstance(summary, dict) or summary.get("schema") != CAMPAIGN_SCHEMAS[PROFILES[profile][1]]:
         return "inconclusive-resource" if stopped else "adapter-error"
     counts = summary.get("counts", {})
     configuration = summary.get("configuration")
     if not isinstance(counts, dict) or not isinstance(configuration, dict) or configuration.get("profile") != profile:
+        return "adapter-error"
+    try:
+        adapter.resolve_backend(backend, summary)
+        if "backend" in configuration:
+            adapter.resolve_backend(backend, configuration)
+    except ValueError:
         return "adapter-error"
     if summary.get("synthetic") is not False:
         return "adapter-error"
@@ -135,6 +146,10 @@ def classify(summary, profile, count, exit_code, stopped=None):
         for finding in findings:
             fingerprint = finding.get("fingerprint") if isinstance(finding, dict) else None
             if not isinstance(fingerprint, dict) or fingerprint.get("synthetic") is not False:
+                return "adapter-error"
+            try:
+                adapter.resolve_backend(backend, fingerprint)
+            except ValueError:
                 return "adapter-error"
             categories.add(fingerprint.get("category"))
     # A real finding survives a later timeout/interruption in another case.
@@ -254,7 +269,7 @@ class Suite:
         self.args = args
         self.started = time.monotonic()
         self.deadline = self.started + args.seconds
-        self.report = {"schema": SCHEMA, "status": "running", "mode": args.mode, "seedVersion": SEED_VERSION,
+        self.report = {"schema": SCHEMA, "status": "running", "backend": args.backend, "mode": args.mode, "seedVersion": SEED_VERSION,
             "rootSeed": str(args.seed), "shardIndex": args.shard_index, "shardCount": args.shard_count,
             "selectedProfiles": args.profile, "profiles": [], "unexecutedProfiles": args.profile[:],
             "limits": {key: getattr(args, key) for key in ("seconds", "profile_seconds", "disk_bytes", "profile_disk_bytes", "output_limit", "cleanup_seconds")},
@@ -279,7 +294,7 @@ class Suite:
             count = requested(args, profile)
             folder = args.output / f"{index:02d}-{profile}"
             argv = command(args, profile, folder, seconds, min(args.profile_disk_bytes, free))
-            row = {"profile": profile, "status": "running", "requested": count, "output": folder.name,
+            row = {"profile": profile, "backend": args.backend, "status": "running", "requested": count, "output": folder.name,
                    "command": argv, "campaignSha256": digest(Path(argv[1]))}
             if args.mode == "fixed":
                 row.update(manifest=str(manifest(profile).relative_to(ROOT)), manifestSha256=digest(manifest(profile)))
@@ -300,9 +315,9 @@ class Suite:
                 summary = json.loads(summary_path.read_text())
             except (OSError, ValueError) as error:
                 row["summaryError"] = str(error)
-            row["status"] = classify(summary, profile, count, exit_code, stopped)
+            row["status"] = classify(summary, profile, count, exit_code, stopped, args.backend)
             if isinstance(summary, dict):
-                row["campaign"] = {key: summary[key] for key in ("status", "counts", "transactionCounts", "stop", "generation") if key in summary}
+                row["campaign"] = {key: summary[key] for key in ("backend", "status", "counts", "transactionCounts", "stop", "generation") if key in summary}
                 row["missingCoverage"] = missing_coverage(summary)
                 row["summary"] = str(summary_path.relative_to(args.output))
                 row["summarySha256"] = digest(summary_path)
@@ -333,6 +348,7 @@ class Suite:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
     parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirteen")
