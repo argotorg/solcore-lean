@@ -28,6 +28,14 @@ lean_exe semanticStorageRollbackTool where
   root := `Tests.SemanticStorageRollbackTool
   exeName := "semantic-storage-rollback-tool"
 
+lean_exe semanticCallTool where
+  root := `Tests.SemanticCallTool
+  exeName := "semantic-call-tool"
+
+lean_exe rustHullCallScenario where
+  root := `Tests.RustHullCallScenarioRun
+  exeName := "rust-hull-call-scenario"
+
 lean_exe rustHullStorageScenario where
   root := `Tests.RustHullStorageScenarioRun
   exeName := "rust-hull-storage-scenario"

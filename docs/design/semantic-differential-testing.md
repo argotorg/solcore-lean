@@ -30,6 +30,8 @@ comparison must not share the Rust frontend with its reference computation.
 | Generated storage scenarios | `Solcore/Synthesis/Core/StorageContract.lean`, `Source/StorageCases.lean`, `Stateful/StorageExecution.lean` | One checked host-aware contract, initially empty slots zero/one and one to three ordered zero-value transactions; fresh execution through `ContractRuntime`. |
 | Storage comparison and replay | `scripts/semantic-storage-differential.py`, `Tests/RustHullStorageScenarioRun.lean` | Actual mined EVM transactions, original Core and imported-Hull execution; initial and per-transaction committed storage comparison. |
 | Storage campaigns | `scripts/semantic-storage-campaign.py`, `scripts/semantic-storage-corpus.json` | Bounded execution, failure-preserving sequence reduction and ten fixed scenarios covering 27 transaction prefixes. |
+| Bounded parent/child execution | `Solcore/Synthesis/Core/NestedCall.lean`, `Source/NestedCallCases.lean`, `Stateful/NestedCallExecution.lean` | Two original checked host contracts, a funded parent, one child and up to three role-based transactions; committed accounts and logs from the nested runtime. |
+| Nested-call comparison | `scripts/semantic-call-differential.py`, `Tests/RustHullCallScenarioRun.lean` | Actual funded deployments and mined transactions, original Core and imported Hull; initial/per-prefix storage, balances, root payload and ordered committed logs. |
 | Rust EVM reference | `scripts/rust-evm-reference.py` | Fixed upstream E2E fixtures on Anvil; Sonatina O0/O2 and Yul execution. |
 | Compatibility inventories | `scripts/RUST_PARITY.md` | Fixed expectations checked separately by the Rust and Core paths. These are not a direct comparison runner for generated inputs. |
 
@@ -67,7 +69,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Complete, 2026-10-25 |
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
-| M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | In progress |
+| M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Complete, 2026-10-25 |
 | M6 | Add selected generics, closures, comptime and module combinations. | Planned |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
@@ -440,7 +442,7 @@ The bounded-loop slice completes the restricted M4 scope:
   cases from the older five profiles retained identical artifacts and
   observations. Focused protocol/campaign regressions passed.
 
-M4 is complete within the documented restrictions. M5 is in progress; M6 remains
+M4 and M5 are complete within the documented restrictions. M6 remains
 planned. Stateful scenarios retain an original Core reference that does not
 share the Rust frontend.
 
@@ -577,11 +579,123 @@ candidate report matched; exact archive replay matched and fresh synthetic
 replay retained the same stable-ID, reverted-outcome fingerprint. Exhausting
 the candidate budget is reported as an attempt limit, not as proof of minimality.
 
-M5b is complete within its documented scope. M5 remains in progress for M5c's
-bounded external calls, logs and value transfers. No emitter-preservation or
+M5b and M5c are complete within their documented scopes. No emitter-preservation or
 broader ledger-equivalence claim follows from these results.
 Usage and validation commands are in
 [Generated semantic comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-ordered-storage-transactions).
+
+M5c implementation contract:
+
+- Install one parent and one child contract, each with initially empty slots
+  zero/one. An empty payable parent constructor receives value eight; child
+  deployment receives zero. Original Core starts in the resulting declared
+  post-deployment world, with parent balance eight and child balance zero; it
+  does not execute a corresponding source constructor. A scenario has
+  one through three zero-value top-level transactions. The deployed addresses
+  are distinct, valid non-precompile addresses; cases retain symbolic roles and
+  bindings supply the actual addresses to every execution path.
+  The Osaka boundary rejects contract addresses zero through `0x11` and
+  `0x100`, including the [BLS12-381 range](https://eips.ethereum.org/EIPS/eip-2537)
+  and [P256VERIFY](https://eips.ethereum.org/EIPS/eip-7951) included by the
+  [Fulu/Osaka upgrade](https://eips.ethereum.org/EIPS/eip-7607).
+- The parent is `SynthesizedCaller.run(uint256 target, uint256 input)`, selector
+  `0x7357f5d2`. It receives the child address as the first Word and reads the
+  input at byte offset 36. The payable `SynthesizedCallee` fallback receives
+  exactly one raw Word at offset zero. Neither original Core program embeds a
+  chosen deployment address.
+- The parent adds input to its slot zero and emits topic-one/payload-new-slot
+  log before calling the child. Input bit two selects value zero or one. The
+  child applies the checked aggregate step to `input + oldChild0`, stores that
+  result in slot zero, increments slot one and emits topic two with new slot
+  zero as payload. Bit zero selects child revert; both child completions carry
+  the new slot-zero Word.
+- The parent stores the returned child payload in slot one, or adds one to a
+  reverted payload before storing it. It emits topic three with that value and
+  returns the sum of both parent slots. Bit one instead reverts with that sum.
+  Unexpected call failures and non-Word returndata are exceptional exits, not
+  ordinary child reverts. Source logs use the raw one-topic opcode; Core uses
+  `emitLogWord(topic, payload)`. Payload bytes are big-endian Words.
+- Execute original Core through `OneLevelNestedExecution.run` and carry only
+  `terminal.finalWorld` into the next transaction. Compare parent outcome and
+  payload, both contracts' committed slots and balances, and the ordered
+  per-transaction committed logs from `terminal.committedJournal.logList`.
+  Internal child outcomes are observed through their effects on the parent and
+  committed state; prescribed input bits are not claimed as execution traces.
+  Out-of-fuel retains the preceding committed accounts and unknown logs.
+- Both linked Hull runtime images must be installed with their exact exported
+  bytes. Funded EVM deployments and resulting initial balances are recorded.
+  Receipt-block queries provide both committed account snapshots. Matching a
+  parent revert also requires both prior snapshots and an empty committed log
+  list. A child revert may retain parent writes/logs made before the call.
+- Bound the sum of the actual parent and child Core node counts to 512. Fixed
+  coverage includes inputs zero through seven, maximum Word and the high bit,
+  so all child-revert/parent-revert/value combinations are exercised. Generation
+  and reduction retain checked step scope, stable transaction IDs and exact
+  canonical program reconstruction. Depth-one installed-contract calls are the
+  supported domain; gas equivalence, arbitrary callees and deeper calls remain
+  outside it.
+
+Delivered M5c execution connection:
+
+- `NestedCall` Core, emitter and case modules retain two fully checked original
+  host programs and their arbitrary aggregate step. Both contracts use
+  `CheckedCoreContract.wordOutcomeV1`; the fixed wrappers add 179 nodes, and
+  admission measures the combined complete programs against the 512-node limit.
+  Source scratch memory is reserved through the free-memory pointer, and child
+  returndata must contain exactly one Word before the parent consumes it.
+- `semanticCallTool` and `rustHullCallScenario` build the separate native tools.
+  Generation, emission, strict replay, observation and checked reduction
+  candidates are available. Plan/case schemas are `solcore-lean.call-plan.v1`
+  and `solcore-lean.semantic-call-case.v1`. Transactions retain symbolic roles
+  and stable IDs; `solcore-lean.call-bindings.v1` supplies the actual caller,
+  parent and child addresses. Every origin reconstructs both original programs
+  and the source from its checked step, without trusting saved observations.
+- `scripts/semantic-call-differential.py` compares original Core, checked Hull
+  and mined EVM execution. It executes the empty source deployments, including
+  the parent's value-eight funding, checks linked runtime bytes and initial
+  accounts, and compares every completed prefix's root status/payload, both
+  contracts' storage and balances, and ordered committed logs. Receipt-block
+  snapshots and transaction traces belong to actual mined transactions. Unknown
+  submission outcomes never trigger resubmission. Root reverts require both
+  prior snapshots and empty committed logs; resource failures remain incomplete.
+- Ten external scenarios and 26 transactions passed all three paths, with
+  nineteen root returns and seven root reverts. Exact archive replay of the
+  aggregate scenario also passed. Inputs cover every prescribed low-three-bit
+  combination, maximum Word and the high bit, with private-cell/arbitrary-entry
+  and aggregate steps. Changing the input sequence preserves both original Core
+  programs and source. Six additional identity sequences and fifteen
+  transactions matched original Core and imported Hull.
+- Full repository build (9,880 jobs), full tests and kernel policy passed, as
+  did eleven protocol and thirty campaign regressions. These results establish the
+  tested execution connection; they do not prove emitter preservation. Exact
+  archives pin tool hashes, so a later binary or adapter update requires a fresh
+  `--case` run instead of replaying an old archive under changed executables.
+
+The separate `scripts/semantic-call-campaign.py` and fixed
+`scripts/semantic-call-corpus.json` passed integration validation. The
+manifest contains fourteen scenarios and 38 transactions, nineteen step AST
+features, all ten boundary inputs, helper/transaction counts one through three,
+and all four step recipes. Its prescribed call modes are `input & 7`; root
+outcomes and ordered log patterns count only from actual completed matches.
+These dimensions are distinct from dynamic opcode or internal-child trace
+coverage. Native fixed-corpus validation passed all fourteen scenarios and 38
+transactions across eight plans, with repeated materialization, strict replay
+and repeated actual Core observations. All declared coverage and 24 negative
+checks passed, including fuel exhaustion. This validator does not execute the
+EVM. The actual fixed campaign also passed all fourteen scenarios and 38
+transaction prefixes, with every required coverage item present. A copied log
+payload difference at `tx-1` accepted three reductions in six actual candidate
+executions, removing the earlier and later transactions while retaining the
+same ordered-log fingerprint. Original and reduced actual reports matched;
+exact archive replay matched and fresh synthetic replay retained the finding.
+An actual fuel-one run remained inconclusive, preserved prior accounts and
+reported unknown logs with zero completed/matched transactions. Constructor
+receipts are checked against the exact linked runtime bytes for both roles;
+a fresh comparison and exact replay passed after that receipt check was added.
+M5 is complete within these fixed storage, rollback and depth-one call profiles.
+
+Commands are in
+[Bounded parent/child comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-parentchild-calls).
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

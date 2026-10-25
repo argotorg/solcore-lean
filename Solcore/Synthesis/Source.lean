@@ -14,5 +14,7 @@ import Solcore.Synthesis.Source.StorageEmitter
 import Solcore.Synthesis.Source.StorageCases
 import Solcore.Synthesis.Source.StorageRollbackEmitter
 import Solcore.Synthesis.Source.StorageRollbackCases
+import Solcore.Synthesis.Source.NestedCallEmitter
+import Solcore.Synthesis.Source.NestedCallCases
 
 /-! Checked Core cases, deterministic Solcore source emission and replay. -/

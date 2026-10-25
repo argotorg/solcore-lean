@@ -1848,6 +1848,8 @@ import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
 import Solcore.Test.SourceStorageRollbackCases
+import Solcore.Test.SourceNestedCallEmitter
+import Solcore.Test.SourceNestedCallCases
 import Solcore.Test.TypeSystemInference
 import Solcore.Test.ProgramEnvironmentAndTypeResolution
 import Solcore.Test.ProgramModuleResolution
@@ -3907,6 +3909,8 @@ def run : IO Unit := do
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter
   SourceStorageRollbackCases.testSourceStorageRollbackCases
+  SourceNestedCallEmitter.testSourceNestedCallEmitter
+  SourceNestedCallCases.testSourceNestedCallCases
   testDetailedCoreChecker
   testWorkspacePathIdentity
   testWorkspaceCanonicalValidation

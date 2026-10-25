@@ -186,12 +186,21 @@ inputs with a 32-byte payload; even inputs return normally. All eight external
 scenarios and 21 transactions agree across the three paths, including retained
 committed storage after each revert and exact archive replay. The fixed rollback
 corpus passes native validation and actual three-way comparison for twelve
-scenarios and 33 transaction prefixes. Failure reduction preserves reverted outcomes and payload
-differences, including when earlier transactions are removed.
-M5 remains in progress for bounded external calls, logs and
-value transfers. Gas, balances, nonce and arbitrary storage are outside the
-delivered comparisons. Selected generics/closures/comptime/module combinations
-remain planned.
+scenarios and 33 transaction prefixes. Failure reduction preserves reverted
+outcomes and payload differences, including when earlier transactions are removed.
+
+The bounded-call profile installs a funded parent and one child contract. It
+compares both accounts' storage and balances, the root outcome, and ordered
+committed logs after every transaction. Cases include child rollback, root
+rollback, value transfers and aggregate steps with private mutable cells. All
+ten external scenarios and 26 transactions agree across the three paths, and
+exact archive replay passes. See the [call runner](scripts/semantic-call-differential.py)
+and [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-parentchild-calls).
+All fourteen fixed call scenarios and 38 transaction prefixes match, and log
+differences survive failure-preserving reduction and replay. M5 is complete for
+these restricted profiles. Gas and nonce equivalence, arbitrary storage/accounts, precompiles
+and deeper calls are outside these comparisons. Selected generics, closures,
+comptime and module combinations remain planned.
 
 ## Code layout
 
@@ -205,7 +214,7 @@ remain planned.
 | [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. |
 | [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. |
 | [Abi](Solcore/Abi.lean) / [Core.Wire](Solcore/Core/Wire.lean) | ABI encoding and the JSON representation of Core. |
-| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Deterministic pure Core generation and checked shrinking. |
+| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Checked program generation and shrinking for bounded execution profiles. |
 | [Test](Solcore/Test/) | Tests and reusable fixtures, registered in [Tests/Main.lean](Tests/Main.lean). |
 
 [Solcore.lean](Solcore.lean) provides the main import. The source-to-Core

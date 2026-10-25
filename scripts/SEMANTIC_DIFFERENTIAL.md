@@ -583,10 +583,10 @@ and rewriting a slot, fresh private cells, arbitrary entries and aggregate
 branches. Changing the input sequence leaves the original Core contract and
 source unchanged. Full repository build/tests and the kernel policy check pass.
 
-M5 remains in progress. This first storage profile admits valid `run(uint256)`
+This first storage profile admits valid `run(uint256)`
 inputs, zero call value, initially empty literal slots zero and one, and
 successful Word returns. The rollback profile below extends completion
-behavior; external calls remain separate work. This scope
+behavior; bounded external calls use the separate profile below. This scope
 does not establish equivalence of arbitrary storage, gas, balances, nonce,
 logs, account lifecycle or the source emitter itself.
 
@@ -719,6 +719,131 @@ For this profile, a reducer cannot preserve a reverted-payload finding by
 turning it into a normal return, an empty payload or resource exhaustion.
 
 Full repository build/tests and kernel policy passed, along with forty storage
-protocol and 24 campaign regressions. M5 remains in progress: bounded external
-calls, logs and value transfers belong to M5c. The rollback profile retains the
-initially empty two-slot domain, valid Word calldata and zero call value.
+protocol and 24 campaign regressions. The rollback profile retains the initially
+empty two-slot domain, valid Word calldata and zero call value.
+
+## Compare bounded parent/child calls
+
+The `stateful-calls` profile installs `SynthesizedCaller` and
+`SynthesizedCallee`. The parent's empty payable constructor receives eight units
+of value; the child's deployment receives zero. Both begin with empty storage.
+Original Core starts from that declared post-deployment world; it does not
+execute the source constructors. Rust EVM and imported Hull execute the actual
+deployments, and the runner checks their resulting initial accounts.
+
+Each of one to three zero-value transactions calls
+`SynthesizedCaller.run(uint256 target, uint256 input)`, selector `0x7357f5d2`.
+The parent receives 68 bytes including the selector. It calls the payable child
+fallback with one raw 32-byte Word. The source reserves scratch memory through
+the free-memory pointer and rejects child returndata that is not exactly 32
+bytes. The fixed protocol uses the low three input bits:
+
+| Mask | Prescribed behavior |
+| --- | --- |
+| `1` | Child reverts after its storage writes and topic-two log. |
+| `2` | Parent reverts after consuming the child outcome and writing/logging its result. |
+| `4` | Parent sends value one to the child; otherwise it sends zero. |
+
+The parent increments slot zero by the input and logs topic one. The child
+applies the checked aggregate step to `input + oldChild0`, writes that result
+to slot zero, increments slot one, and logs topic two. The parent writes the
+child payload to slot one, adding one if the child reverted, then logs topic
+three. Its root payload is the sum of both parent slots. Each return/revert
+payload is one big-endian Word. Unexpected call failures are exceptional exits.
+
+Build the separate native tools and generate a case:
+
+```sh
+lake build semanticCallTool rustHullCallScenario
+mkdir -p .upstream/semantic-call-cases
+.lake/build/bin/semantic-call-tool generate 1 243 1 1 1000000 \
+  > .upstream/semantic-call-cases/corpus.json
+python3 - <<'PY'
+import json
+from pathlib import Path
+root = Path('.upstream/semantic-call-cases')
+corpus = json.loads((root / 'corpus.json').read_text())
+assert corpus['status'] == 'complete' and corpus['cases']
+(root / 'case.json').write_text(json.dumps(corpus['cases'][0], indent=2) + '\n')
+PY
+python3 scripts/semantic-call-differential.py \
+  --case .upstream/semantic-call-cases/case.json \
+  --output .upstream/semantic-call-cases/run
+python3 scripts/semantic-call-differential.py \
+  --replay .upstream/semantic-call-cases/run \
+  --output .upstream/semantic-call-cases/replay
+```
+
+The native tool also provides:
+
+```text
+semantic-call-tool emit PLAN.json TRANSACTIONS.json [FUEL]
+semantic-call-tool replay CASE.json [FUEL]
+semantic-call-tool observe CASE.json BINDINGS.json [FUEL]
+semantic-call-tool shrink CASE.json LIMIT [FUEL]
+```
+
+Plans use `solcore-lean.call-plan.v1` with a checked aggregate `stepProgram`.
+Cases use `solcore-lean.semantic-call-case.v1` and retain both original Core
+programs. The combined programs are limited to 512 nodes; the fixed wrappers
+add 179 nodes to the step. Transactions contain a stable `id`, decimal `input`,
+`value: "0"`, `target: "parent"` and `callee: "child"`. The source and programs
+remain fixed across input sequences. Actual decimal caller/parent/child
+addresses arrive through `solcore-lean.call-bindings.v1`. They must be distinct;
+contract addresses zero through 17 and 256 are excluded at the Osaka boundary.
+Cases never embed an invented deployment address or a saved expected result.
+
+Original Core runs through `OneLevelNestedExecution.run`, retaining only the
+terminal committed world between transactions and starting fresh private heaps.
+The Rust path mines transactions, reads their output from step-enabled traces,
+and obtains both accounts' slots zero/one and balances at each receipt block.
+Committed logs come from receipts. Imported Hull uses the same actual bindings
+and exact linked runtime images. A pass requires matching initial accounts and
+every completed prefix: root status/payload, both account snapshots and ordered
+logs. Root rollback must restore both prior snapshots and remove committed
+logs; child rollback can leave earlier parent effects intact. Unknown submission
+outcomes are not retried. Fuel, gas and process limits remain distinct.
+
+Exact archive replay checks saved artifact and executable hashes before fresh
+execution. Rebuilding a native tool or changing an adapter invalidates an old
+exact archive; use its `case.json` with `--case` for a new run under updated tools.
+
+```sh
+python3 scripts/test-source-call-rust.py
+python3 scripts/test-semantic-call-differential.py
+python3 scripts/test-semantic-call-campaign.py
+python3 Tests/scripts/test-semantic-call-corpus.py
+python3 scripts/semantic-call-campaign.py \
+  --corpus scripts/semantic-call-corpus.json \
+  --output .upstream/semantic-call-ci --seconds 600
+```
+
+The external suite passed ten scenarios and 26 transactions, including nineteen
+returns and seven root reverts, followed by exact archive replay. It covers all
+eight prescribed modes, Word boundaries, value retained after child success,
+both rollback levels, fresh private cells and aggregate branches. Six separate
+identity sequences covering fifteen transactions also matched original Core and
+imported Hull. Full repository build/tests and kernel policy passed, along with
+eleven protocol and thirty campaign regressions.
+
+The fixed manifest contains fourteen scenarios and 38 transactions, nineteen
+step AST features, inputs zero through seven/maximum/high-bit, helper and
+transaction counts one through three, and four generation templates. Coverage
+distinguishes prescribed `input & 7` modes from observed root outcomes and
+ordered committed log patterns. Neither is internal opcode trace coverage.
+Native materialization, strict replay and repeated observations passed all
+fourteen scenarios and 38 transactions, with complete declared coverage and
+24 negative checks, including fuel exhaustion. This validator does not execute
+the EVM. The actual fixed campaign also passed all fourteen scenarios and 38
+prefixes, with complete coverage. A copied log-payload difference at `tx-1`
+reduced three transactions to one through three accepted reductions in six
+candidate executions. All actual reports matched; exact archive replay and
+synthetic same-fingerprint replay passed. Fuel exhaustion remained inconclusive
+with prior accounts retained and unknown logs. Both constructor receipts must
+verify their exact linked runtime bytes; a fresh run and exact replay also
+passed after that check was added.
+
+M5 is complete within its documented profiles. The bounded-call domain is one installed parent and
+one child, valid Word calldata, fixed initial balances and slots zero/one.
+Gas/nonce equivalence, precompiles, arbitrary accounts and deeper calls remain
+outside this profile.
