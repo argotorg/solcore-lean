@@ -1,12 +1,30 @@
 # Core unification: T0 audit of features, semantics, and proof boundaries
 
-Initial audit: 2026-09-30. Last updated: 2026-10-19.
+Initial audit: 2026-09-30. Last updated: 2026-10-25.
 
 This document preserves the initial audit for the [implementation design](core-runtime-unification.md) and subsequent dated investigations. Sections 1–9 record the state on 2026-09-30; later sections record the state on their respective dates. References to the "current" implementation, "unfinished" work, "next steps," or old API names describe that historical state.
 
 Runtime Core unification was completed in `a3168382`. See the [API migration record](core-runtime-unification-api.md) for the current public entry points. The [implementation record](core-runtime-unification-progress.md) and the latest dated audit section describe the latest commits, validation, and uncommitted work.
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
+
+## Maintenance boundary (2026-10-25)
+
+Runtime unification is complete; unrestricted Source-to-Core meaning preservation is still incomplete. The next milestone is the restricted G0-to-Solcore [differential-testing MVP](semantic-differential-testing.md). Remaining proofs are deferred, not counted as complete.
+
+The retained-expression helpers now propagate the existing integer-pattern provenance condition. Obsolete ledger drafts were removed because the actual-expression, actual-pattern and mutual-ledger modules already provide the completed proofs. An optional closure-depth profiling draft was also removed; the runtime implementation is unchanged. See the [current validation record](core-runtime-unification-progress.md#maintenance-checkpoint-and-next-milestone-2026-10-25). This cleanup makes no new end-to-end preservation claim.
+
+## Checker validity checkpoint (2026-10-21)
+
+Commit `a5fa0ad8` derives the initializer barriers and original body typing for every ordinary-function and implementation-method row in the selected compilation cache. The proof follows the actual inference calls, retained binders, capture lifetimes, final substitution and initializer ownership. It covers dependencies discovered after the initial worklist.
+
+`SourceCompiledActualInitializerBarriers.compile_cached_bodies` takes successful compilation and its actual cached artifact. `SelectedCompilationRawPublicReceipt.Receipt.checker_bodies` exposes the result through the actual public compilation receipt. Neither endpoint requires separately supplied body typing or initializer barriers.
+
+The remaining work is execution preservation for unrestricted accepted bodies and its connection to public sessions. The existing `StaticProfile` deliberately describes a narrower syntax subset; successful compilation alone cannot imply it. The general proof must instead consume actual named/contextual body receipts, preserve independently instantiated Source metadata and captured environments, and assemble the existing expression, statement and loop simulations. The profiled public endpoints remain available while that connection is completed.
+
+The checkpoint is recorded in commit `a5fa0ad8` (68 files). It does not establish unrestricted runtime preservation; validation recorded in the older dated entries refers to those checkpoints, not to the current workspace.
+
+Goal one is complete. Goal two remains incomplete; this checkpoint closes the actual cached-body checker premise, not the unrestricted runtime theorem.
 
 ## Projected unary assignment audit (2026-10-19)
 

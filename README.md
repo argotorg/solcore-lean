@@ -3,9 +3,10 @@
 An executable specification of Solcore in Lean 4.
 
 The project includes a source frontend, a typed intermediate language (Core),
-and a model of contract execution. Source programs compile to Core. Its evaluator
-takes a fuel budget that limits the number of execution steps. The contract
-runtime models accounts, storage, calls, and transaction commits and rollbacks.
+and a model of contract execution. Source programs compile to Core. The Core
+machine runs with an execution-step budget and can resume from a checkpoint.
+The contract runtime models accounts, storage, calls, and transaction commits
+and rollbacks.
 
 ## Build and test
 
@@ -80,20 +81,64 @@ The pinned contract inventory covers 168 fixtures. The checked Rust driver
 accepts 165; their 1,382 constructor and call observations match the fixture
 expectations on Core. Three fixtures fail upstream source checks before export.
 [RUST_PARITY.md](scripts/RUST_PARITY.md) lists the gates and how to reproduce them.
-
-`import Solcore.Frontend.RustHull.Safety` provides the execution safety proofs.
-Successful preparation supplies the typing conditions for actual input parsing,
-contract initialization, execution and checkpoint resumption. A Core machine
-fault is excluded; a language failure, revert or exhausted fuel budget remains
-a possible result.
+The Rust EVM reference runs separately through Sonatina at O0 and O2 and through
+Yul compiled by solc. These checks compare each execution with fixture
+expectations; they do not yet compare arbitrary generated programs directly.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the
 native Lean source checker to every Rust feature. Recursive references use the
 Rust backends’ Word layout; aggregate construction and unfolding cases that fail
 in both backends remain explicit errors. Arbitrary EVM bytecode and additional
-precompiles are outside the executable code catalogue. Compatibility decisions,
-coverage, and unresolved upstream issues are recorded in
-[questions.md](questions.md).
+precompiles are outside the executable code catalogue. The compatibility gates
+and their limits are documented in [RUST_PARITY.md](scripts/RUST_PARITY.md).
+
+## Proof status
+
+Core has proofs of type preservation and finite execution safety. The
+independent source semantics also has a type preservation proof. Correspondence
+between native source execution and generated Core code has been proved for
+parts of the language; the theorem covering the complete compiler remains
+unfinished. The [Core runtime unification design](docs/design/core-runtime-unification.md)
+records that work.
+
+`import Solcore.Frontend.RustHull.Safety` provides safety proofs for imported
+Hull. Successful preparation supplies the typing conditions for input parsing,
+contract initialization, execution and checkpoint resumption. These proofs
+exclude Core machine faults while allowing language failures, reverts and
+exhausted fuel budgets.
+
+The separate [Hull meaning-preservation proofs](docs/design/hull-meaning-preservation.md)
+connect independent finite Hull evaluations to actual lowering and public
+execution, including repeated resumptions. Connected features include recursive
+functions, loops, language faults, memory, storage, logs, return data, all four
+message-call modes, root reentry and account destruction. Contract creation,
+precompile execution, independent assembly semantics and object linking still
+need their full public meaning-preservation connections. Executable support is
+broader than this proved subset.
+
+The native source compiler handles closed entry points with a finite
+specialization plan. Its source contract members, persistent storage and
+external calls have yet to be connected to `ContractRuntime`; its ABI wrapper
+is limited to static Word values. The Rust Hull path has a separate import
+boundary and supports generated dynamic ABI code.
+
+## Differential testing
+
+The next development milestone is semantic differential testing against the
+pinned Rust compiler. It starts with a small, gas-independent subset and does
+not wait for every remaining Hull correspondence proof.
+
+[Synthesis.Core](Solcore/Synthesis/Core.lean) already provides deterministic
+generation and shrinking of pure Word programs with Boolean subexpressions,
+local bindings, conditionals and primitive operations. Generated and reduced
+programs pass the Core checker; accepted programs carry a proof of Core typing.
+This guarantee does not yet cover printing them as Solcore source.
+
+The [differential-testing milestones](docs/design/semantic-differential-testing.md)
+specify source emission, seed replay, failure classification and reduction. The
+planned comparison uses the original generated Core result, Rust-produced EVM
+execution, and execution of Rust Hull on Lean Core to help locate disagreements.
+Core fuel, EVM gas and process timeouts remain separate resource limits.
 
 ## Code layout
 
@@ -107,28 +152,12 @@ coverage, and unresolved upstream issues are recorded in
 | [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. |
 | [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. |
 | [Abi](Solcore/Abi.lean) / [Core.Wire](Solcore/Core/Wire.lean) | ABI encoding and the JSON representation of Core. |
+| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Deterministic pure Core generation and checked shrinking. |
 | [Test](Solcore/Test/) | Tests and reusable fixtures, registered in [Tests/Main.lean](Tests/Main.lean). |
 
 [Solcore.lean](Solcore.lean) provides the main import. The source-to-Core
 correspondence proofs live under
 [SourceSemantics/CoreLowering](Solcore/SourceSemantics/CoreLowering.lean).
-
-## Status
-
-Development is ongoing. Core has proofs of type preservation and finite
-execution safety. The independent source semantics also has a type preservation
-proof. Correspondence between source execution and generated Core code has
-been proved for parts of the language; the theorem covering the complete
-compiler is still in progress.
-
-The native source compiler handles closed entry points with a finite
-specialization plan. Its source contract members, persistent storage and
-external calls have yet to be connected to `ContractRuntime`; its ABI wrapper
-is limited to static Word values. The Rust Hull execution path above has a
-separate import boundary and supports generated dynamic ABI code.
-
-The [Core runtime unification design](docs/design/core-runtime-unification.md)
-records the compiler design and the remaining proof work.
 
 ## Contributing
 

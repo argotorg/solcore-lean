@@ -333,10 +333,16 @@ delay those connections.
 
 ## Next public milestone
 
-Connect the identity precompile through its independent byte-copy and gas
-semantics, actual dispatch and public execution. Then cover the remaining
-precompiles, creation and assembly. Each step must derive
-runtime inputs from actual initialization and end in a public theorem consumer.
+The active priority is the restricted differential-testing campaign described
+in [Semantic differential testing milestones](semantic-differential-testing.md).
+Completing every remaining Hull proof is not a prerequisite for that campaign.
+
+The next deferred public proof connection is the identity precompile, through
+its independent byte-copy and gas semantics, actual dispatch and public
+execution. The remaining precompiles, creation and assembly follow as their
+test domains are enabled. Each proof step must derive runtime inputs from actual
+initialization and end in a public theorem consumer. These obligations remain
+open while differential testing takes priority.
 
 ## Remaining public connections
 

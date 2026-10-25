@@ -1,8 +1,26 @@
 # Core runtime unification and semantic preservation
 
-Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
+Status: The first goal (runtime unification on Core) is complete. The second goal (preserving meaning across the full compilation pipeline) remains incomplete; further proof work is deferred behind the differential-testing milestone.
 
-Created: 2026-09-30. Updated: 2026-10-21.
+Created: 2026-09-30. Updated: 2026-10-25.
+
+## Current priority (2026-10-25)
+
+Runtime unification is complete. The general Source-to-Core meaning-preservation proof remains incomplete and is deferred while work prioritizes the restricted G0-to-Solcore [differential-testing MVP](semantic-differential-testing.md). Differential testing provides additional implementation evidence; it does not complete the proof goal.
+
+The [maintenance record](core-runtime-unification-progress.md#maintenance-checkpoint-and-next-milestone-2026-10-25) covers the retained-expression provenance fix, removal of superseded ledger drafts and removal of an optional profiling draft. Imported Hull execution and its separate proof boundary are tracked in [Hull meaning preservation](hull-meaning-preservation.md). The dated sections below preserve earlier design checkpoints.
+
+## Checker validity checkpoint (2026-10-21)
+
+Commit `a5fa0ad8` derives the initializer barriers and original body typing for every ordinary-function and implementation-method row in the selected compilation cache. The proof follows the actual inference calls, retained binders, capture lifetimes, final substitution and initializer ownership. It covers dependencies discovered after the initial worklist.
+
+`SourceCompiledActualInitializerBarriers.compile_cached_bodies` takes successful compilation and its actual cached artifact. `SelectedCompilationRawPublicReceipt.Receipt.checker_bodies` exposes the result through the actual public compilation receipt. Neither endpoint requires separately supplied body typing or initializer barriers.
+
+The remaining work is execution preservation for unrestricted accepted bodies and its connection to public sessions. The existing `StaticProfile` deliberately describes a narrower syntax subset; successful compilation alone cannot imply it. The general proof must instead consume actual named/contextual body receipts, preserve independently instantiated Source metadata and captured environments, and assemble the existing expression, statement and loop simulations. The profiled public endpoints remain available while that connection is completed.
+
+The checkpoint is recorded in commit `a5fa0ad8` (68 files). It does not establish unrestricted runtime preservation; validation recorded in the older dated entries refers to those checkpoints, not to the current workspace.
+
+Goal one is complete. Goal two remains incomplete; this checkpoint closes the actual cached-body checker premise, not the unrestricted runtime theorem.
 
 ## Current proof target: the selected compilation (2026-10-14)
 
