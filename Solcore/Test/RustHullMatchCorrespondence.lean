@@ -77,7 +77,7 @@ theorem program_eligible : RecursiveProgram program.functions := by
   simp only [program, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl | rfl | rfl | rfl | rfl
   all_goals simp only [addBonus, missingReturn, indexedLoop, wordWildcard, selectedFault, scrutineeFault,
-    indexedMatch, indexedArms, wordArms, faultArms, wildcardArm, arm, ret, RecursiveStatement,
+    indexedMatch, indexedArms, wordArms, faultArms, wildcardArm, arm, ret, ExecutableStatement,
     List.forall_mem_cons, List.not_mem_nil, false_implies, implies_true, true_and, and_true]
   · apply RecursiveExpression.builtin (operation := .binary .add) rfl (by rfl)
     intro argument member

@@ -124,7 +124,7 @@ theorem program_eligible : RecursiveProgram program.functions := by
   all_goals
     simp only [positive, sumLoop, plus, breakBody, breakPost, nestedReturn, nestedBreak, postReturn,
       ret, decl, assign, v, loop, loopInit, loopBody, loopPost, forever, continuing, breaking,
-      RecursiveStatement, List.forall_mem_cons, List.not_mem_nil, false_implies, implies_true, true_and, and_true]
+      ExecutableStatement, List.forall_mem_cons, List.not_mem_nil, false_implies, implies_true, true_and, and_true]
   · exact positive_eligible
   · exact ⟨⟨literal_eligible _, condition_eligible, ⟨post_eligible, literal_eligible _⟩, body_eligible, literal_eligible _⟩,
       variable_eligible _⟩

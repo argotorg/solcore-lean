@@ -32,7 +32,7 @@ theorem countdown_eligible : ∀ statement ∈ countdown.body,
   intro statement statementMember
   simp only [countdown, List.mem_cons, List.not_mem_nil, or_false] at statementMember
   subst statement
-  simp only [RecursiveStatement]
+  simp only [ExecutableStatement]
   apply RecursiveExpression.conditional
   · apply RecursiveExpression.builtin (operation := .comparison .eq) rfl (by rfl)
     intro argument member
@@ -62,7 +62,7 @@ theorem program_eligible : RecursiveProgram program.functions := by
   · intro statement member
     simp only [answer, List.mem_cons, List.not_mem_nil, or_false] at member
     subst statement
-    simp only [RecursiveStatement]
+    simp only [ExecutableStatement]
     exact .word _ _ _
 
 /-- Every recursive invocation allocates its actual remaining counter. -/

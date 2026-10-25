@@ -10,7 +10,7 @@ open Correspondence DerivationCorrespondence StatementCorrespondence
 
 /-- The scrutinee is already evaluated and resides at the compiler's temporary
 slot. The relation follows the particular independent alternative derivation. -/
-def AlternativesSimulation {σ : Type} (signatures : List Signature)
+def AlternativesSimulation {σ : Type} {model : StateModel σ} {slots : List EffectSlot} (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (sourceType : Ty) (sourceValue : Semantics.Value)
     (alternatives : List Alt) (initial : Semantics.State σ) (control : Semantics.Control)
@@ -23,19 +23,20 @@ def AlternativesSimulation {σ : Type} (signatures : List Signature)
     ValueRel targetType sourceValue targetValue → environment[mapping 0]? = some targetValue →
     EnvironmentRel world sourceEnvironment scope mapping environment →
     GlobalEnvironmentRel codes locations scope mapping environment →
-    HeapRel world initial.heap store → InstalledGlobals codes locations captured store →
+    EffectEnvironmentRel slots scope mapping environment →
+    StateRel model world initial store → InstalledGlobals codes locations captured store →
     ∃ extension target finalStore,
       ControlRel result control target ∧ Core.Evaluates environment store (expression.rename mapping) target finalStore ∧
-      HeapRel (world ++ extension) final.heap finalStore ∧
+      StateRel model (world ++ extension) final finalStore ∧
       InstalledGlobals codes locations captured finalStore ∧ ClosuresPreserved store finalStore
 
-def AlternativesMotive {σ : Type} (functions : List Function) (signatures : List Signature)
+def AlternativesMotive {supported : String → Prop} {σ : Type} {model : StateModel σ} {slots : List EffectSlot} (functions : List Function) (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (sourceType : Ty) (sourceValue : Semantics.Value)
     (alternatives : List Alt) (initial : Semantics.State σ) (control : Semantics.Control)
     (final : Semantics.State σ) : Prop :=
-  (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, RecursiveStatement functions statement) →
-  AlternativesSimulation signatures codes locations captured sourceEnvironment sourceType sourceValue
+  (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, ExecutableStatement supported functions statement) →
+  AlternativesSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment sourceType sourceValue
     alternatives initial control final
 
 private theorem alternatives_components {fuel : Nat} {signatures : List Signature} {scope : Scope}
@@ -83,15 +84,15 @@ private theorem statement_components {fuel : Nat} {signatures : List Signature} 
   exact ⟨targetType, value, arms, typeCompiled, valueCompiled,
     expectType_eq_of_ok typeChecked, armsCompiled, rfl⟩
 
-variable {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+variable {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
   {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
 
 /-- Exhausted alternatives fall through without allocating a binder. -/
 theorem nil {sourceType : Ty} {sourceValue : Semantics.Value} {state : Semantics.State σ} :
-    AlternativesSimulation signatures codes locations captured sourceEnvironment sourceType sourceValue
+    AlternativesSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment sourceType sourceValue
       [] state .fallthrough state := by
   intro typeFuel targetType _ fuel scope result loops expression compiled _ world mapping environment store
-    targetValue _ _ _ _ heap installed
+    targetValue _ _ _ _ _ heap installed
   cases fuel with
   | zero => simp [lowerAlternatives, fail] at compiled
   | succ fuel =>
@@ -106,13 +107,13 @@ through arbitrary calls, loops, return or language failure in its body. -/
 theorem matched {sourceType : Ty} {sourceValue payload : Semantics.Value}
     {alternative : Alt} {rest : List Alt} {initial final : Semantics.State σ} {control : Semantics.Control}
     (selected : Semantics.patternPayload? sourceType alternative.pat.kind sourceValue = some payload)
-    (continued : StatementsSimulation signatures codes locations captured
+    (continued : StatementsSimulation (model := model) (slots := slots) signatures codes locations captured
       ((alternative.binder, initial.heap.length) :: sourceEnvironment) alternative.body
       (Semantics.allocate initial payload).2 control final) :
-    AlternativesSimulation signatures codes locations captured sourceEnvironment sourceType sourceValue
+    AlternativesSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment sourceType sourceValue
       (alternative :: rest) initial control final := by
   intro typeFuel targetType typeCompiled fuel scope result loops expression compiled covered world mapping environment store
-    targetValue related found locals globals heap installed
+    targetValue related found locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerAlternatives, fail] at compiled
   | succ fuel =>
@@ -136,7 +137,9 @@ theorem matched {sourceType : Ty} {sourceValue payload : Semantics.Value}
             alternative.binder payloadType (.cellRef (Core.OptionalCell.cellType payloadType) store.length) allowed
           obtain ⟨extension, target, finalStore, controlRelated, bodyEvaluated, finalHeap, finalInstalled, frame⟩ :=
             continued bodyCompiled
-              ((covered.temporary payloadType).addLocal alternative.binder payloadType initial.heap.length) bodyLocals bodyGlobals allocated (installed.append _)
+              ((covered.temporary payloadType).addLocal alternative.binder payloadType initial.heap.length) bodyLocals bodyGlobals
+              ((runtime.temporary payloadType targetPayload).addLocal alternative.binder payloadType
+                (.cellRef (Core.OptionalCell.cellType payloadType) store.length) allowed) allocated (installed.append _)
           refine ⟨[(payloadType, store.length)] ++ extension, target, finalStore, controlRelated,
             ?_, ?_, finalInstalled, ClosuresPreserved.trans (ClosuresPreserved.append _ _) frame⟩
           · exact .caseRight patternEvaluated
@@ -148,12 +151,12 @@ the same scrutinee and lexical environment for the remaining alternatives. -/
 theorem next {sourceType : Ty} {sourceValue : Semantics.Value}
     {alternative : Alt} {rest : List Alt} {initial final : Semantics.State σ} {control : Semantics.Control}
     (rejected : Semantics.patternPayload? sourceType alternative.pat.kind sourceValue = none)
-    (continued : AlternativesSimulation signatures codes locations captured sourceEnvironment sourceType sourceValue
+    (continued : AlternativesSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment sourceType sourceValue
       rest initial control final) :
-    AlternativesSimulation signatures codes locations captured sourceEnvironment sourceType sourceValue
+    AlternativesSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment sourceType sourceValue
       (alternative :: rest) initial control final := by
   intro typeFuel targetType typeCompiled fuel scope result loops expression compiled covered world mapping environment store
-    targetValue related found locals globals heap installed
+    targetValue related found locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerAlternatives, fail] at compiled
   | succ fuel =>
@@ -169,7 +172,7 @@ theorem next {sourceType : Ty} {sourceValue : Semantics.Value}
             simpa [Nat.add_comm] using found
           obtain ⟨extension, target, finalStore, controlRelated, nextEvaluated, finalHeap, finalInstalled, frame⟩ :=
             continued typeCompiled nextCompiled covered related shiftedFound
-              (locals.prepend [.unit]) (globals.prepend [.unit]) heap installed
+              (locals.prepend [.unit]) (globals.prepend [.unit]) (runtime.prepend [.unit]) heap installed
           refine ⟨extension, target, finalStore, controlRelated, ?_, finalHeap, finalInstalled, frame⟩
           apply Core.Evaluates.caseLeft patternEvaluated
           have renamed : (next.weakenAt 0).rename (Core.Renaming.lift mapping) =
@@ -186,11 +189,11 @@ independent alternative derivation in its exact temporary scope. -/
 theorem statement {statement : Stmt} {sourceType : Ty} {scrutinee : Expr} {alternatives : List Alt}
     {initial middle final : Semantics.State σ} {sourceValue : Semantics.Value} {control : Semantics.Control}
     (kind : statement.kind = .matchStmt sourceType scrutinee alternatives)
-    (tested : ExprSimulation signatures codes locations captured sourceEnvironment scrutinee initial (.value sourceValue) middle)
-    (selected : AlternativesSimulation signatures codes locations captured sourceEnvironment sourceType sourceValue
+    (tested : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment scrutinee initial (.value sourceValue) middle)
+    (selected : AlternativesSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment sourceType sourceValue
       alternatives middle control final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial control final := by
-  intro fuel scope result loops expression compiled covered world mapping environment store locals globals heap installed
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial control final := by
+  intro fuel scope result loops expression compiled covered world mapping environment store locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -199,11 +202,11 @@ theorem statement {statement : Stmt} {sourceType : Ty} {scrutinee : Expr} {alter
       obtain ⟨targetType, value, arms, typeCompiled, valueCompiled, same, armsCompiled, rfl⟩ :=
         statement_components compiled
       obtain ⟨firstExtension, targetValue, middleStore, related, evaluated, middleHeap, middleInstalled, firstFrame⟩ :=
-        tested.value rfl valueCompiled covered locals globals heap installed
+        tested.value rfl valueCompiled covered locals globals runtime heap installed
       obtain ⟨extension, target, finalStore, controlRelated, armsEvaluated, finalHeap, finalInstalled, frame⟩ :=
         selected typeCompiled armsCompiled (covered.temporary targetType) (same ▸ related) rfl
           ((locals.extendWorld firstExtension).temporary targetType targetValue)
-          (globals.temporary targetType targetValue) middleHeap middleInstalled
+          (globals.temporary targetType targetValue) (runtime.temporary targetType targetValue) middleHeap middleInstalled
       exact ⟨firstExtension ++ extension, target, finalStore, controlRelated,
         Core.LanguageResult.bind_success _ evaluated armsEvaluated,
         by simpa only [List.append_assoc] using finalHeap, finalInstalled, firstFrame.trans frame⟩
@@ -212,9 +215,9 @@ theorem statement {statement : Stmt} {sourceType : Ty} {scrutinee : Expr} {alter
 theorem fault {statement : Stmt} {sourceType : Ty} {scrutinee : Expr} {alternatives : List Alt}
     {initial final : Semantics.State σ} {reason : Semantics.Fault}
     (kind : statement.kind = .matchStmt sourceType scrutinee alternatives)
-    (tested : ExprSimulation signatures codes locations captured sourceEnvironment scrutinee initial (.fault reason) final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
-  intro fuel scope result loops expression compiled covered world mapping environment store locals globals heap installed
+    (tested : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment scrutinee initial (.fault reason) final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro fuel scope result loops expression compiled covered world mapping environment store locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -222,7 +225,7 @@ theorem fault {statement : Stmt} {sourceType : Ty} {scrutinee : Expr} {alternati
   | succ fuel =>
       obtain ⟨targetType, value, arms, _, valueCompiled, _, _, rfl⟩ := statement_components compiled
       obtain ⟨extension, targetValue, finalStore, related, evaluated, finalHeap, finalInstalled, frame⟩ :=
-        tested valueCompiled covered locals globals heap installed
+        tested valueCompiled covered locals globals runtime heap installed
       cases related with | language reason =>
       exact ⟨extension, _, finalStore, .language reason,
         Core.LanguageResult.bind_failure _ evaluated, finalHeap, finalInstalled, frame⟩

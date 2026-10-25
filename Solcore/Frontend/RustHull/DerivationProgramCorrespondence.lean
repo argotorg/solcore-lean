@@ -11,7 +11,7 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.DerivationProgramCorrespondence
 open Correspondence DerivationCorrespondence ScalarExecution
 
-theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ}
+theorem function_preserves_effects {supported : String → Prop} {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {effects : Semantics.ExternalSemantics σ}
     {fuel : Nat} {functions : List Function} {signatures : List Signature} {scope : Scope}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
     (signaturesCompiled : functions.mapM (signature fuel) = .ok signatures)
@@ -19,29 +19,31 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     (unique : (signatures.map Signature.name).Nodup)
     (covered : ScopeCoverage [] scope)
     (globals : GlobalEnvironmentRel codes locations scope Core.Renaming.id captured)
-    (eligible : RecursiveProgram functions)
+    (runtime : EffectEnvironmentRel slots scope Core.Renaming.id captured)
+    (external : ExternalCallPreservation supported model slots effects)
+    (eligible : ExecutableProgram supported functions)
     {function : Function} {sources : List Semantics.Value} {initial final : Semantics.State σ}
     {result : Semantics.Result Semantics.Value}
     (evaluated : Semantics.EvalFunction functions effects function sources initial result final) :
-    FunctionMotive functions signatures codes locations captured function sources initial result final := by
+    FunctionMotive (model := model) functions signatures codes locations captured function sources initial result final := by
   refine Semantics.EvalFunction.rec
     (motive_1 := fun env expression initial result final _ =>
-      ExprMotive functions signatures codes locations captured env expression initial result final)
+      ExprMotive (supported := supported) (model := model) (slots := slots) functions signatures codes locations captured env expression initial result final)
     (motive_2 := fun env expressions initial result final _ =>
-      ExprsMotive functions signatures codes locations captured env expressions initial result final)
+      ExprsMotive (supported := supported) (model := model) (slots := slots) functions signatures codes locations captured env expressions initial result final)
     (motive_3 := fun name _ sources initial result final _ =>
-      CallSimulation functions signatures codes locations captured name sources initial result final)
+      CallSimulation (model := model) functions signatures codes locations captured name sources initial result final)
     (motive_4 := fun function sources initial result final _ =>
-      FunctionMotive functions signatures codes locations captured function sources initial result final)
+      FunctionMotive (model := model) functions signatures codes locations captured function sources initial result final)
     (motive_5 := fun env statement initial control final _ =>
-      StmtMotive functions signatures codes locations captured env statement initial control final)
+      StmtMotive (supported := supported) (model := model) (slots := slots) functions signatures codes locations captured env statement initial control final)
     (motive_6 := fun env statements initial control final _ =>
-      StatementsMotive functions signatures codes locations captured env statements initial control final)
+      StatementsMotive (supported := supported) (model := model) (slots := slots) functions signatures codes locations captured env statements initial control final)
     (motive_7 := fun env test post body initial control final _ =>
-      LoopDerivationCorrespondence.LoopMotive functions signatures codes locations captured
+      LoopDerivationCorrespondence.LoopMotive (supported := supported) (model := model) (slots := slots) functions signatures codes locations captured
         env test post body initial control final)
     (motive_8 := fun env target value alternatives initial control final _ =>
-      MatchDerivationCorrespondence.AlternativesMotive functions signatures codes locations captured
+      MatchDerivationCorrespondence.AlternativesMotive (supported := supported) (model := model) (slots := slots) functions signatures codes locations captured
         env target value alternatives initial control final)
     ?word
     ?bool
@@ -158,10 +160,10 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env expression initial middle final name arguments values result kind argumentsEvaluated called argumentsIH callIH accepted
     cases expression with | mk type expressionKind span =>
     cases kind
-    have argumentsAccepted : ∀ argument ∈ arguments, RecursiveExpression functions argument := by
+    have argumentsAccepted : ∀ argument ∈ arguments, ExecutableExpression supported functions argument := by
       cases accepted <;> assumption
     intro executionFuel executionScope lowered
-    exact DerivationCallCorrespondence.call signaturesCompiled codesCompiled accepted called
+    exact DerivationCallCorrespondence.call signaturesCompiled codesCompiled accepted external called
       (argumentsIH argumentsAccepted) callIH
   case ifTrue =>
     intro env expression initial middle final target condition yes no value result kind tested truth selected conditionIH branchIH accepted
@@ -199,7 +201,7 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro name code index selected signatureSelected codeFound
     obtain ⟨signatureCompiled, functionCompiled⟩ :=
       compiledFunction_at signaturesCompiled codesCompiled unique selected signatureSelected codeFound
-    exact DerivationFunctionCorrespondence.function_simulation signatureCompiled functionCompiled covered globals bound
+    exact DerivationFunctionCorrespondence.function_simulation signatureCompiled functionCompiled covered globals runtime bound
       (continued (eligible function (List.mem_of_find?_eq_some selected)))
   case pairFault =>
     intro env expression initial final left right reason kind first firstIH accepted
@@ -211,7 +213,7 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env expression initial final name arguments reason kind evaluated argumentsIH accepted
     cases expression with | mk type expressionKind span =>
     cases kind
-    have argumentsAccepted : ∀ argument ∈ arguments, RecursiveExpression functions argument := by
+    have argumentsAccepted : ∀ argument ∈ arguments, ExecutableExpression supported functions argument := by
       cases accepted <;> assumption
     intro executionFuel executionScope lowered
     exact DerivationCallCorrespondence.call_fault signaturesCompiled codesCompiled accepted
@@ -247,33 +249,33 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env statement lhs rhs initial final reason kind evaluated rhsIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
+    simp only [ExecutableStatement] at accepted
     exact DerivationStatementCorrespondence.assign_fault rfl (rhsIH accepted)
   case assignInvalid =>
     intro env statement lhs rhs initial middle value reason kind evaluated invalid rhsIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
+    simp only [ExecutableStatement] at accepted
     exact DerivationStatementCorrespondence.assign_invalid rfl (rhsIH accepted) invalid
   case expressionFault =>
     intro env statement value initial final reason kind evaluated valueIH accepted
     cases statement with | mk statementKind span =>
     cases kind
     exact DerivationStatementCorrespondence.expression_fault rfl
-      (valueIH (by simpa only [RecursiveStatement] using accepted))
+      (valueIH (by simpa only [ExecutableStatement] using accepted))
   case returnFault =>
     intro env statement value initial final reason kind evaluated valueIH accepted
     cases statement with | mk statementKind span =>
     cases kind
     exact DerivationStatementCorrespondence.return_fault rfl
-      (valueIH (by simpa only [RecursiveStatement] using accepted))
+      (valueIH (by simpa only [ExecutableStatement] using accepted))
   case matchFault =>
     intro env statement target expression alternatives initial final reason kind evaluated exprIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    have parts : RecursiveExpression functions expression ∧
-        (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, RecursiveStatement functions statement) := by
-      simpa only [RecursiveStatement] using accepted
+    have parts : ExecutableExpression supported functions expression ∧
+        (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, ExecutableStatement supported functions statement) := by
+      simpa only [ExecutableStatement] using accepted
     intro executionFuel executionScope resultType loops coreExpression
     exact MatchDerivationCorrespondence.fault (statement := ⟨.matchStmt target expression alternatives, span⟩) rfl (exprIH parts.1)
   case nil_2 =>
@@ -292,36 +294,36 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
       kind evaluated selected exprIH altIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    have parts : RecursiveExpression functions expression ∧
-        (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, RecursiveStatement functions statement) := by
-      simpa only [RecursiveStatement] using accepted
+    have parts : ExecutableExpression supported functions expression ∧
+        (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, ExecutableStatement supported functions statement) := by
+      simpa only [ExecutableStatement] using accepted
     intro executionFuel executionScope resultType loops coreExpression
     exact MatchDerivationCorrespondence.statement (statement := ⟨.matchStmt target expression alternatives, span⟩) rfl (exprIH parts.1) (altIH parts.2)
   case assembly =>
     intro env statement body initial final control kind executed accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
+    simp only [ExecutableStatement] at accepted
   case revert =>
     intro env statement message state external control kind executed accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
+    simp only [ExecutableStatement] at accepted
   case block =>
     intro env statement body initial final control kind evaluated bodyIH accepted
     cases statement with | mk statementKind span =>
     cases kind
     exact DerivationStatementCorrespondence.block rfl
-      (bodyIH (by simpa only [RecursiveStatement] using accepted))
+      (bodyIH (by simpa only [ExecutableStatement] using accepted))
   case forInit =>
     intro env statement init test post body initial final control kind nonempty evaluated initIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    have parts : (∀ statement ∈ init, RecursiveStatement functions statement) ∧
-        RecursiveExpression functions test ∧
-        (∀ statement ∈ post, RecursiveStatement functions statement) ∧
-        (∀ statement ∈ body, RecursiveStatement functions statement) := by
-      simpa only [RecursiveStatement] using accepted
+    have parts : (∀ statement ∈ init, ExecutableStatement supported functions statement) ∧
+        ExecutableExpression supported functions test ∧
+        (∀ statement ∈ post, ExecutableStatement supported functions statement) ∧
+        (∀ statement ∈ body, ExecutableStatement supported functions statement) := by
+      simpa only [ExecutableStatement] using accepted
     apply LoopDerivationCorrespondence.initialized_statement rfl nonempty
     apply initIH
     intro member selected
@@ -329,16 +331,16 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     · exact parts.1 member selected
     · simp only [List.mem_singleton] at selected
       subst member
-      simpa only [RecursiveStatement, List.not_mem_nil, false_implies, implies_true, true_and] using parts.2
+      simpa only [ExecutableStatement, List.not_mem_nil, false_implies, implies_true, true_and] using parts.2
   case forLoop =>
     intro env statement test post body initial final control kind evaluated loopIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    have parts : (∀ statement ∈ ([] : List Stmt), RecursiveStatement functions statement) ∧
-        RecursiveExpression functions test ∧
-        (∀ statement ∈ post, RecursiveStatement functions statement) ∧
-        (∀ statement ∈ body, RecursiveStatement functions statement) := by
-      simpa only [RecursiveStatement] using accepted
+    have parts : (∀ statement ∈ ([] : List Stmt), ExecutableStatement supported functions statement) ∧
+        ExecutableExpression supported functions test ∧
+        (∀ statement ∈ post, ExecutableStatement supported functions statement) ∧
+        (∀ statement ∈ body, ExecutableStatement supported functions statement) := by
+      simpa only [ExecutableStatement] using accepted
     intro executionFuel executionScope resultType loops coreExpression
     exact LoopDerivationCorrespondence.statement (statement := ⟨.forLoop [] test post body, span⟩) rfl (loopIH parts.2.1 parts.2.2.1 parts.2.2.2)
   case breaking =>
@@ -388,22 +390,22 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env statement lhs rhs initial middle final value kind evaluated assigned rhsIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
+    simp only [ExecutableStatement] at accepted
     exact DerivationStatementCorrespondence.assign rfl (rhsIH accepted) assigned
   case expression =>
     intro env statement value initial final sourceValue kind evaluated valueIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    have valueAccepted : RecursiveExpression functions value := by
-      simpa only [RecursiveStatement] using accepted
+    have valueAccepted : ExecutableExpression supported functions value := by
+      simpa only [ExecutableStatement] using accepted
     intro executionFuel executionScope resultType loops coreExpression
     exact DerivationStatementCorrespondence.expression_statement (statement := ⟨.expression value, span⟩) rfl (valueIH valueAccepted)
   case returned =>
     intro env statement value initial final sourceValue kind evaluated valueIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    have valueAccepted : RecursiveExpression functions value := by
-      simpa only [RecursiveStatement] using accepted
+    have valueAccepted : ExecutableExpression supported functions value := by
+      simpa only [ExecutableStatement] using accepted
     intro executionFuel executionScope resultType loops coreExpression
     exact DerivationStatementCorrespondence.returned (statement := ⟨.returnStmt value, span⟩) rfl (valueIH valueAccepted)
   case comment =>
@@ -425,5 +427,22 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env statement rest initial final control notDeclaration head stopped headIH accepted
     exact DerivationStatementCorrespondence.stop notDeclaration
       (headIH (accepted statement (List.mem_cons_self ..))) stopped
+
+theorem function_preserves {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {effects : Semantics.ExternalSemantics σ}
+    {fuel : Nat} {functions : List Function} {signatures : List Signature} {scope : Scope}
+    {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
+    (signaturesCompiled : functions.mapM (signature fuel) = .ok signatures)
+    (codesCompiled : CompiledGlobals fuel signatures scope (functions.zip signatures).reverse codes)
+    (unique : (signatures.map Signature.name).Nodup)
+    (covered : ScopeCoverage [] scope)
+    (globals : GlobalEnvironmentRel codes locations scope Core.Renaming.id captured)
+    (runtime : EffectEnvironmentRel slots scope Core.Renaming.id captured)
+    (eligible : RecursiveProgram functions)
+    {function : Function} {sources : List Semantics.Value} {initial final : Semantics.State σ}
+    {result : Semantics.Result Semantics.Value}
+    (evaluated : Semantics.EvalFunction functions effects function sources initial result final) :
+    FunctionMotive (model := model) functions signatures codes locations captured function sources initial result final :=
+  function_preserves_effects signaturesCompiled codesCompiled unique covered globals runtime
+    (ExternalCallPreservation.empty model slots effects) eligible evaluated
 
 end Solcore.Frontend.RustHull.DerivationProgramCorrespondence

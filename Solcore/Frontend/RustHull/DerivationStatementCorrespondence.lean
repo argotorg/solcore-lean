@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.DerivationStatementCorrespondence
 open Correspondence StatementCorrespondence DerivationCorrespondence
 
-variable {σ : Type} {signatures : List Signature}
+variable {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature}
   {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
   {sourceEnvironment : Semantics.Environment}
 
@@ -18,11 +18,11 @@ read after the RHS finishes, and only the selected component is replaced. -/
 theorem assign {statement : Stmt} {lhs rhs : Expr}
     {initial middle final : Semantics.State σ} {sourceValue : Semantics.Value}
     (kind : statement.kind = .assign lhs rhs)
-    (right : ExprSimulation signatures codes locations captured sourceEnvironment rhs initial (.value sourceValue) middle)
+    (right : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment rhs initial (.value sourceValue) middle)
     (assigned : Semantics.assignResult sourceEnvironment middle lhs sourceValue = .value final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial .fallthrough final := by
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial .fallthrough final := by
   intro fuel scope result loops expression compiled covered world mapping environment store
-    environmentRelated globalsRelated heapRelated installed
+    environmentRelated globalsRelated runtime heapRelated installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -31,7 +31,7 @@ theorem assign {statement : Stmt} {lhs rhs : Expr}
       obtain ⟨lowered, name, path, binding, index, updated, rightCompiled, placed,
           looked, _, selected, updatedCompiled, rfl⟩ := assignment_components compiled
       obtain ⟨extension, value, middleStore, valueRelated, evaluated, middleHeap, middleInstalled, firstFrame⟩ :=
-        right.value rfl rightCompiled covered environmentRelated globalsRelated heapRelated installed
+        right.value rfl rightCompiled covered environmentRelated globalsRelated runtime heapRelated installed
       obtain ⟨sourceLocation, sourceOld, sourceUpdated, found, read, updateSource, rfl⟩ :=
         assignment_source placed assigned
       obtain ⟨location, entry, _, targetFound⟩ :=
@@ -50,15 +50,15 @@ theorem assign {statement : Stmt} {lhs rhs : Expr}
           some (middleStore.set location (.inRight .unit newValue)) :=
         Core.Store.write?_eq_some_iff.mpr ⟨middleHeap.location_bound entry, rfl⟩
       exact ⟨extension, _, _, .fallthrough, assignment_core evaluated targetFound targetRead updatedEvaluated written,
-        middleHeap.write entry newRelated written, middleInstalled.write middleHeap entry written,
-        firstFrame.trans (ClosuresPreserved.write middleHeap entry written)⟩
+        middleHeap.write entry newRelated written, middleInstalled.write middleHeap.toHeapRel entry written,
+        firstFrame.trans (ClosuresPreserved.write middleHeap.toHeapRel entry written)⟩
 
 theorem returned {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
     {sourceValue : Semantics.Value} (kind : statement.kind = .returnStmt value)
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment value initial (.value sourceValue) final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.returned sourceValue) final := by
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment value initial (.value sourceValue) final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial (.returned sourceValue) final := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    environmentRelated globalsRelated heapRelated installed
+    environmentRelated globalsRelated runtime heapRelated installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -71,17 +71,17 @@ theorem returned {statement : Stmt} {value : Expr} {initial final : Semantics.St
       cases checked
       have sameType := expectType_eq_of_ok matched
       obtain ⟨extension, targetValue, finalStore, valueRelated, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        preserves.value rfl valueCompiled covered environmentRelated globalsRelated heapRelated installed
+        preserves.value rfl valueCompiled covered environmentRelated globalsRelated runtime heapRelated installed
       exact ⟨extension, Core.LocalLoop.returnedValue targetValue, finalStore,
         .returned (sameType ▸ valueRelated), return_success compiled valueCompiled evaluated,
         finalHeap, finalInstalled, lastFrame⟩
 
 theorem expression_statement {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
     {sourceValue : Semantics.Value} (kind : statement.kind = .expression value)
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment value initial (.value sourceValue) final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial .fallthrough final := by
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment value initial (.value sourceValue) final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial .fallthrough final := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    environmentRelated globalsRelated heapRelated installed
+    environmentRelated globalsRelated runtime heapRelated installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -91,7 +91,7 @@ theorem expression_statement {statement : Stmt} {value : Expr} {initial final : 
       obtain ⟨lowered, valueCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨extension, targetValue, finalStore, _, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        preserves.value rfl valueCompiled covered environmentRelated globalsRelated heapRelated installed
+        preserves.value rfl valueCompiled covered environmentRelated globalsRelated runtime heapRelated installed
       refine ⟨extension, _, finalStore, .fallthrough, ?_, finalHeap, finalInstalled, lastFrame⟩
       apply Core.LanguageResult.bind_success _ evaluated
       simpa only [← Core.Expr.rename_insertion, rename_fallthrough] using
@@ -101,9 +101,9 @@ theorem expression_statement {statement : Stmt} {value : Expr} {initial final : 
 theorem assign_fault {statement : Stmt} {lhs rhs : Expr}
     {initial final : Semantics.State σ} {reason : Semantics.Fault}
     (kind : statement.kind = .assign lhs rhs)
-    (right : ExprSimulation signatures codes locations captured sourceEnvironment rhs initial (.fault reason) final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
-  intro fuel scope result loops expression compiled covered world mapping environment store locals globals heap installed
+    (right : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment rhs initial (.fault reason) final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro fuel scope result loops expression compiled covered world mapping environment store locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -112,7 +112,7 @@ theorem assign_fault {statement : Stmt} {lhs rhs : Expr}
       obtain ⟨lowered, name, path, binding, index, updated, rightCompiled,
           _, _, _, _, _, rfl⟩ := assignment_components compiled
       obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
-        right rightCompiled covered locals globals heap installed
+        right rightCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           exact ⟨extension, _, finalStore, .language reason,
@@ -120,9 +120,9 @@ theorem assign_fault {statement : Stmt} {lhs rhs : Expr}
 
 theorem return_fault {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
     {reason : Semantics.Fault} (kind : statement.kind = .returnStmt value)
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment value initial (.fault reason) final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
-  intro fuel scope type loops expression compiled covered world mapping environment store locals globals heap installed
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment value initial (.fault reason) final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro fuel scope type loops expression compiled covered world mapping environment store locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -135,7 +135,7 @@ theorem return_fault {statement : Stmt} {value : Expr} {initial final : Semantic
       cases returned
       have sameType := expectType_eq_of_ok matched
       obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
-        preserves valueCompiled covered locals globals heap installed
+        preserves valueCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           exact ⟨extension, _, finalStore, .language reason,
@@ -143,9 +143,9 @@ theorem return_fault {statement : Stmt} {value : Expr} {initial final : Semantic
 
 theorem expression_fault {statement : Stmt} {value : Expr} {initial final : Semantics.State σ}
     {reason : Semantics.Fault} (kind : statement.kind = .expression value)
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment value initial (.fault reason) final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
-  intro fuel scope type loops expression compiled covered world mapping environment store locals globals heap installed
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment value initial (.fault reason) final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial (.fault reason) final := by
+  intro fuel scope type loops expression compiled covered world mapping environment store locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -155,7 +155,7 @@ theorem expression_fault {statement : Stmt} {value : Expr} {initial final : Sema
       obtain ⟨lowered, valueCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨extension, target, finalStore, related, executed, finalHeap, finalInstalled, frame⟩ :=
-        preserves valueCompiled covered locals globals heap installed
+        preserves valueCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           exact ⟨extension, _, finalStore, .language reason,
@@ -166,10 +166,10 @@ therefore has a source update, excluding every malformed assignment outcome. -/
 theorem assign_invalid {statement : Stmt} {lhs rhs : Expr}
     {initial middle : Semantics.State σ} {sourceValue : Semantics.Value} {reason : Semantics.Fault}
     (kind : statement.kind = .assign lhs rhs)
-    (right : ExprSimulation signatures codes locations captured sourceEnvironment rhs initial (.value sourceValue) middle)
+    (right : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment rhs initial (.value sourceValue) middle)
     (invalid : Semantics.assignResult sourceEnvironment middle lhs sourceValue = .fault reason) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial (.fault reason) middle := by
-  intro fuel scope result loops expression compiled covered world mapping environment store locals globals heap installed
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial (.fault reason) middle := by
+  intro fuel scope result loops expression compiled covered world mapping environment store locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -177,9 +177,9 @@ theorem assign_invalid {statement : Stmt} {lhs rhs : Expr}
   | succ fuel =>
       obtain ⟨lowered, name, path, binding, index, updated, rightCompiled, _⟩ := assignment_components compiled
       obtain ⟨extension, value, middleStore, _, _, middleHeap, _, _⟩ :=
-        right.value rfl rightCompiled covered locals globals heap installed
+        right.value rfl rightCompiled covered locals globals runtime heap installed
       obtain ⟨finalState, assigned⟩ := assignment_valid (value := sourceValue) compiled covered
-        (locals.extendWorld extension) middleHeap
+        (locals.extendWorld extension) middleHeap.toHeapRel
       rw [invalid] at assigned
       cases assigned
 
@@ -188,7 +188,7 @@ source declaration cannot occur in a compiled statement list. -/
 theorem declare_invalid {statement : Stmt} {rest : List Stmt} {name : String} {type : Ty}
     {state : Semantics.State σ} (kind : statement.kind = .letDecl name type)
     (invalid : Semantics.zero? type = none) :
-    StatementsSimulation signatures codes locations captured sourceEnvironment (statement :: rest)
+    StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (statement :: rest)
       state (.fault .unsupportedType) state := by
   intro fuel scope result loops expression compiled
   cases statement with | mk statementKind span =>
@@ -203,7 +203,7 @@ theorem declare_invalid {statement : Stmt} {rest : List Stmt} {name : String} {t
 theorem declared_invalid {statement : Stmt} {name : String} {type : Ty}
     {state : Semantics.State σ} (kind : statement.kind = .letDecl name type)
     (invalid : Semantics.zero? type = none) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement state (.fault .unsupportedType) state := by
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement state (.fault .unsupportedType) state := by
   intro fuel scope result loops expression compiled
   cases statement with | mk statementKind span =>
   cases kind
@@ -213,9 +213,9 @@ theorem declared_invalid {statement : Stmt} {name : String} {type : Ty}
 
 theorem comment {statement : Stmt} {text : String} {state : Semantics.State σ}
     (kind : statement.kind = .comment text) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement state .fallthrough state := by
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement state .fallthrough state := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    _ _ heapRelated installed
+    _ _ _ heapRelated installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -227,20 +227,20 @@ theorem comment {statement : Stmt} {text : String} {state : Semantics.State σ}
         by simpa only [List.append_nil] using heapRelated, installed, ClosuresPreserved.refl store⟩
 
 theorem nil {state : Semantics.State σ} :
-    StatementsSimulation signatures codes locations captured sourceEnvironment [] state .fallthrough state := by
+    StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment [] state .fallthrough state := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    _ _ heapRelated installed
+    _ _ _ heapRelated installed
   exact ⟨[], _, store, .fallthrough, empty compiled mapping environment store,
     by simpa only [List.append_nil] using heapRelated, installed, ClosuresPreserved.refl store⟩
 
 theorem declare {statement : Stmt} {rest : List Stmt} {name : String} {sourceType : Ty}
     {sourceValue : Semantics.Value} {initial final : Semantics.State σ} {control : Semantics.Control}
     (kind : statement.kind = .letDecl name sourceType) (zero : Semantics.zero? sourceType = some sourceValue)
-    (tail : StatementsSimulation signatures codes locations captured
+    (tail : StatementsSimulation (model := model) (slots := slots) signatures codes locations captured
       ((name, initial.heap.length) :: sourceEnvironment) rest (Semantics.allocate initial sourceValue).2 control final) :
-    StatementsSimulation signatures codes locations captured sourceEnvironment (statement :: rest) initial control final := by
+    StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (statement :: rest) initial control final := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    environmentRelated globalsRelated heapRelated installed
+    environmentRelated globalsRelated runtime heapRelated installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -263,7 +263,8 @@ theorem declare {statement : Stmt} {rest : List Stmt} {name : String} {sourceTyp
       have globalsExtended := globalsRelated.addLocal name (coreType shape)
         (.cellRef (Core.OptionalCell.cellType (coreType shape)) store.length) allowed
       obtain ⟨extension, targetValue, finalStore, related, bodyEvaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        tail bodyCompiled (covered.addLocal name (coreType shape) initial.heap.length) environmentExtended globalsExtended allocated (installed.append _)
+        tail bodyCompiled (covered.addLocal name (coreType shape) initial.heap.length) environmentExtended globalsExtended
+          (runtime.addLocal name (coreType shape) (.cellRef (Core.OptionalCell.cellType (coreType shape)) store.length) allowed) allocated (installed.append _)
       refine ⟨[(coreType shape, store.length)] ++ extension, targetValue, finalStore,
         related, ?_, ?_, finalInstalled, ClosuresPreserved.trans (ClosuresPreserved.append _ _) lastFrame⟩
       · have initialized := Core.OptionalCell.allocateInitialized_evaluates (type := coreType shape) evaluated
@@ -275,17 +276,17 @@ theorem declare {statement : Stmt} {rest : List Stmt} {name : String} {sourceTyp
 theorem next {statement : Stmt} {rest : List Stmt} {initial middle final : Semantics.State σ}
     {control : Semantics.Control}
     (notDeclaration : ∀ name type, statement.kind ≠ .letDecl name type)
-    (head : StmtSimulation signatures codes locations captured sourceEnvironment statement initial .fallthrough middle)
-    (tail : StatementsSimulation signatures codes locations captured sourceEnvironment rest middle control final) :
-    StatementsSimulation signatures codes locations captured sourceEnvironment (statement :: rest) initial control final := by
+    (head : StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial .fallthrough middle)
+    (tail : StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment rest middle control final) :
+    StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (statement :: rest) initial control final := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    environmentRelated globalsRelated heapRelated installed
+    environmentRelated globalsRelated runtime heapRelated installed
   cases fuel with
   | zero => simp [lowerStatements, fail] at compiled
   | succ fuel =>
       obtain ⟨first, next, firstCompiled, nextCompiled, rfl⟩ := sequence_components notDeclaration compiled
       obtain ⟨firstExtension, firstValue, middleStore, firstRelated, firstEvaluated, middleHeap, middleInstalled, firstFrame⟩ :=
-        head firstCompiled covered environmentRelated globalsRelated heapRelated installed
+        head firstCompiled covered environmentRelated globalsRelated runtime heapRelated installed
       cases firstRelated
       have nextEnvironment : EnvironmentRel (world ++ firstExtension) sourceEnvironment scope
           (fun index => mapping index + 3)
@@ -301,7 +302,10 @@ theorem next {statement : Stmt} {rest : List Stmt} {initial middle final : Seman
           List.nil_append] using globalsRelated.prepend
             [.unit, .inLeft type .unit, .inLeft Core.LocalLoop.transferType (.inLeft type .unit)]
       obtain ⟨extension, targetValue, finalStore, related, nextEvaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        tail nextCompiled covered nextEnvironment nextGlobals middleHeap middleInstalled
+        tail nextCompiled covered nextEnvironment nextGlobals
+          (by simpa only [Nat.add_comm, List.length_cons, List.length_nil, Nat.zero_add, List.cons_append, List.nil_append]
+            using runtime.prepend [.unit, .inLeft type .unit,
+              .inLeft Core.LocalLoop.transferType (.inLeft type .unit)]) middleHeap middleInstalled
       exact ⟨firstExtension ++ extension, targetValue, finalStore, related,
         sequence_fallthrough firstEvaluated nextEvaluated,
         by simpa only [List.append_assoc] using finalHeap, finalInstalled, firstFrame.trans lastFrame⟩
@@ -309,17 +313,17 @@ theorem next {statement : Stmt} {rest : List Stmt} {initial middle final : Seman
 theorem stop {statement : Stmt} {rest : List Stmt} {initial final : Semantics.State σ}
     {control : Semantics.Control}
     (notDeclaration : ∀ name type, statement.kind ≠ .letDecl name type)
-    (head : StmtSimulation signatures codes locations captured sourceEnvironment statement initial control final)
+    (head : StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial control final)
     (stopped : control ≠ .fallthrough) :
-    StatementsSimulation signatures codes locations captured sourceEnvironment (statement :: rest) initial control final := by
+    StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (statement :: rest) initial control final := by
   intro fuel scope type loops expression compiled covered world mapping environment store
-    environmentRelated globalsRelated heapRelated installed
+    environmentRelated globalsRelated runtime heapRelated installed
   cases fuel with
   | zero => simp [lowerStatements, fail] at compiled
   | succ fuel =>
       obtain ⟨first, next, firstCompiled, _, rfl⟩ := sequence_components notDeclaration compiled
       obtain ⟨extension, targetValue, finalStore, related, evaluated, finalHeap, finalInstalled, lastFrame⟩ :=
-        head firstCompiled covered environmentRelated globalsRelated heapRelated installed
+        head firstCompiled covered environmentRelated globalsRelated runtime heapRelated installed
       refine ⟨extension, targetValue, finalStore, related, ?_, finalHeap, finalInstalled, lastFrame⟩
       rw [rename_sequence]
       cases related with
@@ -334,23 +338,23 @@ statement-list compiler. The new local remains represented in the final heap. -/
 theorem declared {statement : Stmt} {name : String} {type : Ty}
     {value : Semantics.Value} (kind : statement.kind = .letDecl name type)
     (zero : Semantics.zero? type = some value) {initial : Semantics.State σ} :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial
       .fallthrough (Semantics.allocate initial value).2 := by
   intro fuel scope result loops expression compiled covered world mapping environment store
-    locals globals heap installed
+    locals globals runtime heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
   | zero => simp [lowerStatement, fail] at compiled
   | succ fuel =>
       simp only [lowerStatement] at compiled
-      exact declare rfl zero nil compiled covered locals globals heap installed
+      exact declare rfl zero nil compiled covered locals globals runtime heap installed
 
 theorem block {statement : Stmt} {body : List Stmt}
     {initial final : Semantics.State σ} {control : Semantics.Control}
     (kind : statement.kind = .block body)
-    (continued : StatementsSimulation signatures codes locations captured sourceEnvironment body initial control final) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement initial control final := by
+    (continued : StatementsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment body initial control final) :
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement initial control final := by
   intro fuel scope result loops expression compiled
   cases statement with | mk statementKind span =>
   cases kind
@@ -360,8 +364,8 @@ theorem block {statement : Stmt} {body : List Stmt}
 
 theorem breaking {statement : Stmt} {state : Semantics.State σ}
     (kind : statement.kind = .breakStmt) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement state .breaking state := by
-  intro fuel scope result loops expression compiled covered world mapping environment store _ _ heap installed
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement state .breaking state := by
+  intro fuel scope result loops expression compiled covered world mapping environment store _ _ _ heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with
@@ -377,8 +381,8 @@ theorem breaking {statement : Stmt} {state : Semantics.State σ}
 
 theorem continuing {statement : Stmt} {state : Semantics.State σ}
     (kind : statement.kind = .continueStmt) :
-    StmtSimulation signatures codes locations captured sourceEnvironment statement state .continuing state := by
-  intro fuel scope result loops expression compiled covered world mapping environment store _ _ heap installed
+    StmtSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment statement state .continuing state := by
+  intro fuel scope result loops expression compiled covered world mapping environment store _ _ _ heap installed
   cases statement with | mk statementKind span =>
   cases kind
   cases fuel with

@@ -102,7 +102,7 @@ theorem program_eligible : RecursiveProgram program.functions := by
   all_goals
     simp only [missingWord, missingBool, touch, namedFault, argumentFault, pairFault, assignmentFault,
       conditionFault, bodyFault, postFault, combine, namedArgumentsFault, setup, afterFault, missingBody, List.cons_append, List.nil_append,
-      ret, decl, assign, expr, v, loop, RecursiveStatement, List.forall_mem_cons,
+      ret, decl, assign, expr, v, loop, ExecutableStatement, List.forall_mem_cons,
       List.not_mem_nil, false_implies, implies_true, true_and, and_true]
   · exact literal_eligible _
   · exact literal_eligible _

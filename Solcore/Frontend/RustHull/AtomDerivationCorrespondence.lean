@@ -7,42 +7,42 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.DerivationCorrespondence
 open Correspondence
 
-theorem word {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem word {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {env : Semantics.Environment}
     {expression : Expr} {initial : Semantics.State σ} {text : String}
     (kind : expression.kind = .word text) :
-    ExprSimulation signatures codes locations captured env expression initial
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured env expression initial
       (Semantics.literalResult text) initial := by
-  intro fuel scope lowered compiled _ world mapping environment store _ _ heap installed
+  intro fuel scope lowered compiled _ world mapping environment store _ _ _ heap installed
   obtain ⟨target, related, evaluated⟩ := ExpressionCorrespondence.word kind compiled mapping environment store
   exact ⟨[], target, store, related, evaluated, by simpa using heap, installed, ClosuresPreserved.refl store⟩
 
-theorem bool {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem bool {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {env : Semantics.Environment}
     {expression : Expr} {initial : Semantics.State σ} {value : Bool}
     (kind : expression.kind = .bool value) :
-    ExprSimulation signatures codes locations captured env expression initial
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured env expression initial
       (Semantics.booleanResult expression.ty value) initial := by
-  intro fuel scope lowered compiled _ world mapping environment store _ _ heap installed
+  intro fuel scope lowered compiled _ world mapping environment store _ _ _ heap installed
   obtain ⟨target, related, evaluated⟩ := ExpressionCorrespondence.bool kind compiled mapping environment store
   exact ⟨[], target, store, related, evaluated, by simpa using heap, installed, ClosuresPreserved.refl store⟩
 
-theorem unit {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem unit {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {env : Semantics.Environment}
     {expression : Expr} {initial : Semantics.State σ}
     (kind : expression.kind = .unit) :
-    ExprSimulation signatures codes locations captured env expression initial (.value .unit) initial := by
-  intro fuel scope lowered compiled _ world mapping environment store _ _ heap installed
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured env expression initial (.value .unit) initial := by
+  intro fuel scope lowered compiled _ world mapping environment store _ _ _ heap installed
   obtain ⟨related, evaluated⟩ := ExpressionCorrespondence.unit kind compiled mapping environment store
   exact ⟨[], _, store, related, evaluated, by simpa using heap, installed, ClosuresPreserved.refl store⟩
 
-theorem var {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem var {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {env : Semantics.Environment}
     {expression : Expr} {initial : Semantics.State σ} {name : String}
     (kind : expression.kind = .var name) :
-    ExprSimulation signatures codes locations captured env expression initial
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured env expression initial
       (Semantics.readResult env initial name) initial := by
-  intro fuel scope lowered compiled covered world mapping environment store locals _ heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals _ _ heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
@@ -62,7 +62,7 @@ theorem var {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
           obtain ⟨sourceLocation, found⟩ := covered name binding index allowed looked
           obtain ⟨targetLocation, entry, _, _⟩ := locals name sourceLocation binding index found looked
           obtain ⟨source, _, sourceRead, _, _⟩ := heap.cell sourceLocation binding.type targetLocation entry
-          obtain ⟨target, related, evaluated⟩ := ExpressionCorrespondence.read locals heap found sourceRead originalRead
+          obtain ⟨target, related, evaluated⟩ := ExpressionCorrespondence.read locals heap.toHeapRel found sourceRead originalRead
           refine ⟨[], .inRight .word target, store, ?_, evaluated, by simpa using heap,
             installed, ClosuresPreserved.refl store⟩
           simpa only [Semantics.readResult, found, sourceRead] using ResultRel.value related

@@ -2,6 +2,7 @@ import Solcore.Frontend.RustHull.ContextualExpressionCorrespondence
 import Solcore.Frontend.RustHull.CompiledProgramLookup
 import Solcore.Frontend.RustHull.DerivationCorrespondenceSupport
 import Solcore.Frontend.RustHull.BuiltinTotalCorrespondence
+import Solcore.Frontend.RustHull.ExternalCallCorrespondence
 
 /-! Calls and argument lists composed along one independent source execution.
 Only the operand and callee derivations already encountered by that execution
@@ -43,34 +44,34 @@ theorem primitive_call_result {σ : Type} {functions : List Function}
       rw [notPrimitive] at known
       cases known
 
-theorem arguments_nil {σ : Type} (signatures : List Signature) (codes : List GlobalCode)
+theorem arguments_nil {σ : Type} {model : StateModel σ} {slots : List EffectSlot} (signatures : List Signature) (codes : List GlobalCode)
     (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (state : Semantics.State σ) :
-    ExprsSimulation signatures codes locations captured sourceEnvironment [] state (.value []) state := by
-  intro fuel scope arguments compiled coverage world mapping environment store locals globals heap installed
+    ExprsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment [] state (.value []) state := by
+  intro fuel scope arguments compiled coverage world mapping environment store locals globals runtime heap installed
   cases compiled
   exact ⟨[], .inRight .word .unit, store, .value .nil, .inRight .unit,
     by simpa using heap, installed, ClosuresPreserved.refl store⟩
 
-theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semantics.ExternalSemantics σ}
+theorem arguments_cons {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {functions : List Function} {effects : Semantics.ExternalSemantics σ}
     {signatures : List Signature} {codes : List GlobalCode} {locations : Nat → Nat}
     {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {argument : Expr} {rest : List Expr} {initial middle final : Semantics.State σ}
     {source : Semantics.Value} {result : Semantics.Result (List Semantics.Value)}
     (tailEvaluated : Semantics.EvalExprs functions effects sourceEnvironment rest middle result final)
-    (head : ExprSimulation signatures codes locations captured sourceEnvironment argument initial (.value source) middle)
-    (tail : ExprsSimulation signatures codes locations captured sourceEnvironment rest middle result final) :
-    ExprsSimulation signatures codes locations captured sourceEnvironment (argument :: rest)
+    (head : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment argument initial (.value source) middle)
+    (tail : ExprsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment rest middle result final) :
+    ExprsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (argument :: rest)
       initial (result.map (source :: ·)) final := by
   cases result with
   | value sources =>
-      intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
+      intro fuel scope lowered compiled coverage world mapping environment store locals globals runtime heap installed
       simp only [List.mapM_cons] at compiled
       obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
       obtain ⟨tailCode, tailCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨headExtension, target, middleStore, related, headEvaluation, middleHeap, middleInstalled, headFrame⟩ :=
-        head.value rfl headCompiled coverage locals globals heap installed
+        head.value rfl headCompiled coverage locals globals runtime heap installed
       cases rest with
       | nil =>
           cases tailCompiled
@@ -80,7 +81,7 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
       | cons next rest =>
           have tailLocals := (locals.extendWorld headExtension).prepend [target]
           obtain ⟨tailExtension, targets, finalStore, tailRelated, tailEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            tail.value rfl tailCompiled coverage tailLocals (globals.prepend [target]) middleHeap middleInstalled
+            tail.value rfl tailCompiled coverage tailLocals (globals.prepend [target]) (runtime.prepend [target]) middleHeap middleInstalled
           have nonempty : tailCode ≠ [] := by
             intro empty
             subst tailCode
@@ -122,19 +123,19 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
 
 
   | fault reason =>
-      intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
+      intro fuel scope lowered compiled coverage world mapping environment store locals globals runtime heap installed
       simp only [List.mapM_cons] at compiled
       obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
       obtain ⟨tailCode, tailCompiled, returned⟩ := lower_bind_eq_ok.mp compiled
       cases returned
       obtain ⟨headExtension, target, middleStore, related, headEvaluation, middleHeap, middleInstalled, headFrame⟩ :=
-        head.value rfl headCompiled coverage locals globals heap installed
+        head.value rfl headCompiled coverage locals globals runtime heap installed
       cases rest with
       | nil => cases tailEvaluated
       | cons next rest =>
           have tailLocals := (locals.extendWorld headExtension).prepend [target]
           obtain ⟨tailExtension, tailTarget, finalStore, tailRelated, tailEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            tail tailCompiled coverage tailLocals (globals.prepend [target]) middleHeap middleInstalled
+            tail tailCompiled coverage tailLocals (globals.prepend [target]) (runtime.prepend [target]) middleHeap middleInstalled
           cases tailRelated
           rename_i reason
           have nonempty : tailCode ≠ [] := by
@@ -164,21 +165,21 @@ theorem arguments_cons {σ : Type} {functions : List Function} {effects : Semant
               · simpa only [List.append_assoc] using finalHeap
 
 /-- A failed head skips the rest of the actual compiled argument bundle. -/
-theorem arguments_fault {σ : Type} {signatures : List Signature}
+theorem arguments_fault {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
     {sourceEnvironment : Semantics.Environment} {argument : Expr} {rest : List Expr}
     {initial final : Semantics.State σ} {reason : Semantics.Fault}
-    (head : ExprSimulation signatures codes locations captured sourceEnvironment argument
+    (head : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment argument
       initial (.fault reason) final) :
-    ExprsSimulation signatures codes locations captured sourceEnvironment (argument :: rest)
+    ExprsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (argument :: rest)
       initial (.fault reason) final := by
-  intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled coverage world mapping environment store locals globals runtime heap installed
   simp only [List.mapM_cons] at compiled
   obtain ⟨headCode, headCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
   obtain ⟨tailCode, _, returned⟩ := lower_bind_eq_ok.mp compiled
   cases returned
   obtain ⟨extension, target, finalStore, related, evaluation, finalHeap, finalInstalled, frame⟩ :=
-    head headCompiled coverage locals globals heap installed
+    head headCompiled coverage locals globals runtime heap installed
   cases related
   rename_i reason
   cases tailCode with
@@ -192,27 +193,27 @@ theorem arguments_fault {σ : Type} {signatures : List Signature}
       rw [ContextualExpressionCorrespondence.pair_rename]
       exact Core.LocalSequence.pair_left_failure _ _ evaluation
 
-theorem call_function {σ : Type} {functions : List Function} {signatures : List Signature}
+theorem call_function {σ : Type} {model : StateModel σ} {functions : List Function} {signatures : List Signature}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
     {name : String} {function : Function} {sources : List Semantics.Value}
     {initial final : Semantics.State σ} {result : Semantics.Result Semantics.Value}
     (selected : functions.find? (·.name == name) = some function)
     (continued : ∀ {name code index}, functions.find? (·.name == name) = some function →
       signatures.find? (·.name == name) = some code.own → codes[index]? = some code →
-      FunctionSimulation codes locations captured code index sources initial result final) :
-    CallSimulation functions signatures codes locations captured name sources initial result final := by
+      FunctionSimulation (model := model) codes locations captured code index sources initial result final) :
+    CallSimulation (model := model) functions signatures codes locations captured name sources initial result final := by
   intro other code index sourceSelected signatureSelected codeFound
   have same := Option.some.inj (sourceSelected.symm.trans selected)
   subst other
   intro targets values world store heap installed
   exact continued selected signatureSelected codeFound values heap installed
 
-theorem call_not_function {σ : Type} {functions : List Function} {signatures : List Signature}
+theorem call_not_function {σ : Type} {model : StateModel σ} {functions : List Function} {signatures : List Signature}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
     {name : String} {sources : List Semantics.Value} {initial final : Semantics.State σ}
     {result : Semantics.Result Semantics.Value}
     (absent : functions.find? (·.name == name) = none) :
-    CallSimulation functions signatures codes locations captured name sources initial result final := by
+    CallSimulation (model := model) functions signatures codes locations captured name sources initial result final := by
   intro function code index selected
   rw [absent] at selected
   cases selected
@@ -220,7 +221,7 @@ theorem call_not_function {σ : Type} {functions : List Function} {signatures : 
 /-- A particular call derivation uses only the argument-list IH and its
 selected callee IH. Builtin computation uses the actual compiler branch and
 does not assume any callee simulation. -/
-theorem call {σ : Type} {functions : List Function} {effects : Semantics.ExternalSemantics σ}
+theorem call {supported : String → Prop} {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {functions : List Function} {effects : Semantics.ExternalSemantics σ}
     {compilationFuel : Nat} {signatures : List Signature} {programScope : Scope}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
     (signaturesCompiled : functions.mapM (signature compilationFuel) = .ok signatures)
@@ -228,14 +229,15 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
     {sourceEnvironment : Semantics.Environment} {type : Ty} {name : String} {arguments : List Expr}
     {span : Option Span} {sources : List Semantics.Value} {initial middle final : Semantics.State σ}
     {result : Semantics.Result Semantics.Value}
-    (eligible : RecursiveExpression functions ⟨type, .call name arguments, span⟩)
+    (eligible : ExecutableExpression supported functions ⟨type, .call name arguments, span⟩)
+    (external : ExternalCallPreservation supported model slots effects)
     (called : Semantics.EvalCall functions effects name type sources middle result final)
-    (argumentsIH : ExprsSimulation signatures codes locations captured sourceEnvironment arguments
+    (argumentsIH : ExprsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment arguments
       initial (.value sources) middle)
-    (callIH : CallSimulation functions signatures codes locations captured name sources middle result final) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    (callIH : CallSimulation (model := model) functions signatures codes locations captured name sources middle result final) :
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, .call name arguments, span⟩ initial result final := by
-  intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled coverage world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
@@ -246,7 +248,7 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
           obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
             builtin_components notSignature compiled
           obtain ⟨extension, targets, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
-            argumentsIH.value rfl argumentsCompiled coverage locals globals heap installed
+            argumentsIH.value rfl argumentsCompiled coverage locals globals runtime heap installed
           obtain ⟨source, target, meaning, resultRelated, resultEvaluation⟩ :=
             BuiltinTotalCorrespondence.builtin_preserves_result classified typeCompiled builtinCompiled
               related argumentsEvaluation
@@ -254,6 +256,17 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
           subst result
           exact ⟨extension, .inRight .word target, finalStore, .value resultRelated,
             resultEvaluation, finalHeap, finalInstalled, tailFrame⟩
+      | external available notFunction argumentsEligible =>
+          have notSignature := (SignatureNames.compiled signaturesCompiled).absent notFunction
+          obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
+            builtin_components notSignature compiled
+          obtain ⟨extension, targets, argumentStore, related, argumentsEvaluation, argumentHeap, argumentInstalled, argumentFrame⟩ :=
+            argumentsIH.value rfl argumentsCompiled coverage locals globals runtime heap installed
+          obtain ⟨target, finalStore, resultRelated, resultEvaluation, finalHeap, finalInstalled, frame⟩ :=
+            external available notFunction called typeCompiled builtinCompiled related argumentsEvaluation
+              runtime argumentHeap argumentInstalled
+          exact ⟨extension, target, finalStore, resultRelated, resultEvaluation, finalHeap, finalInstalled,
+            argumentFrame.trans frame⟩
       | named selected argumentsEligible =>
           obtain ⟨index, code, foundSignature, foundCode, _, _⟩ :=
             compiledFunction_resolve signaturesCompiled codesCompiled selected
@@ -268,7 +281,7 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
             (installationEnvironment captured index)
           obtain ⟨argumentExtension, targets, argumentStore, argumentsRelated,
               argumentsEvaluation, argumentHeap, argumentInstalled, argumentFrame⟩ :=
-            argumentsIH.value rfl argumentsCompiled coverage (locals.prepend [closure]) (globals.prepend [closure]) heap installed
+            argumentsIH.value rfl argumentsCompiled coverage (locals.prepend [closure]) (globals.prepend [closure]) (runtime.prepend [closure]) heap installed
           have values : ValuesRel code.own.parameters sources targets :=
             argumentTypes ▸ ArgumentsRel.values argumentsRelated
           obtain ⟨callExtension, target, finalStore, related, bodyEvaluation, finalHeap, finalInstalled, tailFrame⟩ :=
@@ -280,19 +293,19 @@ theorem call {σ : Type} {functions : List Function} {effects : Semantics.Extern
 
 /-- Failed arguments preserve their actual heap and skip both builtin bodies
 and named function invocation. The named closure read still precedes the pack. -/
-theorem call_fault {σ : Type} {functions : List Function}
+theorem call_fault {supported : String → Prop} {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {functions : List Function}
     {compilationFuel : Nat} {signatures : List Signature} {programScope : Scope}
     {codes : List GlobalCode} {locations : Nat → Nat} {captured : Core.Environment}
     (signaturesCompiled : functions.mapM (signature compilationFuel) = .ok signatures)
     (codesCompiled : CompiledGlobals compilationFuel signatures programScope (functions.zip signatures).reverse codes)
     {sourceEnvironment : Semantics.Environment} {type : Ty} {name : String} {arguments : List Expr}
     {span : Option Span} {initial final : Semantics.State σ} {reason : Semantics.Fault}
-    (eligible : RecursiveExpression functions ⟨type, .call name arguments, span⟩)
-    (argumentsIH : ExprsSimulation signatures codes locations captured sourceEnvironment arguments
+    (eligible : ExecutableExpression supported functions ⟨type, .call name arguments, span⟩)
+    (argumentsIH : ExprsSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment arguments
       initial (.fault reason) final) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, .call name arguments, span⟩ initial (.fault reason) final := by
-  intro fuel scope lowered compiled coverage world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled coverage world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
@@ -302,7 +315,18 @@ theorem call_fault {σ : Type} {functions : List Function}
           obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
             builtin_components notSignature compiled
           obtain ⟨extension, target, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, frame⟩ :=
-            argumentsIH argumentsCompiled coverage locals globals heap installed
+            argumentsIH argumentsCompiled coverage locals globals runtime heap installed
+          cases related
+          rename_i reason
+          exact ⟨extension, _, finalStore, .language reason,
+            BuiltinCorrespondence.argument_failure builtinCompiled argumentsEvaluation,
+            finalHeap, finalInstalled, frame⟩
+      | external available notFunction argumentsEligible =>
+          have notSignature := (SignatureNames.compiled signaturesCompiled).absent notFunction
+          obtain ⟨expected, argumentCodes, typeCompiled, argumentsCompiled, builtinCompiled⟩ :=
+            builtin_components notSignature compiled
+          obtain ⟨extension, target, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, frame⟩ :=
+            argumentsIH argumentsCompiled coverage locals globals runtime heap installed
           cases related
           rename_i reason
           exact ⟨extension, _, finalStore, .language reason,
@@ -321,7 +345,7 @@ theorem call_fault {σ : Type} {functions : List Function}
             (Core.LanguageResult.resultType code.own.result) (code.body.rename (globalShift index).lift)
             (installationEnvironment captured index)
           obtain ⟨extension, target, finalStore, related, argumentsEvaluation, finalHeap, finalInstalled, frame⟩ :=
-            argumentsIH argumentsCompiled coverage (locals.prepend [closure]) (globals.prepend [closure]) heap installed
+            argumentsIH argumentsCompiled coverage (locals.prepend [closure]) (globals.prepend [closure]) (runtime.prepend [closure]) heap installed
           cases related
           rename_i reason
           exact ⟨extension, _, finalStore, .language reason,

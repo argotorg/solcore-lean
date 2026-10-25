@@ -7,26 +7,26 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.DerivationCorrespondence
 open Correspondence StatementCorrespondence ContextualExpressionCorrespondence
 
-theorem pair {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem pair {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial middle final : Semantics.State σ} {left right : Expr}
     {leftValue : Semantics.Value} {rightResult : Semantics.Result Semantics.Value}
-    (leftPreserves : ExprSimulation signatures codes locations captured sourceEnvironment left initial (.value leftValue) middle)
-    (rightPreserves : ExprSimulation signatures codes locations captured sourceEnvironment right middle rightResult final)
+    (leftPreserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment left initial (.value leftValue) middle)
+    (rightPreserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment right middle rightResult final)
     (type : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment ⟨type, .pair left right, span⟩
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment ⟨type, .pair left right, span⟩
       initial (rightResult.map (Semantics.Value.pair leftValue)) final := by
-  intro fuel scope lowered compiled covered world mapping environment store environmentRelated globals heap externalRelated
+  intro fuel scope lowered compiled covered world mapping environment store environmentRelated globals runtime heap externalRelated
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨leftCode, rightCode, leftCompiled, rightCompiled, rfl⟩ :=
         lowerExpression_pair_components compiled
       obtain ⟨leftExtension, targetLeft, middleStore, leftRelated, leftEvaluation, middleHeap, middleExternal, firstFrame⟩ :=
-        leftPreserves.value rfl leftCompiled covered environmentRelated globals heap externalRelated
+        leftPreserves.value rfl leftCompiled covered environmentRelated globals runtime heap externalRelated
       have middleEnvironment := (environmentRelated.extendWorld leftExtension).prepend [targetLeft]
       obtain ⟨rightExtension, targetRight, finalStore, rightRelated, rightEvaluation, finalHeap, finalExternal, lastFrame⟩ :=
-        rightPreserves rightCompiled covered middleEnvironment (globals.prepend [targetLeft]) middleHeap middleExternal
+        rightPreserves rightCompiled covered middleEnvironment (globals.prepend [targetLeft]) (runtime.prepend [targetLeft]) middleHeap middleExternal
       have renamed : (rightCode.expression.rename mapping).weakenAt 0 =
           rightCode.expression.rename (fun index => 1 + mapping index) := by
         simp only [← Core.Expr.rename_insertion, Core.Expr.rename_comp]
@@ -50,20 +50,20 @@ theorem pair {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
           · simpa only [List.append_assoc] using finalHeap
 
 /-- A failing first operand skips the second operand of the actual pair code. -/
-theorem pair_fault {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem pair_fault {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial final : Semantics.State σ} {left right : Expr} {reason : Semantics.Fault}
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment left initial (.fault reason) final)
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment left initial (.fault reason) final)
     (type : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment ⟨type, .pair left right, span⟩
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment ⟨type, .pair left right, span⟩
       initial (.fault reason) final := by
-  intro fuel scope lowered compiled covered world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨leftCode, rightCode, leftCompiled, _, rfl⟩ := lowerExpression_pair_components compiled
       obtain ⟨extension, target, finalStore, related, evaluated, finalHeap, finalInstalled, frame⟩ :=
-        preserves leftCompiled covered locals globals heap installed
+        preserves leftCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           refine ⟨extension, .inLeft _ (.word reason), finalStore, .language reason,
@@ -71,22 +71,22 @@ theorem pair_fault {σ : Type} {signatures : List Signature} {codes : List Globa
           rw [pair_rename]
           exact Core.LocalSequence.pair_left_failure _ _ evaluated
 
-theorem projection {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem projection {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial final : Semantics.State σ} {operand : Expr} {result : Semantics.Result Semantics.Value}
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment operand initial result final)
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment operand initial result final)
     (right : Bool) (type : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, if right then .snd operand else .fst operand, span⟩ initial
       (result.bind (Semantics.projectResult right)) final := by
-  intro fuel scope lowered compiled covered world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨operandCode, leftType, rightType, operandCompiled, operandType, rfl⟩ :=
         lowerExpression_projection_components right compiled
       obtain ⟨extension, targetValue, finalStore, related, evaluation, finalHeap, finalInstalled, frame⟩ :=
-        preserves operandCompiled covered locals globals heap installed
+        preserves operandCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           exact ⟨extension, .inLeft _ (.word reason), finalStore, .language reason,
@@ -104,22 +104,22 @@ theorem projection {σ : Type} {signatures : List Signature} {codes : List Globa
                   Core.LanguageResult.bind_success _ evaluation (.inRight (.second (.var rfl))),
                   finalHeap, finalInstalled, frame⟩
 
-theorem injection {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem injection {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial final : Semantics.State σ} {operand : Expr} {result : Semantics.Result Semantics.Value}
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment operand initial result final)
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment operand initial result final)
     (right : Bool) (type target : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, if right then .inr target operand else .inl target operand, span⟩ initial
       (result.bind (Semantics.sumInjectionResult right target)) final := by
-  intro fuel scope lowered compiled covered world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨operandCode, leftType, rightType, targetCompiled, operandCompiled, operandType, rfl⟩ :=
         lowerExpression_injection_components right compiled
       obtain ⟨extension, targetValue, finalStore, related, evaluation, finalHeap, finalInstalled, frame⟩ :=
-        preserves operandCompiled covered locals globals heap installed
+        preserves operandCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           exact ⟨extension, .inLeft _ (.word reason), finalStore, .language reason,
@@ -141,17 +141,17 @@ theorem injection {σ : Type} {signatures : List Signature} {codes : List Global
               Core.LanguageResult.bind_success _ evaluation (.inRight (.inRight (.var rfl))),
               finalHeap, finalInstalled, frame⟩
 
-theorem conditional {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem conditional {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial middle final : Semantics.State σ} {conditionExpr yes no : Expr}
     {conditionValue : Semantics.Value} {result : Semantics.Result Semantics.Value}
     (truth : Bool) (tested : Semantics.condition? conditionValue = some truth)
-    (conditionPreserves : ExprSimulation signatures codes locations captured sourceEnvironment conditionExpr initial (.value conditionValue) middle)
-    (branchPreserves : ExprSimulation signatures codes locations captured sourceEnvironment (if truth then yes else no) middle result final)
+    (conditionPreserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment conditionExpr initial (.value conditionValue) middle)
+    (branchPreserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment (if truth then yes else no) middle result final)
     (type target : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, .ifThen target conditionExpr yes no, span⟩ initial result final := by
-  intro fuel scope lowered compiled covered world mapping environment store environmentRelated globals heap externalRelated
+  intro fuel scope lowered compiled covered world mapping environment store environmentRelated globals runtime heap externalRelated
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
@@ -160,7 +160,7 @@ theorem conditional {σ : Type} {signatures : List Signature} {codes : List Glob
         lowerExpression_conditional_components compiled
       obtain ⟨conditionExtension, targetCondition, middleStore, conditionRelated,
         conditionEvaluation, middleHeap, middleExternal, firstFrame⟩ :=
-        conditionPreserves.value rfl conditionCompiled covered environmentRelated globals heap externalRelated
+        conditionPreserves.value rfl conditionCompiled covered environmentRelated globals runtime heap externalRelated
       have testEvaluation := ExpressionCorrespondence.condition_evaluates
         testCompiled conditionRelated tested conditionEvaluation
       have middleEnvironment :=
@@ -168,7 +168,7 @@ theorem conditional {σ : Type} {signatures : List Signature} {codes : List Glob
       have branchCompiled : lowerExpression fuel signatures scope (if truth then yes else no) =
           .ok (if truth then yesCode else noCode) := by cases truth <;> assumption
       obtain ⟨branchExtension, targetValue, finalStore, related, branchEvaluation, finalHeap, finalExternal, lastFrame⟩ :=
-        branchPreserves branchCompiled covered middleEnvironment (globals.prepend [.bool truth]) middleHeap middleExternal
+        branchPreserves branchCompiled covered middleEnvironment (globals.prepend [.bool truth]) (runtime.prepend [.bool truth]) middleHeap middleExternal
       refine ⟨conditionExtension ++ branchExtension, targetValue, finalStore, ?_, ?_, ?_, finalExternal, firstFrame.trans lastFrame⟩
       · cases truth <;> simpa only [Bool.false_eq_true, ↓reduceIte, yesType, noType] using related
       · have renamed (expression : Core.Expr) : (expression.rename mapping).weakenAt 0 =
@@ -187,21 +187,21 @@ theorem conditional {σ : Type} {signatures : List Signature} {codes : List Glob
             simpa [renamed] using branchEvaluation
       · simpa only [List.append_assoc] using finalHeap
 
-theorem indexedInjection {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem indexedInjection {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial final : Semantics.State σ} {operand : Expr} {result : Semantics.Result Semantics.Value}
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment operand initial result final)
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment operand initial result final)
     (index : Nat) (type target : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, .inK index target operand, span⟩ initial (result.bind (Semantics.injectionResult index target)) final := by
-  intro fuel scope lowered compiled covered world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨operandCode, targetType, injected, targetCompiled, operandCompiled, injectionCompiled, rfl⟩ :=
         lowerExpression_indexedInjection_components compiled
       obtain ⟨extension, targetValue, finalStore, related, evaluation, finalHeap, finalInstalled, frame⟩ :=
-        preserves operandCompiled covered locals globals heap installed
+        preserves operandCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           exact ⟨extension, .inLeft _ (.word reason), finalStore, .language reason,
@@ -219,21 +219,21 @@ theorem indexedInjection {σ : Type} {signatures : List Signature} {codes : List
           · exact Core.LanguageResult.bind_success _ evaluation (.inRight injectionEvaluation)
 
 /-- A failing condition skips both branches and preserves the condition's heap. -/
-theorem conditional_fault {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem conditional_fault {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial final : Semantics.State σ} {conditionExpr yes no : Expr} {reason : Semantics.Fault}
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment conditionExpr initial (.fault reason) final)
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment conditionExpr initial (.fault reason) final)
     (type target : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, .ifThen target conditionExpr yes no, span⟩ initial (.fault reason) final := by
-  intro fuel scope lowered compiled covered world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨conditionCode, test, yesCode, noCode, conditionCompiled, testCompiled,
         _, _, _, _, expressionEqual⟩ := lowerExpression_conditional_components compiled
       obtain ⟨extension, value, finalStore, related, evaluated, finalHeap, finalInstalled, frame⟩ :=
-        preserves conditionCompiled covered locals globals heap installed
+        preserves conditionCompiled covered locals globals runtime heap installed
       cases related with
       | language reason =>
           refine ⟨extension, .inLeft _ (.word reason), finalStore, .language reason,
@@ -244,21 +244,21 @@ theorem conditional_fault {σ : Type} {signatures : List Signature} {codes : Lis
 
 /-- A compiled condition whose operand has a represented value cannot produce
 the independent semantics' malformed-condition observation. -/
-theorem conditional_invalid {σ : Type} {signatures : List Signature} {codes : List GlobalCode}
+theorem conditional_invalid {σ : Type} {model : StateModel σ} {slots : List EffectSlot} {signatures : List Signature} {codes : List GlobalCode}
     {locations : Nat → Nat} {captured : Core.Environment} {sourceEnvironment : Semantics.Environment}
     {initial final : Semantics.State σ} {conditionExpr yes no : Expr} {sourceValue : Semantics.Value}
-    (preserves : ExprSimulation signatures codes locations captured sourceEnvironment conditionExpr initial (.value sourceValue) final)
+    (preserves : ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment conditionExpr initial (.value sourceValue) final)
     (invalid : Semantics.condition? sourceValue = none) (type target : Ty) (span : Option Span) :
-    ExprSimulation signatures codes locations captured sourceEnvironment
+    ExprSimulation (model := model) (slots := slots) signatures codes locations captured sourceEnvironment
       ⟨type, .ifThen target conditionExpr yes no, span⟩ initial
       (.fault (.invalidValue "condition")) final := by
-  intro fuel scope lowered compiled covered world mapping environment store locals globals heap installed
+  intro fuel scope lowered compiled covered world mapping environment store locals globals runtime heap installed
   cases fuel with
   | zero => simp [lowerExpression, fail] at compiled
   | succ fuel =>
       obtain ⟨conditionCode, test, _, _, conditionCompiled, testCompiled, _⟩ :=
         lowerExpression_conditional_components compiled
-      obtain ⟨_, _, _, related, _⟩ := preserves.value rfl conditionCompiled covered locals globals heap installed
+      obtain ⟨_, _, _, related, _⟩ := preserves.value rfl conditionCompiled covered locals globals runtime heap installed
       obtain ⟨truth, valid⟩ := condition_valid testCompiled related
       rw [invalid] at valid
       cases valid

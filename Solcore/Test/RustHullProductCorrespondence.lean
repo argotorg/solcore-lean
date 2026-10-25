@@ -74,7 +74,7 @@ theorem program_eligible : RecursiveProgram program.functions := by
   simp only [program, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl | rfl | rfl
   all_goals simp only [inc, missingReturn, productUpdate, productFault, setup, List.cons_append, List.nil_append,
-    ret, assign, RecursiveStatement, List.forall_mem_cons, List.not_mem_nil,
+    ret, assign, ExecutableStatement, List.forall_mem_cons, List.not_mem_nil,
     false_implies, implies_true, true_and, and_true]
   · exact builtin_eligible (operation := .binary .add) rfl (by rfl) (.var _ _ _) (literal_eligible _)
   · exact literal_eligible _

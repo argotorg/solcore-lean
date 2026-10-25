@@ -41,13 +41,13 @@ theorem program_eligible : RecursiveProgram program.functions := by
   rcases member with rfl | rfl
   · simp only [mainFunction, List.mem_cons, List.not_mem_nil, or_false] at statementMember
     rcases statementMember with rfl | rfl | rfl | rfl
-    · simp only [RecursiveStatement]
-    · simpa only [RecursiveStatement, v] using inc_call_eligible "input"
-    · simpa only [RecursiveStatement] using inc_call_eligible "inc"
-    · simpa only [RecursiveStatement] using inc_call_eligible "inc"
+    · simp only [ExecutableStatement]
+    · simpa only [ExecutableStatement, v] using inc_call_eligible "input"
+    · simpa only [ExecutableStatement] using inc_call_eligible "inc"
+    · simpa only [ExecutableStatement] using inc_call_eligible "inc"
   · simp only [incFunction, List.mem_cons, List.not_mem_nil, or_false] at statementMember
     subst statement
-    simp only [RecursiveStatement]
+    simp only [ExecutableStatement]
     apply RecursiveExpression.builtin (operation := .binary .add) rfl (by rfl)
     intro argument member
     simp only [List.mem_cons, List.not_mem_nil, or_false] at member

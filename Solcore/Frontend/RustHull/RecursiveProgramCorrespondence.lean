@@ -58,15 +58,17 @@ theorem compile_recursive_program {σ : Type} {effects : Semantics.ExternalSeman
     obtain ⟨signature, _, rfl⟩ := member
     cases Option.some.inj named
     exact slotName_reserved _
-  have initializedHeap := heapRelated.initializeGlobals signatures codes (bundleValues targets :: environment)
+  have initializedHeap := (StateRel.trivial (source := initial) heapRelated).initializeGlobals signatures codes
+    (bundleValues targets :: environment)
   have installed := InstalledGlobals.initialize aligned (bundleValues targets :: environment) callStore
   obtain ⟨extension, targetValue, finalStore, related, bodyExecuted, finalHeap, _⟩ :=
-    (DerivationProgramCorrespondence.function_preserves signaturesCompiled codesCompiled unique covered globals eligible
+    (DerivationProgramCorrespondence.function_preserves (model := StateModel.trivial σ) (slots := [])
+      signaturesCompiled codesCompiled unique covered globals (EffectEnvironmentRel.empty _ _ _) eligible
       sourceEvaluated) selected signatureSelected codeFound values initializedHeap installed
   have invoked := globalInvocation_evaluates (runtimeValues := []) aligned codeFound installed bodyExecuted
   have assembledExecution := globalInitialization_evaluates aligned invoked
   exact ⟨extension, targetValue, finalStore, related,
-    Core.Evaluates.apply .lambda argumentEvaluated assembledExecution, finalHeap⟩
+    Core.Evaluates.apply .lambda argumentEvaluated assembledExecution, finalHeap.toHeapRel⟩
 
 /-- Actual public preparation supplies the selected function, source arguments
 and empty initial heap. The public premise is syntactic recursive eligibility;
