@@ -241,8 +241,8 @@ local cells throughout child execution and return-data extraction.
 
 This theorem permits arbitrary successfully compiled catalogs with the stated
 source-to-catalog correspondence. Selected children use the established effect
-language without further external calls (`CallFree`). Root reentry, nested child
-calls, precompiles and other call modes remain outside this instance.
+language without further external calls (`CallFree`). Nested calls are covered by the finite-height theorem below. Root reentry,
+precompiles and other call modes remain outside these instances.
 
 `Tests.RustHullChildCallCorrespondence.public_resumes` supplies four independent
 source derivations: a child returns after memory, storage, transient storage and
@@ -252,6 +252,26 @@ before calling, then observes call status, full return-data size and the copied
 byte. Runtime consumers check public receipts, two resumptions, shared rollback,
 parent-local preservation and transaction finalization.
 
+`ContractNestedChildCallCorrespondence.compileObject_resumes_exact` extends the
+connection to any finite-height source call tree. Each child can make ordinary
+or static calls through the same actual dispatcher. The induction uses a
+strictly smaller source height for each executed child; it does not bound Core
+fuel or replace a deeper source execution with a failure.
+
+Nested frame initialization supplies each child's handler and call depth. The
+proof retains the dispatcher cell alongside ambient and creator cells, refreshes
+shared values before each child allocation, and derives callback execution from
+the smaller-height theorem. The public statement has no callback-correctness or
+Core-evaluation premise. Its initial code-link conditions still select nonroot
+catalog entries; root reentry remains a separate connection.
+
+`Tests.RustHullNestedChildCallCorrespondence.public_resumes` covers parent,
+child and grandchild frames with distinct memory contents, storage locations
+and logs. Its three source derivations cover all frames succeeding, a reverted
+grandchild followed by a successful child, and a successful grandchild whose
+changes are subsequently rolled back by the child's revert. Runtime checks also
+cover returned bytes, retained parent and child memory, and repeated resumptions.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -260,7 +280,7 @@ parent-local preservation and transaction finalization.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls, including compiled call-free children, reach public receipts with transfers, return data and checkpoint rollback. Nested calls, additional call modes, precompiles, destruction and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls, including finite nested compiled children, reach public receipts with transfers, return data and checkpoint rollback. Additional call modes, precompiles, destruction and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -270,21 +290,22 @@ delay those connections.
 
 ## Next public milestone
 
-Extend compiled-child execution to nested calls, then cover the remaining call
-modes, precompiles, account operations and assembly. Each step must derive
+Connect `callcode` and `delegatecall`, keeping code selection distinct from the
+execution and storage address. Then cover precompiles, account operations and
+assembly. Each step must derive
 runtime inputs from actual initialization and end in a public theorem consumer.
 
 ## Remaining public connections
 
 `call` and `staticcall` have public connections for calls without child execution
-and for compiled call-free children. Nested children and precompile branches
+and for finite nested compiled children. Root reentry and precompile branches
 remain. Five builtins still have no
 public effect connection: `callcode`, `delegatecall`, `create`, `create2` and
 `selfdestruct`.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Extend the connected compiled-child theorem to finite nested calls, then additional call modes and precompiles. Reuse catalog identities, actual child allocation, checkpoint restoration and the public connection already proved for call-free children. |
+| 1 | Contract calls | Connect CALLCODE and DELEGATECALL, then precompiles and root reentry. Reuse catalog identities, actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
 | 2 | Account destruction | Connect beneficiary transfers, static rejection and transaction-finalization rules to the actual public receipt. Reuse the mutable balance resource established for calls. |
 | 3 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 4 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |

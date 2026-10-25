@@ -2095,6 +2095,8 @@ import Solcore.Test.RustHullCodeImageCorrespondence
 import Solcore.Test.RustHullReturnDataCorrespondence
 import Solcore.Test.RustHullCallCorrespondence
 import Solcore.Test.RustHullChildCallCorrespondence
+import Solcore.Test.RustHullNestedChildCallPublic
+import Solcore.Test.RustHullNestedChildCallRuntime
 import Solcore.Frontend.RustHull.Safety
 set_option autoImplicit false
 
@@ -3924,6 +3926,7 @@ def main : IO UInt32 := do
   Tests.RustHullReturnDataCorrespondence.run
   Tests.RustHullCallCorrespondence.run
   Tests.RustHullChildCallCorrespondence.run
+  Tests.RustHullNestedChildCallRuntime.run
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
