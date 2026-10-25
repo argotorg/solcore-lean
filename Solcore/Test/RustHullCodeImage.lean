@@ -99,8 +99,12 @@ def run : IO Unit := do
   let json := jsonEnvelope "[{\"path\":[\"Root\"],\"bytes\":\"0x0102ff\",\"embeds\":[]}]"
   let decoded ← success (CodeImage.decode json)
   require (decoded == [{path := ["Root"], bytes := bytes [1, 2, 255]}]) "code image decode"
+  require ((← success (CodeImage.decode (json.replace "O0" "O2"))) == decoded)
+    "pinned Sonatina O2 code image rejected"
   for malformed in [json.replace "0x0102ff" "0x1", json.replace "0x0102ff" "0xFF",
-      json.replace "O0" "O2", json.replace CodeImage.backendRevision "wrong",
+      json.replace "O0" "O1", json.replace "O0" "O3", json.replace "O0" "o2",
+      json.replace "O0" "", json.replace "sonatina" "yul",
+      json.replace upstreamCommit "wrong", json.replace CodeImage.backendRevision "wrong",
       json.replace "\"embeds\":[]" "\"embeds\":[],\"extra\":0"] do
     require (CodeImage.decode malformed |> rejected) "malformed artifact accepted"
   for malformed in [String.ofList (List.replicate 17 '['),

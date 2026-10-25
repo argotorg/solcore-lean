@@ -200,9 +200,10 @@ def decode (input : String) (maxInputBytes : Nat := 33554432) : Except String (L
     throw "code image upstream revision mismatch"
   let backend ← field json "backend"
   exact backend ["name", "revision", "optimization"]
+  let optimization ← text (← field backend "optimization")
   unless (← text (← field backend "name")) = "sonatina" &&
       (← text (← field backend "revision")) = backendRevision &&
-      (← text (← field backend "optimization")) = "O0" do
+      (optimization = "O0" || optimization = "O2") do
     throw "unsupported code image backend configuration"
   array decodeImage (← field json "images")
 

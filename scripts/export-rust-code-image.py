@@ -58,6 +58,17 @@ def tool_hashes() -> dict:
             "lockSha256": hull.digest((TOOL / "Cargo.lock").read_bytes())}
 
 
+def validate_backend(document: object, optimization: str) -> None:
+    """The selected real compiler level must agree with the exported envelope."""
+    if (not isinstance(document, dict)
+            or set(document) != {"schema", "upstreamCommit", "backend", "images"}
+            or document.get("schema") != SCHEMA or document.get("upstreamCommit") != hull.COMMIT
+            or document.get("backend") != {"name": "sonatina", "revision": BACKEND, "optimization": optimization}
+            or optimization not in ("O0", "O2")
+            or not isinstance(document.get("images"), list) or not document["images"]):
+        raise ValueError("unexpected code image schema, revision or optimization")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, nargs="?")
@@ -67,6 +78,8 @@ def main() -> int:
     parser.add_argument("--hull-output", type=Path, help="matching checked Hull; default OUTPUT.hull.json")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--build", action="store_true")
+    parser.add_argument("--optimization", choices=("O0", "O2"), default="O0",
+                        help="actual Sonatina compiler optimization level (default: O0)")
     parser.add_argument("--allow-network", action="store_true")
     parser.add_argument("--timeout", type=float, default=300, help="per-export process timeout")
     args = parser.parse_args()
@@ -133,15 +146,15 @@ def main() -> int:
         if compiled.returncode:
             raise ValueError(f"Sonatina translation failed with status {compiled.returncode}")
         ir.write_text(compiled.stdout)
-        code = subprocess.run([str(binary), str(hull_output), str(ir)], cwd=ROOT,
+        code_command = [str(binary), "--optimization", args.optimization, str(hull_output), str(ir)]
+        code = subprocess.run(code_command, cwd=ROOT,
             capture_output=True, text=True, timeout=args.timeout)
         if code.stderr:
             sys.stderr.write(code.stderr)
         if code.returncode:
             raise ValueError(f"code image compilation failed with status {code.returncode}")
         document = json.loads(code.stdout)
-        if document.get("schema") != SCHEMA or document.get("upstreamCommit") != hull.COMMIT:
-            raise ValueError("unexpected code image schema or revision")
+        validate_backend(document, args.optimization)
         sources = hull.source_hashes(hull_document)
         sources[source.as_uri()] = hull.digest(source.read_bytes())
         if sources != hull_record["sources"]:
@@ -150,7 +163,7 @@ def main() -> int:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(contents)
         record = {"schema": SCHEMA, "upstreamCommit": hull.COMMIT, "backendRevision": BACKEND,
-            "optimization": "O0", "toolBuild": build, "hullProvenance": hull_record,
+            "optimization": args.optimization, "toolBuild": build, "hullProvenance": hull_record,
             "hullOutput": str(hull_output), "sonatinaSha256": hull.digest(ir.read_bytes()),
             "outputSha256": hull.digest(contents), "sources": sources, "command": ir_command}
         output.with_suffix(output.suffix + ".provenance.json").write_text(json.dumps(record, indent=2) + "\n")

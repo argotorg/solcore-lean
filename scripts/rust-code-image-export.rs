@@ -2,10 +2,10 @@
 //! Input is the same checked program's Hull JSON and printed Sonatina IR.
 //! This executable performs compilation only; it never executes EVM instructions.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sonatina_codegen::{
-    EvmCompile, OptLevel,
     object::{ObjectArtifact, SymbolId},
+    EvmCompile, OptLevel,
 };
 use std::{env, fmt::Write, fs};
 
@@ -174,22 +174,78 @@ fn hull_json(source: &str) -> Result<Value, String> {
     Ok(value)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Optimization {
+    O0,
+    O2,
+}
+
+impl Optimization {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "O0" => Ok(Self::O0),
+            "O2" => Ok(Self::O2),
+            _ => Err(format!(
+                "unsupported optimization {value}; expected O0 or O2"
+            )),
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::O0 => "O0",
+            Self::O2 => "O2",
+        }
+    }
+
+    fn level(self) -> OptLevel {
+        match self {
+            Self::O0 => OptLevel::O0,
+            Self::O2 => OptLevel::O2,
+        }
+    }
+}
+
+fn arguments(args: &[String]) -> Result<(Optimization, [&str; 2]), String> {
+    let mut optimization = None;
+    let mut paths = Vec::new();
+    let mut iter = args.iter();
+    while let Some(argument) = iter.next() {
+        if argument == "--optimization" {
+            if optimization.is_some() {
+                return Err("duplicate --optimization".into());
+            }
+            optimization = Some(Optimization::parse(
+                iter.next().ok_or("missing --optimization value")?,
+            )?);
+        } else if argument.starts_with('-') {
+            return Err(format!("unknown option {argument}"));
+        } else {
+            paths.push(argument.as_str());
+        }
+    }
+    let [hull, ir] = paths.as_slice() else {
+        return Err(
+            "usage: solcore-code-image-export [--optimization O0|O2] HULL.json SONATINA.ir".into(),
+        );
+    };
+    Ok((optimization.unwrap_or(Optimization::O0), [hull, ir]))
+}
+
 fn run() -> Result<(), String> {
     let args = env::args().skip(1).collect::<Vec<_>>();
-    if args.len() != 2 {
-        return Err("usage: solcore-code-image-export HULL.json SONATINA.ir".into());
-    }
-    let hull = hull_json(&fs::read_to_string(&args[0]).map_err(|error| error.to_string())?)?;
+    let (optimization, paths) = arguments(&args)?;
+    let hull = hull_json(&fs::read_to_string(paths[0]).map_err(|error| error.to_string())?)?;
     if string(&hull, "schema")? != "solcore-rs.hull.v1"
         || string(&hull, "upstreamCommit")? != UPSTREAM
     {
         return Err("unsupported checked Hull schema or revision".into());
     }
-    let ir = fs::read_to_string(&args[1]).map_err(|error| error.to_string())?;
+    let ir = fs::read_to_string(paths[1]).map_err(|error| error.to_string())?;
     let parsed = sonatina_parser::parse_module(&ir)
         .map_err(|errors| format!("Sonatina IR parse: {errors:?}"))?;
     let artifacts = EvmCompile::new(parsed.module)
-        .with_opt_level(OptLevel::O0)
+        .with_opt_level(optimization.level())
         .with_symbol_table(true)
         .compile()
         .map_err(|errors| format!("Sonatina code generation: {errors:?}"))?;
@@ -226,7 +282,7 @@ fn run() -> Result<(), String> {
     println!(
         "{}",
         json!({"schema":"solcore-rs.code-images.v1", "upstreamCommit":UPSTREAM,
-        "backend":{"name":"sonatina", "revision":BACKEND, "optimization":"O0"}, "images":images})
+        "backend":{"name":"sonatina", "revision":BACKEND, "optimization":optimization.name()}, "images":images})
     );
     Ok(())
 }
@@ -247,7 +303,49 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::hull_json;
+    use super::{arguments, hull_json, Optimization};
+    use sonatina_codegen::OptLevel;
+
+    #[test]
+    fn optimization_defaults_and_explicit_levels_are_exact() {
+        let args = ["hull.json".to_owned(), "program.ir".to_owned()];
+        assert_eq!(
+            arguments(&args).unwrap(),
+            (Optimization::O0, ["hull.json", "program.ir"])
+        );
+        for (name, expected) in [("O0", Optimization::O0), ("O2", Optimization::O2)] {
+            for raw in [
+                vec!["--optimization", name, "hull.json", "program.ir"],
+                vec!["hull.json", "program.ir", "--optimization", name],
+            ] {
+                let args = raw.into_iter().map(str::to_owned).collect::<Vec<_>>();
+                let (selected, paths) = arguments(&args).unwrap();
+                assert_eq!(selected, expected);
+                assert_eq!(selected.name(), name);
+                assert_eq!(paths, ["hull.json", "program.ir"]);
+            }
+        }
+        assert!(matches!(Optimization::O0.level(), OptLevel::O0));
+        assert!(matches!(Optimization::O2.level(), OptLevel::O2));
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_unsupported_optimization_arguments() {
+        for raw in [
+            vec!["--optimization"],
+            vec!["--optimization", "O1", "h", "i"],
+            vec!["--optimization", "o2", "h", "i"],
+            vec!["--optimization", "O3", "h", "i"],
+            vec!["--optimization", "O0", "--optimization", "O2", "h", "i"],
+            vec!["--unknown", "h", "i"],
+            vec!["h"],
+            vec!["h", "i", "extra"],
+        ] {
+            let args = raw.into_iter().map(str::to_owned).collect::<Vec<_>>();
+            assert!(arguments(&args).is_err(), "{args:?}");
+        }
+    }
+
     #[test]
     fn accepts_realistic_deep_hull_and_ignores_string_delimiters() {
         let source = format!("{}0{}", "[".repeat(192), "]".repeat(192));
