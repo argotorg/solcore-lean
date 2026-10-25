@@ -159,3 +159,94 @@ python3 scripts/test-semantic-differential.py
 These include real child-process timeouts/output limits and artifact tampering.
 They complement actual Anvil integration; unit tests alone do not establish
 that all three execution paths ran.
+
+## Run a bounded campaign
+
+Run the fixed corpus after building the tools and exporters above:
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-corpus.json \
+  --output .upstream/semantic-ci \
+  --seconds 300 --disk-bytes 134217728
+```
+
+The manifest fixes sixteen seed/node-budget pairs and their expected versions
+and AST features. Its required coverage includes every enabled operation,
+bindings, branches, and Word literals zero, one, maximum and the high bit. Only
+cases that actually match across all three paths contribute to passing
+coverage. This is source AST coverage, not runtime opcode coverage.
+
+For a seed search instead of the fixed corpus:
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --seed 78 --nodes 32 --cases 16 --attempts 256 \
+  --output .upstream/semantic-search \
+  --seconds 300 --disk-bytes 134217728 --shrink-attempts 32
+```
+
+`--attempts` bounds generation attempts. `--shrink-attempts` bounds candidate
+executions across the entire campaign, and `--shrink-candidates` bounds each
+candidate batch. Core fuel, EVM gas, per-case time, total campaign time and
+retained directory size have separate limits. Time and disk usage are checked
+during child-process execution; these are polling limits, not OS quotas.
+An interrupt or SIGTERM stops owned children and writes the campaign summary.
+
+The command prints per-case results and a final summary. `summary.json` records
+generated, excluded, executed, completed, matched, mismatched, inconclusive,
+error and unexecuted counts, with source/compiler rejections counted separately
+within errors. Generation exhaustion, incomplete coverage and interrupted or
+resource-limited runs never pass. Exit zero requires every requested case to
+match and every required coverage item to be present.
+
+All generated cases and compact execution reports remain in `cases/` and
+`results/`. Successful runs' large exports and logs are removed. These compact
+reports retain receipts and observations but cannot serve as exact archives;
+use their saved case with `--case` to execute a new experiment.
+
+Each finding retains complete original and final reduced archives under
+`findings/`, plus `shrink.json`. A candidate must retain the failure category,
+stage, disagreeing paths, and each path's outcome and payload form. A wrong
+return value cannot shrink into a revert or a resource failure. Other genuine
+findings encountered during reduction are retained separately, without recursive
+reduction. Exact replay uses the single-case runner's `--replay ARCHIVE` option.
+
+## Check the reducer
+
+The explicit test adapter below perturbs a copied observation only after all
+three real executions agree:
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --seed 78 --nodes 32 --cases 1 --attempts 1 \
+  --test-perturb-path rustEvm --shrink-attempts 8 \
+  --output .upstream/semantic-reducer-test
+```
+
+This command intentionally exits nonzero. Its synthetic findings are marked
+and stored separately from genuine findings. The actual execution reports are
+unchanged; the changed observation exists only in `analysis.json`. Reproduce
+the reduced synthetic finding with `--case` and the same explicit adapter:
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --case .upstream/semantic-reducer-test/findings/synthetic/0000/reduced/case.json \
+  --test-perturb-path rustEvm --shrink-attempts 0 \
+  --output .upstream/semantic-reducer-replay
+```
+
+Without the adapter, that case's three real results still match. This tests
+detection, preservation and reduction of a controlled difference; it is not
+evidence of an upstream compiler bug.
+
+Focused campaign tests and independent corpus validation are available with:
+
+```sh
+python3 scripts/test-semantic-campaign.py
+python3 Tests/scripts/test-semantic-corpus.py
+```
+
+The corpus validator checks deterministic materialization, native Core
+execution, replay and AST coverage. It does not execute the EVM. The complete
+campaign above executes all three paths for every passing corpus case.

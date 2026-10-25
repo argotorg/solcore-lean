@@ -30,8 +30,8 @@ comparison must not share the Rust frontend with its reference computation.
 | Rust EVM reference | `scripts/rust-evm-reference.py` | Fixed upstream E2E fixtures on Anvil; Sonatina O0/O2 and Yul execution. |
 | Compatibility inventories | `scripts/RUST_PARITY.md` | Fixed expectations checked separately by the Rust and Core paths. These are not a direct comparison runner for generated inputs. |
 
-The restricted source emitter is delivered by M1. The operational comparison and
-campaign are separate M2/M3 deliverables. Rust's raw UTF-8 fuzz targets exercise
+The restricted source emitter, operational comparison and bounded campaign are
+delivered by M1 through M3. Rust's raw UTF-8 fuzz targets exercise
 compiler robustness; they do not supply a typed semantic generator or
 structural reducer.
 
@@ -62,7 +62,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M0 | Record the scope, settle existing working-tree changes, update project documentation, and establish a tested clean baseline. | Complete, 2026-10-25 |
 | M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | Complete, 2026-10-25 |
 | M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Complete, 2026-10-25 |
-| M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | In progress |
+| M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Planned |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
 | M6 | Add selected generics, closures, comptime and module combinations. | Planned |
@@ -261,6 +261,38 @@ Acceptance criteria:
 - The run has explicit time and disk limits, cleans up its child processes, and
   produces machine-readable results and a short human-readable summary.
 - No performance target is claimed before measuring end-to-end throughput.
+
+Delivered M3:
+
+- `scripts/semantic-campaign.py` runs bounded seed searches or a fixed manifest,
+  using the same three real execution paths as the single-case runner. It
+  records coverage and separate outcome counts, including excluded and
+  unexecuted cases. Only completed agreement contributes to passing coverage.
+- The reducer rechecks and executes every accepted candidate. It preserves the
+  failure category, stage, disagreeing paths and per-path outcome/payload form.
+  Original and final archives remain replayable; different genuine findings
+  discovered during reduction are retained separately.
+- Time, disk, generation and reduction limits have explicit outcomes. Successful
+  runs retain cases and compact reports while disposable exports are removed.
+  SIGTERM and keyboard interruption clean up owned child processes.
+- The fixed sixteen-case corpus passed all three paths and covered fifteen AST
+  feature kinds and four Word boundary literals. Native corpus validation also
+  checked deterministic materialization, independent feature extraction and
+  fresh Core execution/replay.
+- An explicit test adapter introduced a difference after actual three-way
+  agreement. A nested generated case reduced to Word zero in one candidate,
+  retaining its failure fingerprint. Exact replay of the reduced archive
+  confirmed real agreement; replay with the adapter reproduced the synthetic
+  difference. Actual observations were never modified.
+- Focused regressions cover classification-preserving reduction, secondary
+  findings, resource limits, manifest validation, coverage accounting and
+  SIGTERM cleanup of a real child process. Zero generation attempts and an
+  exhausted campaign time limit were also checked through the command line.
+
+M1 through M3 establish the initial closed G0 testing workflow. They do not
+complete the broader language profiles or the emitter's meaning-preservation
+proof. Closed computations may be constant-folded; runtime-input coverage is
+the next pure-program expansion before making backend opcode-coverage claims.
 
 ### M4 through M6: scope expansion
 

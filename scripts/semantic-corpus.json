@@ -1,0 +1,216 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "coverageKind": "core-ast-features",
+  "generatorVersion": "core-g0-v1/lcg64-v1",
+  "emitterVersion": "solcore-source-g0-v1",
+  "wrapperVersion": "solcore-word-contract-v1",
+  "requiredFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+    "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "if",
+    "let",
+    "local",
+    "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+  ],
+  "requiredWordLiterals": [
+    "0",
+    "1",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+  ],
+  "cases": [
+    {
+      "id": "literal-zero",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 3
+      },
+      "expectedFeatures": [
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "literal-one",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 3
+      },
+      "expectedFeatures": [
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "literal-maximum",
+      "generation": {
+        "seed": "11",
+        "maxProgramNodes": 3
+      },
+      "expectedFeatures": [
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "literal-high-bit",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 3
+      },
+      "expectedFeatures": [
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-not",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 4
+      },
+      "expectedFeatures": [
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "bool-not",
+      "generation": {
+        "seed": "86",
+        "maxProgramNodes": 10
+      },
+      "expectedFeatures": [
+        "boolLiteral",
+        "if",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-add",
+      "generation": {
+        "seed": "63",
+        "maxProgramNodes": 5
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-subtract",
+      "generation": {
+        "seed": "83",
+        "maxProgramNodes": 5
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-multiply",
+      "generation": {
+        "seed": "95",
+        "maxProgramNodes": 5
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-and",
+      "generation": {
+        "seed": "127",
+        "maxProgramNodes": 5
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-or",
+      "generation": {
+        "seed": "139",
+        "maxProgramNodes": 5
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-xor",
+      "generation": {
+        "seed": "151",
+        "maxProgramNodes": 5
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-equal",
+      "generation": {
+        "seed": "294",
+        "maxProgramNodes": 8
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "if",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "word-greater",
+      "generation": {
+        "seed": "102",
+        "maxProgramNodes": 8
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "if",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "local-binding",
+      "generation": {
+        "seed": "115",
+        "maxProgramNodes": 10
+      },
+      "expectedFeatures": [
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "nested-scopes",
+      "generation": {
+        "seed": "130",
+        "maxProgramNodes": 32
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "boolLiteral",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    }
+  ]
+}
