@@ -214,8 +214,8 @@ completion applies its own commit or rollback rules.
 The source effect instance uses `noChildren`: an absent account in a complete
 world can succeed, but executing a compiled child is outside this instance.
 Explicitly stored empty-code accounts also need a further code-identity proof.
-`effectsWith` accepts a source child relation for the next step, where finite
-call-tree height will supply recursive child derivations.
+`effectsWith` accepts the source child relation used by the later finite-height
+connection below to supply recursive child derivations.
 
 `Tests.RustHullCallCorrespondence.public_resumes` supplies independent source
 derivations for nine scenarios: ordinary and static calls, a balance transfer,
@@ -331,18 +331,21 @@ Priorities 1 and 2 close gaps in the existing pure Hull theorem. Priorities 3
 and 4 connect the remaining observable runtime behavior. Priority 5 should not
 delay those connections.
 
-## Next public milestone
+## Deferred public proof work
 
-The active priority is the restricted differential-testing campaign described
-in [Semantic differential testing milestones](semantic-differential-testing.md).
-Completing every remaining Hull proof is not a prerequisite for that campaign.
+The bounded [M0–M6 differential-testing milestones](semantic-differential-testing.md)
+are complete. They did not require completion of every remaining Hull proof
+and do not discharge those obligations. The
+[next implementation roadmap](next-implementation-roadmap.md) prioritizes
+continuous bounded campaigns, backend and grammar coverage, and the native
+Source public proof connection before this remaining Hull work.
 
 The next deferred public proof connection is the identity precompile, through
 its independent byte-copy and gas semantics, actual dispatch and public
 execution. The remaining precompiles, creation and assembly follow as their
-test domains are enabled. Each proof step must derive runtime inputs from actual
-initialization and end in a public theorem consumer. These obligations remain
-open while differential testing takes priority.
+proof domains are connected. Each proof step must derive runtime inputs from
+actual initialization and end in a public theorem consumer. Executable support
+and test agreement alone do not close these obligations.
 
 ## Remaining public connections
 

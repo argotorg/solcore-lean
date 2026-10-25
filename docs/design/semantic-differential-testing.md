@@ -6,7 +6,10 @@ Prioritize a small, reproducible differential-testing campaign against
 `solcore-rs`. Completing every remaining Hull correspondence proof is not a
 prerequisite. Keep the existing proofs and extend them when a larger comparison
 scope needs stronger evidence. This document is the implementation handoff for
-that work.
+that work. M0–M6 are now complete within the bounded profiles recorded below.
+The [next implementation roadmap](next-implementation-roadmap.md) orders the
+remaining operational and proof work. CI scheduling and generated O2/Yul
+comparisons are not part of the delivered baseline.
 
 The initial reference is `argotorg/solcore-rs` at
 `2a745e12974c373c3799fec81b48a53c7dce2ab4`, matching the existing exporters and
@@ -72,8 +75,9 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Complete, 2026-10-25 |
 | M6 | Add selected generics, closures, comptime and module combinations. | Complete within the bounded profiles, 2026-10-25 |
 
-M1 through M3 are the first operational milestone. Do not begin M4 while the
-basic comparison cannot reproduce and reduce its own failures.
+The acceptance criteria below record the completed implementation sequence.
+M1 through M3 established execution, replay and reduction before the later
+scope expansions. Their historical validation evidence is retained here.
 
 ### M0: a clean handoff
 
@@ -868,24 +872,27 @@ See [Hull meaning preservation](hull-meaning-preservation.md) for exact scope.
 
 Precompile dispatch, creation/deployment, independent assembly semantics and
 object-linking correspondence remain open. Reverse correspondence and
-divergence are also outside the initial milestone. Keep these obligations
-visible, but do not resume them merely to postpone M1 through M3.
+divergence are also outside these bounded milestones. The
+[next roadmap](next-implementation-roadmap.md) orders this proof work after
+operational testing improvements and the native Source public connection.
 
 If identity precompile proofs resume later, connect independent byte-copy/gas
 semantics to the actual fixed runtime dispatcher and public execution. An
 arbitrary-precompile-code preservation premise cannot establish correctness of
 that dispatcher. Isolated helper results do not complete the public connection.
 
-After the initial campaign works, prioritize proofs that resolve an ambiguous
-comparison or support the next enabled feature. A formal source-emitter theorem
+Prioritize proofs that resolve an ambiguous comparison or support the next
+enabled feature. A formal source-emitter theorem
 would strengthen the primary oracle. It is separate from both Core typing and
 the Rust compiler's correctness.
 
-## Planning estimates
+## Original planning estimates
 
-These estimates assume one engineer familiar with the repository and working
-local toolchains. They include implementation and validation, but exclude fixes
-to compiler bugs discovered by the campaign. They are effort ranges, not dates.
+These pre-implementation estimates are retained as planning history, not
+remaining effort or measured delivery time. They assume one engineer familiar
+with the repository and working local toolchains. They include implementation
+and validation, but exclude fixes to compiler bugs discovered by the campaign.
+They are effort ranges, not dates.
 
 | Scope | Estimated effort |
 | --- | --- |
@@ -906,9 +913,9 @@ Read this document, the synthesis modules, `scripts/RUST_PARITY.md`, and the
 current Git status before changing the implementation. Keep this milestone
 table current and record completed deliverables with their verification.
 
-Use logical commits: settle existing proof changes, add source emission, add
-execution comparison, then add reduction/campaign operation. Do not mix an
-unrelated proof expansion into the differential harness. Preserve unknown local
+Use logical commits for each operational extension and its verification,
+following the next roadmap. Do not mix an unrelated proof expansion into the
+differential harness. Preserve unknown local
 changes until they have been inspected. Keep `questions.md` ignored for local
 uncertainties; put confirmed regression cases and public limitations in tracked
 tests and documentation.

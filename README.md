@@ -41,8 +41,8 @@ Source files are supplied as a `Workspace.RawWorkspace`. The
 [execution tests](Solcore/Test/SourceCoreExecution.lean) show how to compile a
 workspace, open a session, call an entry point, and resume after the fuel runs
 out. They also cover recursive functions, closures with mutable captures, and
-mappings. See the [API guide](docs/design/core-runtime-unification-api.md) for
-values, handles, snapshots, and execution options.
+mappings. See the [runtime API overview](docs/design/core-runtime-unification.md#public-runtime-api)
+for values, handles, snapshots, and execution options.
 
 ## Running solcore-rs output
 
@@ -83,7 +83,7 @@ expectations on Core. Three fixtures fail upstream source checks before export.
 [RUST_PARITY.md](scripts/RUST_PARITY.md) lists the gates and how to reproduce them.
 The Rust EVM reference runs separately through Sonatina at O0 and O2 and through
 Yul compiled by solc. These checks compare each execution with fixture
-expectations; they do not yet compare arbitrary generated programs directly.
+expectations; generated differential comparisons use the separate runners below.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the
 native Lean source checker to every Rust feature. Recursive references use the
@@ -223,6 +223,10 @@ reduction and archive replay also pass, including replay after moving the
 archive. See [module comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-module-bundles-and-mixed-features).
 M6 is complete within these bounded profiles. This does not establish
 language-wide coverage or prove source-emitter meaning preservation.
+The [next implementation roadmap](docs/design/next-implementation-roadmap.md)
+prioritizes CI and scheduled bounded campaigns, generated O2/Yul comparisons,
+and additional runtime operations. The local runners exist; continuous CI
+campaigns have not yet been deployed.
 
 ## Code layout
 
