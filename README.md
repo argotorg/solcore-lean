@@ -198,9 +198,15 @@ exact archive replay passes. See the [call runner](scripts/semantic-call-differe
 and [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-parentchild-calls).
 All fourteen fixed call scenarios and 38 transaction prefixes match, and log
 differences survive failure-preserving reduction and replay. M5 is complete for
-these restricted profiles. Gas and nonce equivalence, arbitrary storage/accounts, precompiles
-and deeper calls are outside these comparisons. Selected generics, closures,
-comptime and module combinations remain planned.
+these restricted profiles. Gas and nonce equivalence, arbitrary storage/accounts,
+precompiles and deeper calls are outside these comparisons.
+
+The generic profile instantiates one source selection function at Word, pair
+and sum types, with a checked monomorphic Core reference. All 28 fixed cases
+agree across the three paths. Saved-run replay and failure-preserving reduction
+also pass, including type-preserving reduction of a runtime-input case.
+Capturing closures, comptime and module combinations are the remaining planned
+slices. See [generic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md#compare-generic-selection).
 
 ## Code layout
 

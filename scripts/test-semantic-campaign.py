@@ -84,6 +84,19 @@ def loop_policy_case(mask=7, value=7, helpers=2):
     return case
 
 
+def generic_policy_case(variant="word", value=1, helpers=2):
+    """Generic transport/coverage fixture; not a simulated compiler result."""
+    case = loop_policy_case(7, value, helpers)
+    step = case.pop('loopPlan')['stepProgram']
+    case.update(schema=campaign.m2.GENERIC_CASE_SCHEMA,
+        genericPlan={'schema': 'solcore-lean.generic-plan.v1', 'variant': variant, 'stepProgram': step})
+    case['contract'].update(name='SynthesizedGenerics', deployPath=['SynthesizedGenericsDeploy'],
+        runtimePath=['SynthesizedGenericsDeploy', 'SynthesizedGenerics'])
+    case['provenance']['origin'].update(kind='generic-generated', variant=variant)
+    del case['provenance']['origin']['mask']
+    return case
+
+
 class AnalysisTests(unittest.TestCase):
     def test_normal_analysis_never_changes_observations(self):
         report = matched()
@@ -741,6 +754,119 @@ class LoopCoverageTests(unittest.TestCase):
             summary = json.loads((output / 'summary.json').read_text())
             self.assertEqual(summary['status'], 'coverage-incomplete')
             self.assertEqual(summary['loopCoverage']['missingIterations'], [0, 3])
+
+
+class GenericCoverageTests(unittest.TestCase):
+    def manifest(self):
+        case = generic_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-generics',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS['runtime-generics'])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.INPUT_BOUNDARIES),
+            'requiredHelperCounts': [1, 2, 3],
+            'genericRequirements': {'instantiations': [v + ':' + p for v in ('word', 'pair', 'sum') for p in ('even', 'odd')]},
+            'cases': [{'id': 'generic', 'input': '1', 'genericPlan': case['genericPlan'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_generic_requirements_and_plan_are_profile_specific(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        for invalid in (None, {}, {'instantiations': ['word:even', 'word:even']},
+                {'instantiations': ['closure:odd']}, {'instantiations': [True]},
+                {'instantiations': ['word:even'], 'unknown': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'genericRequirements': invalid})
+        entry = value['cases'][0]
+        for changed in ({**entry, 'program': {}}, {**entry, 'generation': {'seed': '0', 'maxProgramNodes': 384}},
+                {'id': 'generic', 'input': '1', 'program': {}, 'expectedFeatures': []},
+                {'id': 'generic', 'input': '1', 'loopPlan': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        for profile in ('runtime-aggregates', 'runtime-loops', 'closed-g0'):
+            with self.assertRaises(ValueError):
+                campaign.generic_requirements({'profile': profile, 'genericRequirements': value['genericRequirements']})
+        for missing in campaign.PROFILE_VERSION_FIELDS['runtime-generics']:
+            invalid = copy.deepcopy(value)
+            del invalid[missing]
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_coverage_crosses_type_and_parity_and_excludes_wrapper_helpers(self):
+        for variant in ('word', 'pair', 'sum'):
+            for value in (0, 1, 2**255, 2**256 - 1):
+                case = generic_policy_case(variant, value, 3)
+                case['program'] = {}  # Only the original step declares counted helpers.
+                self.assertEqual(campaign.helper_counts(case), {3})
+                self.assertEqual(campaign.specified_generics(case), {variant + (':odd' if value & 1 else ':even')})
+                self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+        self.assertEqual(campaign.specified_generics(loop_policy_case()), set())
+        case['genericPlan']['stepProgram']['resultType'] = 'word'
+        with self.assertRaises(ValueError):
+            campaign.helper_counts(case)
+        case['provenance']['origin']['stepOrigin']['kind'] = 'mutation-generated'
+        with self.assertRaises(ValueError):
+            campaign.generation_recipes(case)
+
+    def test_generated_manifest_requests_all_four_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases = 'runtime-generics', 1
+            value = self.manifest()
+            del value['cases'][0]['genericPlan']
+            value['cases'][0]['generation'] = {'seed': '0', 'maxProgramNodes': 384}
+            config.corpus = Path(directory) / 'manifest.json'
+            config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config)
+            calls = []
+            def tool(arguments, stage):
+                calls.append((arguments, stage))
+                return {'cases': [generic_policy_case()]}
+            instance.tool = tool
+            self.assertEqual(len(instance.prepare_cases()['cases']), 1)
+            self.assertEqual(calls, [(['generic-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+            self.assertEqual(instance.summary['genericCoverage']['generatedInstantiations'], ['word:odd'])
+            self.assertEqual(instance.summary['genericCoverage']['matchedInstantiations'], [])
+
+    def test_rejections_and_exhaustion_do_not_satisfy_instantiation_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-generics', 3, 0
+            instance = campaign.Campaign(config)
+            cases = [generic_policy_case(variant) for variant in ('word', 'pair', 'sum')]
+            instance.summary['genericCoverage']['requiredInstantiations'] = ['word:odd', 'pair:odd', 'sum:odd']
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 3, 'attempted': 3, 'status': 'complete'}
+            def execute_case(case):
+                variant = case['genericPlan']['variant']
+                folder = instance.work / variant
+                folder.mkdir()
+                report = matched()
+                if variant != 'word':
+                    report['comparison'] = {'category': 'inconclusive-resource' if variant == 'pair' else 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['genericCoverage']
+            self.assertEqual(coverage['generatedInstantiations'], ['pair:odd', 'sum:odd', 'word:odd'])
+            self.assertEqual(coverage['matchedInstantiations'], ['word:odd'])
+            self.assertEqual(coverage['missingInstantiations'], ['pair:odd', 'sum:odd'])
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_missing_instantiation_fails_an_otherwise_matched_campaign(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+            def run(instance):
+                instance.summary['status'] = 'complete'
+                instance.summary['counts'].update(generated=1, executed=1, completed=1, matched=1)
+                instance.summary['genericCoverage'].update(requiredInstantiations=['word:even', 'word:odd'],
+                    generatedInstantiations=['word:odd'], matchedInstantiations=['word:odd'])
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-generics', '--cases', '1']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 1)
+            summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(summary['status'], 'coverage-incomplete')
+            self.assertEqual(summary['genericCoverage']['missingInstantiations'], ['word:even'])
 
 
 class CancellationTests(unittest.TestCase):

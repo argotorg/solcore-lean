@@ -847,3 +847,69 @@ M5 is complete within its documented profiles. The bounded-call domain is one in
 one child, valid Word calldata, fixed initial balances and slots zero/one.
 Gas/nonce equivalence, precompiles, arbitrary accounts and deeper calls remain
 outside this profile.
+
+
+## Compare generic selection
+
+The `runtime-generics` profile uses a genuinely polymorphic source function
+`sc_select<a>(flag, left, right)` at Word, `(word, word)` or `sum<word, word>`.
+Each plan contains an independently checked aggregate step graph. The wrapper
+computes `left = step(input)` and `right = step(input + 1)` in order before
+selection. Odd input selects the left candidate; even input selects the right.
+Pair candidates include the original or incremented input as their second
+field, and the result sums both fields. Sum candidates use distinct
+constructors, and the right branch adds one to its payload. Each selected
+value therefore contributes to the returned ABI Word.
+
+The original Core reference contains a monomorphic curried selector closure
+and the complete applied step graph. It does not import Rust's specialized
+program or computed result. The full program passes the Core checker; the
+source emitter's meaning preservation remains unproved.
+
+```sh
+lake build semanticCaseTool rustHullScenario
+python3 scripts/semantic-campaign.py \
+  --profile runtime-generics --seed 1 --nodes 384 --cases 12 --attempts 256 \
+  --output .upstream/semantic-generics
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-generic-corpus.json --seconds 600 \
+  --output .upstream/semantic-generic-ci
+python3 Tests/scripts/test-semantic-generic-corpus.py
+```
+
+Native commands are `generic-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`generic-emit PLAN.json INPUT [FUEL]`. A plan has schema
+`solcore-lean.generic-plan.v1`, a canonical checked `stepProgram`, and `variant`
+equal to `word`, `pair` or `sum`. The case contains both `genericPlan` and its
+complete applied original Core `program`. `observe`, `replay` and `shrink` use
+the same commands as earlier pure profiles. The 512-node limit includes all
+selector and ABI-input reference syntax; the step alone cannot exhaust that
+budget and then hide additional wrapper nodes.
+
+Generated plans use the four boundary inputs zero, one, maximum Word and the
+high bit. Both the step and full reference must return at least two distinct
+boundary results. Imported and reduced constant computations remain valid.
+Seeded provenance is regenerated; every saved program, source, type variant,
+input and ABI is reconstructed. Reduction preserves the type variant, helper
+count and typed binder inventory while strictly decreasing the complete
+reference. A reduced case records its canonical parent plan and input; replay
+checks the claimed decrease instead of trusting a `reduced` label.
+
+The corpus's `genericRequirements.instantiations` contains the six combinations
+`word:even`, `word:odd`, `pair:even`, `pair:odd`, `sum:even` and `sum:odd`.
+`genericCoverage` records these prescribed combinations only after real
+three-way agreement. They are not measured specialization or opcode coverage.
+The step AST feature inventory and declared helper count exclude the selector
+and ABI wrapper. Rejection, resource exhaustion and missing paths cannot meet
+coverage requirements. The common campaign's archive replay, explicit synthetic
+mismatch adapter and reduction checks apply unchanged.
+
+The fixed corpus contains 28 cases across seven plans. All passed the actual
+three-path comparison, covering nineteen step AST features, all four step
+recipes, one through three helpers and every required variant/parity pair.
+Native validation also checks twelve strictly smaller candidates and fifteen
+negative cases. A separate generated pair case reduced its high-bit input to
+zero in eight accepted candidate executions while preserving the synthetic
+failure fingerprint and type. Original/reduced archive replay and synthetic
+replay passed. A fuel-one run remained inconclusive. Capturing closures,
+comptime and module combinations remain separate M6 slices.

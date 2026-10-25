@@ -70,7 +70,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
 | M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Complete, 2026-10-25 |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Complete, 2026-10-25 |
-| M6 | Add selected generics, closures, comptime and module combinations. | Planned |
+| M6 | Add selected generics, closures, comptime and module combinations. | In progress: generic selection complete |
 
 M1 through M3 are the first operational milestone. Do not begin M4 while the
 basic comparison cannot reproduce and reduce its own failures.
@@ -442,9 +442,9 @@ The bounded-loop slice completes the restricted M4 scope:
   cases from the older five profiles retained identical artifacts and
   observations. Focused protocol/campaign regressions passed.
 
-M4 and M5 are complete within the documented restrictions. M6 remains
-planned. Stateful scenarios retain an original Core reference that does not
-share the Rust frontend.
+M4 and M5 are complete within the documented restrictions. M6 is in progress.
+Stateful scenarios retain an original Core reference that does not share the
+Rust frontend.
 
 M5 proceeds in three connected slices:
 
@@ -696,6 +696,65 @@ M5 is complete within these fixed storage, rollback and depth-one call profiles.
 
 Commands are in
 [Bounded parent/child comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-parentchild-calls).
+
+M6 proceeds in four connected slices:
+
+- **M6a: generic selection.** Instantiate one source `select<a>` at Word,
+  internal Word pair, and internal Word sum types. Evaluate the two step
+  arguments eagerly in order; select using runtime input parity and consume
+  the selected payload in the ABI result. The original Core reference uses a
+  checked monomorphic selector and the original aggregate step graph. Keep
+  the selected type during shrinking. Require both input parities for all
+  three types in the fixed corpus.
+- **M6b: capturing closures.** Capture runtime Word values, change the outer
+  local after creation, invoke a closure more than once, and combine two
+  independently created captures. Use actual Core lambdas with snapshots of
+  Word values, following the pinned compiler's capture semantics. Start with
+  fixed callable identities; dynamic identity selection and mutation through
+  captured values are outside this slice.
+- **M6c: comptime.** Evaluate a closed arithmetic expression through an actual
+  source `comptime` parameter and return, then combine it with runtime input.
+  The reference evaluates the original expression in Core; it must not reuse
+  a Rust-computed constant as its expected answer. Reduce the checked closed
+  expression and runtime step independently, then reconstruct the whole case.
+- **M6d: modules and mixed features.** Emit a bounded bundle of flat source
+  files with explicit imports/exports. All providers must contribute to the
+  result. Exercise combinations of generic selection, captured closures and
+  comptime. Save and verify every generated file, normalize generated module
+  provenance by its canonical relative name, and retain separate pinned
+  library provenance so exact replay works after moving an archive.
+
+Delivered M6a:
+
+- Sealed generic plans retain a checked aggregate step graph and one of three
+  type variants. The complete monomorphic Core reference and its application
+  satisfy the whole-program checker and its typing theorem. Source emits the
+  genuine polymorphic selector; the runtime candidates are evaluated eagerly.
+- The fixed 28-case corpus covers seven plans, nineteen step AST features,
+  helper counts one through three, all four step recipes, all four Word
+  boundary inputs and all six variant/parity combinations. All 28 cases pass
+  actual checked Rust compilation and agree across original Core, imported
+  Hull and Sonatina O0 on local Anvil.
+- Native validation reconstructs every case twice, executes and replays it,
+  checks twelve strictly smaller candidates across all three variants and
+  rejects fifteen tampered or out-of-budget cases. Separate native checks
+  covered twelve original and 48 reduced cases. Forty-eight saved cases from
+  the six previous pure profiles retained byte-identical artifacts and results.
+- A generated pair case with high-bit input was reduced in eight accepted
+  candidate executions, retaining its type and mismatch fingerprint; its
+  final input is zero. These differences were introduced only in a separate
+  test analysis after actual agreement. Original and reduced archive replays
+  matched, and synthetic replay reproduced the same fingerprint. The attempt
+  limit was recorded; this is not a minimality claim.
+- Fuel-one execution was inconclusive rather than matched. Thirty adapter and
+  46 campaign regressions passed, as did the existing stateful policy suites,
+  the full repository build/tests and semantic-kernel check. No upstream
+  compiler bug was found in this slice.
+
+Each slice requires fresh three-way execution, strict native reconstruction,
+failure-preserving reduction, a fixed corpus and saved-run replay. M6 remains
+in progress until all four slices meet those requirements. None establishes
+formal correctness of the source emitter or unrestricted feature coverage.
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

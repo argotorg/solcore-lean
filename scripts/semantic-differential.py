@@ -33,12 +33,15 @@ FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
 LOOP_CASE_SCHEMA = "solcore-lean.semantic-loop-case.v1"
+GENERIC_CASE_SCHEMA = "solcore-lean.semantic-generic-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
-                 AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops"}
+                 AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
+                 GENERIC_CASE_SCHEMA: "runtime-generics"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
-                  AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops"}
+                  AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
+                  GENERIC_CASE_SCHEMA: "SynthesizedGenerics"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -132,6 +135,17 @@ def validate_loop_plan(plan) -> dict:
     return plan
 
 
+def validate_generic_plan(plan) -> dict:
+    """Check the transport envelope; native replay authenticates the full plan."""
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.generic-plan.v1":
+        raise ValueError("unsupported generic plan schema")
+    if plan.get("variant") not in ("word", "pair", "sum"):
+        raise ValueError("generic variant must be word, pair or sum")
+    if not isinstance(plan.get("stepProgram"), dict):
+        raise ValueError("generic plan requires its original step function graph")
+    return plan
+
+
 def validate_case(case: dict) -> None:
     if not isinstance(case, dict) or case.get("schema") not in CASE_PROFILES:
         raise ValueError("unsupported semantic case schema")
@@ -139,6 +153,8 @@ def validate_case(case: dict) -> None:
         raise ValueError("case requires its original Core program and emitted source")
     if case["schema"] == LOOP_CASE_SCHEMA:
         validate_loop_plan(case.get("loopPlan"))
+    if case["schema"] == GENERIC_CASE_SCHEMA:
+        validate_generic_plan(case.get("genericPlan"))
     provenance = case.get("provenance")
     if not isinstance(provenance, dict):
         raise ValueError("case provenance is missing")
@@ -465,7 +481,8 @@ def execute(args, report: dict) -> None:
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
-        LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word"
+        LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
+        GENERIC_CASE_SCHEMA: "runtime Word input, generic Word/pair/sum selection versus checked monomorphic Core, aggregate step graph, Sonatina O0, run(uint256) ABI Word"
     }[case["schema"]]
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))
@@ -498,7 +515,7 @@ def execute(args, report: dict) -> None:
         [str(args.case_tool), "replay", str(case_path), str(args.direct_fuel)])
     fresh = json.loads(refreshed["stdout"])
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "genericPlan"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
     (args.output / "replayed-case.json").write_bytes(json_bytes(fresh))

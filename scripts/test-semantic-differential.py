@@ -72,13 +72,15 @@ class CaseProfileTests(unittest.TestCase):
 
     def test_named_function_profile_retains_the_runtime_argument(self):
         for schema in (runner.FUNCTION_CASE_SCHEMA, runner.MUTATION_CASE_SCHEMA,
-                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA):
+                       runner.AGGREGATE_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA, runner.GENERIC_CASE_SCHEMA):
             name = runner.CASE_CONTRACTS[schema]
             for value in (0, 1, 2**255, 2**256 - 1):
                 case = self.input_case(value)
                 case["schema"] = schema
                 if schema == runner.LOOP_CASE_SCHEMA:
                     case["loopPlan"] = {"schema": "solcore-lean.loop-plan.v1", "mask": 7, "stepProgram": {}}
+                if schema == runner.GENERIC_CASE_SCHEMA:
+                    case["genericPlan"] = {"schema": "solcore-lean.generic-plan.v1", "variant": "sum", "stepProgram": {}}
                 case["contract"].update(name=name,
                     deployPath=[name + "Deploy"], runtimePath=[name + "Deploy", name])
                 runner.validate_case(case)
@@ -97,6 +99,17 @@ class CaseProfileTests(unittest.TestCase):
         for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None}):
             with self.assertRaises(ValueError):
                 runner.validate_loop_plan(invalid)
+
+    def test_generic_plan_requires_an_admitted_type_and_original_step(self):
+        plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
+        for variant in ("word", "pair", "sum"):
+            runner.validate_generic_plan({**plan, "variant": variant})
+        for variant in (True, 0, None, [], {}, "closure", "Word", "word "):
+            with self.assertRaises(ValueError):
+                runner.validate_generic_plan({**plan, "variant": variant})
+        for invalid in (None, {}, {**plan, "schema": "unknown"}, {**plan, "stepProgram": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_generic_plan(invalid)
 
 
 class ClassificationTests(unittest.TestCase):
