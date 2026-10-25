@@ -180,9 +180,17 @@ replay are available through `semantic-storage-tool`; the separate
 [storage runner](scripts/semantic-storage-differential.py) performs fresh
 three-way comparisons. Bounded storage campaigns include failure-preserving
 sequence reduction; all ten fixed scenarios and 27 transaction prefixes agree.
-M5 remains in progress, with rollback and external-call profiles still to
-follow. Gas, balances, nonce and arbitrary storage are outside this
-initial comparison. Selected generics/closures/comptime/module combinations
+
+A separately versioned rollback profile writes both slots before reverting odd
+inputs with a 32-byte payload; even inputs return normally. All eight external
+scenarios and 21 transactions agree across the three paths, including retained
+committed storage after each revert and exact archive replay. The fixed rollback
+corpus passes native validation and actual three-way comparison for twelve
+scenarios and 33 transaction prefixes. Failure reduction preserves reverted outcomes and payload
+differences, including when earlier transactions are removed.
+M5 remains in progress for bounded external calls, logs and
+value transfers. Gas, balances, nonce and arbitrary storage are outside the
+delivered comparisons. Selected generics/closures/comptime/module combinations
 remain planned.
 
 ## Code layout

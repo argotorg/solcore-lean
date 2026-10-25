@@ -583,9 +583,10 @@ and rewriting a slot, fresh private cells, arbitrary entries and aggregate
 branches. Changing the input sequence leaves the original Core contract and
 source unchanged. Full repository build/tests and the kernel policy check pass.
 
-M5 remains in progress. The delivered comparison admits valid `run(uint256)` inputs, zero
-call value, initially empty literal slots zero and one, and successful Word
-returns. Rollback and external-call profiles remain separate work. This scope
+M5 remains in progress. This first storage profile admits valid `run(uint256)`
+inputs, zero call value, initially empty literal slots zero and one, and
+successful Word returns. The rollback profile below extends completion
+behavior; external calls remain separate work. This scope
 does not establish equivalence of arbitrary storage, gas, balances, nonce,
 logs, account lifecycle or the source emitter itself.
 
@@ -643,3 +644,81 @@ removed by a candidate cannot preserve that synthetic finding. The integrated
 check reduced three transactions to only `tx-1`, retained the same fingerprint,
 and passed both fresh actual archive replay and synthetic replay. Genuine
 findings discovered while shrinking are retained separately.
+
+## Compare rollback after storage writes
+
+The `stateful-storage-rollback` profile keeps the two-slot feedback protocol and
+uses `SynthesizedRollback.run(uint256)`. Both writes and the final slot reads
+execute before the original ABI input selects completion: an odd input reverts
+with the tentative slot sum encoded as exactly 32 bytes; an even input returns
+that same Word. A reverted call retains the immediately preceding committed
+world, while its output describes the tentative computation. A zero payload
+still contains 32 bytes.
+
+The original Core contract uses the existing typed `wordOutcomeV1` convention.
+`ContractRuntime` selects the committed or rolled-back world; the Core wrapper
+does not restore storage itself. The source emits `mstore(0, result)` followed
+by `revert_(0, 32)` in the odd-input branch. The comparison requires matching
+status, payload and committed storage at every prefix, and independently checks
+that each reverted snapshot equals its predecessor.
+
+Build the new native case tool:
+
+```sh
+lake build semanticStorageRollbackTool rustHullStorageScenario
+```
+
+`semantic-storage-rollback-tool` provides the same `generate`, `emit`, `replay`,
+`observe` and `shrink` commands as the storage tool above. Its plan schema is
+`solcore-lean.storage-rollback-plan.v1`, and its case schema is
+`solcore-lean.semantic-storage-rollback-case.v1`. Generated scenarios use an
+even/odd/even sequence and must complete as return/revert/return under actual
+Core execution. Imported and reduced scenarios may have any parity pattern
+within the one-to-three transaction limit. Existing successful-storage cases
+retain their own schema, source and completion policy.
+
+The same comparison and campaign scripts select the native tool and completion
+rules from the saved case or corpus profile. Use
+`--profile stateful-storage-rollback` for a seed search. The storage runner enables Anvil's
+`--steps-tracing`: a failed receipt counts as an explicit revert only when its
+trace confirms terminal `REVERT`, after resource errors have been excluded.
+Out-of-gas, fuel exhaustion and exceptional failure never become matching
+rollbacks. Archive replay retains the usual tool-hash and budget checks.
+
+```sh
+python3 scripts/test-source-storage-rollback-rust.py
+python3 Tests/scripts/test-semantic-storage-corpus.py \
+  --manifest scripts/semantic-storage-rollback-corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-storage-rollback-corpus.json \
+  --output .upstream/semantic-storage-rollback-ci --seconds 600
+```
+
+The external suite passed eight scenarios and 21 actual transactions, including
+twelve returns and nine reverts, followed by exact archive replay. Cases cover
+success/revert/success, consecutive reverts, an initial all-zero revert payload,
+rollback of a tentative slot deletion, fresh private cells, arbitrary entries,
+aggregate branches and zero writes. The original Core contract and source stay
+fixed when transaction inputs change.
+
+The fixed twelve-scenario corpus passed native materialization, replay and all
+33 transactions. It covers twenty step AST features, the six boundary inputs,
+one through three declared helpers and transactions, and all four generator
+templates. `requiredOutcomes` and `requiredCompletionPatterns` add coverage for
+both return/revert and four ordered completion patterns, measured from completed
+histories. This native validator does not execute the EVM. The separate actual
+campaign also passed all twelve scenarios and 33 prefixes, with complete
+coverage. The ten-scenario M5a campaign still passed all 27 prefixes with step
+tracing enabled.
+
+A copied reverted-payload difference at `tx-1` accepted nine reductions in
+twelve candidate executions, leaving only the same reverting transaction.
+Every actual candidate report matched. Exact archive replay and fresh synthetic
+replay reproduced actual agreement and the same synthetic failure fingerprint.
+For this profile, a reducer cannot preserve a reverted-payload finding by
+turning it into a normal return, an empty payload or resource exhaustion.
+
+Full repository build/tests and kernel policy passed, along with forty storage
+protocol and 24 campaign regressions. M5 remains in progress: bounded external
+calls, logs and value transfers belong to M5c. The rollback profile retains the
+initially empty two-slot domain, valid Word calldata and zero call value.

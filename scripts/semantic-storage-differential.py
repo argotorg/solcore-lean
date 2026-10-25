@@ -26,6 +26,16 @@ spec = importlib.util.spec_from_file_location("semantic_common", ROOT / "scripts
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
 CASE_SCHEMA = "solcore-lean.semantic-storage-case.v1"
+ROLLBACK_CASE_SCHEMA = "solcore-lean.semantic-storage-rollback-case.v1"
+PROFILES = {
+    "stateful-storage": {"caseSchema": CASE_SCHEMA, "planSchema": "solcore-lean.storage-plan.v1",
+        "corpusSchema": "solcore-lean.semantic-storage-corpus.v1", "originKind": "storage-generated",
+        "contract": "SynthesizedStorage", "caseTool": "semantic-storage-tool", "rollback": False},
+    "stateful-storage-rollback": {"caseSchema": ROLLBACK_CASE_SCHEMA,
+        "planSchema": "solcore-lean.storage-rollback-plan.v1",
+        "corpusSchema": "solcore-lean.semantic-storage-rollback-corpus.v1", "originKind": "storage-rollback-generated",
+        "contract": "SynthesizedRollback", "caseTool": "semantic-storage-rollback-tool", "rollback": True},
+}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
 HISTORY_SCHEMA = "solcore-lean.storage-history.v1"
 PATHS = ("directCore", "importedHull", "rustEvm")
@@ -38,20 +48,33 @@ def save(path: Path, value) -> None:
     path.write_bytes(common.json_bytes(value))
 
 
+def profile(case: dict) -> dict:
+    if isinstance(case, dict):
+        for value in PROFILES.values():
+            if case.get("schema") == value["caseSchema"]:
+                return value
+    raise ValueError("unsupported storage case schema")
+
+
+def expected_status(case: dict, transaction: dict) -> str:
+    """The profile fixes completion polarity, not the returned value or world."""
+    return "reverted" if profile(case)["rollback"] and int(common.word(transaction["input"])) % 2 else "returned"
+
+
 def validate_case(case) -> None:
-    if not isinstance(case, dict) or case.get("schema") != CASE_SCHEMA:
-        raise ValueError("unsupported storage case schema")
+    selected = profile(case)
     plan = case.get("storagePlan")
-    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.storage-plan.v1" or not isinstance(plan.get("stepProgram"), dict):
+    if not isinstance(plan, dict) or plan.get("schema") != selected["planSchema"] or not isinstance(plan.get("stepProgram"), dict):
         raise ValueError("storage case requires its original checked step plan")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
     if case.get("initialState") != {"storage": []} or case.get("observedSlots") != list(SLOTS):
         raise Finding("unsupported-scope", "input", "storage profile starts empty and observes slots zero and one")
     contract = case.get("contract")
-    expected = {"name": "SynthesizedStorage", "method": "run", "signature": "run(uint256)",
-        "selector": "0xa444f5e9", "deployPath": ["SynthesizedStorageDeploy"],
-        "runtimePath": ["SynthesizedStorageDeploy", "SynthesizedStorage"], "constructorCalldata": "0x"}
+    name = selected["contract"]
+    expected = {"name": name, "method": "run", "signature": "run(uint256)",
+        "selector": "0xa444f5e9", "deployPath": [name + "Deploy"],
+        "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x"}
     if contract != expected:
         raise Finding("unsupported-scope", "input", "storage wrapper differs from the fixed profile")
     provenance = case.get("provenance")
@@ -135,6 +158,7 @@ def compare(histories: dict, case: dict) -> dict:
     if set(histories) != set(PATHS):
         return {"category": "adapter-error", "stage": "comparison", "detail": "three histories required", "pairs": {}}
     try:
+        profile(case)
         values = {name: normalize_history(histories[name], case) for name in PATHS}
     except (ValueError, KeyError, TypeError) as error:
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
@@ -153,8 +177,13 @@ def compare(histories: dict, case: dict) -> dict:
             return {"category": "execution-error", **where, "pairs": {}}
         pairs = pairwise(rows)
         fields = [key for key in ("status", "output", "committedStorage") if len({json.dumps(row[key], sort_keys=True) for row in rows.values()}) != 1]
-        normal = all(row["status"] == "returned" and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows.values())
-        if not all(pairs.values()) or not normal:
+        normal = all(row["status"] == expected_status(case, tx) and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows.values())
+        rollback = all(row["status"] != "reverted" or row["committedStorage"] ==
+            (values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])
+            for name, row in rows.items())
+        if not rollback and "committedStorage" not in fields:
+            fields.append("committedStorage")
+        if not all(pairs.values()) or not normal or not rollback:
             return {"category": "semantic-mismatch", **where, "pairs": pairs, "fields": fields or ["status", "output"]}
     return {"category": "matched", "stage": "completed-history", "pairs": pairwise(values)}
 
@@ -314,7 +343,7 @@ def execute(args, report: dict) -> None:
     images = common.read_json(images_path, args.artifact_limit)
     init = common.image_bytes(images, case["contract"]["deployPath"])
     runtime = common.image_bytes(images, case["contract"]["runtimePath"])
-    with common.anvil(runner, args.anvil) as rpc:
+    with common.anvil(runner, args.anvil, steps_tracing=True) as rpc:
         accounts = rpc.call("eth_accounts", [])
         if not accounts or not re.fullmatch(r"0x[0-9a-fA-F]{40}", accounts[0]):
             raise ValueError("local Anvil supplied no valid sender")
@@ -408,7 +437,7 @@ def main() -> int:
     selection.add_argument("--case", type=Path)
     selection.add_argument("--replay", type=Path)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-storage-tool")
+    parser.add_argument("--case-tool", type=Path)
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-storage-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
@@ -418,6 +447,13 @@ def main() -> int:
     for key in defaults:
         parser.add_argument("--" + key.replace("_", "-"), type=float if "timeout" in key else int)
     args = parser.parse_args()
+    try:
+        selected = common.read_json(args.replay / "case.json" if args.replay else args.case)
+        validate_case(selected)
+        if args.case_tool is None:
+            args.case_tool = ROOT / ".lake/build/bin" / profile(selected)["caseTool"]
+    except (ValueError, OSError, KeyError, TypeError, Finding) as error:
+        parser.error(str(error))
     saved = common.read_json(args.replay / "report.json", defaults["artifact_limit"]).get("budgets", {}) if args.replay else {}
     for key, default in defaults.items():
         explicit = getattr(args, key)

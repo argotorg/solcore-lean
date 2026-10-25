@@ -43,6 +43,7 @@ RESOURCE = "inconclusive-resource"
 SHRINKABLE = legacy.SHRINKABLE
 VERSIONS = ("generatorVersion", "profileVersion", "functionVersion", "templateVersion", "stepProfileVersion",
             "stepFunctionVersion", "stepTemplateVersion", "emitterVersion", "wrapperVersion")
+DIMENSIONS = ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templates", "Outcomes", "CompletionPatterns")
 
 
 def case_hash(case):
@@ -59,7 +60,7 @@ def helper_count(case):
 
 def recipes(case):
     origin = case["provenance"].get("origin", {})
-    if origin.get("kind") != "storage-generated":
+    if origin.get("kind") != adapter.profile(case)["originKind"]:
         return set()
     step = origin.get("stepOrigin")
     if not isinstance(step, dict) or step.get("kind") != "aggregate-generated":
@@ -77,8 +78,9 @@ def recipes(case):
 
 
 def validate_manifest(manifest):
-    if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("profile") != "stateful-storage":
+    if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("profile") not in adapter.PROFILES:
         raise ValueError("unsupported storage corpus manifest")
+    selected = adapter.PROFILES[manifest["profile"]]
     if manifest.get("coverageKind") != "step-core-ast-features":
         raise ValueError("storage corpus coverage must name the step AST")
     for key in VERSIONS:
@@ -100,6 +102,16 @@ def validate_manifest(manifest):
     values = requirements["templates"]
     if not isinstance(values, list) or any(type(v) is not int or v not in range(4) for v in values) or len(set(values)) != len(values):
         raise ValueError("invalid storage template requirements")
+    outcomes = manifest.get("requiredOutcomes", [])
+    patterns = manifest.get("requiredCompletionPatterns", [])
+    if selected["rollback"]:
+        if not isinstance(outcomes, list) or any(not isinstance(v, str) for v in outcomes) or sorted(outcomes) != ["returned", "reverted"]:
+            raise ValueError("rollback coverage requires returned and reverted outcomes")
+        if not isinstance(patterns, list) or not patterns or any(not isinstance(v, str) or
+                not 1 <= len(v.split(",")) <= 3 or any(s not in outcomes for s in v.split(",")) for v in patterns) or len(set(patterns)) != len(patterns):
+            raise ValueError("invalid rollback completion pattern requirements")
+    elif outcomes or patterns:
+        raise ValueError("completion requirements belong to the rollback profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -124,7 +136,7 @@ def validate_manifest(manifest):
             if int(seed) >= 2**64 or type(nodes) is not int or not 1 <= nodes <= 512:
                 raise ValueError("storage generation request exceeds bounds")
         else:
-            if not isinstance(entry["storagePlan"], dict) or entry["storagePlan"].get("schema") != "solcore-lean.storage-plan.v1":
+            if not isinstance(entry["storagePlan"], dict) or entry["storagePlan"].get("schema") != selected["planSchema"]:
                 raise ValueError("invalid imported storage plan")
             # Full source/host checking and canonical ABI validation are native.
             if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3:
@@ -213,7 +225,11 @@ def transaction_counts(histories, case):
         result["executed"] += bool(rows)
         complete = len(rows) == 3 and all(row["status"] in ("returned", "reverted") for row in rows)
         result["completed"] += complete
-        prefix = prefix and complete and all(row == rows[0] for row in rows) and all(row["status"] == "returned" and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows)
+        prefix = prefix and complete and all(row == rows[0] for row in rows) and all(
+            row["status"] == adapter.expected_status(case, tx) and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows)
+        prefix = prefix and all(row["status"] != "reverted" or row["committedStorage"] ==
+            (value["transactions"][index - 1]["committedStorage"] if index else value["initialStorage"])
+            for value in values.values() for row in value["transactions"][index:index + 1])
         result["matched"] += prefix
     return result
 
@@ -245,6 +261,8 @@ def count_outcome(counts, analysis, case):
 class Campaign:
     def __init__(self, args):
         self.args, self.started = args, time.monotonic()
+        self.profile = getattr(args, "profile", "stateful-storage")
+        self.specification = adapter.PROFILES[self.profile]
         self.deadline = self.started + args.seconds
         self.reserve = min(40 * 1024 * 1024, args.disk_bytes // 4)
         self.work = args.output / ".work"
@@ -252,13 +270,13 @@ class Campaign:
         self.counter = self.shrink_attempts = 0
         self.materialized = []
         self.summary = {"schema": SCHEMA, "status": "running", "synthetic": args.test_perturb_path is not None,
-            "configuration": {key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
+            "configuration": {"profile": self.profile, **{key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")}},
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path, "transactionId": args.test_transaction_id, "field": args.test_field} if args.test_perturb_path else None,
             "tools": {"campaignSha256": common.file_digest(Path(__file__)), "differentialSha256": common.file_digest(ROOT / "scripts/semantic-storage-differential.py"), "caseTool": str(args.case_tool)},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "transactionCounts": {"kind": "observed on any path; completed on all three; matched ordered prefixes; shrink executions excluded", "planned": 0, "executed": 0, "completed": 0, "matched": 0, "actualMatched": 0},
             "coverage": {"kind": "step AST features and declared helpers; native-verified generation recipes; inputs and sequence lengths of fully matched scenarios; not opcode traces",
-                         **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templates")}},
+                         **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in DIMENSIONS}},
             "cases": [], "materializedIds": [], "findings": [], "secondaryFindings": [],
             "retention": "input cases/compact receipts; complete archives for original/final/secondary findings; matched exports removed (use --case; exact archive replay unavailable)"}
         self.checkpoint()
@@ -268,7 +286,7 @@ class Campaign:
         counts["unexecuted"] = counts["generated"] - counts["executed"]
         tx = self.summary["transactionCounts"]
         tx["unobserved"] = tx["planned"] - tx["executed"]
-        for dimension in ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templates"):
+        for dimension in DIMENSIONS:
             coverage["missing" + dimension] = sorted(set(coverage["required" + dimension]) - set(coverage["matched" + dimension]), key=int if dimension == "Inputs" else None)
         self.summary.update(elapsedSeconds=round(time.monotonic() - self.started, 3), retainedBytes=directory_bytes(self.args.output), shrinkAttempts=self.shrink_attempts)
         save_json(self.args.output / "summary.json", self.summary)
@@ -294,15 +312,24 @@ class Campaign:
             self.summary["tools"]["caseToolSha256"] = runner.identity(self.args.case_tool)["sha256"]
         return value
 
-    def record_coverage(self, case, prefix):
+    def record_coverage(self, case, prefix, histories=None):
         values = {"Features": set(case["provenance"]["features"]), "Inputs": {tx["input"] for tx in case["transactions"]},
                   "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case)}
+        if prefix == "matched":
+            if histories is None or adapter.compare(histories, case)["category"] != "matched":
+                raise ValueError("coverage requires actual matched histories")
+            statuses = [row["status"] for row in histories["directCore"]["transactions"]]
+        else:
+            statuses = [adapter.expected_status(case, tx) for tx in case["transactions"]]
+        values.update(Outcomes=set(statuses), CompletionPatterns={",".join(statuses)})
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension == "Inputs" else None)
 
     def add_case(self, case, identifier):
         adapter.validate_case(case)
+        if case["schema"] != self.specification["caseSchema"]:
+            raise ValueError("case differs from the selected campaign profile")
         index = len(self.materialized)
         save_json(self.args.output / "cases" / f"{index:04d}.json", case)
         self.materialized.append(case)
@@ -318,7 +345,7 @@ class Campaign:
             return
         if not self.args.corpus:
             response = self.tool(["generate", self.args.seed, self.args.nodes, self.args.cases, self.args.attempts, self.args.direct_fuel], "generation")
-            if response.get("schema") != CORPUS_SCHEMA or not isinstance(response.get("cases"), list) or len(response["cases"]) > self.args.cases:
+            if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > self.args.cases:
                 raise ValueError("invalid native storage corpus")
             excluded = response.get("excluded", [])
             self.summary["counts"]["excluded"] = len(excluded)
@@ -329,11 +356,15 @@ class Campaign:
                 self.add_case(case, f"generated-{index}")
             return
         manifest = validate_manifest(common.read_json(self.args.corpus))
+        if manifest["profile"] != self.profile:
+            raise ValueError("manifest differs from the selected campaign profile")
         save_json(self.args.output / "corpus.json", manifest)
         self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": common.digest(common.json_bytes(manifest))}
         for dimension in ("Features", "Inputs", "HelperCounts", "TransactionCounts"):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
+        for dimension in ("Outcomes", "CompletionPatterns"):
+            self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         self.checkpoint()
         exclusions = []
         for entry in manifest["cases"][:self.args.cases]:
@@ -341,7 +372,7 @@ class Campaign:
             if "generation" in entry:
                 request = entry["generation"]
                 response = self.tool(["generate", request["seed"], request["maxProgramNodes"], 1, 1, self.args.direct_fuel], "corpus-generation")
-                if response.get("schema") != CORPUS_SCHEMA or not isinstance(response.get("cases"), list) or len(response["cases"]) > 1:
+                if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > 1:
                     raise ValueError("invalid bounded corpus generation")
                 if not response["cases"]:
                     exclusions.append({"id": entry["id"], "detail": response})
@@ -352,7 +383,7 @@ class Campaign:
                     continue
                 case = response["cases"][0]
                 origin = case["provenance"]["origin"]
-                if origin.get("kind") != "storage-generated" or any(origin.get(key) != request[key] for key in ("seed", "maxProgramNodes")):
+                if origin.get("kind") != self.specification["originKind"] or any(origin.get(key) != request[key] for key in ("seed", "maxProgramNodes")):
                     raise ValueError("native generation differs from requested seed/budget")
             else:
                 plan_path, tx_path = self.work / "plan.json", self.work / "transactions.json"
@@ -441,7 +472,7 @@ class Campaign:
                 limit = min(self.args.shrink_candidates, self.args.shrink_attempts - self.shrink_attempts)
                 response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
                 candidates = response.get("cases")
-                if response.get("schema") != CORPUS_SCHEMA or not isinstance(candidates, list) or len(candidates) > limit:
+                if response.get("schema") != self.specification["corpusSchema"] or not isinstance(candidates, list) or len(candidates) > limit:
                     raise ValueError("invalid native bounded shrink response")
                 accepted = False
                 for candidate in candidates:
@@ -486,7 +517,7 @@ class Campaign:
                     if accepted:
                         break
                 if not accepted:
-                    history["status"] = "no-preserving-candidate"
+                    history["status"] = "attempt-limit" if self.shrink_attempts >= self.args.shrink_attempts else "no-preserving-candidate"
                     break
             else:
                 history["status"] = "attempt-limit"
@@ -517,7 +548,7 @@ class Campaign:
                 self.summary["transactionCounts"][key] += value
             self.summary["transactionCounts"]["actualMatched"] += transaction_counts(report.get("histories", {}), case)["matched"]
             if category == "matched":
-                self.record_coverage(case, "matched")
+                self.record_coverage(case, "matched", report.get("histories"))
             save_json(self.args.output / "results" / f"{index:04d}.json", {"actualReport": compact_storage_report(report), "analysis": analysis})
             self.summary["cases"].append({"index": index, "id": self.summary["materializedIds"][index],
                 "case": f"cases/{index:04d}.json", "result": f"results/{index:04d}.json", "caseSha256": case_hash(case),
@@ -543,6 +574,7 @@ def main():
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path)
     selection.add_argument("--case", type=Path)
+    parser.add_argument("--profile", choices=tuple(adapter.PROFILES))
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--nodes", type=int, default=384)
     parser.add_argument("--cases", type=int)
@@ -555,7 +587,7 @@ def main():
     parser.add_argument("--direct-fuel", type=int, default=1000000)
     parser.add_argument("--core-fuel", type=int, default=10000000)
     parser.add_argument("--gas", type=int, default=10000000)
-    parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-storage-tool")
+    parser.add_argument("--case-tool", type=Path)
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-storage-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
@@ -565,10 +597,22 @@ def main():
     parser.add_argument("--test-field", choices=("output", "storage:0", "storage:1"), default="output")
     args = parser.parse_args()
     try:
+        selected_profile = args.profile
         if args.corpus:
-            validate_manifest(common.read_json(args.corpus))
+            manifest = validate_manifest(common.read_json(args.corpus))
+            if selected_profile is not None and selected_profile != manifest["profile"]:
+                raise ValueError("explicit profile differs from corpus")
+            selected_profile = manifest["profile"]
         if args.case:
-            adapter.validate_case(common.read_json(args.case))
+            case = common.read_json(args.case)
+            adapter.validate_case(case)
+            case_profile = next(name for name, specification in adapter.PROFILES.items() if case["schema"] == specification["caseSchema"])
+            if selected_profile is not None and selected_profile != case_profile:
+                raise ValueError("explicit profile differs from saved case")
+            selected_profile = case_profile
+        args.profile = selected_profile or "stateful-storage"
+        if args.case_tool is None:
+            args.case_tool = ROOT / ".lake/build/bin" / adapter.PROFILES[args.profile]["caseTool"]
         if args.cases is None:
             args.cases = 1 if args.case else len(common.read_json(args.corpus)["cases"]) if args.corpus else 10
     except (ValueError, OSError, KeyError, TypeError, common.Finding) as error:

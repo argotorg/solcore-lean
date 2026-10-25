@@ -57,9 +57,12 @@ def inputData (input : Word) : HostStorageDriver.InputData := {
 
 def calldata (input : Word) : String := encodeBytesText (inputData input).bytes
 
-def initialWorld (plan : CheckedPlan) (bindings : Bindings) : WorldState :=
+def initialWorldForContract (contract : CheckedCoreContract) (bindings : Bindings) : WorldState :=
   (WorldState.empty.putAccount bindings.caller Account.empty).putAccount bindings.address
-    (Account.empty.withCode plan.code)
+    (Account.empty.withCode contract.code)
+
+def initialWorld (plan : CheckedPlan) (bindings : Bindings) : WorldState :=
+  initialWorldForContract plan.contract bindings
 
 def storageJson (account : Account) : Json := toJson ([0, 1].map fun slot => Json.mkObj [
   ("slot", toJson (toString slot)),
@@ -80,12 +83,11 @@ private def outcomeFields : FrameOutcome Word → List (String × Json)
 /-- Independent original-Core observation. The code registry is resolved again
 against each current committed world, so persistence cannot accidentally install
 a different contract or retain one invocation's local heap. -/
-def observe (plan : CheckedPlan) (transactions : List Transaction)
+def observeContract (contract : CheckedCoreContract) (transactions : List Transaction)
     (bindings : Bindings) (fuel : Nat) : Json := Id.run do
-  let contract := plan.contract
   let registry : CheckedContractRegistry := {
     lookup := fun target => if target = bindings.address then some contract else none }
-  let mut world := initialWorld plan bindings
+  let mut world := initialWorldForContract contract bindings
   let initial := worldStorage world bindings
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
@@ -120,5 +122,9 @@ def observe (plan : CheckedPlan) (transactions : List Transaction)
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]
+
+def observe (plan : CheckedPlan) (transactions : List Transaction)
+    (bindings : Bindings) (fuel : Nat) : Json :=
+  observeContract plan.contract transactions bindings fuel
 
 end Solcore.Synthesis.Stateful.StorageExecution

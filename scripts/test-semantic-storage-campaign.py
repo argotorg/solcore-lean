@@ -276,6 +276,70 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(stopped.exception.code, 2)
 
 
+class RollbackCampaignTests(unittest.TestCase):
+    def setUp(self):
+        self.case = case()
+        self.case["schema"] = campaign.adapter.ROLLBACK_CASE_SCHEMA
+        self.case["storagePlan"]["schema"] = "solcore-lean.storage-rollback-plan.v1"
+        self.case["contract"].update(name="SynthesizedRollback", deployPath=["SynthesizedRollbackDeploy"],
+            runtimePath=["SynthesizedRollbackDeploy", "SynthesizedRollback"])
+        self.raw = report(self.case)
+        for history in self.raw["histories"].values():
+            history["transactions"][1]["status"] = "reverted"
+        self.raw["comparison"] = campaign.adapter.compare(self.raw["histories"], self.case)
+
+    def test_matching_revert_is_a_completed_matched_transaction(self):
+        self.assertEqual(campaign.transaction_counts(self.raw["histories"], self.case),
+                         {"executed": 3, "completed": 3, "matched": 3})
+        for history in self.raw["histories"].values():
+            history["transactions"][1]["committedStorage"] = fixtures.slots(90, 1)
+        self.assertEqual(campaign.transaction_counts(self.raw["histories"], self.case),
+                         {"executed": 3, "completed": 3, "matched": 1})
+
+    def test_coverage_requires_observed_matched_outcomes_and_patterns(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-storage-rollback"))
+            with self.assertRaises(ValueError):
+                instance.record_coverage(self.case, "matched")
+            instance.record_coverage(self.case, "matched", self.raw["histories"])
+            self.assertEqual(instance.summary["coverage"]["matchedOutcomes"], ["returned", "reverted"])
+            self.assertEqual(instance.summary["coverage"]["matchedCompletionPatterns"], ["returned,reverted,returned"])
+            instance.summary["coverage"]["requiredCompletionPatterns"] = ["reverted,reverted,returned"]
+            instance.checkpoint()
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+            self.raw["histories"]["rustEvm"]["transactions"][1]["status"] = "returned"
+            with self.assertRaises(ValueError):
+                instance.record_coverage(self.case, "matched", self.raw["histories"])
+
+    def test_reverted_payload_can_be_shrunk_but_not_changed_to_a_return(self):
+        changed = campaign.analyze(self.raw, self.case, "rustEvm", "tx-1", "output")
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual(fingerprint["pathShapes"]["rustEvm"]["status"], "reverted")
+        self.assertEqual(changed["comparison"]["category"], "semantic-mismatch")
+        value = copy.deepcopy(self.case)
+        value["transactions"][1].update(input="0", calldata="0xa444f5e9" + "00" * 32)
+        actual = report(value)
+        self.assertFalse(campaign.same_failure(fingerprint, campaign.analyze(actual, value, "rustEvm", "tx-1", "output")))
+
+    def test_profile_and_required_completion_patterns_are_not_interchangeable(self):
+        manifest = json.loads((ROOT / "scripts/semantic-storage-corpus.json").read_text())
+        manifest["profile"] = "stateful-storage-rollback"
+        for entry in manifest["cases"]:
+            if "storagePlan" in entry:
+                entry["storagePlan"]["schema"] = "solcore-lean.storage-rollback-plan.v1"
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(manifest)
+        manifest.update(requiredOutcomes=["returned", "reverted"], requiredCompletionPatterns=["returned,reverted,returned"])
+        campaign.validate_manifest(manifest)
+        for pattern in ("returned,out-of-fuel", "returned,reverted,returned,reverted", ""):
+            with self.subTest(pattern=pattern), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, "requiredCompletionPatterns": [pattern]})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory))
+            with self.assertRaises(ValueError):
+                instance.add_case(self.case, "wrong-profile")
+
+
 class RetentionTests(unittest.TestCase):
     def retained(self, instance, value=None, synthetic=True):
         value = case() if value is None else value
@@ -338,6 +402,7 @@ class RetentionTests(unittest.TestCase):
             campaign.shutil.rmtree(instance.work)
             self.assertTrue((Path(directory) / secondary["archive"] / "report.json").is_file())
             self.assertEqual(finding["finalArchive"], finding["originalArchive"])
+            self.assertEqual(campaign.common.read_json(Path(directory) / finding["history"])["status"], "attempt-limit")
 
 
 class CancellationTests(unittest.TestCase):

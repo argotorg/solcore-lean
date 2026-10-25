@@ -459,11 +459,12 @@ M5 proceeds in three connected slices:
   final result. A separate Hull runner exposes the selected committed storage
   and stops on incomplete execution; an empty failed receipt world is not a
   committed-state snapshot.
-- **M5b: rollback.** Add explicit language reverts and mixed success/revert
-  sequences. Compare returned/reverted bytes and retained committed storage
-  after every call. Use the existing typed outcome convention and transaction
-  checkpoints. Resource exhaustion must not become a revert or a passing
-  rollback observation.
+- **M5b: rollback.** A separately versioned fixed protocol reverts odd original
+  inputs after both storage writes and returns normally for even inputs. Both
+  outcomes carry the tentative reread sum as one ABI Word. Compare completion,
+  bytes and retained committed storage after every call, using the existing
+  typed outcome convention and transaction checkpoints. Resource exhaustion
+  must not become a revert or a passing rollback observation.
 - **M5c: bounded external calls.** Add a finite account catalogue and the
   existing nested runtime. Compare parent/child outcomes and relevant committed
   storage, logs and value transfers. Record bounded call depth and scenario
@@ -533,8 +534,52 @@ Delivered M5a campaign operation:
   stable-ID failure preservation, coverage gates, budget exits and cleanup of
   owned child processes on SIGTERM.
 
-M5a is complete within its documented scope. M5 remains in progress because
-rollback and bounded external calls are separate remaining slices.
+M5a is complete within its documented scope.
+
+Delivered M5b execution and native corpus connection:
+
+- New `StorageRollback` Core, emitter and case modules retain the same checked
+  aggregate step while fixing the odd-input completion policy. The original
+  host-aware program has result type `Word + (Word + Word)` and uses
+  `CheckedCoreContract.wordOutcomeV1`. The public runtime's terminal world
+  supplies the next transaction; tentative writes and the revert payload remain
+  distinct from committed storage. The wrapper is `SynthesizedRollback` with
+  the existing `run(uint256)` selector and a separate plan/case version.
+- `semanticStorageRollbackTool` supplies generation, emission, replay,
+  observation and checked reduction candidates. Generated sequences use
+  even/odd/even inputs and validate actual return/revert/return completion.
+  Imported and reduced sequences allow other patterns. Every origin rechecks
+  its exact canonical Core contract, source, transaction metadata and versions.
+- The shared runner and campaign select the profile from a saved case or
+  manifest. Storage execution enables Anvil step tracing so failed receipts can
+  be classified by a confirmed terminal `REVERT`; resource errors take priority.
+  The new profile compares 32-byte payloads and committed snapshots, including
+  the requirement that a revert retain the preceding committed state. M5a
+  continues to require successful Word returns.
+- Eight external scenarios and 21 transactions passed all three actual paths,
+  including twelve returns and nine reverts, followed by exact archive replay.
+  They cover mixed and consecutive reverts, a zero payload, tentative deletion
+  rollback, private cells, arbitrary entries, aggregates and zero writes.
+  Changing the transaction sequence leaves original Core and source unchanged.
+- The fixed twelve-scenario corpus passed native materialization, replay and
+  repeated execution of all 33 transactions. It covers twenty step AST feature
+  kinds, six boundary inputs, helper and transaction counts one through three,
+  four generator templates, both outcomes and four ordered completion patterns.
+  This validator does not execute an EVM. Full repository build/tests and kernel
+  policy passed, as did forty protocol and 24 campaign regressions.
+
+The actual fixed campaign also passed all twelve scenarios and 33 transaction
+prefixes, including every required outcome and completion pattern. All ten M5a
+scenarios and 27 prefixes still matched with tracing enabled. A synthetic
+reverted-payload difference at `tx-1` accepted nine reductions in twelve
+candidate executions, leaving only that reverting transaction. Every actual
+candidate report matched; exact archive replay matched and fresh synthetic
+replay retained the same stable-ID, reverted-outcome fingerprint. Exhausting
+the candidate budget is reported as an attempt limit, not as proof of minimality.
+
+M5b is complete within its documented scope. M5 remains in progress for M5c's
+bounded external calls, logs and value transfers. No emitter-preservation or
+broader ledger-equivalence claim follows from these results.
 Usage and validation commands are in
 [Generated semantic comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-ordered-storage-transactions).
 

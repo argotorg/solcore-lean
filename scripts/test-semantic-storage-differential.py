@@ -98,6 +98,75 @@ class CaseTests(unittest.TestCase):
             runner.validate_case({**case(), "storagePlan": {}})
 
 
+class RollbackTests(unittest.TestCase):
+    def setUp(self):
+        self.case = case()
+        self.case["schema"] = runner.ROLLBACK_CASE_SCHEMA
+        self.case["storagePlan"]["schema"] = "solcore-lean.storage-rollback-plan.v1"
+        self.case["contract"].update(name="SynthesizedRollback", deployPath=["SynthesizedRollbackDeploy"],
+            runtimePath=["SynthesizedRollbackDeploy", "SynthesizedRollback"])
+        self.histories = histories(self.case)
+        for observed in self.histories.values():
+            observed["transactions"][1]["status"] = "reverted"
+
+    def test_rollback_has_a_distinct_case_plan_and_wrapper(self):
+        runner.validate_case(self.case)
+        self.assertEqual(runner.profile(self.case)["caseTool"], "semantic-storage-rollback-tool")
+        for key in ("schema", "storagePlan", "contract"):
+            bad = copy.deepcopy(self.case)
+            bad[key] = case()[key]
+            with self.subTest(key=key), self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(bad)
+
+    def test_mixed_completion_matches_only_the_declared_parities(self):
+        self.assertEqual(runner.compare(self.histories, self.case)["category"], "matched")
+        for observed in self.histories.values():
+            observed["transactions"][1]["status"] = "returned"
+        result = runner.compare(self.histories, self.case)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        self.assertTrue(all(result["pairs"].values()))
+
+    def test_revert_payload_remains_observable_and_exactly_one_word(self):
+        for observed in self.histories.values():
+            observed["transactions"][1]["output"] = "0x" + "00" * 32
+        self.assertEqual(runner.compare(self.histories, self.case)["category"], "matched")
+        self.histories["importedHull"]["transactions"][1]["output"] = "0x"
+        result = runner.compare(self.histories, self.case)
+        self.assertEqual(result["category"], "semantic-mismatch")
+        self.assertIn("output", result["fields"])
+        for observed in self.histories.values():
+            observed["transactions"][1]["output"] = "0x"
+        self.assertEqual(runner.compare(self.histories, self.case)["category"], "semantic-mismatch")
+
+    def test_agreed_revert_cannot_commit_tentative_storage(self):
+        for observed in self.histories.values():
+            observed["transactions"][1]["committedStorage"] = slots(0, 9)
+        result = runner.compare(self.histories, self.case)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                         ("semantic-mismatch", "tx-1", ["committedStorage"]))
+        self.assertTrue(all(result["pairs"].values()))
+
+    def test_initial_and_consecutive_reverts_use_the_prior_committed_snapshot(self):
+        for transaction in self.case["transactions"]:
+            transaction.update(input="1", calldata="0xa444f5e9" + f"{1:064x}")
+        for observed in self.histories.values():
+            for record in observed["transactions"]:
+                record.update(status="reverted", committedStorage=slots())
+            observed["finalStorage"] = slots()
+        self.assertEqual(runner.compare(self.histories, self.case)["category"], "matched")
+        for observed in self.histories.values():
+            observed["transactions"][0]["committedStorage"] = slots(1, 0)
+        self.assertEqual(runner.compare(self.histories, self.case)["transactionId"], "tx-0")
+
+    def test_incomplete_execution_is_not_an_observed_revert(self):
+        observed = self.histories["importedHull"]
+        observed["transactions"] = observed["transactions"][:2]
+        observed["transactions"][1].pop("output")
+        observed["transactions"][1]["status"] = "out-of-fuel"
+        observed.update(status="incomplete", unexecuted=["tx-2"])
+        self.assertEqual(runner.compare(self.histories, self.case)["category"], "inconclusive-resource")
+
+
 class HistoryTests(unittest.TestCase):
     def test_all_three_completed_histories_are_required(self):
         actual = histories()
@@ -519,7 +588,8 @@ class InterruptedExecutionPolicyTests(unittest.TestCase):
         rpc.call.side_effect = rpc_call
 
         @contextmanager
-        def anvil(*_args):
+        def anvil(*_args, steps_tracing=False):
+            self.assertTrue(steps_tracing)
             yield rpc
 
         report = {"histories": {}, "processes": []}
@@ -615,6 +685,8 @@ class CancellationTests(unittest.TestCase):
         signal.signal(signal.SIGTERM, original_handler)
         try:
             with tempfile.TemporaryDirectory() as temporary:
+                case_path = Path(temporary) / "case.json"
+                case_path.write_text(json.dumps(case()))
                 for interrupt in (False, True):
                     output = Path(temporary) / str(interrupt)
 
@@ -623,7 +695,7 @@ class CancellationTests(unittest.TestCase):
                             os.kill(os.getpid(), signal.SIGTERM)
                         report["comparison"] = {"category": "matched", "pairs": {}}
 
-                    with patch.object(sys, "argv", ["semantic-storage-differential", "--case", "unused.json", "--output", str(output)]), \
+                    with patch.object(sys, "argv", ["semantic-storage-differential", "--case", str(case_path), "--output", str(output)]), \
                             patch.object(runner, "execute", side_effect=execute), redirect_stdout(io.StringIO()):
                         self.assertEqual(runner.main(), int(interrupt))
                     self.assertIs(signal.getsignal(signal.SIGTERM), original_handler)

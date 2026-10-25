@@ -346,9 +346,11 @@ class Rpc:
 
 
 @contextmanager
-def anvil(runner: Runner, binary: Path):
+def anvil(runner: Runner, binary: Path, *, steps_tracing: bool = False):
     command = [str(binary), "--host", "127.0.0.1", "--port", "0", "--hardfork", "osaka",
                "--chain-id", "31337", "--timestamp", "1700000000", "--gas-limit", str(max(30000000, runner.args.gas))]
+    if steps_tracing:
+        command.append("--steps-tracing")
     budget = runner.remaining(runner.args.startup_timeout)
     with tempfile.TemporaryFile() as log:
         process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=log,
