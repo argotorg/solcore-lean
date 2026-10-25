@@ -242,7 +242,8 @@ local cells throughout child execution and return-data extraction.
 This theorem permits arbitrary successfully compiled catalogs with the stated
 source-to-catalog correspondence. Selected children use the established effect
 language without further external calls (`CallFree`). Nested calls are covered by the finite-height theorem below. Root reentry,
-precompiles and other call modes remain outside these instances.
+precompiles remain outside these instances; the mode theorem below covers
+CALLCODE and DELEGATECALL.
 
 `Tests.RustHullChildCallCorrespondence.public_resumes` supplies four independent
 source derivations: a child returns after memory, storage, transient storage and
@@ -272,6 +273,19 @@ grandchild followed by a successful child, and a successful grandchild whose
 changes are subsequently rolled back by the child's revert. Runtime checks also
 cover returned bytes, retained parent and child memory, and repeated resumptions.
 
+`ContractCallModeCorrespondence.compileObject_resumes_exact` connects all four
+message-call operations through the same finite-height construction. CALLCODE
+and DELEGATECALL select code by the requested target but execute against the
+invoking frame's address and storage. CALLCODE supplies the explicit value and
+current address as caller; DELEGATECALL inherits the caller and call value.
+Neither mode transfers balances. Their concrete handler closures come from the
+actual frame allocator, and every nested call retains those captures.
+
+The mode consumers cover CALLCODE success, DELEGATECALL success and a reverting
+DELEGATECALL. They compare the independent source result with public receipts,
+including execution address, caller, value, storage, logs, return bytes and
+balance preservation. The rollback case retains the parent's earlier changes.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -280,7 +294,7 @@ cover returned bytes, retained parent and child memory, and repeated resumptions
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls, including finite nested compiled children, reach public receipts with transfers, return data and checkpoint rollback. Additional call modes, precompiles, destruction and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | Ordinary and static calls, including finite nested compiled children, reach public receipts with transfers, return data and checkpoint rollback. Precompiles, destruction and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -290,22 +304,22 @@ delay those connections.
 
 ## Next public milestone
 
-Connect `callcode` and `delegatecall`, keeping code selection distinct from the
-execution and storage address. Then cover precompiles, account operations and
-assembly. Each step must derive
+Connect `selfdestruct` through beneficiary transfers, pending account removal
+and public transaction finalization. Then cover precompiles, root reentry,
+creation and assembly. Each step must derive
 runtime inputs from actual initialization and end in a public theorem consumer.
 
 ## Remaining public connections
 
 `call` and `staticcall` have public connections for calls without child execution
 and for finite nested compiled children. Root reentry and precompile branches
-remain. Five builtins still have no
-public effect connection: `callcode`, `delegatecall`, `create`, `create2` and
-`selfdestruct`.
+remain. Three builtins still have no public effect connection: `create`,
+`create2` and `selfdestruct`. CALLCODE and DELEGATECALL are covered by the same
+finite nested-child connection.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Connect CALLCODE and DELEGATECALL, then precompiles and root reentry. Reuse catalog identities, actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
+| 1 | Contract calls | Connect precompiles and root reentry. Reuse catalog identities, actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
 | 2 | Account destruction | Connect beneficiary transfers, static rejection and transaction-finalization rules to the actual public receipt. Reuse the mutable balance resource established for calls. |
 | 3 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 4 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
