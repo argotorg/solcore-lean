@@ -38,7 +38,7 @@ assignments and pattern alternatives. Language fault propagation is connected
 through expressions, argument evaluation, function boundaries and every loop
 stage (`2b7a07347`).
 
-## Public contract memory theorem
+## Public contract state theorems
 
 `ContractMemoryCorrespondence.prepare_resumes_exact` connects an independent
 Hull evaluation to actual `Contract.prepare`, `runWithReceipt` and any genuine
@@ -53,14 +53,29 @@ preserves the final memory, including writes before failure. The public result
 is the actual receipt decoder applied to the source-derived message value, so
 export limits and cumulative execution fuel retain their public behavior.
 
-The current contract theorem uses an empty code catalog, no supplied code
-image and a context with `deploying = false`. It does not yet cover deployment,
-environment reads, storage calls, logs or calls to other contracts.
+The contract theorems use an empty code catalog, no supplied code image and a
+context with `deploying = false`. They do not yet cover deployment, environment
+reads, logs or calls to other contracts.
 
 `Tests.RustHullMemoryCorrespondence.public_resumes` supplies complete independent
 source derivations for unaligned memory access and a fault after a write, then
 applies the public theorem. Executable regressions also check checkpoint
 resumption, public outcomes and final Core snapshots.
+
+`ContractRuntimeEffectsCorrespondence.prepare_resumes_exact` extends this
+connection to `sload`, `sstore`, `tload` and `tstore`, interleaved with memory
+operations. The actual allocator establishes distinct locations for all memory
+and storage registers, including shared references. The resulting message
+relates the independent final world and memory to the actual frame snapshot,
+message finalization and public receipt decoder.
+
+The proof includes static-write rejection, writes before faults and transaction
+finalization. `Tests.RustHullRuntimeEffectsCorrespondence.public_resumes`
+provides independent derivations for successful interleaved writes and reads,
+a memory fault after storage writes, and a rejected static write after a memory
+write. Executable checks also verify committed persistent storage, cleared
+transient storage, retained failure snapshots and empty exported worlds on
+failure.
 
 ## Priorities
 
@@ -69,7 +84,7 @@ resumption, public outcomes and final Core snapshots.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Independent memory, storage, environment and log semantics relate to the emitted Core code and public contract state. | Open |
+| 3 | Concrete external state is preserved. | Memory and storage reach public receipts and resumptions; environment and logs remain to be connected. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -80,13 +95,12 @@ delay those connections.
 
 ## Next public milestone
 
-Extend the public memory theorem to interleaved storage operations, then
-environment reads and logs. Memory and storage already share a concrete state
-relation through actual builtin lowering, assembly and compiled frame calls.
-The remaining storage connection must derive all initial cell observations and
-distinct locations from the actual allocator, then preserve message finalization
-and public receipts. Once these state relations are connected, use them for
-external calls, creation, rollback and assembly.
+Connect environment reads and logs to public contract execution. Then cover
+explicit return/revert/stop/invalid, memory copying, hashing and account
+inspection through the same state relations. The remaining work includes code
+images and catalogs, external calls, creation, rollback and assembly. Each step
+must derive runtime inputs from actual initialization and end in a public
+theorem consumer.
 
 ## Verification
 
