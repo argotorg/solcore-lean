@@ -42,7 +42,7 @@ inductive RecursiveExpression (functions : List Function) : Expr → Prop where
       (type span) : RecursiveExpression functions ⟨type, .call name arguments, span⟩
 
 /-- Structured local control includes blocks, loops and loop transfers.
-External effects and pattern alternatives have separate proof obligations. -/
+External effects have separate proof obligations. -/
 def RecursiveStatement (functions : List Function) : Stmt → Prop
   | ⟨.letDecl _ _, _⟩ | ⟨.comment _, _⟩ => True
   | ⟨.assign _ value, _⟩ | ⟨.expression value, _⟩ | ⟨.returnStmt value, _⟩ =>
@@ -53,9 +53,20 @@ def RecursiveStatement (functions : List Function) : Stmt → Prop
       RecursiveExpression functions condition ∧
       (∀ statement ∈ post, RecursiveStatement functions statement) ∧
       (∀ statement ∈ body, RecursiveStatement functions statement)
+  | ⟨.matchStmt _ value alternatives, _⟩ =>
+      RecursiveExpression functions value ∧
+      (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, RecursiveStatement functions statement)
   | ⟨.breakStmt, _⟩ | ⟨.continueStmt, _⟩ => True
   | _ => False
 termination_by statement => sizeOf statement
+decreasing_by
+  all_goals first | decreasing_trivial | skip
+  have smaller := List.sizeOf_lt_of_mem ‹alternative ∈ alternatives›
+  have bodySmaller : sizeOf alternative.body < sizeOf alternative := by
+    cases alternative
+    simp
+    omega
+  omega
 
 /-- Language failures are executable outcomes. Malformed source observations
 have no representation in the Core language result. -/
@@ -230,8 +241,8 @@ def CallSimulation {σ : Type} (functions : List Function) (signatures : List Si
     FunctionSimulation codes locations captured code index sources initial result final
 
 /- These motives ignore proof identity. The mutual recursor uses the separate
-LoopMotive for installed loop closures. Pattern alternatives remain outside
-RecursiveStatement and therefore have no simulation obligation here. -/
+LoopMotive for installed loop closures and AlternativesMotive for pattern
+selection and binder allocation. -/
 def ExprMotive {σ : Type} (functions : List Function) (signatures : List Signature)
     (codes : List GlobalCode) (locations : Nat → Nat) (captured : Core.Environment)
     (sourceEnvironment : Semantics.Environment) (expression : Expr)

@@ -28,8 +28,8 @@ such as an absent variable are outside that result relation. The theorem does
 not assert termination or specify concrete external effects.
 
 The connected fragment includes structural values, pure builtins, recursive
-named calls, local variables, blocks, loops and control transfers. Language
-fault propagation is connected through expressions, argument evaluation,
+named calls, local variables, blocks, loops and control transfers, product-path
+assignments and pattern alternatives. Language fault propagation is connected through expressions, argument evaluation,
 function boundaries and every loop stage (`2b7a07347`).
 
 ## Priorities
@@ -37,7 +37,7 @@ function boundaries and every loop stage (`2b7a07347`).
 | Priority | Theorem / connection | Completion evidence | Status |
 | --- | --- | --- | --- |
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
-| 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Next |
+| 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Derive scope coverage and representation invariants from actual globals, parameters, locals and match binders; remove the public `SafeResult` assumption where justified. | Open |
 | 3 | Concrete external state is preserved. | Independent memory, storage, environment and log semantics relate to the emitted Core code and public contract state. | Open |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
@@ -47,6 +47,15 @@ function boundaries and every loop stage (`2b7a07347`).
 Priorities 1 and 2 close gaps in the existing pure Hull theorem. Priorities 3
 and 4 connect the remaining observable runtime behavior. Priority 5 should not
 delay those connections.
+
+## Next public milestone
+
+For the connected fragment, successful preparation and a finite independent
+source evaluation should suffice to obtain a related public outcome and heap.
+The caller should not have to supply `SafeResult`. Establish this by carrying
+scope coverage and typed heap invariants from actual initialization, and by
+using successful builtin compilation to derive the argument constraints.
+Keep these obligations inside the compiler-to-public-execution proof.
 
 ## Verification
 

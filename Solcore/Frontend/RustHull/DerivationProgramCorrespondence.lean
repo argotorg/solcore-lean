@@ -2,6 +2,7 @@ import Solcore.Frontend.RustHull.DerivationExpressionCorrespondence
 import Solcore.Frontend.RustHull.DerivationCallCorrespondence
 import Solcore.Frontend.RustHull.DerivationFunctionCorrespondence
 import Solcore.Frontend.RustHull.LoopDerivationCorrespondence
+import Solcore.Frontend.RustHull.MatchDerivationCorrespondence
 
 /-! Finite independent Hull execution drives the mutual simulation proof.
 Recursive function calls use their actual finite child derivations, without
@@ -38,7 +39,9 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     (motive_7 := fun env test post body initial control final _ =>
       LoopDerivationCorrespondence.LoopMotive functions signatures codes locations captured
         env test post body initial control final)
-    (motive_8 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_8 := fun env target value alternatives initial control final _ =>
+      MatchDerivationCorrespondence.AlternativesMotive functions signatures codes locations captured
+        env target value alternatives initial control final)
     ?word
     ?bool
     ?unit
@@ -266,16 +269,30 @@ theorem function_preserves {σ : Type} {effects : Semantics.ExternalSemantics σ
     intro env statement target expression alternatives initial final reason kind evaluated exprIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
-  case nil_2 | matched | next_1 =>
-    intros
-    trivial
+    have parts : RecursiveExpression functions expression ∧
+        (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, RecursiveStatement functions statement) := by
+      simpa only [RecursiveStatement] using accepted
+    exact MatchDerivationCorrespondence.fault rfl (exprIH parts.1)
+  case nil_2 =>
+    intro env target value state _
+    exact MatchDerivationCorrespondence.nil
+  case matched =>
+    intro env target value alternative rest initial final payload control selected executed bodyIH accepted
+    exact MatchDerivationCorrespondence.matched selected
+      (bodyIH (accepted alternative (List.mem_cons_self ..)))
+  case next_1 =>
+    intro env target value alternative rest initial final control rejected executed tailIH accepted
+    exact MatchDerivationCorrespondence.next rejected
+      (tailIH (fun other member => accepted other (List.mem_cons_of_mem _ member)))
   case matchStmt =>
     intro env statement target expression alternatives initial middle final value control
       kind evaluated selected exprIH altIH accepted
     cases statement with | mk statementKind span =>
     cases kind
-    simp only [RecursiveStatement] at accepted
+    have parts : RecursiveExpression functions expression ∧
+        (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, RecursiveStatement functions statement) := by
+      simpa only [RecursiveStatement] using accepted
+    exact MatchDerivationCorrespondence.statement rfl (exprIH parts.1) (altIH parts.2)
   case assembly =>
     intro env statement body initial final control kind executed accepted
     cases statement with | mk statementKind span =>
