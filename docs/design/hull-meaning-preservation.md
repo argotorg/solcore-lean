@@ -54,8 +54,8 @@ is the actual receipt decoder applied to the source-derived message value, so
 export limits and cumulative execution fuel retain their public behavior.
 
 The contract theorems use an empty code catalog, no supplied code image and a
-context with `deploying = false`. They do not yet cover deployment, logs or
-calls to other contracts.
+context with `deploying = false`. They do not yet cover deployment or calls
+to other contracts.
 
 `Tests.RustHullMemoryCorrespondence.public_resumes` supplies complete independent
 source derivations for unaligned memory access and a fault after a write, then
@@ -93,6 +93,20 @@ block/blob hash reads and a missing-gas fault after writes. Runtime checks cover
 address normalization, transient-state finalization, checkpoints and the
 snapshots retained before a fault.
 
+`ContractLogCorrespondence.prepare_resumes_exact` adds `log0` through `log4`
+to the same memory, storage and environment model. Its independent event
+semantics records emitter, topics and a copied payload. The actual allocator
+supplies the log mapping and cursor, and the compiled frame observes their
+final values before message completion and public receipt decoding. Static
+logging, capacity overflow and memory overflow retain their termination or
+fault behavior.
+
+`Tests.RustHullLogCorrespondence.public_resumes` supplies independent source
+derivations for two logs separated by a memory overwrite, a later missing-gas
+fault, and logging in a static context. Executable checks compare copied
+payloads, checkpoint resumption and failure receipts with retained Core
+snapshots.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -100,7 +114,7 @@ snapshots retained before a fault.
 | 1 | Product-path assignment preserves the result and heap, including failed RHS calls. | The common recursive public theorem covers nested places; source/public/runtime consumers cover successful writes and faults. | Connected |
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
-| 3 | Concrete external state is preserved. | Memory, storage and environment reads reach public receipts and resumptions; logs and further state operations remain. | In progress |
+| 3 | Concrete external state is preserved. | Memory, storage, environment reads and logs reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | Returned data, balances, storage, receipts and rollback are related through actual execution and resumption. | Open |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
@@ -111,8 +125,7 @@ delay those connections.
 
 ## Next public milestone
 
-Connect logs to public contract execution. Then cover explicit
-return/revert/stop/invalid, memory copying, hashing and account
+Connect explicit return/revert/stop/invalid, memory copying, hashing and account
 inspection through the same state relations. The remaining work includes code
 images and catalogs, external calls, creation, rollback and assembly. Each step
 must derive runtime inputs from actual initialization and end in a public

@@ -10,27 +10,27 @@ open Core
 def capacityReason : Word := Word.ofNatModulo 10
 def topicReason : Word := Word.ofNatModulo 11
 
-private def number (value : Nat) : Expr := .word (Word.ofNatModulo value)
-private def add (left right : Expr) : Expr := .binary .wordAdd left right
-private def packet : List Expr → Expr
+def number (value : Nat) : Expr := .word (Word.ofNatModulo value)
+def add (left right : Expr) : Expr := .binary .wordAdd left right
+def packet : List Expr → Expr
   | [] => .unit
   | [value] => value
   | value :: rest => .pair value (packet rest)
-private def field (index : Nat) : Nat → Expr → Expr
+def field (index : Nat) : Nat → Expr → Expr
   | 0, _ => .unit
   | 1, value => value
   | count + 2, value => if index = 0 then .first value
       else field (index - 1) (count + 1) (.second value)
-private def types : List Ty → Ty
+def types : List Ty → Ty
   | [] => .unit
   | [type] => type
   | type :: rest => .product type (types rest)
 
-private def wordCount (bytes : Expr) : Expr :=
+def wordCount (bytes : Expr) : Expr :=
   add (.binary .wordDiv bytes (number 32))
     (.ifE (.binary .wordEq (.binary .wordMod bytes (number 32)) (number 0)) (number 0) (number 1))
 
-private def insertWords (mapping cursor : Expr) (values : List Expr) : Expr :=
+def insertWords (mapping cursor : Expr) (values : List Expr) : Expr :=
   match values with
   | [] => LanguageResult.success mapping
   | value :: rest => LanguageResult.bind WordMapping.type (WordMapping.insert mapping cursor value)
@@ -39,9 +39,9 @@ private def insertWords (mapping cursor : Expr) (values : List Expr) : Expr :=
 termination_by values.length
 decreasing_by simp_wf
 
-private def copyType : Ty := types [WordMapping.type, .word, .word, WordMapping.type, .word]
+def copyType : Ty := types [WordMapping.type, .word, .word, WordMapping.type, .word]
 
-private def copyBody : Expr :=
+def copyBody : Expr :=
   let parameter := Expr.var 0
   .ifE (.binary .wordEq (field 2 5 parameter) (number 0))
     (LanguageResult.success (field 3 5 parameter))
@@ -58,7 +58,7 @@ private def copyBody : Expr :=
                 .binary .wordSub (field 2 5 (.var 4)) (.var 2), .var 0,
                 add (field 4 5 (.var 4)) (number 1)]))))))
 
-private def copyPayload (memory offset length mapping cursor : Expr) : Expr :=
+def copyPayload (memory offset length mapping cursor : Expr) : Expr :=
   WordMapping.runHelper copyType WordMapping.type copyBody (packet [memory, offset, length, mapping, cursor])
 
 /-- Append a log with zero to four topics. Inputs are evaluated once. Cursor

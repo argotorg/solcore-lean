@@ -314,37 +314,48 @@ private theorem stop_components {scope : Scope} {stop : Core.Expr}
   exact ⟨memorySize, exit, offset, size, memoryCompiled, exitCompiled, offsetCompiled, sizeCompiled,
     (Except.ok.inj returned).symm⟩
 
-theorem stop_evaluates {scope : Scope} {stop : Core.Expr}
+def haltCells (exit offset size : Nat) (store : Store) : Store :=
+  ((store.set offset (.word Word.zero)).set size (.word Word.zero)).set exit (.word (Word.ofNatModulo 3))
+
+/-- Zero-length termination reads no memory-size value. Its execution needs
+only the three destination cells and their pairwise separation. -/
+theorem stop_evaluates_cells {scope : Scope} {stop : Core.Expr}
     (compiled : Effects.terminate scope 3 (.word Word.zero) (.word Word.zero) = .ok stop)
     {slots : List EffectSlot} {mapping : Renaming} {environment : Environment} {store : Store}
-    {locations : Locations} {state : StorageSemantics.State}
+    {memorySizeLocation exitLocation offsetLocation sizeLocation : Nat}
     (runtime : EffectEnvironmentRel slots scope mapping environment)
-    (memorySizeMember : ⟨"memorySize", .word, locations.memorySize⟩ ∈ slots)
-    (exitMember : ⟨"exit", .word, locations.exit⟩ ∈ slots)
-    (offsetMember : ⟨"returnOffset", .word, locations.returnOffset⟩ ∈ slots)
-    (sizeMember : ⟨"returnSize", .word, locations.returnSize⟩ ∈ slots)
-    (stateRelated : StateRel locations state store) :
-    Evaluates environment store (stop.rename mapping) (.inLeft .unit (.word Word.maximum)) (haltStore locations store) := by
+    (memorySizeMember : ⟨"memorySize", .word, memorySizeLocation⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, exitLocation⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, offsetLocation⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, sizeLocation⟩ ∈ slots)
+    {exitValue offsetValue sizeValue : Word}
+    (exitInitial : store.read? exitLocation = some (.word exitValue))
+    (offsetRead : store.read? offsetLocation = some (.word offsetValue))
+    (sizeInitial : store.read? sizeLocation = some (.word sizeValue))
+    (exitOffset : exitLocation ≠ offsetLocation) (exitSize : exitLocation ≠ sizeLocation)
+    (sizeOffset : sizeLocation ≠ offsetLocation) :
+    Evaluates environment store (stop.rename mapping) (.inLeft .unit (.word Word.maximum))
+      (haltCells exitLocation offsetLocation sizeLocation store) := by
+  let locations : Locations := ⟨0, 0, 0, 0, exitLocation, offsetLocation, sizeLocation, memorySizeLocation⟩
+  change Evaluates environment store (stop.rename mapping) (.inLeft .unit (.word Word.maximum)) (haltStore locations store)
   obtain ⟨memorySize, exit, offset, size, memoryCompiled, exitCompiled, offsetCompiled, sizeCompiled, rfl⟩ := stop_components compiled
   obtain ⟨memoryIndex, rfl, memoryFound⟩ := reference_position runtime memorySizeMember memoryCompiled
   obtain ⟨exitIndex, rfl, exitFound⟩ := reference_position runtime exitMember exitCompiled
   obtain ⟨offsetIndex, rfl, offsetFound⟩ := reference_position runtime offsetMember offsetCompiled
   obtain ⟨sizeIndex, rfl, sizeFound⟩ := reference_position runtime sizeMember sizeCompiled
-  have distinct := stateRelated.distinct
-  simp [Locations.all] at distinct
   have offsetWritten : store.write? locations.returnOffset (.word Word.zero) =
       some (offsetStore locations store) :=
-    Store.write?_eq_some_iff.mpr ⟨(List.getElem?_eq_some_iff.mp stateRelated.returnOffset).1, rfl⟩
-  have sizeRead : (offsetStore locations store).read? locations.returnSize = some (.word state.returnSize) := by
-    rw [Store.write?_preserves_other offsetWritten (by intro same; simp_all : locations.returnSize ≠ locations.returnOffset)]
-    exact stateRelated.returnSize
+    Store.write?_eq_some_iff.mpr ⟨(List.getElem?_eq_some_iff.mp offsetRead).1, rfl⟩
+  have sizeRead : (offsetStore locations store).read? locations.returnSize = some (.word sizeValue) := by
+    rw [Store.write?_preserves_other offsetWritten sizeOffset]
+    exact sizeInitial
   have sizeWritten : (offsetStore locations store).write? locations.returnSize (.word Word.zero) =
       some (sizeStore locations store) :=
     Store.write?_eq_some_iff.mpr ⟨(List.getElem?_eq_some_iff.mp sizeRead).1, rfl⟩
   have exitRead : (sizeStore locations store).read? locations.exit =
-      some (.word state.exit) := by
-    rw [Store.write?_preserves_other sizeWritten (by intro same; simp_all : locations.exit ≠ locations.returnSize), Store.write?_preserves_other offsetWritten (by intro same; simp_all : locations.exit ≠ locations.returnOffset)]
-    exact stateRelated.exit
+      some (.word exitValue) := by
+    rw [Store.write?_preserves_other sizeWritten exitSize, Store.write?_preserves_other offsetWritten exitOffset]
+    exact exitInitial
   have exitWritten : (sizeStore locations store).write?
       locations.exit (.word (Word.ofNatModulo 3)) = some (haltStore locations store) :=
     Store.write?_eq_some_iff.mpr ⟨(List.getElem?_eq_some_iff.mp exitRead).1, rfl⟩
@@ -356,12 +367,30 @@ theorem stop_evaluates {scope : Scope} {stop : Core.Expr}
     apply Evaluates.letE (.pair (.var memoryFound) (.pair .word .word))
     exact .ifTrue (.binary (.second (.second (.var rfl))) .word rfl) (.inRight .unit)
   · apply Evaluates.letE (bodyStore := store.set locations.returnOffset (.word Word.zero))
-    · exact .storeCell (.var (by simpa [Renaming.lift] using offsetFound)) stateRelated.returnOffset .word offsetWritten
+    · exact .storeCell (.var (by simpa [Renaming.lift] using offsetFound)) offsetRead .word offsetWritten
     · apply Evaluates.letE (bodyStore := (offsetStore locations store).set locations.returnSize (.word Word.zero))
       · exact .storeCell (.var (by simpa [Renaming.lift, Nat.add_assoc] using sizeFound)) sizeRead .word sizeWritten
       · apply Evaluates.letE (bodyStore := haltStore locations store)
         · exact .storeCell (.var (by simpa [Renaming.lift, Nat.add_assoc] using exitFound)) exitRead .word exitWritten
         · exact .inLeft .word
+
+
+theorem stop_evaluates {scope : Scope} {stop : Core.Expr}
+    (compiled : Effects.terminate scope 3 (.word Word.zero) (.word Word.zero) = .ok stop)
+    {slots : List EffectSlot} {mapping : Renaming} {environment : Environment} {store : Store}
+    {locations : Locations} {state : StorageSemantics.State}
+    (runtime : EffectEnvironmentRel slots scope mapping environment)
+    (memorySizeMember : ⟨"memorySize", .word, locations.memorySize⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, locations.exit⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, locations.returnOffset⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, locations.returnSize⟩ ∈ slots)
+    (stateRelated : StateRel locations state store) :
+    Evaluates environment store (stop.rename mapping) (.inLeft .unit (.word Word.maximum)) (haltStore locations store) := by
+  have distinct := stateRelated.distinct
+  simp [Locations.all] at distinct
+  exact stop_evaluates_cells compiled runtime memorySizeMember exitMember offsetMember sizeMember
+    stateRelated.exit stateRelated.returnOffset stateRelated.returnSize
+    (by intro same; simp_all) (by intro same; simp_all) (by intro same; simp_all)
 
 
 theorem store_preserves (transient : Bool)
