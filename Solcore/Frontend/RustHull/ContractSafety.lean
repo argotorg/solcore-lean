@@ -63,7 +63,7 @@ theorem CompiledObject.instantiate_hasType
     (context : Context) :
     Core.HasType [] (compiled.instantiate context).expression resultType AccountState.definitions := by
   cases gas : context.availableGas <;>
-    simp only [CompiledObject.instantiate, gas, bundle]
+    simp only [CompiledObject.instantiate, CompiledObject.contextArgument, normalizeContext, gas, bundle]
   all_goals
     apply Core.HasType.apply typing
     repeat first

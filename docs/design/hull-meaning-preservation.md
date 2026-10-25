@@ -13,7 +13,7 @@ Helper lemmas count as intermediate work. Each implementation step should end
 with a public theorem consumer, an executable regression, verification and a
 commit.
 
-## Current public theorem
+## Public function theorem
 
 `Correspondence.prepare_recursive_program_resumes` relates every genuine finite
 chain of resumptions to an independent finite Hull function evaluation. It
@@ -38,6 +38,30 @@ assignments and pattern alternatives. Language fault propagation is connected
 through expressions, argument evaluation, function boundaries and every loop
 stage (`2b7a07347`).
 
+## Public contract memory theorem
+
+`ContractMemoryCorrespondence.prepare_resumes_exact` connects an independent
+Hull evaluation to actual `Contract.prepare`, `runWithReceipt` and any genuine
+chain of `resumeWithReceipt` calls. Successful compilation and the independent
+derivation establish the whole Core evaluation. The proof obtains runtime
+references, initial memory, captured frame closures and snapshot observations
+from the actual object initialization.
+
+The fragment supports `mload`, `mstore`, `mstore8` and `msize`, together with
+pure operations, recursive function calls, loops and language faults. It
+preserves the final memory, including writes before failure. The public result
+is the actual receipt decoder applied to the source-derived message value, so
+export limits and cumulative execution fuel retain their public behavior.
+
+The current contract theorem uses an empty code catalog, no supplied code
+image and a context with `deploying = false`. It does not yet cover deployment,
+environment reads, storage calls, logs or calls to other contracts.
+
+`Tests.RustHullMemoryCorrespondence.public_resumes` supplies complete independent
+source derivations for unaligned memory access and a fault after a write, then
+applies the public theorem. Executable regressions also check checkpoint
+resumption, public outcomes and final Core snapshots.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -56,12 +80,13 @@ delay those connections.
 
 ## Next public milestone
 
-Connect concrete external state to the public theorem. Start with storage and
-memory operations, then environment reads and logs. Define their independent
-Hull effects and relate them to the actual Core context and returned state.
-The proof must include writes before a language fault and state carried across
-resumptions. Once these state relations are connected, use them for external
-calls, creation, rollback and assembly.
+Extend the public memory theorem to interleaved storage operations, then
+environment reads and logs. Memory and storage already share a concrete state
+relation through actual builtin lowering, assembly and compiled frame calls.
+The remaining storage connection must derive all initial cell observations and
+distinct locations from the actual allocator, then preserve message finalization
+and public receipts. Once these state relations are connected, use them for
+external calls, creation, rollback and assembly.
 
 ## Verification
 

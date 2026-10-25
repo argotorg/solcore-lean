@@ -52,7 +52,7 @@ structure CompiledObject where
 
 def contextType : Core.Ty := AccountRuntime.contextType
 
-private def calldataEntries (bytes : List UInt8) : Core.WordMapping.Entries :=
+def calldataEntries (bytes : List UInt8) : Core.WordMapping.Entries :=
   Memory.packBytes bytes
 
 def compileObject (program : Program) (objectPath : List String)
@@ -64,22 +64,26 @@ def compileObject (program : Program) (objectPath : List String)
     codeImages := codeBytes :: catalog.map (some ∘ AccountRuntime.CodeDefinition.bytes)
   }
 
-private def codeIdentity (images : List (Option (List UInt8))) (code : Option (List UInt8)) : Nat :=
+def codeIdentity (images : List (Option (List UInt8))) (code : Option (List UInt8)) : Nat :=
   match code with
   | none => 0
   | some bytes => ((images.zipIdx).find? fun (image, _) => image == some bytes).map
       (fun (_, index) => index + 1) |>.getD 0
 
-def CompiledObject.instantiate (compiled : CompiledObject) (context : Context := {}) : Prepared :=
-  let address (value : Core.Word) := Core.Word.ofNatModulo (value.val % 2 ^ 160)
+def normalizeAddress (value : Core.Word) : Core.Word := Core.Word.ofNatModulo (value.val % 2 ^ 160)
+
+def normalizeContext (context : Context) : Context :=
   let world := context.world.foldl (fun accounts account =>
-    let account := {account with address := address account.address}
+    let account := {account with address := normalizeAddress account.address}
     if accounts.any (·.address == account.address) then accounts else accounts ++ [account]) []
-  let context := {context with
-    address := address context.address, caller := address context.caller,
-    accounts := context.accounts.map fun (key, value) => (address key, value),
-    emptyAccounts := (context.emptyAccounts.map address).eraseDups,
+  {context with
+    address := normalizeAddress context.address, caller := normalizeAddress context.caller,
+    accounts := context.accounts.map fun (key, value) => (normalizeAddress key, value),
+    emptyAccounts := (context.emptyAccounts.map normalizeAddress).eraseDups,
     world := world}
+
+def CompiledObject.initialWorld (compiled : CompiledObject) (context : Context) :
+    List (AccountState.Account × Nat) :=
   let rootCode := if context.selfCodeAvailable then compiled.codeImages.head?.getD none else some []
   let current := {((context.world.find? (·.address == context.address)).getD
       {address := context.address}) with
@@ -88,21 +92,26 @@ def CompiledObject.instantiate (compiled : CompiledObject) (context : Context :=
   let empty := context.emptyAccounts.filterMap fun account =>
     if account == context.address || supplied.any (·.address == account) then none
     else some ({address := account} : AccountState.Account)
-  let world := (current :: (supplied ++ empty)).map fun account =>
+  (current :: (supplied ++ empty)).map fun account =>
     let identity := if account.address == context.address then
       (if context.selfCodeAvailable then 1 else 0)
       else codeIdentity compiled.codeImages account.code
     (account, identity)
+
+def CompiledObject.contextArgument (compiled : CompiledObject) (context : Context) : Core.Expr :=
   let availableGas := match context.availableGas with
     | none => Core.Expr.inLeft .word .unit
     | some gas => .inRight .unit (.word gas)
-  let argument := bundle [Core.WordMapping.literal (calldataEntries context.calldata),
+  bundle [Core.WordMapping.literal (calldataEntries context.calldata),
     .word (Core.Word.ofNatModulo context.calldata.length),
     .word context.value, .word context.caller, .word context.address, availableGas,
     Core.WordMapping.literal (Core.WordMapping.insertEntries context.address context.balance context.accounts),
-    AccountState.literal world, .bool context.isStatic, .bool context.completeWorld,
+    AccountState.literal (compiled.initialWorld context), .bool context.isStatic, .bool context.completeWorld,
     Ambient.contextExpression context.ambient, .bool context.deploying]
-  ⟨.apply compiled.expression argument, context⟩
+
+def CompiledObject.instantiate (compiled : CompiledObject) (context : Context := {}) : Prepared :=
+  let context := normalizeContext context
+  ⟨.apply compiled.expression (compiled.contextArgument context), context⟩
 
 def prepare (program : Program) (objectPath : List String) (context : Context := {})
     (fuel : Nat := 4096) : LowerM Prepared := do
@@ -134,7 +143,7 @@ structure Receipt where
   world : List AccountState.Account := []
   deriving Repr
 
-private def finishOutcome (maxReturnBytes : Nat) (result : Core.Value) : Outcome := Id.run do
+def finishOutcome (maxReturnBytes : Nat) (result : Core.Value) : Outcome := Id.run do
   let .pair status (.pair (.word exit) (.pair (.word offset) (.pair (.word count)
       (.pair memory storage)))) := result | return .exportError "invalid runtime result shape"
   if exit.val = 3 then return .invalid
@@ -156,7 +165,7 @@ private def finishOutcome (maxReturnBytes : Nat) (result : Core.Value) : Outcome
   | .ok storage => return .returned bytes storage
   | .error error => return .exportError error
 
-private def finish (maxReturnBytes : Nat) (result : Core.Value) : Receipt := Id.run do
+def finish (maxReturnBytes : Nat) (result : Core.Value) : Receipt := Id.run do
   let .pair status (.pair exit (.pair offset (.pair count
       (.pair memory (.pair storage (.pair logs (.pair cursor (.pair balances world)))))))) := result |
     return ⟨.exportError "invalid runtime receipt shape", [], [], []⟩
