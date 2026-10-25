@@ -35,6 +35,42 @@ def observations(value=7):
             for name in ("directCore", "importedHull", "rustEvm")}
 
 
+class CaseProfileTests(unittest.TestCase):
+    def input_case(self, value):
+        # Envelope validation only; the native tool separately checks the Core program.
+        return {"schema": runner.INPUT_CASE_SCHEMA, "input": str(value), "program": {},
+            "source": "profile test", "provenance": {
+                key: "profile-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+            "contract": {"name": "SynthesizedInput", "method": "run", "signature": "run(uint256)",
+                "deployPath": ["SynthesizedInputDeploy"],
+                "runtimePath": ["SynthesizedInputDeploy", "SynthesizedInput"],
+                "calldata": "0xa444f5e9" + f"{value:064x}", "constructorCalldata": "0x"}}
+
+    def test_runtime_boundary_inputs_have_exact_abi(self):
+        for value in (0, 1, 2**255, 2**256 - 1):
+            with self.subTest(value=value):
+                runner.validate_case(self.input_case(value))
+
+    def test_input_and_calldata_cannot_disagree(self):
+        case = self.input_case(1)
+        for value in (0, 2, 2**255):
+            with self.assertRaisesRegex(ValueError, "calldata differs"):
+                runner.validate_case({**case, "input": str(value)})
+        for value in (1, "01", "-1", str(2**256)):
+            with self.assertRaises(ValueError):
+                runner.validate_case({**case, "input": value})
+        for calldata in ("0xa444f5e9", case["contract"]["calldata"] + "00", "0xc0406226" + "00" * 32):
+            with self.assertRaisesRegex(ValueError, "calldata differs"):
+                runner.validate_case({**case, "contract": {**case["contract"], "calldata": calldata}})
+
+    def test_profile_and_wrapper_cannot_be_mixed(self):
+        case = self.input_case(1)
+        with self.assertRaises(runner.Finding):
+            runner.validate_case({**case, "schema": runner.CASE_SCHEMA})
+        with self.assertRaises(ValueError):
+            runner.validate_case({**case, "contract": []})
+
+
 class ClassificationTests(unittest.TestCase):
     def test_three_completed_paths_required(self):
         actual = observations()

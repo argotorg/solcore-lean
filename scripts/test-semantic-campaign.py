@@ -26,11 +26,11 @@ def matched():
 
 
 def options(directory):
-    return SimpleNamespace(output=Path(directory), seed=1, nodes=16, cases=2, attempts=16,
+    return SimpleNamespace(output=Path(directory), profile='closed-g0', seed=1, nodes=16, cases=2, attempts=16,
         seconds=30, disk_bytes=16 * 1024 * 1024, shrink_attempts=4, shrink_candidates=8,
         direct_fuel=1000, core_fuel=1000, gas=100000, case_timeout=10,
         case_tool=Path('/unused/case-tool'), core_runner=Path('/unused/core-runner'),
-        anvil=Path('/unused/anvil'), test_perturb_path=None)
+        anvil=Path('/unused/anvil'), test_perturb_path=None, case=None, corpus=None)
 
 
 class AnalysisTests(unittest.TestCase):
@@ -176,6 +176,24 @@ class BudgetAndReceiptTests(unittest.TestCase):
             self.assertEqual(coverage['missingFeatures'], ['let'])
             self.assertEqual(coverage['missingWordLiterals'], ['0'])
 
+    def test_boundary_literals_do_not_replace_executed_input_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory))
+            coverage = instance.summary['coverage']
+            coverage.update(requiredInputs=list(campaign.INPUT_BOUNDARIES),
+                generatedInputs=list(campaign.INPUT_BOUNDARIES), matchedInputs=['0'],
+                matchedWordLiterals=list(campaign.INPUT_BOUNDARIES))
+            instance.checkpoint()
+            self.assertEqual(coverage['missingInputs'], sorted(campaign.INPUT_BOUNDARIES[1:], key=int))
+
+    def test_generation_fuel_failures_have_a_separate_counter(self):
+        rows = [{'category': 'excluded'}, {'category': 'inconclusive-resource'},
+            {'detail': {'excluded': [{'category': 'inconclusive-resource'}]}}]
+        self.assertEqual(campaign.generation_resource_exclusions(rows), 2)
+        for invalid in ([None], [{'detail': {'excluded': ['invalid']}}]):
+            with self.assertRaises(ValueError):
+                campaign.generation_resource_exclusions(invalid)
+
 
 class ManifestTests(unittest.TestCase):
     def valid(self):
@@ -205,6 +223,47 @@ class ManifestTests(unittest.TestCase):
             value['cases'][0]['generation'][field] = bad
             with self.assertRaises(ValueError):
                 campaign.validate_manifest(value)
+
+    def test_runtime_manifest_requires_its_version_and_exact_inputs(self):
+        value = self.valid()
+        value['profile'] = 'runtime-word'
+        value['profileVersion'] = 'runtime-input-test'
+        value['functionVersion'] = 'function-test'
+        value['abstractionVersion'] = 'abstraction-test'
+        value['requiredInputs'] = list(campaign.INPUT_BOUNDARIES)
+        for entry in value['cases']:
+            entry['input'] = '0'
+        campaign.validate_manifest(value)
+        for key in (*campaign.INPUT_VERSIONS, 'requiredInputs'):
+            broken = copy.deepcopy(value)
+            del broken[key]
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(broken)
+        for invalid in (None, 0, '01', str(2**256), '2'):
+            broken = copy.deepcopy(value)
+            broken['cases'][0]['input'] = invalid
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(broken)
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**value, 'profile': 'closed-g0'})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**value, 'profile': 'unknown'})
+
+    def test_generation_profile_selects_native_generator(self):
+        for profile, command in (('closed-g0', 'generate'), ('runtime-word', 'input-generate')):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile = profile
+                instance = campaign.Campaign(config)
+                calls = []
+
+                def tool(arguments, stage):
+                    calls.append((arguments, stage))
+                    return {'generation': 'dispatch test only'}
+
+                instance.tool = tool
+                instance.prepare_cases()
+                self.assertEqual(calls, [([command, '1', '16', '2', '16', '1000'], 'generation')])
 
     def test_secondary_finding_archive_survives_work_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:

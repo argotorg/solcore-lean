@@ -250,3 +250,68 @@ python3 Tests/scripts/test-semantic-corpus.py
 The corpus validator checks deterministic materialization, native Core
 execution, replay and AST coverage. It does not execute the EVM. The complete
 campaign above executes all three paths for every passing corpus case.
+
+## Compare functions with runtime inputs
+
+The `runtime-word` profile is the first M4 extension. It keeps the closed G0
+generator and saved cases unchanged. The original Core program applies a checked
+Word-to-Word lambda to one recorded Word. Its Solcore source accepts that same
+Word through `SynthesizedInput.run(uint256)`, so changing the input does not
+change the function's source. Each input is a separate comparison case and
+currently has its own compilation and deployment.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-word --seed 78 --nodes 32 --cases 8 --attempts 256 \
+  --output .upstream/semantic-runtime-inputs
+```
+
+Generation abstracts one Word literal from a G0 expression without capturing
+local variables. It evaluates the resulting Core function at zero, one, maximum
+Word and the high bit, and accepts the function only if all four return and at
+least two results differ. One accepted function supplies up to four cases in
+that order. `--attempts` counts function candidates; `--cases` counts individual
+input comparisons. The final function's inputs may be truncated by that limit.
+Generation fuel failures appear in `generationResourceExclusions` as a subset
+of `excluded`, separately from executed-case resource failures.
+
+Native commands are:
+
+```text
+semantic-case-tool input-generate SEED NODES COUNT ATTEMPTS FUEL
+semantic-case-tool input-emit FUNCTION.json INPUT [FUEL]
+```
+
+`FUNCTION.json` is a Core Wire program containing a closed Word-to-Word lambda.
+`INPUT` is a canonical unsigned decimal Word. Imported and reduced functions
+may be constant; the input-sensitivity requirement is a generation filter.
+The existing `observe`, `replay` and `shrink` commands recognize both case
+schemas. Replay checks the original Core argument, ABI calldata, function,
+source and versioned generation provenance. It recomputes observations rather
+than trusting saved results. Generated cases retain their generation validation
+fuel independently of a replay's execution budget.
+
+The runtime corpus checks inputs separately from constants in the program:
+
+```sh
+python3 Tests/scripts/test-semantic-corpus.py --manifest scripts/semantic-input-corpus.json
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-input-corpus.json \
+  --output .upstream/semantic-input-ci
+python3 scripts/test-source-input-rust.py
+```
+
+For runtime manifests, `requiredInputs` is satisfied only by inputs whose three
+executions agree. `generatedInputs`, `matchedInputs` and `missingInputs` report
+that coverage. `requiredWordLiterals` still measures literal presence in the
+Core AST, including an application's argument; it cannot establish input
+coverage. The fixed functions cover identity, unsigned boundary branches,
+nested local scopes and generated bodies. They do not claim all richer M4
+features or measured EVM opcode coverage.
+
+The external input regression executes two unchanged source functions at all
+four boundary inputs, checks three-way agreement and varying results, and
+replays a saved input-dependent run. The input profile also supports automatic
+reduction of its function body and input while retaining the checked application
+form. Multiple named functions, mutation, products/sums, matches and bounded
+loops remain later M4 work.

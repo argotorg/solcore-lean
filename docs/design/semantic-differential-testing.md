@@ -63,7 +63,7 @@ is proved. Do not label an unexplained difference as a confirmed upstream bug.
 | M1 | Emit a checked basic G0 subset as Solcore source with a fixed contract/ABI wrapper. | Complete, 2026-10-25 |
 | M2 | Execute arbitrary generated cases through the three comparison paths and save replayable results. | Complete, 2026-10-25 |
 | M3 | Reduce mismatches and support bounded, repeatable campaigns suitable for CI. | Complete, 2026-10-25 |
-| M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | Planned |
+| M4 | Add richer pure programs: multiple functions, mutation, products/sums, matches and bounded loops. | In progress |
 | M5 | Add stateful scenarios: storage, ordered transactions, rollback and bounded external calls. | Planned |
 | M6 | Add selected generics, closures, comptime and module combinations. | Planned |
 
@@ -295,6 +295,46 @@ proof. Closed computations may be constant-folded; runtime-input coverage is
 the next pure-program expansion before making backend opcode-coverage claims.
 
 ### M4 through M6: scope expansion
+
+M4 begins with a separately versioned runtime Word-input profile. Its original
+Core computation applies a checked Word-to-Word function to the recorded input;
+the source wrapper accepts the same input through `run(uint256)`. Generation
+abstracts a selected literal from a G0 body while preserving binder scope.
+Admit generated functions only after direct Core execution returns distinct
+results for at least two of zero, one, maximum Word and the high bit. Imported
+or reduced functions may be constant. Recheck original programs, inputs,
+emission and provenance on replay. Keep the existing closed G0 profile stable.
+
+This first slice tests runtime input without claiming M4 completion or measured
+opcode coverage. Initially each input is a separate comparison case; the source
+function stays identical across its inputs, but compilation and deployment may
+repeat. Next add acyclic named functions and the remaining pure feature families
+listed in M4, with mixed cases and failure-preserving reduction.
+
+The runtime-input slice is delivered:
+
+- Checked scalar functions, scope-aware literal abstraction and checked Core
+  applications have public typing results. The shared scalar renderer preserves
+  the original G0 output; twelve saved G0 cases remained identical after the
+  extension, including source, provenance and observations.
+- Native generation, emission, replay, observation and strict reduction support
+  runtime inputs. Replay validates the argument, ABI, source and generation
+  filter independently of its fresh observation fuel. Generation fuel exhaustion
+  has a separate classification.
+- The runtime corpus contains four distinct functions at four inputs each:
+  identity, input-dependent branching/scopes, and two generated functions using
+  negation and multiplication. All sixteen cases matched across actual Core,
+  imported Hull and EVM execution. Twelve body-feature kinds and all four
+  required runtime inputs were covered; this is not opcode coverage.
+- Controlled mismatch reduction retained the runtime-input profile. Exact replay
+  of the reduced archive matched on all real paths, and the explicit synthetic
+  adapter reproduced the same failure fingerprint. A separate eight-case
+  external regression and saved-run replay also passed.
+- Full repository build/tests, kernel policy, focused protocol regressions and
+  both fixed corpora's deterministic native validation passed.
+
+Multiple named functions, mutable state within pure programs, aggregates,
+matches and bounded loops remain open within M4. M5 and M6 remain planned.
 
 Expand one feature family at a time, including mixed-feature cases and shrink
 rules. Use acyclic function calls and bounded loops before unrestricted

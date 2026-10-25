@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.Cases
+import Solcore.Synthesis.Source.InputCases
 
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false
@@ -31,6 +31,15 @@ private def fuelValue (rest : List String) : IO Nat := do
 
 private def execute (args : List String) : IO Json := do
   match args with
+  | ["input-generate", seed, nodes, count, attempts, fuel] =>
+      let count ← natural "case count" count 1024
+      unless count > 0 do throw (IO.userError "case count must be positive")
+      return Input.generateCases (Solcore.Synthesis.Core.Seed.ofNat
+        (← natural "seed" seed (2 ^ 64 - 1)))
+        (← natural "node budget" nodes 512)
+        count
+        (← natural "attempt limit" attempts 10000)
+        (← natural "execution fuel" fuel 10000000)
   | ["generate", seed, nodes, count, attempts, fuel] =>
       let count ← natural "case count" count 1024
       unless count > 0 do throw (IO.userError "case count must be positive")
@@ -44,15 +53,32 @@ private def execute (args : List String) : IO Json := do
       let checked ← get (checkedProgram (← readJson file))
       get ((emitCase checked (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest)).mapError reprStr)
-  | "observe" :: file :: rest =>
-      let checked ← get (caseProgram (← readJson file))
-      return observe checked (← fuelValue rest)
-  | "replay" :: file :: rest =>
-      get (replayCase (← readJson file) (← fuelValue rest))
-  | "shrink" :: file :: limit :: rest =>
-      get (shrinkCases (← readJson file) (← natural "shrink limit" limit 4096)
+  | "input-emit" :: file :: input :: rest =>
+      let function ← get (Input.checkedFunction (← readJson file))
+      let input ← get (Input.inputWord input)
+      get (Input.emitCase function input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
-  | _ => throw (IO.userError "usage: semantic-case-tool generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | "observe" :: file :: rest =>
+      let json ← readJson file
+      let fuel ← fuelValue rest
+      if (json.getObjValAs? String "schema").toOption == some Input.caseSchema then
+        let checked ← get (Input.caseProgram json)
+        return Input.observe checked.function checked.input fuel
+      else
+        let checked ← get (caseProgram json)
+        return observe checked fuel
+  | "replay" :: file :: rest =>
+      let json ← readJson file
+      let fuel ← fuelValue rest
+      get (if (json.getObjValAs? String "schema").toOption == some Input.caseSchema then
+        Input.replayCase json fuel else replayCase json fuel)
+  | "shrink" :: file :: limit :: rest =>
+      let json ← readJson file
+      let limit ← natural "shrink limit" limit 4096
+      let fuel ← fuelValue rest
+      get (if (json.getObjValAs? String "schema").toOption == some Input.caseSchema then
+        Input.shrinkCases json limit fuel else shrinkCases json limit fuel)
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | input-emit FUNCTION.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

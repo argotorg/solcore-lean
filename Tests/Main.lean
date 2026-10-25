@@ -1834,6 +1834,8 @@ import Solcore.Test.CoreSynthesisSeed
 import Solcore.Test.CoreSynthesisShrink
 import Solcore.Test.SourceSynthesisEmitter
 import Solcore.Test.SourceSynthesisCases
+import Solcore.Test.SourceInputEmitter
+import Solcore.Test.SourceInputCases
 import Solcore.Test.TypeSystemInference
 import Solcore.Test.ProgramEnvironmentAndTypeResolution
 import Solcore.Test.ProgramModuleResolution
@@ -3879,6 +3881,8 @@ def run : IO Unit := do
   CoreSynthesisShrink.testCoreSynthesisShrink
   SourceSynthesisEmitter.testSourceSynthesisEmitter
   SourceSynthesisCases.testSourceSynthesisCases
+  SourceInputEmitter.testSourceInputEmitter
+  SourceInputCases.testSourceInputCases
   testDetailedCoreChecker
   testWorkspacePathIdentity
   testWorkspaceCanonicalValidation

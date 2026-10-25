@@ -1,0 +1,682 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-word",
+  "coverageKind": "core-ast-features",
+  "profileVersion": "runtime-word-input-v1/literal-seed-mod-v1",
+  "functionVersion": "core-word-function-v1",
+  "abstractionVersion": "word-literal-preorder-v1",
+  "generatorVersion": "core-g0-v1/lcg64-v1",
+  "emitterVersion": "solcore-source-input-v1",
+  "wrapperVersion": "solcore-word-input-contract-v1",
+  "requiredFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "if",
+    "let",
+    "local",
+    "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+  ],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+  ],
+  "cases": [
+    {
+      "id": "identity-zero",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "index": 0,
+            "tag": "var"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "local"
+      ]
+    },
+    {
+      "id": "identity-one",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "index": 0,
+            "tag": "var"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "local"
+      ]
+    },
+    {
+      "id": "identity-maximum",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "index": 0,
+            "tag": "var"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "local"
+      ]
+    },
+    {
+      "id": "identity-high-bit",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "index": 0,
+            "tag": "var"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "local"
+      ]
+    },
+    {
+      "id": "runtime-branch-scopes-zero",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "body": {
+              "condition": {
+                "left": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "op": "wordGt",
+                "right": {
+                  "tag": "word",
+                  "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                },
+                "tag": "binary"
+              },
+              "elseBranch": {
+                "body": {
+                  "left": {
+                    "index": 2,
+                    "tag": "var"
+                  },
+                  "op": "wordAdd",
+                  "right": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                },
+                "tag": "let"
+              },
+              "tag": "if",
+              "thenBranch": {
+                "body": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordSub",
+                  "right": {
+                    "index": 1,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordXor",
+                  "right": {
+                    "tag": "word",
+                    "value": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                  },
+                  "tag": "binary"
+                },
+                "tag": "let"
+              }
+            },
+            "initializer": {
+              "left": {
+                "index": 0,
+                "tag": "var"
+              },
+              "op": "wordAdd",
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              "tag": "binary"
+            },
+            "tag": "let"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "runtime-branch-scopes-one",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "body": {
+              "condition": {
+                "left": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "op": "wordGt",
+                "right": {
+                  "tag": "word",
+                  "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                },
+                "tag": "binary"
+              },
+              "elseBranch": {
+                "body": {
+                  "left": {
+                    "index": 2,
+                    "tag": "var"
+                  },
+                  "op": "wordAdd",
+                  "right": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                },
+                "tag": "let"
+              },
+              "tag": "if",
+              "thenBranch": {
+                "body": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordSub",
+                  "right": {
+                    "index": 1,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordXor",
+                  "right": {
+                    "tag": "word",
+                    "value": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                  },
+                  "tag": "binary"
+                },
+                "tag": "let"
+              }
+            },
+            "initializer": {
+              "left": {
+                "index": 0,
+                "tag": "var"
+              },
+              "op": "wordAdd",
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              "tag": "binary"
+            },
+            "tag": "let"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "runtime-branch-scopes-maximum",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "body": {
+              "condition": {
+                "left": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "op": "wordGt",
+                "right": {
+                  "tag": "word",
+                  "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                },
+                "tag": "binary"
+              },
+              "elseBranch": {
+                "body": {
+                  "left": {
+                    "index": 2,
+                    "tag": "var"
+                  },
+                  "op": "wordAdd",
+                  "right": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                },
+                "tag": "let"
+              },
+              "tag": "if",
+              "thenBranch": {
+                "body": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordSub",
+                  "right": {
+                    "index": 1,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordXor",
+                  "right": {
+                    "tag": "word",
+                    "value": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                  },
+                  "tag": "binary"
+                },
+                "tag": "let"
+              }
+            },
+            "initializer": {
+              "left": {
+                "index": 0,
+                "tag": "var"
+              },
+              "op": "wordAdd",
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              "tag": "binary"
+            },
+            "tag": "let"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "runtime-branch-scopes-high-bit",
+      "program": {
+        "schema": "solcore-semantic-core",
+        "resultType": {
+          "tag": "function",
+          "parameter": "word",
+          "result": "word"
+        },
+        "dataDefinitions": [],
+        "body": {
+          "body": {
+            "body": {
+              "condition": {
+                "left": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "op": "wordGt",
+                "right": {
+                  "tag": "word",
+                  "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                },
+                "tag": "binary"
+              },
+              "elseBranch": {
+                "body": {
+                  "left": {
+                    "index": 2,
+                    "tag": "var"
+                  },
+                  "op": "wordAdd",
+                  "right": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000007"
+                },
+                "tag": "let"
+              },
+              "tag": "if",
+              "thenBranch": {
+                "body": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordSub",
+                  "right": {
+                    "index": 1,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "initializer": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordXor",
+                  "right": {
+                    "tag": "word",
+                    "value": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                  },
+                  "tag": "binary"
+                },
+                "tag": "let"
+              }
+            },
+            "initializer": {
+              "left": {
+                "index": 0,
+                "tag": "var"
+              },
+              "op": "wordAdd",
+              "right": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              "tag": "binary"
+            },
+            "tag": "let"
+          },
+          "parameterType": "word",
+          "resultType": "word",
+          "tag": "lambda"
+        }
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "if",
+        "let",
+        "local",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-86-zero",
+      "generation": {
+        "seed": "86",
+        "maxProgramNodes": 32
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "boolLiteral",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-86-one",
+      "generation": {
+        "seed": "86",
+        "maxProgramNodes": 32
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "boolLiteral",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-86-maximum",
+      "generation": {
+        "seed": "86",
+        "maxProgramNodes": 32
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "boolLiteral",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-86-high-bit",
+      "generation": {
+        "seed": "86",
+        "maxProgramNodes": 32
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "boolLiteral",
+        "if",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-172-zero",
+      "generation": {
+        "seed": "172",
+        "maxProgramNodes": 32
+      },
+      "input": "0",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-172-one",
+      "generation": {
+        "seed": "172",
+        "maxProgramNodes": 32
+      },
+      "input": "1",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-172-maximum",
+      "generation": {
+        "seed": "172",
+        "maxProgramNodes": 32
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    },
+    {
+      "id": "generated-172-high-bit",
+      "generation": {
+        "seed": "172",
+        "maxProgramNodes": 32
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral",
+        "if",
+        "let",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ]
+    }
+  ]
+}

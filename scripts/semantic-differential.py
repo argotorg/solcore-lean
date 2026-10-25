@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay one checked G0 case through direct Core, imported Hull and local EVM.
+"""Replay one checked pure case through direct Core, imported Hull and local EVM.
 
 This is a single-case runner, not a campaign or shrinker. It starts its own
 loopback-only Anvil and never connects to an existing chain. Passing means all
@@ -28,6 +28,7 @@ import urllib.request
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 CASE_SCHEMA = "solcore-lean.semantic-case.v1"
+INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -111,7 +112,7 @@ def word(value, label="word") -> str:
 
 
 def validate_case(case: dict) -> None:
-    if not isinstance(case, dict) or case.get("schema") != CASE_SCHEMA:
+    if not isinstance(case, dict) or case.get("schema") not in {CASE_SCHEMA, INPUT_CASE_SCHEMA}:
         raise ValueError("unsupported semantic case schema")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("case requires its original Core program and emitted source")
@@ -122,13 +123,20 @@ def validate_case(case: dict) -> None:
         if not isinstance(provenance.get(key), str) or not provenance[key]:
             raise ValueError(f"missing provenance {key}")
     contract = case.get("contract", {})
-    if (contract.get("name"), contract.get("method"), contract.get("signature")) != (
-            "SynthesizedG0", "run", "run()"):
-        raise Finding("unsupported-scope", "input", "only the versioned SynthesizedG0.run() wrapper is supported")
-    if contract.get("deployPath") != ["SynthesizedG0Deploy"] or contract.get("runtimePath") != ["SynthesizedG0Deploy", "SynthesizedG0"]:
+    if not isinstance(contract, dict):
+        raise ValueError("case contract metadata is missing")
+    if case["schema"] == INPUT_CASE_SCHEMA:
+        name, signature = "SynthesizedInput", "run(uint256)"
+        calldata = bytes.fromhex("a444f5e9") + int(word(case.get("input"), "input")).to_bytes(32, "big")
+    else:
+        name, signature = "SynthesizedG0", "run()"
+        calldata = bytes.fromhex("c0406226")
+    if (contract.get("name"), contract.get("method"), contract.get("signature")) != (name, "run", signature):
+        raise Finding("unsupported-scope", "input", "contract wrapper differs from its case profile")
+    if contract.get("deployPath") != [name + "Deploy"] or contract.get("runtimePath") != [name + "Deploy", name]:
         raise ValueError("unexpected generated object paths")
-    if hex_bytes(contract.get("calldata"), "calldata") != bytes.fromhex("c0406226"):
-        raise ValueError("calldata differs from run() selector")
+    if hex_bytes(contract.get("calldata"), "calldata") != calldata:
+        raise ValueError("calldata differs from the profile selector and original Core input")
     if hex_bytes(contract.get("constructorCalldata"), "constructorCalldata"):
         raise Finding("unsupported-scope", "input", "constructor arguments are outside the initial profile")
 
@@ -425,6 +433,9 @@ def execute(args, report: dict) -> None:
         original = args.replay / "case.json"
     case = read_json(original)
     validate_case(case)
+    report["scope"] = ("runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word"
+                       if case["schema"] == INPUT_CASE_SCHEMA else
+                       "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word")
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))
     source.write_text(case["source"])
@@ -456,7 +467,7 @@ def execute(args, report: dict) -> None:
         [str(args.case_tool), "replay", str(case_path), str(args.direct_fuel)])
     fresh = json.loads(refreshed["stdout"])
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract"):
+    for key in ("program", "source", "provenance", "contract", "input"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
     (args.output / "replayed-case.json").write_bytes(json_bytes(fresh))

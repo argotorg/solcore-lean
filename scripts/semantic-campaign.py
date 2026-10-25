@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded sequential G0 differential campaigns and failure-preserving reduction.
+"""Bounded pure-program differential campaigns and failure-preserving reduction.
 
 Normal execution never changes observations. --test-perturb-path is an explicit
 synthetic test adapter: after all real paths match, it flips one observed Word
@@ -29,6 +29,9 @@ SCHEMA = "solcore-lean.semantic-campaign.v1"
 ANALYSIS_SCHEMA = "solcore-lean.semantic-analysis.v1"
 TEST_ADAPTER = "xor-low-bit-after-matched-execution-v1"
 PATHS = ("directCore", "importedHull", "rustEvm")
+PROFILES = ("closed-g0", "runtime-word")
+INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
+INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
@@ -68,7 +71,11 @@ def word_literals(program: dict) -> set[str]:
 def validate_manifest(manifest) -> dict:
     if not isinstance(manifest, dict) or manifest.get("schema") != "solcore-lean.semantic-corpus-manifest.v1" or not isinstance(manifest.get("cases"), list):
         raise ValueError("unsupported corpus manifest")
-    for key in ("generatorVersion", "emitterVersion", "wrapperVersion"):
+    profile = manifest.get("profile", "closed-g0")
+    if profile not in PROFILES:
+        raise ValueError("unsupported corpus profile")
+    version_keys = ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if profile == "runtime-word" else ())
+    for key in version_keys:
         if not isinstance(manifest.get(key), str) or not manifest[key]:
             raise ValueError(f"missing corpus {key}")
     for key in ("requiredFeatures", "requiredWordLiterals"):
@@ -76,6 +83,13 @@ def validate_manifest(manifest) -> dict:
             raise ValueError(f"corpus {key} must be an array of strings")
     for value in manifest["requiredWordLiterals"]:
         m2.word(value)
+    required_inputs = manifest.get("requiredInputs", [] if profile == "closed-g0" else None)
+    if not isinstance(required_inputs, list):
+        raise ValueError("runtime corpus requiredInputs must be an array")
+    for value in required_inputs:
+        m2.word(value, "required input")
+    if profile == "closed-g0" and required_inputs:
+        raise ValueError("closed G0 corpus cannot require runtime inputs")
     ids = set()
     for entry in manifest["cases"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
@@ -83,6 +97,12 @@ def validate_manifest(manifest) -> dict:
         ids.add(entry["id"])
         if ("generation" in entry) == ("program" in entry):
             raise ValueError("corpus entry must specify exactly one generation request or program")
+        if profile == "runtime-word":
+            m2.word(entry.get("input"), "corpus input")
+            if "generation" in entry and entry["input"] not in INPUT_BOUNDARIES:
+                raise ValueError("generated runtime inputs must be a boundary value")
+        elif "input" in entry:
+            raise ValueError("closed G0 corpus entries cannot specify a runtime input")
         if not isinstance(entry.get("expectedFeatures"), list) or any(not isinstance(value, str) for value in entry["expectedFeatures"]):
             raise ValueError("expectedFeatures must be an array of strings")
         if "generation" in entry:
@@ -96,6 +116,23 @@ def validate_manifest(manifest) -> dict:
         elif not isinstance(entry["program"], dict):
             raise ValueError("corpus program must be a Core JSON object")
     return manifest
+
+
+def generation_resource_exclusions(excluded: list) -> int:
+    """Generation resource failures count separately from executed cases."""
+    count = 0
+    for entry in excluded:
+        if not isinstance(entry, dict):
+            raise ValueError("generation exclusions must be objects")
+        if entry.get("category") == RESOURCE:
+            count += 1
+        else:
+            detail = entry.get("detail")
+            if isinstance(detail, dict) and isinstance(detail.get("excluded"), list):
+                if any(not isinstance(item, dict) for item in detail["excluded"]):
+                    raise ValueError("generation exclusions must be objects")
+                count += sum(item.get("category") == RESOURCE for item in detail["excluded"])
+    return count
 
 
 def analyze(report: dict, perturb: str | None = None) -> dict:
@@ -176,16 +213,17 @@ class Campaign:
         self.summary = {
             "schema": SCHEMA, "status": "running", "synthetic": args.test_perturb_path is not None,
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path} if args.test_perturb_path else None,
-            "configuration": {key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
+            "configuration": {key: getattr(args, key) for key in ("profile", "seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
             "tools": {"caseTool": str(args.case_tool), "coreRunner": str(args.core_runner), "anvil": str(args.anvil),
                       "campaignSha256": m2.digest(Path(__file__).read_bytes()),
                       "differentialSha256": m2.digest((ROOT / "scripts/semantic-differential.py").read_bytes())},
-            "counts": {key: 0 for key in ("generated", "excluded", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
+            "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "cases": [], "findings": [], "secondaryFindings": [], "shrinkAttempts": 0,
             "coverage": {"kind": "AST features and literals; not runtime opcode coverage",
                          "generatedFeatures": [], "generatedWordLiterals": [],
                          "matchedFeatures": [], "matchedWordLiterals": [],
-                         "requiredFeatures": [], "requiredWordLiterals": []},
+                         "requiredFeatures": [], "requiredWordLiterals": [],
+                         "generatedInputs": [], "matchedInputs": [], "requiredInputs": []},
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
         self.checkpoint()
 
@@ -197,6 +235,7 @@ class Campaign:
         coverage = self.summary["coverage"]
         coverage["missingFeatures"] = sorted(set(coverage["requiredFeatures"]) - set(coverage["matchedFeatures"]))
         coverage["missingWordLiterals"] = sorted(set(coverage["requiredWordLiterals"]) - set(coverage["matchedWordLiterals"]), key=int)
+        coverage["missingInputs"] = sorted(set(coverage["requiredInputs"]) - set(coverage["matchedInputs"]), key=int)
         save_json(self.args.output / "summary.json", self.summary)
 
     def guard(self) -> None:
@@ -384,14 +423,17 @@ class Campaign:
             return {"schema": "solcore-lean.semantic-corpus.v1", "requested": 1,
                 "attempted": 0, "excluded": [], "cases": [case], "status": "complete"}
         if self.args.corpus is None:
-            return self.tool(["generate", str(self.args.seed), str(self.args.nodes), str(self.args.cases),
+            command = "input-generate" if self.args.profile == "runtime-word" else "generate"
+            return self.tool([command, str(self.args.seed), str(self.args.nodes), str(self.args.cases),
                               str(self.args.attempts), str(self.args.direct_fuel)], "generation")
         manifest = validate_manifest(m2.read_json(self.args.corpus))
+        runtime_input = manifest.get("profile", "closed-g0") == "runtime-word"
         save_json(self.args.output / "corpus.json", manifest)
         self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": m2.digest(m2.json_bytes(manifest))}
         coverage = self.summary["coverage"]
         coverage["requiredFeatures"] = sorted(set(manifest.get("requiredFeatures", [])))
         coverage["requiredWordLiterals"] = sorted({m2.word(value) for value in manifest.get("requiredWordLiterals", [])}, key=int)
+        coverage["requiredInputs"] = sorted(set(manifest.get("requiredInputs", [])), key=int)
         cases, excluded, ids, accepted_ids = [], [], [], []
         attempted = 0
         for entry in manifest["cases"][:self.args.cases]:
@@ -404,12 +446,16 @@ class Campaign:
             ids.append(entry["id"])
             if "generation" in entry:
                 request = entry["generation"]
-                response = self.tool(["generate", str(request["seed"]), str(request["maxProgramNodes"]),
-                    "1", "1", str(self.args.direct_fuel)], "corpus-generation")
+                response = self.tool(["input-generate" if runtime_input else "generate",
+                    str(request["seed"]), str(request["maxProgramNodes"]),
+                    "4" if runtime_input else "1", "1", str(self.args.direct_fuel)], "corpus-generation")
                 generated = response.get("cases", [])
+                if runtime_input:
+                    generated = [case for case in generated if case.get("input") == entry["input"]]
                 if len(generated) != 1:
                     excluded.append({"id": entry["id"], "stage": "generation", "detail": response})
                     self.summary["counts"]["excluded"] = len(excluded)
+                    self.summary["counts"]["generationResourceExclusions"] = generation_resource_exclusions(excluded)
                     self.summary["generation"] = {"requested": self.args.cases, "attempted": attempted, "status": "running"}
                     save_json(self.args.output / "generation.json", {"excluded": excluded, **self.summary["generation"]})
                     self.checkpoint()
@@ -419,17 +465,21 @@ class Campaign:
                 program = self.work / "corpus-program.json"
                 save_json(program, entry["program"])
                 try:
-                    case = self.tool(["emit", str(program), str(self.args.direct_fuel)], "corpus-emission")
+                    command = ["input-emit", str(program), entry["input"]] if runtime_input else ["emit", str(program)]
+                    case = self.tool([*command, str(self.args.direct_fuel)], "corpus-emission")
                 finally:
                     program.unlink(missing_ok=True)
             else:
                 raise ValueError("corpus entry has no generation request or program")
             m2.validate_case(case)
+            if runtime_input and case.get("input") != entry["input"]:
+                raise ValueError(f"corpus input changed for {entry['id']}")
             if "generation" in entry:
                 origin = case["provenance"].get("origin", {})
-                if origin.get("kind") != "generated" or origin.get("seed") != entry["generation"]["seed"] or origin.get("maxProgramNodes") != entry["generation"]["maxProgramNodes"]:
+                kind = "input-generated" if runtime_input else "generated"
+                if origin.get("kind") != kind or origin.get("seed") != entry["generation"]["seed"] or origin.get("maxProgramNodes") != entry["generation"]["maxProgramNodes"]:
                     raise ValueError(f"generated corpus provenance differs for {entry['id']}")
-            for key in ("generatorVersion", "emitterVersion", "wrapperVersion"):
+            for key in ("generatorVersion", "emitterVersion", "wrapperVersion") + (INPUT_VERSIONS if runtime_input else ()):
                 if manifest.get(key) != case["provenance"].get(key):
                     raise ValueError(f"corpus {key} changed")
             if set(entry.get("expectedFeatures", [])) != set(case["provenance"]["features"]):
@@ -440,6 +490,8 @@ class Campaign:
             self.summary["counts"]["generated"] = len(cases)
             coverage["generatedFeatures"] = sorted(set(coverage["generatedFeatures"]) | set(case["provenance"]["features"]))
             coverage["generatedWordLiterals"] = sorted(set(coverage["generatedWordLiterals"]) | word_literals(case["program"]), key=int)
+            if runtime_input:
+                coverage["generatedInputs"] = sorted(set(coverage["generatedInputs"]) | {case["input"]}, key=int)
             self.summary["generation"] = {"requested": self.args.cases, "attempted": attempted, "status": "running"}
             self.summary["corpus"]["acceptedIds"] = accepted_ids
             self.summary["corpus"]["entryIds"] = ids
@@ -457,14 +509,22 @@ class Campaign:
             raise ValueError("invalid bounded generation response")
         self.summary["counts"]["generated"] = len(cases)
         self.summary["counts"]["excluded"] = len(excluded)
+        self.summary["counts"]["generationResourceExclusions"] = generation_resource_exclusions(excluded)
         self.summary["generation"] = {key: response.get(key) for key in ("requested", "attempted", "status")}
+        self.summary["generation"]["attemptUnit"] = (
+            "manifest entries" if self.args.corpus else
+            "function candidates" if self.args.profile == "runtime-word" else "program candidates")
         save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
         coverage = self.summary["coverage"]
         coverage["generatedFeatures"] = sorted({feature for case in cases for feature in case["provenance"]["features"]})
         coverage["generatedWordLiterals"] = sorted({value for case in cases for value in word_literals(case["program"])}, key=int)
+        coverage["generatedInputs"] = sorted({case["input"] for case in cases if case["schema"] == m2.INPUT_CASE_SCHEMA}, key=int)
         for index, case in enumerate(cases):
             self.guard()
             m2.validate_case(case)
+            expected_schema = m2.INPUT_CASE_SCHEMA if self.args.profile == "runtime-word" else m2.CASE_SCHEMA
+            if case["schema"] != expected_schema:
+                raise ValueError("case tool returned a different generation profile")
             save_json(self.args.output / "cases" / f"{index:04d}.json", case)
         for index, case in enumerate(cases):
             self.guard()
@@ -475,6 +535,8 @@ class Campaign:
             if category == "matched":
                 coverage["matchedFeatures"] = sorted(set(coverage["matchedFeatures"]) | set(case["provenance"]["features"]))
                 coverage["matchedWordLiterals"] = sorted(set(coverage["matchedWordLiterals"]) | word_literals(case["program"]), key=int)
+                if case["schema"] == m2.INPUT_CASE_SCHEMA:
+                    coverage["matchedInputs"] = sorted(set(coverage["matchedInputs"]) | {case["input"]}, key=int)
             save_json(self.args.output / "results" / f"{index:04d}.json", {"actualReport": compact_report(report), "analysis": analysis})
             case_id = self.summary.get("corpus", {}).get("acceptedIds", [f"generated-{i}" for i in range(len(cases))])[index]
             row = {"index": index, "id": case_id, "case": f"cases/{index:04d}.json", "result": f"results/{index:04d}.json",
@@ -496,6 +558,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="new campaign directory")
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--profile", choices=PROFILES,
+                        help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
     parser.add_argument("--nodes", type=int, default=32)
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
@@ -518,6 +582,19 @@ def main() -> int:
     parser.add_argument("--test-perturb-path", choices=PATHS,
                         help="SYNTHETIC TEST ONLY: change a copied observation after real three-way agreement")
     args = parser.parse_args()
+    try:
+        selected_profile = None
+        if args.corpus:
+            selected_profile = validate_manifest(m2.read_json(args.corpus)).get("profile", "closed-g0")
+        elif args.case:
+            case = m2.read_json(args.case)
+            m2.validate_case(case)
+            selected_profile = "runtime-word" if case["schema"] == m2.INPUT_CASE_SCHEMA else "closed-g0"
+        if args.profile and selected_profile and args.profile != selected_profile:
+            parser.error("--profile disagrees with the supplied case or corpus")
+        args.profile = args.profile or selected_profile or "closed-g0"
+    except (OSError, ValueError, KeyError, TypeError, m2.Finding) as error:
+        parser.error(str(error))
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16
@@ -563,7 +640,7 @@ def main() -> int:
             shutil.rmtree(campaign.work, ignore_errors=True)
             campaign.checkpoint()
             coverage = campaign.summary["coverage"]
-            if campaign.summary["status"] == "complete" and (coverage["missingFeatures"] or coverage["missingWordLiterals"]):
+            if campaign.summary["status"] == "complete" and (coverage["missingFeatures"] or coverage["missingWordLiterals"] or coverage["missingInputs"]):
                 campaign.summary["status"] = "coverage-incomplete"
                 campaign.checkpoint()
         finally:
@@ -572,7 +649,7 @@ def main() -> int:
     print(json.dumps({"status": campaign.summary["status"], "synthetic": campaign.summary["synthetic"],
                       "counts": counts, "summary": str(args.output / "summary.json")}))
     coverage = campaign.summary["coverage"]
-    return 0 if campaign.summary["status"] == "complete" and counts["matched"] == args.cases and not coverage["missingFeatures"] and not coverage["missingWordLiterals"] else 1
+    return 0 if campaign.summary["status"] == "complete" and counts["matched"] == args.cases and not coverage["missingFeatures"] and not coverage["missingWordLiterals"] and not coverage["missingInputs"] else 1
 
 
 if __name__ == "__main__":
