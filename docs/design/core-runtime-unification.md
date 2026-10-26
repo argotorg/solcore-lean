@@ -122,12 +122,16 @@ including failures, control transfers and the reached heap.
 These theorems keep explicit premises. `Expressions` supplies meaning for
 exactly the expressions the compiler accepted, at every compiler fuel; no
 expression closure exists yet. `Covered` admits returns, final values, discards,
-`break`/`continue`, blocks, conditionals, `while` loops and monomorphic
-initialized or uninitialized declarations. It excludes assignments, bit-not
-updates, matches, `for` loops and generalized declarations, and it requires a
-function-mode fallthrough to have Unit result and a final bare value to have the
-declared result type. The caller also supplies native typing of the flow,
-checker typing of the body and the invocation's physical entry state. These
+`break`/`continue`, blocks, conditionals, `while` loops, monomorphic initialized
+or uninitialized declarations, and bare assignments and bit-not updates when the
+compiler view is the original Source (as for named rows). Their flow heads come
+from the tree's assignment receipts and the body's actual assignment policy
+(`ActualBodyInvocation.Index.assignment_policy` and `bitNot_policy`). `Covered`
+excludes projected writes, matches, `for` loops and generalized declarations,
+and it requires a function-mode fallthrough to have Unit result and a final bare
+value to have the declared result type. The caller also supplies native typing
+of the flow, checker typing of the body, the invocation's physical entry state,
+and the fault interpretation of the body's assignment diagnostic words. These
 theorems are not yet used by the public session.
 
 ## Remaining work for the second goal
@@ -139,9 +143,8 @@ recognizer until it appears universal or assuming a body-execution law.
 
 On the accepted-body route above, the next connected steps are:
 
-- Close the remaining compiler branches in `Covered`: assignments and bit-not
-  updates (heads built from the tree's assignment receipts, including
-  contextual metadata views), matches, `for` loops and generalized
+- Close the remaining compiler branches in `Covered`: projected writes, bare
+  writes under contextual metadata views, matches, `for` loops and generalized
   declarations. Statements after an always-returning prefix in a non-Unit
   function, which the existing flows cannot express, need a separate argument.
 - Discharge `Expressions` by an expression closure over the actual accepted

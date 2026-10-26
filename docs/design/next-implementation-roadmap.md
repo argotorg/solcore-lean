@@ -568,10 +568,11 @@ the actual accepted compiler tree of any named or contextual body invocation,
 and composes the result with the actual function footer
 (`CellAwareInvocationAcceptedFlow.body_preserves` and `body_reflects`). Covered
 branches are returns, final values, discards, transfers, blocks, conditionals,
-`while` loops and monomorphic declarations. Accepted-expression meaning is
-still a premise, assignments, bit-not updates, matches, `for` loops and
-generalized declarations are not yet closed, and the public session does not yet
-use these theorems. The design document lists the remaining premises.
+`while` loops, monomorphic declarations, and bare assignments and bit-not
+updates of named-row bodies. Accepted-expression meaning is still a premise,
+projected writes, matches, `for` loops and generalized declarations are not yet
+closed, and the public session does not yet use these theorems. The design
+document lists the remaining premises.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile
