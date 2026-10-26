@@ -23,7 +23,7 @@ theorem foldl_value (bytes : List UInt8) (accumulator : Nat) :
       rw [List.foldl_cons, ih, RevertSemantics.bytesValue, List.length_cons, Nat.pow_succ, Nat.add_mul,
         Nat.mul_assoc, Nat.mul_comm 256 (256 ^ rest.length), Nat.add_assoc]
 
-private theorem store_components {scope : Scope} {offset value : Core.Expr} {lowered : Lowered}
+theorem store_components {scope : Scope} {offset value : Core.Expr} {lowered : Lowered}
     (compiled : Effects.lowerBuiltin scope "mstore" [offset, value] = .ok lowered) :
     ∃ memory size, Effects.reference scope "memory" WordMapping.type = .ok memory ∧
       Effects.reference scope "memorySize" .word = .ok size ∧
@@ -88,7 +88,7 @@ theorem exit_rename (memory size halt : Core.Expr) (word : Word) (mapping : Rena
   rw [LocalSequence.discard, LanguageResult.bind, Core.Expr.rename, MemoryCorrespondence.mstore_rename]
   rfl
 
-private theorem world_separate (layout : RuntimeEffectsCorrespondence.Layout) :
+theorem world_separate (layout : RuntimeEffectsCorrespondence.Layout) :
     layout.storage.world ≠ layout.memory ∧ layout.storage.world ≠ layout.storage.memorySize ∧
       layout.storage.exit ≠ layout.storage.world ∧ layout.storage.returnOffset ≠ layout.storage.world ∧
       layout.storage.returnSize ≠ layout.storage.world := by
@@ -99,7 +99,7 @@ private theorem world_separate (layout : RuntimeEffectsCorrespondence.Layout) :
 
 /-- The revert termination writes only the memory size and the exit registers,
 so the world cell survives. -/
-private theorem finalStore_world {layout : RuntimeEffectsCorrespondence.Layout}
+theorem finalStore_world {layout : RuntimeEffectsCorrespondence.Layout}
     {state : RuntimeEffectsSemantics.State} {kind : Nat} {offset length : Word} {store : Store} {value : Value}
     (found : store.read? layout.storage.world = some value) :
     (TerminationBuiltinCorrespondence.finalStore layout.storage state kind offset length store).read?

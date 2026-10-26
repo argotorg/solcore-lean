@@ -4,6 +4,7 @@ import Solcore.Frontend.RustHull.DerivationFunctionCorrespondence
 import Solcore.Frontend.RustHull.LoopDerivationCorrespondence
 import Solcore.Frontend.RustHull.MatchDerivationCorrespondence
 import Solcore.Frontend.RustHull.RevertCorrespondence
+import Solcore.Frontend.RustHull.YulCorrespondence
 
 /-! Finite independent Hull execution drives the mutual simulation proof.
 Recursive function calls use their actual finite child derivations, without
@@ -23,6 +24,7 @@ theorem function_preserves_effects {supported : String → Prop} {σ : Type} {mo
     (runtime : EffectEnvironmentRel slots scope Core.Renaming.id captured)
     (external : ExternalCallPreservation supported model slots effects)
     (reverting : RevertPreservation supported model slots effects)
+    (assembling : AssemblyPreservation supported model slots effects)
     (eligible : ExecutableProgram supported functions)
     {function : Function} {sources : List Semantics.Value} {initial final : Semantics.State σ}
     {result : Semantics.Result Semantics.Value}
@@ -306,6 +308,7 @@ theorem function_preserves_effects {supported : String → Prop} {σ : Type} {mo
     cases statement with | mk statementKind span =>
     cases kind
     simp only [ExecutableStatement] at accepted
+    exact assembling accepted executed
   case revert =>
     intro env statement message state external control kind executed accepted
     cases statement with | mk statementKind span =>
@@ -446,6 +449,7 @@ theorem function_preserves {σ : Type} {model : StateModel σ} {slots : List Eff
     (evaluated : Semantics.EvalFunction functions effects function sources initial result final) :
     FunctionMotive (model := model) functions signatures codes locations captured function sources initial result final :=
   function_preserves_effects signaturesCompiled codesCompiled unique covered globals runtime
-    (ExternalCallPreservation.empty model slots effects) (RevertPreservation.empty model slots effects) eligible evaluated
+    (ExternalCallPreservation.empty model slots effects) (RevertPreservation.empty model slots effects)
+    (AssemblyPreservation.empty model slots effects) eligible evaluated
 
 end Solcore.Frontend.RustHull.DerivationProgramCorrespondence

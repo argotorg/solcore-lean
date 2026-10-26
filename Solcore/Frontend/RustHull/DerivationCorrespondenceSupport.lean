@@ -1,4 +1,5 @@
 import Solcore.Frontend.RustHull.NamedCallCorrespondence
+import Solcore.Frontend.RustHull.YulFragment
 import Solcore.Frontend.RustHull.ClosureFrameCorrespondence
 import Solcore.Frontend.RustHull.ScopeCoverage
 import Solcore.Frontend.RustHull.EffectStateCorrespondence
@@ -60,7 +61,8 @@ end RecursiveExpression
 
 /-- Structured local control includes blocks, loops and loop transfers.
 External effects have separate proof obligations; Hull's explicit revert is
-eligible where the `revert` builtin is supported. -/
+eligible where the `revert` builtin is supported, and an assembly block when
+`YulFragment.Eligible` holds. -/
 def ExecutableStatement (supported : String → Prop) (functions : List Function) : Stmt → Prop
   | ⟨.letDecl _ _, _⟩ | ⟨.comment _, _⟩ => True
   | ⟨.assign _ value, _⟩ | ⟨.expression value, _⟩ | ⟨.returnStmt value, _⟩ =>
@@ -76,7 +78,7 @@ def ExecutableStatement (supported : String → Prop) (functions : List Function
       (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, ExecutableStatement supported functions statement)
   | ⟨.breakStmt, _⟩ | ⟨.continueStmt, _⟩ => True
   | ⟨.revert _, _⟩ => supported "revert"
-  | _ => False
+  | ⟨.assembly body, _⟩ => YulFragment.Eligible supported body
 termination_by statement => sizeOf statement
 decreasing_by
   all_goals first | decreasing_trivial | skip

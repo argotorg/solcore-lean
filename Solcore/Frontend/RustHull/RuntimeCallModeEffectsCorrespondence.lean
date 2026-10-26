@@ -6,10 +6,11 @@ import Solcore.Frontend.RustHull.ChildCallBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RuntimeLinkedReturnDataEffectsCorrespondence
 import Solcore.Frontend.RustHull.CreationBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RevertBuiltinCorrespondence
+import Solcore.Frontend.RustHull.YulBuiltinCorrespondence
 
-/-! Message calls, account destruction, creation attempts and Hull's explicit
-revert join the existing concrete effects in the recursive Hull proof. Actual
-installation supplies captured handlers. -/
+/-! Message calls, account destruction, creation attempts, Hull's explicit
+revert and inline Yul blocks join the existing concrete effects in the
+recursive Hull proof. Actual installation supplies captured handlers. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeEffectsCorrespondence
 open Correspondence ScalarExecution DerivationCorrespondence
@@ -167,6 +168,31 @@ theorem revert_preserves (layout : Layout) (baseline : Nat → Option Core.Value
   exact RevertBuiltinCorrespondence.preserves passive memoryMember memorySizeMember exitMember offsetMember sizeMember
     reverted compiled runtime state
 
+theorem assembly_preserves (layout : Layout) (baseline : Nat → Option Core.Value)
+    (slots : List EffectSlot) (image : Option (List UInt8)) (withCode : Bool) (handlers : ModeHandlers layout)
+    (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
+    (memoryMember : ⟨"memory", Core.WordMapping.type, layout.memory⟩ ∈ slots)
+    (memorySizeMember : ⟨"memorySize", .word, layout.storage.memorySize⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, layout.storage.exit⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, layout.storage.returnOffset⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, layout.storage.returnSize⟩ ∈ slots)
+    (anchors : Anchors) (context : Context layout)
+    (children : RuntimeCallEffectsSemantics.State → AccountCallSemantics.Children) :
+    AssemblyPreservation (supported slots withCode) (model layout baseline slots image handlers anchors context) slots
+      (RuntimeCallModeSemantics.effectsWith children image) := by
+  intro functions sourceEnvironment body initial control final _ assembled signatures codes locations captured span
+  intro fuel scope result loops expression compiled covered world mapping environment store _ _ runtime heap installed
+  obtain ⟨external, executed, rfl⟩ := assembled
+  cases fuel with
+  | zero => simp [lowerStatement, fail] at compiled
+  | succ fuel =>
+      simp only [lowerStatement] at compiled
+      obtain ⟨target, finalStore, related, evaluated, finalRelated, closures⟩ :=
+        YulBuiltinCorrespondence.preserves passive memoryMember memorySizeMember exitMember offsetMember sizeMember
+          executed compiled runtime heap
+      exact ⟨[], target, finalStore, related, evaluated, by rw [List.append_nil]; exact finalRelated,
+        installed.preserved closures, closures⟩
+
 theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value)
     (slots : List EffectSlot) (image : Option (List UInt8)) (withCode : Bool) (handlers : ModeHandlers layout)
     (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots) (callPassive : CallPassive layout slots)
@@ -227,6 +253,8 @@ theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value
       memorySizeMember exitMember offsetMember sizeMember logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots anchors context children callbacks) eligible values evaluated
     runtimeLength covered runtimeRelated separated state
     (revert_preserves layout baseline slots image withCode handlers passive memoryMember memorySizeMember exitMember
+      offsetMember sizeMember anchors context children)
+    (assembly_preserves layout baseline slots image withCode handlers passive memoryMember memorySizeMember exitMember
       offsetMember sizeMember anchors context children)
 
 
