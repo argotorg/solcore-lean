@@ -1,12 +1,13 @@
 import Solcore.Frontend.RustHull.RuntimeCallEffectsSemantics
 import Solcore.Frontend.RustHull.RuntimeLifecycleSemantics
 import Solcore.Frontend.RustHull.CreationSemantics
+import Solcore.Frontend.RustHull.RevertSemantics
 
 /-! Message call modes share caller transport and account checkpoints. The
 mode controls the handler, caller observation and stipend checks; account
 dispatch controls execution address and balance transfer separately. Account
 destruction shares the same frame state and transaction world, and so do
-creation attempts. -/
+creation attempts. Hull's explicit revert follows `RevertSemantics`. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeSemantics
 open Core
@@ -120,7 +121,7 @@ def effectsWith (children : State → AccountCallSemantics.Children) (image : Op
     Semantics.ExternalSemantics State where
   builtin := Builtin children image
   assembly := fun _ _ _ _ _ _ => False
-  revert := fun _ _ _ _ => False
+  revert := RevertSemantics.Reverted
 
 def effects (image : Option (List UInt8)) : Semantics.ExternalSemantics State :=
   effectsWith (fun _ => AccountCallSemantics.noChildren) image

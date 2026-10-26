@@ -59,7 +59,8 @@ export ExecutableExpression (word bool unit var pair fst snd inl inr inK conditi
 end RecursiveExpression
 
 /-- Structured local control includes blocks, loops and loop transfers.
-External effects have separate proof obligations. -/
+External effects have separate proof obligations; Hull's explicit revert is
+eligible where the `revert` builtin is supported. -/
 def ExecutableStatement (supported : String → Prop) (functions : List Function) : Stmt → Prop
   | ⟨.letDecl _ _, _⟩ | ⟨.comment _, _⟩ => True
   | ⟨.assign _ value, _⟩ | ⟨.expression value, _⟩ | ⟨.returnStmt value, _⟩ =>
@@ -74,6 +75,7 @@ def ExecutableStatement (supported : String → Prop) (functions : List Function
       ExecutableExpression supported functions value ∧
       (∀ alternative ∈ alternatives, ∀ statement ∈ alternative.body, ExecutableStatement supported functions statement)
   | ⟨.breakStmt, _⟩ | ⟨.continueStmt, _⟩ => True
+  | ⟨.revert _, _⟩ => supported "revert"
   | _ => False
 termination_by statement => sizeOf statement
 decreasing_by

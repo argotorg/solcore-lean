@@ -5,10 +5,11 @@ import Solcore.Frontend.RustHull.CallModeBuiltinCorrespondence
 import Solcore.Frontend.RustHull.ChildCallBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RuntimeLinkedReturnDataEffectsCorrespondence
 import Solcore.Frontend.RustHull.CreationBuiltinCorrespondence
+import Solcore.Frontend.RustHull.RevertBuiltinCorrespondence
 
-/-! Message calls, account destruction and creation attempts join the existing
-concrete effects in the recursive Hull proof. Actual installation supplies
-captured handlers. -/
+/-! Message calls, account destruction, creation attempts and Hull's explicit
+revert join the existing concrete effects in the recursive Hull proof. Actual
+installation supplies captured handlers. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeEffectsCorrespondence
 open Correspondence ScalarExecution DerivationCorrespondence
@@ -150,6 +151,22 @@ theorem external_preserves (layout : Layout) (baseline : Nat → Option Core.Val
                 handlers.create.local_outside, handlers.create.closure⟩ createSlots.handler packed
           exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
 
+theorem revert_preserves (layout : Layout) (baseline : Nat → Option Core.Value)
+    (slots : List EffectSlot) (image : Option (List UInt8)) (withCode : Bool) (handlers : ModeHandlers layout)
+    (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
+    (memoryMember : ⟨"memory", Core.WordMapping.type, layout.memory⟩ ∈ slots)
+    (memorySizeMember : ⟨"memorySize", .word, layout.storage.memorySize⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, layout.storage.exit⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, layout.storage.returnOffset⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, layout.storage.returnSize⟩ ∈ slots)
+    (anchors : Anchors) (context : Context layout)
+    (children : RuntimeCallEffectsSemantics.State → AccountCallSemantics.Children) :
+    RevertPreservation (supported slots withCode) (model layout baseline slots image handlers anchors context) slots
+      (RuntimeCallModeSemantics.effectsWith children image) := by
+  intro message initial control final _ reverted scope exit compiled world mapping environment store runtime state
+  exact RevertBuiltinCorrespondence.preserves passive memoryMember memorySizeMember exitMember offsetMember sizeMember
+    reverted compiled runtime state
+
 theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value)
     (slots : List EffectSlot) (image : Option (List UInt8)) (withCode : Bool) (handlers : ModeHandlers layout)
     (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots) (callPassive : CallPassive layout slots)
@@ -209,6 +226,8 @@ theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value
     (external_preserves layout baseline slots image withCode handlers passive callPassive memoryMember worldMember addressMember completeMember staticMember
       memorySizeMember exitMember offsetMember sizeMember logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots anchors context children callbacks) eligible values evaluated
     runtimeLength covered runtimeRelated separated state
+    (revert_preserves layout baseline slots image withCode handlers passive memoryMember memorySizeMember exitMember
+      offsetMember sizeMember anchors context children)
 
 
 end Solcore.Frontend.RustHull.RuntimeCallModeEffectsCorrespondence

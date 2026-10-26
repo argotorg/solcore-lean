@@ -72,7 +72,9 @@ theorem EffectEnvironmentRel.globalScope {slots : List EffectSlot} {runtime : Sc
 
 /-- The assembled expression runs in the real frame's runtime references,
 followed by its input bundle and caller environment. All function cells and
-captured runtime references come from this same successful assembly. -/
+captured runtime references come from this same successful assembly. The
+revert obligation defaults to the vacuous proof, which effect layers without a
+revert rule meet. -/
 theorem assemble_recursive_program_effects {supported : String → Prop} {σ : Type} {model : StateModel σ} {slots : List EffectSlot}
     {effects : Semantics.ExternalSemantics σ} {functions : List Function} {function : Function}
     {entry : String} {runtime : Scope} {fuel : Nat} {own : Signature} {allocated : Core.Expr}
@@ -90,7 +92,9 @@ theorem assemble_recursive_program_effects {supported : String → Prop} {σ : T
     (runtimeRelated : EffectEnvironmentRel slots runtime Core.Renaming.id
       (runtimeValues ++ bundleValues targets :: caller))
     (separated : EffectSlotsSeparate slots)
-    (state : StateRel model world initial store) :
+    (state : StateRel model world initial store)
+    (reverting : RevertPreservation supported model slots effects :=
+      by exact RevertPreservation.unreachable (fun _ _ _ _ reverted => reverted)) :
     ∃ extension target finalStore,
       ResultRel own.result sourceResult target ∧
       Core.Evaluates (runtimeValues ++ bundleValues targets :: caller) store allocated target finalStore ∧
@@ -121,7 +125,7 @@ theorem assemble_recursive_program_effects {supported : String → Prop} {σ : T
   obtain ⟨extension, target, finalStore, related, executed, finalState, _, frame⟩ :=
     (DerivationProgramCorrespondence.function_preserves_effects signaturesCompiled codesCompiled unique
       (covered.globalScope signatures) globals (runtimeRelated.globalScope separated signatures store.length)
-      external eligible evaluated) selected signatureSelected codeFound values initialized installed
+      external reverting eligible evaluated) selected signatureSelected codeFound values initialized installed
   have invoked := globalInvocation_evaluates aligned codeFound installed executed
   have assembled := globalInitialization_evaluates aligned invoked
   have initialFrame : ClosuresPreserved store
@@ -156,6 +160,6 @@ theorem assemble_recursive_program {σ : Type} {model : StateModel σ} {slots : 
       StateRel model (world ++ extension) final finalStore ∧ ClosuresPreserved store finalStore :=
   assemble_recursive_program_effects accepted selected
     (ExternalCallPreservation.empty model slots effects) eligible values evaluated runtimeLength
-    covered runtimeRelated separated state
+    covered runtimeRelated separated state (RevertPreservation.empty model slots effects)
 
 end Solcore.Frontend.RustHull.Correspondence
