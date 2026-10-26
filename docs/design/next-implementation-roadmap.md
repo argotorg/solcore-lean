@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | In progress: identity and SHA-256 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -679,19 +679,24 @@ dispatch, creation/deployment, independent assembly and source revert, then
 object linking through real implementations and public consumers. Executable
 coverage and differential agreement do not discharge these proof obligations.
 
-Precompile dispatch is connected for the identity and SHA-256 precompiles.
-Their independent rules cover the gas charges, the byte copy of the input, an
-independent FIPS 180-4 digest, failure on insufficient forwarded gas and the
-memory fault. They extend account dispatch, so the public theorems for
+Precompile dispatch is connected for the identity, SHA-256 and RIPEMD-160
+precompiles. Their independent rules cover the gas charges, the byte copy of
+the input, digests specified from FIPS 180-4 and from the RIPEMD-160
+definition, failure on insufficient forwarded gas and the memory fault. They extend account dispatch, so the public theorems for
 child-free calls, compiled and nested children, call modes and root reentry
-now cover both precompiles without statement changes. The proof reaches the
-actual dispatcher, precompile wrapper, copy loop and SHA-256 block helper;
+now cover these precompiles without statement changes. The proof reaches the
+actual dispatcher, precompile wrapper, copy loop and shared block helper;
 `rfl`-checked restatements expose the builders that the implementation keeps
-private. Eight independent source derivations reach the child-free and
-call-mode public resumption theorems, including CALLCODE, DELEGATECALL and a
-SHA-256 digest of "abc"; runtime checks compare bytes, balances and retained
-snapshots. ECRECOVER, RIPEMD-160 and P256VERIFY still need independent
-algorithm semantics. Creation/deployment, assembly and source revert, and object linking
+private. Ten independent source derivations reach the child-free and
+call-mode public resumption theorems, including CALLCODE, DELEGATECALL and
+SHA-256 and RIPEMD-160 digests of "abc"; runtime checks compare bytes, balances
+and retained snapshots. ECRECOVER and P256VERIFY are not connected: an
+independent affine specification would need field arithmetic, identities for
+every Jacobian formula and ladder correctness, which do not fit in one
+connected unit without an algebra library. Creation has no connected first
+step yet: even its early refusals need a call-mode source rule, `supported`
+entries, a create-handler closure correspondence and the actual creation
+transport and dispatcher prefix. Creation/deployment, assembly and source revert, and object linking
 also remain, in that order.
 
 ## Handoff rules

@@ -3,12 +3,13 @@ import Solcore.Frontend.RustHull.MemoryCopyCorrespondence
 import Solcore.Frontend.RustHull.CallTransportValues
 import Solcore.Frontend.RustHull.EffectStateCorrespondence
 import Solcore.Frontend.RustHull.Sha256HashCorrespondence
+import Solcore.Frontend.RustHull.Ripemd160HashCorrespondence
 
-/-! The implemented identity and SHA-256 precompiles preserve their independent
-gas, byte-copy and digest meaning. `Precompiles` keeps its builders private, so
-`staticCall_shape` restates the implemented expression with public builders and
-proves the restatement by `rfl`. Only these two branches are spelled out; the
-other precompiled branches remain opaque. -/
+/-! The implemented identity, SHA-256 and RIPEMD-160 precompiles preserve their
+independent gas, byte-copy and digest meaning. `Precompiles` keeps its builders
+private, so `staticCall_shape` restates the implemented expression with public
+builders and proves the restatement by `rfl`. Only these three branches are
+spelled out; the elliptic-curve branches remain opaque. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.PrecompileCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder CallTransportCorrespondence
@@ -56,33 +57,34 @@ def hashCall (operation : Core.Expr → Core.Expr → Core.Expr → Core.Expr �
   bindResult .word (fun depth => operation (sourceMemory depth) (sourceSize depth) (input 6 depth) (input 7 depth))
     finishWord
 
-def select (recover ripemd p256 : Core.Expr) (snapshot address : Code) : Code :=
+def select (recover p256 : Core.Expr) (snapshot address : Code) : Code :=
   choose (binary .wordEq address (number 1)) (constant recover) <|
   choose (binary .wordEq address (number 2))
     (choose (enoughGas 60 12) (hashCall Sha256.hash snapshot) (success (number 0))) <|
-  choose (binary .wordEq address (number 3)) (constant ripemd) <|
+  choose (binary .wordEq address (number 3))
+    (choose (enoughGas 600 120) (hashCall Ripemd160.hash snapshot) (success (number 0))) <|
   choose (binary .wordEq address (number 4))
     (choose (enoughGas 15 3) (identity snapshot) (success (number 0))) (constant p256)
 
-def dispatch (recover ripemd p256 : Core.Expr) (snapshot : Code) : Code :=
+def dispatch (recover p256 : Core.Expr) (snapshot : Code) : Code :=
   bind (binary .wordAnd (input 5) (number (2 ^ 160 - 1))) fun address =>
-  select recover ripemd p256 snapshot address
+  select recover p256 snapshot address
 
-def callCode (recover ripemd p256 : Core.Expr) : Code :=
+def callCode (recover p256 : Core.Expr) : Code :=
   bindResult .word (touch (input 1) (input 6) (input 7)) fun _ =>
   bindResult .word (touch (input 1) (input 8) (input 9)) fun _ =>
   bind (load (input 0)) fun snapshot =>
   bind (store (input 2) empty) fun _ =>
   bind (store (input 3) (number 0)) fun _ =>
-  dispatch recover ripemd p256 snapshot
+  dispatch recover p256 snapshot
 
 end Implementation
 
 /-- The actual precompile expression, with its other branches left opaque. -/
-theorem staticCall_shape : ∃ recover ripemd p256 : Core.Expr,
+theorem staticCall_shape : ∃ recover p256 : Core.Expr,
     ∀ a b c d e f g h i j : Core.Expr, Precompiles.staticCall a b c d e f g h i j =
-      .letE (bundle [a, b, c, d, e, f, g, h, i, j]) (Implementation.callCode recover ripemd p256 0) :=
-  ⟨_, _, _, fun _ _ _ _ _ _ _ _ _ _ => rfl⟩
+      .letE (bundle [a, b, c, d, e, f, g, h, i, j]) (Implementation.callCode recover p256 0) :=
+  ⟨_, _, fun _ _ _ _ _ _ _ _ _ _ => rfl⟩
 
 /-- Cells below `boundary` keep their values; later cells may change. -/
 structure RetainsBelow (boundary : Nat) (initial final : Core.Store) : Prop where
@@ -205,7 +207,7 @@ theorem branch_address {environment : Core.Environment} {address memory size dat
 
 /-- Both range touches, the return-data reset and target masking reach the
 actual selection among the implemented precompiles. -/
-theorem callCode_prefix {recover ripemd p256 : Core.Expr} {environment : Core.Environment}
+theorem callCode_prefix {recover p256 : Core.Expr} {environment : Core.Environment}
     {store : Core.Store} {memory size data dataSize : Nat} {request : AccountCallSemantics.Request}
     {inputSize : Core.Word} {address : Nat} {flag : Core.Value} {final : Core.Store}
     (masked : request.target.bitAnd (Word.ofNatModulo (2 ^ 160 - 1)) = Word.ofNatModulo address)
@@ -217,10 +219,10 @@ theorem callCode_prefix {recover ripemd p256 : Core.Expr} {environment : Core.En
     (continued : Core.Evaluates (branchEnvironment address memory size data dataSize request environment)
       (((MemoryCorrespondence.touchStore store size Word.zero Word.zero request.calldataSize).set data
         (WordMapping.encode [])).set dataSize (.word Word.zero))
-      (Implementation.select recover ripemd p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
+      (Implementation.select recover p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
       flag final) :
     Core.Evaluates (packetValue memory size data dataSize request :: environment) store
-      (Implementation.callCode recover ripemd p256 0) flag final := by
+      (Implementation.callCode recover p256 0) flag final := by
   let first := MemoryCorrespondence.touchStore store size Word.zero Word.zero request.calldataSize
   have touched := MemoryCorrespondence.touch_evaluates
     (environment := packetValue memory size data dataSize request :: environment)
@@ -264,14 +266,14 @@ theorem callCode_prefix {recover ripemd p256 : Core.Expr} {environment : Core.En
   exact continued
 
 /-- Address 4 selects the identity branch. -/
-theorem select_identity {recover ripemd p256 : Core.Expr} {environment : Core.Environment}
+theorem select_identity {recover p256 : Core.Expr} {environment : Core.Environment}
     {store final : Core.Store} {memory size data dataSize : Nat} {request : AccountCallSemantics.Request}
     {flag : Core.Value}
     (continued : Core.Evaluates (branchEnvironment 4 memory size data dataSize request environment) store
       (choose (Implementation.enoughGas 15 3) (Implementation.identity (fun here => .var (here - 2 - 1)))
         (success (number 0)) 6) flag final) :
     Core.Evaluates (branchEnvironment 4 memory size data dataSize request environment) store
-      (Implementation.select recover ripemd p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
+      (Implementation.select recover p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
       flag final := by
   have addressCode := branch_address (environment := environment) (address := 4) (memory := memory) (size := size)
     (data := data) (dataSize := dataSize) (request := request)
@@ -281,17 +283,34 @@ theorem select_identity {recover ripemd p256 : Core.Expr} {environment : Core.En
   exact .ifTrue (.binary (addressCode.evaluates _) .word rfl) continued
 
 /-- Address 2 selects the SHA-256 branch. -/
-theorem select_sha256 {recover ripemd p256 : Core.Expr} {environment : Core.Environment}
+theorem select_sha256 {recover p256 : Core.Expr} {environment : Core.Environment}
     {store final : Core.Store} {memory size data dataSize : Nat} {request : AccountCallSemantics.Request}
     {flag : Core.Value}
     (continued : Core.Evaluates (branchEnvironment 2 memory size data dataSize request environment) store
       (choose (Implementation.enoughGas 60 12) (Implementation.hashCall Sha256.hash (fun here => .var (here - 2 - 1)))
         (success (number 0)) 6) flag final) :
     Core.Evaluates (branchEnvironment 2 memory size data dataSize request environment) store
-      (Implementation.select recover ripemd p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
+      (Implementation.select recover p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
       flag final := by
   have addressCode := branch_address (environment := environment) (address := 2) (memory := memory) (size := size)
     (data := data) (dataSize := dataSize) (request := request)
+  apply Core.Evaluates.ifFalse (.binary (addressCode.evaluates _) .word rfl)
+  exact .ifTrue (.binary (addressCode.evaluates _) .word rfl) continued
+
+/-- Address 3 selects the RIPEMD-160 branch. -/
+theorem select_ripemd160 {recover p256 : Core.Expr} {environment : Core.Environment}
+    {store final : Core.Store} {memory size data dataSize : Nat} {request : AccountCallSemantics.Request}
+    {flag : Core.Value}
+    (continued : Core.Evaluates (branchEnvironment 3 memory size data dataSize request environment) store
+      (choose (Implementation.enoughGas 600 120)
+        (Implementation.hashCall Ripemd160.hash (fun here => .var (here - 2 - 1)))
+        (success (number 0)) 6) flag final) :
+    Core.Evaluates (branchEnvironment 3 memory size data dataSize request environment) store
+      (Implementation.select recover p256 (fun here => .var (here - 2 - 1)) (fun here => .var (here - 5 - 1)) 6)
+      flag final := by
+  have addressCode := branch_address (environment := environment) (address := 3) (memory := memory) (size := size)
+    (data := data) (dataSize := dataSize) (request := request)
+  apply Core.Evaluates.ifFalse (.binary (addressCode.evaluates _) .word rfl)
   apply Core.Evaluates.ifFalse (.binary (addressCode.evaluates _) .word rfl)
   exact .ifTrue (.binary (addressCode.evaluates _) .word rfl) continued
 
@@ -439,14 +458,49 @@ theorem identity_evaluates {environment : Core.Environment} {store : Core.Store}
       (by simp only [sized, published, List.length_set]; omega)
     exact first.trans (second.trans (third.trans (fourth.trans fifth)))
 
+/-- A digest expression that evaluates from fresh source cells holding `words`
+to `digest`, changing only those two cells and appending helpers. -/
+def HashPreserves (operation : Core.Expr → Core.Expr → Core.Expr → Core.Expr → Core.Expr)
+    (words : MemorySemantics.Entries) (length digest : Core.Word) : Prop :=
+  ∀ {environment : Core.Environment} {store : Core.Store} {memoryLocation sizeLocation : Nat}
+    {memoryRef sizeRef offsetExpr lengthExpr : Core.Expr},
+    MemoryCorrespondence.StateRel memoryLocation sizeLocation ⟨words, Word.zero⟩ store →
+    Core.Evaluates environment store memoryRef (.cellRef WordMapping.type memoryLocation) store →
+    Core.Evaluates environment store sizeRef (.cellRef .word sizeLocation) store →
+    Core.Evaluates environment store offsetExpr (.word Word.zero) store →
+    Core.Evaluates environment store lengthExpr (.word length) store →
+    ∃ final, Core.Evaluates environment store (operation memoryRef sizeRef offsetExpr lengthExpr)
+        (.inRight .word (.word digest)) final ∧
+      MemoryCorrespondence.Frame memoryLocation sizeLocation store final
+
+theorem sha256_preserves {words : MemorySemantics.Entries} {length size digest : Core.Word}
+    (valid : MemorySemantics.touchSize? Word.zero Word.zero length = some size)
+    (digested : Sha256Semantics.Digest words Word.zero length digest) :
+    HashPreserves Sha256.hash words length digest := by
+  intro environment store memoryLocation sizeLocation memoryRef sizeRef offsetExpr lengthExpr
+    related memoryEvaluated sizeEvaluated offsetEvaluated lengthEvaluated
+  obtain ⟨final, evaluated, _, framed⟩ := Sha256HashCorrespondence.hash_preserves (state := ⟨words, Word.zero⟩)
+    valid digested related memoryEvaluated sizeEvaluated offsetEvaluated lengthEvaluated
+  exact ⟨final, evaluated, framed⟩
+
+theorem ripemd160_preserves {words : MemorySemantics.Entries} {length size digest : Core.Word}
+    (valid : MemorySemantics.touchSize? Word.zero Word.zero length = some size)
+    (digested : Ripemd160Semantics.Digest words Word.zero length digest) :
+    HashPreserves Ripemd160.hash words length digest := by
+  intro environment store memoryLocation sizeLocation memoryRef sizeRef offsetExpr lengthExpr
+    related memoryEvaluated sizeEvaluated offsetEvaluated lengthEvaluated
+  obtain ⟨final, evaluated, _, framed⟩ := Ripemd160HashCorrespondence.hash_preserves (state := ⟨words, Word.zero⟩)
+    valid digested related memoryEvaluated sizeEvaluated offsetEvaluated lengthEvaluated
+  exact ⟨final, evaluated, framed⟩
+
 /-- Sufficient gas digests the complete input from a fresh copy of the input
-snapshot through the actual SHA-256 expression, then publishes the 32-byte
-digest as return data. The empty output range leaves caller memory unchanged. -/
-theorem sha256_evaluates {environment : Core.Environment} {store : Core.Store}
-    {boundary memory size data dataSize : Nat} {request : AccountCallSemantics.Request}
+snapshot through the actual digest expression, then publishes the 32-byte
+result as return data. The empty output range leaves caller memory unchanged. -/
+theorem hashCall_evaluates {operation : Core.Expr → Core.Expr → Core.Expr → Core.Expr → Core.Expr}
+    {environment : Core.Environment} {store : Core.Store}
+    {address boundary memory size data dataSize : Nat} {request : AccountCallSemantics.Request}
     {inputSize digest : Core.Word}
-    (valid : MemorySemantics.touchSize? Word.zero Word.zero request.calldataSize = some inputSize)
-    (digested : Sha256Semantics.Digest request.calldata Word.zero request.calldataSize digest)
+    (hashed : HashPreserves operation request.calldata request.calldataSize digest)
     (memoryRead : store.read? memory = some (WordMapping.encode request.calldata))
     (sizeRead : store.read? size = some (.word inputSize))
     (dataBound : data < store.length) (dataSizeBound : dataSize < store.length)
@@ -454,12 +508,12 @@ theorem sha256_evaluates {environment : Core.Environment} {store : Core.Store}
     (sizeData : size ≠ data) (sizeDataSize : size ≠ dataSize) (dataDataSize : data ≠ dataSize)
     (memoryAbove : boundary ≤ memory) (sizeAbove : boundary ≤ size)
     (dataAbove : boundary ≤ data) (dataSizeAbove : boundary ≤ dataSize) :
-    ∃ final, Core.Evaluates (branchEnvironment 2 memory size data dataSize request environment) store
-        (Implementation.hashCall Sha256.hash (fun here => .var (here - 2 - 1)) 6)
+    ∃ final, Core.Evaluates (branchEnvironment address memory size data dataSize request environment) store
+        (Implementation.hashCall operation (fun here => .var (here - 2 - 1)) 6)
         (.inRight .word (.word (Word.ofNatModulo 1))) final ∧
       final.read? data = some (WordMapping.encode [(Word.zero, digest)]) ∧
       final.read? dataSize = some (.word (Word.ofNatModulo 32)) ∧ RetainsBelow boundary store final := by
-  let base := branchEnvironment 2 memory size data dataSize request environment
+  let base := branchEnvironment address memory size data dataSize request environment
   have memoryBound : memory < store.length := (List.getElem?_eq_some_iff.mp memoryRead).1
   have sizeBound : size < store.length := (List.getElem?_eq_some_iff.mp sizeRead).1
   let sourceSize := (store ++ [WordMapping.encode request.calldata]).length
@@ -470,9 +524,8 @@ theorem sha256_evaluates {environment : Core.Environment} {store : Core.Store}
   let sourceSizeValue := Core.Value.cellRef .word sourceSize
   have memoryCode := CodeValue.bound 6 base sourceMemoryValue
   have sizeCode := CodeValue.bound 7 (sourceMemoryValue :: base) sourceSizeValue
-  obtain ⟨hashed, hashEvaluated, hashedRelated, hashedFrame⟩ :=
-    Sha256HashCorrespondence.hash_preserves (environment := [sourceSizeValue, sourceMemoryValue] ++ base)
-      (state := ⟨request.calldata, Word.zero⟩) valid digested sourceRelated
+  obtain ⟨hashed, hashEvaluated, hashedFrame⟩ :=
+    hashed (environment := [sourceSizeValue, sourceMemoryValue] ++ base) sourceRelated
       ((memoryCode.prepend [sourceSizeValue]).evaluates allocated) (sizeCode.evaluates allocated)
       (((branch_field (index := 6) rfl).prepend [sourceSizeValue, sourceMemoryValue]).evaluates allocated)
       (((branch_field (index := 7) rfl).prepend [sourceSizeValue, sourceMemoryValue]).evaluates allocated)
@@ -588,9 +641,10 @@ inductive Answered (data dataSize : Nat) (final : Core.Store) :
   | language (reason : Core.Word) :
       Answered data dataSize final (.fault (.language reason)) (.inLeft .word (.word reason))
 
-/-- Every independent identity and SHA-256 outcome is produced by the actual
-precompile body. Only its four fresh cells and later allocations change. -/
-theorem callCode_preserves {recover ripemd p256 : Core.Expr} {environment : Core.Environment}
+/-- Every independent identity, SHA-256 and RIPEMD-160 outcome is produced by
+the actual precompile body. Only its four fresh cells and later allocations
+change. -/
+theorem callCode_preserves {recover p256 : Core.Expr} {environment : Core.Environment}
     {store : Core.Store} {boundary memory size data dataSize : Nat}
     {request : AccountCallSemantics.Request} {result : Semantics.Result AccountCallSemantics.Response}
     (computed : AccountCallSemantics.Precompile request result)
@@ -602,7 +656,7 @@ theorem callCode_preserves {recover ripemd p256 : Core.Expr} {environment : Core
     (memoryAbove : boundary ≤ memory) (sizeAbove : boundary ≤ size)
     (dataAbove : boundary ≤ data) (dataSizeAbove : boundary ≤ dataSize) :
     ∃ flag final, Core.Evaluates (packetValue memory size data dataSize request :: environment) store
-        (Implementation.callCode recover ripemd p256 0) flag final ∧
+        (Implementation.callCode recover p256 0) flag final ∧
       Answered data dataSize final result flag ∧ RetainsBelow boundary store final := by
   let first := MemoryCorrespondence.touchStore store size Word.zero Word.zero request.calldataSize
   let prepared : Core.Store := (first.set data (WordMapping.encode [])).set dataSize (.word Word.zero)
@@ -636,7 +690,7 @@ theorem callCode_preserves {recover ripemd p256 : Core.Expr} {environment : Core
       (dataSize := dataSize) (request := request) (index := 7) rfl)
   have overflowed (invalid : MemorySemantics.touchSize? Word.zero Word.zero request.calldataSize = none) :
       ∃ flag final, Core.Evaluates (packetValue memory size data dataSize request :: environment) store
-        (Implementation.callCode recover ripemd p256 0) flag final ∧
+        (Implementation.callCode recover p256 0) flag final ∧
       Answered data dataSize final (.fault (.language (Word.ofNatModulo 6))) flag ∧
       RetainsBelow boundary store final := by
     have touched := MemoryCorrespondence.touch_evaluates
@@ -648,6 +702,8 @@ theorem callCode_preserves {recover ripemd p256 : Core.Expr} {environment : Core
   have maskedIdentity : (Word.ofNatModulo 4).bitAnd (Word.ofNatModulo (2 ^ 160 - 1)) = Word.ofNatModulo 4 := by
     decide +kernel
   have maskedSha256 : (Word.ofNatModulo 2).bitAnd (Word.ofNatModulo (2 ^ 160 - 1)) = Word.ofNatModulo 2 := by
+    decide +kernel
+  have maskedRipemd160 : (Word.ofNatModulo 3).bitAnd (Word.ofNatModulo (2 ^ 160 - 1)) = Word.ofNatModulo 3 := by
     decide +kernel
   cases computed with
   | identityOverflow _ invalid => exact overflowed invalid
@@ -677,14 +733,35 @@ theorem callCode_preserves {recover ripemd p256 : Core.Expr} {environment : Core
     simp only [Nat.not_le.mpr short, decide_false] at checked
     exact .ifFalse checked (.inRight .word)
   | @sha256 inputSize digest sha256 valid funded digested =>
-    obtain ⟨final, evaluated, dataRead, dataSizeRead, retained⟩ := sha256_evaluates (environment := environment)
-      valid digested preparedMemory (preparedSize valid) (by omega) (by omega) memorySize memoryData memoryDataSize
-      sizeData sizeDataSize dataDataSize memoryAbove sizeAbove dataAbove dataSizeAbove
+    obtain ⟨final, evaluated, dataRead, dataSizeRead, retained⟩ := hashCall_evaluates (environment := environment)
+      (address := 2) (sha256_preserves valid digested) preparedMemory (preparedSize valid) (by omega) (by omega)
+      memorySize memoryData memoryDataSize sizeData sizeDataSize dataDataSize memoryAbove sizeAbove dataAbove
+      dataSizeAbove
     refine ⟨_, final, callCode_prefix (by rw [sha256]; exact maskedSha256) valid memoryRead sizeRead dataBound
       dataSizeBound memorySize (select_sha256 ?_),
       .returned ⟨true, [(Word.zero, digest)], Word.ofNatModulo 32⟩ dataRead dataSizeRead,
       preparedRetained.trans retained⟩
     have checked := enough 2 60 12
+    simp only [funded, decide_true] at checked
+    exact .ifTrue checked evaluated
+  | ripemd160Overflow _ invalid => exact overflowed invalid
+  | ripemd160Underfunded ripemd160 valid short =>
+    refine ⟨_, prepared, callCode_prefix (by rw [ripemd160]; exact maskedRipemd160) valid memoryRead sizeRead
+      dataBound dataSizeBound memorySize (select_ripemd160 ?_),
+      .returned (AccountCallSemantics.emptyResponse false) preparedData preparedDataSize, preparedRetained⟩
+    have checked := enough 3 600 120
+    simp only [Nat.not_le.mpr short, decide_false] at checked
+    exact .ifFalse checked (.inRight .word)
+  | @ripemd160 inputSize digest ripemd160 valid funded digested =>
+    obtain ⟨final, evaluated, dataRead, dataSizeRead, retained⟩ := hashCall_evaluates (environment := environment)
+      (address := 3) (ripemd160_preserves valid digested) preparedMemory (preparedSize valid) (by omega) (by omega)
+      memorySize memoryData memoryDataSize sizeData sizeDataSize dataDataSize memoryAbove sizeAbove dataAbove
+      dataSizeAbove
+    refine ⟨_, final, callCode_prefix (by rw [ripemd160]; exact maskedRipemd160) valid memoryRead sizeRead dataBound
+      dataSizeBound memorySize (select_ripemd160 ?_),
+      .returned ⟨true, [(Word.zero, digest)], Word.ofNatModulo 32⟩ dataRead dataSizeRead,
+      preparedRetained.trans retained⟩
+    have checked := enough 3 600 120
     simp only [funded, decide_true] at checked
     exact .ifTrue checked evaluated
 
@@ -714,9 +791,9 @@ theorem staticCall_preserves {depth : Nat} {environment : Core.Environment} {sto
           (gasCode depth) (targetCode depth) (number 0 depth) (lengthCode depth) (number 0 depth) (number 0 depth))
         flag final ∧
       Answered data dataSize final result flag ∧ RetainsBelow boundary store final := by
-  obtain ⟨recover, ripemd, p256, shape⟩ := staticCall_shape
+  obtain ⟨recover, p256, shape⟩ := staticCall_shape
   obtain ⟨flag, final, evaluated, answered, retained⟩ := callCode_preserves (recover := recover)
-    (ripemd := ripemd) (p256 := p256) (environment := environment) computed memoryRead sizeRead dataBound
+    (p256 := p256) (environment := environment) computed memoryRead sizeRead dataBound
     dataSizeBound memorySize memoryData memoryDataSize sizeData sizeDataSize dataDataSize memoryAbove sizeAbove
     dataAbove dataSizeAbove
   refine ⟨flag, final, ?_, answered, retained⟩
