@@ -115,8 +115,12 @@ def aliases(case):
 
 
 def case_hash(case):
-    # Runtime inputs and sequence removals do not change the fixed contract.
-    return common.digest(common.json_bytes({key: case[key] for key in ("program", "transactions")}))
+    # Runtime inputs and sequence removals do not change the fixed contract. A
+    # call-value deployment value is part of the deployed world, not the program.
+    identity = {key: case[key] for key in ("program", "transactions")}
+    if adapter.has_balances(case):
+        identity["deploymentValue"] = str(adapter.deployment_value(case))
+    return common.digest(common.json_bytes(identity))
 
 
 def helper_count(case):

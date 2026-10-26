@@ -842,6 +842,10 @@ class LogCampaignTests(unittest.TestCase):
 
 
 
+def common_digest(value):
+    return campaign.common.digest(campaign.common.json_bytes(value))
+
+
 def value_case(deployment=5, rows=((0, 0, 7), (1, 1, 2**64), (0, 3, 1))):
     value = fixtures.value_case(deployment, rows)
     value["callValuePlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
@@ -931,6 +935,15 @@ class CallValueCampaignTests(unittest.TestCase):
         for history in raw["histories"].values():
             history["initialBalance"] = "0"
         self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 0)
+
+    def test_deployment_value_is_part_of_the_reduction_identity(self):
+        value = value_case()
+        lowered = copy.deepcopy(value)
+        lowered["callValuePlan"]["deploymentValue"] = "0"
+        self.assertNotEqual(campaign.case_hash(value), campaign.case_hash(lowered))
+        legacy = log_case()
+        self.assertEqual(campaign.case_hash(legacy),
+                         common_digest({key: legacy[key] for key in ("program", "transactions")}))
 
     def test_value_cli_field_requires_the_call_value_profile(self):
         with tempfile.TemporaryDirectory() as directory:
