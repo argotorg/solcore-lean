@@ -11,6 +11,7 @@ const kernelRoots = [
   "Solcore/Resolved.lean",
   "Solcore/SourceSemantics",
   "Solcore/SourceSemantics.lean",
+  "Solcore/Synthesis/Source/ScalarMeaning",
   "Solcore/TypeSystem",
   "Solcore/TypeSystem.lean",
   "Solcore/Frontend",
