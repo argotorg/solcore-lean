@@ -19,6 +19,21 @@ open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
 open CallableIndexedOwnedFunctionValues (Header NamedCapture OwnedKey)
 open CellAwareInvocationAcceptedNamedHeaders (index)
 
+/-- The original compilation receipt of the theorems below comes from the
+actual checked program, its public compilation and the issued recipe. -/
+theorem compilation_receipts {recipe : SourceCoreIndexedSession.Recipe}
+    {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (checked : checkProgram raw checkingFuel = .ok recipe.compiled.sourceProgram)
+    {seeds : List SourceCompiler.Seed} {options : SourceCompiler.Options} {facade : SourceCompiler.Compiled}
+    (accepted : SourceCompiler.compileChecked recipe.compiled.sourceProgram seeds options = .ok facade)
+    (selected : RecursiveNamedPreparedStageContracts.PublicRecipe facade recipe) :
+    ∃ sourceCompiled : SourceCoreCompiler.Compiled,
+      sourceCompiled.artifact? = some recipe.compiled ∧ checkProgram raw checkingFuel = .ok sourceCompiled.program := by
+  obtain ⟨source, generated, present, _ready⟩ := RecursiveNamedPreparedStageContracts.public_compilation accepted selected
+  refine ⟨source, present, ?_⟩
+  rw [SourceCoreCompiler.compileChecked_program generated]
+  exact checked
+
 variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header whole (Program.ofChecked whole.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key whole (Program.ofChecked whole.sourceProgram))}
