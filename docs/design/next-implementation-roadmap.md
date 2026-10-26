@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph and call-graph loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; bounded `bytes` extension defined; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value and bounded-`bytes` extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection with derived read and write inputs; remaining expression forms and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -957,6 +957,51 @@ were fixed before execution:
   payload's bytes, and flags reduced to their parity or with the revert bit
   cleared, ordered by transaction count, program complexity, total payload
   length, then the sum of flags and payload bytes.
+
+Original Core reads calldata with `inputDataWordBE?`, `inputDataByte?` and
+`inputDataSize`; Core and its host interface are unchanged. The source takes
+the `memory<bytes>` the pinned dispatcher decodes and reads it through the
+`mload` and `calldatasize` wrappers. The declared-slot Hull runner serves the
+profile unchanged. The profile is a twenty-second suite profile with one new
+native tool, `semantic-bytes-tool`; the fourteen other native tools kept their
+hashes. Generation reserves the measured 176-node wrapper before generating
+the step. Three lengths from a nine-entry bank, three byte patterns and the
+completion pattern come from a separate high-bit stream, and seeded bytes
+from a further stream. 275 of the first 300 seeds at 384 nodes were accepted.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions. Its histories were computed outside Lean by a separate evaluator
+of the step programs and a direct model of the protocol. A registered Lean
+validator confirmed every status, payload and slot against original Core and
+rejected tampered entries. Generated calldata matched Foundry's `cast
+calldata` encoder. Coverage includes all 39 step features of the corpus, the
+six boundary Words as chunks, one to three helpers and transactions, four
+templates, six completion patterns, all nine bank lengths and reverted
+payloads of 0, 17, 32, 33 and 64 bytes.
+
+The full Lean build (10,038 jobs), registered tests, kernel policy and 501
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (73.5 and 73.4 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+eighteen attempts, with two ordinary exclusions and no resource exclusions.
+All sixteen and 48 prefixes matched on both levels (101.5 and 100.5 seconds),
+covering every bank length and four completion patterns, with no finding.
+
+A copied Hull difference in slot two at the last of three transactions was
+reduced on each level to that transaction with zero flags, an empty payload
+and a reduced step: nine accepted reductions in nine actual candidate
+executions. Original and reduced archives replayed exactly with agreement
+(four replays), and synthetic fingerprints reproduced. Core or Hull fuel one
+was inconclusive. With the extended adapter, the storage, rollback, call,
+keyed, dynamic-array, log and call-value fixed corpora still matched all 95
+scenarios and 263 prefixes on both levels. An offline preparation of the
+worktree's cloned cache verified all fifteen native tools as ready. Hosted CI
+has not been run.
+
+This scope does not compare gas, balances, nonces, code or memory, payloads
+longer than 64 bytes, non-canonical encodings and the decoder's revert paths,
+strings, `bytes` return values or nested dynamic values. Agreement is test
+evidence, not a preservation proof.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or multiple callers, needs its
