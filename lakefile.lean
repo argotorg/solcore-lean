@@ -83,3 +83,7 @@ lean_exe semanticForwardTool where
 lean_exe rustHullForwardScenario where
   root := `Tests.RustHullForwardScenarioRun
   exeName := "rust-hull-forward-scenario"
+
+lean_exe semanticMappingTool where
+  root := `Tests.SemanticMappingTool
+  exeName := "semantic-mapping-tool"

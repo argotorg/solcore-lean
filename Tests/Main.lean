@@ -2178,6 +2178,9 @@ import Solcore.Test.SourceForwardedCallCases
 import Solcore.Test.SourceForwardedCallCorpus
 import Solcore.Test.RustHullRevertCorrespondence
 import Solcore.Test.SourceGenericMeaning
+import Solcore.Test.SourceStorageMappingEmitter
+import Solcore.Test.SourceStorageMappingCases
+import Solcore.Test.SourceStorageMappingCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4149,5 +4152,8 @@ def main : IO UInt32 := do
   Tests.SourceForwardedCallCorpus.testSourceForwardedCallCorpus
   Tests.RustHullRevertCorrespondence.run
   Tests.SourceGenericMeaning.testSourceGenericMeaning
+  Tests.SourceStorageMappingEmitter.testSourceStorageMappingEmitter
+  Tests.SourceStorageMappingCases.testSourceStorageMappingCases
+  Tests.SourceStorageMappingCorpus.testSourceStorageMappingCorpus
   IO.println "solcore-lean tests passed"
   return 0
