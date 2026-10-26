@@ -1836,6 +1836,9 @@ import Solcore.Test.SourceSynthesisEmitter
 import Solcore.Test.SourceSynthesisCases
 import Solcore.Test.SourceInputEmitter
 import Solcore.Test.SourceInputCases
+import Solcore.Test.SourcePrimitiveEmitter
+import Solcore.Test.SourcePrimitiveCases
+import Solcore.Test.SourcePrimitiveCorpus
 import Solcore.Test.SourceFunctionEmitter
 import Solcore.Test.SourceFunctionCases
 import Solcore.Test.SourceMutationEmitter
@@ -3905,6 +3908,9 @@ def run : IO Unit := do
   SourceSynthesisCases.testSourceSynthesisCases
   SourceInputEmitter.testSourceInputEmitter
   SourceInputCases.testSourceInputCases
+  SourcePrimitiveEmitter.testSourcePrimitiveEmitter
+  SourcePrimitiveCases.testSourcePrimitiveCases
+  SourcePrimitiveCorpus.testSourcePrimitiveCorpus
   SourceFunctionEmitter.testSourceFunctionEmitter
   SourceFunctionCases.testSourceFunctionCases
   SourceMutationEmitter.testSourceMutationEmitter

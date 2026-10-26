@@ -33,6 +33,7 @@ PROFILES = tuple(m2.CASE_PROFILES.values())
 PROFILE_SCHEMAS = {profile: schema for schema, profile in m2.CASE_PROFILES.items()}
 PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-word": ("input-generate", "input-emit", "input-generated"),
+                    "runtime-primitives": ("primitive-generate", "primitive-emit", "primitive-generated"),
                     "runtime-functions": ("function-generate", "function-emit", "function-generated"),
                     "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated"),
                     "runtime-aggregates": ("aggregate-generate", "aggregate-emit", "aggregate-generated"),
@@ -44,8 +45,18 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
 HELPER_PROFILES = ("runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 LOOP_INPUTS = ("0", "1", "3", "7", str(2**256 - 1), str(2**255))
+PRIMITIVE_INPUTS = ("0", "1", "2", "255", "256", str(2**256 - 1), str(2**255), str(2**255 - 1))
+# AST feature coverage only: aliases and executed EVM opcodes are not inferred.
+PRIMITIVE_FEATURES = frozenset(
+    ["binary:Solcore.Core.Wire.BinaryOp." + operation for operation in (
+        "wordDiv", "wordMod", "wordShl", "wordShr", "wordSar", "wordSdiv", "wordSmod",
+        "wordSgt", "wordByte", "wordPow", "wordSignExtend")]
+    + ["unary:Solcore.Core.Wire.UnaryOp.wordClz"]
+    + ["ternary:Solcore.Core.Wire.TernaryOp.wordAddMod", "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod"])
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
+PRIMITIVE_VERSIONS = (*INPUT_VERSIONS, "baseGeneratorVersion", "boundaryVersion")
 PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
+                          "runtime-primitives": PRIMITIVE_VERSIONS,
                           "runtime-functions": INPUT_VERSIONS,
                           "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion"),
                           "runtime-aggregates": ("profileVersion", "functionVersion", "templateVersion"),
@@ -355,6 +366,11 @@ def validate_manifest(manifest) -> dict:
         m2.word(value, "required input")
     if profile == "closed-g0" and required_inputs:
         raise ValueError("closed G0 corpus cannot require runtime inputs")
+    if profile == "runtime-primitives":
+        if not PRIMITIVE_FEATURES <= set(manifest["requiredFeatures"]):
+            raise ValueError("primitive corpus must require all fourteen added AST operators")
+        if not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+            raise ValueError("primitive corpus must require all eight boundary inputs")
     required_helpers = manifest.get("requiredHelperCounts", None if profile in HELPER_PROFILES else [])
     if not isinstance(required_helpers, list) or any(type(value) is not int or not 1 <= value <= 3 for value in required_helpers):
         raise ValueError("corpus requiredHelperCounts must be an array of integers from one to three")
@@ -381,7 +397,7 @@ def validate_manifest(manifest) -> dict:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
             m2.word(entry.get("input"), "corpus input")
-            boundaries = LOOP_INPUTS if profile == "runtime-loops" else INPUT_BOUNDARIES
+            boundaries = profile_inputs(profile)
             if "generation" in entry and entry["input"] not in boundaries:
                 raise ValueError("generated runtime inputs must be a boundary value")
         elif "input" in entry:
@@ -399,7 +415,7 @@ def validate_manifest(manifest) -> dict:
                 raise ValueError("generation request must be an object")
             seed = m2.word(request.get("seed"), "generation seed")
             nodes = request.get("maxProgramNodes")
-            if int(seed) >= 2**64 or type(nodes) is not int or not 3 <= nodes <= 512:
+            if int(seed) >= 2**64 or type(nodes) is not int or not (8 if profile == "runtime-primitives" else 3) <= nodes <= 512:
                 raise ValueError("generation request exceeds seed or node limits")
         elif "loopPlan" in entry:
             m2.validate_loop_plan(entry["loopPlan"])
@@ -414,6 +430,14 @@ def validate_manifest(manifest) -> dict:
         elif not isinstance(entry["program"], dict):
             raise ValueError("corpus program must be a Core JSON object")
     return manifest
+
+
+def profile_inputs(profile: str) -> tuple[str, ...]:
+    if profile == "runtime-loops":
+        return LOOP_INPUTS
+    if profile == "runtime-primitives":
+        return PRIMITIVE_INPUTS
+    return INPUT_BOUNDARIES
 
 
 def generation_resource_exclusions(excluded: list) -> int:
@@ -828,7 +852,7 @@ class Campaign:
                 request = entry["generation"]
                 response = self.tool([generate_command,
                     str(request["seed"]), str(request["maxProgramNodes"]),
-                    "6" if profile == "runtime-loops" else "4" if runtime_input else "1",
+                    str(len(profile_inputs(profile))) if runtime_input else "1",
                     "1", str(self.args.direct_fuel)], "corpus-generation")
                 generated = response.get("cases", [])
                 if runtime_input:
@@ -968,12 +992,12 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 384 for loops/generics/closures/comptime/modules, 256 for aggregates, 192 for local mutation, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates, 192 for mutation, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
     selection.add_argument("--case", type=Path, help="re-execute one saved case, including a reduced finding")
-    parser.add_argument("--attempts", type=int, help="generation attempt limit; default 512 for comptime/modules, otherwise 256")
+    parser.add_argument("--attempts", type=int, help="generation attempt limit; default 512 for primitives/comptime/modules, otherwise 256")
     parser.add_argument("--seconds", type=float, default=300)
     parser.add_argument("--disk-bytes", type=int, default=128 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32, help="total candidate executions across all findings")
@@ -1004,9 +1028,9 @@ def main() -> int:
     except (OSError, ValueError, KeyError, TypeError, m2.Finding) as error:
         parser.error(str(error))
     if args.attempts is None:
-        args.attempts = 512 if args.profile in ("runtime-comptime", "runtime-modules") else 256
+        args.attempts = 512 if args.profile in ("runtime-primitives", "runtime-comptime", "runtime-modules") else 256
     if args.nodes is None:
-        args.nodes = {"runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16
@@ -1014,7 +1038,7 @@ def main() -> int:
             parser.error(str(error))
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
-    limits = {"seed": (0, 2**64 - 1), "nodes": (3, 512), "cases": (1, 1024), "attempts": (0, 10000),
+    limits = {"seed": (0, 2**64 - 1), "nodes": (8 if args.profile == "runtime-primitives" else 3, 512), "cases": (1, 1024), "attempts": (0, 10000),
               "seconds": (0.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10),
               "shrink_attempts": (0, 10000), "shrink_candidates": (1, 4096), "case_timeout": (0.001, 3600),
               "direct_fuel": (1, 10000000), "core_fuel": (1, 1000000000), "gas": (1, 1000000000)}

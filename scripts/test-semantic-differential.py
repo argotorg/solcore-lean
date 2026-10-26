@@ -5,6 +5,7 @@ The process tests execute real bounded Python subprocesses. End-to-end compiler,
 Core and Anvil validation is performed with semantic-differential.py itself.
 """
 import importlib.util
+import copy
 from contextlib import redirect_stdout
 import io
 import json
@@ -154,6 +155,62 @@ class CaseProfileTests(unittest.TestCase):
         case['sourceBundle'] = {}
         with self.assertRaisesRegex(ValueError, 'only admitted by the module profile'):
             runner.validate_case(case)
+
+
+class PrimitiveProfileTests(unittest.TestCase):
+    def case(self, value=1):
+        case = CaseProfileTests().input_case(value)
+        case['schema'] = runner.PRIMITIVE_CASE_SCHEMA
+        case['source'] = 'import { div as sc_div } from std.opcodes; // envelope fixture only'
+        case['provenance'].update({key: 'primitive-policy-test' for key in
+            ('profileVersion', 'functionVersion', 'abstractionVersion', 'baseGeneratorVersion', 'boundaryVersion')})
+        case['contract'].update(name='SynthesizedPrimitives', deployPath=['SynthesizedPrimitivesDeploy'],
+            runtimePath=['SynthesizedPrimitivesDeploy', 'SynthesizedPrimitives'])
+        return case
+
+    def test_all_eight_primitive_inputs_have_exact_abi_and_a_distinct_wrapper(self):
+        for value in (0, 1, 2, 255, 256, 2**256 - 1, 2**255, 2**255 - 1):
+            case = self.case(value)
+            runner.validate_case(case)
+            self.assertEqual(runner.CASE_PROFILES[case['schema']], 'runtime-primitives')
+            with self.assertRaisesRegex(ValueError, 'calldata differs'):
+                runner.validate_case({**case, 'input': str(value ^ 1)})
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'schema': runner.INPUT_CASE_SCHEMA})
+
+    def test_primitive_version_receipts_are_not_optional(self):
+        for key in ('profileVersion', 'functionVersion', 'abstractionVersion', 'baseGeneratorVersion', 'boundaryVersion'):
+            for value in (None, '', 1):
+                case = self.case()
+                case['provenance'][key] = value
+                with self.assertRaisesRegex(ValueError, key):
+                    runner.validate_case(case)
+
+    def test_native_replay_source_alias_program_and_provenance_cannot_change(self):
+        case = self.case()
+        # No Rust/Core execution is simulated: exercise the post-native equality gate.
+        runner.validate_replayed_case(case, copy.deepcopy(case))
+        for key, value in [('source', case['source'].replace('div as', 'sdiv as')),
+                ('program', {'unsealed': True}),
+                ('provenance', {**case['provenance'], 'boundaryVersion': 'forged-bank'})]:
+            with self.assertRaisesRegex(ValueError, 'case replay changed ' + key):
+                runner.validate_replayed_case(case, {**case, key: value})
+        saved = {**case, 'directCore': {'stage': 'execution', 'status': 'returned', 'word': '999'}}
+        fresh = {**case, 'directCore': {'stage': 'execution', 'status': 'returned', 'word': '2'}}
+        runner.validate_replayed_case(saved, fresh)
+        self.assertEqual(runner.normalize_observation(fresh['directCore'], direct=True)['word'], '2')
+
+    def test_primitive_backend_replay_keeps_yul_hull_images_explicit(self):
+        case = self.case()
+        runner.validate_case(case)
+        for backend in runner.BACKENDS:
+            self.assertEqual(runner.resolve_backend(None, {'backend': backend}), backend)
+            expected_images = 'sonatina-o0' if backend == 'yul' else backend
+            self.assertEqual(runner.path_backends(backend),
+                {'directCore': 'original-core', 'importedHull': expected_images, 'rustEvm': backend})
+            other = 'sonatina-o2' if backend != 'sonatina-o2' else 'yul'
+            with self.assertRaises(ValueError):
+                runner.resolve_backend(other, {'backend': backend})
 
 
 class ClassificationTests(unittest.TestCase):

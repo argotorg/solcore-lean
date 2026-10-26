@@ -52,7 +52,7 @@ def require(condition, message):
 
 
 def validate_contract(contract):
-    require(contract in CONTRACTS, "only the ten generated pure contract wrappers are supported")
+    require(contract in CONTRACTS, "only the generated pure contract wrappers are supported")
 
 
 def validate_artifact(document, contract):

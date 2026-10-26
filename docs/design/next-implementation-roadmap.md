@@ -9,13 +9,13 @@ milestones. Delivery and verification are recorded separately below.
 emission, three-way execution, bounded campaigns, failure-preserving reduction
 and strict replay. The primary oracle executes the original generated Core;
 the other paths execute Rust-produced EVM bytecode and imported Rust Hull.
-Generated EVM comparisons support Sonatina O0 and O2 across all thirteen
-profiles. Generated Yul comparison is connected for the ten pure profiles
-under the explicit boundary below, with the full fixed/random gate passed.
+Generated EVM comparisons support Sonatina O0 and O2. The initial thirteen-
+profile O0/O2 and ten-profile pure Yul gates passed. The new primitive profile
+is connected to the runners; its random O2 gate exposed a compiler crash.
 The separate upstream fixture harness also
 runs Yul; its results are distinct from generated semantic campaigns.
 
-Ten pure profiles and three stateful profiles are available locally. The
+Eleven pure profiles and three stateful profiles are available locally. The
 [CI workflow](../../.github/workflows/semantic.yml) and
 [suite commands](../../scripts/SEMANTIC_CI.md) connect the fixed and random
 runners with shared limits, preparation and retained findings. Hosted execution
@@ -30,16 +30,16 @@ test corpus.
 
 ## Ordered priorities
 
-| Order | Deliverable | Completion boundary |
-| --- | --- | --- |
-| 1 | CI and continuous bounded random campaigns across all existing profiles | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
-| 2 | Generated Sonatina O2, then Yul comparisons | The same original cases run on each enabled backend with explicit backend provenance and replay. |
-| 3 | Missing runtime operation mappings | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| Order | Deliverable | Status | Completion boundary |
+| --- | --- | --- | --- |
+| 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; hosted run pending | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
+| 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
+| 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
+| 4 | Richer generated grammar | First family in preparation | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Planned | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 8 | Remaining Hull public connections | Existing partial proofs; deferred to this order | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -284,9 +284,8 @@ Acceptance criteria for each group:
    runtime opcode coverage. Make the last claim only with execution evidence;
    optimizer folding or lowering may remove the expected opcode.
 
-The initial `runtime-primitives` profile is being prepared in separate new
-modules while the Yul gate runs. Existing profiles and eight active native
-executables remain unchanged until that gate completes. It reuses sealed
+The `runtime-primitives` profile is now connected to the ordinary CLI,
+adapters, campaigns and suites after the Yul gate passed. It reuses sealed
 `CheckedWordFunction` values and executes the original applied Core program.
 The source imports explicit aliases from `std.opcodes`; the following table
 describes those raw functions, not similarly named public convenience wrappers.
@@ -330,8 +329,32 @@ The prepared fixed corpus contains 81 cases from 34 functions, with handwritten
 Core results and seventeen distinct inputs. It covers all fourteen additions
 and the required eight generator boundaries. The native corpus validator
 confirmed all 81 results, deterministic source/replay, 319 strictly smaller
-typed candidates and six malformed-corpus rejection checks. The corpus and
-profile registration have not yet been enabled in the shared runners.
+typed candidates and six malformed-corpus rejection checks. The registered fixed corpus adds 81 cases: full suite totals are now 393
+for each Sonatina level and 357 for pure Yul. All 81 new fixed cases passed on
+all three backends. Their local suite times were 409.522 seconds (O0), 410.716
+seconds (O2) and 646.389 seconds (Yul), overlapping each other and other checks.
+
+For root seed `20261026`, sixteen cases and 2,048 attempts, O0 and Yul matched
+all sixteen cases. O2 matched eight and crashed compilation on eight inputs of
+one generated function. The campaign correctly returned failure and preserved
+original/reduced archives. Automatic reduction isolated a large constant
+arithmetic shift and retained the compiler-crash fingerprint. The original
+Core result is independent of this compiler. This is a genuine upstream
+finding recorded for later review, not a successful O2 random gate. Per the
+user's instruction, investigation and fixes are deferred; the operator and
+failures remain in generation and reporting.
+
+After CLI activation, all 286 retained old-profile cases (276 fixed and ten
+random) replayed with identical complete JSON and original Core observations.
+The other seven native tools retained their previous hashes. The full Python
+policy suite passed 358 tests. The source library build and full registered
+Lean test driver passed, including all 81 new corpus observations and 319 typed
+shrinks; those builds left the eight native tool hashes unchanged. A primitive
+multiplication-modulo case passed
+actual three-way execution, two accepted synthetic reductions per backend,
+original and final exact archive replay (six replays), and repeated synthetic
+fingerprints on O0, O2 and Yul. All raw runtime reports remained actual matches;
+these controlled differences are test infrastructure checks, not upstream bugs.
 
 ## 4–8. Subsequent work
 

@@ -1328,6 +1328,163 @@ class ModuleCoverageTests(unittest.TestCase):
             self.assertEqual(summary['moduleCoverage']['missingBranches'], ['even'])
 
 
+class PrimitiveCoverageTests(unittest.TestCase):
+    def case(self, value='255'):
+        # Admission/coverage policy fixture, never a claimed compiler execution.
+        number = int(value)
+        body = {'tag': 'binary', 'op': 'wordDiv', 'left': {'tag': 'var', 'index': 0},
+                'right': {'tag': 'word', 'value': '0x' + f'{2:064x}'}}
+        function = {'tag': 'lambda', 'parameterType': 'word', 'resultType': 'word', 'body': body}
+        return {'schema': campaign.m2.PRIMITIVE_CASE_SCHEMA, 'input': value, 'source': '// primitive policy fixture',
+            'program': {'schema': 'solcore-semantic-core', 'resultType': 'word', 'dataDefinitions': [],
+                'body': {'tag': 'apply', 'function': function,
+                         'argument': {'tag': 'word', 'value': '0x' + f'{number:064x}'}}},
+            'provenance': {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                   *campaign.PRIMITIVE_VERSIONS)},
+                'origin': {'kind': 'primitive-generated', 'seed': '1', 'maxProgramNodes': 96},
+                'features': ['binary:Solcore.Core.Wire.BinaryOp.wordDiv', 'local', 'wordLiteral']},
+            'contract': {'name': 'SynthesizedPrimitives', 'method': 'run', 'signature': 'run(uint256)',
+                'deployPath': ['SynthesizedPrimitivesDeploy'], 'runtimePath': ['SynthesizedPrimitivesDeploy', 'SynthesizedPrimitives'],
+                'calldata': '0xa444f5e9' + f'{number:064x}', 'constructorCalldata': '0x'}}
+
+    def manifest(self, generated=False):
+        case = self.case()
+        program = {**case['program'], 'resultType': {'tag': 'function', 'parameter': 'word', 'result': 'word'},
+                   'body': case['program']['body']['function']}
+        entry = {'id': 'primitive', 'input': '255', 'expectedFeatures': case['provenance']['features'],
+                 **({'generation': {'seed': '1', 'maxProgramNodes': 96}} if generated else {'program': program})}
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-primitives',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                     *campaign.PRIMITIVE_VERSIONS)},
+            'requiredFeatures': sorted(campaign.PRIMITIVE_FEATURES), 'requiredWordLiterals': [],
+            'requiredInputs': list(campaign.PRIMITIVE_INPUTS), 'cases': [entry]}
+
+    def test_primitive_bank_does_not_change_legacy_generation_order(self):
+        self.assertEqual(campaign.profile_inputs('runtime-primitives'),
+            ('0', '1', '2', '255', '256', str(2**256 - 1), str(2**255), str(2**255 - 1)))
+        self.assertEqual(campaign.profile_inputs('runtime-word'), campaign.INPUT_BOUNDARIES)
+        self.assertEqual(campaign.INPUT_BOUNDARIES, ('0', '1', str(2**256 - 1), str(2**255)))
+        self.assertEqual(campaign.profile_inputs('runtime-loops'), campaign.LOOP_INPUTS)
+        self.assertEqual(len(campaign.PRIMITIVE_FEATURES), 14)
+        self.assertIn('binary:Solcore.Core.Wire.BinaryOp.wordPow', campaign.PRIMITIVE_FEATURES)
+        self.assertFalse(any('wordExp' in feature for feature in campaign.PRIMITIVE_FEATURES))
+
+    def test_fixed_manifest_cannot_drop_new_operator_or_input_requirements(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        for key in ('requiredFeatures', 'requiredInputs'):
+            for missing in value[key]:
+                with self.subTest(key=key, missing=missing), self.assertRaises(ValueError):
+                    campaign.validate_manifest({**value, key: [x for x in value[key] if x != missing]})
+        for key in campaign.PRIMITIVE_VERSIONS:
+            broken = copy.deepcopy(value)
+            del broken[key]
+            with self.assertRaisesRegex(ValueError, key):
+                campaign.validate_manifest(broken)
+        generated = self.manifest(True)
+        for invalid in ('3', '254'):
+            bad = copy.deepcopy(generated); bad['cases'][0]['input'] = invalid
+            with self.assertRaises(ValueError): campaign.validate_manifest(bad)
+        for invalid in (3, 7, 513):
+            bad = copy.deepcopy(generated); bad['cases'][0]['generation']['maxProgramNodes'] = invalid
+            with self.assertRaises(ValueError): campaign.validate_manifest(bad)
+        # Imported cases can use other runtime inputs; bank requirements are global.
+        imported = self.manifest(); imported['cases'][0]['input'] = '3'
+        campaign.validate_manifest(imported)
+
+    def test_generated_manifest_requests_eight_and_checks_origin_features_and_versions(self):
+        for tamper in (None, 'seed', 'nodes', 'features', 'boundaryVersion'):
+            with self.subTest(tamper=tamper), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.cases = 'runtime-primitives', 1
+                config.corpus = Path(directory) / 'manifest.json'
+                config.corpus.write_text(json.dumps(self.manifest(True)))
+                instance = campaign.Campaign(config); calls = []
+                case = self.case()
+                if tamper == 'seed': case['provenance']['origin']['seed'] = '2'
+                if tamper == 'nodes': case['provenance']['origin']['maxProgramNodes'] = 97
+                if tamper == 'features': case['provenance']['features'] = []
+                if tamper == 'boundaryVersion': case['provenance']['boundaryVersion'] = 'forged-bank'
+                def tool(arguments, stage):
+                    calls.append((arguments, stage)); return {'cases': [case]}
+                instance.tool = tool
+                if tamper:
+                    with self.assertRaises(ValueError): instance.prepare_cases()
+                else:
+                    self.assertEqual(instance.prepare_cases()['cases'], [case])
+                    self.assertEqual(instance.summary['coverage']['generatedInputs'], ['255'])
+                    self.assertEqual(instance.summary['coverage']['matchedInputs'], [])
+                self.assertEqual(calls, [(['primitive-generate', '1', '96', '8', '1', '1000'], 'corpus-generation')])
+
+    def test_imported_function_routes_to_primitive_emit_without_using_saved_golden(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile, config.cases = 'runtime-primitives', 1
+            value = self.manifest(); value['cases'][0]['expectedCore'] = 'untrusted-golden-is-ignored'
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return self.case()
+            instance.tool = tool
+            self.assertEqual(instance.prepare_cases()['cases'], [self.case()])
+            self.assertEqual(calls, [('primitive-emit', value['cases'][0]['program'], ['255', '1000'], 'corpus-emission')])
+            self.assertEqual(campaign.helper_counts(self.case()), set())
+
+    def test_primitive_coverage_requires_matched_cases_not_generated_ast_claims(self):
+        for failure in ('inconclusive-resource', 'source-rejected', 'compilation-rejected'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.cases, config.shrink_attempts = 'runtime-primitives', 1, 0
+                instance = campaign.Campaign(config); case = self.case()
+                def prepare():
+                    instance.summary['coverage'].update(requiredFeatures=list(campaign.PRIMITIVE_FEATURES),
+                        requiredInputs=list(campaign.PRIMITIVE_INPUTS))
+                    return {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [case],
+                        'excluded': [], 'requested': 1, 'attempted': 1, 'status': 'complete'}
+                def execute(_case):
+                    folder = instance.work / 'candidate'; folder.mkdir()
+                    report = {'comparison': {'category': failure, 'pairs': {}}, 'observations': {}}
+                    return folder, report, campaign.analyze(report)
+                instance.prepare_cases, instance.execute_case = prepare, execute
+                with redirect_stdout(io.StringIO()): instance.run()
+                coverage = instance.summary['coverage']
+                self.assertEqual(coverage['matchedFeatures'], [])
+                self.assertEqual(coverage['matchedInputs'], [])
+                self.assertEqual(set(coverage['missingFeatures']), campaign.PRIMITIVE_FEATURES)
+                self.assertEqual(set(coverage['missingInputs']), set(campaign.PRIMITIVE_INPUTS))
+                self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_default_limits_and_native_random_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'campaign'
+            seen = []
+            def run(instance):
+                instance.tool = lambda arguments, stage: seen.append((arguments, stage)) or {}
+                instance.prepare_cases(); instance.summary['status'] = 'generation-exhausted'
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-primitives', '--cases', '1']), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                campaign.main()
+            self.assertEqual(seen, [(['primitive-generate', '1', '96', '1', '512', '1000000'], 'generation')])
+
+    def test_primitive_execution_and_shrink_keep_every_backend(self):
+        for backend in campaign.m2.BACKENDS:
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.backend = 'runtime-primitives', backend
+                config.test_perturb_path = 'rustEvm'; config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+                instance = campaign.Campaign(config); selected = []
+                original, candidate = self.case('255'), self.case('1')
+                def execute(args, report):
+                    selected.append(args.backend); report.update(matched(), backend=args.backend)
+                    campaign.save_json(args.output / 'case.json', json.loads(args.case.read_text()))
+                with patch.object(campaign.m2, 'execute', side_effect=execute):
+                    folder, report, analysis = instance.execute_case(original)
+                    finding = instance.retain_finding(0, folder, original, report, analysis)
+                    instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
+                    instance.shrink(original, finding)
+                self.assertEqual(selected, [backend, backend])
+                history = json.loads((Path(directory) / finding['history']).read_text())
+                self.assertTrue(history['steps'][0]['accepted'])
+                self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
+
+
 class CancellationTests(unittest.TestCase):
     def test_sigterm_stops_owned_process_and_saves_summary(self):
         with tempfile.TemporaryDirectory() as directory:

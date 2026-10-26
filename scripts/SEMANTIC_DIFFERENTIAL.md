@@ -134,7 +134,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the ten pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the eleven pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -341,6 +341,44 @@ replays a saved input-dependent run. The input profile also supports automatic
 reduction of its function body and input while retaining the checked application
 form. Named functions, private mutable locals, aggregates and bounded loops
 extend this workflow below.
+
+## Compare the extended Word primitives
+
+`runtime-primitives` retains the original checked Word-to-Word Core function
+and imports raw functions from `std.opcodes`. It adds unsigned and signed
+division/remainder, signed greater-than, shifts, byte selection, sign extension,
+exponentiation, leading-zero count and modular addition/multiplication.
+The [mapping table](../docs/design/next-implementation-roadmap.md#3-missing-runtime-operation-mappings)
+records operand order and boundary behavior. Raw division/modular operations
+return zero for a zero divisor/modulus; the public convenience wrappers are
+not interchangeable with those raw functions.
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-primitives \
+  --backend sonatina-o0 --output .upstream/semantic-primitives-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-primitives \
+  --seed 20261026 --cases 16 --attempts 2048 \
+  --output .upstream/semantic-primitives-random
+```
+
+Repeat with `--backend sonatina-o2` or `--backend yul --solc PATH`. The fixed
+manifest contains 81 hand-specified cases and requires all fourteen new AST
+operators plus eight input boundaries. This is AST and observed result coverage,
+not proof that an optimizer emitted or executed a particular opcode.
+
+Generation uses the unchanged broad Core generator, then abstracts a literal
+and requires varied completed results over 0, 1, 2, 255, 256, maximum Word, the
+high bit and the high bit minus one. One accepted function produces up to eight
+inputs in that order. Default generation uses a 96-node complete applied-program
+budget and 512 attempts; the admitted range is 8–512 nodes. The new schema and
+versions preserve earlier profile output. Imported boundary cases may be
+constant. Typed shrinking can reduce both function bodies and inputs, and
+strict replay rederives generation, source, ABI and the original Core result.
+
+Native commands are `primitive-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`primitive-emit FUNCTION.json INPUT [FUEL]`; `replay`, `observe` and `shrink`
+dispatch the new schema. Use `replay` to authenticate a saved case; `observe`
+only executes its admitted Core program and does not authenticate saved source.
 
 ## Compare acyclic named functions
 

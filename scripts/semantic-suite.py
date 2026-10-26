@@ -43,6 +43,7 @@ PROFILES = {
     "runtime-closures": ("semantic-closure", "pure", 384),
     "runtime-comptime": ("semantic-comptime", "pure", 384),
     "runtime-modules": ("semantic-module", "pure", 384),
+    "runtime-primitives": ("semantic-primitive", "pure", 96),
     "stateful-storage": ("semantic-storage", "storage", 384),
     "stateful-storage-rollback": ("semantic-storage-rollback", "storage", 384),
     "stateful-calls": ("semantic-call", "call", 384),
@@ -98,7 +99,7 @@ def requested(args, profile):
 def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
     if args.backend == "yul" and family != "pure":
-        raise ValueError("Yul is restricted to the ten pure profiles")
+        raise ValueError("Yul is restricted to pure profiles")
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else args.storage_case_tool,
             "call": args.call_case_tool}[family]
     runner = {"pure": args.core_runner, "storage": args.storage_core_runner, "call": args.call_core_runner}[family]
@@ -355,7 +356,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default thirteen for Sonatina, ten pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default fourteen for Sonatina, eleven pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")

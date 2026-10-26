@@ -43,10 +43,11 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_thirteen_profiles_match_real_manifests_and_campaign_families(self):
+    def test_fourteen_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 13)
-        self.assertEqual(sum(suite.requested(args, p) for p in args.profile), 312)
+        self.assertEqual(len(args.profile), 14)
+        self.assertEqual(sum(suite.requested(args, p) for p in args.profile if p != "runtime-primitives"), 312)
+        self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         for profile in args.profile:
             command = suite.command(args, profile, self.directory / profile, 30, 64 * 1024**2)
             self.assertEqual(command[command.index("--profile") + 1], profile)
@@ -58,6 +59,34 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(suite.PROFILES["stateful-storage-rollback"][1], "storage")
         self.assertEqual(suite.PROFILES["stateful-calls"][1], "call")
 
+    def test_primitive_profile_routes_its_manifest_and_random_defaults_under_all_backends(self):
+        self.assertEqual(suite.PROFILES['runtime-primitives'], ('semantic-primitive', 'pure', 96))
+        for backend in suite.adapter.BACKENDS:
+            fixed = self.args('--backend', backend, '--profile', 'runtime-primitives')
+            command = suite.command(fixed, 'runtime-primitives', self.directory / backend, 30, 64 * 1024**2)
+            self.assertEqual(command[command.index('--corpus') + 1], str(suite.manifest('runtime-primitives')))
+            self.assertEqual(command[command.index('--backend') + 1], backend)
+            self.assertEqual(Path(command[1]).name, 'semantic-campaign.py')
+            random = self.args('--mode', 'random', '--backend', backend, '--profile', 'runtime-primitives')
+            command = suite.command(random, 'runtime-primitives', self.directory / (backend + '-random'), 30, 64 * 1024**2)
+            self.assertEqual(command[command.index('--nodes') + 1], '96')
+            self.assertEqual(command[command.index('--attempts') + 1], '512')
+            self.assertEqual('--solc' in command, backend == 'yul')
+
+    def test_missing_primitive_operator_or_boundary_prevents_suite_pass(self):
+        for backend in suite.adapter.BACKENDS:
+            summary = completed('runtime-primitives')
+            summary.update(backend=backend)
+            summary['configuration']['backend'] = backend
+            self.assertEqual(suite.classify(summary, 'runtime-primitives', 4, 0, backend=backend), 'passed')
+            for field, missing in [('missingFeatures', ['binary:Solcore.Core.Wire.BinaryOp.wordPow']),
+                                   ('missingInputs', ['256'])]:
+                changed = copy.deepcopy(summary)
+                changed['coverage'][field] = missing
+                self.assertEqual(suite.classify(changed, 'runtime-primitives', 4, 0, backend=backend), 'incomplete')
+            other = 'sonatina-o2' if backend != 'sonatina-o2' else 'yul'
+            self.assertEqual(suite.classify(summary, 'runtime-primitives', 4, 0, backend=other), 'adapter-error')
+
     def test_backend_selection_reaches_every_campaign_family(self):
         self.assertEqual(self.args().backend, 'sonatina-o0')
         for backend in suite.adapter.BACKENDS:
@@ -68,17 +97,18 @@ class SuiteTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.args('--backend', 'unknown-backend')
 
-    def test_yul_defaults_to_all_ten_pure_profiles_and_forwards_only_its_compiler(self):
+    def test_yul_defaults_to_all_eleven_pure_profiles_and_forwards_only_its_compiler(self):
         args = self.args('--backend', 'yul', '--solc', '/chosen/pinned-solc')
-        self.assertEqual(len(args.profile), 10)
-        self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile), 276)
+        self.assertEqual(len(args.profile), 11)
+        self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile if profile != "runtime-primitives"), 276)
+        self.assertIn("runtime-primitives", args.profile)
         self.assertTrue(all(suite.PROFILES[profile][1] == 'pure' for profile in args.profile))
         for profile in args.profile:
             command = suite.command(args, profile, self.directory / profile, 30, 64 * 1024**2)
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 13)
+            self.assertEqual(len(sonatina.profile), 14)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -124,7 +154,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, args.attempts) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 13)
+        self.assertEqual(len(set(seeds.values())), 14)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for seed in seeds.values():
             self.assertLess(seed + args.attempts - 1, 1 << 64)
