@@ -139,9 +139,9 @@ Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
 connects the closed, runtime-input, named-helper, raw-primitive, call-graph,
-private-mutation, Word-aggregate, aggregate call-graph, call-graph loop and
-aggregate loop emitters' text to Core under an independent source semantics and
-a stated Rust-pipeline boundary.
+private-mutation, Word-aggregate, aggregate call-graph, call-graph loop,
+aggregate loop and generic emitters' text to Core under an independent source
+semantics and a stated Rust-pipeline boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A
@@ -164,7 +164,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same twenty-three-profile suite runs locally with shared time and disk limits.
+The same twenty-four-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -314,6 +314,17 @@ twelve fixed scenarios match on both Sonatina levels, as do the sixteen
 recorded random scenarios on O0. On O2 fourteen match and two crash the
 compiler, retained findings. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-value-forwarded-by-contracts).
+
+The mapping profile stores through a `mapping(word => word)` field whose
+entries live at Keccak-256 slots. The pinned std hashes the base slot before
+the key, the reverse of Solidity's order, and the profile follows the dialect.
+Original Core computes each slot with the Hull path's Keccak permutation and
+digest code, which is proved against the independent Keccak specification;
+the observer derives the declared slots with a separate Keccak implementation.
+Each call updates an entry, its successor and a counter; odd flags revert. Its
+twelve fixed scenarios and sixteen recorded random scenarios match on both
+Sonatina levels, with reduction and exact archive replay. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-keccak-addressed-storage-mappings).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases

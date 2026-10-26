@@ -3,7 +3,9 @@ import Solcore.Synthesis.Source.AggregateRenderer
 
 /-! Emit a genuinely polymorphic source selector, instantiated by the typed
 arguments at Word, product or sum. The Core reference is independently built
-with a monomorphic closure. No source-emitter preservation theorem is assumed. -/
+with a monomorphic closure. `ScalarMeaning.Generic.emit_source_meaning`
+relates the emitted text to the original Core result under an independent
+generic source semantics; see `docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Generic
