@@ -15,7 +15,7 @@ is connected to the runners; its random O2 gate exposed a compiler crash.
 The separate upstream fixture harness also
 runs Yul; its results are distinct from generated semantic campaigns.
 
-Eleven pure profiles and three stateful profiles are available locally. The
+Twelve pure profiles and three stateful profiles are available locally. The
 [CI workflow](../../.github/workflows/semantic.yml) and
 [suite commands](../../scripts/SEMANTIC_CI.md) connect the fixed and random
 runners with shared limits, preparation and retained findings. Hosted execution
@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; hosted run pending | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | First family in preparation | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call graphs validated; loop and aggregate consumers remain | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Planned | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -379,6 +379,61 @@ edges separately from runtime coverage. Prepare new modules in isolation while
 the primitive gate runs, then connect the ordinary runners only after that gate
 passes. Aggregate and bounded-loop consumers of this richer grammar follow as
 separate changes; this first family alone does not complete priority 4.
+
+The first family is now connected to the ordinary case tool, adapters,
+campaigns and suites. Generation uses a fresh typed grammar, measured complete
+program budgets and the existing sealed Core DAG. A 256-seed structural census
+covered all thirty features and nine call shapes. The fixed corpus contains
+56 cases from 26 original graphs, eleven distinct inputs including the required
+eight, all three helper counts and all nine call shapes. Native validation
+confirmed every handwritten Core result, source invariance across inputs,
+224 strict typed reductions/replays and sixteen malformed/fuel checks.
+
+Focused Lean builds, the source library and the full registered Lean test
+driver passed. The full Python policy suite passed 372 tests. All 368 retained
+older cases replayed with identical complete JSON and Core observations; the
+other seven native tools kept their hashes.
+
+All 56 new fixed cases passed on O0, O2 and Yul, including the required AST
+features, inputs, helper counts and nine call shapes. Local suite times were
+284.172, 284.635 and 455.645 seconds respectively. Random seed `20261026`,
+sixteen cases and 2,048 attempts produced seven ordinary generation exclusions
+and no resource exclusions on each backend. O0 and Yul matched all sixteen;
+O2 matched eight and recorded eight compiler crashes with the same host integer
+conversion panic observed by the primitive profile. That O2 random gate failed.
+Per the user's instruction, the symptom is recorded without further upstream
+investigation or a backend patch. Local random suite times were 83.439, 158.625
+and 131.550 seconds respectively, overlapping other validation.
+
+A shared-callee diamond passed four accepted typed synthetic reductions on
+each backend (twelve total), retaining all three helper bindings. Original and
+final exact replays all matched (six), synthetic fingerprints reproduced on
+all three backends, and fuel-one executions were correctly inconclusive.
+The raw actual reports remained unchanged. Suite totals are now 449 fixed
+cases/scenarios for Sonatina and 413 pure cases for Yul; the existing and new
+families were validated in separate runs. Hosted CI still has not been run.
+
+The next implementation unit is a separate `runtime-call-graph-loops` family:
+
+- Reseal `CheckedWordFunctionDAG.helpers` and `entry` with
+  `Aggregates.CheckedDAG.ofParts?`, then `BoundedLoop.CheckedPlan.ofParts?`.
+  Keep the scalar step and the executed plan's step program identical. Reuse
+  the existing finite Core reference and typing; add no evaluator or primitive.
+- Emit the arbitrary entry as `sc_step`, using `CallGraphRenderer` and raw
+  primitive imports inside the existing bounded `while` wrapper. The old
+  `LoopEmitter` uses the narrower scalar renderer and must remain unchanged.
+- Generate masks 1, 3 and 7; allow mask 0 for imported/reduced cases. Budget
+  the complete application, subtracting the existing measured loop overhead
+  before generating the step and rechecking the final 512-node limit.
+- Preserve versioned plans, typed strict reduction and exact replay. Require
+  an entry call, input-sensitive step results and a positive-iteration Core
+  observation that changes the input. Fixed cases must cover 0/1/3/7 iterations,
+  nested/shared/branch/local calls and signed/shift/ternary operations.
+- Connect fixed/random O0/O2/Yul execution and original/reduced replay before
+  enabling the new suite profile. Then add a genuinely richer aggregate
+  consumer composing pairs, sums and case payload/projection scopes with calls.
+  Resealing a scalar graph as an aggregate graph alone does not complete that
+  aggregate work or priority 4.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

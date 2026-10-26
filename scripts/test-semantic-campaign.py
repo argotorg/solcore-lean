@@ -1485,6 +1485,166 @@ class PrimitiveCoverageTests(unittest.TestCase):
                 self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
 
 
+class CallGraphCoverageTests(unittest.TestCase):
+    def case(self, value='255', helpers=2):
+        case = function_case(helpers)
+        case.update(schema=campaign.m2.CALL_GRAPH_CASE_SCHEMA, input=value)
+        case['program']['body']['argument']['value'] = '0x' + f'{int(value):064x}'
+        case['provenance'].update({key: 'test' for key in campaign.m2.CALL_GRAPH_VERSIONS})
+        case['provenance'].update(helperCount=helpers, callShapes=['nested-call', 'local-call'],
+            origin={'kind': 'call-graph-generated', 'seed': '1', 'maxProgramNodes': 192})
+        case['contract'].update(name='SynthesizedCallGraphs', deployPath=['SynthesizedCallGraphsDeploy'],
+            runtimePath=['SynthesizedCallGraphsDeploy', 'SynthesizedCallGraphs'],
+            calldata='0xa444f5e9' + f'{int(value):064x}')
+        return case
+
+    def manifest(self, generated=False):
+        case = self.case()
+        program = {**case['program'], 'resultType': {'tag': 'function', 'parameter': 'word', 'result': 'word'},
+            'body': case['program']['body']['function']}
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-call-graphs',
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                *campaign.m2.CALL_GRAPH_VERSIONS)},
+            'requiredFeatures': ['functionCall', 'local'], 'requiredWordLiterals': [],
+            'requiredInputs': list(campaign.PRIMITIVE_INPUTS), 'requiredHelperCounts': [1, 2, 3],
+            'requiredCallShapes': list(campaign.m2.CALL_SHAPES),
+            'cases': [{'id': 'graph', 'input': '255', 'expectedFeatures': ['functionCall', 'local'],
+                'expectedCallShapes': case['provenance']['callShapes'], 'expectedHelperCount': 2,
+                **({'generation': {'seed': '1', 'maxProgramNodes': 192}} if generated else {'program': program})}]}
+
+    def test_manifest_shape_input_and_node_gates(self):
+        manifest = self.manifest(True)
+        campaign.validate_manifest(manifest)
+        for value in (None, ['unknown'], ['nested-call', 'nested-call'], ['local-call', 'nested-call']):
+            with self.assertRaisesRegex(ValueError, 'canonical'):
+                campaign.validate_manifest({**manifest, 'requiredCallShapes': value})
+        missing = dict(manifest); del missing['requiredCallShapes']
+        with self.assertRaises(ValueError): campaign.validate_manifest(missing)
+        for field in campaign.m2.CALL_GRAPH_VERSIONS:
+            missing = dict(manifest); del missing[field]
+            with self.assertRaisesRegex(ValueError, field): campaign.validate_manifest(missing)
+        with self.assertRaisesRegex(ValueError, 'eight boundary'):
+            campaign.validate_manifest({**manifest, 'requiredInputs': ['0']})
+        for value in (12, 513, True):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['maxProgramNodes'] = value
+            with self.assertRaises(ValueError): campaign.validate_manifest(changed)
+        for value in (13, 512):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['maxProgramNodes'] = value
+            campaign.validate_manifest(changed)
+        old = PrimitiveCoverageTests().manifest(); old['requiredCallShapes'] = ['nested-call']
+        with self.assertRaisesRegex(ValueError, 'only call-graph'): campaign.validate_manifest(old)
+
+    def test_helper_count_is_checked_against_declarations_not_claimed_origin(self):
+        for count in (1, 2, 3):
+            case = self.case(helpers=count)
+            self.assertEqual(campaign.helper_counts(case), {count})
+            case['provenance']['helperCount'] = 1 if count != 1 else 2
+            with self.assertRaisesRegex(ValueError, 'declaration'): campaign.helper_counts(case)
+        self.assertEqual(campaign.profile_inputs('runtime-call-graphs'), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.generation_recipes(self.case()), {'Templates': set(), 'Updates': set()})
+
+    def test_materialization_routes_eight_inputs_and_matches_expected_metadata(self):
+        for generated in (False, True):
+            for tamper in (None, 'shapes', 'helper', 'version', 'seed'):
+                if not generated and tamper == 'seed': continue
+                with self.subTest(generated=generated, tamper=tamper), tempfile.TemporaryDirectory() as directory:
+                    config = options(directory); config.profile, config.cases = 'runtime-call-graphs', 1
+                    config.corpus = Path(directory) / 'manifest.json'
+                    manifest = self.manifest(generated); config.corpus.write_text(json.dumps(manifest))
+                    instance = campaign.Campaign(config); calls = []; case = self.case()
+                    if tamper == 'shapes': case['provenance']['callShapes'] = ['diamond']
+                    if tamper == 'helper': case['provenance']['helperCount'] = 3
+                    if tamper == 'version': case['provenance']['callShapeVersion'] = 'wrong'
+                    if tamper == 'seed': case['provenance']['origin']['seed'] = '9'
+                    def tool(arguments, stage):
+                        calls.append((arguments, stage))
+                        if generated: return {'cases': [case]}
+                        self.assertEqual(json.loads(Path(arguments[1]).read_text()), manifest['cases'][0]['program'])
+                        return case
+                    instance.tool = tool
+                    if tamper:
+                        with self.assertRaises(ValueError): instance.prepare_cases()
+                    else:
+                        self.assertEqual(instance.prepare_cases()['cases'], [case])
+                        self.assertEqual(instance.summary['callShapeCoverage']['generatedShapes'], ['nested-call', 'local-call'])
+                        self.assertEqual(instance.summary['callShapeCoverage']['matchedShapes'], [])
+                    if generated:
+                        self.assertEqual(calls, [(['call-graph-generate', '1', '192', '8', '1', '1000'], 'corpus-generation')])
+                    else:
+                        self.assertEqual(calls[0][0][0], 'call-graph-emit')
+                        self.assertEqual(calls[0][0][2:], ['255', '1000'])
+
+    def test_only_actual_matched_cases_satisfy_required_shapes(self):
+        for category in ('matched', 'inconclusive-resource', 'source-rejected', 'semantic-mismatch'):
+            with self.subTest(category=category), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.cases, config.shrink_attempts = 'runtime-call-graphs', 1, 0
+                instance = campaign.Campaign(config); case = self.case()
+                def prepare():
+                    instance.summary['callShapeCoverage']['requiredShapes'] = list(campaign.m2.CALL_SHAPES)
+                    return {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [case], 'excluded': [],
+                        'requested': 1, 'attempted': 1, 'status': 'complete'}
+                def execute(_case):
+                    folder = instance.work / 'candidate'; folder.mkdir()
+                    report = matched()
+                    if category != 'matched': report['comparison'] = {'category': category, 'pairs': {}}
+                    return folder, report, campaign.analyze(report)
+                instance.prepare_cases, instance.execute_case = prepare, execute
+                with redirect_stdout(io.StringIO()): instance.run()
+                coverage = instance.summary['callShapeCoverage']
+                expected = ['nested-call', 'local-call'] if category == 'matched' else []
+                self.assertEqual(coverage['matchedShapes'], expected)
+                self.assertEqual(coverage['missingShapes'], [s for s in campaign.m2.CALL_SHAPES if s not in expected])
+                self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_complete_shape_coverage_and_old_profiles_are_separate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = 'runtime-call-graphs'
+            instance = campaign.Campaign(config)
+            case = self.case(); case['provenance']['callShapes'] = list(campaign.m2.CALL_SHAPES)
+            instance.summary['callShapeCoverage']['requiredShapes'] = list(campaign.m2.CALL_SHAPES)
+            instance.record_call_shapes(case, matched=True); instance.checkpoint()
+            self.assertEqual(instance.summary['callShapeCoverage']['missingShapes'], [])
+            self.assertFalse(campaign.missing_coverage(instance.summary))
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory))
+            self.assertNotIn('callShapeCoverage', instance.summary)
+            instance.record_call_shapes(function_case(1)); instance.checkpoint()
+            self.assertNotIn('callShapeCoverage', instance.summary)
+
+    def test_default_random_limits_and_explicit_limits_route_unchanged(self):
+        for extra, expected in (([], ['192', '1', '1024']), (['--nodes', '128', '--attempts', '7'], ['128', '1', '7'])):
+            with tempfile.TemporaryDirectory() as directory:
+                seen = []
+                def run(instance):
+                    instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                    instance.prepare_cases(); instance.summary['status'] = 'generation-exhausted'
+                with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory)/'run'),
+                        '--profile', 'runtime-call-graphs', '--cases', '1', *extra]),                         patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                    campaign.main()
+                self.assertEqual(seen, [['call-graph-generate', '1', *expected, '1000000']])
+
+    def test_call_graph_shrink_keeps_schema_backend_and_explicit_synthetic_separation(self):
+        for backend in campaign.m2.BACKENDS:
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.backend = 'runtime-call-graphs', backend
+                config.test_perturb_path = 'rustEvm'; config.upstream, config.target_dir = Path('/unused/u'), Path('/unused/t')
+                instance = campaign.Campaign(config); selected = []
+                original, candidate = self.case('255'), self.case('1')
+                def execute(args, report):
+                    selected.append(args.backend); report.update(matched(), backend=args.backend)
+                    campaign.save_json(args.output/'case.json', json.loads(args.case.read_text()))
+                with patch.object(campaign.m2, 'execute', side_effect=execute):
+                    folder, report, analysis = instance.execute_case(original)
+                    finding = instance.retain_finding(0, folder, original, report, analysis)
+                    instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
+                    instance.shrink(original, finding)
+                self.assertEqual(selected, [backend, backend])
+                history = json.loads((Path(directory)/finding['history']).read_text())
+                self.assertTrue(history['steps'][0]['accepted'])
+                self.assertEqual(history['steps'][0]['actualComparison']['category'], 'matched')
+                self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
+
+
 class CancellationTests(unittest.TestCase):
     def test_sigterm_stops_owned_process_and_saves_summary(self):
         with tempfile.TemporaryDirectory() as directory:

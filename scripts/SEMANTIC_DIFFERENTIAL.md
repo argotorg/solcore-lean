@@ -134,7 +134,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the eleven pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the twelve pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -379,6 +379,47 @@ Native commands are `primitive-generate SEED NODES COUNT ATTEMPTS FUEL` and
 `primitive-emit FUNCTION.json INPUT [FUEL]`; `replay`, `observe` and `shrink`
 dispatch the new schema. Use `replay` to authenticate a saved case; `observe`
 only executes its admitted Core program and does not authenticate saved source.
+
+## Compare directly generated call graphs
+
+`runtime-call-graphs` generates typed Word/Bool expressions with the runtime
+parameter already in scope. One to three helpers can call any earlier helper;
+the entry and arguments need not follow a fixed chain. Local bindings,
+conditionals and all scalar primitives are admitted. The original Core checker
+seals the complete graph, and the original Core application supplies the oracle.
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-call-graphs \
+  --backend sonatina-o0 --output .upstream/semantic-call-graphs-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-call-graphs \
+  --seed 20261026 --cases 16 --attempts 2048 \
+  --output .upstream/semantic-call-graphs-random
+```
+
+O2 and Yul use the same cases with their usual backend flags. The fixed corpus
+contains 56 cases with hand-specified Core results. It requires helper counts
+one through three, eight input boundaries and nine syntactic structures:
+skipped helpers, multiple callees, shared callees, nested calls, calls in
+branches and local bindings, a diamond, calls in predicates and primitive
+operands. `callShapeCoverage` records required, generated, matched and missing
+structures. Only completed matches satisfy coverage. The inventory includes
+all declared bodies; it does not claim an executed call trace or branch coverage.
+
+The default complete-program budget is 192 nodes, with 1,024 generation
+attempts. Explicit attempt limits override this default. The admitted budget
+range is 13–512 nodes; small budgets can exhaust generation because a generated
+entry must contain a call. Generated functions must also return varying values
+over the same eight inputs used by `runtime-primitives`. Imported functions
+may be constant. Attempts count graphs, while cases count individual inputs.
+
+`call-graph-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`call-graph-emit FUNCTION.json INPUT [FUEL]` produce the new case schema.
+Replay regenerates the original graph and body budgets, checks canonical
+source, input, versions and structural metadata, and recomputes Core results.
+Reduction retains the helper bindings, reseals every candidate and requires a
+strictly smaller complete application. Its failure identity and selected
+backend follow the ordinary campaign rules. The older chain-based profile
+below keeps its existing schema and generator unchanged.
 
 ## Compare acyclic named functions
 

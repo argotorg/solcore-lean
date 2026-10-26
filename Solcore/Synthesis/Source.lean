@@ -4,6 +4,8 @@ import Solcore.Synthesis.Source.Cases
 import Solcore.Synthesis.Source.InputCases
 import Solcore.Synthesis.Source.PrimitiveEmitter
 import Solcore.Synthesis.Source.PrimitiveCases
+import Solcore.Synthesis.Source.CallGraphEmitter
+import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.FunctionEmitter
 import Solcore.Synthesis.Source.FunctionCases
 import Solcore.Synthesis.Source.MutationEmitter

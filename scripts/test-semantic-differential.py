@@ -213,6 +213,56 @@ class PrimitiveProfileTests(unittest.TestCase):
                 runner.resolve_backend(other, {'backend': backend})
 
 
+class CallGraphProfileTests(unittest.TestCase):
+    def case(self, value=2):
+        case = CaseProfileTests().input_case(value)
+        case['schema'] = runner.CALL_GRAPH_CASE_SCHEMA
+        case['source'] = '// call graph admission fixture; no simulated execution'
+        case['provenance'].update({key: 'policy' for key in runner.CALL_GRAPH_VERSIONS})
+        case['provenance'].update(helperCount=2, callShapes=['nested-call', 'predicate-call'])
+        case['contract'].update(name='SynthesizedCallGraphs', deployPath=['SynthesizedCallGraphsDeploy'],
+            runtimePath=['SynthesizedCallGraphsDeploy', 'SynthesizedCallGraphs'])
+        return case
+
+    def test_call_graph_abi_versions_and_helper_count_are_required(self):
+        for value in (0, 1, 2, 255, 256, 2**256 - 1, 2**255, 2**255 - 1):
+            runner.validate_case(self.case(value))
+        for key in runner.CALL_GRAPH_VERSIONS:
+            case = self.case(); del case['provenance'][key]
+            with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+        for value in (None, True, 0, 4, '2'):
+            case = self.case(); case['provenance']['helperCount'] = value
+            with self.assertRaisesRegex(ValueError, 'helperCount'): runner.validate_case(case)
+        with self.assertRaisesRegex(ValueError, 'calldata differs'):
+            runner.validate_case({**self.case(), 'input': '1'})
+
+    def test_shapes_have_one_canonical_order_and_no_unknown_or_duplicate_items(self):
+        self.assertEqual(runner.CALL_SHAPES, ('skipped-helper', 'multiple-callees', 'shared-callee',
+            'nested-call', 'branch-call', 'local-call', 'diamond', 'predicate-call', 'primitive-operand-call'))
+        for values in ([], ['diamond'], list(runner.CALL_SHAPES)):
+            self.assertEqual(runner.validate_call_shapes(values), values)
+        for values in (None, {}, 'diamond', [1], ['recursive'], ['diamond', 'diamond'],
+                       ['predicate-call', 'nested-call']):
+            case = self.case(); case['provenance']['callShapes'] = values
+            with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_case(case)
+
+    def test_native_replay_must_authenticate_call_shape_claims_and_source(self):
+        case = self.case()
+        for key, value in [('source', case['source'] + 'changed'),
+            ('provenance', {**case['provenance'], 'callShapes': ['diamond']}),
+            ('provenance', {**case['provenance'], 'helperCount': 1})]:
+            with self.assertRaisesRegex(ValueError, 'case replay changed'):
+                runner.validate_replayed_case(case, {**case, key: value})
+        runner.validate_replayed_case({**case, 'directCore': {'word': 'fake'}}, case)
+
+    def test_call_graph_backend_receipts_keep_yul_and_linked_hull_distinct(self):
+        self.assertEqual(runner.CASE_CONTRACTS[runner.CALL_GRAPH_CASE_SCHEMA], 'SynthesizedCallGraphs')
+        for backend in runner.BACKENDS:
+            self.assertEqual(runner.resolve_backend(None, {'backend': backend}), backend)
+            self.assertEqual(runner.path_backends(backend)['importedHull'],
+                'sonatina-o0' if backend == 'yul' else backend)
+
+
 class ClassificationTests(unittest.TestCase):
     def test_three_completed_paths_required(self):
         actual = observations()

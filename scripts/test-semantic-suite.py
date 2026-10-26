@@ -43,10 +43,10 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_fourteen_profiles_match_real_manifests_and_campaign_families(self):
+    def test_fifteen_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 14)
-        self.assertEqual(sum(suite.requested(args, p) for p in args.profile if p != "runtime-primitives"), 312)
+        self.assertEqual(len(args.profile), 15)
+        self.assertEqual(sum(suite.requested(args, p) for p in args.profile if p not in ("runtime-primitives", "runtime-call-graphs")), 312)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         for profile in args.profile:
             command = suite.command(args, profile, self.directory / profile, 30, 64 * 1024**2)
@@ -87,6 +87,45 @@ class SuiteTests(unittest.TestCase):
             other = 'sonatina-o2' if backend != 'sonatina-o2' else 'yul'
             self.assertEqual(suite.classify(summary, 'runtime-primitives', 4, 0, backend=other), 'adapter-error')
 
+    def test_call_graph_matrix_counts_come_from_its_manifest(self):
+        self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
+            list(suite.adapter.CALL_SHAPES))
+        for backend, old_count, profile_count in (('sonatina-o0', 393, 15), ('sonatina-o2', 393, 15), ('yul', 357, 12)):
+            args = self.args('--backend', backend)
+            count = suite.requested(args, 'runtime-call-graphs')
+            self.assertGreater(count, 0)
+            self.assertEqual(len(args.profile), profile_count)
+            self.assertEqual(sum(suite.requested(args, p) for p in args.profile), old_count + count)
+            command = suite.command(args, 'runtime-call-graphs', self.directory/backend, 30, 64*1024**2)
+            self.assertEqual(command[command.index('--corpus')+1], str(suite.manifest('runtime-call-graphs')))
+            self.assertEqual(command[command.index('--backend')+1], backend)
+
+    def test_call_graph_random_defaults_preserve_legacy_and_explicit_attempts(self):
+        for backend in suite.adapter.BACKENDS:
+            args = self.args('--mode', 'random', '--backend', backend)
+            command = suite.command(args, 'runtime-call-graphs', self.directory/backend, 30, 64*1024**2)
+            self.assertEqual(command[command.index('--nodes')+1], '192')
+            self.assertEqual(command[command.index('--attempts')+1], '1024')
+            self.assertEqual('--solc' in command, backend == 'yul')
+            self.assertEqual(suite.profile_attempts(args, 'runtime-primitives'), 512)
+            explicit = self.args('--mode', 'random', '--attempts', '7')
+            command = suite.command(explicit, 'runtime-call-graphs', self.directory/'explicit', 30, 64*1024**2)
+            self.assertEqual(command[command.index('--attempts')+1], '7')
+            self.assertEqual(command[command.index('--seed')+1], str(suite.derived_seed(
+                explicit.seed, 'runtime-call-graphs', explicit.shard_index, explicit.shard_count, 7)))
+
+    def test_missing_call_shapes_prevent_suite_pass(self):
+        for backend in suite.adapter.BACKENDS:
+            summary = completed('runtime-call-graphs')
+            summary.update(backend=backend, callShapeCoverage={'missingShapes': []})
+            summary['configuration']['backend'] = backend
+            self.assertEqual(suite.classify(summary, 'runtime-call-graphs', 4, 0, backend=backend), 'passed')
+            summary['callShapeCoverage']['missingShapes'] = ['predicate-call']
+            self.assertEqual(suite.classify(summary, 'runtime-call-graphs', 4, 0, backend=backend), 'incomplete')
+            summary['callShapeCoverage']['missingShapes'] = []
+            summary['coverage']['missingHelperCounts'] = [3]
+            self.assertEqual(suite.classify(summary, 'runtime-call-graphs', 4, 0, backend=backend), 'incomplete')
+
     def test_backend_selection_reaches_every_campaign_family(self):
         self.assertEqual(self.args().backend, 'sonatina-o0')
         for backend in suite.adapter.BACKENDS:
@@ -97,10 +136,10 @@ class SuiteTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.args('--backend', 'unknown-backend')
 
-    def test_yul_defaults_to_all_eleven_pure_profiles_and_forwards_only_its_compiler(self):
+    def test_yul_defaults_to_all_twelve_pure_profiles_and_forwards_only_its_compiler(self):
         args = self.args('--backend', 'yul', '--solc', '/chosen/pinned-solc')
-        self.assertEqual(len(args.profile), 11)
-        self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile if profile != "runtime-primitives"), 276)
+        self.assertEqual(len(args.profile), 12)
+        self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile if profile not in ("runtime-primitives", "runtime-call-graphs")), 276)
         self.assertIn("runtime-primitives", args.profile)
         self.assertTrue(all(suite.PROFILES[profile][1] == 'pure' for profile in args.profile))
         for profile in args.profile:
@@ -108,7 +147,7 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 14)
+            self.assertEqual(len(sonatina.profile), 15)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -152,12 +191,12 @@ class SuiteTests(unittest.TestCase):
 
     def test_random_seeds_are_order_independent_reproducible_and_sharded(self):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
-        seeds = {p: suite.derived_seed(args.seed, p, 2, 4, args.attempts) for p in suite.PROFILES}
-        self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 14)
+        seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
+        self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
+        self.assertEqual(len(set(seeds.values())), 15)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
-        for seed in seeds.values():
-            self.assertLess(seed + args.attempts - 1, 1 << 64)
+        for profile, seed in seeds.items():
+            self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)
         command = suite.command(args, "runtime-loops", self.directory / "loop", 10, 64 * 1024**2)
         self.assertNotIn("--corpus", command)
         self.assertEqual(command[command.index("--seed") + 1], str(seeds["runtime-loops"]))

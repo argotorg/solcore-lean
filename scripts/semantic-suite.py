@@ -44,6 +44,7 @@ PROFILES = {
     "runtime-comptime": ("semantic-comptime", "pure", 384),
     "runtime-modules": ("semantic-module", "pure", 384),
     "runtime-primitives": ("semantic-primitive", "pure", 96),
+    "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "stateful-storage": ("semantic-storage", "storage", 384),
     "stateful-storage-rollback": ("semantic-storage-rollback", "storage", 384),
     "stateful-calls": ("semantic-call", "call", 384),
@@ -96,8 +97,15 @@ def requested(args, profile):
     return len(data["cases"])
 
 
+def profile_attempts(args, profile):
+    if profile == "runtime-call-graphs" and not getattr(args, "attempts_explicit", True):
+        return 1024
+    return args.attempts
+
+
 def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
+    attempts = profile_attempts(args, profile)
     if args.backend == "yul" and family != "pure":
         raise ValueError("Yul is restricted to pure profiles")
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else args.storage_case_tool,
@@ -111,10 +119,10 @@ def command(args, profile, output, seconds, disk_bytes):
         result += ["--solc", str(args.solc)]
     if args.mode == "fixed":
         # Never truncate a fixed corpus and call its missing coverage complete.
-        result += ["--corpus", str(manifest(profile)), "--attempts", str(max(args.attempts, requested(args, profile)))]
+        result += ["--corpus", str(manifest(profile)), "--attempts", str(max(attempts, requested(args, profile)))]
     else:
-        seed = derived_seed(args.seed, profile, args.shard_index, args.shard_count, args.attempts)
-        result += ["--seed", str(seed), "--nodes", str(args.nodes or nodes), "--cases", str(args.cases), "--attempts", str(args.attempts)]
+        seed = derived_seed(args.seed, profile, args.shard_index, args.shard_count, profile_attempts(args, profile))
+        result += ["--seed", str(seed), "--nodes", str(args.nodes or nodes), "--cases", str(args.cases), "--attempts", str(attempts)]
     return result
 
 
@@ -304,7 +312,7 @@ class Suite:
             if args.mode == "fixed":
                 row.update(manifest=str(manifest(profile).relative_to(ROOT)), manifestSha256=digest(manifest(profile)))
             else:
-                row.update(seed=str(derived_seed(args.seed, profile, args.shard_index, args.shard_count, args.attempts)), attempts=args.attempts)
+                row.update(seed=str(derived_seed(args.seed, profile, args.shard_index, args.shard_count, profile_attempts(args, profile))), attempts=profile_attempts(args, profile))
             self.report["profiles"].append(row)
             self.report["unexecutedProfiles"] = args.profile[index + 1:]
             self.checkpoint()
@@ -356,13 +364,14 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default fourteen for Sonatina, eleven pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default fifteen for Sonatina, twelve pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
     parser.add_argument("--cases", type=int, help="random cases per profile (default 4); fixed mode always uses the entire manifest")
     parser.add_argument("--nodes", type=int, help="override random node budget; otherwise profile-specific defaults")
-    defaults = {"attempts": 512, "seconds": 7200., "profile_seconds": 900., "disk_bytes": 1024**3,
+    parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles")
+    defaults = {"seconds": 7200., "profile_seconds": 900., "disk_bytes": 1024**3,
                 "profile_disk_bytes": 256 * 1024**2, "output_limit": 8 * 1024**2, "cleanup_seconds": 10.,
                 "case_timeout": 90., "direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000,
                 "shrink_attempts": 16, "shrink_candidates": 64}
@@ -378,6 +387,8 @@ def parse_args(argv=None):
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     args = parser.parse_args(argv)
+    args.attempts_explicit = args.attempts is not None
+    args.attempts = 512 if args.attempts is None else args.attempts
     if args.mode == "fixed" and (args.cases is not None or args.nodes is not None):
         parser.error("--cases and --nodes apply only to random mode; fixed corpora must remain complete")
     args.cases = args.cases if args.cases is not None else 4

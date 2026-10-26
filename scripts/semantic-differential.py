@@ -34,6 +34,10 @@ bundle_transport = importlib.util.module_from_spec(_bundle_spec)
 _bundle_spec.loader.exec_module(bundle_transport)
 CASE_SCHEMA = "solcore-lean.semantic-case.v1"
 INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
+CALL_GRAPH_CASE_SCHEMA = "solcore-lean.semantic-call-graph-case.v1"
+CALL_SHAPES = ("skipped-helper", "multiple-callees", "shared-callee", "nested-call",
+               "branch-call", "local-call", "diamond", "predicate-call", "primitive-operand-call")
+CALL_GRAPH_VERSIONS = ("profileVersion", "functionVersion", "boundaryVersion", "callShapeVersion")
 PRIMITIVE_CASE_SCHEMA = "solcore-lean.semantic-primitive-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
@@ -44,12 +48,12 @@ CLOSURE_CASE_SCHEMA = "solcore-lean.semantic-closure-case.v1"
 COMPTIME_CASE_SCHEMA = "solcore-lean.semantic-comptime-case.v1"
 MODULE_CASE_SCHEMA = "solcore-lean.semantic-module-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
-                 PRIMITIVE_CASE_SCHEMA: "runtime-primitives",
+                 PRIMITIVE_CASE_SCHEMA: "runtime-primitives", CALL_GRAPH_CASE_SCHEMA: "runtime-call-graphs",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
                  AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
-                  PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives",
+                  PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
                   AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules"}
@@ -265,6 +269,14 @@ def validate_module_plan(plan) -> dict:
     return plan
 
 
+def validate_call_shapes(values, label="callShapes") -> list[str]:
+    """Native replay authenticates these AST labels; Python checks their envelope."""
+    if (not isinstance(values, list) or any(not isinstance(v, str) or v not in CALL_SHAPES for v in values)
+            or values != [v for v in CALL_SHAPES if v in values]):
+        raise ValueError(f"{label} must be a canonical unique call-shape inventory")
+    return values
+
+
 def validate_case(case: dict) -> None:
     if not isinstance(case, dict) or case.get("schema") not in CASE_PROFILES:
         raise ValueError("unsupported semantic case schema")
@@ -294,6 +306,13 @@ def validate_case(case: dict) -> None:
                     "baseGeneratorVersion", "boundaryVersion"):
             if not isinstance(provenance.get(key), str) or not provenance[key]:
                 raise ValueError(f"missing primitive provenance {key}")
+    if case["schema"] == CALL_GRAPH_CASE_SCHEMA:
+        for key in CALL_GRAPH_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing call-graph provenance {key}")
+        if type(provenance.get("helperCount")) is not int or not 1 <= provenance["helperCount"] <= 3:
+            raise ValueError("call-graph helperCount must be an integer from one to three")
+        validate_call_shapes(provenance.get("callShapes"))
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -629,6 +648,7 @@ def execute(args, report: dict) -> None:
         CASE_SCHEMA: "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word",
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
         PRIMITIVE_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations, Sonatina O0, run(uint256) ABI Word",
+        CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated acyclic Word helper graphs, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
