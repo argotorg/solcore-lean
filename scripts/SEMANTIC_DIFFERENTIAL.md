@@ -1070,6 +1070,137 @@ one child, valid Word calldata, fixed initial balances and slots zero/one.
 Gas/nonce equivalence, precompiles, arbitrary accounts and deeper calls remain
 outside this profile.
 
+## Compare keyed storage transactions
+
+The `stateful-keyed-storage` profile is the first state/ABI extension. Each
+transaction calls `SynthesizedKeyedStorage.run(uint256 key, uint256 input)`,
+selector `0x7357f5d2`, with exactly two ABI Words. The key selects an arbitrary
+full-width slot. The contract reads `old = sload(key)` and the counter
+`count = sload(0)`, computes `step(input + old)` with the checked aggregate
+step, then writes, in this order:
+
+| Order | Slot | Value |
+| --- | --- | --- |
+| 1 | `key` | the step result |
+| 2 | `key + 1`, wrapping | `old` |
+| 3 | `0` (counter) | `count + 1` |
+
+It rereads all three slots and returns their wrapped sum. An odd input reverts
+after those writes and rereads, with the same Word as a 32-byte payload, so the
+committed world keeps its predecessor. Later writes win when slots alias: key
+zero is the counter, key maximum's successor wraps to the counter, and a
+transaction may read another transaction's key or successor slot. The original
+Core contract uses `wordOutcomeV1`; `ContractRuntime` commits or rolls back.
+
+Observations are declared by the case, not discovered from one path.
+`observedSlots` is the sorted, duplicate-free set containing the counter and
+every transaction's key and wrapping successor. All three paths report status,
+payload and the committed value of every declared slot after every transaction.
+Original Core reads them from the public committed world; the Rust EVM path
+uses `eth_getStorageAt` at each receipt block; imported Hull reads its committed
+entries. Because Core's account storage is not enumerable, slots outside the
+declaration are checked only on the two executable paths: the Hull runner
+reports every nonzero committed slot outside it, and the EVM path asks Anvil's
+`prestateTracer` in diff mode for each mined transaction's (and the
+deployment's) changed slots, then rereads those outside the declaration at the
+receipt block. A nonzero undeclared slot on either path is a semantic mismatch
+(`undeclaredStorage`, with `undeclaredPaths`). A diff that changes another
+account's storage fails closed as an adapter error. The deployment must leave
+every declared slot zero and no undeclared nonzero slot.
+
+Build the native tools and generate a case:
+
+```sh
+lake build semanticKeyedStorageTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-keyed-storage-cases
+.lake/build/bin/semantic-keyed-storage-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-keyed-storage-cases/corpus.json
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the two-slot tools. Plans use `solcore-lean.keyed-storage-plan.v1`
+under the case field `keyedStoragePlan`; cases use
+`solcore-lean.semantic-keyed-storage-case.v1`. Transactions are
+`{id, key, input, calldata, value}` with canonical decimal Words, the selector
+followed by both Words, and zero value. Bindings reuse
+`solcore-lean.storage-bindings.v1`. Existing storage, rollback and call schemas,
+plans and saved cases are unchanged.
+
+Generation reuses the aggregate step generator, so most attempts are ordinary
+exclusions of operators the source renderer does not admit; 207 of the first
+3,000 seeds at the default 384-node budget were accepted.
+Three transactions draw keys from a six-entry bank (zero, one, the high bit, a
+full-width pattern, maximum minus one and maximum), inputs from the six storage
+boundaries adjusted to a prescribed parity, and one of four completion patterns
+(all return, or one revert in the first, second or third position). These
+choices use the high halves of draws from a separate stream, so they do not
+correlate with the step seed's helper and template digits. Generated scenarios
+must complete with exactly the prescribed outcomes under original Core.
+Imported and reduced scenarios may use any one to three transactions.
+
+Reduction simplifies the checked step (keeping every helper and binder),
+removes transactions while keeping stable IDs, and replaces one input or key by
+a bank value. The order is transaction count, complete program complexity, then
+the sum of all keys and inputs. Every candidate rederives its observed slots,
+so a reduction that drops the slot of a finding cannot preserve that finding.
+
+```sh
+python3 scripts/semantic-storage-differential.py \
+  --case .upstream/semantic-keyed-storage-cases/case.json \
+  --output .upstream/semantic-keyed-storage-cases/run
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-keyed-storage-corpus.json \
+  --output .upstream/semantic-keyed-storage-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-keyed-storage \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-keyed-random
+```
+
+The storage runner and campaign select the keyed native tool, Hull runner and
+comparison rules from the case or manifest profile. `--backend sonatina-o2`
+works as for the other storage profiles; Yul is rejected. The synthetic
+adapter accepts `--test-field storage:SLOT` for any declared decimal slot of
+the original scenario; a candidate that no longer declares that slot is an
+ordinary, non-preserving analysis. Fingerprints name differing slots and, for
+this profile, the paths with undeclared storage.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans
+and four generated seeds. Its expected histories were computed outside Lean by
+a separate evaluator of the step programs and a direct model of the protocol;
+`Tests/Main.lean` registers a validator that compares every status, payload
+and declared committed slot with original Core and rejects tampered entries.
+Required coverage is all 21 step AST features in the corpus, the six inputs,
+the six bank keys, one to three helpers and transactions, all four generator
+templates, both outcomes, six completion patterns and four static alias kinds:
+`key-counter`, `successor-counter`, `repeated-key` and `successor-key`. Alias
+kinds describe the transaction keys; they do not claim an aliasing write was
+committed or that a particular opcode was executed.
+
+Local validation used committed code with frozen scripts and native tools.
+The fixed suite matched all twelve scenarios and 33 transaction prefixes on
+Sonatina O0 and O2, with complete coverage, in 69.7 and 69.6 seconds. The
+recorded random suite (root seed `20261026`, sixteen cases, 2,048 attempts)
+accepted sixteen scenarios from 196 attempts, with 180 ordinary generation
+exclusions and no resource exclusions. All sixteen scenarios and 48 prefixes
+matched on both levels in 92.5 and 92.4 seconds; they covered all four
+completion patterns and alias kinds. Neither run produced a finding.
+
+A copied `importedHull` difference in slot one at `tx-1` of the counter-alias
+corpus scenario was reduced on each level to that one transaction with key and
+input zero: four accepted reductions in five candidate executions, all of whose
+actual comparisons matched. The original and reduced archives replayed exactly
+with three-way agreement (four replays), and fresh synthetic replays reproduced
+the same fingerprint. Core or Hull fuel one was classified as inconclusive. The
+two existing storage profiles still matched all 22 fixed scenarios and 60
+prefixes on each level with the extended adapter, and the eight existing native
+tools kept their hashes. Changing the shared adapter does invalidate exact
+replay of earlier storage archives, as for any adapter change.
+
+This profile does not compare gas, balances, nonces, logs or code, nor
+malformed calldata, Solidity-style hashed mapping layouts, dynamic ABI values,
+multiple callers or nonzero call value. Undeclared-slot containment is checked
+on the Hull and EVM paths only. Agreement in these runs is test evidence, not
+a preservation proof.
+
 
 ## Compare generic selection
 

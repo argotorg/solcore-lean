@@ -162,7 +162,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same seventeen-profile suite runs locally with shared time and disk limits.
+The same eighteen-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -236,6 +236,16 @@ All fourteen fixed call scenarios and 38 transaction prefixes match, and log
 differences survive failure-preserving reduction and replay. M5 is complete for
 these restricted profiles. Gas and nonce equivalence, arbitrary storage/accounts,
 precompiles and deeper calls are outside these comparisons.
+
+The keyed-storage profile extends the two-slot protocol to a two-Word ABI input
+whose key selects an arbitrary slot. Each call writes the key slot, its wrapping
+successor and a counter slot, so keys can alias the counter and one another;
+odd inputs revert. Every case declares the slots it observes, and the Hull and
+EVM paths must also show no nonzero committed slot outside them. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-keyed-storage-transactions).
+All twelve fixed scenarios and 33 transaction prefixes match on Sonatina O0 and
+O2, as do the sixteen recorded random scenarios. A slot difference survives
+failure-preserving reduction to one transaction and exact archive replay.
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases

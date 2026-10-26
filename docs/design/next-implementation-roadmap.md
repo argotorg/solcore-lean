@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage extension validated locally; dynamic ABI values pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity and SHA-256 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -555,6 +555,64 @@ call profiles to selected dynamic ABI values and richer account/storage or
 transaction behaviors. Define committed observations, rollback, deployment and
 sequence reduction before enabling each feature. Gas-sensitive equivalence,
 precompiles and arbitrary external accounts require separate explicit scopes.
+
+The first extension, `stateful-keyed-storage`, is connected to the native case
+tool, the storage adapter and campaign, and the suite as an eighteenth profile.
+Its definitions were fixed before execution:
+
+- Transactions: one to three zero-value calls of `run(uint256 key, uint256
+  input)` with exactly two ABI Words; malformed calldata is outside the scope.
+- Effects: write the key slot, its wrapping successor, then counter slot zero,
+  so later writes win when keys alias the counter or each other; reread all
+  three. Odd inputs revert with the tentative sum after the writes.
+- Committed observations: status, payload and the committed values of the
+  declared slots (counter, keys and successors, derived from the transactions)
+  after every transaction on all three paths. Because Core account storage is
+  not enumerable, the Hull and EVM paths additionally must show no nonzero
+  committed slot outside the declaration (committed entries and Anvil's
+  prestate diffs reread at each receipt block).
+- Rollback: a revert keeps the prior committed snapshot on every path, chosen
+  by `ContractRuntime` for original Core.
+- Deployment: empty constructor and zero value; every declared slot is zero and
+  no undeclared slot is nonzero afterwards. Original Core starts from the
+  declared post-deployment world.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, and bank replacements of one input or key, ordered by transaction count,
+  program complexity and the sum of keys and inputs. Candidates rederive their
+  slots; a candidate that no longer declares a finding's slot cannot keep it.
+
+Original Core uses the checked `wordOutcomeV1` contract convention; the
+emitter, observer, Hull runner and campaign rules are separate versioned
+modules, and existing schemas, saved cases and native tool hashes are
+unchanged. Generation reuses the aggregate step generator and draws keys from
+a six-entry bank, parity-adjusted inputs and one of four completion patterns
+from a separate high-bit stream. The fixed corpus has twelve scenarios (eight
+imported, four generated) and 33 transactions. Its histories were computed
+outside Lean by a separate evaluator and protocol model; a registered Lean
+validator confirmed every status, payload and declared slot against original
+Core and rejected tampered entries. Coverage includes 21 step features, six
+inputs, six keys, one to three helpers and transactions, four templates, six
+completion patterns and four static alias kinds.
+
+The full Lean build (9,934 jobs), registered tests, semantic-kernel policy and
+the full Python policy suite (462 tests) passed. The fixed suite matched all 12
+scenarios and 33 prefixes on Sonatina O0 and O2 (69.7 and 69.6 seconds). Random
+seed `20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios
+from 196 attempts, with 180 ordinary exclusions and no resource exclusions; all
+sixteen and 48 prefixes matched on both levels (92.5 and 92.4 seconds), with
+no finding. A copied Hull slot difference reduced a three-transaction alias
+scenario to one transaction on each level (eight accepted reductions in ten
+actual candidate executions); original and reduced archives replayed exactly
+with agreement (four replays) and synthetic fingerprints reproduced. Core or
+Hull fuel one was inconclusive. The two-slot storage and rollback profiles
+still matched all 22 fixed scenarios on both levels. Yul remains restricted to
+pure profiles. Hosted CI has not been run.
+
+This scope does not compare gas, balances, nonces, logs or code, multiple
+callers, nonzero call value or hashed mapping layouts. Agreement is test
+evidence, not a preservation proof. Selected dynamic ABI values are the next
+extension, then account or transaction behaviors, each with its own
+observation, rollback, deployment and reduction definitions.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
