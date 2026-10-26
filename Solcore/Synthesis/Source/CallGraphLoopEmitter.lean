@@ -5,7 +5,9 @@ import Solcore.Synthesis.Source.PrimitiveEmitter
 /-! Emit a bounded source while loop around a scalar call-graph step. Helpers
 and the arbitrary entry use the call-graph renderer and raw primitive aliases;
 the entry is always `sc_step`. The older aggregate loop emitter is unchanged.
-Source-printing preservation is tested, not formally asserted. -/
+`ScalarMeaning.CallGraphLoop.emit_source_meaning` relates the emitted text to
+the original Core result under an independent fuel-indexed loop semantics; see
+`docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.CallGraphLoop

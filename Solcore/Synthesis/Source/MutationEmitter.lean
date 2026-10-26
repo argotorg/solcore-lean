@@ -1,7 +1,9 @@
 import Solcore.Synthesis.Source.MutationRenderer
 
 /-! Source mutation uses only private Word locals. The same original Core DAG
-drives the independent runtime result; printer preservation is tested separately. -/
+drives the independent runtime result. `ScalarMeaning.Mutation.emit_source_meaning`
+relates the emitted text to the original Core result under an independent
+source semantics; see `docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Mutation

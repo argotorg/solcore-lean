@@ -3,7 +3,8 @@ import Solcore.Synthesis.Source.ScalarRenderer
 
 /-! Named helper emission for checked acyclic Word-function graphs. Helpers
 keep their Core declaration order and can call only earlier declarations.
-The printer remains independently tested, not a proved compilation pass. -/
+`ScalarMeaning.Function.emit_source_meaning` relates the emitted text to the original Core result under an independent
+source semantics; see `docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Function

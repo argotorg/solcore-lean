@@ -139,9 +139,9 @@ Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
 connects the closed, runtime-input, named-helper, raw-primitive, call-graph,
-private-mutation, Word-aggregate and aggregate call-graph emitters' text to
-Core under an independent source semantics and a stated Rust-pipeline
-boundary.
+private-mutation, Word-aggregate, aggregate call-graph and call-graph loop
+emitters' text to Core under an independent source semantics and a stated
+Rust-pipeline boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A
@@ -164,7 +164,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same twenty-one-profile suite runs locally with shared time and disk limits.
+The same twenty-two-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -290,6 +290,17 @@ scenarios and sixteen recorded random scenarios match on both Sonatina levels,
 with reduction of transactions, values and the deployment value and exact
 archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nonzero-call-value).
+
+The bytes profile adds one bounded dynamic `bytes` value: `run(uint256 flags,
+bytes payload)` with 0 to 64 bytes in the canonical head/tail encoding with
+zero padding. The pinned dialect decodes `bytes` only into memory; original
+Core reads the calldata directly. The contract folds each present 32-byte
+chunk through the checked step, recording each result in its own slot, and
+records the payload length and last byte; odd flags revert. Its twelve fixed
+scenarios and sixteen recorded random scenarios match on both Sonatina levels,
+with reduction of transactions, payloads and the step and exact archive
+replay. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-dynamic-bytes).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases
