@@ -139,8 +139,9 @@ Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
 connects the closed, runtime-input, named-helper, raw-primitive, call-graph,
-private-mutation and Word-aggregate emitters' text to Core under an independent
-source semantics and a stated Rust-pipeline boundary.
+private-mutation, Word-aggregate and aggregate call-graph emitters' text to
+Core under an independent source semantics and a stated Rust-pipeline
+boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A
@@ -163,7 +164,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same twenty-profile suite runs locally with shared time and disk limits.
+The same twenty-one-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -275,6 +276,20 @@ decodes. Its twelve fixed scenarios match on both Sonatina levels, as do the
 sixteen recorded random scenarios on O0. On O2 fifteen match and one crashes
 the compiler, a retained finding. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-committed-event-logs).
+
+The call-value profile sends value with each transaction and makes the
+contract's own committed balance an observation. The payable `run(uint256
+flags, uint256 input)` reads the value through the pinned `std.opcodes`
+`callvalue` wrapper, folds it into the checked step's input and accumulates
+accepted value in a second slot; odd flags revert, which must refund the value.
+Original Core runs each call in its balanced top-level execution, which
+transfers the value before the call. The contract is deployed with a recorded
+value of 0 or 5, and every committed balance must equal that value plus the
+accepted total; the sender's balance is not observed. Its twelve fixed
+scenarios and sixteen recorded random scenarios match on both Sonatina levels,
+with reduction of transactions, values and the deployment value and exact
+archive replay. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nonzero-call-value).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases

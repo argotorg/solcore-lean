@@ -24,7 +24,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-offline and the twelve native Lean tools in one Lake invocation. Existing
+offline and the fourteen native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -59,8 +59,8 @@ builds Rust and Lean tools; solc is supplied and checked separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 678 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 678 | Sonatina O2 | Sonatina O2 |
+| `sonatina-o0` | 690 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 690 | Sonatina O2 | Sonatina O2 |
 | `yul` | 595, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
@@ -68,9 +68,9 @@ linked layout is not supplied to the Hull importer. Its pure result can still
 be compared with both other paths; code-dependent and stateful Yul observations
 remain unsupported. Reports record this distinction in `pathBackends`.
 
-The default selection is all twenty profiles: fourteen pure profiles, storage,
-storage rollback, parent/child calls, keyed storage, dynamic arrays and event
-logs. Fixed mode runs all 678 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
+The default selection is all twenty-one profiles: fourteen pure profiles,
+storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
+event logs and call value. Fixed mode runs all 690 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
 than silently truncating required coverage. Repeat `--profile NAME` to select a
 smaller suite.
 

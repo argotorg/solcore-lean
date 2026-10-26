@@ -5,7 +5,9 @@ import Solcore.Synthesis.Source.PrimitiveEmitter
 /-! Emission of checked Word-function graphs that compose pairs, sums,
 projections and case payload scopes with helper calls. Helpers keep their Core
 declaration order and can call only earlier declarations; their arguments and
-results remain Words. The printer is independently tested, not proved. -/
+results remain Words. `ScalarMeaning.AggregateCallGraph.emit_source_meaning`
+relates the emitted text to the original Core result under an independent
+source semantics; see `docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.AggregateCallGraph
