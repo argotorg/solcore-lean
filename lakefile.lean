@@ -55,3 +55,7 @@ lean_exe semanticKeyedStorageTool where
 lean_exe rustHullKeyedStorageScenario where
   root := `Tests.RustHullKeyedStorageScenarioRun
   exeName := "rust-hull-keyed-storage-scenario"
+
+lean_exe semanticDynamicArrayTool where
+  root := `Tests.SemanticDynamicArrayTool
+  exeName := "semantic-dynamic-array-tool"

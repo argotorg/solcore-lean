@@ -2151,6 +2151,9 @@ import Solcore.Test.RustHullPrecompileCorrespondence
 import Solcore.Test.SourceKeyedStorageEmitter
 import Solcore.Test.SourceKeyedStorageCases
 import Solcore.Test.SourceKeyedStorageCorpus
+import Solcore.Test.SourceDynamicArrayEmitter
+import Solcore.Test.SourceDynamicArrayCases
+import Solcore.Test.SourceDynamicArrayCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4096,5 +4099,8 @@ def main : IO UInt32 := do
   Tests.SourceKeyedStorageEmitter.testSourceKeyedStorageEmitter
   Tests.SourceKeyedStorageCases.testSourceKeyedStorageCases
   Tests.SourceKeyedStorageCorpus.testSourceKeyedStorageCorpus
+  Tests.SourceDynamicArrayEmitter.testSourceDynamicArrayEmitter
+  Tests.SourceDynamicArrayCases.testSourceDynamicArrayCases
+  Tests.SourceDynamicArrayCorpus.testSourceDynamicArrayCorpus
   IO.println "solcore-lean tests passed"
   return 0
