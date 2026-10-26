@@ -43,6 +43,8 @@ LOG_CASE_SCHEMA = "solcore-lean.semantic-log-case.v1"
 LOG_HISTORY_SCHEMA = "solcore-lean.log-history.v1"
 VALUE_CASE_SCHEMA = "solcore-lean.semantic-call-value-case.v1"
 VALUE_HISTORY_SCHEMA = "solcore-lean.call-value-history.v1"
+BYTES_CASE_SCHEMA = "solcore-lean.semantic-bytes-case.v1"
+BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -87,6 +89,13 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.value-contract-scenario.v1", "historySchema": VALUE_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "value", "balances": True, "deploymentLogs": True},
+    "stateful-bytes": {"caseSchema": BYTES_CASE_SCHEMA, "planSchema": "solcore-lean.bytes-plan.v1",
+        "planKey": "bytesPlan", "corpusSchema": "solcore-lean.semantic-bytes-corpus.v1",
+        "originKind": "bytes-generated", "contract": "SynthesizedBytes",
+        "caseTool": "semantic-bytes-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": BYTES_HISTORY_SCHEMA,
+        "signature": "run(uint256,bytes)", "selector": "0x220eb9b6", "rollback": True, "keyed": False,
+        "declared": True, "abi": "bytes"},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
@@ -104,6 +113,8 @@ VALUE_SLOTS = ["0", "1"]
 # Every value, including the deployment value, and a scenario's total stay
 # within the funded local sender; original Core and Hull fund the caller with 2^80.
 MAX_VALUE, MAX_TOTAL, CALLER_FUNDS = 2**70, 2**72, 2**80
+BYTES_SLOTS = ["0", "1", "2", "3", "4"]
+MAX_PAYLOAD = 64
 RESOURCE_STATUSES = {"out-of-fuel", "out-of-gas", "timeout", "resource-limit", "output-limit"}
 Finding, RpcError = common.Finding, common.RpcError
 
@@ -122,7 +133,7 @@ def profile(case: dict) -> dict:
 
 def expected_status(case: dict, transaction: dict) -> str:
     """The profile fixes completion polarity, not the returned value or world."""
-    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value") else "input"]
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value", "bytes") else "input"]
     return "reverted" if profile(case)["rollback"] and int(common.word(parity)) % 2 else "returned"
 
 
@@ -153,6 +164,49 @@ def expected_balance(case: dict, row: dict) -> str:
     """Committed balance the protocol implies: deployment value plus slot one."""
     accepted = next(int(entry["value"]) for entry in row["committedStorage"] if entry["slot"] == "1")
     return str((deployment_value(case) + accepted) % 2**256)
+
+
+def has_bytes(case: dict) -> bool:
+    return profile(case)["abi"] == "bytes"
+
+
+def payload(transaction: dict) -> bytes:
+    """A bytes transaction's payload: 0..64 bytes as canonical lowercase hex."""
+    text = transaction.get("payload") if isinstance(transaction, dict) else None
+    if not isinstance(text, str) or not re.fullmatch(r"0x(?:[0-9a-f]{2}){0,%d}" % MAX_PAYLOAD, text):
+        raise ValueError("bytes payloads carry 0..64 bytes as canonical lowercase hexadecimal")
+    return bytes.fromhex(text[2:])
+
+
+def bytes_calldata(selector: str, flags: int, data: bytes) -> str:
+    """Canonical head/tail ABI: flags, tail offset 64, length, payload, zero padding."""
+    padded = data + bytes(-len(data) % 32)
+    return selector + f"{flags:064x}{64:064x}{len(data):064x}" + padded.hex()
+
+
+def payload_chunks(transaction: dict) -> list[int]:
+    """The zero-padded 32-byte chunk Words the step folds."""
+    data = payload(transaction)
+    return [int.from_bytes((data[start:start + 32] + bytes(32))[:32], "big") for start in range(0, len(data), 32)]
+
+
+def bytes_fields(transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a completed row that break the bytes protocol: a returned
+    transaction adds its payload length to slot three, leaves its last byte
+    (zero when empty) in slot four and returns the committed slots zero, three
+    and four plus its calldata size. A revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    data = payload(transaction)
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after["3"] != (before["3"] + len(data)) % 2**256 or after["4"] != (data[-1] if data else 0):
+        fields.append("committedStorage")
+    size = 100 + len(data) + -len(data) % 32
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after["3"] + after["4"] + size) % 2**256:
+        fields.append("output")
+    return fields
 
 
 def log_sites(case: dict) -> list[dict]:
@@ -214,6 +268,10 @@ def scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_bytes(case):
+        return ("ordered zero-value run(uint256,bytes) transactions with canonical, zero-padded 0..64-byte payloads; "
+                "initially empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on "
+                "Hull/EVM; no gas/balance/nonce or memory equivalence")
     if has_balances(case):
         return ("ordered value-bearing payable run(uint256,uint256) transactions after a funded payable deployment; "
                 "committed slots 0/1 and the contract's committed balance on all paths and no nonzero undeclared slot on "
@@ -258,6 +316,11 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != expected or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
+        if selected["abi"] == "bytes":
+            expected = bytes_calldata(selected["selector"], int(common.word(tx.get("flags"), "transaction flags")), payload(tx))
+            if tx.get("calldata") != expected or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
+            continue
         value = int(common.word(tx.get("input"), "transaction input"))
         prefix = {"keyed": "key", "flags": "flags", "value": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
@@ -286,6 +349,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "bytes":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_SLOTS:
+            raise Finding("unsupported-scope", "input", "bytes profile starts empty and observes slots zero through four")
     elif selected["abi"] == "flags":
         log_sites(case)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != LOG_SLOTS:
@@ -429,10 +495,13 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     """The fixed protocol of a completed row: polarity, a one-Word payload,
     rollback of the committed slots and, for logs, the static log shapes from
     the contract address; a reverted row commits no logs. For call value, the
-    balance is the deployment value plus slot one and a revert keeps it."""
+    balance is the deployment value plus slot one and a revert keeps it. For
+    bytes, a returned row records its payload length, last byte and sum."""
     if row["status"] != expected_status(case, tx) or len(common.hex_bytes(row["output"], "output")) != 32:
         return False
     if row["status"] == "reverted" and row["committedStorage"] != prior:
+        return False
+    if has_bytes(case) and bytes_fields(tx, row, prior):
         return False
     if has_balances(case) and (row["committedBalance"] != expected_balance(case, row) or
                                (row["status"] == "reverted" and row["committedBalance"] != prior_balance)):
@@ -519,6 +588,13 @@ def compare(histories: dict, case: dict) -> dict:
             if not refunded and "committedBalance" not in fields:
                 fields.append("committedBalance")
             normal = normal and refunded
+        if has_bytes(case):
+            # A returned row records its payload length and last byte and returns
+            # the committed sum; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in bytes_fields(tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
         if has_logs(case):
             # Static shapes cover rollback: an expected revert commits no logs.
             shaped = all(log_shapes(row["logs"]) == expected_log_shapes(case, tx) and

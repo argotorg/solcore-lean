@@ -55,6 +55,9 @@ LOG_DIMENSIONS = DIMENSIONS + tuple(LOG_EXTRA)
 # Call values, the values reverted transactions must refund, and deployment values.
 VALUE_EXTRA = ("Values", "RevertedValues", "DeploymentValues")
 VALUE_DIMENSIONS = DIMENSIONS + VALUE_EXTRA
+# Payload lengths, and those of reverted transactions, whose slot writes rollback discards.
+BYTES_EXTRA = {"PayloadLengths": tuple(range(adapter.MAX_PAYLOAD + 1)), "RevertedPayloadLengths": tuple(range(adapter.MAX_PAYLOAD + 1))}
+BYTES_DIMENSIONS = DIMENSIONS + tuple(BYTES_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -62,7 +65,8 @@ TEST_FIELD = re.compile(r"output|log|balance|storage:(?:0|[1-9][0-9]{0,77})")
 
 
 def dimensions(profile_name):
-    return {"keyed": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS, "value": VALUE_DIMENSIONS}.get(
+    return {"keyed": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS, "value": VALUE_DIMENSIONS,
+            "bytes": BYTES_DIMENSIONS}.get(
         adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
 
 
@@ -71,6 +75,13 @@ def value_coverage(case, statuses):
     return {"Values": {tx["value"] for tx in case["transactions"]},
             "RevertedValues": {tx["value"] for tx, status in zip(case["transactions"], statuses) if status == "reverted"},
             "DeploymentValues": {str(adapter.deployment_value(case))}}
+
+
+def bytes_coverage(case, statuses):
+    """Payload lengths, and the lengths of reverted payloads."""
+    lengths = [len(adapter.payload(tx)) for tx in case["transactions"]]
+    return {"PayloadLengths": set(lengths),
+            "RevertedPayloadLengths": {length for length, status in zip(lengths, statuses) if status == "reverted"}}
 
 
 def versions(profile_name):
@@ -93,9 +104,12 @@ def log_coverage(case, statuses, rows=None):
 
 
 def inputs(case):
-    """Runtime Words: the ABI input, or every element of the dynamic arrays."""
+    """Runtime Words: the ABI input, every element of the dynamic arrays, or
+    every zero-padded payload chunk the bytes step folds."""
     if adapter.profile(case)["abi"] == "array":
         return {value for tx in case["transactions"] for value in tx["values"]}
+    if adapter.has_bytes(case):
+        return {str(chunk) for tx in case["transactions"] for chunk in adapter.payload_chunks(tx)}
     return {tx["input"] for tx in case["transactions"]}
 
 
@@ -216,6 +230,13 @@ def validate_manifest(manifest):
                 common.word(value, "required " + dimension)
     elif any("required" + dimension in manifest for dimension in VALUE_EXTRA):
         raise ValueError("value coverage belongs to the call-value profile")
+    if selected["abi"] == "bytes":
+        for dimension, allowed in BYTES_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"bytes coverage requires unique required{dimension} from zero to 64")
+    elif any("required" + dimension in manifest for dimension in BYTES_EXTRA):
+        raise ValueError("payload coverage belongs to the bytes profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -352,7 +373,7 @@ def keyed_analysis(analysis):
     histories = analysis.get("histories", {})
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
-                                                adapter.VALUE_HISTORY_SCHEMA)
+                                                adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -488,6 +509,8 @@ class Campaign:
             values.update(log_coverage(case, statuses, histories["directCore"]["transactions"] if prefix == "matched" else None))
         elif self.specification["abi"] == "value":
             values.update(value_coverage(case, statuses))
+        elif self.specification["abi"] == "bytes":
+            values.update(bytes_coverage(case, statuses))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -531,7 +554,8 @@ class Campaign:
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
-        for dimension in {"keyed": ("Keys", "Aliases"), "array": ("Lengths",), "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA}.get(self.specification["abi"], ()):
+        for dimension in {"keyed": ("Keys", "Aliases"), "array": ("Lengths",), "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA,
+                          "bytes": tuple(BYTES_EXTRA)}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []

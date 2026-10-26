@@ -1507,5 +1507,162 @@ class CallValueTests(unittest.TestCase):
                 self.assertNotIn("committedBalance", normalized["transactions"][0])
 
 
+def bytes_calldata(flags, data):
+    """Written from the ABI rules, independently of the adapter's encoder."""
+    return "0x220eb9b6" + f"{flags:064x}" + f"{64:064x}" + f"{len(data):064x}" + data.hex() + "00" * (-len(data) % 32)
+
+
+def bytes_case(rows=((0, bytes([1, 3, 7])), (1, b"\xff" * 33), (2, b""))):
+    """Envelope fixture only: native replay checks the actual bytes program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "payload": "0x" + data.hex(), "value": "0",
+        "calldata": bytes_calldata(flags, data)} for index, (flags, data) in enumerate(rows)]
+    return {"schema": runner.BYTES_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "bytesPlan": {"schema": "solcore-lean.bytes-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": list(runner.BYTES_SLOTS),
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedBytes", "method": "run", "signature": "run(uint256,bytes)",
+            "selector": "0x220eb9b6", "deployPath": ["SynthesizedBytesDeploy"],
+            "runtimePath": ["SynthesizedBytesDeploy", "SynthesizedBytes"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def bytes_slots(values=(0, 0, 0, 0, 0)):
+    return [{"slot": str(index), "value": str(value)} for index, value in enumerate(values)]
+
+
+def bytes_history(value, path):
+    """Rows that follow the bytes protocol: slots zero to two are fixtures,
+    slot three counts committed payload bytes, slot four holds the last byte,
+    and a returned payload is the committed sum plus the calldata size. Odd
+    flags revert and keep the prior snapshot."""
+    rows, prior = [], [0, 0, 0, 0, 0]
+    for index, tx in enumerate(value["transactions"]):
+        data = bytes.fromhex(tx["payload"][2:])
+        reverted = int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else [index + 10, index + 20, index + 30, prior[3] + len(data), data[-1] if data else 0]
+        output = index + 3 if reverted else committed[0] + committed[3] + committed[4] + 100 + len(data) + -len(data) % 32
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{output:064x}", "committedStorage": bytes_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.BYTES_HISTORY_SCHEMA, "observedSlots": list(runner.BYTES_SLOTS),
+        "initialStorage": bytes_slots(), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def bytes_histories(value=None):
+    value = bytes_case() if value is None else value
+    return {path: bytes_history(value, path) for path in runner.PATHS}
+
+
+class BytesTests(unittest.TestCase):
+    def test_bytes_case_requires_canonical_zero_padded_calldata(self):
+        value = bytes_case()
+        runner.validate_case(value)
+        # `cast calldata "run(uint256,bytes)" 1 0xabab...ab` (33 bytes) from the pinned Foundry release.
+        self.assertEqual(bytes_calldata(1, b"\xab" * 33), "0x220eb9b6" + "".join(
+            f"{word:064x}" for word in (1, 0x40, 0x21)) + "ab" * 33 + "00" * 31)
+        self.assertEqual(runner.bytes_calldata("0x220eb9b6", 1, b"\xab" * 33), bytes_calldata(1, b"\xab" * 33))
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"]),
+                         ("semantic-bytes-tool", "rust-hull-keyed-storage-scenario", True, "bytes"))
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2", "3", "4"))
+        self.assertTrue(runner.has_bytes(value))
+        self.assertFalse(runner.has_bytes(array_case()) or runner.has_logs(value) or runner.has_balances(value) or runner.deployment_logs(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual([runner.payload_chunks(tx) for tx in value["transactions"]],
+                         [[int.from_bytes(bytes([1, 3, 7]) + bytes(29), "big")], [MAX_WORD, 0xff << 248], []])
+        runner.validate_case(bytes_case(rows=((0, bytes(64)),)))
+        original = value["transactions"][0]["calldata"]
+        for key, changed in (("payload", "0x0103"), ("payload", "0x01030A"), ("payload", "010307"), ("payload", "0x0103070"),
+                             ("payload", "0x" + "01" * 65), ("payload", None), ("payload", [1, 3, 7]), ("flags", "01"),
+                             ("calldata", bytes_calldata(0, bytes([1, 3]))), ("calldata", original[:-2]),
+                             ("calldata", original[:-2] + "01"), ("calldata", original.replace(f"{0x40:064x}", f"{0x60:064x}")),
+                             ("calldata", "0x9a94c44b" + original[10:]), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for slots in (["0", "1", "2", "3"], ["0", "1", "2", "3", "4", "5"], ["1", "0", "2", "3", "4"]):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        mixed = copy.deepcopy(value)
+        mixed["contract"]["selector"] = "0x9a94c44b"
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(mixed)
+        self.assertIn("run(uint256,bytes)", runner.scope(value))
+
+    def test_returned_rows_record_length_last_byte_and_sum(self):
+        value = bytes_case()
+        self.assertEqual(runner.compare(bytes_histories(value), value)["category"], "matched")
+        for path in runner.PATHS:
+            for slot in (3, 4):
+                observed = bytes_histories(value)
+                row = observed[path]["transactions"][2]
+                row["committedStorage"][slot]["value"] = str(int(row["committedStorage"][slot]["value"]) + 1)
+                observed[path]["finalStorage"] = copy.deepcopy(row["committedStorage"])
+                result = runner.compare(observed, value)
+                with self.subTest(path=path, slot=slot):
+                    self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-2"))
+                    self.assertFalse(all(result["pairs"].values()))
+                    self.assertIn("committedStorage", result["fields"])
+        # All three paths agreeing on a wrong count, last byte or sum still break the protocol.
+        for name, slot, text in (("count", 3, "4"), ("last byte", 4, "3")):
+            agreed = bytes_histories(value)
+            for history in agreed.values():
+                history["transactions"][0]["committedStorage"][slot]["value"] = text
+            result = runner.compare(agreed, value)
+            with self.subTest(change=name):
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-0", ["committedStorage", "output"]))
+        summed = bytes_histories(value)
+        for history in summed.values():
+            history["transactions"][0]["output"] = "0x" + f"{1:064x}"
+        result = runner.compare(summed, value)
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-0", ["output"]))
+        committed = bytes_histories(value)
+        for history in committed.values():
+            history["transactions"][1]["committedStorage"][3]["value"] = "36"
+        result = runner.compare(committed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-1", ["committedStorage"]))
+        observed = bytes_histories(value)
+        observed["rustEvm"]["transactions"][2]["undeclaredStorage"] = [{"slot": "5", "value": "1"}]
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["undeclaredPaths"]), ("semantic-mismatch", "tx-2", ["rustEvm"]))
+        array_schema = bytes_histories(value)
+        array_schema["directCore"]["schema"] = runner.ARRAY_HISTORY_SCHEMA
+        self.assertEqual(runner.compare(array_schema, value)["category"], "adapter-error")
+
+    def test_conforms_applies_the_bytes_protocol(self):
+        value = bytes_case()
+        history = runner.normalize_history(bytes_history(value, "rustEvm"), value, "rustEvm")
+        prior = history["initialStorage"]
+        for tx, row in zip(value["transactions"], history["transactions"]):
+            self.assertTrue(runner.conforms(value, tx, row, prior))
+            prior = row["committedStorage"]
+        row = copy.deepcopy(history["transactions"][0])
+        row["committedStorage"][4]["value"] = "8"
+        self.assertFalse(runner.conforms(value, value["transactions"][0], row, history["initialStorage"]))
+        self.assertEqual(runner.bytes_fields(value["transactions"][0], row, history["initialStorage"]), ["committedStorage", "output"])
+        self.assertEqual(runner.bytes_fields(value["transactions"][1], history["transactions"][1], history["transactions"][0]["committedStorage"]), [])
+        self.assertEqual(runner.bytes_fields(value["transactions"][2], history["transactions"][2], history["transactions"][1]["committedStorage"]), [])
+
+    def test_bytes_hull_history_uses_the_declared_slot_runner_rows(self):
+        value = bytes_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": bytes_slots(), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in bytes_history(value, "importedHull")["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"]), (runner.BYTES_HISTORY_SCHEMA, list(runner.BYTES_SLOTS)))
+        self.assertNotIn("initialLogs", history)
+        self.assertEqual(runner.compare({**bytes_histories(value), "importedHull": history}, value)["category"], "matched")
+
+
 if __name__ == "__main__":
     unittest.main()

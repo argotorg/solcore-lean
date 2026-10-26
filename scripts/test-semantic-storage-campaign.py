@@ -957,5 +957,78 @@ class CallValueCampaignTests(unittest.TestCase):
         self.assertTrue(campaign.TEST_FIELD.fullmatch("balance"))
 
 
+def bytes_case(rows=((0, bytes([1, 3, 7])), (1, b"\xff" * 33), (2, b""))):
+    value = fixtures.bytes_case(rows)
+    value["bytesPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def bytes_report(value):
+    histories = fixtures.bytes_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class BytesCampaignTests(unittest.TestCase):
+    def test_bytes_inputs_are_chunks_and_lengths_are_their_own_dimensions(self):
+        value = bytes_case()
+        self.assertEqual(campaign.dimensions("stateful-bytes"), campaign.DIMENSIONS + ("PayloadLengths", "RevertedPayloadLengths"))
+        self.assertEqual(campaign.versions("stateful-bytes"), campaign.VERSIONS)
+        self.assertEqual(campaign.inputs(value), {str(int.from_bytes(bytes([1, 3, 7]) + bytes(29), "big")),
+                                                  str(fixtures.MAX_WORD), str(0xff << 248)})
+        self.assertEqual(campaign.bytes_coverage(value, ["returned", "reverted", "returned"]),
+                         {"PayloadLengths": {3, 33, 0}, "RevertedPayloadLengths": {33}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-bytes"))
+            instance.summary["coverage"].update(requiredPayloadLengths=[0, 1, 3, 33], requiredRevertedPayloadLengths=[0, 33],
+                                                requiredInputs=["0", str(fixtures.MAX_WORD)])
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", bytes_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedPayloadLengths"], coverage["matchedRevertedPayloadLengths"]), ([0, 3, 33], [33]))
+            self.assertEqual((coverage["missingPayloadLengths"], coverage["missingRevertedPayloadLengths"], coverage["missingInputs"]),
+                             ([1], [0], ["0"]))
+            self.assertNotIn("requiredLengths", coverage)
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertNotIn("requiredPayloadLengths", campaign.Campaign(options(directory, profile="stateful-dynamic-array")).summary["coverage"])
+
+    def test_bytes_manifest_requires_payload_lengths_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-bytes-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(manifest["requiredPayloadLengths"], [0, 1, 17, 31, 32, 33, 48, 63, 64])
+        changes = [lambda m: m.pop("requiredPayloadLengths"), lambda m: m.update(requiredPayloadLengths=[65]),
+            lambda m: m.update(requiredRevertedPayloadLengths=[]), lambda m: m.update(requiredPayloadLengths=[1, 1]),
+            lambda m: m.update(requiredRevertedPayloadLengths=["0"]), lambda m: m.update(requiredLengths=[0]),
+            lambda m: m["cases"][0].update(dynamicArrayPlan=m["cases"][0].pop("bytesPlan"))]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        array = json.loads((ROOT / "scripts/semantic-dynamic-array-corpus.json").read_text())
+        array["requiredPayloadLengths"] = [0]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(array)
+
+    def test_bytes_slots_are_named_in_fingerprints_injection_and_prefix_counts(self):
+        value = bytes_case()
+        raw = bytes_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        changed = campaign.analyze(raw, value, "importedHull", "tx-2", "storage:4")
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["undeclaredPaths"], fingerprint["transactionId"]), (["4"], [], "tx-2"))
+        self.assertTrue(changed["synthetic"])
+        self.assertFalse(campaign.analyze(raw, value, "importedHull", "tx-0", "storage:5")["synthetic"])
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+        for history in raw["histories"].values():
+            history["transactions"][0]["committedStorage"][3]["value"] = "4"
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 0)
+        with self.assertRaises(ValueError):
+            campaign.analyze(bytes_report(value), value, "rustEvm", "tx-1", "balance")
+
+
 if __name__ == "__main__":
     unittest.main()
