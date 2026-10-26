@@ -242,15 +242,52 @@ resumption carries the exported value and the physical history of the returned
 session.
 
 These public theorems keep as explicit premises `Closed`, the accepted body
-receipt and its `Covered`, and the original compilation receipt.
-They also keep the root, start and caller-state receipts that the older public
-root takes. The trivial attachment does not satisfy `Generalized`, so
-generalized declarations are not connected. The theorems take a staged Source
-trace. Unlike the older imperative family, which lifts an original Source trace
-with its profiled body tree, they do not lift original traces. The reached
-heap and history are in the accepted instance model, and no continuation
-theorem consumes them, so later public calls do not yet chain from them. No
-concrete program instantiates these theorems yet.
+receipt and its `Covered`, and the original compilation receipt. They also keep
+the root, start and caller-state receipts that the older public root takes, and
+they take a staged Source trace. The trivial attachment does not satisfy
+`Generalized`, so generalized declarations are not connected. The reached heap
+and history are in the accepted instance model, and no continuation theorem
+consumes them, so later public calls do not yet chain from them.
+
+Each of these premises, and the staged trace, can be produced at an actual
+program.
+[CellAwareInvocationAcceptedSubsetCheck](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedSubsetCheck.lean)
+checks the subset: `nodes?` reads a row's Source nodes and the prepared local
+inventory and returns a proof that every expression node is a `Subset` site. A
+site depends on its row only through the row's key, so `transport` moves the
+proof to every row with that key, and `closed` turns it into `Closed`.
+[CellAwareInvocationAcceptedReturnCoverage](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedReturnCoverage.lean)
+`returning` covers every accepted tree of statements whose first statement
+returns a value: the compiler reads that statement before choosing a branch, so
+the tree is its `returning` branch.
+`CellAwarePublicAcceptedNamedRoot.compilation_receipts` derives the original
+compilation receipt from the checked program, its public compilation and the
+issued recipe.
+[CellAwareInvocationAcceptedSourceLifting](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedSourceLifting.lean)
+lifts original Source executions to staged ones. `expression_value` stages
+every value execution of a subset expression, by structural induction on
+`Subset` with no typing or state input: a subset expression contains no call,
+so each original value rule is the staged rule of the same form, and a
+generalized local read keeps its descriptor. `returned` stages every
+value-returning execution of a body whose terminal statement returns, or is, a
+subset expression, with the same context, value and heap. Fault outcomes and
+the other statement forms are not lifted.
+
+The test
+[SourceCoreGeneralizedExportAcceptedTick](../../Solcore/Test/SourceCoreGeneralizedExportAcceptedTick.lean)
+compiles the existing three-function GeneralizedExport program at runtime and
+takes its `tick` row, whose body returns its Bool parameter. Its
+`accepted_tick` meets every premise of `first_value_selected`,
+`checkpoint_has_sufficient_fuel_selected` and `checkpoint_reflects_selected` at
+the row's first public call, with the existing start receipts: the runtime
+subset check, the return inversion, the body receipt, the compilation receipts
+and the lifted trace of the row's independent Source execution. Program support
+comes from `SelectedCompilationNamedSupport.Support.of_program` with the
+well-formedness that the existing typing observation derives; no
+`StaticProfile` enters. The runtime harness checks the subset, builds this
+kernel-checked plan for both inputs and resumes the actual call. The instance
+exercises one ordinary local read; the theorems it uses are general over the
+subset.
 
 ## Remaining work for the second goal
 
@@ -276,11 +313,12 @@ On the accepted-body route above, the next connected steps are:
   constructors, generalized reads, closures and coercions. Expressions of
   contextual closures need the relation between the compiler view and the
   Source that their writes and matches also need.
-- Strengthen the named-row public connection. Lift original Source traces of
-  accepted bodies to staged traces, and carry the accepted instance model
-  through public histories so that later calls chain. Then instantiate the
-  public theorems on a concrete program, and issue program support from the
-  receipt without `StaticProfile`.
+- Strengthen the named-row public connection. Extend the lifting of original
+  Source traces to fault outcomes and to the remaining statement forms of
+  accepted bodies, and the `Covered` inversion beyond a returning first
+  statement; carry the accepted instance model through public histories so that
+  later calls chain; and issue program support from the compiler receipt for
+  every accepted program, rather than from an observation of its typings.
 
 The final connection must:
 

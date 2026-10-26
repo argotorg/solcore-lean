@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph and call-graph loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value and bounded-`bytes` extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection with derived read and write inputs; remaining expression forms and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows, its public-root connection and one concrete instance; remaining expression and statement forms, fault lifting and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -1052,10 +1052,21 @@ actual public start in both directions. A returning trace reaches a successful
 `SourceCoreExecution` resumption with the exported value and the returned
 session's physical history. `Closed`, the body receipt and its coverage and the
 original compilation receipt remain premises. Generalized declarations are not
-connected, original (unstaged) traces are not lifted, and later calls do not
-yet chain from the reached history, which uses the accepted instance model. No
-concrete program uses these theorems yet. The design document lists the
-remaining premises.
+connected, and later calls do not yet chain from the reached history, which
+uses the accepted instance model. The design document lists the remaining
+premises.
+
+One actual row meets every premise (`SourceCoreGeneralizedExportAcceptedTick`).
+At `tick` of the GeneralizedExport program, a runtime check of its expression
+nodes supplies `Closed` (`CellAwareInvocationAcceptedSubsetCheck`), the
+inversion of its returning accepted tree supplies the coverage
+(`CellAwareInvocationAcceptedReturnCoverage`), the public compilation supplies
+the original compilation receipt, and the row's independent Source execution is
+lifted to the staged trace (`CellAwareInvocationAcceptedSourceLifting`). The
+output and both checkpoint theorems are applied together at the first public
+call. The lifting covers value-returning executions of bodies whose terminal
+statement returns, or is, a subset expression; fault outcomes and other
+statement forms are not lifted.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile

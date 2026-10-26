@@ -2171,6 +2171,7 @@ import Solcore.Test.SourceDynamicBytesEmitter
 import Solcore.Test.SourceDynamicBytesCases
 import Solcore.Test.SourceDynamicBytesCorpus
 import Solcore.Test.RustHullCreationFaultCorrespondence
+import Solcore.Test.SourceCoreGeneralizedExportAcceptedTick
 set_option autoImplicit false
 
 open Solcore
@@ -4135,5 +4136,6 @@ def main : IO UInt32 := do
   Tests.SourceDynamicBytesCases.testSourceDynamicBytesCases
   Tests.SourceDynamicBytesCorpus.testSourceDynamicBytesCorpus
   Tests.RustHullCreationFaultCorrespondence.run
+  Tests.SourceCoreGeneralizedExport.AcceptedTickRuntime.run
   IO.println "solcore-lean tests passed"
   return 0
