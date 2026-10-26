@@ -63,4 +63,43 @@ theorem binder_projected {compiled : SourceCoreUnifiedCompilation.Compiled}
     rw [material.indexed.represented] at accepted
     exact CompatibleStatementBindings.binder_projected accepted
 
+/-- The actual statement read also locates the node in the compiler's view. -/
+theorem compiler_read {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {bodyRelation : ActualBodyInvocation.BodyRelation} (index : ActualBodyInvocation.Index compiled bodyRelation)
+    {id : StatementId} {node : StatementNode} {type : Ty}
+    (accepted : index.policy.readStatement index.compilerSource id = .ok (node, type)) :
+    index.compilerSource.lookupStatement? id = some node := by
+  rw [index.statement_reader] at accepted
+  unfold SourceCoreCompatibleDataExpressions.readStatement at accepted
+  by_cases owner : id.occurrence.owner ≠ index.compilerSource.owner
+  · simp [owner, throw, bind, Except.bind] at accepted
+  · simp only [owner, ↓reduceIte, bind, Except.bind, pure, Except.pure] at accepted
+    cases found : index.compilerSource.lookupStatement? id with
+    | none => simp [found] at accepted
+    | some actual =>
+      simp only [found] at accepted
+      obtain ⟨_, _, same⟩ := CompatibleEncoding.bind_ok accepted
+      cases same
+      rfl
+
+/-- Header items extend the lexical context without changing its signatures. -/
+theorem items_signatures {control : ControlContext} {signatures : ProgramSignatures} :
+    ∀ {items : List ForItemForm} {context final : SourceSemantics.Context},
+      ForItemsHaveType source control context items final →
+      context.signatures = signatures → final.signatures = signatures
+  | [], _, _, typed, same => by
+    cases typed
+    exact same
+  | _ :: _, _, _, typed, same => by
+    cases typed with
+    | cons head tail =>
+      apply items_signatures tail
+      cases head with
+      | letUninitialized _ _ extension => cases extension; exact same
+      | letInitialized _ _ _ extension => cases extension; exact same
+      | letInitializedGeneralized _ _ _ _ extension => cases extension; exact same
+      | expression => exact same
+      | assignValue => exact same
+      | assignBitNot => exact same
+
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedSourceFacts

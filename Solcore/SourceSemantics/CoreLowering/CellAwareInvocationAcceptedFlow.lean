@@ -11,6 +11,10 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationOrdinaryAcceptedA
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAbsentAcceptedAllocation
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationBodyFinish
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedForItems
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationForInitialTerminal
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationForSequences
+import Solcore.SourceSemantics.CoreLowering.TypedImperativeForNative
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedAssignments
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationBareAssignmentFlow
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationBareBitNotFlow
@@ -65,6 +69,9 @@ def Covered (semantic : TypedSource) (expected : TypeSystem.Ty) {mode : Bool} {e
   | .conditional _ _ _ _ _ left right tail =>
       Covered semantic expected left ∧ Covered semantic expected right ∧ Covered semantic expected tail
   | .whileLoop _ _ _ _ _ _ inner tail => Covered semantic expected inner ∧ Covered semantic expected tail
+  | .forLoop _ _ _ _ _ _ initial inner after tail =>
+      CellAwareInvocationAcceptedForItems.ItemsCovered semantic initial ∧ Covered semantic expected inner ∧
+        CellAwareInvocationAcceptedForItems.ItemsCovered semantic after ∧ Covered semantic expected tail
   | _ => False
 
 end Coverage
@@ -129,35 +136,19 @@ theorem reflects_of_valid
 
 end Validity
 
-/-- Accepted-expression meaning for every child the compiler lowered, at every
-compiler fuel. This is the only expression input of the statement closure. -/
-def Expressions (budget : Nat) : Prop :=
-  ∀ fuel context, Dynamic.SourceRuntimeValid program context index.source →
-    invocation.evidence.Covers context → context.solvedRequirements = index.compilation.solvedRequirements →
-    CellAwareInvocationExpressionBounds.PreservesBelow (attachment := attachment) bridge context model index
-      registry invocation (children index fuel) faults budget ∧
-    CellAwareInvocationExpressionBounds.ReflectsBelow (attachment := attachment) bridge context model index
-      registry invocation (children index fuel) faults budget
-
 include bindings transport registered in
 /-- Induction over the actual compiler tree. Each covered branch applies its
 existing flow theorem to the compiler's read, lowered children and allocation
 receipt; nested statement lists inherit reachability, checker typing and native
 typing from the enclosing compiled code. -/
 theorem correct (budget : Nat)
-    (expressions : Expressions (attachment := attachment) (receiving := receiving) (functions := functions)
-      bridge index registry invocation faults budget)
-    (extension : SourceCoreRawMetadata.Extends
-      (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
-    (operands : ∀ site root operator, AssignmentOperandDiagnostics.OperandsLaw
-      (fun reason token => faults (.semantic reason) token) operator (index.invalidOperand site root operator))
-    (unary : ∀ site root, faults (.semantic (.invalidUnaryOperand .bitNot)) (index.invalidUnary site root))
-    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
-    (observations : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities)
-    (functionTypes : CompatiblePayload.FunctionRuntimeViews functions)
-    (placeDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial whole.compatible.checked)
-      (ambient := CallableIndexedAmbient.ambientDefinitions whole.indexed) functions protocol invocation.source
-      index.invalidProjection index.missingDefault receiving (fun reason token => faults (.semantic reason) token))
+    (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
+      (functions := functions) bridge index registry invocation faults budget)
+    (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
+      (protocol := protocol) index invocation faults)
+    {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
+    (artifact : sourceCompiled.artifact? = some whole)
+    (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
     (sourceEq : invocation.source = index.source) (unique : NodeOccurrencesUnique invocation.source)
     {expected : TypeSystem.Ty} :
     ∀ {mode escaped fuel scope statements code}
@@ -297,15 +288,15 @@ theorem correct (budget : Nat)
     have token : AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token)
         operator head.invalid := by
       rw [invalid]
-      exact operands _ _ _
+      exact writes.operands _ _ _
     rw [emitted]
     exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationBareAssignmentFlow.preserves bridge transport functions
-          producer sourceEq unique (sourceEq ▸ statementFound) form head receipt.bare extension token budget
+          producer sourceEq unique (sourceEq ▸ statementFound) form head receipt.bare writes.extension token budget
           (expressions fuel context runtime covers ledger).1 tailBounds.1,
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationBareAssignmentFlow.reflects bridge transport functions
-          producer sourceEq unique (sourceEq ▸ statementFound) form head receipt.bare extension token budget
+          producer sourceEq unique (sourceEq ▸ statementFound) form head receipt.bare writes.extension token budget
           (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
   | @projectedAssigned mode escaped fuel scope id rest node stored assignment operator expression tail code
       read form statementType remaining receipt route tailIH =>
@@ -326,17 +317,17 @@ theorem correct (budget : Nat)
     have shapes := fun (sourceTyped : SourceAssignmentHasType invocation.source context assignment operator expression)
         {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
         (initial : protocol.State initialIndex) =>
-      placeDiagnostics.assignment head (.statement found form) signatures receipt.projected preparedAt sourceTyped
+      writes.placeDiagnostics.assignment head (.statement found form) signatures receipt.projected preparedAt sourceTyped
         (environment := environment) initial
     rw [emitted]
     exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationProjectedAssignmentFlow.preserves bridge transport functions
-          producer sourceEq unique found form head receipt.projected extension faithful observations shapes budget
+          producer sourceEq unique found form head receipt.projected writes.extension writes.faithful writes.observations shapes budget
           (expressions fuel context runtime covers ledger).1 tailBounds.1,
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationProjectedAssignmentFlow.reflects bridge transport functions
-          producer sourceEq unique found form head receipt.projected extension faithful observations shapes
-          functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          producer sourceEq unique found form head receipt.projected writes.extension writes.faithful writes.observations shapes
+          writes.functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
   | bitNotting => intro covered; cases covered
   | @bitNotted mode escaped fuel scope id rest node stored assignment tail code
       read form statementType remaining receipt targetType tailIH =>
@@ -356,7 +347,7 @@ theorem correct (budget : Nat)
     have errors : head.Errors (fun reason token => faults (.semantic reason) token) := by
       show faults (.semantic (.invalidUnaryOperand .bitNot)) head.invalid
       rw [invalid]
-      exact unary _ _
+      exact writes.unary _ _
     rw [emitted]
     exact ⟨CellAwareInvocationBareBitNotFlow.preserves bridge transport functions producer head sourceEq unique
         (sourceEq ▸ statementFound) form errors budget tailBounds.1,
@@ -386,16 +377,16 @@ theorem correct (budget : Nat)
             initial (fun reason token => faults (.semantic reason) token) (registry := receiving) := by
       intro sourceTyped environment initialIndex initial
       cases sourceTyped with
-      | intro place _ => exact placeDiagnostics.unary head (.statement found form) signatures preparedAt place initial
+      | intro place _ => exact writes.placeDiagnostics.unary head (.statement found form) signatures preparedAt place initial
     rw [emitted]
     exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationProjectedBitNotFlow.preserves bridge transport functions
-          producer sourceEq unique found form head receipt.projected extension faithful observations reachedErrors
+          producer sourceEq unique found form head receipt.projected writes.extension writes.faithful writes.observations reachedErrors
           budget (expressions fuel context runtime covers ledger).1 tailBounds.1,
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationProjectedBitNotFlow.reflects bridge transport functions
-          producer sourceEq unique found form head receipt.projected extension faithful observations reachedErrors
-          functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          producer sourceEq unique found form head receipt.projected writes.extension writes.faithful writes.observations reachedErrors
+          writes.functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
   | @discard mode escaped fuel scope id rest node stored expression tail read form child generated statementType remaining tailIH =>
     intro covered reached control context final facts result signatures typed native
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
@@ -592,7 +583,79 @@ theorem correct (budget : Nat)
         registry invocation faults administrative scope mode expected index.result unique found form size,
       fun size _ => CellAwareInvocationTransferFlow.continuing_reflects bridge context model index producer
         registry invocation faults administrative scope mode expected index.result found form size⟩
-  | forLoop => intro covered; cases covered
+  | @forLoop mode escaped fuel scope id rest node stored initializer condition post body loopScope postScope
+      loopCode postCode initialCode tail read form statementType child generated conditionType initial inner after
+      remaining innerIH tailIH =>
+    intro covered reached control context final facts result signatures typed native
+    obtain ⟨initialCovered, innerCovered, afterCovered, tailCovered⟩ := covered
+    have headReached := reached id (List.mem_cons_self ..)
+    have statementFound := index.statement_read_reached headReached read
+    have compilerFound := CellAwareInvocationAcceptedSourceFacts.compiler_read index read
+    obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
+    cases child with
+    | mk childType childCode =>
+    have boolType := ensure_eq conditionType
+    dsimp only at boolType
+    subst boolType
+    rw [form] at formTyped
+    cases formTyped with
+    | @forLoop _ _ _ _ loopContext _ _ _ initialTyped conditionTyped bodyTyped postTyped =>
+    have loopSignatures := CellAwareInvocationAcceptedSourceFacts.items_signatures initialTyped signatures
+    obtain ⟨conditionNode, conditionFound, nodeType, conditionTyped⟩ := expression_node sourceUnique conditionTyped
+    obtain ⟨_, native⟩ := native
+    obtain ⟨⟨_, initialNative⟩, ⟨_, tailNative⟩⟩ := TypedLexicalWhile.Native.sequence_children native
+    have innerReached : ∀ other ∈ body, index.Reached (.statement other) := fun other member =>
+      index.statement_child headReached read (by rw [form]; simp [StatementForm.references, member])
+    have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
+      result signatures restTyped ⟨_, tailNative⟩
+    have terminal : (∃ nativeType, HasType (SourceCoreLocalCell.coreContext loopScope ++ administrative)
+          (LocalLoop.iterate index.result childCode loopCode postCode escaped) nativeType
+          whole.indexed.layouts.definitions) →
+        CellAwareInvocationForInitialBounds.PreservesAtMost (attachment := attachment) bridge loopContext model index
+          producer registry invocation faults administrative loopScope [] condition post body expected index.result
+          (LocalLoop.iterate index.result childCode loopCode postCode escaped) budget ∧
+        CellAwareInvocationForInitialBounds.ReflectsAtMost (attachment := attachment) bridge loopContext model index
+          producer registry invocation faults administrative loopScope [] condition post body expected index.result
+          (LocalLoop.iterate index.result childCode loopCode postCode escaped) budget := by
+      intro loopNative
+      obtain ⟨_, loopNative⟩ := loopNative
+      obtain ⟨⟨_, bodyNative⟩, ⟨_, postNative⟩, loopTyped⟩ := TypedImperativeFor.Native.iterate_children loopNative
+      have innerBounds := innerIH innerCovered innerReached (control := control.enterLoop) result loopSignatures
+        bodyTyped ⟨_, bodyNative⟩
+      have postBounds := CellAwareInvocationAcceptedForItems.post_correct (expected := expected) bridge bindings
+        transport index producer registered registry invocation faults administrative budget expressions writes sourceEq
+        unique artifact checked
+        headReached compilerFound form after afterCovered (fun item member => List.mem_append_right _ member)
+        loopSignatures postTyped ⟨_, postNative⟩
+      exact ⟨CellAwareInvocationAcceptedForItems.initial_preserves_of_valid bridge index producer registry invocation
+          faults administrative fun runtime covers ledger => CellAwareInvocationForInitialTerminal.preserves bridge
+            model producer transport (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
+            (expressions fuel _ runtime covers ledger).1 (sourceEq ▸ conditionFound) nodeType
+            (sourceEq ▸ conditionTyped) generated loopTyped innerBounds.1 postBounds.1 ⟨_, _, _, bodyTyped⟩
+            ⟨_, _, postTyped⟩,
+        CellAwareInvocationAcceptedForItems.initial_reflects_of_valid bridge index producer registry invocation
+          faults administrative fun runtime covers ledger => CellAwareInvocationForInitialTerminal.reflects bridge
+            model producer transport (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
+            (expressions fuel _ runtime covers ledger).2 (sourceEq ▸ conditionFound) nodeType
+            (sourceEq ▸ conditionTyped) generated loopTyped innerBounds.2 postBounds.2 ⟨_, _, _, bodyTyped⟩
+            ⟨_, _, postTyped⟩⟩
+    have initialBounds := CellAwareInvocationAcceptedForItems.initial_correct bridge bindings transport index producer
+      registered registry invocation faults administrative budget expressions writes sourceEq unique artifact checked
+      headReached compilerFound form terminal initial initialCovered (fun item member => List.mem_append_left _ member)
+      signatures initialTyped ⟨_, initialNative⟩
+    refine ⟨?_, ?_⟩
+    · intro size within mapping world actualContext environment canonical actual before store embedding
+        environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+      exact CellAwareInvocationForSequences.preserves bridge model producer sourceEq initialBounds.1 unique
+        (sourceEq ▸ statementFound) form tailBounds.1 within environments heaps locals agrees actualTyped runtime covers
+        sameLedger sourceTyped initial admitted authority physical owner sameLocation ready trace
+    · intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
+        environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        initial admitted authority physical owner sameLocation ready completed
+      exact CellAwareInvocationForSequences.reflects bridge model producer sourceEq initialBounds.2
+        (sourceEq ▸ statementFound) form tailBounds.2 within environments heaps locals agrees actualTyped runtime covers
+        sameLedger sourceTyped initial admitted authority physical owner sameLocation ready completed
   | forBoundary => intro covered; cases covered
   | boundary => intro covered; cases covered
 
@@ -601,19 +664,13 @@ include bindings transport registered in
 its compiler tree, footer and native result. Source executions of the original
 statements are related in both directions at the actual reached heap. -/
 theorem body_preserves (budget : Nat)
-    (expressions : Expressions (attachment := attachment) (receiving := receiving) (functions := functions)
-      bridge index registry invocation faults budget)
-    (extension : SourceCoreRawMetadata.Extends
-      (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
-    (operands : ∀ site root operator, AssignmentOperandDiagnostics.OperandsLaw
-      (fun reason token => faults (.semantic reason) token) operator (index.invalidOperand site root operator))
-    (unary : ∀ site root, faults (.semantic (.invalidUnaryOperand .bitNot)) (index.invalidUnary site root))
-    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
-    (observations : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities)
-    (functionTypes : CompatiblePayload.FunctionRuntimeViews functions)
-    (placeDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial whole.compatible.checked)
-      (ambient := CallableIndexedAmbient.ambientDefinitions whole.indexed) functions protocol invocation.source
-      index.invalidProjection index.missingDefault receiving (fun reason token => faults (.semantic reason) token))
+    (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
+      (functions := functions) bridge index registry invocation faults budget)
+    (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
+      (protocol := protocol) index invocation faults)
+    {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
+    (artifact : sourceCompiled.artifact? = some whole)
+    (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
     (sourceEq : invocation.source = index.source) (unique : NodeOccurrencesUnique invocation.source)
     {control : ControlContext} {expected : TypeSystem.Ty} {context staticFinal : SourceSemantics.Context}
     {facts : BodyFacts} (result : control.returnType = expected) (depth : control.loopDepth = 0)
@@ -671,8 +728,7 @@ theorem body_preserves (budget : Nat)
     rw [body.emitted] at native
     exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
-    administrative budget expressions extension operands unary faithful observations functionTypes placeDiagnostics
-    sourceEq unique body.tree covered (fun _ member => index.body_root member)
+    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.body_root member)
     result signatures sourceTyped flowNative).1
   intro size within
   rw [body.emitted]
@@ -683,19 +739,13 @@ include bindings transport registered in
 /-- Native completion of the same complete accepted body reconstructs an
 original Source execution, its body result and the reached heap. -/
 theorem body_reflects (budget : Nat)
-    (expressions : Expressions (attachment := attachment) (receiving := receiving) (functions := functions)
-      bridge index registry invocation faults budget)
-    (extension : SourceCoreRawMetadata.Extends
-      (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
-    (operands : ∀ site root operator, AssignmentOperandDiagnostics.OperandsLaw
-      (fun reason token => faults (.semantic reason) token) operator (index.invalidOperand site root operator))
-    (unary : ∀ site root, faults (.semantic (.invalidUnaryOperand .bitNot)) (index.invalidUnary site root))
-    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
-    (observations : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities)
-    (functionTypes : CompatiblePayload.FunctionRuntimeViews functions)
-    (placeDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial whole.compatible.checked)
-      (ambient := CallableIndexedAmbient.ambientDefinitions whole.indexed) functions protocol invocation.source
-      index.invalidProjection index.missingDefault receiving (fun reason token => faults (.semantic reason) token))
+    (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
+      (functions := functions) bridge index registry invocation faults budget)
+    (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
+      (protocol := protocol) index invocation faults)
+    {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
+    (artifact : sourceCompiled.artifact? = some whole)
+    (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
     (sourceEq : invocation.source = index.source) (unique : NodeOccurrencesUnique invocation.source)
     {control : ControlContext} {expected : TypeSystem.Ty} {context staticFinal : SourceSemantics.Context}
     {facts : BodyFacts} (result : control.returnType = expected) (depth : control.loopDepth = 0)
@@ -753,8 +803,7 @@ theorem body_reflects (budget : Nat)
     rw [body.emitted] at native
     exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
-    administrative budget expressions extension operands unary faithful observations functionTypes placeDiagnostics
-    sourceEq unique body.tree covered (fun _ member => index.body_root member)
+    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.body_root member)
     result signatures sourceTyped flowNative).2
   intro size within
   rw [body.emitted]
