@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | Existing partial proofs; deferred to this order | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity precompile connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -568,6 +568,19 @@ Do not resume disconnected small lemmas in place of that public connection.
 dispatch, creation/deployment, independent assembly and source revert, then
 object linking through real implementations and public consumers. Executable
 coverage and differential agreement do not discharge these proof obligations.
+
+Precompile dispatch is connected for the identity precompile. Its independent
+rule covers the gas charge, the byte copy of the input, failure on
+insufficient forwarded gas and the memory fault. It extends account dispatch,
+so the public theorems for child-free calls, compiled and nested children,
+call modes and root reentry now cover identity calls without statement changes.
+The proof reaches the actual dispatcher, precompile wrapper and copy loop;
+`rfl`-checked restatements expose the builders that the implementation keeps
+private. Four independent source derivations reach the public resumption
+theorem, and runtime checks compare bytes, balances and retained snapshots.
+ECRECOVER, SHA-256, RIPEMD-160 and P256VERIFY still need independent algorithm
+semantics. Creation/deployment, assembly and source revert, and object linking
+also remain, in that order.
 
 ## Handoff rules
 

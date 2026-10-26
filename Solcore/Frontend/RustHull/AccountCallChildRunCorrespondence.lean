@@ -71,6 +71,30 @@ theorem ChildRunPreservation.prepend {anchors : List CatalogWorldCorrespondence.
   simpa only [List.length_append, List.append_assoc, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using
     preserved computed (extra ++ front) references' argument' related ready (precompiled := precompiled)
 
+/-- The supplied precompile code produces every independent precompile result
+for the request and retains the calling store. Dispatch supplies the actual
+precompile call through `precompileCode_preservation`. -/
+def PrecompiledPreservation (precompiled : Code) (request : AccountCallSemantics.Request)
+    (baseDepth : Nat) (captured : Core.Environment) : Prop :=
+  ∀ {result}, AccountCallSemantics.Precompile request result →
+  ∀ (extra : Core.Environment) (store : Core.Store),
+    ∃ target final, Core.Evaluates (extra ++ captured) store (precompiled (baseDepth + extra.length)) target final ∧
+      ResponseRel result target ∧ StoreRetains store final
+
+theorem PrecompiledPreservation.prepend {precompiled : Code} {request : AccountCallSemantics.Request}
+    {baseDepth : Nat} {captured : Core.Environment}
+    (preserved : PrecompiledPreservation precompiled request baseDepth captured) (front : Core.Environment) :
+    PrecompiledPreservation precompiled request (baseDepth + front.length) (front ++ captured) := by
+  intro result computed extra store
+  simpa only [List.length_append, List.append_assoc, Nat.add_assoc, Nat.add_comm front.length extra.length] using
+    preserved computed (extra ++ front) store
+
+theorem precompileCode_preservation {depth : Nat} {environment : Core.Environment} {requestCode : Code}
+    {request : AccountCallSemantics.Request}
+    (requestRelated : CodeValue depth environment requestCode (requestValue request)) :
+    PrecompiledPreservation (PrecompileCorrespondence.precompileCode requestCode) request depth environment :=
+  fun computed extra _ => PrecompileCorrespondence.precompile_preserves (requestRelated.prepend extra) computed
+
 /-- A selected nonzero identity reaches the actual frame continuation. The
 lookup's helper allocation is retained and exposed to the continuation. -/
 theorem accountRun_child_evaluates {depth : Nat} {environment : Core.Environment} {initial final : Core.Store}

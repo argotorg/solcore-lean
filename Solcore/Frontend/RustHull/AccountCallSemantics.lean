@@ -1,10 +1,12 @@
 import Solcore.Frontend.RustHull.StorageSemantics
 import Solcore.Frontend.RustHull.MemorySemantics
+import Solcore.Frontend.RustHull.MemoryCopySemantics
 
 /-! Account dispatch and its checkpoint are independent of Core closures.
 Requests carry the copied calldata of a child frame. The child relation is
 instantiated by finite source call trees, while an absent account in a complete
-world can return without executing a child frame. -/
+world can return without executing a child frame. Precompiled accounts answer
+from their request alone. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.AccountCallSemantics
 open Core
@@ -65,11 +67,51 @@ def transferFor (mode : Mode) (source : Word) (request : Request) (state : Share
 
 abbrev Children := Mode → Word → Request → Shared → Semantics.Result Response → Shared → Prop
 
+/-- A base charge plus a charge per started 32-byte input word, computed over
+natural numbers so that neither the product nor the sum wraps. -/
+def linearCost (base perWord : Nat) (length : Word) : Nat :=
+  base + perWord * ((length.val + 31) / 32)
+
+/-- Identity, at address 4, charges 15 gas plus 3 per started input word and
+returns a byte copy of its complete input. Forwarded gas below that charge
+fails the call without return data. An input range beyond addressable memory
+is a memory fault. Precompiled addresses without a rule here have no source
+derivation. -/
+inductive Precompile (request : Request) : Semantics.Result Response → Prop where
+  | identityOverflow
+      (identity : request.target = Word.ofNatModulo 4)
+      (invalid : MemorySemantics.touchSize? Word.zero Word.zero request.calldataSize = none) :
+      Precompile request (.fault (.language (Word.ofNatModulo 6)))
+  | identityUnderfunded {size : Word}
+      (identity : request.target = Word.ofNatModulo 4)
+      (valid : MemorySemantics.touchSize? Word.zero Word.zero request.calldataSize = some size)
+      (short : request.gas.val < linearCost 15 3 request.calldataSize) :
+      Precompile request (.value (emptyResponse false))
+  | identity {size : Word} {output : MemorySemantics.Entries}
+      (identity : request.target = Word.ofNatModulo 4)
+      (valid : MemorySemantics.touchSize? Word.zero Word.zero request.calldataSize = some size)
+      (funded : linearCost 15 3 request.calldataSize ≤ request.gas.val)
+      (copied : MemoryCopySemantics.Copy request.calldata Word.zero Word.zero request.calldataSize [] output) :
+      Precompile request (.value ⟨true, output, request.calldataSize⟩)
+
+theorem Precompile.target {request : Request} {result : Semantics.Result Response}
+    (computed : Precompile request result) : request.target = Word.ofNatModulo 4 := by
+  cases computed <;> assumption
+
+theorem Precompile.precompiled {request : Request} {result : Semantics.Result Response}
+    (computed : Precompile request result) : isPrecompile request.target = true := by
+  rw [computed.target]
+  decide
+
 /-- A child-free dispatch is justified by absence in the source world. This
 also establishes that its real default record has executable identity zero;
-no identity is inferred merely from empty bytecode. -/
+no identity is inferred merely from empty bytecode. A precompiled account
+neither executes account code nor changes shared state. -/
 inductive Run (children : Children) (mode : Mode) (source : Word) (request : Request) :
     Shared → Semantics.Result Response → Shared → Prop where
+  | precompile {state : Shared} {result : Semantics.Result Response}
+      (executed : Precompile request result) :
+      Run children mode source request state result state
   | empty {state : Shared}
       (ordinaryAccount : isPrecompile request.target = false)
       (absent : StorageSemantics.lookup request.target state.world = none)

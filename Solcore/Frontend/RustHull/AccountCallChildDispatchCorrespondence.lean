@@ -12,6 +12,7 @@ theorem run_children_preserves {anchors : List CatalogWorldCorrespondence.Anchor
     {extended precompiled : Code} {source : Core.Word} {request : AccountCallSemantics.Request}
     {state finalState : AccountCallSemantics.Shared} {result : Semantics.Result AccountCallSemantics.Response}
     (childrenPreserved : ChildRunPreservation anchors locations shared runFrame children valid depth environment)
+    (precompiledPreserved : PrecompiledPreservation precompiled request depth environment)
     (references : SharedReferences depth environment shared locations)
     (argument : CodeValue depth environment extended (extendedValue source request))
     (related : LinkedSharedStateRel anchors locations state store) (ready : valid store)
@@ -20,6 +21,11 @@ theorem run_children_preserves {anchors : List CatalogWorldCorrespondence.Anchor
       ResponseRel result target ∧ LinkedSharedStateRel anchors locations finalState final ∧
       SharedFrame locations store final := by
   cases computed with
+  | precompile executed =>
+    obtain ⟨target, final, evaluated, responded, retained⟩ := precompiledPreserved executed [] store
+    refine ⟨target, final, ?_, responded, related.retained retained, .ofRetains retained⟩
+    exact accountRun_precompile_evaluates ((argument.part (index := 0) rfl).part (index := 0) rfl)
+      executed.precompiled (by simpa only [List.nil_append, List.length_nil, Nat.add_zero] using evaluated)
   | empty ordinary absent complete =>
     obtain ⟨final, evaluated, retained⟩ := accountRun_absent references
       ((argument.part (index := 0) rfl).part (index := 0) rfl) related.shared ordinary absent
@@ -69,6 +75,7 @@ theorem dispatch_transferred_preserves {anchors : List CatalogWorldCorrespondenc
     {state attempted : AccountCallSemantics.Shared} {balances : StorageSemantics.Words}
     {result : Semantics.Result AccountCallSemantics.Response}
     (childrenPreserved : ChildRunPreservation anchors locations shared runFrame children valid depth environment)
+    (precompiledPreserved : PrecompiledPreservation precompiled request depth environment)
     (stable : ∀ {first last}, SharedFrame locations first last → valid first → valid last)
     (references : SharedReferences depth environment shared locations)
     (argument : CodeValue depth environment extended (extendedValue source request))
@@ -100,9 +107,9 @@ theorem dispatch_transferred_preserves {anchors : List CatalogWorldCorrespondenc
   let runExtra := .unit :: extra
   let runEnv := runExtra ++ environment
   obtain ⟨output, afterRun, runEvaluated, resultRelated, afterRelated, runFrameProof⟩ :=
-    run_children_preserves (childrenPreserved.prepend runExtra) (references.prepend runExtra)
-      (argument.prepend runExtra) transferredRelated (stable (.ofBalance combined) ready) computed
-      (precompiled := precompiled)
+    run_children_preserves (childrenPreserved.prepend runExtra) (precompiledPreserved.prepend runExtra)
+      (references.prepend runExtra) (argument.prepend runExtra) transferredRelated
+      (stable (.ofBalance combined) ready) computed
   have throughRun : SharedFrame locations initial afterRun := (SharedFrame.ofBalance combined).trans runFrameProof
   have enter {target : Core.Value} {final : Core.Store}
       (continued : Core.Evaluates runEnv transferred
@@ -151,6 +158,13 @@ theorem dispatch_transferred_preserves {anchors : List CatalogWorldCorrespondenc
       [.word reason, .unit, .word sourceBalance] restoreBound)
     exact .inLeft (((CodeValue.bound (depth + 6) runEnv (.word reason)).prepend [.unit]).evaluates restored)
 
+/-- The actual dispatcher is the composition above with the actual precompile
+call, restated by `PrecompileCorrespondence.precompileCode`. -/
+theorem dispatch_precompile_eq (shared : AccountRuntime.References) (runFrame : Code → Code → Code)
+    (extended : Code) :
+    AccountRuntime.dispatch shared runFrame extended =
+      dispatchWith shared runFrame extended (PrecompileCorrespondence.precompileCode (part 0 3 extended)) := rfl
+
 /-- Source dispatch selects the real funds, transfer and child branches. This
 internal composition theorem is instantiated with compiled child execution. -/
 theorem dispatch_children_preserves {anchors : List CatalogWorldCorrespondence.Anchor} {locations : SharedLocations}
@@ -167,6 +181,8 @@ theorem dispatch_children_preserves {anchors : List CatalogWorldCorrespondence.A
     ∃ target final, Core.Evaluates environment initial (AccountRuntime.dispatch shared runFrame extended depth) target final ∧
       ResponseRel result target ∧ LinkedSharedStateRel anchors locations finalState final ∧
       SharedFrame locations initial final := by
+  have requestCode : CodeValue depth environment (part 0 3 extended) (requestValue request) :=
+    argument.part (index := 0) rfl
   cases computed with
   | insufficient checked shortfall =>
     obtain ⟨final, evaluated, retained⟩ := dispatch_insufficient references argument related.shared shortfall
@@ -179,16 +195,22 @@ theorem dispatch_children_preserves {anchors : List CatalogWorldCorrespondence.A
   | succeeded funds moved executed success =>
     have funds' : ¬ request.value > StorageSemantics.readWord source state.balances := by simpa using funds
     obtain ⟨balances, transferOk, rfl⟩ := transferFor_ok moved
-    simpa only [dispatchAfter, success, ↓reduceIte, dispatchWith, AccountRuntime.dispatch, dispatchRun, accountRun, childRequest] using
-      dispatch_transferred_preserves childrenPreserved stable references argument related ready funds' transferOk executed
+    rw [dispatch_precompile_eq]
+    simpa only [dispatchAfter, success, ↓reduceIte] using
+      dispatch_transferred_preserves childrenPreserved (precompileCode_preservation requestCode)
+        stable references argument related ready funds' transferOk executed
   | refused funds moved executed failure =>
     have funds' : ¬ request.value > StorageSemantics.readWord source state.balances := by simpa using funds
     obtain ⟨balances, transferOk, rfl⟩ := transferFor_ok moved
-    simpa only [dispatchAfter, failure, Bool.false_eq_true, ↓reduceIte, dispatchWith, AccountRuntime.dispatch, dispatchRun, accountRun, childRequest] using
-      dispatch_transferred_preserves childrenPreserved stable references argument related ready funds' transferOk executed
+    rw [dispatch_precompile_eq]
+    simpa only [dispatchAfter, failure, Bool.false_eq_true, ↓reduceIte] using
+      dispatch_transferred_preserves childrenPreserved (precompileCode_preservation requestCode)
+        stable references argument related ready funds' transferOk executed
   | fault funds moved executed =>
     have funds' : ¬ request.value > StorageSemantics.readWord source state.balances := by simpa using funds
     obtain ⟨balances, transferOk, rfl⟩ := transferFor_ok moved
-    exact dispatch_transferred_preserves childrenPreserved stable references argument related ready funds' transferOk executed
+    rw [dispatch_precompile_eq]
+    exact dispatch_transferred_preserves childrenPreserved (precompileCode_preservation requestCode)
+      stable references argument related ready funds' transferOk executed
 
 end Solcore.Frontend.RustHull.AccountCallCorrespondence

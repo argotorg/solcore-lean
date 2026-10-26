@@ -77,6 +77,7 @@ theorem run_children_preserves {mode : AccountCallSemantics.Mode} {anchors : Lis
     {extended precompiled : Code} {source : Core.Word} {request : AccountCallSemantics.Request}
     {state finalState : AccountCallSemantics.Shared} {result : Semantics.Result AccountCallSemantics.Response}
     (childrenPreserved : ChildRunPreservation mode anchors locations shared runFrame children valid depth environment)
+    (precompiledPreserved : PrecompiledPreservation precompiled request depth environment)
     (references : SharedReferences depth environment shared locations)
     (argument : CodeValue depth environment extended (extendedValue mode source request))
     (related : LinkedSharedStateRel anchors locations state store) (ready : valid store)
@@ -85,6 +86,11 @@ theorem run_children_preserves {mode : AccountCallSemantics.Mode} {anchors : Lis
       ResponseRel result target ∧ LinkedSharedStateRel anchors locations finalState final ∧
       SharedFrame locations store final := by
   cases computed with
+  | precompile executed =>
+    obtain ⟨target, final, evaluated, responded, retained⟩ := precompiledPreserved executed [] store
+    refine ⟨target, final, ?_, responded, related.retained retained, .ofRetains retained⟩
+    exact accountRun_precompile_evaluates ((argument.part (index := 0) rfl).part (index := 0) rfl)
+      executed.precompiled (by simpa only [List.nil_append, List.length_nil, Nat.add_zero] using evaluated)
   | empty ordinary absent complete =>
     obtain ⟨final, evaluated, retained⟩ := accountRun_absent references
       ((argument.part (index := 0) rfl).part (index := 0) rfl) related.shared ordinary absent

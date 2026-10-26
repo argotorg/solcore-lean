@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.AccountCallCheckpointCorrespondence
 import Solcore.Frontend.RustHull.AccountCallTransferCorrespondence
 import Solcore.Frontend.RustHull.AccountCallRunCorrespondence
+import Solcore.Frontend.RustHull.PrecompileCallCorrespondence
 
 /-! Independent account dispatch reaches the actual checkpoint, funds check,
 and world lookup before a child closure would be selected. -/
@@ -228,6 +229,124 @@ theorem dispatch_unavailable {depth : Nat} {environment : Core.Environment} {ini
   apply Core.Evaluates.letE restored
   exact .inLeft (((CodeValue.bound (depth + 6) runEnv (.word (Core.Word.ofNatModulo 7))).prepend [.unit]).evaluates final)
 
+/-- The shared state after a transferred precompile call: a successful response
+keeps the transfer, while a false response or a fault restores the checkpoint. -/
+def precompileAfter (state : AccountCallSemantics.Shared) (balances : StorageSemantics.Words) :
+    Semantics.Result AccountCallSemantics.Response → AccountCallSemantics.Shared
+  | .value response => if response.success then {state with balances := balances} else state
+  | .fault _ => state
+
+/-- After the transfer, a precompiled target answers through the actual
+precompile call without a world lookup. The checkpoint restores the balances
+after a false response or a language fault. -/
+theorem dispatch_precompile {depth : Nat} {environment : Core.Environment} {initial : Core.Store}
+    {shared : AccountRuntime.References} {runFrame : Code → Code → Code} {extended : Code}
+    {locations : SharedLocations} {source : Core.Word} {request : AccountCallSemantics.Request}
+    {state : AccountCallSemantics.Shared} {balances : StorageSemantics.Words}
+    {result : Semantics.Result AccountCallSemantics.Response}
+    (references : SharedReferences depth environment shared locations)
+    (argument : CodeValue depth environment extended (extendedValue source request))
+    (related : SharedStateRel locations state initial)
+    (funds : ¬ request.value > StorageSemantics.readWord source state.balances)
+    (moved : AccountCallSemantics.transfer source request.target request.value state.balances = .ok balances)
+    (computed : AccountCallSemantics.Precompile request result) :
+    ∃ target final, Core.Evaluates environment initial (AccountRuntime.dispatch shared runFrame extended depth) target final ∧
+      ResponseRel result target ∧ SharedStateRel locations (precompileAfter state balances result) final ∧
+      BalanceFrame locations.balances initial final := by
+  obtain ⟨accounts, worldSame, worldRead⟩ := related.world
+  let saved : Core.Environment := [WordMapping.encode state.balances, .word state.logSize,
+    WordMapping.encode state.logs, StorageCorrespondence.world accounts]
+  have innerReferences := references.prepend saved
+  have innerArgument := argument.prepend saved
+  obtain ⟨first, looked, retained⟩ := lookup_preserves
+    (.loadCell (innerReferences.balances.evaluates initial) related.balances)
+    ((innerArgument.part (index := 2) rfl).evaluates initial)
+  let sourceBalance := StorageSemantics.readWord source state.balances
+  let extra := .word sourceBalance :: saved
+  have afterArgument := argument.prepend extra
+  have requestCode := afterArgument.part (index := 0) rfl
+  obtain ⟨transferred, transferEvaluated, balanceFinal, transferFrame⟩ := transfer_preserves (references.balances.prepend extra)
+    (afterArgument.part (index := 2) rfl) (requestCode.part (index := 0) rfl) (requestCode.part (index := 2) rfl)
+    (retained_read retained related.balances)
+  rw [moved] at transferEvaluated balanceFinal
+  have combined := (BalanceFrame.ofRetains retained).trans transferFrame
+  have transferredRelated : SharedStateRel locations {state with balances := balances} transferred :=
+    related.balances_updated combined balanceFinal
+  have distinct := related.distinct
+  simp only [SharedLocations.all, List.nodup_cons, List.mem_cons, List.not_mem_nil, or_false,
+    not_or, List.nodup_nil, and_true] at distinct
+  have worldTransferred : transferred.read? locations.world = some (StorageCorrespondence.world accounts) :=
+    (combined.other locations.world distinct.1.2.2.1 (List.getElem?_eq_some_iff.mp worldRead).1).trans worldRead
+  let runExtra := .unit :: extra
+  let runEnv := runExtra ++ environment
+  have runRequest := (argument.prepend runExtra).part (index := 0) rfl
+  obtain ⟨runTarget, ran, runEvaluated, runRelated, runRetained⟩ :=
+    PrecompileCorrespondence.precompile_preserves (store := transferred) runRequest computed
+  have ranRelated := transferredRelated.retained runRetained
+  have ranFrame := combined.trans (.ofRetains runRetained)
+  let restored := ran.set locations.balances (WordMapping.encode state.balances)
+  have restoredFrame := ranFrame.trans (BalanceFrame.write locations.balances ran (WordMapping.encode state.balances))
+  have restoredBalance : Core.Store.read? restored locations.balances = some (WordMapping.encode state.balances) :=
+    List.getElem?_set_self (List.getElem?_eq_some_iff.mp ranRelated.balances).1
+  have restoredRelated : SharedStateRel locations state restored :=
+    related.balances_updated restoredFrame restoredBalance
+  cases runRelated with
+  | returned response =>
+    have responseCode := CodeValue.bound (depth + 6) runEnv (responseValue response)
+    cases success : response.success with
+    | true =>
+      refine ⟨_, ran, ?_, .returned _, by simpa only [precompileAfter, success, ↓reduceIte] using ranRelated, ranFrame⟩
+      apply checkpoint_evaluates references worldRead related.logs related.logSize related.balances
+      apply LanguageResult.bind_success Calls.responseType looked
+      apply Core.Evaluates.ifFalse
+      · apply Core.Evaluates.ifFalse (.binary ((afterArgument.part (index := 1) rfl).evaluates first) .word rfl)
+        exact .binary ((requestCode.part (index := 2) rfl).evaluates first)
+          ((CodeValue.bound (depth + 4) (saved ++ environment) (.word sourceBalance)).evaluates first)
+          (by simp [BinaryOp.apply, sourceBalance, funds])
+      apply LanguageResult.bind_success Calls.responseType
+        (.ifTrue (.binary ((afterArgument.part (index := 1) rfl).evaluates first) .word rfl) transferEvaluated)
+      apply Core.Evaluates.caseRight
+        (accountRun_precompile_evaluates (runRequest.part (index := 0) rfl) computed.precompiled runEvaluated)
+      exact .ifTrue (by simpa only [success, responseValues, List.length_cons, List.length_nil, Nat.add_assoc] using
+        (responseCode.part (index := 0) rfl).evaluates ran) (.inRight (responseCode.evaluates ran))
+    | false =>
+      refine ⟨_, restored, ?_, .returned _, by simpa only [precompileAfter, success, Bool.false_eq_true, ↓reduceIte]
+        using restoredRelated, restoredFrame⟩
+      apply checkpoint_evaluates references worldRead related.logs related.logSize related.balances
+      apply LanguageResult.bind_success Calls.responseType looked
+      apply Core.Evaluates.ifFalse
+      · apply Core.Evaluates.ifFalse (.binary ((afterArgument.part (index := 1) rfl).evaluates first) .word rfl)
+        exact .binary ((requestCode.part (index := 2) rfl).evaluates first)
+          ((CodeValue.bound (depth + 4) (saved ++ environment) (.word sourceBalance)).evaluates first)
+          (by simp [BinaryOp.apply, sourceBalance, funds])
+      apply LanguageResult.bind_success Calls.responseType
+        (.ifTrue (.binary ((afterArgument.part (index := 1) rfl).evaluates first) .word rfl) transferEvaluated)
+      apply Core.Evaluates.caseRight
+        (accountRun_precompile_evaluates (runRequest.part (index := 0) rfl) computed.precompiled runEvaluated)
+      apply Core.Evaluates.ifFalse (by simpa only [success, responseValues, List.length_cons, List.length_nil, Nat.add_assoc]
+        using (responseCode.part (index := 0) rfl).evaluates ran)
+      apply Core.Evaluates.letE (checkpointRestore_evaluates (balances := WordMapping.encode state.balances) references
+        [responseValue response, .unit, .word sourceBalance] (retained_read runRetained worldTransferred)
+        ranRelated.logs ranRelated.logSize ranRelated.balances related.distinct)
+      exact .inRight ((responseCode.prepend [.unit]).evaluates restored)
+  | language reason =>
+    refine ⟨_, restored, ?_, .language _, by simpa only [precompileAfter] using restoredRelated, restoredFrame⟩
+    apply checkpoint_evaluates references worldRead related.logs related.logSize related.balances
+    apply LanguageResult.bind_success Calls.responseType looked
+    apply Core.Evaluates.ifFalse
+    · apply Core.Evaluates.ifFalse (.binary ((afterArgument.part (index := 1) rfl).evaluates first) .word rfl)
+      exact .binary ((requestCode.part (index := 2) rfl).evaluates first)
+        ((CodeValue.bound (depth + 4) (saved ++ environment) (.word sourceBalance)).evaluates first)
+        (by simp [BinaryOp.apply, sourceBalance, funds])
+    apply LanguageResult.bind_success Calls.responseType
+      (.ifTrue (.binary ((afterArgument.part (index := 1) rfl).evaluates first) .word rfl) transferEvaluated)
+    apply Core.Evaluates.caseLeft
+      (accountRun_precompile_evaluates (runRequest.part (index := 0) rfl) computed.precompiled runEvaluated)
+    apply Core.Evaluates.letE (checkpointRestore_evaluates (balances := WordMapping.encode state.balances) references
+      [.word reason, .unit, .word sourceBalance] (retained_read runRetained worldTransferred)
+      ranRelated.logs ranRelated.logSize ranRelated.balances related.distinct)
+    exact .inLeft (((CodeValue.bound (depth + 6) runEnv (.word reason)).prepend [.unit]).evaluates restored)
+
 theorem transferFor_error {source : Core.Word} {request : AccountCallSemantics.Request}
     {state : AccountCallSemantics.Shared} {reason : Core.Word}
     (failed : AccountCallSemantics.transferFor .ordinary source request state = .error reason) :
@@ -280,6 +399,11 @@ theorem dispatch_preserves {depth : Nat} {environment : Core.Environment} {initi
     have funds' : ¬ request.value > StorageSemantics.readWord source state.balances := by simpa using funds
     obtain ⟨balances, transferOk, rfl⟩ := transferFor_ok moved
     cases executed with
+    | precompile executed =>
+      obtain ⟨target, final, evaluated, responded, finalRelated, frame⟩ :=
+        dispatch_precompile references argument related funds' transferOk executed
+      exact ⟨target, final, evaluated, responded,
+        by simpa only [precompileAfter, success, ↓reduceIte] using finalRelated, frame⟩
     | empty ordinary absent complete =>
       obtain ⟨final, evaluated, finalRelated, frame⟩ :=
         dispatch_empty references argument related funds' transferOk ordinary absent complete
@@ -287,12 +411,23 @@ theorem dispatch_preserves {depth : Nat} {environment : Core.Environment} {initi
     | child impossible => exact False.elim impossible
   | refused funds moved executed failure =>
     cases executed with
+    | precompile executed =>
+      have funds' : ¬ request.value > StorageSemantics.readWord source state.balances := by simpa using funds
+      obtain ⟨balances, transferOk, rfl⟩ := transferFor_ok moved
+      obtain ⟨target, final, evaluated, responded, finalRelated, frame⟩ :=
+        dispatch_precompile references argument related funds' transferOk executed
+      exact ⟨target, final, evaluated, responded,
+        by simpa only [precompileAfter, failure, Bool.false_eq_true, ↓reduceIte] using finalRelated, frame⟩
     | empty ordinary absent complete => cases failure
     | child impossible => exact False.elim impossible
   | fault funds moved executed =>
     have funds' : ¬ request.value > StorageSemantics.readWord source state.balances := by simpa using funds
     obtain ⟨balances, transferOk, rfl⟩ := transferFor_ok moved
     cases executed with
+    | precompile executed =>
+      obtain ⟨target, final, evaluated, responded, finalRelated, frame⟩ :=
+        dispatch_precompile references argument related funds' transferOk executed
+      exact ⟨target, final, evaluated, responded, by simpa only [precompileAfter] using finalRelated, frame⟩
     | unavailable ordinary absent incomplete =>
       obtain ⟨final, evaluated, finalRelated, frame⟩ :=
         dispatch_unavailable references argument related funds' transferOk ordinary absent incomplete

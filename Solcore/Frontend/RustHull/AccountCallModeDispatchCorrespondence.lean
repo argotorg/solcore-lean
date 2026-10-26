@@ -54,6 +54,7 @@ theorem dispatch_untransferred_preserves {mode : AccountCallSemantics.Mode} {anc
     {state attempted : AccountCallSemantics.Shared}
     {result : Semantics.Result AccountCallSemantics.Response}
     (childrenPreserved : ChildRunPreservation mode anchors locations shared runFrame children valid depth environment)
+    (precompiledPreserved : PrecompiledPreservation precompiled request depth environment)
     (stable : ∀ {first last}, SharedFrame locations first last → valid first → valid last)
     (references : SharedReferences depth environment shared locations)
     (argument : CodeValue depth environment extended (extendedValue mode source request))
@@ -79,9 +80,9 @@ theorem dispatch_untransferred_preserves {mode : AccountCallSemantics.Mode} {anc
   let runExtra := .unit :: extra
   let runEnv := runExtra ++ environment
   obtain ⟨output, afterRun, runEvaluated, resultRelated, afterRelated, runFrameProof⟩ :=
-    run_children_preserves (childrenPreserved.prepend runExtra) (references.prepend runExtra)
-      (argument.prepend runExtra) (related.retained retained) (stable (.ofRetains retained) ready) computed
-      (precompiled := precompiled)
+    run_children_preserves (childrenPreserved.prepend runExtra) (precompiledPreserved.prepend runExtra)
+      (references.prepend runExtra) (argument.prepend runExtra) (related.retained retained)
+      (stable (.ofRetains retained) ready) computed
   have throughRun : SharedFrame locations initial afterRun := (SharedFrame.ofRetains retained).trans runFrameProof
   have enter {target : Core.Value} {final : Core.Store}
       (continued : Core.Evaluates runEnv first
@@ -172,6 +173,8 @@ theorem dispatch_children_preserves {mode : AccountCallSemantics.Mode}
   by_cases ordinary : mode = .ordinary
   · subst mode
     exact AccountCallCorrespondence.dispatch_children_preserves childrenPreserved stable references argument related ready computed
+  have requestCode : CodeValue depth environment (part 0 3 extended) (requestValue request) :=
+    argument.part (index := 0) rfl
   cases computed with
   | insufficient checked shortfall =>
     obtain ⟨final, evaluated, retained⟩ := dispatch_insufficient references argument related.shared checked shortfall
@@ -183,16 +186,20 @@ theorem dispatch_children_preserves {mode : AccountCallSemantics.Mode}
     contradiction
   | succeeded funds moved executed success =>
     cases transferFor_noTransfer ordinary moved
-    simpa only [dispatchAfter, success, ↓reduceIte, dispatchWith, AccountRuntime.dispatch,
-      dispatchRun, accountRun, childRequest] using
-      dispatch_untransferred_preserves childrenPreserved stable references argument related ready ordinary funds executed
+    rw [dispatch_precompile_eq]
+    simpa only [dispatchAfter, success, ↓reduceIte] using
+      dispatch_untransferred_preserves childrenPreserved (precompileCode_preservation requestCode) stable references
+        argument related ready ordinary funds executed
   | refused funds moved executed failure =>
     cases transferFor_noTransfer ordinary moved
-    simpa only [dispatchAfter, failure, Bool.false_eq_true, ↓reduceIte, dispatchWith, AccountRuntime.dispatch,
-      dispatchRun, accountRun, childRequest] using
-      dispatch_untransferred_preserves childrenPreserved stable references argument related ready ordinary funds executed
+    rw [dispatch_precompile_eq]
+    simpa only [dispatchAfter, failure, Bool.false_eq_true, ↓reduceIte] using
+      dispatch_untransferred_preserves childrenPreserved (precompileCode_preservation requestCode) stable references
+        argument related ready ordinary funds executed
   | fault funds moved executed =>
     cases transferFor_noTransfer ordinary moved
-    exact dispatch_untransferred_preserves childrenPreserved stable references argument related ready ordinary funds executed
+    rw [dispatch_precompile_eq]
+    exact dispatch_untransferred_preserves childrenPreserved (precompileCode_preservation requestCode) stable references
+      argument related ready ordinary funds executed
 
 end Solcore.Frontend.RustHull.AccountCallModeCorrespondence

@@ -241,9 +241,9 @@ local cells throughout child execution and return-data extraction.
 
 This theorem permits arbitrary successfully compiled catalogs with the stated
 source-to-catalog correspondence. Selected children use the established effect
-language without further external calls (`CallFree`). Nested calls are covered by the finite-height theorem below. Root reentry,
-precompiles remain outside these instances; the mode theorem below covers
-CALLCODE and DELEGATECALL.
+language without further external calls (`CallFree`). Nested calls are covered by the finite-height theorem below. Root reentry
+remains outside these instances; the mode theorem below covers CALLCODE and
+DELEGATECALL. Identity precompile calls are covered as described below.
 
 `Tests.RustHullChildCallCorrespondence.public_resumes` supplies four independent
 source derivations: a child returns after memory, storage, transient storage and
@@ -315,6 +315,35 @@ They check fresh child calldata and memory, retained parent memory, shared
 storage, return bytes and repeated public resumptions. Their public proofs
 require only actual compilation success.
 
+The identity precompile is connected through the same account dispatch. Its
+independent rule, `AccountCallSemantics.Precompile`, applies to address 4. It
+charges 15 gas plus 3 per started input word, computed over natural numbers and
+compared with the forwarded gas. A funded call returns a byte copy of the
+complete input, specified by `MemoryCopySemantics.Copy`. Forwarded gas below
+the charge fails the call without return data, and an unaddressable input range
+is a memory fault. `Run.precompile` adds this rule to dispatch without changing
+shared state. Value transfer and checkpoint rules are those of ordinary
+dispatch, so a false response or a fault restores the transferred balances.
+
+The proof reaches the actual `AccountRuntime.dispatch`, its precompile wrapper
+and `Precompiles.staticCall`. The identity branch runs the actual copy loop into
+fresh result memory, publishes the return data and copies the empty output
+range. Both implementation files keep these builders private.
+`PrecompileCorrespondence.staticCall_shape` and
+`AccountCallCorrespondence.dispatch_precompile_eq` restate them with public
+builders and prove each restatement by `rfl`; the other precompile branches stay
+opaque. The public call theorems for child-free calls, compiled children,
+finite nested children, call modes and root reentry keep their statements.
+Their source semantics now includes identity calls.
+
+`Tests.RustHullPrecompileCorrespondence.public_resumes` supplies four independent
+source derivations: a funded identity call whose output is copied into caller
+memory, an underfunded call, a value transfer to address 4 and a static call.
+Runtime checks compare returned bytes, committed balances, repeated
+resumptions and the retained Core snapshot. ECRECOVER, SHA-256, RIPEMD-160 and
+P256VERIFY have no source rule, so the public theorems state nothing about
+calls to them.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -323,7 +352,7 @@ require only actual compilation success.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. Precompiles and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity precompile and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. The other four precompiles and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -340,9 +369,10 @@ and do not discharge those obligations. The
 continuous bounded campaigns, backend and grammar coverage, and the native
 Source public proof connection before this remaining Hull work.
 
-The next deferred public proof connection is the identity precompile, through
-its independent byte-copy and gas semantics, actual dispatch and public
-execution. The remaining precompiles, creation and assembly follow as their
+The identity precompile is connected through its independent byte-copy and
+gas semantics, actual dispatch and public execution. ECRECOVER, SHA-256,
+RIPEMD-160 and P256VERIFY each still need an independent algorithm semantics
+connected to its Core implementation; creation and assembly follow as their
 proof domains are connected. Each proof step must derive runtime inputs from
 actual initialization and end in a public theorem consumer. Executable support
 and test agreement alone do not close these obligations.
@@ -350,14 +380,15 @@ and test agreement alone do not close these obligations.
 ## Remaining public connections
 
 `call` and `staticcall` have public connections for calls without child execution,
-finite nested compiled children and root reentry. Precompile branches remain.
+finite nested compiled children, root reentry and the identity precompile. The
+other precompile branches remain.
 Two builtins still have no public effect connection: `create` and
 `create2`. CALLCODE and DELEGATECALL are covered by the same
 finite nested-child connection.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Connect precompiles. Reuse actual child allocation, finite call-tree induction, checkpoint restoration and public resumptions. |
+| 1 | Contract calls | Connect ECRECOVER (1), SHA-256 (2), RIPEMD-160 (3) and P256VERIFY (0x100) through independent algorithm semantics. Reuse the identity connection's dispatch, checkpoint restoration and public resumptions. |
 | 2 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |

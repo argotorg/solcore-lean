@@ -41,6 +41,17 @@ def accountRun (shared : AccountRuntime.References) (target precompiled : Code) 
         (failure Calls.responseType (number 15)))
       (child record)
 
+/-- A precompiled target runs the supplied precompile code; no world lookup
+or account frame is reached. -/
+theorem accountRun_precompile_evaluates {depth : Nat} {environment : Core.Environment} {initial final : Core.Store}
+    {shared : AccountRuntime.References} {targetCode precompiled : Code} {child : Code → Code}
+    {target : Core.Word} {result : Core.Value}
+    (argument : CodeValue depth environment targetCode (.word target))
+    (precompiledTarget : AccountCallSemantics.isPrecompile target = true)
+    (evaluated : Core.Evaluates environment initial (precompiled depth) result final) :
+    Core.Evaluates environment initial (accountRun shared targetCode precompiled child depth) result final :=
+  .ifTrue (by simpa only [precompiledTarget] using isPrecompile_evaluates argument) evaluated
+
 def emptyRunResult (complete : Bool) : Core.Value :=
   if complete then .inRight .word (responseValue (AccountCallSemantics.emptyResponse true))
   else .inLeft Calls.responseType (.word (Word.ofNatModulo 7))
