@@ -439,6 +439,114 @@ theorem aRenderIH_newCellLet {inner body : CoreExpr} (innerIH : ARenderIH inner)
       · exact same ▸ cellTemp' _ (by omega)
       · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
 
+/-- A `let` of a Word, Boolean, pair or sum value copies it to a fresh
+temporary, which the body sees as a value binding. -/
+theorem aletValue_spec {initializer body : CoreExpr} {kindTarget target : ATarget}
+    {functions : List String} {bindings : List Binding} {indent first : Nat}
+    {initial rest : ARendered} {value : String}
+    (unitKind : ¬ kindTarget = .unit) (fresh : ANamesFresh bindings first)
+    (initSpec : ARenderSpec admits initializer kindTarget functions bindings indent first initial)
+    (valueFound : initial.value = some value)
+    (bodySpec : ARenderSpec admits body target functions
+      (valueBinding kindTarget (temporary initial.nextId) :: bindings) indent
+      (initial.nextId + 1) rest) :
+    ARenderSpec admits (.letE initializer body) target functions bindings indent first
+      ⟨initial.lines ++ Stmt.lines indent (.letDecl (temporary initial.nextId)
+          (ATarget.localType kindTarget) (.name value)) ++ rest.lines,
+        rest.value, rest.nextId⟩ := by
+  obtain ⟨initStatements, initLines, initLe, initValue, initNames, initSimulates⟩ := initSpec
+  obtain ⟨bodyStatements, bodyLines, bodyLe, bodyValue, bodyNames, bodySimulates⟩ := bodySpec
+  have bound : ∀ last, initial.nextId < last →
+      ATempIn first last (temporary initial.nextId) :=
+    fun _ lt => aTempIn_temporary initLe lt
+  refine ⟨initStatements ++ [.letDecl (temporary initial.nextId) (ATarget.localType kindTarget)
+    (.name value)] ++ bodyStatements, ?_, by dsimp only; omega, ?_, ?_, ?_⟩
+  · simp only [Stmt.listLines_append, initLines, bodyLines, Stmt.listLines, List.append_nil]
+  · intro name same
+    rcases (bodyValue name same).mono (Nat.le_succ_of_le initLe) (Nat.le_refl _) with
+      ⟨index, kind, valued, found⟩ | ⟨index, rfl, lower, upper⟩
+    · cases index with
+      | zero =>
+          simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+          have sameName : name = temporary initial.nextId := by
+            have := congrArg abindingName? found
+            rw [valueBinding_name unitKind, valueBinding_name valued] at this
+            exact (Option.some.inj this).symm
+          subst sameName
+          exact Or.inr ⟨initial.nextId, rfl, initLe, by dsimp only; omega⟩
+      | succ index => exact Or.inl ⟨index, kind, valued, by simpa using found⟩
+    · exact Or.inr ⟨index, rfl, lower, upper⟩
+  · intro name mem
+    simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
+      Stmt.identifiers, Expr.identifiers, List.append_nil, List.mem_cons, List.not_mem_nil,
+      or_false] at mem
+    rcases mem with (mem | same | same) | mem
+    · exact (initNames name mem).mono (Nat.le_refl _) (by dsimp only; omega)
+    · subst same
+      exact Or.inr (Or.inr (Or.inl (bound _ (by dsimp only; omega))))
+    · subst same
+      exact (initValue name valueFound).uses.mono (Nat.le_refl _) (by dsimp only; omega)
+    · exact (bodyNames name mem).of_cons
+        (fun found same => by
+          rw [valueBinding_name unitKind] at same
+          cases same
+          exact bound _ (by omega))
+        (Nat.le_succ_of_le initLe)
+  · dsimp only
+    intro context environment store scope outer admitted agree distinctCells lengthOk
+      functionsOk
+    obtain ⟨initCore, store₁, scope₁, outer₁, added₁, initEvaluates, initRepresents, initExec,
+      agree₁, frame₁, keeps₁, shape₁, names₁, addedTemp₁⟩ :=
+      initSimulates context environment store scope outer admitted agree distinctCells
+        lengthOk functionsOk
+    rw [valueFound, Option.bind_some] at initRepresents
+    obtain ⟨source, lookupValue, represents⟩ := initRepresents.value unitKind
+    have bodyAgree : ABindingsAgree (((temporary initial.nextId, source) :: scope₁) :: outer₁)
+        (valueBinding kindTarget (temporary initial.nextId) :: bindings)
+        (initCore :: environment) store₁ := by
+      refine (agree₁.declare (fresh.ne_temp (bound _ (Nat.lt_succ_self _))) source).cons ?_
+      rw [valueBinding_holds unitKind]
+      simp only [Frames.lookup_declared, if_pos]
+      exact ARepresents.of_value represents
+    have notCellBinding : ∀ name, valueBinding kindTarget (temporary initial.nextId) ≠
+        .cellWord name := fun name => valueBinding_ne_cell _ _
+    obtain ⟨bodyCore, store₂, scope₂, outer₂, added₂, bodyEvaluates, bodyRepresents, bodyExec,
+      agree₂, frame₂, keeps₂, shape₂, names₂, addedTemp₂⟩ :=
+      bodySimulates context (initCore :: environment) store₁
+        ((temporary initial.nextId, source) :: scope₁) outer₁ admitted bodyAgree
+        (distinctCells.cons_value notCellBinding) (by simp; omega) (by simpa using functionsOk)
+    have outside : ∀ name, ¬ ATempIn first rest.nextId name →
+        temporary initial.nextId ≠ name :=
+      fun name notTemp same => notTemp (same ▸ bound _ (by omega))
+    refine ⟨bodyCore, store₂, scope₂, outer₂, added₂ ++ temporary initial.nextId :: added₁,
+      ?_, bodyRepresents, ?_, agree₂.tail, ?_, ?_, shape₂.trans shape₁, ?_, ?_⟩
+    · simp only [Solcore.Core.Wire.Expr.toCore]
+      exact .letE initEvaluates bodyEvaluates
+    · rw [Stmt.execList_append, Stmt.execList_append, initExec]
+      simp [Stmt.execList, Stmt.exec, Expr.eval, lookupValue, represents.admits,
+        Frames.declare, bodyExec]
+    · exact frame₁.trans (frame₂.of_cons notCellBinding)
+    · intro name notTemp notCell
+      rw [keeps₂ name (fun temp => notTemp (aTempIn_mono temp (by omega) (Nat.le_refl _)))
+          (fun index found => ?_),
+        Frames.lookup_declared, if_neg (outside name notTemp),
+        keeps₁ name (fun temp => notTemp (aTempIn_mono temp (Nat.le_refl _) (by omega)))
+          notCell]
+      cases index with
+      | zero => exact notCellBinding name (by simpa using found)
+      | succ index => exact notCell index (by simpa using found)
+    · rw [names₂]
+      show added₂ ++ temporary initial.nextId :: scope₁.names =
+        (added₂ ++ temporary initial.nextId :: added₁) ++ scope.names
+      rw [names₁]
+      simp
+    · intro name mem
+      simp only [List.mem_append, List.mem_cons] at mem
+      rcases mem with mem | same | mem
+      · exact aTempIn_mono (addedTemp₂ name mem) (by omega) (Nat.le_refl _)
+      · exact same ▸ bound _ (by omega)
+      · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
+
 /-- A `let` of a Unit or value initializer. A Unit binding has no source name;
 a Word, Boolean, pair or sum value is copied to a fresh immutable temporary. -/
 theorem aRenderIH_letE {initializer body : CoreExpr}
@@ -524,12 +632,9 @@ theorem aRenderIH_letE {initializer body : CoreExpr}
         · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
   · obtain ⟨initial, value, rest, initialEquation, valueFound, restEquation, rfl⟩ :=
       AggregateEquations.letE_value_ok notCell unitKind inferred equation
-    obtain ⟨initStatements, initLines, initLe, initValue, initNames, initSimulates⟩ :=
-      initializerIH admits initializerReady functions kindTarget bindings indent first initial
-        initializerKind initialEquation fresh distinct
-    have bound : ∀ last, initial.nextId < last →
-        ATempIn first last (temporary initial.nextId) :=
-      fun _ lt => aTempIn_temporary initLe lt
+    have initSpec := initializerIH admits initializerReady functions kindTarget bindings indent
+      first initial initializerKind initialEquation fresh distinct
+    have initLe := initSpec.le
     have bodyFresh : ANamesFresh (valueBinding kindTarget (temporary initial.nextId) :: bindings)
         (initial.nextId + 1) := by
       refine fresh.cons (Nat.le_succ_of_le initLe) fun name same => ?_
@@ -545,98 +650,10 @@ theorem aRenderIH_letE {initializer body : CoreExpr}
     have bodyKind' : initializerKind? ((valueBinding kindTarget (temporary initial.nextId) ::
         bindings).map Binding.kind) functions.length body = some target.toLocal := by
       simpa [valueBinding_kind unitKind] using bodyKind
-    obtain ⟨bodyStatements, bodyLines, bodyLe, bodyValue, bodyNames, bodySimulates⟩ :=
-      bodyIH admits bodyReady functions target
+    exact aletValue_spec unitKind fresh initSpec valueFound
+      (bodyIH admits bodyReady functions target
         (valueBinding kindTarget (temporary initial.nextId) :: bindings) indent
-        (initial.nextId + 1) rest bodyKind' restEquation bodyFresh bodyDistinct
-    refine ⟨initStatements ++ [.letDecl (temporary initial.nextId) (ATarget.localType kindTarget)
-      (.name value)] ++ bodyStatements, ?_, by dsimp only; omega, ?_, ?_, ?_⟩
-    · simp only [Stmt.listLines_append, initLines, bodyLines, Stmt.listLines, List.append_nil]
-    · intro name same
-      rcases (bodyValue name same).mono (Nat.le_succ_of_le initLe) (Nat.le_refl _) with
-        ⟨index, kind, valued, found⟩ | ⟨index, rfl, lower, upper⟩
-      · cases index with
-        | zero =>
-            simp only [List.getElem?_cons_zero, Option.some.injEq] at found
-            have sameName : name = temporary initial.nextId := by
-              have := congrArg abindingName? found
-              rw [valueBinding_name unitKind, valueBinding_name valued] at this
-              exact (Option.some.inj this).symm
-            subst sameName
-            exact Or.inr ⟨initial.nextId, rfl, initLe, by dsimp only; omega⟩
-        | succ index => exact Or.inl ⟨index, kind, valued, by simpa using found⟩
-      · exact Or.inr ⟨index, rfl, lower, upper⟩
-    · intro name mem
-      simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
-        Stmt.identifiers, Expr.identifiers, List.append_nil, List.mem_cons, List.not_mem_nil,
-        or_false] at mem
-      rcases mem with (mem | same | same) | mem
-      · exact (initNames name mem).mono (Nat.le_refl _) (by dsimp only; omega)
-      · subst same
-        exact Or.inr (Or.inr (Or.inl (bound _ (by dsimp only; omega))))
-      · subst same
-        exact (initValue name valueFound).uses.mono (Nat.le_refl _) (by dsimp only; omega)
-      · exact (bodyNames name mem).of_cons
-          (fun found same => by
-            rw [valueBinding_name unitKind] at same
-            cases same
-            exact bound _ (by omega))
-          (Nat.le_succ_of_le initLe)
-    · dsimp only
-      intro context environment store scope outer admitted agree distinctCells lengthOk
-        functionsOk
-      obtain ⟨initCore, store₁, scope₁, outer₁, added₁, initEvaluates, initRepresents, initExec,
-        agree₁, frame₁, keeps₁, shape₁, names₁, addedTemp₁⟩ :=
-        initSimulates context environment store scope outer admitted agree distinctCells
-          lengthOk functionsOk
-      rw [valueFound, Option.bind_some] at initRepresents
-      obtain ⟨source, lookupValue, represents⟩ := initRepresents.value unitKind
-      have bodyAgree : ABindingsAgree (((temporary initial.nextId, source) :: scope₁) :: outer₁)
-          (valueBinding kindTarget (temporary initial.nextId) :: bindings)
-          (initCore :: environment) store₁ := by
-        refine (agree₁.declare (fresh.ne_temp (bound _ (Nat.lt_succ_self _))) source).cons ?_
-        rw [valueBinding_holds unitKind]
-        simp only [Frames.lookup_declared, if_pos]
-        exact ARepresents.of_value represents
-      have notCellBinding : ∀ name, valueBinding kindTarget (temporary initial.nextId) ≠
-          .cellWord name := fun name => valueBinding_ne_cell _ _
-      obtain ⟨bodyCore, store₂, scope₂, outer₂, added₂, bodyEvaluates, bodyRepresents, bodyExec,
-        agree₂, frame₂, keeps₂, shape₂, names₂, addedTemp₂⟩ :=
-        bodySimulates context (initCore :: environment) store₁
-          ((temporary initial.nextId, source) :: scope₁) outer₁ admitted bodyAgree
-          (distinctCells.cons_value notCellBinding) (by simp; omega) (by simpa using functionsOk)
-      have outside : ∀ name, ¬ ATempIn first rest.nextId name →
-          temporary initial.nextId ≠ name :=
-        fun name notTemp same => notTemp (same ▸ bound _ (by omega))
-      refine ⟨bodyCore, store₂, scope₂, outer₂, added₂ ++ temporary initial.nextId :: added₁,
-        ?_, bodyRepresents, ?_, agree₂.tail, ?_, ?_, shape₂.trans shape₁, ?_, ?_⟩
-      · simp only [Solcore.Core.Wire.Expr.toCore]
-        exact .letE initEvaluates bodyEvaluates
-      · rw [Stmt.execList_append, Stmt.execList_append, initExec]
-        simp [Stmt.execList, Stmt.exec, Expr.eval, lookupValue, represents.admits,
-          Frames.declare, bodyExec]
-      · exact frame₁.trans (frame₂.of_cons notCellBinding)
-      · intro name notTemp notCell
-        rw [keeps₂ name (fun temp => notTemp (aTempIn_mono temp (by omega) (Nat.le_refl _)))
-            (fun index found => ?_),
-          Frames.lookup_declared, if_neg (outside name notTemp),
-          keeps₁ name (fun temp => notTemp (aTempIn_mono temp (Nat.le_refl _) (by omega)))
-            notCell]
-        cases index with
-        | zero => exact notCellBinding name (by simpa using found)
-        | succ index => exact notCell index (by simpa using found)
-      · rw [names₂]
-        show added₂ ++ temporary initial.nextId :: scope₁.names =
-          (added₂ ++ temporary initial.nextId :: added₁) ++ scope.names
-        rw [names₁]
-        simp
-      · intro name mem
-        simp only [List.mem_append, List.mem_cons] at mem
-        rcases mem with mem | same | mem
-        · exact aTempIn_mono (addedTemp₂ name mem) (by omega) (Nat.le_refl _)
-        · exact same ▸ bound _ (by omega)
-        · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
-
+        (initial.nextId + 1) rest bodyKind' restEquation bodyFresh bodyDistinct)
 /-! ### Cell writes -/
 
 /-- `storeCell` assigns the cell's `sc_c<n>` local after evaluating the value. -/
@@ -717,6 +734,177 @@ theorem aRenderIH_storeCell (index : Nat) {value : CoreExpr} (valueIH : ARenderI
       rw [lookups other, if_neg different, keeps₁ other notTemp notCell]
 
 /-! ### Conditionals -/
+
+/-- An `if` of a value type declares its zero result, then assigns the value
+of the selected branch inside the branch block. -/
+theorem aifValue_spec {condition yes no : CoreExpr} {target : ATarget}
+    {functions : List String} {bindings : List Binding} {indent first : Nat}
+    {tested selected fallback : ARendered}
+    {conditionValue selectedValue fallbackValue : String}
+    (unitTarget : ¬ target = .unit) (fresh : ANamesFresh bindings first)
+    (distinct : ANamesDistinct bindings)
+    (conditionSpec : ARenderSpec admits condition .bool functions bindings indent first tested)
+    (conditionFound : tested.value = some conditionValue)
+    (yesSpec : ARenderSpec admits yes target functions bindings (indent + 4) (tested.nextId + 1)
+      selected)
+    (selectedFound : selected.value = some selectedValue)
+    (noSpec : ARenderSpec admits no target functions bindings (indent + 4) selected.nextId
+      fallback)
+    (fallbackFound : fallback.value = some fallbackValue) :
+    ARenderSpec admits (.ifE condition yes no) target functions bindings indent first
+      ⟨tested.lines ++
+          [indentLine indent ("let " ++ temporary tested.nextId ++ ": " ++
+            target.localType.spelling ++ " = " ++ azeroText target ++ ";")] ++
+          [indentLine indent ("if (" ++ conditionValue ++ ") {")] ++ selected.lines ++
+          [indentLine (indent + 4) (temporary tested.nextId ++ " = " ++ selectedValue ++ ";"),
+            indentLine indent "} else {"] ++
+          fallback.lines ++
+          [indentLine (indent + 4) (temporary tested.nextId ++ " = " ++ fallbackValue ++ ";"),
+            indentLine indent "}"],
+        some (temporary tested.nextId), fallback.nextId⟩ := by
+  have enterNil : ∀ (scope : Scope) (outer : Frames) (environment : Solcore.Core.Environment)
+      (store : Solcore.Core.Store), ABindingsAgree (scope :: outer) bindings environment store →
+      ABindingsAgree ([] :: scope :: outer) bindings environment store :=
+    fun _ _ _ _ agree => agree.enter [] fun _ _ _ => not_mem_names_nil _
+  obtain ⟨cStatements, cLines, cLe, cValue, cNames, cSimulates⟩ := conditionSpec
+  obtain ⟨yStatements, yLines, yLe, yValue, yNames, ySimulates⟩ := yesSpec
+  obtain ⟨nStatements, nLines, nLe, nValue, nNames, nSimulates⟩ := noSpec
+  have result : ∀ last, tested.nextId < last → ATempIn first last (temporary tested.nextId) :=
+    fun _ lt => aTempIn_temporary cLe lt
+  refine ⟨cStatements ++
+      [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target),
+        .ifElse (.name conditionValue)
+          (yStatements ++ [.assign (temporary tested.nextId) (.name selectedValue)])
+          (nStatements ++ [.assign (temporary tested.nextId) (.name fallbackValue)])],
+    ?_, by dsimp only; omega, ?_, ?_, ?_⟩
+  · simp only [Stmt.listLines_append, cLines, yLines, nLines, Stmt.listLines, Stmt.lines,
+      Expr.print, azero_print unitTarget, List.append_nil, List.append_assoc,
+      List.cons_append, List.nil_append]
+  · intro name same
+    cases same
+    exact Or.inr ⟨tested.nextId, rfl, cLe, by dsimp only; omega⟩
+  · dsimp only
+    intro name mem
+    simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
+      Stmt.identifiers, Expr.identifiers, azero_identifiers, List.append_nil, List.mem_cons,
+      List.not_mem_nil, or_false] at mem
+    rcases mem with mem | same | (same | mem | same | same) | (mem | same | same)
+    · exact (cNames name mem).mono (Nat.le_refl _) (by omega)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
+    · subst same
+      exact (cValue name conditionFound).uses.mono (Nat.le_refl _) (by omega)
+    · exact (yNames name mem).mono (by omega) (by omega)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
+    · subst same
+      exact (yValue name selectedFound).uses.mono (by omega) (by omega)
+    · exact (nNames name mem).mono (by omega) (Nat.le_refl _)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
+    · subst same
+      exact (nValue name fallbackFound).uses.mono (by omega) (Nat.le_refl _)
+  · dsimp only
+    intro context environment store scope outer admitted agree distinctCells lengthOk
+      functionsOk
+    obtain ⟨cCore, store₁, scope₁, outer₁, added₁, cEvaluates, cRepresents, cExec, agree₁,
+      frame₁, keeps₁, shape₁, names₁, addedTemp₁⟩ :=
+      cSimulates context environment store scope outer admitted agree distinctCells lengthOk
+        functionsOk
+    rw [conditionFound, Option.bind_some] at cRepresents
+    obtain ⟨_, cLookup, flag, rfl, rfl⟩ := cRepresents
+    have resultTemp := result (tested.nextId + 1) (Nat.lt_succ_self _)
+    rw [selectedFound] at ySimulates
+    rw [fallbackFound] at nSimulates
+    have resultNotBinding : ∀ index found, anameAt bindings index = some found →
+        found ≠ temporary tested.nextId := fresh.ne_temp resultTemp
+    have agreeDeclared := agree₁.declare (fresh.ne_temp resultTemp) (azeroValue target)
+    have declared : Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) ::
+        outer₁) (temporary tested.nextId) = some (azeroValue target) := by
+      simp [Frames.lookup_declared]
+    have conditionSurvives : temporary tested.nextId ≠ conditionValue := by
+      intro same
+      exact ((cValue conditionValue conditionFound).survives (last := tested.nextId + 1) fresh
+        distinct cLe).1 (same ▸ aTempIn_temporary (Nat.le_refl _) (Nat.lt_succ_self _))
+    have conditionLookup : Frames.lookup (((temporary tested.nextId, azeroValue target) ::
+        scope₁) :: outer₁) conditionValue = some (.bool flag) := by
+      rw [Frames.lookup_declared, if_neg conditionSurvives]
+      exact cLookup
+    have prefixExec : Stmt.execList context (scope :: outer) (cStatements ++
+        [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target)]) =
+        some (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁) := by
+      rw [Stmt.execList_append, cExec]
+      simp [Stmt.execList, Stmt.exec, azero_eval, azeroValue_admits, Frames.declare]
+    have keepsOutside : ∀ name, ¬ ATempIn first fallback.nextId name →
+        (∀ index : Nat, bindings[index]? ≠ some (Binding.cellWord name)) →
+        Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁)
+          name = Frames.lookup (scope :: outer) name := by
+      intro name notTemp notCell
+      have different : temporary tested.nextId ≠ name := fun same =>
+        notTemp (same ▸ result _ (by omega))
+      rw [Frames.lookup_declared, if_neg different,
+        keeps₁ name (fun temp => notTemp (aTempIn_mono temp (Nat.le_refl _) (by omega)))
+          notCell]
+    have scopeNames₁ :
+        Scope.names ((temporary tested.nextId, azeroValue target) :: scope₁) =
+        (temporary tested.nextId :: added₁) ++ scope.names := by
+      show temporary tested.nextId :: scope₁.names = _
+      rw [names₁]
+      rfl
+    have addedOk : ∀ name ∈ temporary tested.nextId :: added₁,
+        ATempIn first fallback.nextId name := by
+      intro name mem
+      rcases List.mem_cons.mp mem with same | mem
+      · exact same ▸ result _ (by omega)
+      · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
+    cases flag with
+    | true =>
+        obtain ⟨branchCore, value, store₂, top, scope₂, outer₂, branchEvaluates,
+          branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
+          aarm_value unitTarget ySimulates (fresh.mono (by omega)) admitted
+            (enterNil _ _ _ _ agreeDeclared) distinctCells lengthOk functionsOk
+            (fun _ _ agree => agree) (fun _ frame => frame) (fun _ notCell => notCell)
+            (fun _ _ _ => not_mem_names_nil _)
+            (not_aTempIn_of_aTempIn resultTemp (Or.inl (Nat.le_refl _)))
+            (not_mem_names_nil _) (fresh.not_cell resultTemp) resultNotBinding declared
+        refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
+          ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
+          scopeNames.trans scopeNames₁, addedOk⟩
+        · simp only [Solcore.Core.Wire.Expr.toCore]
+          exact .ifTrue cEvaluates branchEvaluates
+        · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
+            (Or.inl (Nat.le_refl _))) (not_mem_names_nil _) (fresh.not_cell resultTemp),
+            if_pos rfl]
+          exact ARepresents.of_value branchRepresents
+        · rw [List.append_cons, Stmt.execList_append, prefixExec]
+          simp [Stmt.execList, Stmt.exec, Expr.eval, conditionLookup, branchExec]
+        · intro name notTemp notCell
+          have different : temporary tested.nextId ≠ name := fun same =>
+            notTemp (same ▸ result _ (by omega))
+          rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (by omega)))
+            (not_mem_names_nil _) notCell, if_neg different, keepsOutside name notTemp notCell]
+    | false =>
+        obtain ⟨branchCore, value, store₂, top, scope₂, outer₂, branchEvaluates,
+          branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
+          aarm_value unitTarget nSimulates (fresh.mono (by omega)) admitted
+            (enterNil _ _ _ _ agreeDeclared) distinctCells lengthOk functionsOk
+            (fun _ _ agree => agree) (fun _ frame => frame) (fun _ notCell => notCell)
+            (fun _ _ _ => not_mem_names_nil _)
+            (not_aTempIn_of_aTempIn resultTemp (Or.inl (by omega)))
+            (not_mem_names_nil _) (fresh.not_cell resultTemp) resultNotBinding declared
+        refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
+          ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
+          scopeNames.trans scopeNames₁, addedOk⟩
+        · simp only [Solcore.Core.Wire.Expr.toCore]
+          exact .ifFalse cEvaluates branchEvaluates
+        · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
+            (Or.inl (by omega))) (not_mem_names_nil _) (fresh.not_cell resultTemp),
+            if_pos rfl]
+          exact ARepresents.of_value branchRepresents
+        · rw [List.append_cons, Stmt.execList_append, prefixExec]
+          simp [Stmt.execList, Stmt.exec, Expr.eval, conditionLookup, branchExec]
+        · intro name notTemp notCell
+          have different : temporary tested.nextId ≠ name := fun same =>
+            notTemp (same ▸ result _ (by omega))
+          rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (Nat.le_refl _)))
+            (not_mem_names_nil _) notCell, if_neg different, keepsOutside name notTemp notCell]
 
 theorem aRenderIH_ifE {condition yes no : CoreExpr} (conditionIH : ARenderIH condition)
     (yesIH : ARenderIH yes) (noIH : ARenderIH no) : ARenderIH (.ifE condition yes no) := by
@@ -810,152 +998,16 @@ theorem aRenderIH_ifE {condition yes no : CoreExpr} (conditionIH : ARenderIH con
   · obtain ⟨tested, conditionValue, selected, selectedValue, fallback, fallbackValue,
       testedEquation, conditionFound, selectedEquation, selectedFound, fallbackEquation,
       fallbackFound, rfl⟩ := AggregateEquations.ifE_value_ok unitTarget equation
-    obtain ⟨cStatements, cLines, cLe, cValue, cNames, cSimulates⟩ :=
-      conditionIH admits conditionReady functions .bool bindings indent first tested
-        conditionKind testedEquation fresh distinct
-    obtain ⟨yStatements, yLines, yLe, yValue, yNames, ySimulates⟩ :=
-      yesIH admits yesReady functions target bindings (indent + 4) (tested.nextId + 1) selected
-        yesKind selectedEquation (fresh.mono (by omega)) distinct
-    obtain ⟨nStatements, nLines, nLe, nValue, nNames, nSimulates⟩ :=
-      noIH admits noReady functions target bindings (indent + 4) selected.nextId fallback noKind
-        fallbackEquation (fresh.mono (by omega)) distinct
-    have result : ∀ last, tested.nextId < last → ATempIn first last (temporary tested.nextId) :=
-      fun _ lt => aTempIn_temporary cLe lt
-    refine ⟨cStatements ++
-        [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target),
-          .ifElse (.name conditionValue)
-            (yStatements ++ [.assign (temporary tested.nextId) (.name selectedValue)])
-            (nStatements ++ [.assign (temporary tested.nextId) (.name fallbackValue)])],
-      ?_, by dsimp only; omega, ?_, ?_, ?_⟩
-    · simp only [Stmt.listLines_append, cLines, yLines, nLines, Stmt.listLines, Stmt.lines,
-        Expr.print, azero_print unitTarget, List.append_nil, List.append_assoc,
-        List.cons_append, List.nil_append]
-    · intro name same
-      cases same
-      exact Or.inr ⟨tested.nextId, rfl, cLe, by dsimp only; omega⟩
-    · dsimp only
-      intro name mem
-      simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
-        Stmt.identifiers, Expr.identifiers, azero_identifiers, List.append_nil, List.mem_cons,
-        List.not_mem_nil, or_false] at mem
-      rcases mem with mem | same | (same | mem | same | same) | (mem | same | same)
-      · exact (cNames name mem).mono (Nat.le_refl _) (by omega)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
-      · subst same
-        exact (cValue name conditionFound).uses.mono (Nat.le_refl _) (by omega)
-      · exact (yNames name mem).mono (by omega) (by omega)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
-      · subst same
-        exact (yValue name selectedFound).uses.mono (by omega) (by omega)
-      · exact (nNames name mem).mono (by omega) (Nat.le_refl _)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
-      · subst same
-        exact (nValue name fallbackFound).uses.mono (by omega) (Nat.le_refl _)
-    · dsimp only
-      intro context environment store scope outer admitted agree distinctCells lengthOk
-        functionsOk
-      obtain ⟨cCore, store₁, scope₁, outer₁, added₁, cEvaluates, cRepresents, cExec, agree₁,
-        frame₁, keeps₁, shape₁, names₁, addedTemp₁⟩ :=
-        cSimulates context environment store scope outer admitted agree distinctCells lengthOk
-          functionsOk
-      rw [conditionFound, Option.bind_some] at cRepresents
-      obtain ⟨_, cLookup, flag, rfl, rfl⟩ := cRepresents
-      have resultTemp := result (tested.nextId + 1) (Nat.lt_succ_self _)
-      rw [selectedFound] at ySimulates
-      rw [fallbackFound] at nSimulates
-      have resultNotBinding : ∀ index found, anameAt bindings index = some found →
-          found ≠ temporary tested.nextId := fresh.ne_temp resultTemp
-      have agreeDeclared := agree₁.declare (fresh.ne_temp resultTemp) (azeroValue target)
-      have declared : Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) ::
-          outer₁) (temporary tested.nextId) = some (azeroValue target) := by
-        simp [Frames.lookup_declared]
-      have conditionSurvives : temporary tested.nextId ≠ conditionValue := by
-        intro same
-        exact ((cValue conditionValue conditionFound).survives (last := tested.nextId + 1) fresh
-          distinct cLe).1 (same ▸ aTempIn_temporary (Nat.le_refl _) (Nat.lt_succ_self _))
-      have conditionLookup : Frames.lookup (((temporary tested.nextId, azeroValue target) ::
-          scope₁) :: outer₁) conditionValue = some (.bool flag) := by
-        rw [Frames.lookup_declared, if_neg conditionSurvives]
-        exact cLookup
-      have prefixExec : Stmt.execList context (scope :: outer) (cStatements ++
-          [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target)]) =
-          some (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁) := by
-        rw [Stmt.execList_append, cExec]
-        simp [Stmt.execList, Stmt.exec, azero_eval, azeroValue_admits, Frames.declare]
-      have keepsOutside : ∀ name, ¬ ATempIn first fallback.nextId name →
-          (∀ index : Nat, bindings[index]? ≠ some (Binding.cellWord name)) →
-          Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁)
-            name = Frames.lookup (scope :: outer) name := by
-        intro name notTemp notCell
-        have different : temporary tested.nextId ≠ name := fun same =>
-          notTemp (same ▸ result _ (by omega))
-        rw [Frames.lookup_declared, if_neg different,
-          keeps₁ name (fun temp => notTemp (aTempIn_mono temp (Nat.le_refl _) (by omega)))
-            notCell]
-      have scopeNames₁ :
-          Scope.names ((temporary tested.nextId, azeroValue target) :: scope₁) =
-          (temporary tested.nextId :: added₁) ++ scope.names := by
-        show temporary tested.nextId :: scope₁.names = _
-        rw [names₁]
-        rfl
-      have addedOk : ∀ name ∈ temporary tested.nextId :: added₁,
-          ATempIn first fallback.nextId name := by
-        intro name mem
-        rcases List.mem_cons.mp mem with same | mem
-        · exact same ▸ result _ (by omega)
-        · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
-      cases flag with
-      | true =>
-          obtain ⟨branchCore, value, store₂, top, scope₂, outer₂, branchEvaluates,
-            branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
-            aarm_value unitTarget ySimulates (fresh.mono (by omega)) admitted
-              (enterNil _ _ _ _ agreeDeclared) distinctCells lengthOk functionsOk
-              (fun _ _ agree => agree) (fun _ frame => frame) (fun _ notCell => notCell)
-              (fun _ _ _ => not_mem_names_nil _)
-              (not_aTempIn_of_aTempIn resultTemp (Or.inl (Nat.le_refl _)))
-              (not_mem_names_nil _) (fresh.not_cell resultTemp) resultNotBinding declared
-          refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
-            ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
-            scopeNames.trans scopeNames₁, addedOk⟩
-          · simp only [Solcore.Core.Wire.Expr.toCore]
-            exact .ifTrue cEvaluates branchEvaluates
-          · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
-              (Or.inl (Nat.le_refl _))) (not_mem_names_nil _) (fresh.not_cell resultTemp),
-              if_pos rfl]
-            exact ARepresents.of_value branchRepresents
-          · rw [List.append_cons, Stmt.execList_append, prefixExec]
-            simp [Stmt.execList, Stmt.exec, Expr.eval, conditionLookup, branchExec]
-          · intro name notTemp notCell
-            have different : temporary tested.nextId ≠ name := fun same =>
-              notTemp (same ▸ result _ (by omega))
-            rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (by omega)))
-              (not_mem_names_nil _) notCell, if_neg different, keepsOutside name notTemp notCell]
-      | false =>
-          obtain ⟨branchCore, value, store₂, top, scope₂, outer₂, branchEvaluates,
-            branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
-            aarm_value unitTarget nSimulates (fresh.mono (by omega)) admitted
-              (enterNil _ _ _ _ agreeDeclared) distinctCells lengthOk functionsOk
-              (fun _ _ agree => agree) (fun _ frame => frame) (fun _ notCell => notCell)
-              (fun _ _ _ => not_mem_names_nil _)
-              (not_aTempIn_of_aTempIn resultTemp (Or.inl (by omega)))
-              (not_mem_names_nil _) (fresh.not_cell resultTemp) resultNotBinding declared
-          refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
-            ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
-            scopeNames.trans scopeNames₁, addedOk⟩
-          · simp only [Solcore.Core.Wire.Expr.toCore]
-            exact .ifFalse cEvaluates branchEvaluates
-          · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
-              (Or.inl (by omega))) (not_mem_names_nil _) (fresh.not_cell resultTemp),
-              if_pos rfl]
-            exact ARepresents.of_value branchRepresents
-          · rw [List.append_cons, Stmt.execList_append, prefixExec]
-            simp [Stmt.execList, Stmt.exec, Expr.eval, conditionLookup, branchExec]
-          · intro name notTemp notCell
-            have different : temporary tested.nextId ≠ name := fun same =>
-              notTemp (same ▸ result _ (by omega))
-            rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (Nat.le_refl _)))
-              (not_mem_names_nil _) notCell, if_neg different, keepsOutside name notTemp notCell]
-
+    have conditionSpec := conditionIH admits conditionReady functions .bool bindings indent
+      first tested conditionKind testedEquation fresh distinct
+    have yesSpec := yesIH admits yesReady functions target bindings (indent + 4)
+      (tested.nextId + 1) selected yesKind selectedEquation
+      (fresh.mono (by have := conditionSpec.le; omega)) distinct
+    have noSpec := noIH admits noReady functions target bindings (indent + 4) selected.nextId
+      fallback noKind fallbackEquation
+      (fresh.mono (by have := conditionSpec.le; have := yesSpec.le; omega)) distinct
+    exact aifValue_spec unitTarget fresh distinct conditionSpec conditionFound yesSpec
+      selectedFound noSpec fallbackFound
 /-! ### Sum cases -/
 
 /-- A case body sees one more binding: its payload, named by a fresh pattern
@@ -1000,6 +1052,210 @@ theorem payload_cells {bindings : List Binding} (payload name : String) :
 theorem payload_kinds (payload : String) (bindings : List Binding) :
     (Binding.word payload :: bindings).map Binding.kind = .word :: bindings.map Binding.kind :=
   rfl
+
+/-- A sum `case` of a value type declares its zero result and matches the
+scrutinee once; the selected case binds the payload under a fresh pattern name
+and assigns its value to the result. -/
+theorem acaseValue_spec {scrutinee yes no : CoreExpr} {target : ATarget}
+    {functions : List String} {bindings : List Binding} {indent first : Nat}
+    {tested selected fallback : ARendered} {value selectedValue fallbackValue : String}
+    (unitTarget : ¬ target = .unit) (fresh : ANamesFresh bindings first)
+    (distinct : ANamesDistinct bindings)
+    (scrutineeSpec : ARenderSpec admits scrutinee .wordSum functions bindings indent first
+      tested)
+    (valueFound : tested.value = some value)
+    (yesSpec : ARenderSpec admits yes target functions
+      (.word (payloadTemp (tested.nextId + 1)) :: bindings) (indent + 8) (tested.nextId + 2)
+      selected)
+    (selectedFound : selected.value = some selectedValue)
+    (noSpec : ARenderSpec admits no target functions
+      (.word (payloadTemp selected.nextId) :: bindings) (indent + 8) (selected.nextId + 1)
+      fallback)
+    (fallbackFound : fallback.value = some fallbackValue) :
+    ARenderSpec admits (.caseE scrutinee yes no) target functions bindings indent first
+      ⟨tested.lines ++
+          [indentLine indent ("let " ++ temporary tested.nextId ++ ": " ++
+            target.localType.spelling ++ " = " ++ azeroText target ++ ";")] ++
+          [indentLine indent ("match (" ++ value ++ ") {"),
+            indentLine (indent + 4) ("case inl(" ++ payloadTemp (tested.nextId + 1) ++ ") {")] ++
+          (selected.lines ++
+            [indentLine (indent + 8) (temporary tested.nextId ++ " = " ++ selectedValue ++ ";")]) ++
+          [indentLine (indent + 4) "}",
+            indentLine (indent + 4)
+              ("case inr(" ++ payloadTemp selected.nextId ++ ") {")] ++
+          (fallback.lines ++
+            [indentLine (indent + 8) (temporary tested.nextId ++ " = " ++ fallbackValue ++ ";")]) ++
+          [indentLine (indent + 4) "}", indentLine indent "}"],
+        some (temporary tested.nextId), fallback.nextId⟩ := by
+  obtain ⟨sStatements, sLines, sLe, sValue, sNames, sSimulates⟩ := scrutineeSpec
+  obtain ⟨yStatements, yLines, yLe, yValue, yNames, ySimulates⟩ := yesSpec
+  obtain ⟨nStatements, nLines, nLe, nValue, nNames, nSimulates⟩ := noSpec
+  have result : ∀ last, tested.nextId < last → ATempIn first last (temporary tested.nextId) :=
+    fun _ lt => aTempIn_temporary sLe lt
+  have leftTemp : ATempIn first fallback.nextId (payloadTemp (tested.nextId + 1)) :=
+    aTempIn_payloadTemp (by omega) (by omega)
+  have rightTemp : ATempIn first fallback.nextId (payloadTemp selected.nextId) :=
+    aTempIn_payloadTemp (by omega) (by omega)
+  refine ⟨sStatements ++
+      [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target),
+        .matchSum (.name value) (payloadTemp (tested.nextId + 1))
+          (yStatements ++ [.assign (temporary tested.nextId) (.name selectedValue)])
+          (payloadTemp selected.nextId)
+          (nStatements ++ [.assign (temporary tested.nextId) (.name fallbackValue)])],
+    ?_, by dsimp only; omega, ?_, ?_, ?_⟩
+  · simp only [Stmt.listLines_append, sLines, yLines, nLines, Stmt.listLines, Stmt.lines,
+      Expr.print, azero_print unitTarget, List.append_nil, List.append_assoc,
+      List.cons_append, List.nil_append]
+  · intro name same
+    cases same
+    exact Or.inr ⟨tested.nextId, rfl, sLe, by dsimp only; omega⟩
+  · dsimp only
+    intro name mem
+    simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
+      Stmt.identifiers, Expr.identifiers, azero_identifiers, List.append_nil, List.mem_cons,
+      List.not_mem_nil, or_false] at mem
+    rcases mem with mem | same | ((same | same | mem | same | same) | same | mem | same | same)
+    · exact (sNames name mem).mono (Nat.le_refl _) (by omega)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
+    · subst same
+      exact (sValue name valueFound).uses.mono (Nat.le_refl _) (by omega)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ leftTemp)))
+    · exact ((yNames name mem).of_cons (fun found same => by
+        cases same
+        exact aTempIn_payloadTemp (by omega) (by omega)) (by omega)).mono (Nat.le_refl _)
+          (by omega)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
+    · subst same
+      exact ((yValue name selectedFound).uses.of_cons
+        (fun found same => by
+          cases same
+          exact aTempIn_payloadTemp (by omega) (by omega)) (by omega)).mono (Nat.le_refl _)
+          (by omega)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ rightTemp)))
+    · exact ((nNames name mem).of_cons (fun found same => by cases same; exact rightTemp)
+        (by omega)).mono (Nat.le_refl _) (Nat.le_refl _)
+    · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
+    · subst same
+      exact ((nValue name fallbackFound).uses.of_cons
+        (fun found same => by cases same; exact rightTemp) (by omega)).mono (Nat.le_refl _)
+          (Nat.le_refl _)
+  · dsimp only
+    intro context environment store scope outer admitted agree distinctCells lengthOk
+      functionsOk
+    obtain ⟨sCore, store₁, scope₁, outer₁, added₁, sEvaluates, sRepresents, sExec, agree₁,
+      frame₁, keeps₁, shape₁, names₁, addedTemp₁⟩ :=
+      sSimulates context environment store scope outer admitted agree distinctCells lengthOk
+        functionsOk
+    rw [valueFound, Option.bind_some] at sRepresents
+    obtain ⟨sumSource, sLookup, sumValue⟩ := sRepresents
+    have resultTemp := result (tested.nextId + 1) (Nat.lt_succ_self _)
+    rw [selectedFound] at ySimulates
+    rw [fallbackFound] at nSimulates
+    have resultNotBinding : ∀ index found, anameAt bindings index = some found →
+        found ≠ temporary tested.nextId := fresh.ne_temp resultTemp
+    have agreeDeclared := agree₁.declare (fresh.ne_temp resultTemp) (azeroValue target)
+    have declared : Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) ::
+        outer₁) (temporary tested.nextId) = some (azeroValue target) := by
+      simp [Frames.lookup_declared]
+    have scrutineeSurvives : temporary tested.nextId ≠ value := by
+      intro same
+      exact ((sValue value valueFound).survives (last := tested.nextId + 1) fresh distinct
+        sLe).1 (same ▸ aTempIn_temporary (Nat.le_refl _) (Nat.lt_succ_self _))
+    have scrutineeLookup : Frames.lookup (((temporary tested.nextId, azeroValue target) ::
+        scope₁) :: outer₁) value = some sumSource := by
+      rw [Frames.lookup_declared, if_neg scrutineeSurvives]
+      exact sLookup
+    have prefixExec : Stmt.execList context (scope :: outer) (sStatements ++
+        [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target)]) =
+        some (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁) := by
+      rw [Stmt.execList_append, sExec]
+      simp [Stmt.execList, Stmt.exec, azero_eval, azeroValue_admits, Frames.declare]
+    have keepsOutside : ∀ name, ¬ ATempIn first fallback.nextId name →
+        (∀ index : Nat, bindings[index]? ≠ some (Binding.cellWord name)) →
+        Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁)
+          name = Frames.lookup (scope :: outer) name := by
+      intro name notTemp notCell
+      have different : temporary tested.nextId ≠ name := fun same =>
+        notTemp (same ▸ result _ (by omega))
+      rw [Frames.lookup_declared, if_neg different,
+        keeps₁ name (fun temp => notTemp (aTempIn_mono temp (Nat.le_refl _) (by omega)))
+          notCell]
+    have scopeNames₁ :
+        Scope.names ((temporary tested.nextId, azeroValue target) :: scope₁) =
+        (temporary tested.nextId :: added₁) ++ scope.names := by
+      show temporary tested.nextId :: scope₁.names = _
+      rw [names₁]
+      rfl
+    have addedOk : ∀ name ∈ temporary tested.nextId :: added₁,
+        ATempIn first fallback.nextId name := by
+      intro name mem
+      rcases List.mem_cons.mp mem with same | mem
+      · exact same ▸ result _ (by omega)
+      · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
+    have resultNotPayload : ∀ payload : Nat, ∀ word : Value,
+        temporary tested.nextId ∉ Scope.names [(payloadTemp payload, word)] := by
+      intro payload word mem
+      simp only [Scope.names, List.map_cons, List.map_nil, List.mem_singleton] at mem
+      exact payloadTemp_ne_temporary _ _ mem.symm
+    rcases sumValue with ⟨type, payload, rfl, rfl⟩ | ⟨type, payload, rfl, rfl⟩
+    · obtain ⟨branchCore, branchValue, store₂, top, scope₂, outer₂, branchEvaluates,
+        branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
+        aarm_value (bindings := bindings) (environment := environment) unitTarget ySimulates
+          (fresh.mono (by omega)) admitted
+          (agreeDeclared.payload (payload_absent fresh (by omega)) payload)
+          (distinctCells.cons_value fun _ same => by cases same) (by simp; omega)
+          (by simpa using functionsOk) (fun _ _ agree => agree.tail)
+          (fun _ frame => frame.of_cons fun _ same => by cases same)
+          (payload_cells _) (payload_outside fresh (by omega) _)
+          (not_aTempIn_of_aTempIn resultTemp (Or.inl (by omega)))
+          (resultNotPayload _ _) (fresh.not_cell resultTemp) resultNotBinding declared
+      refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
+        ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
+        scopeNames.trans scopeNames₁, addedOk⟩
+      · simp only [Solcore.Core.Wire.Expr.toCore]
+        exact .caseLeft sEvaluates branchEvaluates
+      · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
+          (Or.inl (by omega))) (resultNotPayload _ _) (fresh.not_cell resultTemp), if_pos rfl]
+        exact ARepresents.of_value branchRepresents
+      · rw [List.append_cons, Stmt.execList_append, prefixExec]
+        simp [Stmt.execList, Stmt.exec, Expr.eval, scrutineeLookup, branchExec]
+      · intro name notTemp notCell
+        have different : temporary tested.nextId ≠ name := fun same =>
+          notTemp (same ▸ result _ (by omega))
+        rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (by omega)))
+            (fun mem => by
+              simp only [Scope.names, List.map_cons, List.map_nil, List.mem_singleton] at mem
+              exact notTemp (mem ▸ leftTemp)) notCell,
+          if_neg different, keepsOutside name notTemp notCell]
+    · obtain ⟨branchCore, branchValue, store₂, top, scope₂, outer₂, branchEvaluates,
+        branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
+        aarm_value (bindings := bindings) (environment := environment) unitTarget nSimulates
+          (fresh.mono (by omega)) admitted
+          (agreeDeclared.payload (payload_absent fresh (by omega)) payload)
+          (distinctCells.cons_value fun _ same => by cases same) (by simp; omega)
+          (by simpa using functionsOk) (fun _ _ agree => agree.tail)
+          (fun _ frame => frame.of_cons fun _ same => by cases same)
+          (payload_cells _) (payload_outside fresh (by omega) _)
+          (not_aTempIn_of_aTempIn resultTemp (Or.inl (by omega)))
+          (resultNotPayload _ _) (fresh.not_cell resultTemp) resultNotBinding declared
+      refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
+        ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
+        scopeNames.trans scopeNames₁, addedOk⟩
+      · simp only [Solcore.Core.Wire.Expr.toCore]
+        exact .caseRight sEvaluates branchEvaluates
+      · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
+          (Or.inl (by omega))) (resultNotPayload _ _) (fresh.not_cell resultTemp), if_pos rfl]
+        exact ARepresents.of_value branchRepresents
+      · rw [List.append_cons, Stmt.execList_append, prefixExec]
+        simp [Stmt.execList, Stmt.exec, Expr.eval, scrutineeLookup, branchExec]
+      · intro name notTemp notCell
+        have different : temporary tested.nextId ≠ name := fun same =>
+          notTemp (same ▸ result _ (by omega))
+        rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (Nat.le_refl _)))
+            (fun mem => by
+              simp only [Scope.names, List.map_cons, List.map_nil, List.mem_singleton] at mem
+              exact notTemp (mem ▸ rightTemp)) notCell,
+          if_neg different, keepsOutside name notTemp notCell]
 
 theorem aRenderIH_caseE {scrutinee yes no : CoreExpr} (scrutineeIH : ARenderIH scrutinee)
     (yesIH : ARenderIH yes) (noIH : ARenderIH no) : ARenderIH (.caseE scrutinee yes no) := by
@@ -1113,186 +1369,20 @@ theorem aRenderIH_caseE {scrutinee yes no : CoreExpr} (scrutineeIH : ARenderIH s
   · obtain ⟨tested, value, selected, selectedValue, fallback, fallbackValue, testedEquation,
       valueFound, selectedEquation, selectedFound, fallbackEquation, fallbackFound, rfl⟩ :=
       AggregateEquations.caseE_value_ok unitTarget equation
-    obtain ⟨sStatements, sLines, sLe, sValue, sNames, sSimulates⟩ :=
-      scrutineeIH admits scrutineeReady functions .wordSum bindings indent first tested
-        scrutineeKind testedEquation fresh distinct
-    obtain ⟨yStatements, yLines, yLe, yValue, yNames, ySimulates⟩ :=
-      yesIH admits yesReady functions target
-        (.word (payloadTemp (tested.nextId + 1)) :: bindings) (indent + 8) (tested.nextId + 2)
-        selected (by rw [payload_kinds]; exact yesKind) selectedEquation
-        (payload_fresh fresh (by omega)) (payload_distinct fresh distinct (by omega))
-    obtain ⟨nStatements, nLines, nLe, nValue, nNames, nSimulates⟩ :=
-      noIH admits noReady functions target (.word (payloadTemp selected.nextId) :: bindings)
-        (indent + 8) (selected.nextId + 1) fallback (by rw [payload_kinds]; exact noKind)
-        fallbackEquation (payload_fresh fresh (by omega))
-        (payload_distinct fresh distinct (by omega))
-    have result : ∀ last, tested.nextId < last → ATempIn first last (temporary tested.nextId) :=
-      fun _ lt => aTempIn_temporary sLe lt
-    have leftTemp : ATempIn first fallback.nextId (payloadTemp (tested.nextId + 1)) :=
-      aTempIn_payloadTemp (by omega) (by omega)
-    have rightTemp : ATempIn first fallback.nextId (payloadTemp selected.nextId) :=
-      aTempIn_payloadTemp (by omega) (by omega)
-    refine ⟨sStatements ++
-        [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target),
-          .matchSum (.name value) (payloadTemp (tested.nextId + 1))
-            (yStatements ++ [.assign (temporary tested.nextId) (.name selectedValue)])
-            (payloadTemp selected.nextId)
-            (nStatements ++ [.assign (temporary tested.nextId) (.name fallbackValue)])],
-      ?_, by dsimp only; omega, ?_, ?_, ?_⟩
-    · simp only [Stmt.listLines_append, sLines, yLines, nLines, Stmt.listLines, Stmt.lines,
-        Expr.print, azero_print unitTarget, List.append_nil, List.append_assoc,
-        List.cons_append, List.nil_append]
-    · intro name same
-      cases same
-      exact Or.inr ⟨tested.nextId, rfl, sLe, by dsimp only; omega⟩
-    · dsimp only
-      intro name mem
-      simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
-        Stmt.identifiers, Expr.identifiers, azero_identifiers, List.append_nil, List.mem_cons,
-        List.not_mem_nil, or_false] at mem
-      rcases mem with mem | same | ((same | same | mem | same | same) | same | mem | same | same)
-      · exact (sNames name mem).mono (Nat.le_refl _) (by omega)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
-      · subst same
-        exact (sValue name valueFound).uses.mono (Nat.le_refl _) (by omega)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ leftTemp)))
-      · exact ((yNames name mem).of_cons (fun found same => by
-          cases same
-          exact aTempIn_payloadTemp (by omega) (by omega)) (by omega)).mono (Nat.le_refl _)
-            (by omega)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
-      · subst same
-        exact ((yValue name selectedFound).uses.of_cons
-          (fun found same => by
-            cases same
-            exact aTempIn_payloadTemp (by omega) (by omega)) (by omega)).mono (Nat.le_refl _)
-            (by omega)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ rightTemp)))
-      · exact ((nNames name mem).of_cons (fun found same => by cases same; exact rightTemp)
-          (by omega)).mono (Nat.le_refl _) (Nat.le_refl _)
-      · exact Or.inr (Or.inr (Or.inl (same ▸ result _ (by omega))))
-      · subst same
-        exact ((nValue name fallbackFound).uses.of_cons
-          (fun found same => by cases same; exact rightTemp) (by omega)).mono (Nat.le_refl _)
-            (Nat.le_refl _)
-    · dsimp only
-      intro context environment store scope outer admitted agree distinctCells lengthOk
-        functionsOk
-      obtain ⟨sCore, store₁, scope₁, outer₁, added₁, sEvaluates, sRepresents, sExec, agree₁,
-        frame₁, keeps₁, shape₁, names₁, addedTemp₁⟩ :=
-        sSimulates context environment store scope outer admitted agree distinctCells lengthOk
-          functionsOk
-      rw [valueFound, Option.bind_some] at sRepresents
-      obtain ⟨sumSource, sLookup, sumValue⟩ := sRepresents
-      have resultTemp := result (tested.nextId + 1) (Nat.lt_succ_self _)
-      rw [selectedFound] at ySimulates
-      rw [fallbackFound] at nSimulates
-      have resultNotBinding : ∀ index found, anameAt bindings index = some found →
-          found ≠ temporary tested.nextId := fresh.ne_temp resultTemp
-      have agreeDeclared := agree₁.declare (fresh.ne_temp resultTemp) (azeroValue target)
-      have declared : Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) ::
-          outer₁) (temporary tested.nextId) = some (azeroValue target) := by
-        simp [Frames.lookup_declared]
-      have scrutineeSurvives : temporary tested.nextId ≠ value := by
-        intro same
-        exact ((sValue value valueFound).survives (last := tested.nextId + 1) fresh distinct
-          sLe).1 (same ▸ aTempIn_temporary (Nat.le_refl _) (Nat.lt_succ_self _))
-      have scrutineeLookup : Frames.lookup (((temporary tested.nextId, azeroValue target) ::
-          scope₁) :: outer₁) value = some sumSource := by
-        rw [Frames.lookup_declared, if_neg scrutineeSurvives]
-        exact sLookup
-      have prefixExec : Stmt.execList context (scope :: outer) (sStatements ++
-          [.letDecl (temporary tested.nextId) (ATarget.localType target) (azero target)]) =
-          some (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁) := by
-        rw [Stmt.execList_append, sExec]
-        simp [Stmt.execList, Stmt.exec, azero_eval, azeroValue_admits, Frames.declare]
-      have keepsOutside : ∀ name, ¬ ATempIn first fallback.nextId name →
-          (∀ index : Nat, bindings[index]? ≠ some (Binding.cellWord name)) →
-          Frames.lookup (((temporary tested.nextId, azeroValue target) :: scope₁) :: outer₁)
-            name = Frames.lookup (scope :: outer) name := by
-        intro name notTemp notCell
-        have different : temporary tested.nextId ≠ name := fun same =>
-          notTemp (same ▸ result _ (by omega))
-        rw [Frames.lookup_declared, if_neg different,
-          keeps₁ name (fun temp => notTemp (aTempIn_mono temp (Nat.le_refl _) (by omega)))
-            notCell]
-      have scopeNames₁ :
-          Scope.names ((temporary tested.nextId, azeroValue target) :: scope₁) =
-          (temporary tested.nextId :: added₁) ++ scope.names := by
-        show temporary tested.nextId :: scope₁.names = _
-        rw [names₁]
-        rfl
-      have addedOk : ∀ name ∈ temporary tested.nextId :: added₁,
-          ATempIn first fallback.nextId name := by
-        intro name mem
-        rcases List.mem_cons.mp mem with same | mem
-        · exact same ▸ result _ (by omega)
-        · exact aTempIn_mono (addedTemp₁ name mem) (Nat.le_refl _) (by omega)
-      have resultNotPayload : ∀ payload : Nat, ∀ word : Value,
-          temporary tested.nextId ∉ Scope.names [(payloadTemp payload, word)] := by
-        intro payload word mem
-        simp only [Scope.names, List.map_cons, List.map_nil, List.mem_singleton] at mem
-        exact payloadTemp_ne_temporary _ _ mem.symm
-      rcases sumValue with ⟨type, payload, rfl, rfl⟩ | ⟨type, payload, rfl, rfl⟩
-      · obtain ⟨branchCore, branchValue, store₂, top, scope₂, outer₂, branchEvaluates,
-          branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
-          aarm_value (bindings := bindings) (environment := environment) unitTarget ySimulates
-            (fresh.mono (by omega)) admitted
-            (agreeDeclared.payload (payload_absent fresh (by omega)) payload)
-            (distinctCells.cons_value fun _ same => by cases same) (by simp; omega)
-            (by simpa using functionsOk) (fun _ _ agree => agree.tail)
-            (fun _ frame => frame.of_cons fun _ same => by cases same)
-            (payload_cells _) (payload_outside fresh (by omega) _)
-            (not_aTempIn_of_aTempIn resultTemp (Or.inl (by omega)))
-            (resultNotPayload _ _) (fresh.not_cell resultTemp) resultNotBinding declared
-        refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
-          ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
-          scopeNames.trans scopeNames₁, addedOk⟩
-        · simp only [Solcore.Core.Wire.Expr.toCore]
-          exact .caseLeft sEvaluates branchEvaluates
-        · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
-            (Or.inl (by omega))) (resultNotPayload _ _) (fresh.not_cell resultTemp), if_pos rfl]
-          exact ARepresents.of_value branchRepresents
-        · rw [List.append_cons, Stmt.execList_append, prefixExec]
-          simp [Stmt.execList, Stmt.exec, Expr.eval, scrutineeLookup, branchExec]
-        · intro name notTemp notCell
-          have different : temporary tested.nextId ≠ name := fun same =>
-            notTemp (same ▸ result _ (by omega))
-          rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (by omega)))
-              (fun mem => by
-                simp only [Scope.names, List.map_cons, List.map_nil, List.mem_singleton] at mem
-                exact notTemp (mem ▸ leftTemp)) notCell,
-            if_neg different, keepsOutside name notTemp notCell]
-      · obtain ⟨branchCore, branchValue, store₂, top, scope₂, outer₂, branchEvaluates,
-          branchRepresents, branchExec, agree₂, frame₂, scopeNames, outerShape, lookups⟩ :=
-          aarm_value (bindings := bindings) (environment := environment) unitTarget nSimulates
-            (fresh.mono (by omega)) admitted
-            (agreeDeclared.payload (payload_absent fresh (by omega)) payload)
-            (distinctCells.cons_value fun _ same => by cases same) (by simp; omega)
-            (by simpa using functionsOk) (fun _ _ agree => agree.tail)
-            (fun _ frame => frame.of_cons fun _ same => by cases same)
-            (payload_cells _) (payload_outside fresh (by omega) _)
-            (not_aTempIn_of_aTempIn resultTemp (Or.inl (by omega)))
-            (resultNotPayload _ _) (fresh.not_cell resultTemp) resultNotBinding declared
-        refine ⟨branchCore, store₂, scope₂, outer₂, temporary tested.nextId :: added₁, ?_, ?_,
-          ?_, agree₂, frame₁.trans frame₂, ?_, outerShape.trans shape₁,
-          scopeNames.trans scopeNames₁, addedOk⟩
-        · simp only [Solcore.Core.Wire.Expr.toCore]
-          exact .caseRight sEvaluates branchEvaluates
-        · rw [Option.bind_some, lookups _ (not_aTempIn_of_aTempIn resultTemp
-            (Or.inl (by omega))) (resultNotPayload _ _) (fresh.not_cell resultTemp), if_pos rfl]
-          exact ARepresents.of_value branchRepresents
-        · rw [List.append_cons, Stmt.execList_append, prefixExec]
-          simp [Stmt.execList, Stmt.exec, Expr.eval, scrutineeLookup, branchExec]
-        · intro name notTemp notCell
-          have different : temporary tested.nextId ≠ name := fun same =>
-            notTemp (same ▸ result _ (by omega))
-          rw [lookups name (fun temp => notTemp (aTempIn_mono temp (by omega) (Nat.le_refl _)))
-              (fun mem => by
-                simp only [Scope.names, List.map_cons, List.map_nil, List.mem_singleton] at mem
-                exact notTemp (mem ▸ rightTemp)) notCell,
-            if_neg different, keepsOutside name notTemp notCell]
-
+    have scrutineeSpec := scrutineeIH admits scrutineeReady functions .wordSum bindings indent
+      first tested scrutineeKind testedEquation fresh distinct
+    have sLe := scrutineeSpec.le
+    have yesSpec := yesIH admits yesReady functions target
+      (.word (payloadTemp (tested.nextId + 1)) :: bindings) (indent + 8) (tested.nextId + 2)
+      selected (by rw [payload_kinds]; exact yesKind) selectedEquation
+      (payload_fresh fresh (by omega)) (payload_distinct fresh distinct (by omega))
+    have yLe := yesSpec.le
+    have noSpec := noIH admits noReady functions target
+      (.word (payloadTemp selected.nextId) :: bindings) (indent + 8) (selected.nextId + 1)
+      fallback (by rw [payload_kinds]; exact noKind) fallbackEquation
+      (payload_fresh fresh (by omega)) (payload_distinct fresh distinct (by omega))
+    exact acaseValue_spec unitTarget fresh distinct scrutineeSpec valueFound yesSpec
+      selectedFound noSpec fallbackFound
 /-! ### Projections -/
 
 /-- A projection declares its zero result, matches the pair once, and assigns

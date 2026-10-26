@@ -20,8 +20,9 @@ semantic-kernel policy check now covers.
 | `CallGraph.emit_source_meaning` | If `CallGraph.emit graph = .ok emitted` (profile `runtime-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
 | `Mutation.emit_source_meaning` | If `Mutation.emit graph = .ok emitted` (profile `runtime-mutation`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
 | `Aggregate.emit_source_meaning` | If `Aggregate.emit graph = .ok emitted` (profile `runtime-aggregates`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
-| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render` and `AggregateRenderer.render`, described below. |
+| `AggregateCallGraph.emit_source_meaning` | If `AggregateCallGraph.emit graph = .ok emitted` (profile `runtime-aggregate-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
+| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
+| `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
@@ -29,11 +30,14 @@ the source semantics below. `CoreReturns core w` states that Core's
 `runStateful` returns `.done (.word w) []` for all sufficiently large fuel, and
 that every completed run returns exactly that Word and store. This is the Core
 machine used as the differential-testing oracle; for the runtime-input,
-named-helper, raw-primitive, call-graph, private-mutation and aggregate
-profiles it runs the original lambda or binding chain applied to the input. A
-Core program with mutable locals ends with its cells in the store, so
-`CoreReturnsWithStore` states the same for some final store that every
-completed run reaches.
+named-helper, raw-primitive, call-graph, private-mutation, aggregate and
+aggregate call-graph profiles it runs the original lambda or binding chain
+applied to the input. A Core program with mutable locals ends with its cells in
+the store, so `CoreReturnsWithStore` states the same for some final store that
+every completed run reaches. The aggregate call-graph renderer refuses cells,
+and the executable checks observe an empty final store, but its theorem states
+only `CoreReturnsWithStore`: the proof reuses the store-aware aggregate
+invariant, which does not track that no cell is allocated.
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -252,6 +256,23 @@ alias, the actual import line is the printing of the fourteen aliases and every
 helper and the entry run in a primitive call context. Otherwise the file
 imports no aliases, and no body needs the alias context.
 
+[AggregateCallGraphEquations](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateCallGraphEquations.lean)
+and [AggregateCallGraphPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateCallGraphPreservation.lean)
+prove `aggregateCallGraph_render_spec` for `AggregateCallGraphRenderer.render`.
+That renderer prints pairs, sums, projections and case payloads as the
+aggregate renderer does, and scalar operations, raw opcodes and helper calls as
+the call-graph renderer does. It refuses cells, Unit, integers, lambdas and
+data constructors, so every accepted expression has a value. Its bindings are
+Words, Booleans, pairs and sums; the proof maps each to the aggregate binding
+of the same kind, so the aggregate invariant and its lemmas apply unchanged.
+The value cases of `let`, `if` and `case` are separate lemmas of
+[AggregateControl](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateControl.lean)
+that both renderers use. Every body runs in a primitive call context.
+[AggregateCallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateCallGraphEmitter.lean)
+connects the actual helper loop and wrapper. As in the call-graph emitter, the
+file always imports the fourteen aliases, and its import line is their
+printing.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`). The meaning is therefore a function of the emitted
@@ -285,6 +306,11 @@ Rust pipeline are assumed, and are exercised only by the existing tests:
    dispatch, `uint256` ABI decoding and 32-byte result encoding. Gas and EVM
    resource limits are not modeled; the source meaning has no fuel.
 
+The aggregate call-graph emitter adds no assumption to these four. Its text
+uses only the forms above. That the frontend accepts helper calls inside `if`
+branches and `match` cases is part of assumption 2, and their lowering is part
+of assumption 4.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -292,17 +318,17 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render` and seven actual emitters: closed G0
-(`closed-g0`), runtime input (`runtime-word`), named helpers
-(`runtime-functions`), raw primitive aliases (`runtime-primitives`), call
-graphs (`runtime-call-graphs`), private mutable locals (`runtime-mutation`)
-and Word aggregates (`runtime-aggregates`). They do not yet cover the other
-emitters that render with `AggregateRenderer` (loops, generic, closures,
-comptime, modules, storage, storage rollback, keyed storage, dynamic arrays
-and contract calls), nor `CallGraphLoopEmitter` or
-`AggregateCallGraphEmitter`. Their text uses forms outside this fragment, such
-as `while` loops, storage access, external calls, lambdas, generic functions
-and multi-file module bundles.
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and eight
+actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
+named helpers (`runtime-functions`), raw primitive aliases
+(`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
+locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`) and
+aggregate call graphs (`runtime-aggregate-call-graphs`). They do not yet cover
+the other emitters that render with `AggregateRenderer` (loops, generic,
+closures, comptime, modules, storage, storage rollback, keyed storage, dynamic
+arrays and contract calls), nor `CallGraphLoopEmitter`. Their text uses forms
+outside this fragment, such as `while` loops, storage access, external calls,
+lambdas, generic functions and multi-file module bundles.
 
 ## Executable checks
 
@@ -345,3 +371,21 @@ one. A sum match with two `inr` cases, a payload used after its case, a sum
 match on a word, a pair with a Boolean component, a pair assigned to a word, a
 call to an alias that is not imported, and a primitive text without its import
 line are all rejected.
+
+[SourceAggregateCallGraphMeaning](../../Solcore/Test/SourceAggregateCallGraphMeaning.lean)
+is registered as well. It runs actual `AggregateCallGraph.emit` output through
+`sourceCall` at the same eight boundary inputs and compares it with Core. It
+covers the regression graph that composes all nine composition shapes, which
+must also give `(8x + 4) mod 2^256` above five and `4x + 1` otherwise. It
+covers the regression's nine minimal shape graphs and its scalar, adjacent and
+outer-local graphs, with hand-known formulas, and three helper-call graphs:
+the projected call pair, the payload helper call and the call-graph emitter's
+mixed graph, with hand-known Words. The fourteen opcodes applied to helper
+results run inside a projected pair and as a sum payload, each with a
+hand-known Word. Twenty-four generated graphs, eight seeds at each of the 96,
+192 and 256-node budgets, together cover every composition shape. Every Core
+run must end with an empty store. Each text must reparse, print back to
+itself, import the fourteen aliases and declare one function per helper. A sum
+match with two `inr` cases, a payload used after its case, a helper applied to
+a pair, a helper that returns a pair for a `word`, a helper that calls a later
+helper and a primitive text without its import line are all rejected.

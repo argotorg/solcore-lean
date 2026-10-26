@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation and aggregate emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate and aggregate call-graph emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array and event-log extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection; remaining expression forms, write inputs and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles and refused CREATE/CREATE2 attempts connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -598,11 +598,20 @@ proof relates Core pairs and sums to source pairs and tagged sums, binds each
 Core `case` payload in the selected case scope under a fresh name, and extends
 the mutation invariant for cells, helper calls and raw opcode operands. The
 file imports the raw aliases only when a rendered body uses one, and the proof
-needs the alias call context only for such bodies. The other emitters that
-render with the aggregate renderer (loops, generic, closures, comptime,
-modules, storage, storage rollback, keyed storage, dynamic arrays and calls),
-`CallGraphLoopEmitter` and `AggregateCallGraphEmitter` are not covered; their
-text uses forms outside the source fragment.
+needs the alias call context only for such bodies.
+
+`AggregateCallGraph.emit_source_meaning` covers the
+`runtime-aggregate-call-graphs` emitter, whose helpers and entry compose Word
+pairs, sums, projections and case payloads with calls to earlier helpers and
+the raw opcode aliases. Its text needs no new source form. The proof maps the
+renderer's Word, Boolean, pair and sum bindings to aggregate bindings and
+reuses the aggregate invariant and lemmas; as in the call-graph emitter, the
+file always imports the aliases. The renderer refuses cells and the
+executable checks observe an empty final Core store, but the theorem keeps the
+store-aware statement. The other emitters that render with the aggregate
+renderer (loops, generic, closures, comptime, modules, storage, storage
+rollback, keyed storage, dynamic arrays and calls) and `CallGraphLoopEmitter`
+are not covered; their text uses forms outside the source fragment.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -616,9 +625,15 @@ and `case` joins over every target, four templates, eighteen raw primitive
 bodies and 24 generated aggregate graphs at eight boundary inputs; all agree
 with Core, and the regression graphs, joins and templates also match
 hand-known formulas. Malformed aggregate texts, such as a payload used after
-its case or a primitive text without its alias import, are rejected. The full
-Lean build (9,994 jobs), registered tests and the semantic-kernel policy
-passed.
+its case or a primitive text without its alias import, are rejected. The
+registered `SourceAggregateCallGraphMeaning` test runs the regression graph
+with all nine composition shapes, twelve shape graphs, three helper-call
+graphs, 28 raw primitive bodies inside pairs and sums and 24 generated graphs
+at eight boundary inputs; all agree with Core, every Core run ends with an
+empty store, and the fixed graphs also match hand-known results. A helper
+applied to a pair or returning one, a helper that calls a later helper and a
+primitive text without its import line are rejected. The full Lean build
+(10,014 jobs), registered tests and the semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or
