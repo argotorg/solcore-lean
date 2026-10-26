@@ -3,6 +3,7 @@
 import copy
 import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -23,30 +24,66 @@ spec.loader.exec_module(exporter)
 CONTRACT = "SynthesizedG0"
 
 
-def solc_output():
-    return {"contracts": {"checked.yul": {CONTRACT + "Deploy": {"evm": {
+def solc_output(contract=CONTRACT):
+    return {"contracts": {"checked.yul": {contract + "Deploy": {"evm": {
         "bytecode": {"object": "600000", "linkReferences": {}},
         "deployedBytecode": {"object": "00", "linkReferences": {}, "immutableReferences": {}}}}}},
-        "sources": {"checked.yul": {"id": 0, "ast": {"nodeType": "YulObject", "name": CONTRACT + "Deploy",
-            "subObjects": [{"nodeType": "YulObject", "name": CONTRACT, "subObjects": []}]}}}}
+        "sources": {"checked.yul": {"id": 0, "ast": {"nodeType": "YulObject", "name": contract + "Deploy",
+            "subObjects": [{"nodeType": "YulObject", "name": contract, "subObjects": []}]}}}}
 
 
-def hull_output():
+def hull_output(contract=CONTRACT):
     return {"schema": exporter.hull.SCHEMA, "upstreamCommit": exporter.hull.COMMIT,
-            "program": {"objects": [{"name": CONTRACT + "Deploy", "inners": [{"name": CONTRACT, "inners": []}]}]}}
+            "program": {"objects": [{"name": contract + "Deploy", "inners": [{"name": contract, "inners": []}]}]}}
 
 
 class YulProtocolTests(unittest.TestCase):
-    def test_all_thirteen_pure_contracts_are_admitted_but_stateful_wrappers_are_not(self):
-        self.assertEqual(len(exporter.CONTRACTS), 13)
+    def test_all_fourteen_pure_contracts_are_admitted_but_stateful_wrappers_are_not(self):
+        self.assertEqual(len(exporter.CONTRACTS), 14)
+        self.assertEqual(len(set(exporter.CONTRACTS)), 14)
         self.assertIn("SynthesizedPrimitives", exporter.CONTRACTS)
         self.assertIn("SynthesizedCallGraphs", exporter.CONTRACTS)
         self.assertIn("SynthesizedCallGraphLoops", exporter.CONTRACTS)
+        self.assertIn("SynthesizedAggregateCallGraphs", exporter.CONTRACTS)
+        # The allow-list is derived from the case profiles, not maintained separately.
+        self.assertEqual(exporter.CONTRACTS, tuple(exporter.common.CASE_CONTRACTS.values()))
         for contract in exporter.CONTRACTS:
             exporter.validate_contract(contract)
         for contract in ("Root", "SynthesizedStorage", "SynthesizedRollback", "SynthesizedCaller", "SynthesizedCallee", None):
             with self.assertRaises(ValueError):
                 exporter.validate_contract(contract)
+        # Near misses of the new wrapper name are not admitted either.
+        for contract in ("SynthesizedAggregateCallGraph", "SynthesizedAggregateCallGraphsDeploy",
+                         "synthesizedaggregatecallgraphs", "SynthesizedAggregateCallGraphs ", ""):
+            with self.assertRaises(ValueError):
+                exporter.validate_contract(contract)
+
+    def test_aggregate_call_graph_wrapper_has_its_own_checked_objects_and_cli_choice(self):
+        contract = "SynthesizedAggregateCallGraphs"
+        artifact = exporter.artifact_from_output(solc_output(contract), contract)
+        self.assertEqual((artifact["selectedObject"], artifact["runtimeObject"]), (contract + "Deploy", contract))
+        exporter.validate_artifact(artifact, contract)
+        exporter.validate_hull(hull_output(contract), contract)
+        # A neighbouring wrapper's objects, artifact or checked Hull cannot be exported under this name, nor the reverse.
+        for other in (CONTRACT, "SynthesizedCallGraphs", "SynthesizedCallGraphLoops", "SynthesizedAggregates"):
+            with self.subTest(other=other):
+                with self.assertRaises(ValueError):
+                    exporter.artifact_from_output(solc_output(other), contract)
+                with self.assertRaises(ValueError):
+                    exporter.artifact_from_output(solc_output(contract), other)
+                with self.assertRaises(ValueError):
+                    exporter.validate_artifact(exporter.artifact_from_output(solc_output(other), other), contract)
+                with self.assertRaises(ValueError):
+                    exporter.validate_artifact(artifact, other)
+                with self.assertRaises(ValueError):
+                    exporter.validate_hull(hull_output(other), contract)
+                with self.assertRaises(ValueError):
+                    exporter.validate_hull(hull_output(contract), other)
+        arguments = ["policy.sol", "--output", "policy.json", "--solc", "/policy/solc"]
+        self.assertEqual(exporter.parse_args([*arguments, "--contract", contract]).contract, contract)
+        for rejected in ("SynthesizedStorage", "SynthesizedAggregateCallGraph"):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                exporter.parse_args([*arguments, "--contract", rejected])
 
     def test_only_pinned_release_accepts_linux_and_macos_suffixes(self):
         for suffix in ('', '.Linux.g++', '.Darwin.appleclang'):

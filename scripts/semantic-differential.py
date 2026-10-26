@@ -41,6 +41,10 @@ CALL_GRAPH_VERSIONS = ("profileVersion", "functionVersion", "boundaryVersion", "
 CALL_GRAPH_LOOP_CASE_SCHEMA = "solcore-lean.semantic-call-graph-loop-case.v1"
 CALL_GRAPH_LOOP_VERSIONS = ("profileVersion", "functionVersion", "loopVersion", "stepFunctionVersion",
                             "aggregateVersion", "boundaryVersion", "stepBoundaryVersion", "callShapeVersion")
+AGGREGATE_CALL_GRAPH_CASE_SCHEMA = "solcore-lean.semantic-aggregate-call-graph-case.v1"
+AGGREGATE_SHAPES = ("pair-component-call", "sum-payload-call", "projected-call-argument", "case-scrutinee-call",
+                    "case-branch-call", "payload-call-argument", "aggregate-let", "aggregate-branch", "nested-case")
+AGGREGATE_CALL_GRAPH_VERSIONS = ("profileVersion", "functionVersion", "boundaryVersion", "shapeVersion")
 PRIMITIVE_CASE_SCHEMA = "solcore-lean.semantic-primitive-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
@@ -53,12 +57,14 @@ MODULE_CASE_SCHEMA = "solcore-lean.semantic-module-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  PRIMITIVE_CASE_SCHEMA: "runtime-primitives", CALL_GRAPH_CASE_SCHEMA: "runtime-call-graphs",
                  CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime-call-graph-loops",
+                 AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime-aggregate-call-graphs",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
                  AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
                   CALL_GRAPH_LOOP_CASE_SCHEMA: "SynthesizedCallGraphLoops",
+                  AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "SynthesizedAggregateCallGraphs",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
                   AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules"}
@@ -293,6 +299,14 @@ def validate_call_shapes(values, label="callShapes") -> list[str]:
     return values
 
 
+def validate_aggregate_shapes(values, label="aggregateShapes") -> list[str]:
+    """Native replay authenticates these AST labels; Python checks their envelope."""
+    if (not isinstance(values, list) or any(not isinstance(v, str) or v not in AGGREGATE_SHAPES for v in values)
+            or values != [v for v in AGGREGATE_SHAPES if v in values]):
+        raise ValueError(f"{label} must be a canonical unique aggregate-shape inventory")
+    return values
+
+
 def validate_case(case: dict) -> None:
     if not isinstance(case, dict) or case.get("schema") not in CASE_PROFILES:
         raise ValueError("unsupported semantic case schema")
@@ -332,6 +346,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("helperCount")) is not int or not 1 <= provenance["helperCount"] <= 3:
             raise ValueError("call-graph helperCount must be an integer from one to three")
         validate_call_shapes(provenance.get("callShapes"))
+    if case["schema"] == AGGREGATE_CALL_GRAPH_CASE_SCHEMA:
+        for key in AGGREGATE_CALL_GRAPH_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing aggregate call-graph provenance {key}")
+        if type(provenance.get("helperCount")) is not int or not 1 <= provenance["helperCount"] <= 3:
+            raise ValueError("aggregate call-graph helperCount must be an integer from one to three")
+        validate_aggregate_shapes(provenance.get("aggregateShapes"))
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -675,6 +696,7 @@ def execute(args, report: dict) -> None:
         PRIMITIVE_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated acyclic Word helper graphs, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, directly generated acyclic Word helper step graph, Sonatina O0, run(uint256) ABI Word",
+        AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated internal Word pairs/sums, projections and case payload scopes with acyclic Word helper calls, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

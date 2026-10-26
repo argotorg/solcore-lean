@@ -134,7 +134,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the thirteen pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the fourteen pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -648,10 +648,65 @@ Neither inventory is an executed trace, call path or opcode measurement.
 Native validation confirmed all 66 expected Words and replayed 264 strictly
 smaller typed reductions. All 66 fixed cases matched on O0, O2 and Yul; the
 first O2 run had stopped on one host adapter error before any execution, and a
-fresh run matched all 66. Random seed `20261026` with sixteen cases and 2,048
+fresh run matched all 66. That error was macOS rejecting `killpg` with `EPERM`
+for a group holding only an exited, unreaped member; process cleanup now
+tolerates it. Random seed `20261026` with sixteen cases and 2,048
 attempts matched all sixteen on each backend. A controlled synthetic reduction
 accepted four typed reductions per backend, all keeping three helpers, and
 original and reduced archives replayed exactly.
+
+## Compare aggregate compositions with call graphs
+
+`runtime-aggregate-call-graphs` generates typed Word, Bool, Word-pair and
+Word-sum expressions directly, with the runtime parameter in scope. One to
+three helpers may call any earlier helper. Pairs, sums, projections, let-bound
+aggregates, aggregate-valued branches and case expressions compose with those
+calls in operands, components, payloads, scrutinees and branches. Helper
+arguments and results and the ABI remain Words. Private cells and Unit values,
+covered by `runtime-aggregates`, are outside this grammar. The existing
+aggregate DAG checker seals each graph; original Core supplies the oracle.
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-aggregate-call-graphs \
+  --backend sonatina-o0 --output .upstream/semantic-aggregate-call-graphs-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-aggregate-call-graphs \
+  --seed 20261026 --cases 16 --attempts 2048 \
+  --output .upstream/semantic-aggregate-call-graphs-random
+```
+
+Source uses the call-graph renderer's scalar, raw-primitive, snapshot and call
+formatting, and the aggregate profile's tuple, `sum<word, word>`, `inl`/`inr`
+and `match` forms; a test checks scalar bodies render identically to the
+call-graph profile. The default budget is 192 complete-program nodes, admitted
+13–512. Accepted graphs need an entry call, a call composed with an aggregate
+value or payload scope, and varied results over the eight primitive inputs.
+Imported graphs may be constant. Each graph yields up to eight inputs.
+
+`aggregate-call-graph-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`aggregate-call-graph-emit FUNCTION.json INPUT [FUEL]` produce the case schema
+`solcore-lean.semantic-aggregate-call-graph-case.v1`. Replay regenerates the
+graph and budgets and checks canonical source, ABI, versions, features, helper
+count and composition shapes. Reduction reuses the typed aggregate reductions:
+every helper, typed let and case payload scope is retained, candidates stay in
+this grammar and must strictly decrease the complete application.
+
+`aggregateShapeCoverage` records nine syntactic structures: calls in pair
+components and sum payloads, calls on projections, calls in case scrutinees and
+branches, calls on a case payload, let-bound aggregates, aggregate-valued
+branches and nested cases. Only completed matches satisfy coverage; this does
+not claim that a call, branch or payload executed. The fixed corpus has four
+imported and three generated graphs at all eight inputs. Its expected Words
+were computed outside Lean, and native validation checks each against original
+Core. It requires all 36 scalar and aggregate AST features, one to three helpers
+and the nine structures.
+
+Native validation confirmed all 56 expected Words and replayed 224 strictly
+smaller typed reductions. All 56 fixed cases matched on O0, O2 and Yul. Random
+seed `20261026` with sixteen cases and 2,048 attempts matched all sixteen on O0
+and Yul; O2 matched eight and retained eight compiler crashes from one graph,
+a recorded upstream finding, so that O2 random run fails. A controlled
+synthetic reduction accepted four typed reductions per backend, keeping every
+helper and binder, and original and reduced archives replayed exactly.
 
 ## Compare ordered storage transactions
 

@@ -36,6 +36,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-primitives": ("primitive-generate", "primitive-emit", "primitive-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
+                    "runtime-aggregate-call-graphs": ("aggregate-call-graph-generate", "aggregate-call-graph-emit", "aggregate-call-graph-generated"),
                     "runtime-functions": ("function-generate", "function-emit", "function-generated"),
                     "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated"),
                     "runtime-aggregates": ("aggregate-generate", "aggregate-emit", "aggregate-generated"),
@@ -46,7 +47,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-modules": ("module-generate", "module-emit", "module-generated")}
 CALL_GRAPH_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops")
 LOOP_PROFILES = ("runtime-loops", "runtime-call-graph-loops")
-HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
+HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-aggregate-call-graphs", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 LOOP_INPUTS = ("0", "1", "3", "7", str(2**256 - 1), str(2**255))
 PRIMITIVE_INPUTS = ("0", "1", "2", "255", "256", str(2**256 - 1), str(2**255), str(2**255 - 1))
@@ -63,6 +64,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-primitives": PRIMITIVE_VERSIONS,
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
+                          "runtime-aggregate-call-graphs": m2.AGGREGATE_CALL_GRAPH_VERSIONS,
                           "runtime-functions": INPUT_VERSIONS,
                           "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion"),
                           "runtime-aggregates": ("profileVersion", "functionVersion", "templateVersion"),
@@ -157,7 +159,7 @@ def helper_counts(case: dict) -> set[int]:
         if step.get("resultType") != {"tag": "function", "parameter": "word", "result": "word"} or step.get("dataDefinitions") != []:
             raise ValueError("plan step must be a closed Word function graph")
         return {bound_helper_count(step.get("body"))}
-    if case.get("schema") == m2.CALL_GRAPH_CASE_SCHEMA:
+    if case.get("schema") in (m2.CALL_GRAPH_CASE_SCHEMA, m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA):
         count = declared_helper_count(case["program"])
         if case.get("provenance", {}).get("helperCount") != count:
             raise ValueError("call-graph helperCount differs from its declaration inventory")
@@ -188,8 +190,24 @@ def call_shapes(case: dict) -> set[str]:
     return set(m2.validate_call_shapes(case.get("provenance", {}).get("callShapes")))
 
 
+def aggregate_shape_requirements(manifest: dict) -> list[str]:
+    profile = manifest.get("profile", "closed-g0")
+    values = m2.validate_aggregate_shapes(manifest.get("requiredAggregateShapes",
+        None if profile == "runtime-aggregate-call-graphs" else []), "requiredAggregateShapes")
+    if profile != "runtime-aggregate-call-graphs" and values:
+        raise ValueError("only aggregate call-graph corpora can require aggregate shapes")
+    return values
+
+
+def aggregate_shapes(case: dict) -> set[str]:
+    if case.get("schema") != m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA:
+        return set()
+    return set(m2.validate_aggregate_shapes(case.get("provenance", {}).get("aggregateShapes")))
+
+
 def minimum_nodes(profile: str) -> int:
-    return {"runtime-primitives": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39}.get(profile, 3)
+    return {"runtime-primitives": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39,
+            "runtime-aggregate-call-graphs": 13}.get(profile, 3)
 
 
 def loop_requirements(manifest: dict) -> dict:
@@ -382,7 +400,8 @@ def missing_coverage(summary: dict) -> bool:
         or bool(summary["comptimeCoverage"]["missingVariants"])
         or bool(summary["constantCoverage"]["missingFeatures"])
         or bool(summary["moduleCoverage"]["missingBranches"])
-        or bool(summary.get("callShapeCoverage", {}).get("missingShapes", [])))
+        or bool(summary.get("callShapeCoverage", {}).get("missingShapes", []))
+        or bool(summary.get("aggregateShapeCoverage", {}).get("missingShapes", [])))
 
 
 def validate_manifest(manifest) -> dict:
@@ -416,6 +435,8 @@ def validate_manifest(manifest) -> dict:
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph loop corpus must require all six loop boundary inputs")
+    if profile == "runtime-aggregate-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+        raise ValueError("aggregate call-graph corpus must require all eight boundary inputs")
     required_helpers = manifest.get("requiredHelperCounts", None if profile in HELPER_PROFILES else [])
     if not isinstance(required_helpers, list) or any(type(value) is not int or not 1 <= value <= 3 for value in required_helpers):
         raise ValueError("corpus requiredHelperCounts must be an array of integers from one to three")
@@ -431,6 +452,7 @@ def validate_manifest(manifest) -> dict:
     constant_requirements(manifest)
     module_requirements(manifest)
     call_shape_requirements(manifest)
+    aggregate_shape_requirements(manifest)
     ids = set()
     for entry in manifest["cases"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
@@ -453,6 +475,11 @@ def validate_manifest(manifest) -> dict:
         if profile in CALL_GRAPH_PROFILES:
             if "expectedCallShapes" in entry:
                 m2.validate_call_shapes(entry["expectedCallShapes"], "expectedCallShapes")
+            if "expectedHelperCount" in entry and (type(entry["expectedHelperCount"]) is not int or not 1 <= entry["expectedHelperCount"] <= 3):
+                raise ValueError("expectedHelperCount must be an integer from one to three")
+        if profile == "runtime-aggregate-call-graphs":
+            if "expectedAggregateShapes" in entry:
+                m2.validate_aggregate_shapes(entry["expectedAggregateShapes"], "expectedAggregateShapes")
             if "expectedHelperCount" in entry and (type(entry["expectedHelperCount"]) is not int or not 1 <= entry["expectedHelperCount"] <= 3):
                 raise ValueError("expectedHelperCount must be an integer from one to three")
         if profile in ("runtime-comptime", "runtime-modules"):
@@ -486,7 +513,7 @@ def validate_manifest(manifest) -> dict:
 def profile_inputs(profile: str) -> tuple[str, ...]:
     if profile in LOOP_PROFILES:
         return LOOP_INPUTS
-    if profile in ("runtime-primitives", "runtime-call-graphs"):
+    if profile in ("runtime-primitives", "runtime-call-graphs", "runtime-aggregate-call-graphs"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
 
@@ -624,6 +651,10 @@ class Campaign:
             self.summary["callShapeCoverage"] = {
                 "classification": "original Core syntactic call shapes; matched cases authenticated by native replay; not measured calls or opcode coverage",
                 "requiredShapes": [], "generatedShapes": [], "matchedShapes": [], "missingShapes": []}
+        if args.profile == "runtime-aggregate-call-graphs":
+            self.summary["aggregateShapeCoverage"] = {
+                "classification": "original Core syntactic aggregate/call composition shapes; matched cases authenticated by native replay; not measured calls, payloads or opcode coverage",
+                "requiredShapes": [], "generatedShapes": [], "matchedShapes": [], "missingShapes": []}
         self.checkpoint()
 
     def checkpoint(self) -> None:
@@ -655,6 +686,10 @@ class Campaign:
         if "callShapeCoverage" in self.summary:
             shapes = self.summary["callShapeCoverage"]
             shapes["missingShapes"] = [name for name in m2.CALL_SHAPES
+                if name in shapes["requiredShapes"] and name not in shapes["matchedShapes"]]
+        if "aggregateShapeCoverage" in self.summary:
+            shapes = self.summary["aggregateShapeCoverage"]
+            shapes["missingShapes"] = [name for name in m2.AGGREGATE_SHAPES
                 if name in shapes["requiredShapes"] and name not in shapes["matchedShapes"]]
         save_json(self.args.output / "summary.json", self.summary)
 
@@ -693,6 +728,13 @@ class Campaign:
         key = ("matched" if matched else "generated") + "Shapes"
         values = set(self.summary["callShapeCoverage"][key]) | call_shapes(case)
         self.summary["callShapeCoverage"][key] = [name for name in m2.CALL_SHAPES if name in values]
+
+    def record_aggregate_shapes(self, case: dict, *, matched: bool = False) -> None:
+        if "aggregateShapeCoverage" not in self.summary:
+            return
+        key = ("matched" if matched else "generated") + "Shapes"
+        values = set(self.summary["aggregateShapeCoverage"][key]) | aggregate_shapes(case)
+        self.summary["aggregateShapeCoverage"][key] = [name for name in m2.AGGREGATE_SHAPES if name in values]
 
     def guard(self) -> None:
         if time.monotonic() >= self.deadline:
@@ -906,6 +948,8 @@ class Campaign:
         self.summary["moduleCoverage"]["requiredBranches"] = sorted(module_requirements(manifest)["branches"])
         if "callShapeCoverage" in self.summary:
             self.summary["callShapeCoverage"]["requiredShapes"] = call_shape_requirements(manifest)
+        if "aggregateShapeCoverage" in self.summary:
+            self.summary["aggregateShapeCoverage"]["requiredShapes"] = aggregate_shape_requirements(manifest)
         cases, excluded, ids, accepted_ids = [], [], [], []
         attempted = 0
         for entry in manifest["cases"][:self.args.cases]:
@@ -964,6 +1008,11 @@ class Campaign:
                     raise ValueError(f"corpus call shape inventory changed for {entry['id']}")
                 if "expectedHelperCount" in entry and entry["expectedHelperCount"] != case["provenance"]["helperCount"]:
                     raise ValueError(f"corpus helper count changed for {entry['id']}")
+            if profile == "runtime-aggregate-call-graphs":
+                if "expectedAggregateShapes" in entry and entry["expectedAggregateShapes"] != case["provenance"]["aggregateShapes"]:
+                    raise ValueError(f"corpus aggregate shape inventory changed for {entry['id']}")
+                if "expectedHelperCount" in entry and entry["expectedHelperCount"] != case["provenance"]["helperCount"]:
+                    raise ValueError(f"corpus helper count changed for {entry['id']}")
             cases.append(case)
             accepted_ids.append(entry["id"])
             save_json(self.args.output / "cases" / f"{len(cases)-1:04d}.json", case)
@@ -978,6 +1027,7 @@ class Campaign:
             self.record_comptime(case)
             self.record_modules(case)
             self.record_call_shapes(case)
+            self.record_aggregate_shapes(case)
             if runtime_input:
                 coverage["generatedInputs"] = sorted(set(coverage["generatedInputs"]) | {case["input"]}, key=int)
             self.summary["generation"] = {"requested": self.args.cases, "attempted": attempted, "status": "running"}
@@ -1017,6 +1067,7 @@ class Campaign:
             self.record_comptime(case)
             self.record_modules(case)
             self.record_call_shapes(case)
+            self.record_aggregate_shapes(case)
         for index, case in enumerate(cases):
             self.guard()
             m2.validate_case(case)
@@ -1041,6 +1092,7 @@ class Campaign:
                 self.record_comptime(case, matched=True)
                 self.record_modules(case, matched=True)
                 self.record_call_shapes(case, matched=True)
+                self.record_aggregate_shapes(case, matched=True)
                 if case["schema"] != m2.CASE_SCHEMA:
                     coverage["matchedInputs"] = sorted(set(coverage["matchedInputs"]) | {case["input"]}, key=int)
             save_json(self.args.output / "results" / f"{index:04d}.json", {"actualReport": compact_report(report), "analysis": analysis})
@@ -1068,7 +1120,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs, 96 for primitives, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
@@ -1106,7 +1158,7 @@ def main() -> int:
     if args.attempts is None:
         args.attempts = 1024 if args.profile == "runtime-call-graphs" else 512 if args.profile in ("runtime-primitives", "runtime-comptime", "runtime-modules") else 256
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

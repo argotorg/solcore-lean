@@ -472,6 +472,256 @@ class CallGraphLoopProfileTests(unittest.TestCase):
                 runner.resolve_backend(other, {'backend': backend})
 
 
+class AggregateCallGraphProfileTests(unittest.TestCase):
+    NAME = 'SynthesizedAggregateCallGraphs'
+    SHAPES = ['pair-component-call', 'case-branch-call']
+    INPUTS = (0, 1, 2, 255, 256, 2**256 - 1, 2**255, 2**255 - 1)
+
+    def case(self, value=2):
+        # Envelope only; the native tool separately reseals the Core graph, its shapes and the source.
+        case = CaseProfileTests().input_case(value)
+        case['schema'] = runner.AGGREGATE_CALL_GRAPH_CASE_SCHEMA
+        case['source'] = '// aggregate call-graph admission fixture; no simulated execution'
+        case['provenance'].update({key: 'policy' for key in runner.AGGREGATE_CALL_GRAPH_VERSIONS})
+        case['provenance'].update(helperCount=2, aggregateShapes=list(self.SHAPES))
+        case['contract'].update(name=self.NAME, deployPath=[self.NAME + 'Deploy'],
+            runtimePath=[self.NAME + 'Deploy', self.NAME])
+        return case
+
+    def test_schema_registers_a_distinct_profile_contract_and_version_inventory(self):
+        schema = runner.AGGREGATE_CALL_GRAPH_CASE_SCHEMA
+        self.assertEqual(schema, 'solcore-lean.semantic-aggregate-call-graph-case.v1')
+        self.assertEqual(runner.CASE_PROFILES[schema], 'runtime-aggregate-call-graphs')
+        self.assertEqual(runner.CASE_CONTRACTS[schema], self.NAME)
+        others = (runner.CALL_GRAPH_CASE_SCHEMA, runner.CALL_GRAPH_LOOP_CASE_SCHEMA, runner.AGGREGATE_CASE_SCHEMA)
+        self.assertNotIn(schema, others)
+        self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
+        self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
+        self.assertEqual(len(runner.CASE_PROFILES), 14)
+        self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
+        self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
+        self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))
+        self.assertEqual(runner.AGGREGATE_CALL_GRAPH_VERSIONS,
+            ('profileVersion', 'functionVersion', 'boundaryVersion', 'shapeVersion'))
+        # The scalar profile names its shape receipt differently, so neither inventory can stand in for the other.
+        self.assertEqual(set(runner.CALL_GRAPH_VERSIONS) ^ set(runner.AGGREGATE_CALL_GRAPH_VERSIONS),
+            {'callShapeVersion', 'shapeVersion'})
+
+    def test_shape_inventory_is_nine_ordered_names_disjoint_from_the_scalar_call_shapes(self):
+        self.assertEqual(runner.AGGREGATE_SHAPES, ('pair-component-call', 'sum-payload-call', 'projected-call-argument',
+            'case-scrutinee-call', 'case-branch-call', 'payload-call-argument', 'aggregate-let', 'aggregate-branch',
+            'nested-case'))
+        self.assertEqual(len(set(runner.AGGREGATE_SHAPES)), 9)
+        self.assertFalse(set(runner.AGGREGATE_SHAPES) & set(runner.CALL_SHAPES))
+
+    def test_all_eight_primitive_inputs_have_exact_abi_and_a_distinct_wrapper(self):
+        for value in self.INPUTS:
+            with self.subTest(value=value):
+                case = self.case(value)
+                runner.validate_case(case)
+                self.assertEqual(runner.CASE_PROFILES[case['schema']], 'runtime-aggregate-call-graphs')
+                with self.assertRaisesRegex(ValueError, 'calldata differs'):
+                    runner.validate_case({**case, 'input': str(value ^ 1)})
+                # The wrapper name selects the profile: other schemas do not admit this envelope.
+                for schema in (runner.INPUT_CASE_SCHEMA, runner.AGGREGATE_CASE_SCHEMA, runner.FUNCTION_CASE_SCHEMA,
+                               runner.CASE_SCHEMA):
+                    with self.assertRaises(runner.Finding):
+                        runner.validate_case({**case, 'schema': schema})
+                for schema in (runner.CALL_GRAPH_CASE_SCHEMA, runner.CALL_GRAPH_LOOP_CASE_SCHEMA,
+                               runner.PRIMITIVE_CASE_SCHEMA, 'unknown', None,
+                               runner.AGGREGATE_CALL_GRAPH_CASE_SCHEMA.replace('.v1', '.v2')):
+                    with self.assertRaises(ValueError):
+                        runner.validate_case({**case, 'schema': schema})
+        for value in (1, '01', '-1', str(2**256), None):
+            with self.assertRaises(ValueError):
+                runner.validate_case({**self.case(), 'input': value})
+
+    def test_case_requires_its_original_core_program_and_emitted_source(self):
+        case = self.case()
+        for key, value in (('program', None), ('program', []), ('program', 'core'),
+                           ('source', None), ('source', 7), ('source', [])):
+            with self.assertRaisesRegex(ValueError, 'original Core program and emitted source'):
+                runner.validate_case({**case, key: value})
+        for key in ('program', 'source', 'provenance', 'contract', 'input'):
+            missing = dict(case); del missing[key]
+            with self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(missing)
+        for provenance in (None, [], 'policy'):
+            with self.assertRaisesRegex(ValueError, 'provenance'):
+                runner.validate_case({**case, 'provenance': provenance})
+
+    def test_every_aggregate_call_graph_version_receipt_is_required(self):
+        for key in runner.AGGREGATE_CALL_GRAPH_VERSIONS:
+            case = self.case(); del case['provenance'][key]
+            with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+            for value in (None, '', 1, True, []):
+                case = self.case(); case['provenance'][key] = value
+                with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+        for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion'):
+            case = self.case(); del case['provenance'][key]
+            with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+        # The scalar call-graph shape receipt is a different field and cannot replace this profile's.
+        case = self.case(); del case['provenance']['shapeVersion']; case['provenance']['callShapeVersion'] = 'policy'
+        with self.assertRaisesRegex(ValueError, 'shapeVersion'): runner.validate_case(case)
+        # The aggregate receipts are not part of the scalar call-graph inventory either.
+        scalar = CallGraphProfileTests().case()
+        scalar['provenance'].update({key: 'policy' for key in runner.AGGREGATE_CALL_GRAPH_VERSIONS})
+        runner.validate_case(scalar)
+        del scalar['provenance']['callShapeVersion']
+        with self.assertRaisesRegex(ValueError, 'callShapeVersion'): runner.validate_case(scalar)
+
+    def test_helper_count_is_one_to_three(self):
+        for value in (1, 2, 3):
+            case = self.case(); case['provenance']['helperCount'] = value
+            runner.validate_case(case)
+        for value in (None, True, False, 0, 4, -1, 2.0, '2'):
+            case = self.case(); case['provenance']['helperCount'] = value
+            with self.assertRaisesRegex(ValueError, 'helperCount'): runner.validate_case(case)
+        case = self.case(); del case['provenance']['helperCount']
+        with self.assertRaisesRegex(ValueError, 'helperCount'): runner.validate_case(case)
+
+    def test_aggregate_shapes_keep_one_canonical_order_and_no_unknown_or_duplicate_items(self):
+        valid = [[], ['nested-case'], ['pair-component-call', 'aggregate-let'], list(runner.AGGREGATE_SHAPES)]
+        valid += [[shape] for shape in runner.AGGREGATE_SHAPES]
+        for values in valid:
+            self.assertEqual(runner.validate_aggregate_shapes(values), values)
+            case = self.case(); case['provenance']['aggregateShapes'] = values
+            runner.validate_case(case)
+        invalid = [None, {}, 'nested-case', 7, [1], [None], ['recursive'], ['Nested-Case'], ['nested-case '],
+                   ['nested-case', 'nested-case'], ['nested-case', 'aggregate-let'],
+                   ['case-branch-call', 'pair-component-call'], list(reversed(runner.AGGREGATE_SHAPES)),
+                   tuple(runner.AGGREGATE_SHAPES), ['diamond'], list(runner.CALL_SHAPES)]
+        for values in invalid:
+            with self.subTest(values=values):
+                case = self.case(); case['provenance']['aggregateShapes'] = values
+                with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_case(case)
+                with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_aggregate_shapes(values)
+        case = self.case(); del case['provenance']['aggregateShapes']
+        with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_case(case)
+        with self.assertRaisesRegex(ValueError, 'expectedAggregateShapes'):
+            runner.validate_aggregate_shapes(None, 'expectedAggregateShapes')
+        # Neither profile accepts the other's shape vocabulary.
+        scalar = CallGraphProfileTests().case()
+        scalar['provenance']['callShapes'] = ['nested-case']
+        with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_case(scalar)
+        with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_call_shapes(['pair-component-call'])
+
+    def test_wrapper_name_object_paths_and_calldata_cannot_change(self):
+        case = self.case()
+        for name in ('SynthesizedCallGraphs', 'SynthesizedCallGraphLoops', 'SynthesizedAggregates', 'SynthesizedInput',
+                     'SynthesizedG0', self.NAME + 'Deploy', ''):
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'contract': {**case['contract'], 'name': name}})
+        for key, value in (('method', 'other'), ('signature', 'run()'), ('signature', 'run(uint256) ')):
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'contract': {**case['contract'], key: value}})
+        missing = dict(case); del missing['contract']
+        with self.assertRaises(runner.Finding): runner.validate_case(missing)
+        for deploy, runtime in ((['SynthesizedAggregatesDeploy'], ['SynthesizedAggregatesDeploy', 'SynthesizedAggregates']),
+                                (['SynthesizedCallGraphsDeploy'], ['SynthesizedCallGraphsDeploy', 'SynthesizedCallGraphs']),
+                                ([self.NAME], [self.NAME + 'Deploy', self.NAME]),
+                                ([self.NAME + 'Deploy'], [self.NAME + 'Deploy']),
+                                ([self.NAME + 'Deploy'], [self.NAME, self.NAME + 'Deploy']),
+                                ([self.NAME + 'Deploy', 'extra'], [self.NAME + 'Deploy', self.NAME])):
+            with self.assertRaisesRegex(ValueError, 'object paths'):
+                runner.validate_case({**case, 'contract': {**case['contract'], 'deployPath': deploy, 'runtimePath': runtime}})
+        for calldata in ('0xa444f5e9', case['contract']['calldata'] + '00', '0xc0406226' + '00' * 32):
+            with self.assertRaisesRegex(ValueError, 'calldata differs'):
+                runner.validate_case({**case, 'contract': {**case['contract'], 'calldata': calldata}})
+        with self.assertRaises(runner.Finding):
+            runner.validate_case({**case, 'contract': {**case['contract'], 'constructorCalldata': '0x00'}})
+        with self.assertRaises(ValueError):
+            runner.validate_case({**case, 'contract': []})
+
+    def test_source_bundles_are_only_admitted_by_the_module_profile(self):
+        case = self.case()
+        well_formed = {'schema': runner.bundle_transport.SCHEMA, 'entry': 'case.sol',
+            'files': [{'path': name, 'source': case['source'] if name == 'case.sol' else '// provider'}
+                      for name in runner.bundle_transport.FILES]}
+        for bundle in ({}, None, [], well_formed):
+            with self.assertRaisesRegex(ValueError, 'only admitted by the module profile'):
+                runner.validate_case({**case, 'sourceBundle': bundle})
+
+    def test_native_replay_must_authenticate_program_source_shapes_helper_count_versions_and_input(self):
+        case = self.case()
+        runner.validate_replayed_case(case, copy.deepcopy(case))
+        # A saved observation is no oracle for the replayed case.
+        runner.validate_replayed_case({**case, 'directCore': {'word': 'fake'}}, case)
+        runner.validate_replayed_case(case, {**case, 'directCore': {'word': 'other'}})
+        provenance = case['provenance']
+        changes = [('source', case['source'] + 'changed'), ('program', {'unsealed': True}),
+            ('contract', {**case['contract'], 'note': 'unsealed'}),
+            ('provenance', {**provenance, 'aggregateShapes': ['nested-case']}),
+            ('provenance', {**provenance, 'aggregateShapes': []}),
+            ('provenance', {**provenance, 'helperCount': 1}), ('provenance', {**provenance, 'helperCount': 3}),
+            ('provenance', {**provenance, 'features': ['forged']}),
+            ('provenance', {**provenance, 'origin': {'kind': 'forged'}})]
+        changes += [('provenance', {**provenance, key: 'forged'}) for key in
+                    (*runner.AGGREGATE_CALL_GRAPH_VERSIONS, 'generatorVersion', 'emitterVersion', 'wrapperVersion')]
+        # A plan envelope belongs to other profiles: native replay may neither add nor drop one.
+        changes += [(key, {'schema': 'solcore-lean.loop-plan.v1', 'stepProgram': {}}) for key in
+                    ('loopPlan', 'genericPlan', 'closurePlan', 'comptimePlan', 'modulePlan')]
+        for key, value in changes:
+            with self.subTest(key=key, value=value):
+                with self.assertRaisesRegex(ValueError, 'case replay changed ' + key):
+                    runner.validate_replayed_case(case, {**case, key: value})
+                with self.assertRaisesRegex(ValueError, 'case replay changed ' + key):
+                    runner.validate_replayed_case({**case, key: value}, case)
+        with self.assertRaisesRegex(ValueError, 'case replay changed input'):
+            runner.validate_replayed_case({**case, 'input': '3'}, case)
+        with self.assertRaisesRegex(ValueError, 'case replay changed'):
+            runner.validate_replayed_case(case, self.case(3))
+        # The replayed case must itself be a valid envelope before it is compared.
+        fresh_provenance = {**provenance, 'aggregateShapes': ['nested-case', 'aggregate-let']}
+        with self.assertRaisesRegex(ValueError, 'canonical'):
+            runner.validate_replayed_case({**case, 'provenance': fresh_provenance}, {**case, 'provenance': fresh_provenance})
+        fresh_provenance = {**provenance, 'helperCount': 4}
+        with self.assertRaisesRegex(ValueError, 'helperCount'):
+            runner.validate_replayed_case({**case, 'provenance': fresh_provenance}, {**case, 'provenance': fresh_provenance})
+        with self.assertRaisesRegex(ValueError, 'only admitted by the module profile'):
+            runner.validate_replayed_case(case, {**case, 'sourceBundle': {}})
+
+    def test_backend_receipts_keep_yul_and_linked_hull_distinct(self):
+        self.assertEqual(runner.CASE_CONTRACTS[runner.AGGREGATE_CALL_GRAPH_CASE_SCHEMA], self.NAME)
+        for backend in runner.BACKENDS:
+            self.assertEqual(runner.resolve_backend(None, {'backend': backend}), backend)
+            self.assertEqual(runner.path_backends(backend)['importedHull'],
+                'sonatina-o0' if backend == 'yul' else backend)
+            other = 'sonatina-o2' if backend != 'sonatina-o2' else 'yul'
+            with self.assertRaises(ValueError):
+                runner.resolve_backend(other, {'backend': backend})
+
+    def test_execution_scope_is_registered_for_every_backend_before_any_tool_runs(self):
+        class Stop(Exception):
+            pass
+
+        class StoppingRunner:
+            """Stops at the first tool identity: no process, compiler or EVM is started."""
+            def __init__(self, args, report):
+                pass
+
+            def identity(self, *_args, **_kwargs):
+                raise Stop
+
+        for backend in runner.BACKENDS:
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+                folder = Path(directory)
+                (folder / 'input.json').write_text(json.dumps(self.case()))
+                (folder / 'out').mkdir()
+                args = SimpleNamespace(case=folder / 'input.json', replay=None, backend=backend, output=folder / 'out',
+                    case_tool=Path('/unused/case-tool'), total_timeout=5)
+                report = {'processes': [], 'observations': {}, 'rawObservations': {}}
+                with patch.object(runner, 'Runner', StoppingRunner), self.assertRaises(Stop):
+                    runner.execute(args, report)
+                self.assertIn('directly generated internal Word pairs/sums, projections and case payload scopes with '
+                              'acyclic Word helper calls', report['scope'])
+                self.assertIn('Yul EVM and Sonatina O0-linked Hull' if backend == 'yul'
+                              else 'Sonatina ' + runner.optimization_for_backend(backend), report['scope'])
+                self.assertEqual((report['backend'], report['pathBackends']), (backend, runner.path_backends(backend)))
+                self.assertEqual(report['provenance'], self.case()['provenance'])
+                self.assertEqual(json.loads((folder / 'out/case.json').read_text()), self.case())
+
+
 class ClassificationTests(unittest.TestCase):
     def test_three_completed_paths_required(self):
         actual = observations()

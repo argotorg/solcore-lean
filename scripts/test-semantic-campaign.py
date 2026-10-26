@@ -158,6 +158,22 @@ def call_graph_loop_policy_case(mask=7, value=7, helpers=2, shapes=('nested-call
     return case
 
 
+def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
+    """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(helpers)
+    case.update(schema=campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA, input=str(value))
+    case['program']['body']['argument']['value'] = '0x' + f'{value:064x}'
+    case['contract'].update(name='SynthesizedAggregateCallGraphs',
+        deployPath=['SynthesizedAggregateCallGraphsDeploy'],
+        runtimePath=['SynthesizedAggregateCallGraphsDeploy', 'SynthesizedAggregateCallGraphs'],
+        calldata='0xa444f5e9' + f'{value:064x}')
+    case['provenance'] = {key: 'test' for key in
+        ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.m2.AGGREGATE_CALL_GRAPH_VERSIONS)}
+    case['provenance'].update(features=['functionCall', 'local'], helperCount=helpers, aggregateShapes=list(shapes),
+        origin={'kind': 'aggregate-call-graph-generated', 'seed': '1', 'maxProgramNodes': 192})
+    return case
+
+
 class AnalysisTests(unittest.TestCase):
     def test_backend_is_normalized_and_part_of_the_reduction_fingerprint(self):
         legacy = campaign.analyze(matched(), 'rustEvm')
@@ -2200,6 +2216,693 @@ class CallGraphLoopCoverageTests(unittest.TestCase):
                 self.assertTrue(history['steps'][0]['accepted'])
                 self.assertEqual(history['steps'][0]['actualComparison']['category'], 'matched')
                 self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
+
+
+class AggregateCallGraphCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-aggregate-call-graphs'
+    CORPUS = ROOT / 'scripts/semantic-aggregate-call-graph-corpus.json'
+    SHAPES = ('pair-component-call', 'case-branch-call')
+    VERSIONS = ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.m2.AGGREGATE_CALL_GRAPH_VERSIONS)
+
+    def case(self, value=255, helpers=2, shapes=SHAPES):
+        return aggregate_call_graph_policy_case(value, helpers, shapes)
+
+    def manifest(self, generated=False):
+        case = self.case()
+        program = {**case['program'], 'resultType': {'tag': 'function', 'parameter': 'word', 'result': 'word'},
+                   'body': case['program']['body']['function']}
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in self.VERSIONS},
+            'requiredFeatures': ['functionCall', 'local'], 'requiredWordLiterals': [],
+            'requiredInputs': list(campaign.PRIMITIVE_INPUTS), 'requiredHelperCounts': [1, 2, 3],
+            'requiredAggregateShapes': list(campaign.m2.AGGREGATE_SHAPES),
+            'cases': [{'id': 'graph', 'input': '255', 'expectedFeatures': ['functionCall', 'local'],
+                'expectedAggregateShapes': list(self.SHAPES), 'expectedHelperCount': 2,
+                **({'generation': {'seed': '1', 'maxProgramNodes': 192}} if generated else {'program': program})}]}
+
+    def committed(self):
+        return json.loads(self.CORPUS.read_text())
+
+    def run_main(self, *argv, prepare=True):
+        """Parse the real command line and capture native commands without running a campaign."""
+        with tempfile.TemporaryDirectory() as directory:
+            configured, seen = [], []
+            def run(instance):
+                configured.append(instance.args)
+                instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                if prepare: instance.prepare_cases()
+                instance.summary['status'] = 'generation-exhausted'
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory) / 'run'), *argv]), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                campaign.main()
+            return configured[0], seen
+
+    def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
+        self.assertIn(self.PROFILE, campaign.PROFILES)
+        self.assertEqual(len(campaign.PROFILES), 14)
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+            ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_VERSIONS)
+        self.assertEqual(set(campaign.PROFILE_COMMANDS), set(campaign.PROFILES))
+        self.assertEqual(set(campaign.PROFILE_VERSION_FIELDS), set(campaign.PROFILES))
+        # Every profile keeps its own native generator, emitter and origin kind.
+        for position in range(3):
+            self.assertEqual(len({commands[position] for commands in campaign.PROFILE_COMMANDS.values()}),
+                len(campaign.PROFILES))
+        self.assertIn(self.PROFILE, campaign.HELPER_PROFILES)
+        # It composes aggregates with calls but is neither a scalar call-graph nor a loop profile.
+        self.assertNotIn(self.PROFILE, campaign.CALL_GRAPH_PROFILES)
+        self.assertNotIn(self.PROFILE, campaign.LOOP_PROFILES)
+        self.assertEqual(campaign.CALL_GRAPH_PROFILES, ('runtime-call-graphs', 'runtime-call-graph-loops'))
+        self.assertEqual(campaign.LOOP_PROFILES, ('runtime-loops', 'runtime-call-graph-loops'))
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(len(campaign.PRIMITIVE_INPUTS), 8)
+        for profile, inputs in (('runtime-call-graphs', campaign.PRIMITIVE_INPUTS),
+                ('runtime-primitives', campaign.PRIMITIVE_INPUTS), ('runtime-call-graph-loops', campaign.LOOP_INPUTS),
+                ('runtime-loops', campaign.LOOP_INPUTS), ('runtime-aggregates', campaign.INPUT_BOUNDARIES),
+                ('runtime-functions', campaign.INPUT_BOUNDARIES), ('closed-g0', campaign.INPUT_BOUNDARIES)):
+            self.assertEqual(campaign.profile_inputs(profile), inputs)
+        self.assertEqual({profile: campaign.minimum_nodes(profile) for profile in
+            (self.PROFILE, 'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-primitives',
+             'runtime-aggregates', 'runtime-loops', 'closed-g0')},
+            {self.PROFILE: 13, 'runtime-call-graphs': 13, 'runtime-call-graph-loops': 39, 'runtime-primitives': 8,
+             'runtime-aggregates': 3, 'runtime-loops': 3, 'closed-g0': 3})
+        for profile in (self.PROFILE, 'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregates', 'closed-g0'):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile = profile
+                instance = campaign.Campaign(config)
+                self.assertEqual(instance.summary['configuration']['profile'], profile)
+                self.assertEqual('aggregateShapeCoverage' in instance.summary, profile == self.PROFILE)
+                self.assertEqual('callShapeCoverage' in instance.summary, profile in campaign.CALL_GRAPH_PROFILES)
+                if profile == self.PROFILE:
+                    group = instance.summary['aggregateShapeCoverage']
+                    self.assertEqual({key: value for key, value in group.items() if key != 'classification'},
+                        {'requiredShapes': [], 'generatedShapes': [], 'matchedShapes': [], 'missingShapes': []})
+                    self.assertIsInstance(group['classification'], str)
+                    saved = json.loads((Path(directory) / 'summary.json').read_text())
+                    self.assertEqual(saved['aggregateShapeCoverage'], group)
+                    self.assertEqual(instance.summary['loopCoverage']['requiredMasks'], [])
+
+    def test_committed_corpus_validates_and_its_entries_deliver_every_requirement(self):
+        manifest = self.committed()
+        campaign.validate_manifest(manifest)
+        self.assertEqual(manifest['profile'], self.PROFILE)
+        self.assertEqual(set(manifest['requiredInputs']), set(campaign.PRIMITIVE_INPUTS))
+        self.assertEqual(manifest['requiredHelperCounts'], [1, 2, 3])
+        self.assertEqual(campaign.aggregate_shape_requirements(manifest), list(campaign.m2.AGGREGATE_SHAPES))
+        # This profile has no scalar call-shape, loop or recipe requirements.
+        self.assertEqual(campaign.call_shape_requirements(manifest), [])
+        self.assertEqual(campaign.loop_requirements(manifest), {'masks': [], 'iterations': []})
+        self.assertEqual(campaign.recipe_requirements(manifest), {'templates': [], 'updates': []})
+        shapes, counts, inputs, features = set(), set(), set(), set()
+        fixed = generated = 0
+        self.assertEqual(len({entry['id'] for entry in manifest['cases']}), len(manifest['cases']))
+        for entry in manifest['cases']:
+            inputs.add(entry['input']); counts.add(entry['expectedHelperCount']); features |= set(entry['expectedFeatures'])
+            # Every committed entry states the inventory that a rebuilt case has to reproduce.
+            shapes |= set(campaign.m2.validate_aggregate_shapes(entry['expectedAggregateShapes']))
+            if 'generation' in entry:
+                generated += 1
+                self.assertIn(entry['input'], campaign.PRIMITIVE_INPUTS)
+                continue
+            fixed += 1
+            self.assertEqual(entry['program']['resultType'], {'tag': 'function', 'parameter': 'word', 'result': 'word'})
+            self.assertEqual(entry['program']['dataDefinitions'], [])
+            applied = {'schema': 'solcore-semantic-core', 'resultType': 'word', 'dataDefinitions': [],
+                'body': {'tag': 'apply', 'function': entry['program']['body'],
+                         'argument': {'tag': 'word', 'value': '0x' + f"{int(entry['input']):064x}"}}}
+            case = {'schema': campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA, 'input': entry['input'], 'program': applied,
+                'provenance': {'helperCount': entry['expectedHelperCount'], 'aggregateShapes': entry['expectedAggregateShapes']}}
+            # The declared helper count must equal the actual declaration inventory of the corpus program.
+            self.assertEqual(campaign.helper_counts(case), {entry['expectedHelperCount']})
+            self.assertEqual(campaign.aggregate_shapes(case), set(entry['expectedAggregateShapes']))
+        self.assertTrue(fixed and generated)
+        self.assertEqual(counts, {1, 2, 3})
+        self.assertEqual(shapes, set(campaign.m2.AGGREGATE_SHAPES))
+        self.assertLessEqual(set(campaign.PRIMITIVE_INPUTS), inputs)
+        self.assertLessEqual(set(manifest['requiredFeatures']), features)
+
+    def test_committed_corpus_is_not_admitted_as_another_profile(self):
+        manifest = self.committed()
+        for profile in ('runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregates', 'runtime-functions',
+                        'runtime-primitives', 'runtime-loops', 'closed-g0', 'unknown'):
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, 'profile': profile})
+            if profile in campaign.PROFILES:
+                with self.assertRaisesRegex(ValueError, 'only aggregate call-graph'):
+                    campaign.aggregate_shape_requirements({**manifest, 'profile': profile})
+        # Supplying every other receipt of a neighbouring profile still leaves the aggregate-shape requirement foreign.
+        for profile, extra in (
+                ('runtime-call-graphs', {'callShapeVersion': 'x', 'requiredCallShapes': list(campaign.m2.CALL_SHAPES)}),
+                ('runtime-functions', {'abstractionVersion': 'x'}),
+                ('runtime-aggregates', {'templateVersion': 'x'})):
+            with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'only aggregate call-graph'):
+                campaign.validate_manifest({**manifest, 'profile': profile, **extra})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**CallGraphCoverageTests().manifest(True), 'profile': self.PROFILE})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**CallGraphLoopCoverageTests().manifest(), 'profile': self.PROFILE})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**self.manifest(), 'profile': 'runtime-call-graphs'})
+
+    def test_manifest_inputs_versions_requirements_and_node_gates(self):
+        for generated in (False, True):
+            manifest = self.manifest(generated)
+            campaign.validate_manifest(manifest)
+            for field in (*campaign.m2.AGGREGATE_CALL_GRAPH_VERSIONS, 'generatorVersion', 'emitterVersion', 'wrapperVersion'):
+                missing = dict(manifest); del missing[field]
+                with self.assertRaisesRegex(ValueError, field): campaign.validate_manifest(missing)
+                with self.assertRaisesRegex(ValueError, field): campaign.validate_manifest({**manifest, field: ''})
+                with self.assertRaisesRegex(ValueError, field): campaign.validate_manifest({**manifest, field: 1})
+            # The scalar call-graph shape receipt is not this profile's receipt.
+            swapped = dict(manifest); del swapped['shapeVersion']; swapped['callShapeVersion'] = 'x'
+            with self.assertRaisesRegex(ValueError, 'shapeVersion'): campaign.validate_manifest(swapped)
+            for field in ('requiredInputs', 'requiredAggregateShapes', 'requiredHelperCounts'):
+                missing = dict(manifest); del missing[field]
+                with self.assertRaises(ValueError): campaign.validate_manifest(missing)
+            for value in (None, 'nested-case', ['unknown'], ['nested-case', 'nested-case'],
+                          ['nested-case', 'aggregate-let'], ['nested-call'], list(campaign.m2.CALL_SHAPES)):
+                with self.assertRaisesRegex(ValueError, 'canonical'):
+                    campaign.validate_manifest({**manifest, 'requiredAggregateShapes': value})
+            for value in ([], ['nested-case'], ['pair-component-call', 'aggregate-let'], list(campaign.m2.AGGREGATE_SHAPES)):
+                campaign.validate_manifest({**manifest, 'requiredAggregateShapes': value})
+            # Each of the eight boundary inputs is individually required; extras are allowed.
+            for missing in campaign.PRIMITIVE_INPUTS:
+                changed = {**manifest, 'requiredInputs': [v for v in campaign.PRIMITIVE_INPUTS if v != missing]}
+                with self.assertRaisesRegex(ValueError, 'eight boundary'): campaign.validate_manifest(changed)
+            for value in (list(campaign.LOOP_INPUTS), list(campaign.INPUT_BOUNDARIES), ['0'], []):
+                with self.assertRaisesRegex(ValueError, 'eight boundary'):
+                    campaign.validate_manifest({**manifest, 'requiredInputs': value})
+            campaign.validate_manifest({**manifest, 'requiredInputs': [*campaign.PRIMITIVE_INPUTS, '3']})
+            for value in ([0], [4], [True], ['1'], [1.0]):
+                with self.assertRaisesRegex(ValueError, 'one to three'):
+                    campaign.validate_manifest({**manifest, 'requiredHelperCounts': value})
+            for value in (None, '1', 1):
+                with self.assertRaises(ValueError): campaign.validate_manifest({**manifest, 'requiredHelperCounts': value})
+            with self.assertRaisesRegex(ValueError, 'duplicates'):
+                campaign.validate_manifest({**manifest, 'requiredHelperCounts': [1, 1]})
+            for value in ([], [2], [3, 1], [1, 2, 3]):
+                campaign.validate_manifest({**manifest, 'requiredHelperCounts': value})
+        manifest = self.manifest(True)
+        for value in (12, 3, 513, True, '192', None, 192.0):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['maxProgramNodes'] = value
+            with self.assertRaises(ValueError): campaign.validate_manifest(changed)
+        for value in (13, 192, 512):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['maxProgramNodes'] = value
+            campaign.validate_manifest(changed)
+        for seed in ('01', '-1', str(2**64), 1, None):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['seed'] = seed
+            with self.assertRaises(ValueError): campaign.validate_manifest(changed)
+        changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['seed'] = str(2**64 - 1)
+        campaign.validate_manifest(changed)
+        # Generated requests select one of the eight boundary inputs; fixed programs may carry any Word.
+        for value in campaign.PRIMITIVE_INPUTS:
+            changed = copy.deepcopy(manifest); changed['cases'][0]['input'] = value
+            campaign.validate_manifest(changed)
+        for value in ('3', '7', str(2**255 + 1)):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['input'] = value
+            with self.assertRaisesRegex(ValueError, 'boundary value'): campaign.validate_manifest(changed)
+            fixed = self.manifest(); fixed['cases'][0]['input'] = value
+            campaign.validate_manifest(fixed)
+
+    def test_expected_aggregate_shapes_and_helper_count_validate_for_this_profile(self):
+        for generated in (False, True):
+            manifest = self.manifest(generated)
+            for value in (None, 'nested-case', ['unknown'], ['nested-case', 'nested-case'],
+                          ['nested-case', 'aggregate-let'], ['diamond']):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedAggregateShapes'] = value
+                with self.assertRaisesRegex(ValueError, 'expectedAggregateShapes'): campaign.validate_manifest(changed)
+            for value in (0, 4, True, '2', 2.0, None):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedHelperCount'] = value
+                with self.assertRaisesRegex(ValueError, 'expectedHelperCount'): campaign.validate_manifest(changed)
+            for value in (1, 2, 3):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedHelperCount'] = value
+                campaign.validate_manifest(changed)
+            for value in ([], list(campaign.m2.AGGREGATE_SHAPES)):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedAggregateShapes'] = value
+                campaign.validate_manifest(changed)
+            optional = copy.deepcopy(manifest)
+            del optional['cases'][0]['expectedAggregateShapes'], optional['cases'][0]['expectedHelperCount']
+            campaign.validate_manifest(optional)
+            # expectedFeatures stays mandatory for every entry.
+            required = copy.deepcopy(manifest); del required['cases'][0]['expectedFeatures']
+            with self.assertRaisesRegex(ValueError, 'expectedFeatures'): campaign.validate_manifest(required)
+
+    def test_entry_source_and_shape_of_each_entry_belong_to_this_profile(self):
+        manifest = self.manifest()
+        entry = manifest['cases'][0]
+        bare = {key: value for key, value in entry.items() if key != 'program'}
+        plan = {'schema': 'solcore-lean.loop-plan.v1', 'mask': 7, 'stepProgram': entry['program']}
+        for changed in ({**entry, 'generation': {'seed': '1', 'maxProgramNodes': 192}}, bare,
+                        {**bare, 'loopPlan': plan}, {**bare, 'genericPlan': plan}, {**bare, 'modulePlan': plan},
+                        {**entry, 'program': None}, {**entry, 'program': []}, {**entry, 'program': 'core'},
+                        {**entry, 'id': ''}, {**entry, 'id': 7}, {key: value for key, value in entry.items() if key != 'id'},
+                        {key: value for key, value in entry.items() if key != 'input'}, {**entry, 'input': '01'},
+                        {**entry, 'input': 3}, {**entry, 'expectedFeatures': 'functionCall'},
+                        {**entry, 'expectedFeatures': [1]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, 'cases': [changed]})
+        generated = self.manifest(True)['cases'][0]
+        with self.assertRaises(ValueError):  # a generation request and a program are exclusive
+            campaign.validate_manifest({**manifest, 'cases': [{**generated, 'program': entry['program']}]})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**manifest, 'cases': [entry, entry]})
+        campaign.validate_manifest({**manifest, 'cases': [entry, {**entry, 'id': 'second'}, {**generated, 'id': 'third'}]})
+
+    def test_aggregate_shape_requirements_are_profile_specific(self):
+        shapes = {'requiredAggregateShapes': ['nested-case']}
+        for profile in ('closed-g0', 'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregates',
+                        'runtime-functions', 'runtime-loops'):
+            with self.assertRaisesRegex(ValueError, 'only aggregate call-graph'):
+                campaign.aggregate_shape_requirements({'profile': profile, **shapes})
+            self.assertEqual(campaign.aggregate_shape_requirements({'profile': profile}), [])
+            self.assertEqual(campaign.aggregate_shape_requirements({'profile': profile, 'requiredAggregateShapes': []}), [])
+        self.assertEqual(campaign.aggregate_shape_requirements({'profile': self.PROFILE, **shapes}), ['nested-case'])
+        self.assertEqual(campaign.aggregate_shape_requirements({'profile': self.PROFILE, 'requiredAggregateShapes': []}), [])
+        with self.assertRaises(ValueError):  # this profile must state its aggregate-shape requirements
+            campaign.aggregate_shape_requirements({'profile': self.PROFILE})
+        for old in (PrimitiveCoverageTests().manifest(), CallGraphCoverageTests().manifest(True),
+                    CallGraphLoopCoverageTests().manifest(), LoopCoverageTests().manifest()):
+            campaign.validate_manifest(old)
+            with self.assertRaisesRegex(ValueError, 'only aggregate call-graph'):
+                campaign.validate_manifest({**old, **shapes})
+        # Scalar call-shape and loop requirements belong to other profiles.
+        manifest = self.manifest(True)
+        with self.assertRaisesRegex(ValueError, 'only call-graph'):
+            campaign.validate_manifest({**manifest, 'requiredCallShapes': ['nested-call']})
+        with self.assertRaisesRegex(ValueError, 'only loop'):
+            campaign.validate_manifest({**manifest, 'loopRequirements': {'masks': [1], 'iterations': [1]}})
+        campaign.validate_manifest({**manifest, 'requiredCallShapes': [], 'loopRequirements': {'masks': [], 'iterations': []}})
+        with self.assertRaisesRegex(ValueError, 'only call-graph'):
+            campaign.call_shape_requirements({'profile': self.PROFILE, 'requiredCallShapes': ['nested-call']})
+        self.assertEqual(campaign.call_shape_requirements({'profile': self.PROFILE}), [])
+        with self.assertRaisesRegex(ValueError, 'only loop'):
+            campaign.loop_requirements({'profile': self.PROFILE, 'loopRequirements': {'masks': [1], 'iterations': []}})
+        self.assertEqual(campaign.loop_requirements({'profile': self.PROFILE}), {'masks': [], 'iterations': []})
+        # Neither recipe nor other requirement families are inherited from the aggregate step grammar.
+        for key, value in (('generationRecipeRequirements', {'templates': [1], 'updates': []}),
+                           ('genericRequirements', {'instantiations': ['word:even']}),
+                           ('closureRequirements', {'variants': ['snapshot']}),
+                           ('comptimeRequirements', {'variants': ['offset']}),
+                           ('moduleRequirements', {'branches': ['even']}),
+                           ('requiredConstantFeatures', ['wordLiteral'])):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: value})
+
+    def test_helper_count_is_checked_against_declarations_not_claimed_origin(self):
+        for count in (1, 2, 3):
+            case = self.case(helpers=count)
+            case['provenance']['origin']['helperCount'] = 99  # claimed origin metadata is not evidence
+            self.assertEqual(campaign.helper_counts(case), {count})
+            case['provenance']['helperCount'] = 1 if count != 1 else 2
+            with self.assertRaisesRegex(ValueError, 'declaration'): campaign.helper_counts(case)
+            del case['provenance']['helperCount']
+            with self.assertRaisesRegex(ValueError, 'declaration'): campaign.helper_counts(case)
+        for malformed in (None, {}, function_case(0)['program'], function_case(4)['program']):
+            case = self.case(); case['program'] = malformed
+            with self.assertRaises(ValueError): campaign.helper_counts(case)
+        case = self.case(); case['program']['body']['argument'] = {'tag': 'bool', 'value': False}
+        with self.assertRaises(ValueError): campaign.helper_counts(case)
+        # Only this schema's declarations are checked against its provenance claim.
+        other = self.case(helpers=3); other['schema'] = campaign.m2.INPUT_CASE_SCHEMA
+        self.assertEqual(campaign.helper_counts(other), set())
+        self.assertEqual(campaign.helper_counts(CallGraphCoverageTests().case(helpers=3)), {3})
+
+    def test_aggregate_shapes_come_only_from_the_canonical_provenance_inventory(self):
+        self.assertEqual(campaign.aggregate_shapes(self.case()), set(self.SHAPES))
+        self.assertEqual(campaign.aggregate_shapes(self.case(shapes=campaign.m2.AGGREGATE_SHAPES)),
+            set(campaign.m2.AGGREGATE_SHAPES))
+        self.assertEqual(campaign.aggregate_shapes(self.case(shapes=())), set())
+        for value in (None, 'nested-case', ['unknown'], ['nested-case', 'nested-case'], ['nested-case', 'aggregate-let'],
+                      ['diamond']):
+            case = self.case(); case['provenance']['aggregateShapes'] = value
+            with self.assertRaisesRegex(ValueError, 'canonical'): campaign.aggregate_shapes(case)
+        case = self.case(); del case['provenance']['aggregateShapes']
+        with self.assertRaisesRegex(ValueError, 'canonical'): campaign.aggregate_shapes(case)
+        # Only this schema claims aggregate shapes, even if another case's provenance said otherwise.
+        for other in (function_case(1), CallGraphCoverageTests().case(), call_graph_loop_policy_case(), loop_policy_case()):
+            other['provenance']['aggregateShapes'] = ['nested-case']
+            self.assertEqual(campaign.aggregate_shapes(other), set())
+        # ... and this schema claims no scalar call shapes.
+        case = self.case(); case['provenance']['callShapes'] = ['diamond']
+        self.assertEqual(campaign.call_shapes(case), set())
+
+    def test_aggregate_call_graph_cases_are_not_claimed_by_other_coverage_groups(self):
+        case = self.case()
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': set(), 'Updates': set()})
+        self.assertEqual(campaign.specified_loops(case), {'Masks': set(), 'Iterations': set()})
+        for claim in (campaign.specified_generics, campaign.specified_closures, campaign.specified_comptime,
+                      campaign.constant_features, campaign.specified_modules):
+            self.assertEqual(claim(case), set())
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            before = copy.deepcopy({key: value for key, value in instance.summary.items()
+                if key in ('recipeCoverage', 'loopCoverage', 'genericCoverage', 'closureCoverage',
+                           'comptimeCoverage', 'constantCoverage', 'moduleCoverage', 'callShapeCoverage')})
+            instance.record_recipes(case, matched=True); instance.record_loops(case, matched=True)
+            instance.record_generics(case, matched=True); instance.record_closures(case, matched=True)
+            instance.record_comptime(case, matched=True); instance.record_modules(case, matched=True)
+            instance.record_call_shapes(case, matched=True)
+            self.assertEqual(before, {key: instance.summary.get(key) for key in before if key in instance.summary})
+            self.assertNotIn('callShapeCoverage', instance.summary)
+
+    def test_materialization_routes_eight_inputs_and_matches_expected_metadata(self):
+        tampers = (None, 'shapes', 'helper', 'features', 'seed', 'kind', 'nodes', 'input',
+                   *('version:' + key for key in self.VERSIONS))
+        messages = {'shapes': 'aggregate shape inventory changed', 'helper': 'helper count changed',
+                    'features': 'feature inventory changed', 'seed': 'generated corpus provenance differs',
+                    'kind': 'generated corpus provenance differs', 'nodes': 'generated corpus provenance differs',
+                    'input': 'corpus input changed'}
+        for generated in (False, True):
+            for tamper in tampers:
+                if not generated and tamper in ('seed', 'kind', 'nodes'): continue
+                with self.subTest(generated=generated, tamper=tamper), tempfile.TemporaryDirectory() as directory:
+                    config = options(directory); config.profile, config.cases = self.PROFILE, 1
+                    config.corpus = Path(directory) / 'manifest.json'
+                    manifest = self.manifest(generated); config.corpus.write_text(json.dumps(manifest))
+                    instance = campaign.Campaign(config); calls = []; plans = []; case = self.case()
+                    if tamper == 'shapes': case['provenance']['aggregateShapes'] = ['nested-case']
+                    if tamper == 'helper': case['provenance']['helperCount'] = 3
+                    if tamper == 'features': case['provenance']['features'] = ['functionCall']
+                    if tamper == 'seed': case['provenance']['origin']['seed'] = '9'
+                    if tamper == 'kind': case['provenance']['origin']['kind'] = 'call-graph-generated'
+                    if tamper == 'nodes': case['provenance']['origin']['maxProgramNodes'] = 128
+                    if tamper == 'input': case = self.case(3)
+                    if tamper and tamper.startswith('version:'): case['provenance'][tamper[8:]] = 'wrong'
+                    def tool(arguments, stage):
+                        calls.append((arguments, stage))
+                        if generated: return {'cases': [case]}
+                        plans.append(json.loads(Path(arguments[1]).read_text()))
+                        return case
+                    instance.tool = tool
+                    if generated and tamper == 'input':
+                        # A generated request keeps only the case with the requested boundary input.
+                        response = instance.prepare_cases()
+                        self.assertEqual(response['cases'], [])
+                        self.assertEqual(response['excluded'][0]['stage'], 'generation')
+                        self.assertEqual(response['status'], 'generation-exhausted')
+                    elif tamper:
+                        message = messages.get(tamper, 'corpus ' + str(tamper)[8:] + ' changed')
+                        with self.assertRaisesRegex(ValueError, message): instance.prepare_cases()
+                    else:
+                        self.assertEqual(instance.prepare_cases()['cases'], [case])
+                        summary = instance.summary
+                        self.assertNotIn('callShapeCoverage', summary)
+                        self.assertEqual(summary['aggregateShapeCoverage']['generatedShapes'], list(self.SHAPES))
+                        self.assertEqual(summary['aggregateShapeCoverage']['matchedShapes'], [])
+                        self.assertEqual(summary['aggregateShapeCoverage']['requiredShapes'], list(campaign.m2.AGGREGATE_SHAPES))
+                        self.assertEqual(summary['loopCoverage']['generatedMasks'], [])
+                        self.assertEqual(summary['coverage']['generatedHelperCounts'], [2])
+                        self.assertEqual(summary['coverage']['generatedInputs'], ['255'])
+                        self.assertEqual(summary['coverage']['requiredInputs'], sorted(campaign.PRIMITIVE_INPUTS, key=int))
+                        self.assertEqual(summary['coverage']['requiredHelperCounts'], [1, 2, 3])
+                        self.assertEqual(summary['recipeCoverage']['generatedTemplates'], [])
+                    if generated:
+                        self.assertEqual(calls, [(['aggregate-call-graph-generate', '1', '192', '8', '1', '1000'], 'corpus-generation')])
+                    else:
+                        self.assertEqual(len(calls), 1)
+                        self.assertEqual(calls[0][1], 'corpus-emission')
+                        self.assertEqual(calls[0][0][0], 'aggregate-call-graph-emit')
+                        self.assertEqual(calls[0][0][2:], ['255', '1000'])
+                        self.assertEqual(plans, [manifest['cases'][0]['program']])
+
+    def test_committed_corpus_routes_every_entry_to_its_native_command(self):
+        manifest = self.committed(); entries = manifest['cases']
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile, config.cases, config.attempts = self.PROFILE, len(entries), len(entries)
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(manifest))
+            instance = campaign.Campaign(config); calls = []; programs = []
+            def build(entry, value):
+                case = self.case(int(value), entry['expectedHelperCount'], entry['expectedAggregateShapes'])
+                case['provenance'].update({key: manifest[key] for key in self.VERSIONS})
+                case['provenance']['features'] = list(entry['expectedFeatures'])
+                return case
+            def tool(arguments, stage):
+                entry = entries[len(calls)]
+                calls.append((arguments, stage))
+                if 'generation' in entry:
+                    request = entry['generation']
+                    cases = [build(entry, value) for value in campaign.PRIMITIVE_INPUTS]
+                    for case in cases:
+                        case['provenance']['origin'].update(seed=request['seed'], maxProgramNodes=request['maxProgramNodes'])
+                    # The native generator answers with all eight boundary inputs of one graph; the campaign selects one.
+                    return {'cases': cases}
+                programs.append(json.loads(Path(arguments[1]).read_text()))
+                return build(entry, entry['input'])
+            instance.tool = tool
+            response = instance.prepare_cases()
+        self.assertEqual(len(response['cases']), len(entries))
+        self.assertEqual(response['excluded'], [])
+        self.assertEqual(response['status'], 'complete')
+        self.assertEqual([case['input'] for case in response['cases']], [entry['input'] for entry in entries])
+        self.assertEqual(len(calls), len(entries))
+        fixed = [entry for entry in entries if 'program' in entry]
+        self.assertEqual(programs, [entry['program'] for entry in fixed])
+        for (arguments, stage), entry in zip(calls, entries):
+            if 'generation' in entry:
+                request = entry['generation']
+                self.assertEqual((arguments, stage), (['aggregate-call-graph-generate', request['seed'],
+                    str(request['maxProgramNodes']), '8', '1', '1000'], 'corpus-generation'))
+            else:
+                self.assertEqual((arguments[0], arguments[2:], stage),
+                    ('aggregate-call-graph-emit', [entry['input'], '1000'], 'corpus-emission'))
+        summary = instance.summary
+        self.assertEqual(summary['counts']['generated'], len(entries))
+        self.assertEqual(summary['corpus']['acceptedIds'], [entry['id'] for entry in entries])
+        self.assertEqual(summary['aggregateShapeCoverage']['generatedShapes'], list(campaign.m2.AGGREGATE_SHAPES))
+        self.assertEqual(summary['aggregateShapeCoverage']['requiredShapes'], list(campaign.m2.AGGREGATE_SHAPES))
+        self.assertEqual(summary['aggregateShapeCoverage']['matchedShapes'], [])
+        self.assertEqual(summary['coverage']['generatedHelperCounts'], [1, 2, 3])
+        self.assertEqual(summary['coverage']['generatedInputs'], sorted(campaign.PRIMITIVE_INPUTS, key=int))
+        self.assertEqual(summary['coverage']['requiredInputs'], sorted(campaign.PRIMITIVE_INPUTS, key=int))
+        self.assertEqual(summary['coverage']['matchedInputs'], [])
+
+    def test_partial_materialization_preserves_generated_aggregate_shapes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile, config.cases = self.PROFILE, 2
+            manifest = self.manifest(True)
+            manifest['cases'].append({**manifest['cases'][0], 'id': 'second', 'input': '0'})
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(manifest))
+            instance = campaign.Campaign(config); calls = 0
+            def tool(_arguments, _stage):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise campaign.m2.Finding('inconclusive-resource', 'test-budget', 'stopped during materialization')
+                return {'cases': [self.case()]}
+            instance.tool = tool
+            with self.assertRaises(campaign.m2.Finding): instance.prepare_cases()
+            saved = json.loads((Path(directory) / 'summary.json').read_text())
+            self.assertEqual(saved['counts']['generated'], 1)
+            self.assertNotIn('callShapeCoverage', saved)
+            self.assertEqual(saved['aggregateShapeCoverage']['generatedShapes'], list(self.SHAPES))
+            self.assertEqual(saved['aggregateShapeCoverage']['matchedShapes'], [])
+            self.assertEqual(saved['aggregateShapeCoverage']['requiredShapes'], list(campaign.m2.AGGREGATE_SHAPES))
+            self.assertEqual(saved['aggregateShapeCoverage']['missingShapes'], list(campaign.m2.AGGREGATE_SHAPES))
+            self.assertEqual(saved['coverage']['generatedHelperCounts'], [2])
+            self.assertEqual(saved['coverage']['missingHelperCounts'], [1, 2, 3])
+
+    def test_only_actual_matched_cases_satisfy_aggregate_shape_and_helper_requirements(self):
+        for category in ('matched', 'inconclusive-resource', 'source-rejected', 'semantic-mismatch'):
+            for satisfiable in (False, True):
+                with self.subTest(category=category, satisfiable=satisfiable), tempfile.TemporaryDirectory() as directory:
+                    config = options(directory); config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+                    instance = campaign.Campaign(config); case = self.case(255, 3)
+                    required_shapes = list(self.SHAPES) if satisfiable else list(campaign.m2.AGGREGATE_SHAPES)
+                    required_counts = [3] if satisfiable else [1, 2, 3]
+                    def prepare():
+                        instance.summary['aggregateShapeCoverage']['requiredShapes'] = required_shapes
+                        instance.summary['coverage']['requiredHelperCounts'] = required_counts
+                        instance.summary['coverage']['requiredInputs'] = ['255']
+                        return {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [case], 'excluded': [],
+                            'requested': 1, 'attempted': 1, 'status': 'complete'}
+                    def execute(_case):
+                        folder = instance.work / 'candidate'; folder.mkdir()
+                        report = matched()
+                        if category != 'matched': report['comparison'] = {'category': category, 'pairs': {}}
+                        return folder, report, campaign.analyze(report)
+                    instance.prepare_cases, instance.execute_case = prepare, execute
+                    with redirect_stdout(io.StringIO()): instance.run()
+                    ok = category == 'matched'
+                    shapes, coverage = instance.summary['aggregateShapeCoverage'], instance.summary['coverage']
+                    self.assertNotIn('callShapeCoverage', instance.summary)
+                    self.assertEqual(shapes['generatedShapes'], list(self.SHAPES))
+                    self.assertEqual(shapes['matchedShapes'], list(self.SHAPES) if ok else [])
+                    self.assertEqual(shapes['missingShapes'],
+                        [s for s in required_shapes if not ok or s not in self.SHAPES])
+                    self.assertEqual(coverage['generatedHelperCounts'], [3])
+                    self.assertEqual(coverage['matchedHelperCounts'], [3] if ok else [])
+                    self.assertEqual(coverage['missingHelperCounts'], [c for c in required_counts if not ok or c != 3])
+                    self.assertEqual(coverage['generatedInputs'], ['255'])
+                    self.assertEqual(coverage['matchedInputs'], ['255'] if ok else [])
+                    self.assertEqual(instance.summary['generation']['attemptUnit'], 'function graph candidates')
+                    # A single non-matching outcome leaves even a satisfiable requirement unmet.
+                    self.assertEqual(campaign.missing_coverage(instance.summary), not (ok and satisfiable))
+
+    def test_complete_coverage_is_the_union_of_matched_cases_and_other_profiles_are_separate(self):
+        shapes = campaign.m2.AGGREGATE_SHAPES
+        cases = [self.case(shapes=shapes[6:]), self.case(shapes=shapes[:3]), self.case(shapes=shapes[3:6]), self.case(shapes=())]
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            group = instance.summary['aggregateShapeCoverage']
+            group['requiredShapes'] = list(shapes)
+            for case in cases:  # Generated-only cases never satisfy a requirement.
+                instance.record_aggregate_shapes(case)
+            instance.checkpoint()
+            self.assertEqual(group['generatedShapes'], list(shapes))
+            self.assertEqual(group['matchedShapes'], [])
+            self.assertEqual(group['missingShapes'], list(shapes))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+            matched_so_far = set()
+            for case in cases:
+                instance.record_aggregate_shapes(case, matched=True); instance.checkpoint()
+                matched_so_far |= set(case['provenance']['aggregateShapes'])
+                missing = [name for name in shapes if name not in matched_so_far]
+                self.assertEqual(group['matchedShapes'], [name for name in shapes if name in matched_so_far])
+                self.assertEqual(group['missingShapes'], missing)
+                self.assertEqual(campaign.missing_coverage(instance.summary), bool(missing))
+            self.assertEqual(group['matchedShapes'], list(shapes))
+            self.assertEqual(group['missingShapes'], [])
+            self.assertFalse(campaign.missing_coverage(instance.summary))
+            saved = json.loads((Path(directory) / 'summary.json').read_text())
+            self.assertEqual(saved['aggregateShapeCoverage'], group)
+        with tempfile.TemporaryDirectory() as directory:
+            # Missing shapes are reported in canonical order whatever order the requirement lists them in.
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            group = instance.summary['aggregateShapeCoverage']
+            group.update(requiredShapes=['nested-case', 'aggregate-let', 'pair-component-call'])
+            instance.record_aggregate_shapes(self.case(shapes=('aggregate-let',)), matched=True); instance.checkpoint()
+            self.assertEqual(group['missingShapes'], ['pair-component-call', 'nested-case'])
+            # Matched shapes outside the requirement are retained but never required.
+            instance.record_aggregate_shapes(self.case(shapes=('sum-payload-call',)), matched=True); instance.checkpoint()
+            self.assertEqual(group['matchedShapes'], ['sum-payload-call', 'aggregate-let'])
+            self.assertEqual(group['missingShapes'], ['pair-component-call', 'nested-case'])
+            # A scalar call-graph case claims no aggregate shapes and a scalar recorder leaves no group behind.
+            instance.record_aggregate_shapes(CallGraphCoverageTests().case(), matched=True)
+            instance.record_call_shapes(CallGraphCoverageTests().case(), matched=True)
+            instance.checkpoint()
+            self.assertEqual(group['matchedShapes'], ['sum-payload-call', 'aggregate-let'])
+            self.assertNotIn('callShapeCoverage', instance.summary)
+        # No other profile gains this coverage group or accumulates this profile's claims.
+        for profile in ('runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregates', 'closed-g0'):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile = profile
+                instance = campaign.Campaign(config)
+                self.assertNotIn('aggregateShapeCoverage', instance.summary)
+                instance.record_aggregate_shapes(self.case(shapes=shapes), matched=True); instance.checkpoint()
+                self.assertNotIn('aggregateShapeCoverage', instance.summary)
+                self.assertNotIn('aggregateShapeCoverage', json.loads((Path(directory) / 'summary.json').read_text()))
+                self.assertFalse(campaign.missing_coverage(instance.summary))
+
+    def test_missing_aggregate_shapes_or_helper_counts_fail_an_otherwise_matched_campaign(self):
+        everything = list(campaign.m2.AGGREGATE_SHAPES)
+        for gap, code, missing_shapes in (('none', 0, []), ('last', 1, ['nested-case']), ('middle', 1, ['aggregate-let']),
+                ('several', 1, ['sum-payload-call', 'case-branch-call', 'nested-case']), ('generated-only', 1, everything),
+                ('helpers', 1, [])):
+            with self.subTest(gap=gap), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'campaign'
+                def run(instance, gap=gap, missing_shapes=missing_shapes):
+                    instance.summary['status'] = 'complete'
+                    instance.summary['counts'].update(generated=1, executed=1, completed=1, matched=1)
+                    instance.summary['aggregateShapeCoverage'].update(requiredShapes=everything, generatedShapes=everything,
+                        matchedShapes=[] if gap == 'generated-only' else [s for s in everything if s not in missing_shapes])
+                    instance.summary['coverage'].update(requiredHelperCounts=[1, 2, 3], generatedHelperCounts=[1, 2, 3],
+                        matchedHelperCounts=[1, 2] if gap == 'helpers' else [1, 2, 3])
+                with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', self.PROFILE, '--cases', '1']), \
+                        patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                    self.assertEqual(campaign.main(), code)
+                summary = json.loads((output / 'summary.json').read_text())
+                self.assertEqual(summary['status'], 'complete' if gap == 'none' else 'coverage-incomplete')
+                self.assertEqual(summary['aggregateShapeCoverage']['missingShapes'], missing_shapes)
+                self.assertEqual(summary['coverage']['missingHelperCounts'], [3] if gap == 'helpers' else [])
+                self.assertNotIn('callShapeCoverage', summary)
+
+    def test_case_tool_responses_must_use_this_profiles_schema(self):
+        for profile, case in ((self.PROFILE, CallGraphCoverageTests().case()), (self.PROFILE, call_graph_loop_policy_case()),
+                              (self.PROFILE, function_case(1)), (self.PROFILE, loop_policy_case()),
+                              ('runtime-call-graphs', self.case()), ('runtime-call-graph-loops', self.case()),
+                              ('runtime-functions', self.case()), ('runtime-aggregates', self.case()),
+                              ('closed-g0', self.case())):
+            with self.subTest(profile=profile, schema=case['schema']), tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile, config.cases = profile, 1
+                instance = campaign.Campaign(config)
+                instance.prepare_cases = lambda case=case: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [case],
+                    'excluded': [], 'requested': 1, 'attempted': 1, 'status': 'complete'}
+                with self.assertRaisesRegex(ValueError, 'different generation profile'): instance.run()
+
+    def test_cli_infers_profile_and_defaults_from_corpus_or_saved_case(self):
+        count = len(self.committed()['cases'])
+        args, _ = self.run_main('--corpus', str(self.CORPUS), prepare=False)
+        self.assertEqual((args.profile, args.cases, args.nodes, args.attempts), (self.PROFILE, count, 192, 256))
+        self.assertEqual(args.corpus, self.CORPUS)
+        args, _ = self.run_main('--profile', self.PROFILE, '--corpus', str(self.CORPUS), '--cases', '3', prepare=False)
+        self.assertEqual((args.profile, args.cases), (self.PROFILE, 3))
+        with tempfile.TemporaryDirectory() as directory:
+            saved = Path(directory) / 'case.json'; saved.write_text(json.dumps(self.case()))
+            args, seen = self.run_main('--case', str(saved))
+            self.assertEqual((args.profile, args.cases, args.nodes), (self.PROFILE, 1, 192))
+            self.assertEqual(seen, [])
+            for profile in ('runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregates'):
+                with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    self.run_main('--profile', profile, '--case', str(saved), prepare=False)
+        for profile in ('runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregates', 'closed-g0'):
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.run_main('--profile', profile, '--corpus', str(self.CORPUS), prepare=False)
+        # A corpus of another profile cannot be run as this one.
+        with tempfile.TemporaryDirectory() as directory:
+            other = Path(directory) / 'other.json'; other.write_text(json.dumps(CallGraphCoverageTests().manifest(True)))
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.run_main('--profile', self.PROFILE, '--corpus', str(other), prepare=False)
+
+    def test_default_random_limits_and_explicit_limits_route_unchanged(self):
+        for extra, expected in (([], ['192', '1', '256']), (['--nodes', '128', '--attempts', '7'], ['128', '1', '7']),
+                                (['--nodes', '13'], ['13', '1', '256']), (['--nodes', '512'], ['512', '1', '256'])):
+            with self.subTest(extra=extra):
+                _, seen = self.run_main('--profile', self.PROFILE, '--cases', '1', *extra)
+                self.assertEqual(seen, [['aggregate-call-graph-generate', '1', *expected, '1000000']])
+        # Neighbouring defaults are untouched.
+        for profile, command, nodes, attempts in (('runtime-call-graphs', 'call-graph-generate', '192', '1024'),
+                ('runtime-call-graph-loops', 'call-graph-loop-generate', '256', '256'),
+                ('runtime-aggregates', 'aggregate-generate', '256', '256'),
+                ('runtime-mutation', 'mutation-generate', '192', '256'),
+                ('runtime-primitives', 'primitive-generate', '96', '512')):
+            _, seen = self.run_main('--profile', profile, '--cases', '1')
+            self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000']])
+        for nodes in ('12', '3', '513'):
+            with self.subTest(nodes=nodes), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.run_main('--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        # The lower bound is specific to the call-graph profiles: the template aggregate profile still accepts 12.
+        _, seen = self.run_main('--profile', 'runtime-aggregates', '--cases', '1', '--nodes', '12')
+        self.assertEqual(seen, [['aggregate-generate', '1', '12', '1', '256', '1000000']])
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.run_main('--profile', 'runtime-call-graphs', '--cases', '1', '--nodes', '12')
+
+    def test_aggregate_call_graph_shrink_keeps_schema_backend_and_explicit_synthetic_separation(self):
+        for backend in campaign.m2.BACKENDS:
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.backend = self.PROFILE, backend
+                config.test_perturb_path = 'rustEvm'; config.upstream, config.target_dir = Path('/unused/u'), Path('/unused/t')
+                instance = campaign.Campaign(config); selected = []
+                original, candidate = self.case(255), self.case(1)
+                def execute(args, report):
+                    selected.append(args.backend); report.update(matched(), backend=args.backend)
+                    campaign.save_json(args.output/'case.json', json.loads(args.case.read_text()))
+                with patch.object(campaign.m2, 'execute', side_effect=execute):
+                    folder, report, analysis = instance.execute_case(original)
+                    finding = instance.retain_finding(0, folder, original, report, analysis)
+                    instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
+                    instance.shrink(original, finding)
+                self.assertEqual(selected, [backend, backend])
+                history = json.loads((Path(directory)/finding['history']).read_text())
+                self.assertTrue(history['steps'][0]['accepted'])
+                self.assertEqual(history['steps'][0]['actualComparison']['category'], 'matched')
+                self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
+                self.assertTrue(finding['synthetic'])
 
 
 class CancellationTests(unittest.TestCase):

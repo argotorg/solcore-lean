@@ -15,7 +15,7 @@ is connected to the runners; its random O2 gate exposed a compiler crash.
 The separate upstream fixture harness also
 runs Yul; its results are distinct from generated semantic campaigns.
 
-Thirteen pure profiles and three stateful profiles are available locally. The
+Fourteen pure profiles and three stateful profiles are available locally. The
 [CI workflow](../../.github/workflows/semantic.yml) and
 [suite commands](../../scripts/SEMANTIC_CI.md) connect the fixed and random
 runners with shared limits, preparation and retained findings. Hosted execution
@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; hosted run pending | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call graphs and call-graph loops validated; aggregate consumer remains | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Planned | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -448,8 +448,11 @@ All 66 fixed cases matched on O0 and Yul with complete feature, input, helper,
 mask, iteration and call-shape coverage. The first O2 fixed run matched 65; the
 other case stopped with a host `Operation not permitted` error raised inside
 the adapter before any execution path ran, while parallel suites and
-process-spawning tests heavily loaded the machine. It is retained as a failed
-run and was not reproduced at normal load; a fresh O2 run matched all 66.
+process-spawning tests heavily loaded the machine. A fresh O2 run matched all
+66. The error came from `killpg` on a process group holding only an exited,
+unreaped member, which macOS can report as `EPERM`; the suite runner already
+tolerated it. The adapter and Yul exporter now tolerate it as well, with
+regression tests. The failed run remains retained locally.
 Local fixed times were 415.034 seconds (O0), 421.204 seconds (O2 rerun) and
 618.790 seconds (Yul), overlapping other runs. Random seed `20261026`, sixteen
 cases and 2,048 attempts accepted three plans from fourteen attempts, using
@@ -466,12 +469,55 @@ fuel-one executions were inconclusive. Raw actual reports remained matches.
 Suite totals are now 515 fixed cases/scenarios for Sonatina and 479 pure cases
 for Yul. Hosted CI still has not been run.
 
-The next implementation unit is a genuinely richer aggregate consumer of the
-call-graph grammar: generated pairs, sums, projections and case payload scopes
-composed with helper calls in the same typed expressions. Resealing a scalar
-graph as an aggregate graph does not complete that work. Priority 4 remains
-incomplete until that family has passed the same fixed, random, reduction and
-replay gates.
+The third family, `runtime-aggregate-call-graphs`, composes internal Word
+pairs, Word sums, projections and case payload scopes with helper calls in the
+same directly generated typed expressions; it does not reseal a scalar graph.
+Generation tracks Word, Bool, pair and sum locals, charges each typed form its
+measured minimum and seals the graph with the existing aggregate DAG checker.
+A new renderer keeps the call-graph scalar, primitive and call formatting
+(checked identical on scalar bodies) and the aggregate tuple, sum and match
+forms. Reduction reuses the typed aggregate reductions, which keep every
+helper, typed let and payload scope. A nine-shape structural inventory records
+calls in pair components, sum payloads, projections, case scrutinees, case
+branches and payload arguments, plus aggregate lets, aggregate branches and
+nested cases. Generated graphs need an entry call and at least one call
+composed with an aggregate value or payload; private cells and Unit values stay
+in the older template profile.
+
+A census of 288 generated graphs covered all nine shapes with no checker or
+budget-invariant failure. The fixed corpus contains 56 cases from seven graphs,
+four imported and three generated, at the eight primitive inputs. Expected
+Words were computed outside Lean; native validation confirmed all 56 and
+replayed 224 typed reductions. Before activation the same independent evaluator
+agreed with original Core on 26 generated graphs at all eight inputs, and eight
+generated cases matched on O0, O2 and Yul.
+
+The full Lean build (9,927 jobs) and registered test driver passed. The full
+Python policy suite passed 445 tests, including the process-cleanup
+regressions. All 492 retained cases replayed with identical complete JSON and
+Core observations; the other seven native tools kept their hashes.
+
+All 56 fixed cases matched on O0, O2 and Yul with complete feature, input,
+helper and composition-shape coverage, in 340.678, 344.691 and 517.510 seconds
+locally. Random seed `20261026`, sixteen cases and 2,048 attempts accepted two
+graphs from fifteen attempts, with thirteen ordinary exclusions and no resource
+exclusions. O0 and Yul matched all sixteen. O2 matched eight and recorded eight
+compiler crashes, all inputs of one graph, with the same host integer-conversion
+panic recorded for the primitive and call-graph families; automatic reduction
+retained the crash fingerprint. That O2 random gate failed. Per the user's
+instruction, the symptom is recorded without upstream investigation or a
+backend patch.
+
+A two-helper fixed case passed controlled synthetic reduction on each backend:
+twelve accepted typed reductions kept every helper and binder. Original and
+final archives replayed exactly with three-way agreement (six replays),
+synthetic fingerprints reproduced and fuel-one executions were inconclusive.
+Suite totals are now 571 fixed cases/scenarios for Sonatina and 535 pure cases
+for Yul. Hosted CI still has not been run.
+
+The three planned priority-4 families are now connected. Private-cell effects in
+the direct grammar and unrestricted recursion remain outside these profiles.
+The next priority is the minimal Rust-dialect emitter proof below.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

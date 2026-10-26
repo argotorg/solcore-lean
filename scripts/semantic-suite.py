@@ -46,6 +46,7 @@ PROFILES = {
     "runtime-primitives": ("semantic-primitive", "pure", 96),
     "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "runtime-call-graph-loops": ("semantic-call-graph-loop", "pure", 256),
+    "runtime-aggregate-call-graphs": ("semantic-aggregate-call-graph", "pure", 192),
     "stateful-storage": ("semantic-storage", "storage", 384),
     "stateful-storage-rollback": ("semantic-storage-rollback", "storage", 384),
     "stateful-calls": ("semantic-call", "call", 384),
@@ -365,7 +366,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default sixteen for Sonatina, thirteen pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default seventeen for Sonatina, fourteen pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
