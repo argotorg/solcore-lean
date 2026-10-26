@@ -75,3 +75,11 @@ lean_exe rustHullValueScenario where
 lean_exe semanticBytesTool where
   root := `Tests.SemanticBytesTool
   exeName := "semantic-bytes-tool"
+
+lean_exe semanticForwardTool where
+  root := `Tests.SemanticForwardTool
+  exeName := "semantic-forward-tool"
+
+lean_exe rustHullForwardScenario where
+  root := `Tests.RustHullForwardScenarioRun
+  exeName := "rust-hull-forward-scenario"

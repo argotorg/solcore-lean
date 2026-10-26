@@ -2173,6 +2173,9 @@ import Solcore.Test.SourceDynamicBytesCorpus
 import Solcore.Test.RustHullCreationFaultCorrespondence
 import Solcore.Test.SourceCoreGeneralizedExportAcceptedTick
 import Solcore.Test.SourceLoopMeaning
+import Solcore.Test.SourceForwardedCallEmitter
+import Solcore.Test.SourceForwardedCallCases
+import Solcore.Test.SourceForwardedCallCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4139,5 +4142,8 @@ def main : IO UInt32 := do
   Tests.RustHullCreationFaultCorrespondence.run
   Tests.SourceCoreGeneralizedExport.AcceptedTickRuntime.run
   Tests.SourceLoopMeaning.testSourceLoopMeaning
+  Tests.SourceForwardedCallEmitter.testSourceForwardedCallEmitter
+  Tests.SourceForwardedCallCases.testSourceForwardedCallCases
+  Tests.SourceForwardedCallCorpus.testSourceForwardedCallCorpus
   IO.println "solcore-lean tests passed"
   return 0

@@ -16,6 +16,7 @@ import Solcore.Synthesis.Core.DynamicArray
 import Solcore.Synthesis.Core.EventLog
 import Solcore.Synthesis.Core.CallValue
 import Solcore.Synthesis.Core.DynamicBytes
+import Solcore.Synthesis.Core.ForwardedCall
 import Solcore.Synthesis.Core.NestedCall
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink

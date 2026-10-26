@@ -1,0 +1,2417 @@
+{
+ "schema": "solcore-lean.semantic-call-corpus-manifest.v1",
+ "profile": "stateful-forwarded-value",
+ "generatorVersion": "core-g0-v1/lcg64-v1",
+ "profileVersion": "stateful-forwarded-value-v1/forward-sequence-seed-v1",
+ "functionVersion": "core-forwarded-value-call-v1",
+ "templateVersion": "forward-value-two-account-call-v1",
+ "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
+ "stepFunctionVersion": "core-aggregate-dag-v1",
+ "stepTemplateVersion": "word-aggregate-templates-v1",
+ "emitterVersion": "solcore-source-forwarded-value-v1",
+ "wrapperVersion": "solcore-word-forwarded-value-v1",
+ "coverageKind": "step-core-ast-features",
+ "requiredFeatures": [
+  "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+  "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+  "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+  "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+  "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+  "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+  "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+  "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+  "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+  "binary:Solcore.Core.Wire.BinaryOp.wordPow",
+  "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+  "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+  "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+  "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+  "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+  "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+  "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+  "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+  "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+  "boolLiteral",
+  "case",
+  "first",
+  "functionCall",
+  "if",
+  "inLeft",
+  "inRight",
+  "let",
+  "loadCell",
+  "local",
+  "newCell",
+  "pair",
+  "second",
+  "storeCell",
+  "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+  "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+  "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+  "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+  "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+  "wordLiteral"
+ ],
+ "requiredInputs": [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+  "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+ ],
+ "requiredHelperCounts": [
+  1,
+  2,
+  3
+ ],
+ "requiredTransactionCounts": [
+  1,
+  2,
+  3
+ ],
+ "generationRecipeRequirements": {
+  "templates": [
+   0,
+   1,
+   2,
+   3
+  ]
+ },
+ "requiredCallModes": [
+  0,
+  1,
+  2,
+  3
+ ],
+ "requiredOutcomes": [
+  "returned",
+  "reverted"
+ ],
+ "requiredValues": [
+  "0",
+  "1",
+  "7",
+  "18446744073709551615",
+  "18446744073709551616",
+  "1180591620717411303424"
+ ],
+ "requiredForwardedValues": [
+  "0",
+  "1",
+  "7",
+  "18446744073709551615",
+  "18446744073709551616",
+  "1180591620717411303424"
+ ],
+ "requiredRefundedForwards": [
+  "1",
+  "18446744073709551616",
+  "1180591620717411303424"
+ ],
+ "requiredRevertedValues": [
+  "0",
+  "7",
+  "18446744073709551615",
+  "1180591620717411303424"
+ ],
+ "cases": [
+  {
+   "id": "identity-forward-refund",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "var",
+        "index": 0
+       }
+      },
+      "body": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "apply",
+        "function": {
+         "tag": "var",
+         "index": 1
+        },
+        "argument": {
+         "tag": "var",
+         "index": 0
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "0",
+     "value": "7",
+     "amount": "5",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "1",
+     "value": "0",
+     "amount": "1180591620717411303424",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-2",
+     "input": "2",
+     "value": "1",
+     "amount": "1",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "functionCall",
+    "local"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0x000000000000000000000000000000000000000000000000000000000000000c",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213698",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "7"
+        },
+        {
+         "slot": "1",
+         "value": "5"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "5",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "5"
+        },
+        {
+         "slot": "1",
+         "value": "5"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0x000000000000000000000000000000000000000000000040000000000000000f",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213698",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "8"
+        },
+        {
+         "slot": "1",
+         "value": "1180591620717411303431"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "5",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "5"
+        },
+        {
+         "slot": "1",
+         "value": "5"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0x0000000000000000000000000000000000000000000000000000000000000013",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213698",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "8"
+        },
+        {
+         "slot": "1",
+         "value": "1180591620717411303431"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "5",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "5"
+        },
+        {
+         "slot": "1",
+         "value": "5"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "increment-large-forwards",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "binary",
+        "op": "wordAdd",
+        "left": {
+         "tag": "var",
+         "index": 0
+        },
+        "right": {
+         "tag": "word",
+         "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+        }
+       }
+      },
+      "body": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "apply",
+        "function": {
+         "tag": "var",
+         "index": 1
+        },
+        "argument": {
+         "tag": "var",
+         "index": 0
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "4",
+     "value": "18446744073709551615",
+     "amount": "18446744073709551616",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "5",
+     "value": "18446744073709551616",
+     "amount": "18446744073709551616",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-2",
+     "input": "6",
+     "value": "1180591620717411303424",
+     "amount": "18446744073709551615",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "functionCall",
+    "local",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000020000000000000008",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213695",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551619"
+        },
+        {
+         "slot": "1",
+         "value": "18446744073709551621"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "18446744073709551616",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551621"
+        },
+        {
+         "slot": "1",
+         "value": "18446744073709551616"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000040000000000000014",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4740813226943354765311",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "36893488147419103240"
+        },
+        {
+         "slot": "1",
+         "value": "36893488147419103244"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "18446744073709551616",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551621"
+        },
+        {
+         "slot": "1",
+         "value": "18446744073709551616"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0x0000000000000000000000000000000000000000000000440000000000000019",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4740813226943354765311",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "36893488147419103240"
+        },
+        {
+         "slot": "1",
+         "value": "36893488147419103244"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "18446744073709551616",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551621"
+        },
+        {
+         "slot": "1",
+         "value": "18446744073709551616"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "constant-zero-both-revert",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "var",
+        "index": 0
+       }
+      },
+      "body": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "word",
+        "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "3",
+     "value": "7",
+     "amount": "7",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "0",
+     "value": "0",
+     "amount": "0",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-2",
+     "input": "7",
+     "value": "18446744073709551615",
+     "amount": "1",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "local",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "reverted",
+     "output": "0x000000000000000000000000000000000000000000000000000000000000000b",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000000000000000000000",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0x0000000000000000000000000000000000000000000000010000000000000007",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "fresh-cell-high-input",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "let",
+        "initializer": {
+         "tag": "newCell",
+         "elementType": "word",
+         "initializer": {
+          "tag": "word",
+          "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+         }
+        },
+        "body": {
+         "tag": "let",
+         "initializer": {
+          "tag": "storeCell",
+          "reference": {
+           "tag": "var",
+           "index": 0
+          },
+          "value": {
+           "tag": "binary",
+           "op": "wordAdd",
+           "left": {
+            "tag": "loadCell",
+            "reference": {
+             "tag": "var",
+             "index": 0
+            }
+           },
+           "right": {
+            "tag": "word",
+            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+           }
+          }
+         },
+         "body": {
+          "tag": "binary",
+          "op": "wordAdd",
+          "left": {
+           "tag": "var",
+           "index": 2
+          },
+          "right": {
+           "tag": "loadCell",
+           "reference": {
+            "tag": "var",
+            "index": 1
+           }
+          }
+         }
+        }
+       }
+      },
+      "body": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "binary",
+        "op": "wordSub",
+        "left": {
+         "tag": "apply",
+         "function": {
+          "tag": "var",
+          "index": 1
+         },
+         "argument": {
+          "tag": "var",
+          "index": 0
+         }
+        },
+        "right": {
+         "tag": "word",
+         "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+     "value": "18446744073709551616",
+     "amount": "1180591620717411303424",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "1",
+     "value": "1",
+     "amount": "1",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-2",
+     "input": "0",
+     "value": "1180591620717411303424",
+     "amount": "7",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "functionCall",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "storeCell",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000410000000000000001",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "3560221606225943461888",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "57896044618658097711785492504343953926634992332820282019747238748030274371584"
+        },
+        {
+         "slot": "1",
+         "value": "57896044618658097711785492504343953926634992332820282020909383624673976123393"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "1180591620717411303424",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "57896044618658097711785492504343953926634992332820282020909383624673976123393"
+        },
+        {
+         "slot": "1",
+         "value": "1180591620717411303424"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000410000000000000007",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "3560221606225943461889",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "57896044618658097711785492504343953926634992332820282019747238748030274371586"
+        },
+        {
+         "slot": "1",
+         "value": "57896044618658097711785492504343953926634992332820282020909383624673976123397"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "1180591620717411303424",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "57896044618658097711785492504343953926634992332820282020909383624673976123393"
+        },
+        {
+         "slot": "1",
+         "value": "1180591620717411303424"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "returned",
+     "output": "0x000000000000000000000000000000000000000000000081000000000000000b",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4740813226943354765306",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "57896044618658097711785492504343953926634992332820282020927830368747685675010"
+        },
+        {
+         "slot": "1",
+         "value": "57896044618658097711785492504343953926634992332820282020909383624673976123401"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "1180591620717411303431",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "57896044618658097711785492504343953926634992332820282020909383624673976123401"
+        },
+        {
+         "slot": "1",
+         "value": "1180591620717411303431"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "aggregate-pair-max-input",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "binary",
+        "op": "wordAdd",
+        "left": {
+         "tag": "var",
+         "index": 0
+        },
+        "right": {
+         "tag": "word",
+         "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+        }
+       }
+      },
+      "body": {
+       "tag": "let",
+       "initializer": {
+        "tag": "lambda",
+        "parameterType": "word",
+        "resultType": "word",
+        "body": {
+         "tag": "let",
+         "initializer": {
+          "tag": "newCell",
+          "elementType": "word",
+          "initializer": {
+           "tag": "var",
+           "index": 0
+          }
+         },
+         "body": {
+          "tag": "let",
+          "initializer": {
+           "tag": "pair",
+           "left": {
+            "tag": "loadCell",
+            "reference": {
+             "tag": "var",
+             "index": 0
+            }
+           },
+           "right": {
+            "tag": "let",
+            "initializer": {
+             "tag": "storeCell",
+             "reference": {
+              "tag": "var",
+              "index": 0
+             },
+             "value": {
+              "tag": "word",
+              "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+             }
+            },
+            "body": {
+             "tag": "loadCell",
+             "reference": {
+              "tag": "var",
+              "index": 1
+             }
+            }
+           }
+          },
+          "body": {
+           "tag": "binary",
+           "op": "wordAdd",
+           "left": {
+            "tag": "first",
+            "operand": {
+             "tag": "var",
+             "index": 0
+            }
+           },
+           "right": {
+            "tag": "second",
+            "operand": {
+             "tag": "var",
+             "index": 0
+            }
+           }
+          }
+         }
+        }
+       },
+       "body": {
+        "tag": "lambda",
+        "parameterType": "word",
+        "resultType": "word",
+        "body": {
+         "tag": "apply",
+         "function": {
+          "tag": "var",
+          "index": 1
+         },
+         "argument": {
+          "tag": "apply",
+          "function": {
+           "tag": "var",
+           "index": 2
+          },
+          "argument": {
+           "tag": "var",
+           "index": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+     "value": "0",
+     "amount": "18446744073709551616",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "4",
+     "value": "7",
+     "amount": "0",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-2",
+     "input": "2",
+     "value": "0",
+     "amount": "1180591620717411303424",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "first",
+    "functionCall",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "reverted",
+     "output": "0x0000000000000000000000000000000000000000000000010000000000000002",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000000000000000000012",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213703",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "11"
+        },
+        {
+         "slot": "1",
+         "value": "7"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "7"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0x0000000000000000000000000000000000000000000000400000000000000019",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213703",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "11"
+        },
+        {
+         "slot": "1",
+         "value": "7"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "7"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "three-helper-forwards",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "binary",
+        "op": "wordAdd",
+        "left": {
+         "tag": "var",
+         "index": 0
+        },
+        "right": {
+         "tag": "word",
+         "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+        }
+       }
+      },
+      "body": {
+       "tag": "let",
+       "initializer": {
+        "tag": "lambda",
+        "parameterType": "word",
+        "resultType": "word",
+        "body": {
+         "tag": "binary",
+         "op": "wordAdd",
+         "left": {
+          "tag": "apply",
+          "function": {
+           "tag": "var",
+           "index": 1
+          },
+          "argument": {
+           "tag": "var",
+           "index": 0
+          }
+         },
+         "right": {
+          "tag": "var",
+          "index": 0
+         }
+        }
+       },
+       "body": {
+        "tag": "let",
+        "initializer": {
+         "tag": "lambda",
+         "parameterType": "word",
+         "resultType": "word",
+         "body": {
+          "tag": "apply",
+          "function": {
+           "tag": "var",
+           "index": 1
+          },
+          "argument": {
+           "tag": "binary",
+           "op": "wordXor",
+           "left": {
+            "tag": "unary",
+            "op": "wordNot",
+            "operand": {
+             "tag": "var",
+             "index": 0
+            }
+           },
+           "right": {
+            "tag": "word",
+            "value": "0x00000000000000000000000000000000000000000000000000000000000000ff"
+           }
+          }
+         }
+        },
+        "body": {
+         "tag": "lambda",
+         "parameterType": "word",
+         "resultType": "word",
+         "body": {
+          "tag": "apply",
+          "function": {
+           "tag": "var",
+           "index": 1
+          },
+          "argument": {
+           "tag": "var",
+           "index": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "0",
+     "value": "1",
+     "amount": "18446744073709551615",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "5",
+     "value": "18446744073709551615",
+     "amount": "7",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-2",
+     "input": "4",
+     "value": "18446744073709551616",
+     "amount": "18446744073709551616",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "functionCall",
+    "local",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0xfffffffffffffffffffffffffffffffffffffffffffffffe0000000000000200",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4703919738795935662082",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "1"
+        },
+        {
+         "slot": "1",
+         "value": "115792089237316195423570985008687907853269984665640564039420690519765710537215"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "18446744073709551615",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "115792089237316195423570985008687907853269984665640564039420690519765710537215"
+        },
+        {
+         "slot": "1",
+         "value": "18446744073709551615"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0x000000000000000000000000000000000000000000000004fffffffffffffa1d",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213697",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551621"
+        },
+        {
+         "slot": "1",
+         "value": "73786976294838204952"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "18446744073709551615",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "115792089237316195423570985008687907853269984665640564039420690519765710537215"
+        },
+        {
+         "slot": "1",
+         "value": "18446744073709551615"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "returned",
+     "output": "0x000000000000000000000000000000000000000000000003fffffffffffffa10",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213697",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "36893488147419103241"
+        },
+        {
+         "slot": "1",
+         "value": "36893488147419101703"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "36893488147419103231",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "36893488147419101703"
+        },
+        {
+         "slot": "1",
+         "value": "36893488147419103231"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "branch-single-forward",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "if",
+        "condition": {
+         "tag": "binary",
+         "op": "wordGt",
+         "left": {
+          "tag": "var",
+          "index": 0
+         },
+         "right": {
+          "tag": "word",
+          "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+         }
+        },
+        "thenBranch": {
+         "tag": "binary",
+         "op": "wordSub",
+         "left": {
+          "tag": "var",
+          "index": 0
+         },
+         "right": {
+          "tag": "word",
+          "value": "0x8000000000000000000000000000000000000000000000000000000000000000"
+         }
+        },
+        "elseBranch": {
+         "tag": "binary",
+         "op": "wordXor",
+         "left": {
+          "tag": "unary",
+          "op": "wordNot",
+          "operand": {
+           "tag": "var",
+           "index": 0
+          }
+         },
+         "right": {
+          "tag": "word",
+          "value": "0x00000000000000000000000000000000000000000000000000000000000000ff"
+         }
+        }
+       }
+      },
+      "body": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "apply",
+        "function": {
+         "tag": "var",
+         "index": 1
+        },
+        "argument": {
+         "tag": "var",
+         "index": 0
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "0",
+     "value": "1180591620717411303424",
+     "amount": "1180591620717411303424",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "functionCall",
+    "if",
+    "local",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "1180591620717411303424"
+        },
+        {
+         "slot": "1",
+         "value": "115792089237316195423570985008687907853269984665640564038276992387195718336256"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "1180591620717411303424",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "115792089237316195423570985008687907853269984665640564038276992387195718336256"
+        },
+        {
+         "slot": "1",
+         "value": "1180591620717411303424"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "branch-two-reverts",
+   "forwardPlan": {
+    "schema": "solcore-lean.forward-plan.v1",
+    "stepProgram": {
+     "schema": "solcore-semantic-core",
+     "dataDefinitions": [],
+     "resultType": {
+      "tag": "function",
+      "parameter": "word",
+      "result": "word"
+     },
+     "body": {
+      "tag": "let",
+      "initializer": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "if",
+        "condition": {
+         "tag": "binary",
+         "op": "wordGt",
+         "left": {
+          "tag": "var",
+          "index": 0
+         },
+         "right": {
+          "tag": "word",
+          "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+         }
+        },
+        "thenBranch": {
+         "tag": "binary",
+         "op": "wordSub",
+         "left": {
+          "tag": "var",
+          "index": 0
+         },
+         "right": {
+          "tag": "word",
+          "value": "0x8000000000000000000000000000000000000000000000000000000000000000"
+         }
+        },
+        "elseBranch": {
+         "tag": "binary",
+         "op": "wordXor",
+         "left": {
+          "tag": "unary",
+          "op": "wordNot",
+          "operand": {
+           "tag": "var",
+           "index": 0
+          }
+         },
+         "right": {
+          "tag": "word",
+          "value": "0x00000000000000000000000000000000000000000000000000000000000000ff"
+         }
+        }
+       }
+      },
+      "body": {
+       "tag": "lambda",
+       "parameterType": "word",
+       "resultType": "word",
+       "body": {
+        "tag": "apply",
+        "function": {
+         "tag": "var",
+         "index": 1
+        },
+        "argument": {
+         "tag": "var",
+         "index": 0
+        }
+       }
+      }
+     }
+    }
+   },
+   "transactions": [
+    {
+     "id": "tx-0",
+     "input": "6",
+     "value": "18446744073709551616",
+     "amount": "1",
+     "target": "parent",
+     "callee": "child"
+    },
+    {
+     "id": "tx-1",
+     "input": "1",
+     "value": "7",
+     "amount": "18446744073709551615",
+     "target": "parent",
+     "callee": "child"
+    }
+   ],
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "functionCall",
+    "if",
+    "local",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "reverted",
+     "output": "0x000000000000000000000000000000000000000000000000ffffffffffffff0d",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0xfffffffffffffffffffffffffffffffffffffffffffffffeffffffffffffff09",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213703",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "8"
+        },
+        {
+         "slot": "1",
+         "value": "115792089237316195423570985008687907853269984665640564039439137263839420088065"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "generated-1",
+   "generation": {
+    "seed": "1",
+    "maxProgramNodes": 384
+   },
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+    "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+    "boolLiteral",
+    "first",
+    "functionCall",
+    "if",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+    "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "reverted",
+     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c613a58792b5602f5d",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "reverted",
+     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c713a58792b5602f60",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c613a58792b5602f68",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "generated-2",
+   "generation": {
+    "seed": "2",
+    "maxProgramNodes": 384
+   },
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "case",
+    "first",
+    "functionCall",
+    "if",
+    "inLeft",
+    "inRight",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "reverted",
+     "output": "0xcfe67828f086941481a688084d39e5e649b336719f728292064db4cee4f023d3",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213696",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "returned",
+     "output": "0xcfe67828f086941481a688084d39e5e649b336719f728293064db4cee4f023df",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213703",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "12"
+        },
+        {
+         "slot": "1",
+         "value": "94035963794924964701437935123488179642838357455191985210362830292942635148243"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0xcfe67828f086941481a688084d39e5e649b336719f728294064db4cee4f023dd",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4722366482869645213703",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "12"
+        },
+        {
+         "slot": "1",
+         "value": "94035963794924964701437935123488179642838357455191985210362830292942635148243"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "generated-23",
+   "generation": {
+    "seed": "23",
+    "maxProgramNodes": 384
+   },
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+    "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordPow",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "case",
+    "first",
+    "functionCall",
+    "if",
+    "inLeft",
+    "inRight",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+    "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbfc1dbafefaa36387b9",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "5902958103587056517120",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "1180591620717411303429"
+        },
+        {
+         "slot": "1",
+         "value": "34172931613825889958631261795812245184495377969953043412356205871146821978036"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "reverted",
+     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbfc1dbafefaa36387d0",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "5902958103587056517120",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "1180591620717411303429"
+        },
+        {
+         "slot": "1",
+         "value": "34172931613825889958631261795812245184495377969953043412356205871146821978036"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbfd1dbafefaa36387b7",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "5902958103587056517120",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "1180591620717411303429"
+        },
+        {
+         "slot": "1",
+         "value": "34172931613825889958631261795812245184495377969953043412356205871146821978036"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "0",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "0"
+        },
+        {
+         "slot": "1",
+         "value": "0"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  },
+  {
+   "id": "generated-78",
+   "generation": {
+    "seed": "78",
+    "maxProgramNodes": 384
+   },
+   "expectedFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+    "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+    "boolLiteral",
+    "case",
+    "first",
+    "functionCall",
+    "if",
+    "inLeft",
+    "inRight",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+   ],
+   "expectedHistory": [
+    {
+     "id": "tx-0",
+     "status": "returned",
+     "output": "0x000000000000000000000000000000000000000000000001000000000000000e",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4740813226943354765304",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551619"
+        },
+        {
+         "slot": "1",
+         "value": "11"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "7",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "11"
+        },
+        {
+         "slot": "1",
+         "value": "7"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-1",
+     "status": "reverted",
+     "output": "0x0000000000000000000000000000000000000000000000420000000000000015",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4740813226943354765304",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551619"
+        },
+        {
+         "slot": "1",
+         "value": "11"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "7",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "11"
+        },
+        {
+         "slot": "1",
+         "value": "7"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    },
+    {
+     "id": "tx-2",
+     "status": "reverted",
+     "output": "0x000000000000000000000000000000000000000000000041000000000000000b",
+     "committedAccounts": [
+      {
+       "role": "parent",
+       "address": "101",
+       "balance": "4740813226943354765304",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "18446744073709551619"
+        },
+        {
+         "slot": "1",
+         "value": "11"
+        }
+       ]
+      },
+      {
+       "role": "child",
+       "address": "102",
+       "balance": "7",
+       "storage": [
+        {
+         "slot": "0",
+         "value": "11"
+        },
+        {
+         "slot": "1",
+         "value": "7"
+        }
+       ]
+      }
+     ],
+     "logs": []
+    }
+   ]
+  }
+ ]
+}

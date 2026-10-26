@@ -40,6 +40,8 @@ import Solcore.Synthesis.Source.CallValueEmitter
 import Solcore.Synthesis.Source.CallValueCases
 import Solcore.Synthesis.Source.DynamicBytesEmitter
 import Solcore.Synthesis.Source.DynamicBytesCases
+import Solcore.Synthesis.Source.ForwardedCallEmitter
+import Solcore.Synthesis.Source.ForwardedCallCases
 import Solcore.Synthesis.Source.NestedCallEmitter
 import Solcore.Synthesis.Source.NestedCallCases
 
