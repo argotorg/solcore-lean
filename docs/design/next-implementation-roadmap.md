@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate and aggregate call-graph emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array and event-log extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection; remaining expression forms, write inputs and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles and refused CREATE/CREATE2 attempts connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -842,6 +842,56 @@ before execution:
   with the revert bit cleared, and a zero deployment value, ordered by
   transaction count, program complexity and the sum of flags, inputs, values
   and the deployment value.
+
+Original Core runs each transaction through `BalancedTopLevelExecution`. It
+transfers the value before the root runs and refunds it through the checkpoint
+world on revert; Core and its host interface are unchanged. The source reads
+`callvalue` through the pinned `std.opcodes` wrapper in a payable method,
+behind a payable constructor. The keyed-storage Hull runner rejects nonzero
+value, so a new runner, `rust-hull-value-scenario`, performs each top-level
+transfer in its checked ledger. The EVM path deploys and calls with value and
+reads `eth_getBalance` at each receipt block. The profile is a twenty-first
+suite profile with two new native tools; the twelve other native tools kept
+their hashes. Generation draws three inputs, three bank values, a deployment
+value of zero or five and a completion pattern from a separate high-bit
+stream. All of the first 300 seeds at 384 nodes were accepted.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions. Its histories, including every committed balance, were computed
+outside Lean by a separate evaluator of the step programs and a direct model
+of the protocol. A registered Lean validator confirmed every status, payload,
+slot and balance against original Core and rejected tampered entries.
+Coverage includes all 39 step features of the corpus, six inputs, one to
+three helpers and transactions, four templates, six completion patterns, all
+six bank values, refunds of 0, 1, 2^64 - 1, 2^64 and 2^70, and both
+deployment values.
+
+The full Lean build (10,017 jobs), registered tests, kernel policy and 494
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (66.8 and 66.5 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+sixteen attempts with no exclusions. All sixteen and 48 prefixes matched on
+both levels (94.9 and 93.5 seconds), refunding every bank value and covering
+both deployment values and all four generated completion patterns, with no
+finding.
+
+A copied Hull balance difference at the last of three transactions was
+reduced on each level to that transaction with zero flags, input, value and
+deployment value: six accepted reductions in six actual candidate executions.
+The first reduction run stopped at a deployment value of five, because the
+campaign's candidate identity omitted the plan's deployment value. The
+identity now includes it, other profiles keep theirs, and the whole matrix
+was rerun on the corrected scripts. Original and reduced archives replayed
+exactly with agreement (four replays), and synthetic fingerprints reproduced.
+Core or Hull fuel one was inconclusive. With the extended adapter, the
+storage, rollback, call, keyed, dynamic-array and log fixed corpora still
+matched all 83 scenarios and 230 prefixes on both levels. An offline
+preparation of the worktree's cloned cache verified all fourteen native tools
+as ready. Hosted CI has not been run.
+
+This scope does not compare the sender's balance, gas, nonces or code, value
+sent by contracts, values above the local sender's funds or non-payable
+methods. Agreement is test evidence, not a preservation proof.
 
 Further state/ABI work, such as nested or multi-word ABI elements, `bytes`,
 ABI-encoded return values or multiple callers, needs its own observation,

@@ -1636,6 +1636,77 @@ Coverage adds three dimensions to the storage step dimensions: the call
 values, the values of reverted transactions, whose refunds rollback must
 perform, and the deployment values.
 
+### Running and validation
+
+```sh
+lake build semanticCallValueTool rustHullValueScenario
+mkdir -p .upstream/semantic-call-value-cases
+.lake/build/bin/semantic-call-value-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-call-value-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-call-value-corpus.json \
+  --output .upstream/semantic-call-value-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-call-value \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-call-value-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the other storage tools. Plans use `solcore-lean.call-value-plan.v1`
+under the case field `callValuePlan`, with the step program and the
+`deploymentValue`; cases use `solcore-lean.semantic-call-value-case.v1`.
+Transactions are `{id, flags, input, value, calldata}`, where `value` is the
+call value. Histories use `solcore-lean.call-value-history.v1`: the storage
+history fields plus `initialBalance`, the per-transaction `committedBalance`,
+`finalBalance` and the deployment `initialLogs`. The keyed-storage runner
+rejects nonzero value, so the new runner `rust-hull-value-scenario` accepts
+`callerFunds`, a constructor value and per-call values in its
+`solcore-lean.value-contract-scenario.v1` scenarios and reports a rejected
+transfer as `transfer-rejected`. Every value is at most 2^70, so a scenario of
+at most four values, including the deployment value, sends at most 2^72.
+
+Generation uses a separate high-bit stream for three boundary inputs, three
+bank values, the deployment value and one of the four completion patterns;
+flags are just the parity. All of the first 300 seeds at the 384-node default
+were accepted. Generated scenarios must complete with the prescribed outcomes,
+and their committed balances must equal the deployment value plus slot 1 under
+original Core. The campaign's candidate identity includes the deployment value,
+so a candidate that only lowers it is executed rather than skipped.
+
+The synthetic adapter accepts `--test-field balance`: it flips the low bit of
+the selected transaction's committed balance in a copied history.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with new values, flags and
+deployment values, and four generated seeds. Its expected histories, including
+every committed balance, were computed outside Lean by a separate evaluator of
+the step programs and a direct model of the protocol. `Tests/Main.lean`
+registers a validator that compares every status, payload, slot and balance
+with original Core and rejects tampered balances, values, deployment values and
+committed refunds. Required coverage is all 39 step AST features in the
+corpus, the six inputs, one to three helpers and transactions, all four
+templates, both outcomes, six completion patterns, all six bank values, refunds
+of 0, 1, 2^64 and 2^70, and both deployment values.
+
+Local validation used committed code with frozen scripts and native tools; the
+twelve existing native tools kept their hashes. The fixed suite matched all
+twelve scenarios and 33 prefixes on Sonatina O0 and O2, with complete coverage,
+in 66.8 and 66.5 seconds. The recorded random suite (root seed `20261026`,
+sixteen cases, 2,048 attempts) accepted sixteen scenarios from sixteen
+attempts without exclusions. All sixteen scenarios and 48 prefixes matched on
+both levels in 94.9 and 93.5 seconds; they refunded every bank value and
+covered both deployment values and the four generated completion patterns.
+Neither run produced a finding.
+
+A copied `importedHull` balance difference at `tx-2` of the funded
+`identity-funded-refund` scenario was reduced on each level to that
+transaction with zero flags, input, value and deployment value: six accepted
+reductions in six candidate executions, all of whose actual comparisons
+matched. The original and reduced archives replayed exactly with three-way
+agreement (four replays), and synthetic replays reproduced the fingerprint.
+Core or Hull fuel one was classified as inconclusive. With the extended
+adapter, the two-slot storage, rollback, call, keyed, dynamic-array and log
+fixed corpora still matched all 83 scenarios and 230 prefixes on each level.
+
 This profile does not compare the sender's balance, gas, nonces or code, value
 sent by contracts, values above the local sender's funds, or non-payable
 methods, whose dispatcher rejects value with a 4-byte selector payload that
