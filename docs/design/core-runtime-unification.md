@@ -129,10 +129,14 @@ from the tree's assignment receipts and the body's actual assignment policy
 (`ActualBodyInvocation.Index.assignment_policy` and `bitNot_policy`). `Covered`
 excludes projected writes, matches, `for` loops and generalized declarations,
 and it requires a function-mode fallthrough to have Unit result and a final bare
-value to have the declared result type. The caller also supplies native typing
-of the flow, checker typing of the body, the invocation's physical entry state,
-and the fault interpretation of the body's assignment diagnostic words. These
-theorems are not yet used by the public session.
+value to have the declared result type. The caller also supplies Core typing of
+the compiled body, fixed-control checker typing and the result projection; for
+an actual prepared named header,
+[CellAwareInvocationAcceptedNamedHeaders.static_inputs](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedHeaders.lean)
+derives all three from checker certification and the cached body's Core typing.
+The invocation's physical entry state and the fault interpretation of the
+body's assignment diagnostic words remain inputs. These theorems are not yet
+used by the public session.
 
 ## Remaining work for the second goal
 
@@ -146,13 +150,15 @@ On the accepted-body route above, the next connected steps are:
 - Close the remaining compiler branches in `Covered`: projected writes, bare
   writes under contextual metadata views, matches, `for` loops and generalized
   declarations. Statements after an always-returning prefix in a non-Unit
-  function, which the existing flows cannot express, need a separate argument.
+  function, which the existing flows cannot express, need a separate argument;
+  the header certificate's `BodyCompletes` fact is the available Source input.
 - Discharge `Expressions` by an expression closure over the actual accepted
   expression compiler, with calls, closures, methods and coercions supplied by
   the shared size induction.
 - Construct the invocation's physical entry state from the actual named
-  parameter entry and connect `body_preserves`/`body_reflects` to the public
-  body ports, then issue program support from the receipt without
+  parameter entry, as `CellAwareImperativeNamedInvocation` does for the older
+  scope family, and connect `body_preserves`/`body_reflects` to the cell-aware
+  public body ports. Then issue program support from the receipt without
   `StaticProfile`.
 
 The final connection must:

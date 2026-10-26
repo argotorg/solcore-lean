@@ -536,7 +536,7 @@ theorem body_preserves (budget : Nat)
     (body : AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope index.statements
       index.result index.reasonAt index.fellThrough index.escaped index.body)
     (covered : Covered index.source expected body.tree)
-    (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) body.flow
+    (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) index.body
       nativeType whole.indexed.layouts.definitions) :
     ∀ {size}, size ≤ budget →
     ∀ {mapping world actualContext environment canonical actual before store embedding},
@@ -578,9 +578,14 @@ theorem body_preserves (budget : Nat)
       ∃ reached : protocol.State ⟨index.scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission bridge
           context expected (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) reached := by
+  have flowNative : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative)
+      body.flow nativeType whole.indexed.layouts.definitions := by
+    obtain ⟨_, native⟩ := native
+    rw [body.emitted] at native
+    exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
     administrative budget expressions extension operands unary sourceEq unique body.tree covered (fun _ member => index.body_root member)
-    result sourceTyped native).1
+    result sourceTyped flowNative).1
   intro size within
   rw [body.emitted]
   exact CellAwareInvocationBodyFinish.preserves bridge producer bound sourceEq sourceTyped depth projection
@@ -605,7 +610,7 @@ theorem body_reflects (budget : Nat)
     (body : AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope index.statements
       index.result index.reasonAt index.fellThrough index.escaped index.body)
     (covered : Covered index.source expected body.tree)
-    (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) body.flow
+    (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) index.body
       nativeType whole.indexed.layouts.definitions) :
     ∀ {size}, size ≤ budget →
     ∀ {mapping world actualContext environment canonical actual before store embedding},
@@ -647,9 +652,14 @@ theorem body_reflects (budget : Nat)
       ∃ reached : protocol.State ⟨index.scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission bridge
           context expected (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) reached := by
+  have flowNative : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative)
+      body.flow nativeType whole.indexed.layouts.definitions := by
+    obtain ⟨_, native⟩ := native
+    rw [body.emitted] at native
+    exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
     administrative budget expressions extension operands unary sourceEq unique body.tree covered (fun _ member => index.body_root member)
-    result sourceTyped native).2
+    result sourceTyped flowNative).2
   intro size within
   rw [body.emitted]
   exact CellAwareInvocationBodyFinish.reflects bridge producer bound sourceEq sourceTyped depth projection
