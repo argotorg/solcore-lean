@@ -71,3 +71,7 @@ lean_exe semanticCallValueTool where
 lean_exe rustHullValueScenario where
   root := `Tests.RustHullValueScenarioRun
   exeName := "rust-hull-value-scenario"
+
+lean_exe semanticBytesTool where
+  root := `Tests.SemanticBytesTool
+  exeName := "semantic-bytes-tool"

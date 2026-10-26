@@ -2167,6 +2167,9 @@ import Solcore.Test.SourceCallValueCorpus
 import Solcore.Test.RustHullCreationAddressVectors
 import Solcore.Test.RustHullCreationAdmittedCorrespondence
 import Solcore.Test.SourceCallGraphLoopMeaning
+import Solcore.Test.SourceDynamicBytesEmitter
+import Solcore.Test.SourceDynamicBytesCases
+import Solcore.Test.SourceDynamicBytesCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4127,5 +4130,8 @@ def main : IO UInt32 := do
   Tests.SourceCallValueCorpus.testSourceCallValueCorpus
   Tests.RustHullCreationAdmittedCorrespondence.run
   Tests.SourceCallGraphLoopMeaning.testSourceCallGraphLoopMeaning
+  Tests.SourceDynamicBytesEmitter.testSourceDynamicBytesEmitter
+  Tests.SourceDynamicBytesCases.testSourceDynamicBytesCases
+  Tests.SourceDynamicBytesCorpus.testSourceDynamicBytesCorpus
   IO.println "solcore-lean tests passed"
   return 0
