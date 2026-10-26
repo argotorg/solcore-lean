@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate and aggregate call-graph emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection; remaining expression forms, write inputs and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection with derived read and write inputs; remaining expression forms and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -933,16 +933,19 @@ premise. Contextual-view writes and matches are not yet closed.
 For these named rows the subset is connected to the unchanged public root
 (`CellAwarePublicAcceptedNamedRoot` and `CellAwarePublicAcceptedNamedForward`).
 The actual named parameter entry constructs the body's physical entry state,
-and the public diagnostic receipt supplies `Reads`
-(`CellAwareInvocationAcceptedNamedInvocation`). A staged Source trace is
-related to native completion of the actual public start in both directions. A
-returning trace reaches a successful `SourceCoreExecution` resumption with the
-exported value and the returned session's physical history. `Closed`, the body
-receipt and its coverage, the write inputs and the original compilation receipt
-remain premises. Generalized declarations are not connected, original
-(unstaged) traces are not lifted, and later calls do not yet chain from the
-reached history, which uses the accepted instance model. No concrete program
-uses these theorems yet. The design document lists the remaining premises.
+and the public diagnostic receipt supplies `Reads` and the write inputs
+(`CellAwareInvocationAcceptedNamedInvocation`). The write inputs interpret
+operand and unary diagnostic words at the typed assignment occurrences of the
+Source; the earlier statement over every site had no instance under the actual
+fault relation. A staged Source trace is related to native completion of the
+actual public start in both directions. A returning trace reaches a successful
+`SourceCoreExecution` resumption with the exported value and the returned
+session's physical history. `Closed`, the body receipt and its coverage and the
+original compilation receipt remain premises. Generalized declarations are not
+connected, original (unstaged) traces are not lifted, and later calls do not
+yet chain from the reached history, which uses the accepted instance model. No
+concrete program uses these theorems yet. The design document lists the
+remaining premises.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile

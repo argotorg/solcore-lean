@@ -380,8 +380,9 @@ theorem correct (budget : Nat)
       result signatures restTyped ⟨_, tailNative⟩
     have token : AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token)
         operator head.invalid := by
+      have found : invocation.source.lookupStatement? id = some node := sourceEq ▸ statementFound
       rw [invalid]
-      exact writes.operands _ _ _
+      exact writes.operands (.statement found form) (sourceEq ▸ assignmentTyped)
     rw [emitted]
     exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationBareAssignmentFlow.preserves bridge transport functions
@@ -445,8 +446,9 @@ theorem correct (budget : Nat)
       result signatures restTyped ⟨_, tailNative⟩
     have errors : head.Errors (fun reason token => faults (.semantic reason) token) := by
       show faults (.semantic (.invalidUnaryOperand .bitNot)) head.invalid
+      have found : invocation.source.lookupStatement? id = some node := sourceEq ▸ statementFound
       rw [invalid]
-      exact writes.unary _ _
+      exact writes.unary (.statement found form) (sourceEq ▸ assignmentTyped)
     rw [emitted]
     exact ⟨CellAwareInvocationBareBitNotFlow.preserves bridge transport functions producer head sourceEq unique
         (sourceEq ▸ statementFound) form errors budget tailBounds.1,

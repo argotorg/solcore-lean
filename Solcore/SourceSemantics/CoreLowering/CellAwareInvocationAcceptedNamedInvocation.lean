@@ -10,14 +10,19 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocati
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedSourceFrames
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationPhysicalExtension
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedExpressions
+import Solcore.SourceSemantics.CoreLowering.CellAwareNamedAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 
 /-! One genuine named invocation of an accepted body whose expressions lie in
 the closed subset. The actual named parameter entry supplies the physical entry
 state of the body's own accepted-body index, the accepted-body theorem relates
 the compiled body to independent Source execution, and the saved physical
-caller is restored. The caller's heap is represented with the profiled instance
-model of the older family; each of its snapshots embeds in the accepted
-instance model, in which the result is stated. -/
+caller is restored. The read and write inputs of the accepted-body theorem come
+from the issued compilation and the public receiver. The caller's heap is
+represented with the profiled instance model of the older family; each of its
+snapshots embeds in the accepted instance model, in which the result is
+stated. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -114,6 +119,75 @@ theorem reads (unique : NodeOccurrencesUnique (CallableIndexedNamedGeneration.so
 
 end Reads
 
+section Writes
+variable {whole : SourceCoreUnifiedCompilation.Compiled}
+  {headers : List (Header whole (Program.ofChecked whole.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key whole (Program.ofChecked whole.sourceProgram))}
+  {protocol : ProtectedStateTransition.Protocol (Records keys)}
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (profile : whole.compatible.checked.catalog.callableContracts = true)
+  {named : SourceCoreGeneralFunctions.Function}
+  {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+  (generation : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics code)
+  (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key =
+    .ok named.specialized)
+  (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics)
+  (assignments : ∃ first, SourceCoreAssignmentFaultSites.prepare (CallableIndexedNamedGeneration.source named) first =
+    .ok generation.own.assignments)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver whole.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt whole.indexed completion.entry
+    completion.result.context.registry completion.result.extension completion.result.diagnostics)
+
+include profile issued assignments receiver in
+/-- The write inputs of the accepted-body theorems at a named row. The issued
+compilation, its prepared assignment table and the public receiver interpret
+the operand, unary and place diagnostics of every typed assignment occurrence,
+as `CallableIndexedOwnedIssuedAssignmentRecipes.operands` and
+`CellAwareNamedAssignmentDiagnostics.ready` do for the older named family. The
+registry extension is the receiver's own, and the identity and runtime views
+are those of the physical function origins. -/
+def writes {invocation : Staging.Recursive.Scope}
+    (sourceEq : invocation.source = CallableIndexedNamedGeneration.source named)
+    (unique : NodeOccurrencesUnique (CallableIndexedNamedGeneration.source named)) :
+    CellAwareInvocationAcceptedInputs.Writes (receiving := completion.result.context.registry)
+      (functions := CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults profile)
+      (protocol := protocol) (rowIndex generation record) invocation
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) where
+  extension := completion.result.extension
+  operands := by
+    intro context site assignment operator rhs origin typed
+    obtain ⟨first, prepared⟩ := assignments
+    rw [sourceEq] at origin typed
+    have raw : operator = .equal ∨ assignment.target.type = .word := by
+      cases typed with
+      | equal => exact .inl rfl
+      | wordCompound _ place _ _ =>
+        cases place with
+        | intro _ _ same => exact .inr same
+    exact PreparedBranchingAssignmentDiagnostics.operands prepared
+      (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands generation issued receiver represented)
+      origin raw
+  unary := by
+    intro context site assignment origin typed
+    obtain ⟨first, prepared⟩ := assignments
+    rw [sourceEq] at origin typed
+    cases typed with
+    | intro place _ =>
+      cases place with
+      | intro _ _ word =>
+        exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
+          (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.compilation_unary
+            generation issued receiver represented) origin word
+  identities := CallableIndexedLambdaValues.Identity whole.indexed
+  faithful := CallableIndexedLambdaValues.identity_faithful whole.indexed
+  observations := CellAwarePhysicalFunctionOrigins.observations profile
+  functionTypes := CellAwarePhysicalFunctionOrigins.runtime_views profile
+  placeDiagnostics := by
+    rw [sourceEq]
+    exact CellAwareNamedAssignmentDiagnostics.ready record unique issued receiver _ protocol
+
+end Writes
+
 private theorem monomorphic_context {owner : Resolved.DeclarationId} {context final : SourceSemantics.Context}
     {parameters : List TypedBinder} {types : List TypeSystem.Ty}
     (extended : MonoBindersExtend owner context parameters types final)
@@ -185,10 +259,9 @@ local notation "bridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge (
 
 variable
   (closed : CellAwareInvocationAcceptedExpressions.Closed (rowIndex generation record))
-  (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := completion.result.context.registry)
-    (functions := CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults profile)
-    (protocol := protocol headers keys) (rowIndex generation record) invocation
-    (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics))
+  (issued : CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt whole.indexed diagnostics)
+  (assignments : ∃ first, SourceCoreAssignmentFaultSites.prepare (CallableIndexedNamedGeneration.source named) first =
+    .ok generation.own.assignments)
   {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
   (artifact : sourceCompiled.artifact? = some whole)
   (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
@@ -205,7 +278,7 @@ variable
     (rowIndex generation record).body nativeType whole.indexed.layouts.definitions)
 
 include profile receiver record sameNamed sameLayouts sameGlobals sameBindings sameBody sameSolved selected issuer
-  projection support closed writes artifact checked covered native in
+  projection support closed issued assignments artifact checked covered native in
 /-- The Source allocation and body trace are independent inputs. The native
 entry, the accepted body and the saved-caller restoration are constructed from
 the compiler; no body or expression execution law is assumed. -/
@@ -284,7 +357,9 @@ theorem preserves_selected
     (CallableIndexedOwnedFunctionState.administrativeTransport headers keys) (rowIndex generation record) producer
     (CallableIndexedAmbient.frame_registered whole.indexed) stages invocation faults
     (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.administrative) size closed
-    (reads generation record issuer receiver runtime.graph.nodeOccurrencesUnique) support.registryBodies writes
+    (reads generation record issuer receiver runtime.graph.nodeOccurrencesUnique) support.registryBodies
+    (writes profile generation record issued assignments receiver (protocol := protocol headers keys) sourceEq
+      runtime.graph.nodeOccurrencesUnique)
     artifact checked sourceEq unique (control := {returnType := header.function.resultType})
     (expected := header.function.resultType) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
@@ -319,7 +394,7 @@ theorem preserves_selected
     restoredFrame, prefixEffect.metadata.trans bodyMetadata, returned, restoredRelated, post⟩
 
 include profile receiver record sameNamed sameLayouts sameGlobals sameBindings sameBody sameSolved selected issuer
-  projection support closed writes artifact checked covered native in
+  projection support closed issued assignments artifact checked covered native in
 /-- Actual native completion is unwrapped through the same named entry and
 reconstructs an independent Source execution with the restored caller. -/
 theorem reflects_selected
@@ -403,7 +478,9 @@ theorem reflects_selected
     (CallableIndexedOwnedFunctionState.administrativeTransport headers keys) (rowIndex generation record) producer
     (CallableIndexedAmbient.frame_registered whole.indexed) stages invocation faults
     (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.administrative) nativeSize closed
-    (reads generation record issuer receiver runtime.graph.nodeOccurrencesUnique) support.registryBodies writes
+    (reads generation record issuer receiver runtime.graph.nodeOccurrencesUnique) support.registryBodies
+    (writes profile generation record issued assignments receiver (protocol := protocol headers keys) sourceEq
+      runtime.graph.nodeOccurrencesUnique)
     artifact checked sourceEq unique (control := {returnType := header.function.resultType})
     (expected := header.function.resultType) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))

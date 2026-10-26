@@ -165,10 +165,11 @@ typing and the result projection; for an actual prepared named header,
 derives all three from checker certification and the cached body's Core typing.
 The invocation's physical entry state, the original compilation receipt, and
 the write inputs (`CellAwareInvocationAcceptedInputs.Writes`: fault
-interpretation of the body's assignment diagnostic words, reached place
-diagnostics and function identity views) remain inputs of these theorems. The
-public connection below constructs the physical entry state for named rows
-whose accepted expressions lie in the first expression subset.
+interpretation of the body's assignment diagnostic words at its typed
+assignment occurrences, reached place diagnostics and function identity views)
+remain inputs of these theorems. The public connection below constructs the
+physical entry state and the write inputs for named rows whose accepted
+expressions lie in the first expression subset.
 
 The first expression closure is
 [CellAwareInvocationAcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressions.lean).
@@ -207,7 +208,16 @@ The public connection of this subset starts at
 [CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
 Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
 and the public fault receiver, as `CellAwareNamedReadDiagnostics.uninitialized`
-does for the older named family. `preserves_selected` and `reflects_selected`
+does for the older named family. Its `writes` derives `Writes` from the issued
+compilation, its prepared assignment table and the public receiver, as
+`CallableIndexedOwnedIssuedAssignmentRecipes.operands` and
+`CellAwareNamedAssignmentDiagnostics.ready` do for the older family; the
+registry extension is the receiver's own. `Writes` asks for the operand and
+unary words only at the typed assignment occurrences of the Source, as for the
+reached place diagnostics. It used to ask for them at every site, but a site
+without a table entry yields the zero word for both kinds of fault, and the
+receiving table cannot decode one word as both, so with the actual fault
+relation that input had no instance. `preserves_selected` and `reflects_selected`
 run the actual named parameter entry (`CellAwareNamedEntry.prepare_selected`).
 From it they build the physical entry state of the row's own accepted-body
 index: the parameters are monomorphic, so
@@ -219,8 +229,9 @@ the older family. `cell_of_profiled` embeds each of its cells in the accepted
 instance model with the trivial attachment, and the results are stated in that
 model. At an actual prepared header,
 [CellAwarePublicAcceptedNamedRoot](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedNamedRoot.lean)
-derives the static inputs (`CellAwareInvocationAcceptedNamedHeaders.static_inputs`)
-and the issuer from the public diagnostic receipt. Its
+derives the static inputs (`CellAwareInvocationAcceptedNamedHeaders.static_inputs`),
+the issuer, the issued tables and the prepared assignment table from the public
+diagnostic receipt. Its
 `checkpoint_has_sufficient_fuel_selected` and `checkpoint_reflects_selected`
 relate a staged Source trace of the body to the native completion of the actual
 public start in both directions, through the unchanged public root.
@@ -231,7 +242,7 @@ resumption carries the exported value and the physical history of the returned
 session.
 
 These public theorems keep as explicit premises `Closed`, the accepted body
-receipt and its `Covered`, `Writes`, and the original compilation receipt.
+receipt and its `Covered`, and the original compilation receipt.
 They also keep the root, start and caller-state receipts that the older public
 root takes. The trivial attachment does not satisfy `Generalized`, so
 generalized declarations are not connected. The theorems take a staged Source
@@ -265,11 +276,8 @@ On the accepted-body route above, the next connected steps are:
   constructors, generalized reads, closures and coercions. Expressions of
   contextual closures need the relation between the compiler view and the
   Source that their writes and matches also need.
-- Strengthen the named-row public connection. Derive `Writes` at actual
-  headers from the issued assignment recipes and the public receiver, as the
-  older family does with `CallableIndexedOwnedIssuedAssignmentRecipes.operands`
-  and `CellAwareNamedAssignmentDiagnostics.ready`. Lift original Source traces
-  of accepted bodies to staged traces, and carry the accepted instance model
+- Strengthen the named-row public connection. Lift original Source traces of
+  accepted bodies to staged traces, and carry the accepted instance model
   through public histories so that later calls chain. Then instantiate the
   public theorems on a concrete program, and issue program support from the
   receipt without `StaticProfile`.

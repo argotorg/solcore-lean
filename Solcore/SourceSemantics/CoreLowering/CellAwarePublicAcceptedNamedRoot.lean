@@ -6,9 +6,9 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNamedInvo
 
 /-! The unchanged public root executes its actual argument packing, stored
 named closure and accepted body. The body's own accepted-body index, its
-static inputs and its read-fault interpretation come from the actual prepared
+static inputs and its read and write inputs come from the actual prepared
 header and public diagnostic receipt; the closed expression subset, statement
-coverage, write inputs and the original compilation receipt remain explicit. -/
+coverage and the original compilation receipt remain explicit. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -59,10 +59,6 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
 
 variable
   (closed : CellAwareInvocationAcceptedExpressions.Closed (index prepared aligned))
-  (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := completion.result.context.registry)
-    (functions := CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults callableProfile)
-    (protocol := protocol headers keys) (index prepared aligned) (RecursiveStageRegistry.scope sidecar [] header.function)
-    (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics))
   {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
   (artifact : sourceCompiled.artifact? = some whole)
   (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
@@ -115,7 +111,7 @@ private theorem header_inputs (capture : CallableIndexedOwnedNamedPhysicalCaptur
   exact ⟨projection, issuer, nativeType, nativeTyped⟩
 
 include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
-  stable heapTyped argumentsTyped bodySelected closed writes artifact checked covered represented heaps in
+  stable heapTyped argumentsTyped bodySelected closed artifact checked covered represented heaps in
 /-- An independent Source trace of the accepted body determines the actual root
 execution and the restored caller. -/
 theorem preserves_root_selected
@@ -141,7 +137,9 @@ theorem preserves_root_selected
   obtain ⟨value, finalStore, finalMap, finalWorld, result⟩ :=
     CellAwareInvocationAcceptedNamedInvocation.preserves_selected callableProfile receiver owner caller header capture.named
       prepared.compilation (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) aligned.named aligned.layouts
-      aligned.globals aligned.bindings aligned.body aligned.solved bodySelected issuer projection support closed writes
+      aligned.globals aligned.bindings aligned.body aligned.solved bodySelected issuer projection support closed
+      (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic)
+      (CallableIndexedOwnedPublicDiagnosticReceipts.assignments_prepared prepared diagnostic)
       artifact checked body covered native stable heapTyped argumentsTyped represented heaps allocated trace
   have argumentsEvaluated := selected.arguments_evaluate represented store
   have actualReference :
@@ -164,7 +162,7 @@ theorem preserves_root_selected
   exact ⟨capture.named, value, finalStore, finalMap, finalWorld, required, run, result⟩
 
 include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
-  stable heapTyped argumentsTyped bodySelected closed writes artifact checked covered represented heaps in
+  stable heapTyped argumentsTyped bodySelected closed artifact checked covered represented heaps in
 /-- Actual completion of the root reconstructs an independent Source execution
 of the accepted body with the restored caller. -/
 theorem reflects_root_selected
@@ -203,7 +201,9 @@ theorem reflects_root_selected
       allocated, trace, matched, result⟩ :=
     CellAwareInvocationAcceptedNamedInvocation.reflects_selected callableProfile receiver owner caller header capture.named
       prepared.compilation (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) aligned.named aligned.layouts
-      aligned.globals aligned.bindings aligned.body aligned.solved bodySelected issuer projection support closed writes
+      aligned.globals aligned.bindings aligned.body aligned.solved bodySelected issuer projection support closed
+      (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic)
+      (CallableIndexedOwnedPublicDiagnosticReceipts.assignments_prepared prepared diagnostic)
       artifact checked body covered native stable heapTyped argumentsTyped represented heaps bodyEvaluation.sound
   exact ⟨capture.named, size, environment, bound, finalContext, outcome, after, finalMap, finalWorld,
     allocated, trace, matched, result⟩
@@ -218,7 +218,7 @@ variable {nativeArtifact : SourceCoreIndexedSession.Artifact}
     nativeCheckpoint recipe (sameCompiled.symm ▸ root) world store payloads encodedValues)
 
 include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
-  stable heapTyped argumentsTyped bodySelected closed writes artifact checked covered represented heaps
+  stable heapTyped argumentsTyped bodySelected closed artifact checked covered represented heaps
   sameCompiled started in
 /-- The actual public start uses the same root and captured cache. Sufficient
 execution fuel follows the independent Source derivation of the accepted body. -/
@@ -238,13 +238,13 @@ theorem checkpoint_has_sufficient_fuel_selected
   cases sameCompiled
   obtain ⟨capture, value, finalStore, finalMap, finalWorld, required, run, result⟩ :=
     preserves_root_selected callableProfile receiver prepared aligned ready diagnostic support selected owner caller
-      globalReference keyPhysical physical stable heapTyped argumentsTyped bodySelected closed writes
+      globalReference keyPhysical physical stable heapTyped argumentsTyped bodySelected closed
       artifact checked body covered represented heaps allocated trace
   exact ⟨capture, value, finalStore, finalMap, finalWorld, required,
     fun fuel enough => started.initial.native_done_iff.mpr (run fuel enough), result⟩
 
 include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
-  stable heapTyped argumentsTyped bodySelected closed writes artifact checked covered represented heaps
+  stable heapTyped argumentsTyped bodySelected closed artifact checked covered represented heaps
   sameCompiled started in
 /-- Actual native completion at the public checkpoint reconstructs an
 independent Source execution of the accepted body. -/
@@ -264,7 +264,7 @@ theorem checkpoint_reflects_selected
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults := by
   cases sameCompiled
   exact reflects_root_selected callableProfile receiver prepared aligned ready diagnostic support selected owner caller
-    globalReference keyPhysical physical stable heapTyped argumentsTyped bodySelected closed writes
+    globalReference keyPhysical physical stable heapTyped argumentsTyped bodySelected closed
     artifact checked body covered represented heaps (started.initial.native_done_iff.mp completed)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedNamedRoot

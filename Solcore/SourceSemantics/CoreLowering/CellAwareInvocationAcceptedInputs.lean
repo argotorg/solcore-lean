@@ -45,13 +45,24 @@ def Expressions (budget : Nat) : Prop :=
 
 /-- Write inputs shared by statements and `for` header items: the metadata
 registry extension, fault interpretation of the body's own diagnostic words,
-reached place diagnostics at the actual compiler sites and identity views. -/
+reached place diagnostics at the actual compiler sites and identity views.
+Operand and unary words are interpreted only at the typed assignment
+occurrences of the Source, as reached place diagnostics are: a site without a
+table entry yields the zero word for both kinds of fault. -/
 structure Writes where
   extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving
-  operands : ∀ site root operator, AssignmentOperandDiagnostics.OperandsLaw
-    (fun reason token => faults (.semantic reason) token) operator (index.invalidOperand site root operator)
-  unary : ∀ site root, faults (.semantic (.invalidUnaryOperand .bitNot)) (index.invalidUnary site root)
+  operands : ∀ {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
+      {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId},
+    AssignmentDiagnosticOrigins.Occurs invocation.source site assignment operator rhs →
+    SourceAssignmentHasType invocation.source context assignment operator rhs →
+    AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token) operator
+      (index.invalidOperand site assignment.target.root operator)
+  unary : ∀ {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
+      {assignment : AssignmentResolution},
+    GenericAssignmentUnaryDiagnostics.UnaryOccurs invocation.source site assignment →
+    SourceBitNotAssignmentValid invocation.source context assignment →
+    faults (.semantic (.invalidUnaryOperand .bitNot)) (index.invalidUnary site assignment.target.root)
   identities : Dynamic.Value → Word → Prop
   faithful : DataEquality.IdentityFaithful identities
   observations : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities

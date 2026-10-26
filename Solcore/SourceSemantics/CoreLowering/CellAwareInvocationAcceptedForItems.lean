@@ -307,8 +307,12 @@ theorem post_correct (budget : Nat)
       signatures restTyped ⟨_, tailNative⟩
     have token : AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token)
         operator head.invalid := by
+      have found : invocation.source.lookupStatement? parentId = some statement := by
+        rw [sourceEq, ← sameSource]
+        exact parentFound
       rw [invalid]
-      exact writes.operands _ _ _
+      exact writes.operands (.header found parentForm (members _ (List.mem_cons_self ..)))
+        (sourceEq ▸ assignmentTyped)
     rw [emitted]
     exact ⟨post_preserves_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationForPostAssignment.preserves bridge transport functions
@@ -365,8 +369,12 @@ theorem post_correct (budget : Nat)
       signatures restTyped ⟨_, tailNative⟩
     have errors : head.Errors (fun reason token => faults (.semantic reason) token) := by
       show faults (.semantic (.invalidUnaryOperand .bitNot)) head.invalid
+      have found : invocation.source.lookupStatement? parentId = some statement := by
+        rw [sourceEq, ← sameSource]
+        exact parentFound
       rw [invalid]
-      exact writes.unary _ _
+      exact writes.unary (.header found parentForm (members _ (List.mem_cons_self ..)))
+        (sourceEq ▸ assignmentTyped)
     rw [emitted]
     exact ⟨CellAwareInvocationForPostBitNot.preserves bridge transport functions producer head sourceEq errors
         budget tailBounds.1,
@@ -554,8 +562,12 @@ theorem initial_correct (budget : Nat)
       signatures restTyped ⟨_, tailNative⟩
     have token : AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token)
         operator head.invalid := by
+      have found : invocation.source.lookupStatement? parentId = some statement := by
+        rw [sourceEq, ← sameSource]
+        exact parentFound
       rw [invalid]
-      exact writes.operands _ _ _
+      exact writes.operands (.header found parentForm (members _ (List.mem_cons_self ..)))
+        (sourceEq ▸ assignmentTyped)
     rw [emitted]
     exact ⟨initial_preserves_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationForInitialAssignment.preserves bridge transport functions
@@ -612,8 +624,12 @@ theorem initial_correct (budget : Nat)
       signatures restTyped ⟨_, tailNative⟩
     have errors : head.Errors (fun reason token => faults (.semantic reason) token) := by
       show faults (.semantic (.invalidUnaryOperand .bitNot)) head.invalid
+      have found : invocation.source.lookupStatement? parentId = some statement := by
+        rw [sourceEq, ← sameSource]
+        exact parentFound
       rw [invalid]
-      exact writes.unary _ _
+      exact writes.unary (.header found parentForm (members _ (List.mem_cons_self ..)))
+        (sourceEq ▸ assignmentTyped)
     rw [emitted]
     exact ⟨CellAwareInvocationForInitialBitNot.preserves bridge transport functions producer head (sourceEq ▸ assignmentTyped) errors
         budget tailBounds.1,

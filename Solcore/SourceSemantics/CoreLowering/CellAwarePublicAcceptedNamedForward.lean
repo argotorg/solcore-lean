@@ -57,10 +57,6 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
 
 variable
   (closed : CellAwareInvocationAcceptedExpressions.Closed (index prepared aligned))
-  (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := completion.result.context.registry)
-    (functions := CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults callableProfile)
-    (protocol := protocol headers keys) (index prepared aligned) (RecursiveStageRegistry.scope sidecar [] header.function)
-    (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics))
   {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
   (artifact : sourceCompiled.artifact? = some whole)
   (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
@@ -103,7 +99,7 @@ local notation "stages" => SelectedCompilationPhysicalProgramSupport.stages whol
 local notation "faults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
 include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
-  stable heapTyped argumentsTyped bodySelected closed writes artifact checked covered represented heaps
+  stable heapTyped argumentsTyped bodySelected closed artifact checked covered represented heaps
   sameCompiled started atCheckpoint exactRegistry exportsReady in
 /-- A staged Source trace that returns a value determines the actual public
 resumption: it succeeds with the exported value, and the returned session has a
@@ -138,7 +134,7 @@ theorem first_value_selected
   obtain ⟨capture, value, finalStore, finalMap, finalWorld, required, run, result⟩ :=
     CellAwarePublicAcceptedNamedRoot.checkpoint_has_sufficient_fuel_selected callableProfile receiver prepared aligned
       ready diagnostic support selected owner caller globalReference keyPhysical physical stable heapTyped argumentsTyped
-      bodySelected closed writes artifact checked body covered represented heaps rfl started allocated trace
+      bodySelected closed artifact checked body covered represented heaps rfl started allocated trace
   have publicResult := result.context
     (SelectedCompilationPublicReturnedValues.header_context_supports header header support.bodyTyping).2
   obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.first_success _ _ selected started
