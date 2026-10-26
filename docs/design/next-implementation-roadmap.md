@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic and two-slot storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; a sender-keyed mapping ledger defined; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance and a direct-call head given the callee's application meaning; discharging that input across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1268,6 +1268,54 @@ run.
 This scope does not compare gas, balances, nonces, code or memory, other key
 or value types, other base slots, nested mappings or Solidity's slot order.
 Agreement is test evidence, not a preservation proof.
+
+The eighth extension, `stateful-ledger`, keeps the mapping layout but keys
+entries by `msg.sender`, so that several funded senders act on one ledger.
+Original Core needs no change. It reads the sender with the `callerAddress`
+host request, which `ContractRuntime` answers with each invocation's caller,
+and it hashes slots with the mapping profile's Keccak closure. A probe
+confirmed that the pinned compiler accepts the contract's `caller()` and `>`
+on Words at O0 and O2. On Hull, the same probe stored a sender's entry at
+`keccak256(1 ++ sender)` and reverted an insufficient transfer with the
+credited balance. The keyed Hull runner requires one caller, so a new runner
+accepts per-call senders from a declared set. Its definitions were fixed
+before execution:
+
+- Senders: three fixed funded senders, Anvil's first three default accounts,
+  with the first as the deployer. Each transaction names its sender. Original
+  Core invokes the transaction with that caller over a world that holds an
+  empty account for each sender. The Hull runner uses the sender as the call
+  context's caller. The EVM path sends from that unlocked account, which Anvil
+  funds with its default 10,000 ether for gas. Balances are not observed.
+- Transactions: one to three zero-value calls of `run(uint256 flags, uint256
+  recipient, uint256 amount, uint256 input)` with exactly four ABI Words, on a
+  contract with the mapping profile's `counter` and `entries` fields.
+- Effects: credit `B = entries[sender] + step(input)`. If the amount exceeds
+  `B`, revert with `B` and write nothing. Otherwise write
+  `entries[sender] = B - amount`, then
+  `entries[recipient] = entries[recipient] + amount`, so a self-transfer
+  leaves `B`. Then increment the counter and return the reread sum of the
+  sender's entry, the recipient's entry and the counter. Odd flags revert with
+  that sum after the writes.
+- Committed observations: status, payload and the committed values of the
+  declared slots after every transaction on all three paths. The declared
+  slots are slot zero and `keccak256(1 ++ k)` for every transaction's sender
+  and recipient `k`. As for the mapping, the Hull and EVM paths must show no
+  nonzero committed slot outside the declaration.
+- Ledger protocol: odd flags revert. An even-flag revert is an insufficient
+  balance, so its payload is below the amount. A revert keeps every declared
+  slot. A returned transaction increments the counter, changes no declared
+  slot other than the counter and the two entries, and returns their sum. A
+  transfer to another key credits the recipient with exactly the amount and
+  leaves a sender entry that the amount does not wrap; a self-transfer leaves
+  an entry of at least the amount.
+- Rollback and deployment: as for the mapping. The first sender deploys.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, an earlier sender for one transaction, a bank recipient, amount or
+  input, and flags reduced to their parity or with the revert bit cleared.
+  Candidates are ordered by transaction count, distinct senders, program
+  complexity, then the sum of sender positions, flags, recipients, amounts and
+  inputs. They rederive their declared slots.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or multiple callers, needs its

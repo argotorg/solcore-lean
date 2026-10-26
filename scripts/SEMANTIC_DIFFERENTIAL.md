@@ -2190,6 +2190,87 @@ This profile does not compare gas, balances, nonces, code or memory, other key
 or value types, other base slots, nested mappings or Solidity's slot order.
 Agreement is test evidence, not a preservation proof.
 
+## Compare a sender-keyed mapping ledger
+
+The `stateful-ledger` profile keys the mapping profile's Keccak-addressed
+entries by the transaction's sender. It installs `SynthesizedLedger` with the
+same two fields: `counter: word` at slot 0 and `entries: mapping(word =>
+word)` at base slot 1. Each transaction calls `SynthesizedLedger.run(uint256
+flags, uint256 recipient, uint256 amount, uint256 input)`, selector
+`0x15509d2b`, with exactly four ABI Words and zero value, from one of three
+fixed senders. These are Anvil's first three default accounts, in this order:
+`0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`,
+`0x70997970C51812dc3A010C7d01b50e0d17dc79C8` and
+`0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC`. The first one deploys the
+contract. The contract reads the sender with `caller()` from `std.opcodes`
+and uses its zero-extended Word as the key.
+
+The contract credits `B = entries[sender] + step(input)` with the checked
+aggregate step. If `amount > B`, it stores `B` at memory zero and reverts with
+those 32 bytes without writing. Otherwise it writes
+`entries[sender] = B - amount` and then
+`entries[recipient] = entries[recipient] + amount`, increments the counter,
+and rereads the sender's entry, the recipient's entry and the counter. Odd
+flags revert with their sum after the writes; other flags return it.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Senders.** Each transaction names one of the three senders. Original Core
+  invokes it through `TopLevelExecution` with that `caller`, over a world that
+  holds an empty account for each sender, and Core's `callerAddress` host
+  request reads it. A new Hull runner, `rust-hull-ledger-scenario`, accepts a
+  declared sender set and uses each call's sender as the call context's
+  caller; the keyed runner, which requires the constructor's caller, is
+  unchanged. The EVM path checks that `eth_accounts` contains every sender
+  and sends each transaction from its sender's unlocked account, which Anvil
+  funds with 10,000 ether. Balances, nonces and gas are not observed.
+- **Slot derivation.** As for the mapping: original Core hashes `1 ++ k` with
+  the fixed Keccak closure for the sender's and the recipient's keys, without
+  a Core or host change.
+- **Committed observation.** After every transaction all three paths report
+  status, payload and the committed values of the declared slots. These are
+  slot 0 plus `keccak256(1 ++ k)` for every transaction's sender and recipient
+  `k`, as decimal Words in ascending order. The keyed profile's containment
+  rules apply.
+- **Committed comparison and ledger protocol.** All three paths must agree on
+  every observed field after every transaction. Each completed row must also
+  follow the protocol, checked from its transaction and the prior committed
+  slots. Odd flags revert. An even-flag revert is an insufficient balance, so
+  its payload is below the amount. A revert keeps every declared slot. A
+  returned row increments the counter, changes no declared slot other than
+  the counter and the two entries, and returns the sum of the sender's entry,
+  the recipient's entry and the counter. For a recipient other than the
+  sender, the recipient's entry gains exactly the amount modulo 2^256, and the
+  sender's entry plus the amount does not exceed the largest Word. A
+  self-transfer leaves an entry of at least the amount.
+- **Rollback.** A revert keeps the prior committed slots on every path, chosen
+  by `ContractRuntime` for original Core. An incomplete transaction ends the
+  sequence.
+- **Deployment.** The first sender deploys with zero value and an empty
+  constructor. Every declared slot is zero afterwards, and no undeclared slot
+  is nonzero on the Hull and EVM paths. Original Core starts from the
+  declared post-deployment world.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, give one
+  transaction an earlier sender in the fixed order, replace one recipient,
+  amount or input by a bank value, or reduce one transaction's flags to their
+  parity or clear its revert bit. They are ordered by transaction count, the
+  number of distinct senders, complete program complexity, then the sum of
+  sender positions, flags, recipients, amounts and inputs. A candidate
+  rederives its declared slots, so one that no longer declares a finding's
+  slot cannot keep the finding.
+
+Generation draws each of three transactions' sender, recipient, amount and
+input, and one of four flags patterns, from a separate high-bit stream.
+Recipients come from a bank of the three senders, 0, 2^160 - 1 and 2^256 - 1;
+amounts from 0, 1, 7, 2^64 - 1, 2^64 and 2^70; inputs from the storage
+boundary inputs. Coverage adds the senders, recipients and amounts, one to
+three distinct senders, both revert causes (odd flags and an even-flag
+insufficient balance) and three static alias kinds: a self-transfer, a sender
+that an earlier transaction paid, and a repeated sender.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function
