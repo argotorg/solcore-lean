@@ -494,6 +494,33 @@ in a deployment context; and an existing account at the address with zero
 nonce and known empty code, because a catalog link for empty bytes at that
 address could not survive installation, which records identity zero.
 
+Hull's explicit `revert` statement is connected through the call-mode and
+root-reentry public theorems. `RevertSemantics.Reverted` specifies it
+independently of the lowering: the message holds at most 32 UTF-8 bytes, their
+big-endian value left-aligned in one word is stored at memory offset zero with
+the `mstore` semantics, and the frame terminates with revert exit 2 over
+exactly the message bytes. The compiler rejects longer messages, as the pinned
+Yul backend does. The call-mode effects use this rule at every frame height.
+`ExecutableStatement` accepts the statement wherever the `revert` builtin is
+supported, and the common recursive proof discharges it through a separate
+obligation, `RevertPreservation`. Effect layers without a revert rule meet the
+obligation vacuously, and `assemble_recursive_program_effects` supplies that
+case by default, so only the call-mode layer gives a proof. No public theorem
+statement changes.
+
+The proof (`RevertBuiltinCorrespondence.preserves`) connects the actual
+`Effects.revertMessage` code. The word the lowering computes is the specified
+left-aligned word, the actual `mstore` code writes it, and the actual revert
+termination records the exit registers over the message range. The frame,
+linked world and captured context relations carry over as for the static-frame
+termination.
+
+`Tests.RustHullRevertCorrespondence.public_resumes` applies the call-mode
+theorem to four independent source scenarios: a short message, an empty
+message, a full 32-byte message, and a short message written over an earlier
+word at offset zero. Runtime checks compare the revert bytes of a full run and
+of a resumption.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -525,8 +552,9 @@ execution. ECRECOVER and P256VERIFY still need independent elliptic-curve
 semantics connected to their Jacobian implementations; the missing pieces are
 listed with the precompile connection above. Creation attempts refused before
 init code runs, collisions, deployments of empty init code and the faults
-after the nonce advance are connected; creation with init frames and assembly
-follow as their proof domains are connected. Each proof step must derive
+after the nonce advance are connected, and so is Hull's explicit revert;
+creation with init frames and assembly follow as their proof domains are
+connected. Each proof step must derive
 runtime inputs from actual initialization and end in a public theorem
 consumer. Executable support and test agreement alone do not close these
 obligations.
@@ -544,7 +572,7 @@ DELEGATECALL are covered by the same finite nested-child connection.
 | --- | --- | --- |
 | 1 | Contract calls | Connect ECRECOVER (1) and P256VERIFY (0x100) through independent affine elliptic-curve semantics, with field arithmetic, Jacobian-formula identities and ladder correctness. Reuse the connected dispatch, Keccak, checkpoint restoration and public resumptions. |
 | 2 | Contract creation | Connect init frames: nonempty init code at the next depth in a deployment context, runtime-code validation, installation of the exact image and failure rollback. Their source rule needs an init-template catalog, which changes the public theorem statements. Also connect existing empty accounts at the address. Refusals, collisions, empty init code, unknown targets and endowment overflow are connected. |
-| 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
+| 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Hull's string revert is connected through its memory write and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
 
 Creation's refusals, collisions, deployments of empty init code and the two
@@ -578,6 +606,13 @@ bytes with the catalog's `isInit` definitions, which no source entry or
 premise describes. The source rule therefore needs an init-template catalog
 keyed by init bytes, and the public theorems need a premise connecting its
 entries to the compiled `isInit` definitions.
+
+Hull assembly blocks can follow the pattern of the explicit revert without a
+public statement change: an `ExecutableStatement` case for `assembly`, an
+`assembly` rule in the call-mode effects given by an independent Yul
+evaluation over the frame and the Hull locals it reads, and a separate
+obligation in the common recursive proof for the actual
+`YulLowering.lowerStatements` code, met by default by the other effect layers.
 
 Lower-level helpers or isolated builtin results do not complete any row without
 its actual public execution consumer.

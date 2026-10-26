@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows, its public-root connection and one concrete instance; remaining expression and statement forms, fault lifting and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and Hull's explicit revert connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -1227,8 +1227,15 @@ init code in a deployment context, runtime-code validation and installation,
 and rollback with revert bytes. Their source rule needs an init-template
 catalog and a premise connecting it to the compiled init definitions, which
 changes the public theorem statements; the Hull design document lists the
-remaining source rules and proof obligations. Assembly and source revert, and
-object linking, also remain, in that order.
+remaining source rules and proof obligations.
+
+Hull's explicit revert is connected. Its independent rule stores the message,
+at most one word of UTF-8 bytes, left-aligned at memory offset zero and
+reverts with exactly the message bytes. The call-mode effects use the rule, the
+common recursive proof gains a separate revert obligation that only the
+call-mode layer discharges, and four independent source scenarios reach the
+call-mode theorem with runtime checks of the revert bytes. No public theorem
+statement changes. Assembly and object linking remain, in that order.
 
 ## Handoff rules
 
