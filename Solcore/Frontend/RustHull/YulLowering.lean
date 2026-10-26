@@ -39,7 +39,7 @@ def literalWord : YulLit → LowerM Core.Word
   | .bool value => pure (Core.Word.ofNatModulo (if value then 1 else 0))
   | .string text => stringWord text
 
-private def bindArguments (resultType : Core.Ty) (body : Core.Expr) :
+def bindArguments (resultType : Core.Ty) (body : Core.Expr) :
     Nat → List Lowered → Core.Expr
   | _, [] => body
   | depth, argument :: rest =>
@@ -47,46 +47,46 @@ private def bindArguments (resultType : Core.Ty) (body : Core.Expr) :
         (argument.expression.rename fun index => index + depth)
         (bindArguments resultType body (depth + 1) rest)
 
-private structure FunctionBinding where
+structure FunctionBinding where
   signature : Signature
   index : Nat
 
-private structure FunctionDecl where
+structure FunctionDecl where
   name : YulName
   parameters : List YulName
   returns : List YulName
   body : List YulStmt
 
-private def FunctionDecl.signature (function : FunctionDecl) : Signature :=
+def FunctionDecl.signature (function : FunctionDecl) : Signature :=
   ⟨function.name.name, function.parameters.map (fun _ => .word),
     bundleType (function.returns.map (fun _ => .word))⟩
 
-private structure Context where
+structure Context where
   scope : Scope
   functions : List FunctionBinding := []
   returnSlots : Option (List Nat) := none
   hullFunctions : List Signature := []
 
-private def Context.push (context : Context) (binding : Binding) : Context := {
+def Context.push (context : Context) (binding : Binding) : Context := {
   scope := binding :: context.scope
   functions := context.functions.map fun entry => {entry with index := entry.index + 1}
   returnSlots := context.returnSlots.map (List.map (· + 1))
   hullFunctions := context.hullFunctions
 }
 
-private def Context.temporary (context : Context) (type : Core.Ty) : Context :=
+def Context.temporary (context : Context) (type : Core.Ty) : Context :=
   context.push ⟨none, type, false⟩
 
-private def Context.addLocal (context : Context) (name : String) : Context :=
+def Context.addLocal (context : Context) (name : String) : Context :=
   context.push ⟨some name, .word, true⟩
 
-private def Context.hideValues (context : Context) : Context := {
+def Context.hideValues (context : Context) : Context := {
   context with scope := context.scope.map fun binding =>
     if binding.name.any (·.startsWith "$lean$evm$") then binding else {binding with name := none}
                returnSlots := none
 }
 
-private def readReturn (context : Context) : LowerM Lowered := do
+def readReturn (context : Context) : LowerM Lowered := do
   let slots ← match context.returnSlots with
     | some slots => pure slots
     | none => fail "inline Yul leave is outside a local function"
@@ -96,7 +96,7 @@ private def readReturn (context : Context) : LowerM Lowered := do
 /-- Explicit upstream `usr$` calls refer to Hull functions. Word arguments and
 Word/Unit results have identical Hull and Yul layouts. Other layouts need a
 separate flattening bridge and are rejected before generating a Core call. -/
-private def lowerHullCall (context : Context) (name : YulName)
+def lowerHullCall (context : Context) (name : YulName)
     (arguments : List Lowered) : LowerM Lowered := do
   let hullName := (name.name.drop 4).toString
   let signature ← match context.hullFunctions.find? (·.name == hullName) with
@@ -116,7 +116,7 @@ private def lowerHullCall (context : Context) (name : YulName)
     (.apply (.var 0) ((bundle rawArguments).weakenAt 0))
   pure ⟨signature.result, bindArguments signature.result body 0 arguments.reverse⟩
 
-private def lowerExpr : Nat → Context → YulExpr → LowerM Lowered
+def lowerExpr : Nat → Context → YulExpr → LowerM Lowered
   | 0, _, expression => fail "inline Yul expression depth exhausted" expression.span
   | fuel + 1, context, expression => do
       match expression.kind with
@@ -163,35 +163,35 @@ private def lowerExpr : Nat → Context → YulExpr → LowerM Lowered
 def lowerExpression (fuel : Nat) (scope : Scope) (expression : YulExpr) : LowerM Lowered :=
   lowerExpr fuel {scope} expression
 
-private def condition (value : Lowered) : LowerM Core.Expr := do
+def condition (value : Lowered) : LowerM Core.Expr := do
   expectType .word value.type
   pure (Core.LanguageResult.bind .bool value.expression
     (Core.LanguageResult.success
       (.unary .boolNot (.binary .wordEq (.var 0) (.word Core.Word.zero)))))
 
-private def switchBranches : List (Core.Word × Core.Expr) → Core.Expr → Core.Expr
+def switchBranches : List (Core.Word × Core.Expr) → Core.Expr → Core.Expr
   | [], defaultBody => defaultBody.weakenAt 0
   | (value, body) :: rest, defaultBody =>
       .ifE (.binary .wordEq (.var 0) (.word value))
         (body.weakenAt 0) (switchBranches rest defaultBody)
 
-private def resultTypeFor (names : List YulName) : Core.Ty :=
+def resultTypeFor (names : List YulName) : Core.Ty :=
   bundleType (names.map (fun _ => .word))
 
-private def distinctNames (names : List YulName) : Bool :=
+def distinctNames (names : List YulName) : Bool :=
   let texts := names.map (·.name)
   texts.eraseDups.length = texts.length
 
-private def allocateValues (names : List YulName) (body : Core.Expr) : Core.Expr :=
+def allocateValues (names : List YulName) (body : Core.Expr) : Core.Expr :=
   names.zipIdx.foldr (fun (_, index) continuation =>
     .letE (Core.OptionalCell.allocateInitialized .word
       (projectArgument index names.length (.var index))) continuation) body
 
-private def allocateZeroes (names : List YulName) (body : Core.Expr) : Core.Expr :=
+def allocateZeroes (names : List YulName) (body : Core.Expr) : Core.Expr :=
   names.foldr (fun _ continuation =>
     .letE (Core.OptionalCell.allocateInitialized .word (.word Core.Word.zero)) continuation) body
 
-private def assignMany (context : Context) (names : List YulName) (value : Lowered)
+def assignMany (context : Context) (names : List YulName) (value : Lowered)
     (resultType : Core.Ty) (next : Core.Expr) : LowerM Core.Expr := do
   if names.isEmpty then fail "inline Yul assignment has no targets"
   else
@@ -208,7 +208,7 @@ private def assignMany (context : Context) (names : List YulName) (value : Lower
       .letE write (continuation.weakenAt 0)) (next.weakenAt 0)
     pure (Core.LanguageResult.bind (Core.LocalLoop.controlType resultType) value.expression body)
 
-private def declarations (statements : List YulStmt) : LowerM (List FunctionDecl) := do
+def declarations (statements : List YulStmt) : LowerM (List FunctionDecl) := do
   let functions := statements.filterMap fun statement => match statement.kind with
     | .functionDef name parameters returns body => some ⟨name, parameters, returns, body⟩
     | _ => none
@@ -221,7 +221,7 @@ private def declarations (statements : List YulStmt) : LowerM (List FunctionDecl
       fail s!"duplicate inline Yul parameter or return name: {function.name.name}" function.name.span
   pure functions
 
-private def addFunctions (context : Context) (functions : List FunctionDecl) : Context :=
+def addFunctions (context : Context) (functions : List FunctionDecl) : Context :=
   let allocated := functions.foldl (fun current function =>
     current.temporary (Core.OptionalCell.referenceType function.signature.functionType)) context
   {allocated with functions := functions.zipIdx.map (fun (function, index) =>
@@ -229,7 +229,7 @@ private def addFunctions (context : Context) (functions : List FunctionDecl) : C
 
 mutual
 
-private def lowerSequence : Nat → Context → Core.Ty → Bool → List YulStmt →
+def lowerSequence : Nat → Context → Core.Ty → Bool → List YulStmt →
     (Context → LowerM Core.Expr) → LowerM Core.Expr
   | 0, _, _, _, _, _ => fail "inline Yul statement depth exhausted"
   | fuel + 1, context, resultType, inLoop, statements, finish => do
@@ -306,7 +306,7 @@ private def lowerSequence : Nat → Context → Core.Ty → Bool → List YulStm
               expectType resultType returned.type
               pure (Core.LocalLoop.returnValue resultType returned.expression)
 
-private def lowerBlock : Nat → Context → Core.Ty → Bool → List YulStmt →
+def lowerBlock : Nat → Context → Core.Ty → Bool → List YulStmt →
     (Context → LowerM Core.Expr) → LowerM Core.Expr
   | 0, _, _, _, _, _ => fail "inline Yul block depth exhausted"
   | fuel + 1, context, resultType, inLoop, statements, finish => do
@@ -320,7 +320,7 @@ private def lowerBlock : Nat → Context → Core.Ty → Bool → List YulStmt �
       pure (functions.foldr (fun function continuation =>
         .letE (Core.OptionalCell.allocate function.signature.functionType) continuation) installed)
 
-private def lowerFunction : Nat → Context → FunctionDecl → LowerM Core.Expr
+def lowerFunction : Nat → Context → FunctionDecl → LowerM Core.Expr
   | 0, _, function => fail "inline Yul function depth exhausted" function.name.span
   | fuel + 1, context, function => do
       let parameterType := bundleType function.signature.parameters
