@@ -61,12 +61,14 @@ BYTES_DIMENSIONS = DIMENSIONS + tuple(BYTES_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
+# Static entry aliasing of the mapping: the maximum key's successor wraps to zero.
+MAPPING_ALIASES = ("repeated-key", "successor-key", "wrapped-successor")
 TEST_FIELD = re.compile(r"output|log|balance|storage:(?:0|[1-9][0-9]{0,77})")
 
 
 def dimensions(profile_name):
-    return {"keyed": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS, "value": VALUE_DIMENSIONS,
-            "bytes": BYTES_DIMENSIONS}.get(
+    return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
+            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS}.get(
         adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
 
 
@@ -114,13 +116,18 @@ def inputs(case):
 
 
 def aliases(case):
-    """Static slot aliasing among keyed transactions, independent of execution."""
+    """Static aliasing among transaction keys, independent of execution: of raw
+    slots for keyed storage and of entry slots for the mapping."""
     keys = [int(common.word(tx["key"], "transaction key")) for tx in case["transactions"]]
     found = set()
-    if int(adapter.COUNTER_SLOT) in keys:
-        found.add("key-counter")
-    if (int(adapter.COUNTER_SLOT) - 1) % 2**256 in keys:
-        found.add("successor-counter")
+    if adapter.profile(case)["abi"] == "mapping":
+        if 2**256 - 1 in keys:
+            found.add("wrapped-successor")
+    else:
+        if int(adapter.COUNTER_SLOT) in keys:
+            found.add("key-counter")
+        if (int(adapter.COUNTER_SLOT) - 1) % 2**256 in keys:
+            found.add("successor-counter")
     if len(set(keys)) < len(keys):
         found.add("repeated-key")
     if any((left + 1) % 2**256 == right for i, left in enumerate(keys) for j, right in enumerate(keys) if i != j):
@@ -198,16 +205,17 @@ def validate_manifest(manifest):
             raise ValueError("invalid rollback completion pattern requirements")
     elif outcomes or patterns:
         raise ValueError("completion requirements belong to the rollback profile")
-    if selected["keyed"]:
+    if selected["keyed"] or selected["abi"] == "mapping":
+        catalog = MAPPING_ALIASES if selected["abi"] == "mapping" else ALIASES
         keys, kinds = manifest.get("requiredKeys"), manifest.get("requiredAliases")
         if not isinstance(keys, list) or not keys or any(not isinstance(v, str) for v in keys) or len(set(keys)) != len(keys):
             raise ValueError("keyed coverage requires unique required keys")
         for value in keys:
             common.word(value, "required key")
-        if not isinstance(kinds, list) or any(v not in ALIASES for v in kinds) or len(set(kinds)) != len(kinds):
+        if not isinstance(kinds, list) or any(v not in catalog for v in kinds) or len(set(kinds)) != len(kinds):
             raise ValueError("invalid keyed alias requirements")
     elif "requiredKeys" in manifest or "requiredAliases" in manifest:
-        raise ValueError("key coverage belongs to the keyed storage profile")
+        raise ValueError("key coverage belongs to the keyed storage and mapping profiles")
     if selected["abi"] == "array":
         lengths = manifest.get("requiredLengths")
         if not isinstance(lengths, list) or not lengths or any(type(v) is not int or v not in ARRAY_LENGTHS for v in lengths) or len(set(lengths)) != len(lengths):
@@ -373,7 +381,7 @@ def keyed_analysis(analysis):
     histories = analysis.get("histories", {})
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
-                                                adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA)
+                                                adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -501,7 +509,7 @@ class Campaign:
         else:
             statuses = [adapter.expected_status(case, tx) for tx in case["transactions"]]
         values.update(Outcomes=set(statuses), CompletionPatterns={",".join(statuses)})
-        if self.specification["abi"] == "keyed":
+        if self.specification["abi"] in ("keyed", "mapping"):
             values.update(Keys={tx["key"] for tx in case["transactions"]}, Aliases=aliases(case))
         elif self.specification["abi"] == "array":
             values.update(Lengths={len(tx["values"]) for tx in case["transactions"]})
@@ -554,8 +562,8 @@ class Campaign:
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
-        for dimension in {"keyed": ("Keys", "Aliases"), "array": ("Lengths",), "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA,
-                          "bytes": tuple(BYTES_EXTRA)}.get(self.specification["abi"], ()):
+        for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
+                          "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": tuple(BYTES_EXTRA)}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []
@@ -661,7 +669,9 @@ class Campaign:
         try:
             while self.shrink_attempts < self.args.shrink_attempts:
                 self.guard()
-                limit = min(self.args.shrink_candidates, self.args.shrink_attempts - self.shrink_attempts)
+                # A profile may bound one native response below the requested batch.
+                limit = min(self.args.shrink_candidates, self.specification.get("shrinkBatch", self.args.shrink_candidates),
+                            self.args.shrink_attempts - self.shrink_attempts)
                 response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
                 candidates = response.get("cases")
                 if response.get("schema") != self.specification["corpusSchema"] or not isinstance(candidates, list) or len(candidates) > limit:

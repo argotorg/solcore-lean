@@ -45,6 +45,8 @@ VALUE_CASE_SCHEMA = "solcore-lean.semantic-call-value-case.v1"
 VALUE_HISTORY_SCHEMA = "solcore-lean.call-value-history.v1"
 BYTES_CASE_SCHEMA = "solcore-lean.semantic-bytes-case.v1"
 BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v1"
+MAPPING_CASE_SCHEMA = "solcore-lean.semantic-mapping-case.v1"
+MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -96,6 +98,15 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": BYTES_HISTORY_SCHEMA,
         "signature": "run(uint256,bytes)", "selector": "0x220eb9b6", "rollback": True, "keyed": False,
         "declared": True, "abi": "bytes"},
+    # One mapping case embeds the fixed Keccak closure (about 110 KB of Core),
+    # so each bounded native shrink response carries at most 16 candidates.
+    "stateful-mapping": {"caseSchema": MAPPING_CASE_SCHEMA, "planSchema": "solcore-lean.mapping-plan.v1",
+        "planKey": "mappingPlan", "corpusSchema": "solcore-lean.semantic-mapping-corpus.v1",
+        "originKind": "mapping-generated", "contract": "SynthesizedMapping",
+        "caseTool": "semantic-mapping-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": MAPPING_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256,uint256)", "selector": "0x24b912e5", "rollback": True, "keyed": False,
+        "declared": True, "abi": "mapping", "shrinkBatch": 16},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
@@ -115,6 +126,18 @@ VALUE_SLOTS = ["0", "1"]
 MAX_VALUE, MAX_TOTAL, CALLER_FUNDS = 2**70, 2**72, 2**80
 BYTES_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_PAYLOAD = 64
+# The mapping profile's counter slot and the mapping field's base slot.
+MAPPING_COUNTER, MAPPING_BASE = 0, 1
+# Ethereum Keccak-256, written from the Keccak reference for the slot check; the
+# lane at index x + 5y has rotation KECCAK_ROTATIONS[x + 5y].
+KECCAK_ROUND_CONSTANTS = (
+    0x0000000000000001, 0x0000000000008082, 0x800000000000808a, 0x8000000080008000,
+    0x000000000000808b, 0x0000000080000001, 0x8000000080008081, 0x8000000000008009,
+    0x000000000000008a, 0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
+    0x000000008000808b, 0x800000000000008b, 0x8000000000008089, 0x8000000000008003,
+    0x8000000000008002, 0x8000000000000080, 0x000000000000800a, 0x800000008000000a,
+    0x8000000080008081, 0x8000000000008080, 0x0000000080000001, 0x8000000080008008)
+KECCAK_ROTATIONS = (0, 1, 62, 28, 27, 36, 44, 6, 55, 20, 3, 10, 43, 25, 39, 41, 45, 15, 21, 8, 18, 2, 61, 56, 14)
 RESOURCE_STATUSES = {"out-of-fuel", "out-of-gas", "timeout", "resource-limit", "output-limit"}
 Finding, RpcError = common.Finding, common.RpcError
 
@@ -133,7 +156,7 @@ def profile(case: dict) -> dict:
 
 def expected_status(case: dict, transaction: dict) -> str:
     """The profile fixes completion polarity, not the returned value or world."""
-    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value", "bytes") else "input"]
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value", "bytes", "mapping") else "input"]
     return "reverted" if profile(case)["rollback"] and int(common.word(parity)) % 2 else "returned"
 
 
@@ -164,6 +187,49 @@ def expected_balance(case: dict, row: dict) -> str:
     """Committed balance the protocol implies: deployment value plus slot one."""
     accepted = next(int(entry["value"]) for entry in row["committedStorage"] if entry["slot"] == "1")
     return str((deployment_value(case) + accepted) % 2**256)
+
+
+def keccak_permutation(lanes: list[int]) -> list[int]:
+    rotate = lambda value, distance: ((value << distance) | (value >> (64 - distance))) & (2**64 - 1)
+    state = list(lanes)
+    for constant in KECCAK_ROUND_CONSTANTS:
+        parity = [state[x] ^ state[x + 5] ^ state[x + 10] ^ state[x + 15] ^ state[x + 20] for x in range(5)]
+        state = [state[index] ^ parity[(index - 1) % 5] ^ rotate(parity[(index + 1) % 5], 1) for index in range(25)]
+        moved = [0] * 25
+        for x in range(5):
+            for y in range(5):
+                moved[y + 5 * ((2 * x + 3 * y) % 5)] = rotate(state[x + 5 * y], KECCAK_ROTATIONS[x + 5 * y])
+        state = [moved[index] ^ (~moved[(index + 1) % 5 + 5 * (index // 5)] & moved[(index + 2) % 5 + 5 * (index // 5)])
+                 for index in range(25)]
+        state[0] ^= constant
+    return state
+
+
+def keccak256(data: bytes) -> bytes:
+    """Ethereum Keccak-256: rate 136 bytes and domain byte 0x01, not SHA3-256."""
+    padded = bytearray(data) + b"\x01" + bytes(-(len(data) + 1) % 136)
+    padded[-1] |= 0x80
+    state = [0] * 25
+    for offset in range(0, len(padded), 136):
+        for index in range(17):
+            state[index] ^= int.from_bytes(padded[offset + 8 * index:offset + 8 * index + 8], "little")
+        state = keccak_permutation(state)
+    return b"".join(lane.to_bytes(8, "little") for lane in state[:4])
+
+
+def entry_slot(key: int) -> int:
+    """The pinned std's slot of `entries[key]`: keccak256(base ++ key) over two big-endian Words."""
+    return int.from_bytes(keccak256(MAPPING_BASE.to_bytes(32, "big") + (key % 2**256).to_bytes(32, "big")), "big")
+
+
+def mapping_slots(transactions) -> list[str]:
+    """The mapping protocol's complete write set: the counter and the entry slots
+    of every key and wrapping successor, in increasing numeric order."""
+    values = {MAPPING_COUNTER}
+    for tx in transactions:
+        key = int(common.word(tx.get("key") if isinstance(tx, dict) else None, "transaction key"))
+        values.update((entry_slot(key), entry_slot(key + 1)))
+    return [str(value) for value in sorted(values)]
 
 
 def has_bytes(case: dict) -> bool:
@@ -268,6 +334,10 @@ def scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if profile(case)["abi"] == "mapping":
+        return ("ordered zero-value run(uint256,uint256,uint256) transactions on a Keccak-addressed mapping; initially "
+                "empty storage; committed values at the counter and every key's and successor's keccak256(1 ++ key) slot "
+                "on all paths and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce equivalence")
     if has_bytes(case):
         return ("ordered zero-value run(uint256,bytes) transactions with canonical, zero-padded 0..64-byte payloads; "
                 "initially empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on "
@@ -321,6 +391,11 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != expected or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
+        if selected["abi"] == "mapping":
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "key", "input")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its three original Words")
+            continue
         value = int(common.word(tx.get("input"), "transaction input"))
         prefix = {"keyed": "key", "flags": "flags", "value": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
@@ -349,6 +424,10 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "mapping":
+        validate_transactions(case, selected)
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != mapping_slots(case["transactions"]):
+            raise Finding("unsupported-scope", "input", "mapping profile starts empty and observes the counter and every key's and successor's entry slot")
     elif selected["abi"] == "bytes":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_SLOTS:
             raise Finding("unsupported-scope", "input", "bytes profile starts empty and observes slots zero through four")

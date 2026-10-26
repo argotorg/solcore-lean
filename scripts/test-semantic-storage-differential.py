@@ -1664,5 +1664,174 @@ class BytesTests(unittest.TestCase):
         self.assertEqual(runner.compare({**bytes_histories(value), "importedHull": history}, value)["category"], "matched")
 
 
+# `cast to-dec $(cast keccak 0x$(printf %064x 1)$(printf %064x KEY))` from the
+# pinned Foundry release: the pinned std's `keccak256(1 ++ key)` entry slots.
+CAST_ENTRY_SLOTS = {
+    0: 78541660797044910968829902406342334108369226379826116161446442989268089806461,
+    1: 92458281274488595289803937127152923398167637295201432141969818930235769911599,
+    5: 9247535584797915451057180664748820695544591120644449140157971996739901653371,
+    6: 28212876883947467128917703474378516019173305230661588919942657668795042982449,
+    7: 81222191986226809103279119994707868322855741819905904417953092666699096963112,
+    MAX_WORD: 71124947674796991739310909576881207026731009306364129481614628957978744178186}
+# Solidity's order, `keccak256(5 ++ 1)`, which the pinned std does not use.
+CAST_SOLIDITY_SLOT_5 = 102407538280218558175650617366741421990572744813161403407894353239866642134028
+
+
+def mapping_calldata(flags, key, value):
+    """Written from the ABI rules, independently of the adapter's encoder."""
+    return "0x24b912e5" + f"{flags:064x}" + f"{key:064x}" + f"{value:064x}"
+
+
+def mapping_case(rows=((0, 5, 7), (1, 6, 3), (2, MAX_WORD, 1))):
+    """Envelope fixture only: native replay checks the actual mapping program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "key": str(key), "input": str(value), "value": "0",
+        "calldata": mapping_calldata(flags, key, value)} for index, (flags, key, value) in enumerate(rows)]
+    slots = {0} | {CAST_ENTRY_SLOTS[(key + step) % 2**256] for _, key, _ in rows for step in (0, 1)}
+    return {"schema": runner.MAPPING_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "mappingPlan": {"schema": "solcore-lean.mapping-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in sorted(slots)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedMapping", "method": "run", "signature": "run(uint256,uint256,uint256)",
+            "selector": "0x24b912e5", "deployPath": ["SynthesizedMappingDeploy"],
+            "runtimePath": ["SynthesizedMappingDeploy", "SynthesizedMapping"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def mapping_slots(value, values=None):
+    values = values or {}
+    return [{"slot": slot, "value": str(values.get(slot, 0))} for slot in value["observedSlots"]]
+
+
+def mapping_history(value, path):
+    """Rows that count returned transactions at slot 0 and write the key's and
+    successor's entry slots; odd flags revert and keep the prior snapshot."""
+    rows, committed = [], {}
+    for index, tx in enumerate(value["transactions"]):
+        reverted = int(tx["flags"]) % 2 == 1
+        if not reverted:
+            key = int(tx["key"])
+            committed = {**committed, "0": committed.get("0", 0) + 1, str(CAST_ENTRY_SLOTS[key]): int(tx["input"]) + index,
+                         str(CAST_ENTRY_SLOTS[(key + 1) % 2**256]): 1}
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{index + 3:064x}", "committedStorage": mapping_slots(value, committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.MAPPING_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": mapping_slots(value), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def mapping_histories(value=None):
+    value = mapping_case() if value is None else value
+    return {path: mapping_history(value, path) for path in runner.PATHS}
+
+
+class MappingTests(unittest.TestCase):
+    def test_adapter_keccak_matches_cast_vectors(self):
+        # `cast keccak` of the empty string, "abc", 135 and 136 zero bytes (the
+        # one-block padding edges) and 200 bytes 0xab (two blocks).
+        for data, digest in ((b"", "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"),
+                             (b"abc", "4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45"),
+                             (bytes(135), "29e3704feeca7fb9ba229f0fa04d9b36449cf3ad6e1d85d9cfff3a10df9abc3e"),
+                             (bytes(136), "3a5912a7c5faa06ee4fe906253e339467a9ce87d533c65be3c15cb231cdb25f9"),
+                             (b"\xab" * 200, "8ca353cee0a5c5b999a0916e88da37a16293cf14a73c735d6b5197b50c3d6656")):
+            with self.subTest(size=len(data)):
+                self.assertEqual(runner.keccak256(data).hex(), digest)
+        for key, slot in CAST_ENTRY_SLOTS.items():
+            with self.subTest(key=key):
+                self.assertEqual(runner.entry_slot(key), slot)
+        self.assertEqual(runner.entry_slot(2**256 + 5), CAST_ENTRY_SLOTS[5])
+        self.assertNotIn(CAST_SOLIDITY_SLOT_5, CAST_ENTRY_SLOTS.values())
+
+    def test_mapping_case_declares_entry_slots_and_three_word_calldata(self):
+        value = mapping_case()
+        runner.validate_case(value)
+        self.assertEqual(len(value["observedSlots"]), 6)
+        self.assertEqual(runner.mapping_slots(value["transactions"]), value["observedSlots"])
+        self.assertEqual(runner.observed_slots(value), tuple(value["observedSlots"]))
+        self.assertEqual(runner.mapping_slots([{"key": "6"}, {"key": "6"}, {"key": "5"}]),
+                         [str(slot) for slot in sorted((0, CAST_ENTRY_SLOTS[5], CAST_ENTRY_SLOTS[6], CAST_ENTRY_SLOTS[7]))])
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["rollback"], selected["keyed"],
+                          selected["declared"], selected["abi"], selected["shrinkBatch"]),
+                         ("semantic-mapping-tool", "rust-hull-keyed-storage-scenario", True, False, True, "mapping", 16))
+        self.assertFalse(runner.has_bytes(value) or runner.has_logs(value) or runner.has_balances(value) or runner.deployment_logs(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        reverting = mapping_case(rows=((0, 5, 1), (3, 5, 2)))
+        self.assertEqual([runner.expected_status(reverting, tx) for tx in reverting["transactions"]], ["returned", "reverted"])
+        original = value["transactions"][0]["calldata"]
+        for key, changed in (("flags", "01"), ("key", "05"), ("key", str(2**256)), ("key", None), ("input", "07"),
+                             ("calldata", mapping_calldata(0, 7, 5)), ("calldata", original[:-2]),
+                             ("calldata", "0x7357f5d2" + original[10:]), ("calldata", original + "00"), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        solidity = [str(slot) for slot in sorted({int(slot) for slot in value["observedSlots"]} - {CAST_ENTRY_SLOTS[5]}
+                                                 | {CAST_SOLIDITY_SLOT_5})]
+        for slots in (solidity, value["observedSlots"][:-1], value["observedSlots"] + [str(MAX_WORD)],
+                      sorted(value["observedSlots"] + ["2"], key=int), list(reversed(value["observedSlots"])),
+                      ["0", "1", "5", "6", "7", str(MAX_WORD)]):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        for key in ("schema", "mappingPlan", "contract"):
+            mixed = copy.deepcopy(value)
+            mixed[key] = keyed_case()[key] if key != "mappingPlan" else {"schema": "solcore-lean.keyed-storage-plan.v1", "stepProgram": {}}
+            with self.subTest(key=key), self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(mixed)
+        self.assertIn("run(uint256,uint256,uint256)", runner.scope(value))
+        self.assertIn("keccak256(1 ++ key)", runner.scope(value))
+
+    def test_mapping_histories_compare_entry_slots_and_containment(self):
+        value = mapping_case()
+        self.assertEqual(runner.compare(mapping_histories(value), value)["category"], "matched")
+        entry = value["observedSlots"].index(str(CAST_ENTRY_SLOTS[5]))
+        for path in runner.PATHS:
+            observed = mapping_histories(value)
+            observed[path]["transactions"][0]["committedStorage"][entry]["value"] = "8"
+            result = runner.compare(observed, value)
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-0", ["committedStorage"]))
+                self.assertFalse(all(result["pairs"].values()))
+        # A path that wrote Solidity's slot instead of the std's leaves the
+        # declared entry zero and an undeclared slot nonzero.
+        for path in runner.CONTAINMENT_PATHS:
+            observed = mapping_histories(value)
+            row = observed[path]["transactions"][0]
+            row["undeclaredStorage"] = [{"slot": str(CAST_SOLIDITY_SLOT_5), "value": row["committedStorage"][entry]["value"]}]
+            row["committedStorage"][entry]["value"] = "0"
+            result = runner.compare(observed, value)
+            with self.subTest(path=path, layout="solidity"):
+                self.assertEqual((result["category"], result["transactionId"], result["undeclaredPaths"]), ("semantic-mismatch", "tx-0", [path]))
+                self.assertEqual(result["fields"], ["committedStorage", "undeclaredStorage"])
+        tentative = mapping_histories(value)
+        for history in tentative.values():
+            history["transactions"][1]["committedStorage"][0]["value"] = "2"
+        result = runner.compare(tentative, value)
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        self.assertIn("committedStorage", result["fields"])
+        keyed_schema = mapping_histories(value)
+        keyed_schema["directCore"]["schema"] = runner.KEYED_HISTORY_SCHEMA
+        self.assertEqual(runner.compare(keyed_schema, value)["category"], "adapter-error")
+        undeclared = mapping_histories(value)
+        undeclared["importedHull"]["observedSlots"] = ["0", "1", "2"]
+        self.assertEqual(runner.compare(undeclared, value)["category"], "adapter-error")
+
+    def test_mapping_hull_history_uses_the_declared_slot_runner_rows(self):
+        value = mapping_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": mapping_slots(value), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in mapping_history(value, "importedHull")["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"], history["initialUndeclaredStorage"]),
+                         (runner.MAPPING_HISTORY_SCHEMA, value["observedSlots"], []))
+        self.assertEqual(runner.compare({**mapping_histories(value), "importedHull": history}, value)["category"], "matched")
+
+
 if __name__ == "__main__":
     unittest.main()

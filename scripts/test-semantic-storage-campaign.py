@@ -1030,5 +1030,103 @@ class BytesCampaignTests(unittest.TestCase):
             campaign.analyze(bytes_report(value), value, "rustEvm", "tx-1", "balance")
 
 
+def mapping_case(rows=((0, 5, 7), (1, 6, 3), (2, fixtures.MAX_WORD, 1))):
+    value = fixtures.mapping_case(rows)
+    value["mappingPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def mapping_report(value):
+    histories = fixtures.mapping_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class MappingCampaignTests(unittest.TestCase):
+    def test_mapping_aliases_follow_repetition_succession_and_wrapping(self):
+        self.assertEqual(campaign.dimensions("stateful-mapping"), campaign.KEYED_DIMENSIONS)
+        self.assertEqual(campaign.versions("stateful-mapping"), campaign.VERSIONS)
+        maximum = fixtures.MAX_WORD
+        # Entry slots never meet the counter, so key zero is no alias here.
+        for rows, expected in ((((0, 5, 7),), set()), (((0, 0, 1),), set()), (((0, maximum, 1),), {"wrapped-successor"}),
+                               (((0, 5, 0), (2, 5, 1)), {"repeated-key"}), (((0, 6, 0), (0, 5, 1)), {"successor-key"}),
+                               (((0, maximum, 1), (0, 0, 1)), {"successor-key", "wrapped-successor"}),
+                               (((0, 5, 7), (1, 6, 3), (2, maximum, 1)), {"successor-key", "wrapped-successor"})):
+            with self.subTest(rows=rows):
+                self.assertEqual(campaign.aliases(mapping_case(rows)), expected)
+
+    def test_mapping_manifest_requires_keys_and_mapping_aliases(self):
+        manifest = json.loads((ROOT / "scripts/semantic-mapping-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(manifest["requiredAliases"], list(campaign.MAPPING_ALIASES))
+        changes = [lambda m: m.pop("requiredKeys"), lambda m: m.pop("requiredAliases"), lambda m: m.update(requiredKeys=["00"]),
+            lambda m: m.update(requiredAliases=["key-counter"]), lambda m: m.update(requiredAliases=["repeated-key", "repeated-key"]),
+            lambda m: m.update(requiredLengths=[0]), lambda m: m.update(requiredOutcomes=["returned"]),
+            lambda m: m["cases"][0].update(keyedStoragePlan=m["cases"][0].pop("mappingPlan")),
+            lambda m: m["cases"][0].update(expectedHistory={})]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        keyed = json.loads((ROOT / "scripts/semantic-keyed-storage-corpus.json").read_text())
+        keyed["requiredAliases"] = ["wrapped-successor"]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(keyed)
+
+    def test_mapping_coverage_records_keys_and_aliases_from_matched_scenarios(self):
+        value = mapping_case()
+        maximum = str(fixtures.MAX_WORD)
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-mapping"))
+            self.assertIn("requiredAliases", instance.summary["coverage"])
+            instance.summary["coverage"].update(requiredKeys=["0", "5", "6", maximum], requiredAliases=list(campaign.MAPPING_ALIASES))
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", mapping_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedKeys"], coverage["matchedAliases"]), (["5", "6", maximum], ["successor-key", "wrapped-successor"]))
+            self.assertEqual((coverage["missingKeys"], coverage["missingAliases"]), (["0"], ["repeated-key"]))
+
+    def test_mapping_entry_slots_are_named_in_fingerprints_injection_and_prefix_counts(self):
+        value = mapping_case()
+        raw = mapping_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        slot = str(fixtures.CAST_ENTRY_SLOTS[5])
+        changed = campaign.analyze(raw, value, "rustEvm", "tx-0", "storage:" + slot)
+        self.assertTrue(changed["synthetic"])
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["fields"], fingerprint["undeclaredPaths"], fingerprint["transactionId"]),
+                         ([slot], ["committedStorage"], [], "tx-0"))
+        self.assertTrue(campaign.same_failure(fingerprint, campaign.analyze(mapping_report(value), value, "rustEvm", "tx-0", "storage:" + slot)))
+        # Solidity's slot of key five is undeclared and cannot carry a synthetic difference.
+        self.assertFalse(campaign.analyze(raw, value, "rustEvm", "tx-0", "storage:" + str(fixtures.CAST_SOLIDITY_SLOT_5))["synthetic"])
+        # A reduced key that no longer declares the entry slot cannot keep the finding.
+        reduced = mapping_case(((0, 0, 7), (1, 6, 3), (2, fixtures.MAX_WORD, 1)))
+        dropped = campaign.analyze(mapping_report(reduced), reduced, "rustEvm", "tx-0", "storage:" + slot)
+        self.assertFalse(dropped["synthetic"])
+        self.assertFalse(campaign.same_failure(fingerprint, dropped))
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+        raw["histories"]["importedHull"]["transactions"][1]["undeclaredStorage"] = [{"slot": str(fixtures.CAST_SOLIDITY_SLOT_5), "value": "1"}]
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 1)
+
+    def test_mapping_shrink_requests_at_most_its_native_batch(self):
+        slot = "storage:" + str(fixtures.CAST_ENTRY_SLOTS[5])
+        for profile, value, candidates, expected in (("stateful-mapping", mapping_case(), 64, 16), ("stateful-mapping", mapping_case(), 8, 8),
+                                                     ("stateful-keyed-storage", keyed_case(), 64, 40)):
+            with self.subTest(profile=profile, candidates=candidates), tempfile.TemporaryDirectory() as directory:
+                instance = campaign.Campaign(options(directory, profile=profile, shrink_attempts=40, shrink_candidates=candidates))
+                raw = mapping_report(value) if profile == "stateful-mapping" else keyed_report(value)
+                analysis = campaign.analyze(raw, value, "rustEvm", "tx-0", slot if profile == "stateful-mapping" else "storage:5")
+                folder, _, _ = saved_execution(instance, value, raw, analysis)
+                finding = instance.retain_finding(0, folder, value, analysis)
+                with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
+                    instance.shrink(value, finding)
+                self.assertEqual(tool.call_args.args[0][2], expected)
+                self.assertEqual(campaign.common.read_json(Path(directory) / finding["history"])["status"], "no-preserving-candidate")
+
+
 if __name__ == "__main__":
     unittest.main()
