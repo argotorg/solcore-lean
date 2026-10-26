@@ -1337,5 +1337,175 @@ class EventLogTests(unittest.TestCase):
                 self.assertNotIn("logs", normalized["transactions"][0])
 
 
+
+def value_case(deployment=5, rows=((0, 0, 7), (1, 1, 2**64), (0, 3, 1))):
+    """Envelope fixture only: native replay checks the actual call-value program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "value": str(sent),
+        "calldata": "0x7357f5d2" + f"{flags:064x}" + f"{value:064x}"} for index, (flags, value, sent) in enumerate(rows)]
+    return {"schema": runner.VALUE_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "callValuePlan": {"schema": "solcore-lean.call-value-plan.v1", "stepProgram": {}, "deploymentValue": str(deployment)},
+        "initialState": {"storage": []}, "observedSlots": ["0", "1"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedCallValue", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": "0x7357f5d2", "deployPath": ["SynthesizedCallValueDeploy"],
+            "runtimePath": ["SynthesizedCallValueDeploy", "SynthesizedCallValue"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def value_history(value, path):
+    """Rows that accept committed values and refund reverted ones; payloads and
+    slot zero are protocol fixtures, not predictions of any step."""
+    deployment = int(value["callValuePlan"]["deploymentValue"])
+    rows, accepted = [], 0
+    for index, tx in enumerate(value["transactions"]):
+        reverted = int(tx["flags"]) % 2 == 1
+        accepted += 0 if reverted else int(tx["value"])
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{index + 3:064x}", "committedStorage": slots(index, accepted),
+               "committedBalance": str(deployment + accepted)}
+        if reverted:
+            row["committedStorage"] = copy.deepcopy(rows[-1]["committedStorage"]) if rows else slots()
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.VALUE_HISTORY_SCHEMA, "observedSlots": ["0", "1"], "initialStorage": slots(),
+        "initialBalance": str(deployment), "initialLogs": [], "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "finalBalance": rows[-1]["committedBalance"],
+        "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def value_histories(value=None):
+    value = value_case() if value is None else value
+    return {path: value_history(value, path) for path in runner.PATHS}
+
+
+class CallValueTests(unittest.TestCase):
+    def test_value_case_validates_values_funds_and_two_word_calldata(self):
+        value = value_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["balances"]),
+                         ("semantic-call-value-tool", "rust-hull-value-scenario", True, "value", True))
+        self.assertTrue(runner.has_balances(value) and runner.deployment_logs(value))
+        self.assertFalse(runner.has_logs(value) or runner.has_balances(log_case()) or runner.deployment_value(log_case()))
+        self.assertEqual(runner.deployment_value(value), 5)
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual(runner.expected_balance(value, {"committedStorage": slots(9, 8)}), "13")
+        runner.validate_case(value_case(rows=((0, 0, 2**70), (0, 0, 2**70), (0, 0, 2**70)), deployment=2**70))
+        for key, changed in (("value", "07"), ("value", str(2**70 + 1)), ("value", None), ("flags", "01"),
+                             ("calldata", value["transactions"][0]["calldata"][:-2]), ("calldata", "0xa444f5e9" + "00" * 64)):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for deployment in ("05", str(2**70 + 1), None, 5):
+            invalid = copy.deepcopy(value)
+            invalid["callValuePlan"]["deploymentValue"] = deployment
+            with self.subTest(deployment=deployment), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for slots_value in (["0"], ["0", "1", "2"]):
+            with self.subTest(slots=slots_value), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots_value})
+        mixed = copy.deepcopy(value)
+        mixed["contract"]["name"] = "SynthesizedLogs"
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(mixed)
+        self.assertIn("committed balance", runner.scope(value))
+        zero = log_case()
+        self.assertEqual(zero["transactions"][0]["value"], "0")
+        zero["transactions"][0]["value"] = "1"
+        with self.assertRaises(ValueError):
+            runner.validate_case(zero)
+
+    def test_committed_balances_are_compared_and_refunds_required(self):
+        value = value_case()
+        self.assertEqual(runner.compare(value_histories(value), value)["category"], "matched")
+        for path in runner.PATHS:
+            observed = value_histories(value)
+            observed[path]["transactions"][2]["committedBalance"] = "14"
+            observed[path]["finalBalance"] = "14"
+            result = runner.compare(observed, value)
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-2", ["committedBalance"]))
+        kept = value_histories(value)
+        for history in kept.values():
+            history["transactions"][1]["committedBalance"] = str(12 + 2**64)
+        result = runner.compare(kept, value)
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-1", ["committedBalance"]))
+        drift = value_histories(value)
+        for history in drift.values():
+            for row in history["transactions"]:
+                row["committedBalance"] = str(int(row["committedBalance"]) + 1)
+            history["finalBalance"] = history["transactions"][-1]["committedBalance"]
+        self.assertEqual(runner.compare(drift, value)["fields"], ["committedBalance"])
+        for path in runner.PATHS:
+            unfunded = value_histories(value)
+            unfunded[path]["initialBalance"] = "0"
+            result = runner.compare(unfunded, value)
+            with self.subTest(path=path, stage="deployment"):
+                self.assertEqual((result["category"], result["stage"], result["fields"]),
+                                 ("semantic-mismatch", "initial-storage", ["committedBalance"]))
+        logged = value_histories(value)
+        logged["importedHull"]["initialLogs"] = [log_entry([], [])]
+        result = runner.compare(logged, value)
+        self.assertEqual((result["stage"], result["fields"], result["logPaths"]), ("initial-storage", ["initialLogs"], ["importedHull"]))
+
+    def test_balance_observations_are_canonical_and_complete(self):
+        value = value_case()
+        for name, change in (("missing", lambda h: h["transactions"][0].pop("committedBalance")),
+                             ("noncanonical", lambda h: h["transactions"][0].__setitem__("committedBalance", "012")),
+                             ("final", lambda h: h.__setitem__("finalBalance", "99")),
+                             ("initial", lambda h: h.pop("initialBalance")),
+                             ("logs", lambda h: h.pop("initialLogs"))):
+            observed = value_histories(value)
+            change(observed["rustEvm"])
+            with self.subTest(change=name):
+                self.assertEqual(runner.compare(observed, value)["category"], "adapter-error")
+        stopped = value_histories(value)
+        history = stopped["directCore"]
+        history["transactions"] = history["transactions"][:2]
+        history["transactions"][1] = {"id": "tx-1", "index": 1, "status": "out-of-fuel", "committedStorage": slots(0, 7), "committedBalance": "12"}
+        history.update(status="incomplete", unexecuted=["tx-2"], finalStorage=slots(0, 7), finalBalance="12")
+        self.assertEqual(runner.normalize_history(history, value, "directCore")["finalBalance"], "12")
+        self.assertEqual(runner.compare(stopped, value)["category"], "inconclusive-resource")
+
+    def test_evm_balance_reads_the_receipt_block(self):
+        calls = []
+        class Rpc:
+            def call(self, method, params):
+                calls.append((method, params))
+                return hex(12)
+        self.assertEqual(runner.evm_balance(Rpc(), "0x" + "ab" * 20, "0x5"), "12")
+        self.assertEqual(calls, [("eth_getBalance", ["0x" + "ab" * 20, "0x5"])])
+        with self.assertRaises(ValueError):
+            runner.evm_balance(Rpc(), "0x" + "ab" * 20, "5")
+
+    def test_value_hull_history_reads_balances_and_deployment_logs(self):
+        value = value_case()
+        expected = value_history(value, "importedHull")
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "undeclaredStorage": [],
+                      "committedBalance": "5", "logs": []}
+        calls = [{"stage": "execution", **row} for row in expected["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["initialBalance"], history["finalBalance"], history["initialLogs"]),
+                         (runner.VALUE_HISTORY_SCHEMA, "5", expected["finalBalance"], []))
+        del deployment["committedBalance"]
+        with self.assertRaises(ValueError):
+            runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+
+    def test_profiles_without_balances_keep_their_observation(self):
+        for value, observed in ((case(), histories(case())), (keyed_case(), keyed_histories()), (log_case(), log_histories())):
+            with self.subTest(schema=value["schema"]):
+                self.assertEqual(runner.compare(observed, value)["category"], "matched")
+                normalized = runner.normalize_history(observed["rustEvm"], value, "rustEvm")
+                self.assertNotIn("initialBalance", normalized)
+                self.assertNotIn("committedBalance", normalized["transactions"][0])
+
+
 if __name__ == "__main__":
     unittest.main()

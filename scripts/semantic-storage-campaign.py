@@ -52,15 +52,25 @@ ARRAY_DIMENSIONS = DIMENSIONS + ("Lengths",)
 LOG_EXTRA = {"LogCounts": tuple(range(4)), "TopicArities": tuple(range(5)), "DataSizes": (0, 32, 64),
              "DiscardedLogCounts": tuple(range(4))}
 LOG_DIMENSIONS = DIMENSIONS + tuple(LOG_EXTRA)
+# Call values, the values reverted transactions must refund, and deployment values.
+VALUE_EXTRA = ("Values", "RevertedValues", "DeploymentValues")
+VALUE_DIMENSIONS = DIMENSIONS + VALUE_EXTRA
 ARRAY_LENGTHS = (0, 1, 2, 3)
-NUMERIC_DIMENSIONS = ("Inputs", "Keys")
+NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
-TEST_FIELD = re.compile(r"output|log|storage:(?:0|[1-9][0-9]{0,77})")
+TEST_FIELD = re.compile(r"output|log|balance|storage:(?:0|[1-9][0-9]{0,77})")
 
 
 def dimensions(profile_name):
-    return {"keyed": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS}.get(
+    return {"keyed": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS, "value": VALUE_DIMENSIONS}.get(
         adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
+
+
+def value_coverage(case, statuses):
+    """Call values, the values of reverted transactions and the deployment value."""
+    return {"Values": {tx["value"] for tx in case["transactions"]},
+            "RevertedValues": {tx["value"] for tx, status in zip(case["transactions"], statuses) if status == "reverted"},
+            "DeploymentValues": {str(adapter.deployment_value(case))}}
 
 
 def versions(profile_name):
@@ -193,6 +203,15 @@ def validate_manifest(manifest):
                 raise ValueError(f"log coverage requires unique required{dimension} from {list(allowed)}")
     elif any("required" + dimension in manifest for dimension in LOG_EXTRA) or "framingVersion" in manifest:
         raise ValueError("log coverage belongs to the log profile")
+    if selected.get("balances"):
+        for dimension in VALUE_EXTRA:
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(not isinstance(v, str) for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"call-value coverage requires unique required{dimension}")
+            for value in values:
+                common.word(value, "required " + dimension)
+    elif any("required" + dimension in manifest for dimension in VALUE_EXTRA):
+        raise ValueError("value coverage belongs to the call-value profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -235,7 +254,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
     if path is not None:
         if path not in PATHS or not TEST_FIELD.fullmatch(field) or (
                 not adapter.profile(case)["declared"] and field not in ("output", "storage:0", "storage:1")) or (
-                field == "log" and not adapter.has_logs(case)):
+                field == "log" and not adapter.has_logs(case)) or (field == "balance" and not adapter.has_balances(case)):
             raise ValueError("unknown synthetic history adapter")
         if actual.get("category") == "matched":
             if adapter.compare(histories, case).get("category") != "matched":
@@ -244,13 +263,17 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
             row = next((row for row in rows if row["id"] == selected), None)
             # Like a removed transaction, a candidate whose keys no longer
             # declare the selected slot cannot preserve the synthetic finding.
-            declared = field in ("output", "log") or field[len("storage:"):] in adapter.observed_slots(case)
+            declared = field in ("output", "log", "balance") or field[len("storage:"):] in adapter.observed_slots(case)
             if row is not None and declared:
                 if field == "output":
                     value = common.hex_bytes(row["output"], "test output")
                     if len(value) != 32:
                         raise ValueError("test adapter requires a returned Word")
                     row["output"] = "0x" + f"{int.from_bytes(value, 'big') ^ 1:064x}"
+                elif field == "balance":
+                    row["committedBalance"] = str(int(common.word(row["committedBalance"], "test balance")) ^ 1)
+                    if rows[-1]["id"] == selected:
+                        histories[path]["finalBalance"] = row["committedBalance"]
                 elif field == "log":
                     # The first committed log's first topic, else its last data
                     # byte. A transaction without such a log cannot keep it.
@@ -324,7 +347,8 @@ def fingerprint(analysis):
 def keyed_analysis(analysis):
     histories = analysis.get("histories", {})
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
-                                               (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA)
+                                               (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
+                                                adapter.VALUE_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -347,7 +371,8 @@ def transaction_counts(histories, case):
     except (ValueError, TypeError, KeyError):
         return result
     prefix = len(values) == 3 and all(all(row["value"] == "0" for row in value["initialStorage"]) and
-                                      not value.get("initialUndeclaredStorage") and not value.get("initialLogs") for value in values.values())
+                                      not value.get("initialUndeclaredStorage") and not value.get("initialLogs") and
+                                      value.get("initialBalance", "0") == str(adapter.deployment_value(case)) for value in values.values())
     for index, tx in enumerate(case["transactions"]):
         rows = [value["transactions"][index] for value in values.values() if index < len(value["transactions"])]
         result["executed"] += bool(rows)
@@ -355,7 +380,8 @@ def transaction_counts(histories, case):
         result["completed"] += complete
         prefix = prefix and complete and all(adapter.without_containment(row) == adapter.without_containment(rows[0]) for row in rows) and not any(
             row.get("undeclaredStorage") for row in rows) and all(adapter.conforms(case, tx, row,
-                value["transactions"][index - 1]["committedStorage"] if index else value["initialStorage"], address)
+                value["transactions"][index - 1]["committedStorage"] if index else value["initialStorage"], address,
+                (value["transactions"][index - 1].get("committedBalance") if index else value.get("initialBalance")))
                 for value in values.values() for row in value["transactions"][index:index + 1])
         result["matched"] += prefix
     return result
@@ -456,6 +482,8 @@ class Campaign:
             values.update(Lengths={len(tx["values"]) for tx in case["transactions"]})
         elif self.specification["abi"] == "flags":
             values.update(log_coverage(case, statuses, histories["directCore"]["transactions"] if prefix == "matched" else None))
+        elif self.specification["abi"] == "value":
+            values.update(value_coverage(case, statuses))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -499,7 +527,7 @@ class Campaign:
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
-        for dimension in {"keyed": ("Keys", "Aliases"), "array": ("Lengths",), "flags": tuple(LOG_EXTRA)}.get(self.specification["abi"], ()):
+        for dimension in {"keyed": ("Keys", "Aliases"), "array": ("Lengths",), "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []
@@ -733,7 +761,8 @@ def main():
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--test-perturb-path", choices=PATHS)
     parser.add_argument("--test-transaction-id")
-    parser.add_argument("--test-field", default="output", help="output, storage:SLOT for an observed decimal slot, or log (log profile)")
+    parser.add_argument("--test-field", default="output",
+                        help="output, storage:SLOT for an observed decimal slot, log (log profile) or balance (call-value profile)")
     args = parser.parse_args()
     try:
         selected_profile = args.profile
@@ -765,8 +794,9 @@ def main():
     if args.test_field != "output" and not args.test_perturb_path:
         parser.error("test field requires the explicit synthetic adapter")
     if not TEST_FIELD.fullmatch(args.test_field) or (not adapter.PROFILES[args.profile]["declared"] and args.test_field not in ("output", "storage:0", "storage:1")) or (
-            args.test_field == "log" and not adapter.PROFILES[args.profile].get("logs")):
-        parser.error("test field must be output, storage:SLOT for an observed slot, or log for the log profile")
+            args.test_field == "log" and not adapter.PROFILES[args.profile].get("logs")) or (
+            args.test_field == "balance" and not adapter.PROFILES[args.profile].get("balances")):
+        parser.error("test field must be output, storage:SLOT for an observed slot, log for the log profile or balance for the call-value profile")
     limits = {"seed": (0, 2**64 - 1), "nodes": (1, 512), "cases": (1, 1024), "attempts": (0, 10000),
         "seconds": (.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10), "shrink_attempts": (0, 10000),
         "shrink_candidates": (1, 4096), "case_timeout": (.001, 3600), "direct_fuel": (1, 10000000),

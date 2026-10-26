@@ -841,5 +841,108 @@ class LogCampaignTests(unittest.TestCase):
         self.assertFalse(campaign.TEST_FIELD.fullmatch("logs"))
 
 
+
+def value_case(deployment=5, rows=((0, 0, 7), (1, 1, 2**64), (0, 3, 1))):
+    value = fixtures.value_case(deployment, rows)
+    value["callValuePlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def value_report(value):
+    histories = fixtures.value_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class CallValueCampaignTests(unittest.TestCase):
+    def test_value_dimensions_record_values_refunds_and_deployment(self):
+        value = value_case()
+        self.assertEqual(campaign.dimensions("stateful-call-value"),
+                         campaign.DIMENSIONS + ("Values", "RevertedValues", "DeploymentValues"))
+        self.assertEqual(campaign.versions("stateful-call-value"), campaign.VERSIONS)
+        self.assertEqual(campaign.inputs(value), {"0", "1", "3"})
+        statuses = ["returned", "reverted", "returned"]
+        self.assertEqual(campaign.value_coverage(value, statuses),
+                         {"Values": {"7", str(2**64), "1"}, "RevertedValues": {str(2**64)}, "DeploymentValues": {"5"}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-call-value"))
+            instance.summary["coverage"].update(requiredValues=["0", "1", "7"], requiredRevertedValues=["0", str(2**64)],
+                                                requiredDeploymentValues=["0", "5"])
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", value_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedValues"], coverage["matchedRevertedValues"], coverage["matchedDeploymentValues"]),
+                             (["1", "7", str(2**64)], [str(2**64)], ["5"]))
+            self.assertEqual((coverage["missingValues"], coverage["missingRevertedValues"], coverage["missingDeploymentValues"]),
+                             (["0"], ["0"], ["0"]))
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertNotIn("requiredValues", campaign.Campaign(options(directory, profile="stateful-logs")).summary["coverage"])
+
+    def test_value_manifest_requires_value_dimensions_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-call-value-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(manifest["requiredDeploymentValues"], ["0", "5"])
+        changes = [lambda m: m.pop("requiredValues"), lambda m: m.update(requiredValues=["07"]),
+            lambda m: m.update(requiredRevertedValues=[]), lambda m: m.update(requiredDeploymentValues=["5", "5"]),
+            lambda m: m.update(requiredValues=[7]),
+            lambda m: m["cases"][0].update(logPlan=m["cases"][0].pop("callValuePlan"))]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        logs = json.loads((ROOT / "scripts/semantic-log-corpus.json").read_text())
+        logs["requiredValues"] = ["0"]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(logs)
+
+    def test_synthetic_balance_injection_perturbs_one_committed_balance(self):
+        value = value_case()
+        raw = value_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        original = copy.deepcopy(raw)
+        changed = campaign.analyze(raw, value, "importedHull", "tx-2", "balance")
+        self.assertEqual(raw, original)
+        self.assertTrue(changed["synthetic"])
+        self.assertEqual((changed["comparison"]["category"], changed["comparison"]["transactionId"], changed["comparison"]["fields"]),
+                         ("semantic-mismatch", "tx-2", ["committedBalance"]))
+        self.assertEqual(changed["histories"]["importedHull"]["finalBalance"], str(int(raw["histories"]["importedHull"]["finalBalance"]) ^ 1))
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["fields"], fingerprint["storageSlots"], fingerprint["undeclaredPaths"]), (["committedBalance"], [], []))
+        self.assertTrue(campaign.same_failure(fingerprint, campaign.analyze(value_report(value), value, "importedHull", "tx-2", "balance")))
+        reduced = value_case(rows=((0, 0, 7),))
+        dropped = campaign.analyze(value_report(reduced), reduced, "importedHull", "tx-2", "balance")
+        self.assertFalse(dropped["synthetic"])
+        for other, report_value in ((keyed_case(), keyed_report(keyed_case())), (log_case(), log_report(log_case()))):
+            with self.subTest(schema=other["schema"]), self.assertRaises(ValueError):
+                campaign.analyze(report_value, other, "rustEvm", "tx-1", "balance")
+
+    def test_value_prefix_counts_require_funded_deployment_and_refunds(self):
+        value = value_case()
+        raw = value_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+        for history in raw["histories"].values():
+            history["transactions"][1]["committedBalance"] = str(12 + 2**64)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 1)
+        raw = value_report(value)
+        for history in raw["histories"].values():
+            history["initialBalance"] = "0"
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 0)
+
+    def test_value_cli_field_requires_the_call_value_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "case.json"
+            path.write_text(json.dumps(log_case()))
+            with patch.object(sys, "argv", ["campaign", "--output", str(Path(directory) / "run"), "--case", str(path),
+                    "--test-perturb-path", "rustEvm", "--test-field", "balance"]), \
+                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+                campaign.main()
+            self.assertEqual(stopped.exception.code, 2)
+        self.assertTrue(campaign.TEST_FIELD.fullmatch("balance"))
+
+
 if __name__ == "__main__":
     unittest.main()

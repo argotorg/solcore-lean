@@ -42,6 +42,8 @@ TARGETS = {
     "rustHullKeyedStorageScenario": "rust-hull-keyed-storage-scenario",
     "semanticDynamicArrayTool": "semantic-dynamic-array-tool",
     "semanticEventLogTool": "semantic-log-tool",
+    "semanticCallValueTool": "semantic-call-value-tool",
+    "rustHullValueScenario": "rust-hull-value-scenario",
 }
 PATCHES = {
     "crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),

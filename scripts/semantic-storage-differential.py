@@ -9,6 +9,8 @@ case and additionally require the Hull and EVM paths to show no nonzero
 committed slot outside them. The log profile also compares the ordered
 committed logs of every transaction: decoded original-Core journals, Hull
 receipt logs and mined receipt logs, plus the EVM chain's complete log list.
+The call-value profile sends value with each transaction and also compares the
+contract's committed balance; the sender's balance is never observed.
 """
 from __future__ import annotations
 
@@ -39,8 +41,12 @@ ARRAY_CASE_SCHEMA = "solcore-lean.semantic-dynamic-array-case.v1"
 ARRAY_HISTORY_SCHEMA = "solcore-lean.dynamic-array-history.v1"
 LOG_CASE_SCHEMA = "solcore-lean.semantic-log-case.v1"
 LOG_HISTORY_SCHEMA = "solcore-lean.log-history.v1"
+VALUE_CASE_SCHEMA = "solcore-lean.semantic-call-value-case.v1"
+VALUE_HISTORY_SCHEMA = "solcore-lean.call-value-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
-# `logs`: ordered committed logs are part of every observation.
+# `logs`: ordered committed logs are part of every observation; `balances`: transactions
+# carry call value and the contract's committed balance is observed; `deploymentLogs`:
+# the deployment receipt must carry no logs even when transactions' logs are not compared.
 _TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "declared": False, "abi": "word",
     "signature": "run(uint256)", "selector": "0xa444f5e9",
     "historySchema": HISTORY_SCHEMA, "coreRunner": "rust-hull-storage-scenario",
@@ -74,6 +80,13 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LOG_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "flags", "logs": True},
+    "stateful-call-value": {"caseSchema": VALUE_CASE_SCHEMA, "planSchema": "solcore-lean.call-value-plan.v1",
+        "planKey": "callValuePlan", "corpusSchema": "solcore-lean.semantic-call-value-corpus.v1",
+        "originKind": "call-value-generated", "contract": "SynthesizedCallValue",
+        "caseTool": "semantic-call-value-tool", "coreRunner": "rust-hull-value-scenario",
+        "scenarioSchema": "solcore-lean.value-contract-scenario.v1", "historySchema": VALUE_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "value", "balances": True, "deploymentLogs": True},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
@@ -87,6 +100,10 @@ MAX_ELEMENTS = 3
 LOG_SLOTS = ["0", "1"]
 MAX_SITES, MAX_TOPICS, MAX_DATA_WORDS = 3, 4, 2
 MAX_LOGS = 64
+VALUE_SLOTS = ["0", "1"]
+# Every value, including the deployment value, and a scenario's total stay
+# within the funded local sender; original Core and Hull fund the caller with 2^80.
+MAX_VALUE, MAX_TOTAL, CALLER_FUNDS = 2**70, 2**72, 2**80
 RESOURCE_STATUSES = {"out-of-fuel", "out-of-gas", "timeout", "resource-limit", "output-limit"}
 Finding, RpcError = common.Finding, common.RpcError
 
@@ -105,12 +122,37 @@ def profile(case: dict) -> dict:
 
 def expected_status(case: dict, transaction: dict) -> str:
     """The profile fixes completion polarity, not the returned value or world."""
-    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags") else "input"]
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value") else "input"]
     return "reverted" if profile(case)["rollback"] and int(common.word(parity)) % 2 else "returned"
 
 
 def has_logs(case: dict) -> bool:
     return profile(case).get("logs", False)
+
+
+def has_balances(case: dict) -> bool:
+    return profile(case).get("balances", False)
+
+
+def deployment_logs(case: dict) -> bool:
+    return has_logs(case) or profile(case).get("deploymentLogs", False)
+
+
+def deployment_value(case: dict) -> int:
+    """The value the empty payable constructor receives; zero elsewhere."""
+    if not has_balances(case):
+        return 0
+    plan = case.get(profile(case)["planKey"])
+    value = int(common.word(plan.get("deploymentValue") if isinstance(plan, dict) else None, "deployment value"))
+    if value > MAX_VALUE:
+        raise ValueError("deployment value exceeds 2^70")
+    return value
+
+
+def expected_balance(case: dict, row: dict) -> str:
+    """Committed balance the protocol implies: deployment value plus slot one."""
+    accepted = next(int(entry["value"]) for entry in row["committedStorage"] if entry["slot"] == "1")
+    return str((deployment_value(case) + accepted) % 2**256)
 
 
 def log_sites(case: dict) -> list[dict]:
@@ -172,6 +214,10 @@ def scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_balances(case):
+        return ("ordered value-bearing payable run(uint256,uint256) transactions after a funded payable deployment; "
+                "committed slots 0/1 and the contract's committed balance on all paths and no nonzero undeclared slot on "
+                "Hull/EVM; no sender-balance, gas or nonce equivalence")
     if has_logs(case):
         return ("ordered zero-value run(uint256,uint256) transactions; no constructor logs; initially empty storage; "
                 "committed slots 0/1 and ordered committed logs (address, topics, data) on all paths, the EVM chain's "
@@ -213,10 +259,17 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
         value = int(common.word(tx.get("input"), "transaction input"))
-        prefix = {"keyed": "key", "flags": "flags"}.get(selected["abi"])
+        prefix = {"keyed": "key", "flags": "flags", "value": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
-        if tx.get("calldata") != selected["selector"] + words + f"{value:064x}" or tx.get("value") != "0":
+        sent = "0"
+        if selected.get("balances"):
+            sent = common.word(tx.get("value"), "call value")
+            if int(sent) > MAX_VALUE:
+                raise ValueError("call value exceeds 2^70")
+        if tx.get("calldata") != selected["selector"] + words + f"{value:064x}" or tx.get("value") != sent:
             raise ValueError("transaction calldata/value differs from its original Word input")
+    if selected.get("balances") and deployment_value(case) + sum(int(tx["value"]) for tx in transactions) > MAX_TOTAL:
+        raise ValueError("a call-value scenario sends at most 2^72 in total")
 
 
 def validate_case(case) -> None:
@@ -237,6 +290,10 @@ def validate_case(case) -> None:
         log_sites(case)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != LOG_SLOTS:
             raise Finding("unsupported-scope", "input", "log profile starts empty and observes slots zero and one")
+    elif selected["abi"] == "value":
+        deployment_value(case)
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != VALUE_SLOTS:
+            raise Finding("unsupported-scope", "input", "call-value profile starts empty and observes slots zero and one")
     elif case.get("initialState") != {"storage": []} or case.get("observedSlots") != list(SLOTS):
         raise Finding("unsupported-scope", "input", "storage profile starts empty and observes slots zero and one")
     contract = case.get("contract")
@@ -298,8 +355,11 @@ def normalize_history(history, case: dict, path=None) -> dict:
     extra = {}
     if selected["declared"]:
         containment(history, extra, path, slots, "initialUndeclaredStorage")
-    if selected.get("logs"):
+    if selected.get("balances"):
+        extra["initialBalance"] = common.word(history.get("initialBalance"), "initial balance")
+    if deployment_logs(case):
         extra["initialLogs"] = logs(history.get("initialLogs"), "deployment logs")
+    if selected.get("logs"):
         if path == "rustEvm":
             chain = history.get("chainLogs")
             extra["chainLogs"] = None if chain is None else logs(chain, "chain logs")
@@ -317,6 +377,8 @@ def normalize_history(history, case: dict, path=None) -> dict:
             raise ValueError("missing transaction status")
         value = {"id": row["id"], "index": index, "status": status,
                  "committedStorage": storage(row.get("committedStorage"), slots)}
+        if selected.get("balances"):
+            value["committedBalance"] = common.word(row.get("committedBalance"), "committed balance")
         if selected["declared"]:
             containment(row, value, path, slots)
         if status in {"returned", "reverted"}:
@@ -348,6 +410,13 @@ def normalize_history(history, case: dict, path=None) -> dict:
         raise ValueError("final committed storage differs from the last observation")
     if unobserved and extra.get("chainLogs") is not None:
         raise ValueError("an unobserved transaction cannot claim a chain-wide log list")
+    if selected.get("balances"):
+        balance = None if unobserved else common.word(history.get("finalBalance"), "final balance")
+        if unobserved and history.get("finalBalance") is not None:
+            raise ValueError("an unobserved transaction cannot claim a final committed balance")
+        if not unobserved and balance != (result[-1]["committedBalance"] if result else extra["initialBalance"]):
+            raise ValueError("final committed balance differs from the last observation")
+        extra["finalBalance"] = balance
     return {"initialStorage": initial, **extra, "transactions": result, "finalStorage": final,
             "status": history["status"], "unexecuted": history["unexecuted"], "unobserved": unobserved}
 
@@ -356,13 +425,17 @@ def without_containment(row: dict) -> dict:
     return {key: value for key, value in row.items() if key != "undeclaredStorage"}
 
 
-def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None) -> bool:
+def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, prior_balance=None) -> bool:
     """The fixed protocol of a completed row: polarity, a one-Word payload,
     rollback of the committed slots and, for logs, the static log shapes from
-    the contract address; a reverted row commits no logs."""
+    the contract address; a reverted row commits no logs. For call value, the
+    balance is the deployment value plus slot one and a revert keeps it."""
     if row["status"] != expected_status(case, tx) or len(common.hex_bytes(row["output"], "output")) != 32:
         return False
     if row["status"] == "reverted" and row["committedStorage"] != prior:
+        return False
+    if has_balances(case) and (row["committedBalance"] != expected_balance(case, row) or
+                               (row["status"] == "reverted" and row["committedBalance"] != prior_balance)):
         return False
     if has_logs(case):
         return log_shapes(row["logs"]) == expected_log_shapes(case, tx) and (
@@ -403,18 +476,22 @@ def compare(histories: dict, case: dict) -> dict:
     outside = undeclared_paths(values) if keyed else []
     declared = not all(pairs.values()) or any(row["value"] != "0" for state in initial.values() for row in state)
     # A fixed empty constructor commits no logs; a deployment log is a difference.
-    deployed_logs = sorted(name for name in PATHS if values[name].get("initialLogs")) if has_logs(case) else []
-    if declared or outside or deployed_logs:
+    deployed_logs = sorted(name for name in PATHS if values[name].get("initialLogs")) if deployment_logs(case) else []
+    # The funded deployment holds exactly its recorded value on every path.
+    funded = not has_balances(case) or all(values[name]["initialBalance"] == str(deployment_value(case)) for name in PATHS)
+    if declared or outside or deployed_logs or not funded:
         fields = (["committedStorage"] if declared else []) + (["undeclaredStorage"] if outside else []) + (
-            ["initialLogs"] if deployed_logs else [])
+            ["initialLogs"] if deployed_logs else []) + ([] if funded else ["committedBalance"])
         mismatch = {"category": "semantic-mismatch", "stage": "initial-storage", "fields": fields,
-            "pairs": pairwise({name: [initial[name], values[name].get("initialLogs")] for name in PATHS}) if deployed_logs else pairs}
+            "pairs": pairwise({name: [initial[name], values[name].get("initialLogs"), values[name].get("initialBalance")]
+                               for name in PATHS}) if deployed_logs or not funded else pairs}
         if outside:
             mismatch["undeclaredPaths"] = outside
         if deployed_logs:
             mismatch["logPaths"] = deployed_logs
         return mismatch
-    observed = ("status", "output", "committedStorage", "logs") if has_logs(case) else ("status", "output", "committedStorage")
+    observed = ("status", "output", "committedStorage") + (("logs",) if has_logs(case) else ()) + (
+        ("committedBalance",) if has_balances(case) else ())
     for index, tx in enumerate(case["transactions"]):
         rows = {name: values[name]["transactions"][index] for name in PATHS if index < len(values[name]["transactions"])}
         where = {"stage": "transaction", "transactionId": tx["id"], "index": index}
@@ -433,6 +510,15 @@ def compare(histories: dict, case: dict) -> dict:
             for name, row in rows.items())
         if not rollback and "committedStorage" not in fields:
             fields.append("committedStorage")
+        if has_balances(case):
+            # Every committed balance is the deployment value plus the accepted
+            # value in slot one, and a revert refunds: the prior balance stays.
+            refunded = all(row["committedBalance"] == expected_balance(case, row) and (row["status"] != "reverted" or
+                row["committedBalance"] == (values[name]["transactions"][index - 1]["committedBalance"] if index else values[name]["initialBalance"]))
+                for name, row in rows.items())
+            if not refunded and "committedBalance" not in fields:
+                fields.append("committedBalance")
+            normal = normal and refunded
         if has_logs(case):
             # Static shapes cover rollback: an expected revert commits no logs.
             shaped = all(log_shapes(row["logs"]) == expected_log_shapes(case, tx) and
@@ -483,8 +569,11 @@ def hull_history(stdout: str, exit_code: int, case: dict) -> dict:
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
     if selected["declared"]:
         history.update(observedSlots=list(observed_slots(case)), initialUndeclaredStorage=deployment.get("undeclaredStorage"))
-    if selected.get("logs"):
+    if deployment_logs(case):
         history["initialLogs"] = deployment.get("logs")
+    if selected.get("balances"):
+        history.update(initialBalance=deployment.get("committedBalance"),
+                       finalBalance=calls[-1].get("committedBalance") if calls else deployment.get("committedBalance"))
     normalize_history(history, case, "importedHull")
     return history
 
@@ -537,6 +626,12 @@ def evm_storage(rpc, address: str, block: str, slots=SLOTS) -> list[dict]:
             raise ValueError("RPC storage value is not exactly one Word")
         result.append({"slot": slot, "value": str(int.from_bytes(raw, "big"))})
     return result
+
+
+def evm_balance(rpc, address: str, block: str) -> str:
+    """The contract's committed balance at one receipt block."""
+    quantity(block, "balance block")
+    return common.word(str(quantity(rpc.call("eth_getBalance", [address, block]), "contract balance")), "contract balance")
 
 
 PRESTATE_DIFF = {"tracer": "prestateTracer", "tracerConfig": {"diffMode": True}}
@@ -711,7 +806,7 @@ def execute(args, report: dict) -> None:
             raise ValueError("local Anvil supplied no valid sender")
         sender, gas = accounts[0], hex(args.gas)
         report["evmDeployment"] = {}
-        tx_hash = submit(rpc, {"from": sender, "data": "0x" + init.hex(), "value": "0x0", "gas": gas}, report["evmDeployment"])
+        tx_hash = submit(rpc, {"from": sender, "data": "0x" + init.hex(), "value": hex(deployment_value(case)), "gas": gas}, report["evmDeployment"])
         deployed = receipt(rpc, tx_hash, runner)
         report["evmDeployment"]["receipt"] = deployed
         if deployed["status"] != "0x1":
@@ -747,6 +842,11 @@ def execute(args, report: dict) -> None:
             "deployPath": case["contract"]["deployPath"], "runtimePath": case["contract"]["runtimePath"], "fuel": args.core_fuel,
             "observedSlots": list(slots), "constructor": {**base, "calldata": "0x"},
             "calls": [{"id": tx["id"], "context": {**base, "calldata": tx["calldata"]}, "persist": True} for tx in case["transactions"]]}
+        if selected.get("balances"):
+            scenario["callerFunds"] = str(CALLER_FUNDS)
+            scenario["constructor"]["value"] = str(deployment_value(case))
+            for call, tx in zip(scenario["calls"], case["transactions"]):
+                call["context"]["value"] = tx["value"]
         scenario_path = args.output / "scenario.json"
         save(scenario_path, scenario)
         result = runner.process("imported-hull", [str(args.core_runner), str(scenario_path)])
@@ -754,13 +854,19 @@ def execute(args, report: dict) -> None:
         initial = evm_storage(rpc, address, deployed["blockNumber"], slots)
         keyed = {"observedSlots": list(slots), "initialUndeclaredStorage":
             evm_undeclared(rpc, address, deployed["blockNumber"], touched, slots)} if selected["declared"] else {}
+        if deployment_logs(case):
+            keyed["initialLogs"] = evm_logs(deployed)
         if selected.get("logs"):
-            keyed.update(initialLogs=evm_logs(deployed), chainLogs=None)
+            keyed["chainLogs"] = None
+        if selected.get("balances"):
+            keyed["initialBalance"] = evm_balance(rpc, address, deployed["blockNumber"])
         evm_rows, records, mined_receipts = [], [], [deployed]
         report["evmTransactions"] = records
         def checkpoint(pending=None):
             complete = len(evm_rows) == len(case["transactions"]) and all(row["status"] in {"returned", "reverted"} for row in evm_rows)
             remaining = [tx["id"] for tx in case["transactions"][len(evm_rows):]]
+            if selected.get("balances"):
+                keyed["finalBalance"] = None if pending else evm_rows[-1]["committedBalance"] if evm_rows else keyed["initialBalance"]
             report["histories"]["rustEvm"] = {"schema": selected["historySchema"], **keyed, "initialStorage": initial,
                 "transactions": list(evm_rows), "finalStorage": None if pending else evm_rows[-1]["committedStorage"] if evm_rows else initial,
                 "status": "complete" if complete else "incomplete", "unobserved": [pending] if pending else [],
@@ -771,7 +877,8 @@ def execute(args, report: dict) -> None:
             records.append(record)
             checkpoint(tx["id"])
             try:
-                tx_hash = submit(rpc, {"from": sender, "to": address, "data": tx["calldata"], "value": "0x0", "gas": gas}, record)
+                tx_hash = submit(rpc, {"from": sender, "to": address, "data": tx["calldata"],
+                                       "value": hex(int(tx["value"])), "gas": gas}, record)
             except BaseException:
                 if record.get("submission") == "rejected":
                     checkpoint()
@@ -786,6 +893,8 @@ def execute(args, report: dict) -> None:
             row = {"id": tx["id"], "index": index, **outcome, "committedStorage": state}
             if selected.get("logs") and outcome["status"] in {"returned", "reverted"}:
                 row["logs"] = evm_logs(mined)
+            if selected.get("balances"):
+                row["committedBalance"] = evm_balance(rpc, address, mined["blockNumber"])
             if selected["declared"]:
                 diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
                 record["storageDiff"] = diff
