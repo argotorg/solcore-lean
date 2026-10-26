@@ -2024,6 +2024,80 @@ This profile does not compare the sender's balance, gas, nonces or code,
 forwards the parent cannot pay, value sent by the child, deeper or repeated
 calls, or logs. Agreement is test evidence, not a preservation proof.
 
+## Compare Keccak-addressed storage mappings
+
+The `stateful-mapping` profile stores through a mapping whose entries live at
+Keccak-256 slots. It installs `SynthesizedMapping` with two contract fields:
+`counter: word` at slot 0 and `entries: mapping(word => word)` at base slot 1.
+The second is the dialect's form of `mapping(uint256 => uint256)`. Each
+transaction calls `SynthesizedMapping.run(uint256 flags, uint256 key, uint256
+input)`, selector `0x24b912e5`, with exactly three ABI Words and zero value.
+
+The pinned std indexes a mapping through `hash2(p, k)`, which stores the
+base slot `p` at memory 0 and the key `k` at memory 32 and hashes those 64
+bytes. An entry therefore lives at `keccak256(p ++ k)`. That is the reverse of
+Solidity's `keccak256(k ++ p)`, although the std comment cites Solidity's
+layout. A probe contract confirmed this order on Sonatina O0 and O2, and the
+profile follows the pinned dialect.
+
+The contract reads `old = entries[key]` and writes `entries[key] =
+step(input + old)` with the checked aggregate step. It then writes
+`entries[key + 1] = old + 1`, where the key wraps at the maximum, and
+increments the counter. The result rereads `entries[key] + entries[key + 1] +
+counter`; odd flags revert with it as a 32-byte payload after the writes, and
+other flags return it.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Slot derivation.** Original Core derives `keccak256(1 ++ key)` and
+  `keccak256(1 ++ (key + 1))` itself, without a Core or host change. It reads
+  the key Word with `inputDataWordBE?`, splits the two big-endian Words into
+  the eight 64-bit lanes of one 136-byte block, adds Ethereum's `0x01` domain
+  byte and the final `0x80`, and applies the Core Keccak-f[1600] permutation
+  and digest builders of the Hull import path, converted to Wire with
+  `Wire.Expr.ofCore?`. The Hull path lowers the source's `keccak256` builtin
+  through the same builders. The reference stays trustworthy for three
+  reasons. Both builders are proved against the independent `KeccakSemantics`
+  specification (`permute_evaluates`, `digest_evaluates`). The EVM path
+  computes Keccak in the EVM, independent of any Lean code. The fixed
+  corpus's slots and histories come from Foundry's `cast keccak`. Only the
+  absorption of two Words is new; tests check it against `cast keccak` and
+  the separate `Solcore.Abi.V1.Keccak256`. The fixed Keccak closure is
+  outside the step's node budget.
+- **Committed observation.** After every transaction all three paths report
+  status, payload and the committed values of the declared slots. These are
+  slot 0 plus `keccak256(1 ++ k)` and `keccak256(1 ++ (k + 1))` for every
+  transaction key `k`, as decimal Words in ascending order. The keyed profile's
+  containment rules apply: the Hull and EVM paths must show no nonzero
+  committed slot outside the declaration. A path that derived a slot
+  differently therefore differs even where the values agree.
+- **Committed comparison.** All three paths must agree on every observed field
+  after every transaction. The flags parity selects the completion, the
+  payload is one Word, and a revert keeps the prior slots.
+- **Rollback.** A revert keeps the prior committed slots on every path, chosen
+  by `ContractRuntime` for original Core. An incomplete transaction ends the
+  sequence.
+- **Deployment.** The constructor is empty and receives zero value. Every
+  declared slot is zero afterwards, and no undeclared slot is nonzero on the
+  Hull and EVM paths. Original Core starts from the declared post-deployment
+  world.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, replace one key
+  or input by a bank value, or reduce one transaction's flags to their parity
+  or clear its revert bit. They are ordered by transaction count, complete
+  program complexity, then the sum of all flags, keys and inputs. A candidate
+  rederives its declared slots, so one that no longer declares a finding's
+  slot cannot keep the finding.
+
+Generation draws three keys from a bank that contains successor pairs and the
+maximum, three inputs from the storage boundary inputs and one of four
+completion patterns from a separate high-bit stream; flags are just the
+parity. Coverage adds the keys and three static alias kinds: a repeated key,
+a key that is another key's successor, and the maximum key, whose successor
+wraps to zero.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

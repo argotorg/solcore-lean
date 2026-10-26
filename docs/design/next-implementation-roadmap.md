@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop and generic emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; Keccak-addressed mappings defined; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection and one concrete instance; remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and Hull's explicit revert connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1134,6 +1134,51 @@ tools as ready. Hosted CI has not been run.
 This scope does not compare the sender's balance, gas, nonces or code,
 forwards the parent cannot pay, value sent by the child, deeper or repeated
 calls, or logs. Agreement is test evidence, not a preservation proof.
+
+The seventh extension, `stateful-mapping`, addresses storage through a
+mapping, whose entries live at Keccak-256 slots. The pinned std derives the
+slot of `m[k]` as `keccak256(p ++ k)`, the field's base slot followed by the
+key, both as big-endian Words. That is the reverse of Solidity's
+`keccak256(k ++ p)`, although the std comment cites Solidity's layout. A
+probe confirmed this order on Sonatina O0 and O2; the profile follows the
+pinned dialect. Original Core needs no Core or host change. It hashes with the
+Core Keccak-f[1600] permutation and digest builders that the Hull import path
+already uses for the `keccak256` builtin, converted to Wire with
+`Wire.Expr.ofCore?`; a probe of two Words matched `cast keccak` on four
+vectors. The reference stays trustworthy although it shares these builders
+with the Hull path. Both builders are proved against the independent
+`KeccakSemantics` specification (`permute_evaluates`, `digest_evaluates`),
+the EVM path computes Keccak in the EVM itself, and the fixed corpus's slots
+and histories come from Foundry's `cast keccak`. Only the 64-byte absorption
+of two Words is new, and tests check it against `cast keccak` vectors. Its
+definitions were fixed before execution:
+
+- Transactions: one to three zero-value calls of `run(uint256 flags, uint256
+  key, uint256 input)` with exactly three ABI Words on a contract with a
+  `counter: word` field at slot zero and an `entries: mapping(word => word)`
+  field at base slot one, the dialect's form of `mapping(uint256 =>
+  uint256)`. Malformed calldata is outside the scope.
+- Effects: read `old = entries[key]`, write `entries[key] = step(input +
+  old)` and then `entries[key + 1] = old + 1` (the key wraps), and increment
+  the counter. The result rereads `entries[key] + entries[key + 1] + counter`.
+  Odd flags revert with it after the writes.
+- Committed observations: status, payload and the committed values of the
+  declared slots after every transaction on all three paths. The declared
+  slots are the counter slot and `keccak256(1 ++ k)` and `keccak256(1 ++ (k +
+  1))` for every transaction key `k`, derived from the transactions. As for
+  keyed storage, the Hull and EVM paths must show no nonzero committed slot
+  outside the declaration, so a wrong slot derivation is a difference even
+  where the values agree.
+- Rollback: a revert keeps the prior committed snapshot on every path, chosen
+  by `ContractRuntime` for original Core.
+- Deployment: empty constructor and zero value; every declared slot is zero
+  and no undeclared slot is nonzero afterwards. Original Core starts from the
+  declared post-deployment world.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, a bank key or input, and flags reduced to their parity or with the
+  revert bit cleared, ordered by transaction count, program complexity, then
+  the sum of flags, keys and inputs. Candidates rederive their declared slots;
+  a candidate that no longer declares a finding's slot cannot keep it.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or multiple callers, needs its
