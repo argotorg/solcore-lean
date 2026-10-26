@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph and call-graph loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value and bounded-`bytes` extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows, its public-root connection and one concrete instance; remaining expression and statement forms, fault lifting and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -623,11 +623,20 @@ that Core's bounded-loop reference returns, with its final store. The proof
 prints the entry as one more helper, `sc_step`, and relates Core's ordinal
 guards, restated from a private definition, to the counting loop by induction.
 The step is pure in Core, so the proof tracks only the accumulator cell, which
-the executable checks observe as the final store. The other emitters that
-render with the aggregate renderer (loops, generic, closures, comptime,
-modules, storage, storage rollback, keyed storage, dynamic arrays and calls)
-are not covered. The aggregate loop emitter prints the same wrapper, but its
-step may allocate cells across iterations, and the other texts use forms
+the executable checks observe as the final store.
+
+`Loop.emit_source_meaning` covers the `runtime-loops` emitter, which prints the
+same wrapper around an aggregate step. Its text needs no new source form, so
+the loop grammar and meaning are reused unchanged. The step comes from the
+aggregate renderer and may allocate private cells, which Core keeps in its
+store; the store therefore grows across iterations. The aggregate helper
+relation states that each call keeps every existing location, so the induction
+over the guards carries a growing store in which the accumulator stays in the
+first cell. The theorem is stated with the final store, which the executable
+checks observe as the accumulator cell followed by the step's cells. The other
+emitters that render with the aggregate renderer (generic, closures, comptime,
+modules, storage, storage rollback, keyed storage, dynamic arrays, dynamic
+bytes, event logs, call value and calls) are not covered; their texts use forms
 outside the source fragment.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
@@ -656,8 +665,12 @@ steps and 24 generated plans at eleven or more inputs. Each call agrees with
 Core at one more unit of fuel than its iterations and has no meaning with less,
 and every Core run ends with the one accumulator cell. Loop-free texts keep
 their `sourceCall` meaning, and altered loops lose or change their meaning. The
-full Lean build (10,035 jobs), registered tests and the semantic-kernel policy
-passed.
+registered `SourceLoopMeaning` test runs eight fixed aggregate steps, including
+one that allocates a cell per call, under every admitted mask, fourteen raw
+primitive steps and 23 generated plans with the same fuel checks. Every Core
+run ends with the accumulator cell followed by the step's cells, and the fixed
+steps also match hand-known formulas and cell counts. The full Lean build
+(10,045 jobs), registered tests and the semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

@@ -22,8 +22,9 @@ semantic-kernel policy check now covers.
 | `Aggregate.emit_source_meaning` | If `Aggregate.emit graph = .ok emitted` (profile `runtime-aggregates`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
 | `AggregateCallGraph.emit_source_meaning` | If `AggregateCallGraph.emit graph = .ok emitted` (profile `runtime-aggregate-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
 | `CallGraphLoop.emit_source_meaning` | If `CallGraphLoop.emit plan = .ok emitted` (profile `runtime-call-graph-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
+| `Loop.emit_source_meaning` | If `Loop.emit plan = .ok emitted` (profile `runtime-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `CallGraphLoop.emit_preserves_meaning` | The same result, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
+| `CallGraphLoop.emit_preserves_meaning`, `Loop.emit_preserves_meaning` | The same results, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
 | `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 | `parseLoopSource_print` | The same for loop files under the loop grammar. |
@@ -37,22 +38,25 @@ that every completed run returns exactly that Word and store. This is the Core
 machine used as the differential-testing oracle; for the runtime-input,
 named-helper, raw-primitive, call-graph, private-mutation, aggregate and
 aggregate call-graph profiles it runs the original lambda or binding chain
-applied to the input. For the call-graph loop profile it runs the original
+applied to the input. For the two loop profiles it runs the original
 bounded-loop reference, applied to the input. A Core program with mutable
 locals ends with its cells in the store, so `CoreReturnsWithStore` states the
 same for some final store that every completed run reaches. The aggregate
 call-graph renderer refuses cells, and the executable checks observe an empty
 final store, but its theorem states only `CoreReturnsWithStore`: the proof
 reuses the store-aware aggregate invariant, which does not track that no cell
-is allocated. The bounded-loop reference keeps its accumulator in a cell; the
-executable checks observe that the final store is that one cell, holding the
-result, while the theorem states `CoreReturnsWithStore`.
+is allocated. The bounded-loop reference keeps its accumulator in a cell, and
+both loop theorems state `CoreReturnsWithStore`. The executable checks observe
+that the final store starts with that cell, holding the result. For the
+call-graph loop it is the only cell; for the aggregate loop the cells that the
+step's calls allocated follow it.
 
 `loopSourceCall fuel` reads a text with the loop grammar below and calls the
 method under the loop meaning, in which each `while` loop may evaluate its
 condition at most `fuel` times. A loop that runs out of fuel has no meaning, so
-`CallGraphLoop.emit_source_meaning` states termination: every fuel above the
-mask, which is at most seven, completes the call.
+`CallGraphLoop.emit_source_meaning` and `Loop.emit_source_meaning` state
+termination: every fuel above the mask, which is at most seven, completes the
+call.
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -331,6 +335,22 @@ both apply the step: Core's application leaves the store unchanged, and
 loop exits. The bound `input & mask` is at most the mask, so every fuel above
 the mask suffices.
 
+[LoopEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LoopEmitter.lean)
+connects the actual `Loop.emit` (profile `runtime-loops`). Its helpers come
+from the aggregate emitter's helper loop. Its entry is printed by
+`AggregateRenderer.render` as `sc_step`, and `aggregate_render_spec` applies to
+it as to a helper. The wrapper, the loop grammar and the source half of the
+proof are those of the call-graph loop. As for the aggregate emitter, the file
+imports the fourteen aliases exactly when a helper or the entry uses one. An
+aggregate step may allocate private cells. The source keeps them in `sc_c<n>`
+locals of `sc_step`, which end with the call, while Core appends them to its
+store, so the store grows from one iteration to the next. The store-aware
+helper relation states that each call keeps every existing location, so the
+accumulator stays in the first location. `storeLoop_agrees` repeats the
+induction of `boundedLoop_agrees` over such stores: an applied step writes its
+result to the accumulator cell after appending its own cells, and a skipped
+guard keeps the store.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
@@ -383,6 +403,9 @@ iteration, runs the body as a block scope and stops when the condition is
 false. That the frontend accepts the loop and its `word` counter is part of
 assumption 2, and its lowering and execution are part of assumption 4.
 
+The aggregate loop emitter adds no further assumption. Its step uses only the
+forms above, and its wrapper is the same `while` loop.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -390,21 +413,20 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and nine
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and ten
 actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
 named helpers (`runtime-functions`), raw primitive aliases
 (`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
 locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`), aggregate
-call graphs (`runtime-aggregate-call-graphs`) and call-graph loops
-(`runtime-call-graph-loops`). They do not yet cover the other emitters that
-render with `AggregateRenderer` (loops, generic, closures, comptime, modules,
-storage, storage rollback, keyed storage, dynamic arrays and contract calls).
-The aggregate loop emitter prints the same bounded `while` wrapper, but its step
-may allocate cells, which the loop proof would have to carry across
-iterations. The other texts use forms outside these fragments, such as storage
-access, external calls, lambdas, generic functions and multi-file module
-bundles. The loop grammar admits loops only at the top level of a method body,
-with a loop-free body and an infix condition.
+call graphs (`runtime-aggregate-call-graphs`), call-graph loops
+(`runtime-call-graph-loops`) and aggregate loops (`runtime-loops`). They do not
+yet cover the other emitters that render with `AggregateRenderer` (generic,
+closures, comptime, modules, storage, storage rollback, keyed storage, dynamic
+arrays, dynamic bytes, event logs, call value and contract calls). Their texts
+use forms outside these fragments, such as storage access, external calls,
+lambdas, generic functions and multi-file module bundles. The loop grammar
+admits loops only at the top level of a method body, with a loop-free body and
+an infix condition.
 
 ## Executable checks
 
@@ -487,3 +509,27 @@ two pairs of parentheses is rejected. A loop without its counter step has no
 meaning once it iterates, a `let` in the body leaves the accumulator unchanged,
 and a reversed condition never iterates. A `word` condition and an assignment
 to an undeclared name have no meaning, and counting by two changes the result.
+
+[SourceLoopMeaning](../../Solcore/Test/SourceLoopMeaning.lean) is registered as
+well. It runs actual `Loop.emit` output through `loopSourceCall` in the same
+way, with the same fuel checks at the same inputs. It covers the six
+regression steps of the loop emitter's test (increment, an arbitrary entry, a
+step that allocates one private cell per call, a mixed step, and identity and
+constant entries) and two steps through a projected pair and a sum payload,
+each under the four admitted masks with hand-known formulas. It also covers the
+private-cell step seven times over with hand-known Words, the fourteen opcodes
+applied to a
+helper result under mask one, with hand-known Words, and 23 generated plans
+from 24 seeds at the 256 and 512-node budgets, which together use every
+generated mask. Every Core run must end with the accumulator cell, holding the
+result, followed only by Word cells. For these fixed steps, the store must hold
+the accumulator cell and one cell per call of the private-cell step. Each text
+must reparse under
+the loop grammar, print back to itself, import the aliases exactly when a step
+body uses one and declare `sc_step` after one function per helper, and
+`parseSource` must reject it. Two loop-free aggregate texts, with private
+cells, a sum and its match, keep their `sourceCall` meaning at fuel 0, 1 and
+64. A loop condition in two pairs of parentheses is rejected. A loop without
+its counter step has no meaning once it iterates, a `let` in the body leaves
+the accumulator unchanged, and a step that assigns a cell it never declared has
+no meaning.
