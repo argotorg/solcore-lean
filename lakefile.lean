@@ -63,3 +63,11 @@ lean_exe semanticDynamicArrayTool where
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"
+
+lean_exe semanticCallValueTool where
+  root := `Tests.SemanticCallValueTool
+  exeName := "semantic-call-value-tool"
+
+lean_exe rustHullValueScenario where
+  root := `Tests.RustHullValueScenarioRun
+  exeName := "rust-hull-value-scenario"

@@ -2161,6 +2161,9 @@ import Solcore.Test.SourceEventLogCases
 import Solcore.Test.SourceEventLogCorpus
 import Solcore.Test.RustHullCreationCorrespondence
 import Solcore.Test.SourceAggregateCallGraphMeaning
+import Solcore.Test.SourceCallValueEmitter
+import Solcore.Test.SourceCallValueCases
+import Solcore.Test.SourceCallValueCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4116,5 +4119,8 @@ def main : IO UInt32 := do
   Tests.SourceEventLogCorpus.testSourceEventLogCorpus
   Tests.RustHullCreationCorrespondence.run
   Tests.SourceAggregateCallGraphMeaning.testSourceAggregateCallGraphMeaning
+  Tests.SourceCallValueEmitter.testSourceCallValueEmitter
+  Tests.SourceCallValueCases.testSourceCallValueCases
+  Tests.SourceCallValueCorpus.testSourceCallValueCorpus
   IO.println "solcore-lean tests passed"
   return 0

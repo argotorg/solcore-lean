@@ -14,6 +14,7 @@ import Solcore.Synthesis.Core.StorageRollback
 import Solcore.Synthesis.Core.KeyedStorage
 import Solcore.Synthesis.Core.DynamicArray
 import Solcore.Synthesis.Core.EventLog
+import Solcore.Synthesis.Core.CallValue
 import Solcore.Synthesis.Core.NestedCall
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink
