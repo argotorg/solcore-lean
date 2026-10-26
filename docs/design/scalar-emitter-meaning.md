@@ -1,6 +1,6 @@
-# Scalar source emitter meaning preservation
+# Source emitter meaning preservation
 
-Updated: 2026-10-26. This records priority 5 of the
+Updated: 2026-10-27. This records priority 5 of the
 [next implementation roadmap](next-implementation-roadmap.md): a minimal
 meaning-preservation theorem for what the Rust-dialect emitter actually prints.
 
@@ -19,8 +19,9 @@ semantic-kernel policy check now covers.
 | `Primitive.emit_source_meaning` | If `Primitive.emit function = .ok emitted` (profile `runtime-primitives`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
 | `CallGraph.emit_source_meaning` | If `CallGraph.emit graph = .ok emitted` (profile `runtime-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
 | `Mutation.emit_source_meaning` | If `Mutation.emit graph = .ok emitted` (profile `runtime-mutation`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
-| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions` and `MutationRenderer.render`, described below. |
+| `Aggregate.emit_source_meaning` | If `Aggregate.emit graph = .ok emitted` (profile `runtime-aggregates`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
+| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
+| `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render` and `AggregateRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
@@ -28,10 +29,11 @@ the source semantics below. `CoreReturns core w` states that Core's
 `runStateful` returns `.done (.word w) []` for all sufficiently large fuel, and
 that every completed run returns exactly that Word and store. This is the Core
 machine used as the differential-testing oracle; for the runtime-input,
-named-helper, raw-primitive, call-graph and private-mutation profiles it runs
-the original lambda or binding chain applied to the input. A Core program with
-mutable locals ends with its cells in the store, so `CoreReturnsWithStore`
-states the same for some final store that every completed run reaches.
+named-helper, raw-primitive, call-graph, private-mutation and aggregate
+profiles it runs the original lambda or binding chain applied to the input. A
+Core program with mutable locals ends with its cells in the store, so
+`CoreReturnsWithStore` states the same for some final store that every
+completed run reaches.
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -220,6 +222,36 @@ connects the actual helper loop and wrapper. Core machine results follow from
 `evaluation_runStateful_complete_with_sufficient_fuel` and determinism of
 `Evaluates`.
 
+[AggregateSpec](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateSpec.lean),
+[AggregateEquations](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateEquations.lean),
+[AggregatePreservation](../../Solcore/Synthesis/Source/ScalarMeaning/AggregatePreservation.lean)
+and [AggregateControl](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateControl.lean)
+prove `aggregate_render_spec` for `AggregateRenderer.render`. The invariant is
+the mutation invariant with two more kinds of binding. A pair binding holds the
+source pair of its two Core Words. A sum binding holds `inl` or `inr` of the
+Core payload; Core also tags a sum with the type of its other side, which the
+source sum does not carry. A pair or sum binding is never a cell, so a later
+cell write cannot change it. A projection is printed as a zero `word` result
+followed by a pair match whose single case assigns the picked component; the
+match evaluates the operand's value name once, as Core evaluates `first` or
+`second` once. A Core `case` binds its payload before every existing local.
+The source binds it, under a fresh `sc_p<n>` name, in the scope of the
+selected case, which is discarded afterwards. The same two lemmas, for Unit
+and for value results, cover `if` branches and `case` bodies: the body runs in
+a block scope that may start with a pattern binding, and a value body ends by
+assigning the result declared before the `if` or `match`. That result starts
+as `0`, `false`, `(0, 0)` or `inl(0)`. Raw operations use the call-graph
+formatting: each raw opcode operand is copied first, and a copy is one more
+rendering of the operand. The equations restate the renderer's private
+helpers, such as its scalar-operand conversion, by definitional equality. The
+alias call context is required only for an expression whose rendering prints
+an alias (`usesOpcodeAliases`).
+[AggregateEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateEmitter.lean)
+connects the actual helper loop and wrapper. When some rendered body uses an
+alias, the actual import line is the printing of the fourteen aliases and every
+helper and the entry run in a primitive call context. Otherwise the file
+imports no aliases, and no body needs the alias context.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`). The meaning is therefore a function of the emitted
@@ -232,21 +264,26 @@ Rust pipeline are assumed, and are exercised only by the existing tests:
 
 1. Parsing. The pinned Rust parser reads the emitted text as the same
    structure as this grammar, including identifier, numeral and `==`
-   tokenization and the parenthesized operator forms.
+   tokenization, the parenthesized operator forms, pairs, the types
+   `(word, word)` and `sum<word, word>`, and the two `match` forms with their
+   case patterns.
 2. Name resolution and typing. The imports bring `word`, `bool`, `uint256` and
    `Typedef` into scope; the operators resolve to the cited `word` instances
-   and `!` to `std.not`; decimal literals elaborate at `word`; the frontend
-   accepts every emitted program. Rust acceptance is not proved.
-3. Standard library meaning. The instance chains and opcode wrappers behave as
-   transcribed in the tables. The transcription is manual and cites the pinned
-   files; it is not derived from the Rust frontend. In particular, the raw
-   `std.opcodes` wrappers do not revert for a zero modulus, unlike the public
-   `std.addmod` and `std.mulmod`, and the target EVM provides `CLZ`.
-4. Compilation and execution. Specialization, lowering, Sonatina or Yul code
-   generation, optimization, EVM execution and `std.dispatch` are assumed.
-   This includes selector dispatch, `uint256` ABI decoding and 32-byte result
-   encoding. Gas and EVM resource limits are not modeled; the source meaning
-   has no fuel.
+   and `!` to `std.not`; pairs, `sum`, `inl` and `inr` resolve to the frontend
+   builtins; decimal literals elaborate at `word`, also inside pairs and in
+   `inl(0)`; the frontend accepts every emitted program. Rust acceptance is not
+   proved.
+3. Standard library and builtin meaning. The instance chains and opcode
+   wrappers behave as transcribed in the tables, and pairs, sums and `match`
+   behave as described above. The transcription is manual and cites the
+   pinned files; it is not derived from the Rust frontend. In particular, the
+   raw `std.opcodes` wrappers do not revert for a zero modulus, unlike the
+   public `std.addmod` and `std.mulmod`, and the target EVM provides `CLZ`.
+4. Compilation and execution. Specialization, lowering (including the lowering
+   of pairs, sums and matches), Sonatina or Yul code generation, optimization,
+   EVM execution and `std.dispatch` are assumed. This includes selector
+   dispatch, `uint256` ABI decoding and 32-byte result encoding. Gas and EVM
+   resource limits are not modeled; the source meaning has no fuel.
 
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
@@ -254,15 +291,18 @@ in a corpus also does not replace this theorem for the printer.
 ## Scope
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
-`CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render` and six
-actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`), named
-helpers (`runtime-functions`), raw primitive aliases (`runtime-primitives`),
-call graphs (`runtime-call-graphs`) and private mutable locals
-(`runtime-mutation`). They do not yet cover aggregates, loops, storage,
-contract calls, closures, generic, comptime or module emitters. Aggregates
-(pairs, sums and their matches) need source types and a source grammar beyond
-this fragment, and the loop emitters render their bodies with the aggregate
-renderer.
+`CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
+`AggregateRenderer.render` and seven actual emitters: closed G0
+(`closed-g0`), runtime input (`runtime-word`), named helpers
+(`runtime-functions`), raw primitive aliases (`runtime-primitives`), call
+graphs (`runtime-call-graphs`), private mutable locals (`runtime-mutation`)
+and Word aggregates (`runtime-aggregates`). They do not yet cover the other
+emitters that render with `AggregateRenderer` (loops, generic, closures,
+comptime, modules, storage, storage rollback, keyed storage, dynamic arrays
+and contract calls), nor `CallGraphLoopEmitter` or
+`AggregateCallGraphEmitter`. Their text uses forms outside this fragment, such
+as `while` loops, storage access, external calls, lambdas, generic functions
+and multi-file module bundles.
 
 ## Executable checks
 
@@ -291,3 +331,17 @@ missing arguments, an undeclared method, `= =` in place of `==`, an
 unparenthesized operator, an undeclared local, a mistyped declaration, a call
 to an undeclared helper and a literal of `2^256` are all rejected rather than
 given a value.
+
+[SourceAggregateMeaning](../../Solcore/Test/SourceAggregateMeaning.lean) is
+registered as well. It runs actual `Aggregate.emit` output through `sourceCall`
+at the same eight boundary inputs and compares it with Core. It covers the six
+graphs of the aggregate emitter's regression, the ten `if` and `case` joins at
+Word, Boolean, Unit, pair and sum targets, the four aggregate case templates,
+eighteen raw primitive bodies inside and around pairs, sums and cells, and the
+first 24 generated aggregate graphs with a 256-node budget. The regression
+graphs, joins and templates also match hand-known formulas. Each text must
+reparse, print back to itself and import the aliases exactly when a body uses
+one. A sum match with two `inr` cases, a payload used after its case, a sum
+match on a word, a pair with a Boolean component, a pair assigned to a word, a
+call to an alias that is not imported, and a primitive text without its import
+line are all rejected.

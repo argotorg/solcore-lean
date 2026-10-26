@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph and private-mutation emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation and aggregate emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree and a first expression subset for named rows; remaining expression forms and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -586,9 +586,23 @@ private mutable Word locals live in the Core store. Each source `sc_c<n>` local
 holds the Word of its Core cell, every read is copied before a later write, and
 helpers keep their caller's store. Because such a program ends with its cells
 in the store, the result is stated for some final store that every completed
-run reaches. The aggregate, loop, storage, call, closure, generic, comptime and
-module emitters are not covered. Aggregates need a larger source grammar, and
-the loop emitters build on the aggregate renderer.
+run reaches.
+
+`Aggregate.emit_source_meaning` covers the `runtime-aggregates` emitter with
+the same store-aware statement. The source grammar and semantics now include
+`(word, word)` pairs, `sum<word, word>` with `inl` and `inr`, the pair match
+printed for projections and the sum match with a payload in each case scope.
+A match evaluates its scrutinee once. Pairs, `sum`, `inl` and `inr` are
+frontend builtins, whose assumed meaning cites the pinned name resolver. The
+proof relates Core pairs and sums to source pairs and tagged sums, binds each
+Core `case` payload in the selected case scope under a fresh name, and extends
+the mutation invariant for cells, helper calls and raw opcode operands. The
+file imports the raw aliases only when a rendered body uses one, and the proof
+needs the alias call context only for such bodies. The other emitters that
+render with the aggregate renderer (loops, generic, closures, comptime,
+modules, storage, storage rollback, keyed storage, dynamic arrays and calls),
+`CallGraphLoopEmitter` and `AggregateCallGraphEmitter` are not covered; their
+text uses forms outside the source fragment.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -596,8 +610,15 @@ fixtures, four named-helper graphs, 39 raw primitive bodies, twenty call graphs
 and six mutation graphs at eight or more boundary inputs, and twenty generated
 programs, agree with Core. Fifty-four primitive and call-graph results and the
 mutation results also match hand-known Words. Malformed and meaningless texts,
-including calls to aliases that are not imported, are rejected. The full Lean
-build (9,951 jobs), registered tests and the semantic-kernel policy passed.
+including calls to aliases that are not imported, are rejected. The registered
+`SourceAggregateMeaning` test runs six aggregate regression graphs, ten `if`
+and `case` joins over every target, four templates, eighteen raw primitive
+bodies and 24 generated aggregate graphs at eight boundary inputs; all agree
+with Core, and the regression graphs, joins and templates also match
+hand-known formulas. Malformed aggregate texts, such as a payload used after
+its case or a primitive text without its alias import, are rejected. The full
+Lean build (9,994 jobs), registered tests and the semantic-kernel policy
+passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

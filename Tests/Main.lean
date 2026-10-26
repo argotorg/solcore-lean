@@ -2155,6 +2155,7 @@ import Solcore.Test.SourceDynamicArrayEmitter
 import Solcore.Test.SourceDynamicArrayCases
 import Solcore.Test.SourceDynamicArrayCorpus
 import Solcore.Test.SourceAggregatePrimitives
+import Solcore.Test.SourceAggregateMeaning
 set_option autoImplicit false
 
 open Solcore
@@ -4104,5 +4105,6 @@ def main : IO UInt32 := do
   Tests.SourceDynamicArrayCases.testSourceDynamicArrayCases
   Tests.SourceDynamicArrayCorpus.testSourceDynamicArrayCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
+  Tests.SourceAggregateMeaning.testSourceAggregateMeaning
   IO.println "solcore-lean tests passed"
   return 0
