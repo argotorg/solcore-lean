@@ -118,6 +118,12 @@ def Expr.pieces : Expr → List Piece
   | .typedefRep operand =>
       [word "Typedef", sym '.', word "rep", sym '('] ++ operand.pieces ++ [sym ')']
   | .uint256 operand => [word "uint256", sym '('] ++ operand.pieces ++ [sym ')']
+  | .call1 callee first => [word callee, sym '('] ++ first.pieces ++ [sym ')']
+  | .call2 callee first second =>
+      [word callee, sym '('] ++ first.pieces ++ [sym ',', space] ++ second.pieces ++ [sym ')']
+  | .call3 callee first second third =>
+      [word callee, sym '('] ++ first.pieces ++ [sym ',', space] ++ second.pieces ++
+        [sym ',', space] ++ third.pieces ++ [sym ')']
 
 theorem UnaryOp.spelling_toList (op : UnaryOp) : op.spelling.toList = op.token.chars := by
   cases op <;> rfl
@@ -143,6 +149,15 @@ theorem Expr.print_toList : (expression : Expr) → expression.print.toList = re
   | .uint256 operand => by
       simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
         Expr.print_toList operand]
+  | .call1 callee first => by
+      simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
+        Expr.print_toList first]
+  | .call2 callee first second => by
+      simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
+        space, Expr.print_toList first, Expr.print_toList second]
+  | .call3 callee first second third => by
+      simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
+        space, Expr.print_toList first, Expr.print_toList second, Expr.print_toList third]
 
 theorem Expr.tokensOf_pieces : (expression : Expr) → tokensOf expression.pieces = expression.tokens
   | .name identifier => rfl
@@ -160,6 +175,15 @@ theorem Expr.tokensOf_pieces : (expression : Expr) → tokensOf expression.piece
   | .uint256 operand => by
       simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word,
         Expr.tokensOf_pieces operand]
+  | .call1 callee first => by
+      simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word,
+        Expr.tokensOf_pieces first]
+  | .call2 callee first second => by
+      simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word, space,
+        Expr.tokensOf_pieces first, Expr.tokensOf_pieces second]
+  | .call3 callee first second third => by
+      simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word, space,
+        Expr.tokensOf_pieces first, Expr.tokensOf_pieces second, Expr.tokensOf_pieces third]
 
 def Expr.IdentifiersValid (expression : Expr) : Prop :=
   ∀ name ∈ expression.identifiers, ValidIdentifier name
@@ -234,6 +258,55 @@ theorem Expr.separated_append : (expression : Expr) → expression.IdentifiersVa
       simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
       refine Separated.cons_before (word_valid (ValidIdentifier.of_check (by decide)))
         (Separated.cons_sym (by decide) inner) ?_
+      intro next same
+      cases same
+      exact sym_safeLeft (by decide)
+  | .call1 callee first, valid, rest, separated, safe => by
+      have inner := Expr.separated_append first
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ')' :: rest) (Separated.cons_sym (by decide) separated)
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
+      refine Separated.cons_before (word_valid (valid callee (by simp [Expr.identifiers])))
+        (Separated.cons_sym (by decide) inner) ?_
+      intro next same
+      cases same
+      exact sym_safeLeft (by decide)
+  | .call2 callee first second, valid, rest, separated, safe => by
+      have secondPart := Expr.separated_append second
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ')' :: rest) (Separated.cons_sym (by decide) separated)
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      have firstPart := Expr.separated_append first
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ',' :: space :: (second.pieces ++ sym ')' :: rest))
+        (Separated.cons_sym (by decide) (Separated.cons_space secondPart))
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
+      refine Separated.cons_before (word_valid (valid callee (by simp [Expr.identifiers])))
+        (Separated.cons_sym (by decide) firstPart) ?_
+      intro next same
+      cases same
+      exact sym_safeLeft (by decide)
+  | .call3 callee first second third, valid, rest, separated, safe => by
+      have thirdPart := Expr.separated_append third
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ')' :: rest) (Separated.cons_sym (by decide) separated)
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      have secondPart := Expr.separated_append second
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ',' :: space :: (third.pieces ++ sym ')' :: rest))
+        (Separated.cons_sym (by decide) (Separated.cons_space thirdPart))
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      have firstPart := Expr.separated_append first
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ',' :: space :: (second.pieces ++ sym ',' :: space :: (third.pieces ++
+          sym ')' :: rest)))
+        (Separated.cons_sym (by decide) (Separated.cons_space secondPart))
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
+      refine Separated.cons_before (word_valid (valid callee (by simp [Expr.identifiers])))
+        (Separated.cons_sym (by decide) firstPart) ?_
       intro next same
       cases same
       exact sym_safeLeft (by decide)
@@ -464,12 +537,218 @@ theorem parameterPieces_separated : (parameters : List String) →
           (Separated.cons_sym (by decide) (Separated.cons_space tail))
           (head_sym (by decide))))) (head_sym (by decide))
 
+def typedParameterPieces : List (String × LocalType) → List Piece
+  | [] => []
+  | [parameter] => [word parameter.1, sym ':', space, word parameter.2.spelling]
+  | parameter :: next :: rest =>
+      [word parameter.1, sym ':', space, word parameter.2.spelling, sym ',', space] ++
+        typedParameterPieces (next :: rest)
+
+theorem typedParameterText_toList : (parameters : List (String × LocalType)) →
+    (FunctionDecl.parameterText parameters).toList = render (typedParameterPieces parameters)
+  | [] => rfl
+  | [parameter] => by
+      simp [FunctionDecl.parameterText, typedParameterPieces, render, Piece.chars, Token.chars,
+        word, sym, space]
+  | parameter :: next :: rest => by
+      have tail := typedParameterText_toList (next :: rest)
+      simp only [FunctionDecl.parameterText, List.map_cons] at tail ⊢
+      rw [String.intercalate_cons_cons, String.toList_append, String.toList_append, tail]
+      simp [typedParameterPieces, render, Piece.chars, Token.chars, word, sym, space]
+
+theorem typedParameterPieces_tokens : (parameters : List (String × LocalType)) →
+    tokensOf (typedParameterPieces parameters) = typedParameterTokens parameters
+  | [] => rfl
+  | [_] => rfl
+  | parameter :: next :: rest => by
+      simp [typedParameterPieces, typedParameterTokens, tokensOf, word, sym, space,
+        typedParameterPieces_tokens (next :: rest)]
+
+theorem typedParameterPieces_separated : (parameters : List (String × LocalType)) →
+    (∀ parameter ∈ parameters, ValidIdentifier parameter.1) →
+    ∀ rest, Separated rest → (∀ next ∈ rest.head?, next.SafeLeft) →
+    Separated (typedParameterPieces parameters ++ rest)
+  | [], _, _, separated, _ => separated
+  | [parameter], valid, rest, separated, safe => by
+      simp only [typedParameterPieces, List.cons_append, List.nil_append]
+      exact Separated.cons_word (valid parameter (by simp)) (Separated.cons_sym (by decide)
+        (Separated.cons_space (Separated.cons_word (LocalType.spelling_valid _) separated safe)))
+        (head_sym (by decide))
+  | parameter :: next :: more, valid, rest, separated, safe => by
+      have tail := typedParameterPieces_separated (next :: more)
+        (fun name mem => valid name (List.mem_cons_of_mem _ mem)) rest separated safe
+      simp only [typedParameterPieces, List.cons_append, List.nil_append]
+      exact Separated.cons_word (valid parameter (by simp)) (Separated.cons_sym (by decide)
+        (Separated.cons_space (Separated.cons_word (LocalType.spelling_valid _)
+          (Separated.cons_sym (by decide) (Separated.cons_space tail))
+          (head_sym (by decide))))) (head_sym (by decide))
+
+/-- One piece list per printed line of a free function. -/
+def FunctionDecl.linePieces (function : FunctionDecl) : List (List Piece) :=
+  [[word "function", space, word function.name, sym '('] ++
+      typedParameterPieces function.parameters ++
+      [sym ')', space, word "returns", space, sym '(', word function.resultType.spelling,
+        sym ')', space, sym '{']] ++
+    Stmt.listLinePieces 4 function.body ++
+    [blanks 4 ++ [word "return", space] ++ function.result.pieces ++ [sym ';'], [sym '}'], []]
+
+theorem FunctionDecl.lines_toList (function : FunctionDecl) :
+    function.lines.map String.toList = function.linePieces.map render := by
+  simp [FunctionDecl.lines, FunctionDecl.linePieces, Stmt.listLines_toList,
+    typedParameterText_toList, Expr.print_toList, render_append, render_blanks, render,
+    Piece.chars, Token.chars, word, sym, space]
+
+theorem FunctionDecl.linePieces_tokens (function : FunctionDecl) :
+    (function.linePieces.map tokensOf).flatten = function.tokens := by
+  simp [FunctionDecl.linePieces, FunctionDecl.tokens, Stmt.listLinePieces_tokens,
+    typedParameterPieces_tokens, Expr.tokensOf_pieces, tokensOf_append, tokensOf_blanks,
+    tokensOf, word, sym, space]
+
+theorem FunctionDecl.linePieces_separated (function : FunctionDecl)
+    (valid : ∀ name ∈ function.identifiers, ValidIdentifier name) :
+    ∀ line ∈ function.linePieces, Separated line := by
+  have nameValid : ValidIdentifier function.name :=
+    valid function.name (by simp [FunctionDecl.identifiers])
+  have parametersValid : ∀ parameter ∈ function.parameters, ValidIdentifier parameter.1 :=
+    fun parameter mem => valid parameter.1 (by
+      simp only [FunctionDecl.identifiers]
+      exact List.mem_append_left _ (List.mem_append_left _
+        (List.mem_cons_of_mem _ (List.mem_map_of_mem mem))))
+  have bodyValid : ∀ name ∈ Stmt.listIdentifiers function.body, ValidIdentifier name :=
+    fun name mem => valid name (by simp [FunctionDecl.identifiers, mem])
+  have resultValid : function.result.IdentifiersValid :=
+    fun name mem => valid name (by simp [FunctionDecl.identifiers, mem])
+  intro line mem
+  simp only [FunctionDecl.linePieces, List.mem_append, List.mem_cons, List.not_mem_nil,
+    or_false] at mem
+  rcases mem with (same | mem) | same | same | same
+  · subst same
+    have parametersPart := typedParameterPieces_separated function.parameters parametersValid
+      [sym ')', space, word "returns", space, sym '(', word function.resultType.spelling,
+        sym ')', space, sym '{']
+      (Separated.cons_sym (by decide) (Separated.cons_space (Separated.cons_word
+        (keyword_valid (by decide)) (Separated.cons_space (Separated.cons_sym (by decide)
+          (Separated.cons_word (LocalType.spelling_valid _) (Separated.cons_sym (by decide)
+            (Separated.cons_space (sym_valid (by decide)))) (head_sym (by decide)))))
+        head_space)))
+      (head_sym (by decide))
+    simp only [List.cons_append, List.nil_append]
+    exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
+      (Separated.cons_word nameValid (Separated.cons_sym (by decide) parametersPart)
+        (head_sym (by decide)))) head_space
+  · exact Stmt.listLinePieces_separated 4 function.body bodyValid line mem
+  · subst same
+    have resultPart := Expr.separated_append function.result resultValid [sym ';']
+      (sym_valid (by decide)) (head_sym (by decide))
+    simp only [List.append_assoc, List.cons_append, List.nil_append]
+    exact Separated.blanks_append 4 (Separated.cons_word (keyword_valid (by decide))
+      (Separated.cons_space resultPart) head_space)
+  · subst same
+    exact sym_valid (by decide)
+  · subst same
+    trivial
+
+def aliasPieces : List (String × String) → List Piece
+  | [] => []
+  | [alias] => [word alias.1, space, word "as", space, word alias.2]
+  | alias :: next :: rest =>
+      [word alias.1, space, word "as", space, word alias.2, sym ',', space] ++
+        aliasPieces (next :: rest)
+
+theorem aliasText_toList : (aliases : List (String × String)) →
+    (String.intercalate ", " (aliases.map fun alias => alias.1 ++ " as " ++ alias.2)).toList =
+      render (aliasPieces aliases)
+  | [] => rfl
+  | [alias] => by
+      simp [aliasPieces, render, Piece.chars, Token.chars, word, space]
+  | alias :: next :: rest => by
+      have tail := aliasText_toList (next :: rest)
+      simp only [List.map_cons] at tail ⊢
+      rw [String.intercalate_cons_cons, String.toList_append, String.toList_append, tail]
+      simp [aliasPieces, render, Piece.chars, Token.chars, word, sym, space]
+
+theorem aliasPieces_tokens : (aliases : List (String × String)) →
+    tokensOf (aliasPieces aliases) = aliasTokens aliases
+  | [] => rfl
+  | [_] => rfl
+  | alias :: next :: rest => by
+      simp [aliasPieces, aliasTokens, tokensOf, word, sym, space,
+        aliasPieces_tokens (next :: rest)]
+
+theorem aliasPieces_separated : (aliases : List (String × String)) →
+    (∀ alias ∈ aliases, ValidIdentifier alias.1 ∧ ValidIdentifier alias.2) →
+    ∀ rest, Separated rest → (∀ next ∈ rest.head?, next.SafeLeft) →
+    Separated (aliasPieces aliases ++ rest)
+  | [], _, _, separated, _ => separated
+  | [alias], valid, rest, separated, safe => by
+      obtain ⟨opcodeValid, aliasValid⟩ := valid alias (by simp)
+      simp only [aliasPieces, List.cons_append, List.nil_append]
+      exact Separated.cons_word opcodeValid (Separated.cons_space (Separated.cons_word
+        (keyword_valid (by decide)) (Separated.cons_space (Separated.cons_word aliasValid
+          separated safe)) head_space)) head_space
+  | alias :: next :: more, valid, rest, separated, safe => by
+      obtain ⟨opcodeValid, aliasValid⟩ := valid alias (by simp)
+      have tail := aliasPieces_separated (next :: more)
+        (fun other mem => valid other (List.mem_cons_of_mem _ mem)) rest separated safe
+      simp only [aliasPieces, List.cons_append, List.nil_append]
+      exact Separated.cons_word opcodeValid (Separated.cons_space (Separated.cons_word
+        (keyword_valid (by decide)) (Separated.cons_space (Separated.cons_word aliasValid
+          (Separated.cons_sym (by decide) (Separated.cons_space tail))
+          (head_sym (by decide)))) head_space)) head_space
+
+def aliasImportLinePieces : List (String × String) → List (List Piece)
+  | [] => []
+  | alias :: rest =>
+      [[word "import", space, sym '{', space] ++ aliasPieces (alias :: rest) ++
+        [space, sym '}', space, word "from", space, word "std", sym '.', word "opcodes",
+          sym ';']]
+
+theorem aliasImportLines_toList (aliases : List (String × String)) :
+    (aliasImportLines aliases).map String.toList = (aliasImportLinePieces aliases).map render := by
+  cases aliases with
+  | nil => rfl
+  | cons alias rest =>
+      simp only [aliasImportLines, aliasImportLinePieces, List.map_cons, List.map_nil,
+        List.cons.injEq, and_true]
+      rw [aliasImportLine, String.toList_append, String.toList_append, aliasText_toList]
+      simp [render_append, render, Piece.chars, Token.chars, word, sym, space]
+
+theorem aliasImportLinePieces_tokens (aliases : List (String × String)) :
+    ((aliasImportLinePieces aliases).map tokensOf).flatten = aliasImportTokens aliases := by
+  cases aliases with
+  | nil => rfl
+  | cons alias rest =>
+      simp [aliasImportLinePieces, aliasImportTokens, tokensOf_append, aliasPieces_tokens,
+        tokensOf, word, sym, space]
+
+theorem aliasImportLinePieces_separated (aliases : List (String × String))
+    (valid : ∀ alias ∈ aliases, ValidIdentifier alias.1 ∧ ValidIdentifier alias.2) :
+    ∀ line ∈ aliasImportLinePieces aliases, Separated line := by
+  cases aliases with
+  | nil => intro line mem; cases mem
+  | cons alias rest =>
+      intro line mem
+      simp only [aliasImportLinePieces, List.mem_singleton] at mem
+      subst mem
+      have aliasesPart := aliasPieces_separated (alias :: rest) valid
+        [space, sym '}', space, word "from", space, word "std", sym '.', word "opcodes", sym ';']
+        (Separated.cons_space (Separated.cons_sym (by decide) (Separated.cons_space
+          (Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
+            (Separated.cons_word (keyword_valid (by decide)) (Separated.cons_sym (by decide)
+              (Separated.cons_word (keyword_valid (by decide)) (sym_valid (by decide))
+                (head_sym (by decide)))) (head_sym (by decide)))) head_space))))
+        head_space
+      simp only [List.cons_append, List.nil_append]
+      exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
+        (Separated.cons_sym (by decide) (Separated.cons_space aliasesPart))) head_space
+
 def SourceFile.linePieces (file : SourceFile) : List (List Piece) :=
   [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
-      word "dispatch", sym ';'],
-    [],
-    [word "contract", space, word file.contract, space, sym '{'],
+      word "dispatch", sym ';']] ++
+  aliasImportLinePieces file.opcodeAliases ++ [[]] ++
+  file.functions.flatMap FunctionDecl.linePieces ++
+  [[word "contract", space, word file.contract, space, sym '{'],
     blanks 4 ++ [word "function", space, word file.method.name, sym '('] ++
       parameterPieces file.method.parameters ++
       [sym ')', space, word "public", space, word "returns", space, sym '(', word "uint256",
@@ -478,32 +757,55 @@ def SourceFile.linePieces (file : SourceFile) : List (List Piece) :=
   [blanks 8 ++ [word "return", space] ++ file.method.result.pieces ++ [sym ';'],
     blanks 4 ++ [sym '}'], [sym '}']]
 
+theorem functions_lines_toList (functions : List FunctionDecl) :
+    (functions.flatMap FunctionDecl.lines).map String.toList =
+      (functions.flatMap FunctionDecl.linePieces).map render := by
+  induction functions with
+  | nil => rfl
+  | cons function rest ih =>
+      simp only [List.flatMap_cons, List.map_append, ih, FunctionDecl.lines_toList]
+
+theorem functions_linePieces_tokens (functions : List FunctionDecl) :
+    ((functions.flatMap FunctionDecl.linePieces).map tokensOf).flatten =
+      functions.flatMap FunctionDecl.tokens := by
+  induction functions with
+  | nil => rfl
+  | cons function rest ih =>
+      simp only [List.flatMap_cons, List.map_append, List.flatten_append, ih,
+        FunctionDecl.linePieces_tokens]
+
 theorem SourceFile.lines_toList (file : SourceFile) :
     file.lines.map String.toList = file.linePieces.map render := by
-  simp [SourceFile.lines, SourceFile.linePieces, Stmt.listLines_toList, parameterText_toList,
-    Expr.print_toList, render_append, render_blanks, render, Piece.chars, Token.chars, word, sym,
-    space]
+  simp only [SourceFile.lines, SourceFile.linePieces, List.map_append, aliasImportLines_toList,
+    functions_lines_toList]
+  simp [Stmt.listLines_toList, parameterText_toList, Expr.print_toList, render_append,
+    render_blanks, render, Piece.chars, Token.chars, word, sym, space]
 
 theorem SourceFile.linePieces_tokens (file : SourceFile) :
     (file.linePieces.map tokensOf).flatten = file.tokens := by
-  simp [SourceFile.linePieces, SourceFile.tokens, headerTokens, signatureTokens,
-    Stmt.listLinePieces_tokens, parameterPieces_tokens, Expr.tokensOf_pieces, tokensOf_append,
-    tokensOf_blanks, tokensOf, word, sym, space]
+  simp only [SourceFile.linePieces, SourceFile.tokens, List.map_append, List.flatten_append,
+    aliasImportLinePieces_tokens, functions_linePieces_tokens]
+  simp [importTokens, signatureTokens, Stmt.listLinePieces_tokens, parameterPieces_tokens,
+    Expr.tokensOf_pieces, tokensOf_append, tokensOf_blanks, tokensOf, word, sym, space]
 
 /-- Every identifier of the file is lexically valid. -/
 def SourceFile.IdentifiersValid (file : SourceFile) : Prop :=
-  ValidIdentifier file.contract ∧ ValidIdentifier file.method.name ∧
+  (∀ alias ∈ file.opcodeAliases, ValidIdentifier alias.1 ∧ ValidIdentifier alias.2) ∧
+    (∀ function ∈ file.functions, ∀ name ∈ function.identifiers, ValidIdentifier name) ∧
+    ValidIdentifier file.contract ∧ ValidIdentifier file.method.name ∧
     (∀ parameter ∈ file.method.parameters, ValidIdentifier parameter) ∧
     (∀ name ∈ Stmt.listIdentifiers file.method.body, ValidIdentifier name) ∧
     (∀ name ∈ file.method.result.identifiers, ValidIdentifier name)
 
 theorem SourceFile.linePieces_separated (file : SourceFile) (valid : file.IdentifiersValid) :
     ∀ line ∈ file.linePieces, Separated line := by
-  obtain ⟨contractValid, methodValid, parametersValid, bodyValid, resultValid⟩ := valid
+  obtain ⟨aliasesValid, functionsValid, contractValid, methodValid, parametersValid, bodyValid,
+    resultValid⟩ := valid
   intro line mem
   simp only [SourceFile.linePieces, List.mem_append, List.mem_cons, List.not_mem_nil,
-    or_false] at mem
-  rcases mem with ((same | same | same | same | same) | mem) | (same | same | same)
+    or_false, List.mem_flatMap] at mem
+  rcases mem with ((((((same | same) | mem) | same) | ⟨function, functionMem, mem⟩) |
+    (same | same)) | mem) | (same | same | same)
   · subst same
     exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
       (Separated.cons_sym (by decide) (Separated.cons_space (Separated.cons_word
@@ -517,8 +819,11 @@ theorem SourceFile.linePieces_separated (file : SourceFile) (valid : file.Identi
           (keyword_valid (by decide)) (Separated.cons_sym (by decide) (Separated.cons_word
             (keyword_valid (by decide)) (sym_valid (by decide)) (head_sym (by decide))))
           (head_sym (by decide)))) head_space)))) head_space
+  · exact aliasImportLinePieces_separated file.opcodeAliases aliasesValid line mem
   · subst same
     trivial
+  · exact FunctionDecl.linePieces_separated function (functionsValid function functionMem) line
+      mem
   · subst same
     exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
       (Separated.cons_word contractValid (Separated.cons_space (sym_valid (by decide)))

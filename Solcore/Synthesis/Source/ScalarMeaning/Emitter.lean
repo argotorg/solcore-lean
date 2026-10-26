@@ -18,12 +18,16 @@ open Solcore.Synthesis.Core (CheckedWordProgram CheckedWordFunction)
 
 /-- The file printed by the closed G0 wrapper around rendered statements. -/
 def closedFile (body : List Stmt) (value : String) : SourceFile := {
+  opcodeAliases := []
+  functions := []
   contract := "SynthesizedG0"
   method := { name := "run", parameters := [], body, result := .uint256 (.name value) } }
 
 /-- The file printed by the runtime-input wrapper. The ABI input is converted
 to a `word` once, and that word is the outermost rendered local. -/
 def inputFile (body : List Stmt) (value : String) : SourceFile := {
+  opcodeAliases := []
+  functions := []
   contract := "SynthesizedInput"
   method := {
     name := "run"
@@ -48,8 +52,8 @@ theorem inputFile_body_lines (statements : List Stmt) (value : String) :
   apply String.toList_inj.mp
   simp [indentLine, Expr.print, LocalType.spelling]
 
-theorem input_declaration (input : Nat) :
-    Stmt.exec [[], [("input", .uint256 input)]]
+theorem input_declaration (context : Context) (input : Nat) :
+    Stmt.exec context [[], [("input", .uint256 input)]]
       (.letDecl "sc_input" .word (.typedefRep (.name "input"))) =
       some [[("sc_input", .word input)], [("input", .uint256 input)]] := by
   simp [Stmt.exec, Expr.eval, Frames.lookup, Scope.get?, LocalType.admits, Frames.declare]
@@ -138,6 +142,20 @@ theorem rendered_name_ok {locals : List String} {name : String} {first last : Na
   · exact localsOk name mem
   · exact ⟨temporary_valid index, temporary_not_reserved index⟩
 
+/-- Every identifier used by rendered statements is a local, a helper name or
+a temporary. -/
+theorem rendered_identifier_ok {locals functions : List String} {name : String}
+    {first last : Nat}
+    (localsOk : ∀ local_ ∈ locals, ValidIdentifier local_ ∧ isReserved local_ = false)
+    (functionsOk : ∀ function ∈ functions, ValidIdentifier function ∧
+      isReserved function = false)
+    (classified : name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first last name) :
+    ValidIdentifier name ∧ isReserved name = false := by
+  rcases classified with mem | mem | ⟨index, rfl, _, _⟩
+  · exact localsOk name mem
+  · exact functionsOk name mem
+  · exact ⟨temporary_valid index, temporary_not_reserved index⟩
+
 /-- **Closed G0 emitter preservation.** If the actual emitter succeeds, its
 source text is the printing of a source file and parses back to it. Calling
 `run()` under the independent source semantics returns exactly the Word that
@@ -149,37 +167,43 @@ theorem emit_preserves_meaning {program : CheckedWordProgram} {emitted : Emitted
       file.call "run" [] = some word.val ∧ CoreReturns program.program.toCore word := by
   obtain ⟨body, rendered, source⟩ := emit_success emitted_eq
   obtain ⟨statements, lines, _, valueName, names, simulates⟩ :=
-    render_spec program.program.body 0 .word [] 8 0 body program.fragment rendered
+    render_spec program.program.body [] 0 0 .word [] 8 0 body
+      (acceptsAt_functionAcceptsAt _ 0 program.fragment) rendered
       (fun _ absent => absurd absent List.not_mem_nil)
   obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
-    simulates [] [] [] [[]] (fun index name found => by simp at found)
+    simulates (closedFile statements body.value).context [] [] [] [[]]
+      (fun index name found => by simp at found) (by simp) (fun _ _ found => by simp at found)
   obtain ⟨word, rfl, rfl⟩ := represents
   have localsOk : ∀ local_ ∈ ([] : List String), ValidIdentifier local_ ∧
       isReserved local_ = false := fun _ absent => absurd absent List.not_mem_nil
+  have bodyOk := fun name mem => rendered_identifier_ok localsOk localsOk (names name mem)
   have printed : emitted.source = (closedFile statements body.value).print := by
     rw [source, SourceFile.print, SourceFile.lines, lines]
     apply string_eq_of_toList
-    simp [closedFile, Method.parameterText, methodName, contractName, Expr.print]
+    simp [closedFile, aliasImportLines, Method.parameterText, methodName, contractName,
+      Expr.print]
   have valueOk := rendered_name_ok localsOk valueName
   have parsed : parseSource emitted.source = some (closedFile statements body.value) := by
     rw [printed]
     apply parseSource_print
-    · refine ⟨rfl, rfl, fun _ absent => absurd absent List.not_mem_nil,
-        fun name mem => (rendered_name_ok localsOk (names name mem)).2, ?_⟩
+    · refine ⟨fun _ absent => absurd absent List.not_mem_nil, rfl, rfl,
+        fun _ absent => absurd absent List.not_mem_nil, fun name mem => (bodyOk name mem).2, ?_⟩
       intro name mem
       simp only [closedFile, Expr.identifiers, List.mem_singleton] at mem
       subst mem
       exact valueOk.2
-    · refine ⟨keyword_valid (show validIdentifier "SynthesizedG0" = true by decide),
-        keyword_valid (show validIdentifier "run" = true by decide),
+    · refine ⟨fun _ absent => absurd absent List.not_mem_nil,
         fun _ absent => absurd absent List.not_mem_nil,
-        fun name mem => (rendered_name_ok localsOk (names name mem)).1, ?_⟩
+        keyword_valid (show validIdentifier "SynthesizedG0" = true by decide),
+        keyword_valid (show validIdentifier "run" = true by decide),
+        fun _ absent => absurd absent List.not_mem_nil, fun name mem => (bodyOk name mem).1, ?_⟩
       intro name mem
       simp only [closedFile, Expr.identifiers, List.mem_singleton] at mem
       subst mem
       exact valueOk.1
   refine ⟨closedFile statements body.value, word, printed, parsed, ?_,
     runStateful_of_evaluates evaluates⟩
+  simp only [closedFile] at exec
   simp [closedFile, SourceFile.call, Method.run, Method.bindParameters, exec, Expr.eval, lookup]
 
 /-- **Closed G0 emitter preservation, on the emitted text.** -/
@@ -209,7 +233,8 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     subst mem
     exact absurd same (input_not_temporary index)
   obtain ⟨statements, lines, _, valueName, names, simulates⟩ :=
-    render_spec function.body 1 .word ["sc_input"] 8 0 body function.fragment rendered fresh
+    render_spec function.body [] 1 0 .word ["sc_input"] 8 0 body
+      (acceptsAt_functionAcceptsAt _ 0 function.fragment) rendered fresh
   have localsOk : ∀ local_ ∈ ["sc_input"], ValidIdentifier local_ ∧
       isReserved local_ = false := by
     intro local_ mem
@@ -230,7 +255,7 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
       simp [inputFile, Expr.print]
     rw [source, SourceFile.print, SourceFile.lines, lines, inputFile_body_lines, functionLine,
       returnLine]
-    rfl
+    simp [inputFile, aliasImportLines, Input.contractName]
   have valueOk := rendered_name_ok localsOk valueName
   have bodyNames : ∀ name ∈ Stmt.listIdentifiers (inputFile statements body.value).method.body,
       ValidIdentifier name ∧ isReserved name = false := by
@@ -240,11 +265,13 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     rcases mem with rfl | rfl | mem
     · exact ⟨keyword_valid (by decide), by decide⟩
     · exact ⟨keyword_valid (by decide), by decide⟩
-    · exact rendered_name_ok localsOk (names name mem)
+    · exact rendered_identifier_ok localsOk (fun _ absent => absurd absent List.not_mem_nil)
+        (names name mem)
   have parsed : parseSource emitted.source = some (inputFile statements body.value) := by
     rw [printed]
     apply parseSource_print
-    · refine ⟨rfl, rfl, ?_, fun name mem => (bodyNames name mem).2, ?_⟩
+    · refine ⟨fun _ absent => absurd absent List.not_mem_nil, rfl, rfl, ?_,
+        fun name mem => (bodyNames name mem).2, ?_⟩
       · intro parameter mem
         simp only [inputFile, List.mem_singleton] at mem
         subst mem
@@ -253,7 +280,9 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
         simp only [inputFile, Expr.identifiers, List.mem_singleton] at mem
         subst mem
         exact valueOk.2
-    · refine ⟨keyword_valid (show validIdentifier "SynthesizedInput" = true by decide),
+    · refine ⟨fun _ absent => absurd absent List.not_mem_nil,
+        fun _ absent => absurd absent List.not_mem_nil,
+        keyword_valid (show validIdentifier "SynthesizedInput" = true by decide),
         keyword_valid (show validIdentifier "run" = true by decide), ?_,
         fun name mem => (bodyNames name mem).1, ?_⟩
       · intro parameter mem
@@ -276,8 +305,9 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
         exact ⟨input, rfl, by simp [Frames.lookup, Scope.get?]⟩
     | succ index => simp at found
   obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
-    simulates [.word input] [] [("sc_input", .word input.val)] [[("input", .uint256 input.val)]]
-      agree
+    simulates (inputFile statements body.value).context [.word input] []
+      [("sc_input", .word input.val)] [[("input", .uint256 input.val)]] agree (by simp)
+      (fun _ _ found => by simp at found)
   obtain ⟨word, rfl, rfl⟩ := represents
   have applied : Solcore.Core.Evaluates [] []
       (function.instantiate input).toCore.body (.word word) [] := by
@@ -289,11 +319,13 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
   have parameters : Method.bindParameters ["input"] [input.val] =
       some [("input", .uint256 input.val)] := by
     simp [Method.bindParameters, word_lt_modulus]
-  have execBody : Stmt.execList [[], [("input", .uint256 input.val)]]
+  have execBody : Stmt.execList (inputFile statements body.value).context
+      [[], [("input", .uint256 input.val)]]
       (.letDecl "sc_input" .word (.typedefRep (.name "input")) :: statements) =
         some (scope' :: outer') := by
     simp only [Stmt.execList, input_declaration]
     exact exec
+  simp only [inputFile] at execBody
   simp [SourceFile.call, Method.run, parameters, execBody, inputFile, Expr.eval, lookup]
 
 /-- **Runtime-input emitter preservation, on the emitted text.** -/

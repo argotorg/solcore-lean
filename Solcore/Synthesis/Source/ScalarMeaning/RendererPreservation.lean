@@ -1,25 +1,51 @@
 import Solcore.Synthesis.Source.ScalarMeaning.Renderer
 
 /-! Per-constructor simulation lemmas and the structural induction over the
-actual scalar renderer. -/
+actual scalar renderer, including direct calls to earlier helpers. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.ScalarMeaning
 
-open Solcore.Synthesis.Core (Target acceptsAt)
+open Solcore.Synthesis.Core (Target acceptsAt functionAcceptsAt)
 open Solcore.Synthesis.Source.ScalarRenderer (Rendered)
+
+theorem classified_mono {locals : List String} {first last first' last' : Nat} {name : String}
+    (classified : name ∈ locals ∨ AllocatedIn first last name) (low : first' ≤ first)
+    (high : last ≤ last') : name ∈ locals ∨ AllocatedIn first' last' name := by
+  rcases classified with mem | allocated
+  · exact Or.inl mem
+  · exact Or.inr (allocated_mono allocated low high)
+
+theorem named_mono {locals functions : List String} {first last first' last' : Nat}
+    {name : String} (named : name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first last name)
+    (low : first' ≤ first) (high : last ≤ last') :
+    name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first' last' name := by
+  rcases named with mem | mem | allocated
+  · exact Or.inl mem
+  · exact Or.inr (Or.inl mem)
+  · exact Or.inr (Or.inr (allocated_mono allocated low high))
+
+theorem named_of_classified {locals functions : List String} {first last first' last' : Nat}
+    {name : String} (classified : name ∈ locals ∨ AllocatedIn first last name)
+    (low : first' ≤ first) (high : last ≤ last') :
+    name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first' last' name := by
+  rcases classified with mem | allocated
+  · exact Or.inl mem
+  · exact Or.inr (Or.inr (allocated_mono allocated low high))
 
 /-- One declaration of a fresh temporary initialized from a closed source
 expression. -/
 private theorem declare_simulates {expression : CoreExpr} {target : Target}
-    {locals : List String} {first : Nat} {initializer : Expr} {core : CoreValue} {value : Value}
+    {functions locals : List String} {first : Nat} {initializer : Expr} {core : CoreValue}
+    {value : Value}
     (evaluates : ∀ (environment : Solcore.Core.Environment) (store : Solcore.Core.Store),
       Solcore.Core.Evaluates environment store expression.toCore core store)
     (represents : Represents target core value)
-    (initialized : ∀ frames : Frames, initializer.eval frames = some value) :
-    Simulates expression target locals first (first + 1)
+    (initialized : ∀ (context : Context) (frames : Frames),
+      initializer.eval context frames = some value) :
+    Simulates expression target functions locals first (first + 1)
       [.letDecl (temporary first) (LocalType.ofTarget target) initializer] (temporary first) := by
-  intro environment store scope outer _
+  intro context environment store scope outer _ _ _
   refine ⟨core, value, (temporary first, value) :: scope, outer, [temporary first],
     evaluates environment store, represents, ?_, ?_, ?_, rfl, rfl, ?_⟩
   · simp [Stmt.execList, Stmt.exec, initialized, represents.admits, Frames.declare]
@@ -34,11 +60,11 @@ private theorem declare_simulates {expression : CoreExpr} {target : Target}
     exact allocated_temporary (Nat.le_refl first) (Nat.lt_succ_self first)
 
 theorem renderIH_word (value : Solcore.Core.Word) : RenderIH (.word value) := by
-  intro depth target locals indent first rendered accepted equation _
+  intro functions depth prior target locals indent first rendered accepted equation _
   have targetWord : target = .word := by
     cases target
     · rfl
-    · simp [acceptsAt, target_beq_iff] at accepted
+    · simp [functionAcceptsAt, target_beq_iff] at accepted
   subst targetWord
   rw [RendererEquations.word] at equation
   cases equation
@@ -48,16 +74,16 @@ theorem renderIH_word (value : Solcore.Core.Word) : RenderIH (.word value) := by
   · intro name mem
     simp [Stmt.listIdentifiers, Stmt.identifiers, Expr.identifiers] at mem
     subst mem
-    exact Or.inr (allocated_temporary (Nat.le_refl first) (Nat.lt_succ_self first))
+    exact Or.inr (Or.inr (allocated_temporary (Nat.le_refl first) (Nat.lt_succ_self first)))
   · exact declare_simulates (target := .word)
       (fun _ _ => by simp only [Solcore.Core.Wire.Expr.toCore]; exact .word)
-      ⟨value, rfl, rfl⟩ (fun _ => by simp [Expr.eval, word_lt_modulus])
+      ⟨value, rfl, rfl⟩ (fun _ _ => by simp [Expr.eval, word_lt_modulus])
 
 theorem renderIH_bool (value : Bool) : RenderIH (.bool value) := by
-  intro depth target locals indent first rendered accepted equation _
+  intro functions depth prior target locals indent first rendered accepted equation _
   have targetBool : target = .bool := by
     cases target
-    · simp [acceptsAt, target_beq_iff] at accepted
+    · simp [functionAcceptsAt, target_beq_iff] at accepted
     · rfl
   subst targetBool
   rw [RendererEquations.bool] at equation
@@ -68,17 +94,17 @@ theorem renderIH_bool (value : Bool) : RenderIH (.bool value) := by
   · intro name mem
     simp [Stmt.listIdentifiers, Stmt.identifiers, Expr.identifiers] at mem
     subst mem
-    exact Or.inr (allocated_temporary (Nat.le_refl first) (Nat.lt_succ_self first))
+    exact Or.inr (Or.inr (allocated_temporary (Nat.le_refl first) (Nat.lt_succ_self first)))
   · exact declare_simulates (target := .bool)
       (fun _ _ => by simp only [Solcore.Core.Wire.Expr.toCore]; exact .bool)
-      ⟨value, rfl, rfl⟩ (fun _ => rfl)
+      ⟨value, rfl, rfl⟩ (fun _ _ => rfl)
 
 theorem renderIH_var (index : Nat) : RenderIH (.var index) := by
-  intro depth target locals indent first rendered accepted equation _
+  intro functions depth prior target locals indent first rendered accepted equation _
   have targetWord : target = .word := by
     cases target
     · rfl
-    · simp [acceptsAt, target_beq_iff] at accepted
+    · simp [functionAcceptsAt, target_beq_iff] at accepted
   subst targetWord
   rw [RendererEquations.var] at equation
   cases found : locals[index]? with
@@ -88,7 +114,7 @@ theorem renderIH_var (index : Nat) : RenderIH (.var index) := by
       subst equation
       refine ⟨[], rfl, Nat.le_refl first, Or.inl (List.mem_of_getElem? found),
         by simp [Stmt.listIdentifiers], ?_⟩
-      intro environment store scope outer agree
+      intro context environment store scope outer agree _ _
       obtain ⟨word, inEnvironment, lookup⟩ := agree index binding found
       refine ⟨.word word, .word word.val, scope, outer, [], ?_, ⟨word, rfl, rfl⟩, rfl, lookup,
         fun _ _ => rfl, rfl, rfl, by simp⟩
@@ -97,8 +123,8 @@ theorem renderIH_var (index : Nat) : RenderIH (.var index) := by
 
 theorem renderIH_letE {initializer body : CoreExpr} (initializerIH : RenderIH initializer)
     (bodyIH : RenderIH body) : RenderIH (.letE initializer body) := by
-  intro depth target locals indent first rendered accepted equation fresh
-  simp only [acceptsAt, Bool.and_eq_true] at accepted
+  intro functions depth prior target locals indent first rendered accepted equation fresh
+  simp only [functionAcceptsAt, Bool.and_eq_true] at accepted
   obtain ⟨initializerAccepted, bodyAccepted⟩ := accepted
   rw [RendererEquations.letE] at equation
   obtain ⟨value, valueEquation, equation⟩ := except_bind_eq_ok equation
@@ -108,7 +134,8 @@ theorem renderIH_letE {initializer body : CoreExpr} (initializerIH : RenderIH in
   dsimp only
   obtain ⟨initializerStatements, initializerLines, initializerLe, initializerValue,
     initializerNames, initializerSimulates⟩ :=
-    initializerIH depth .word locals indent first value initializerAccepted valueEquation fresh
+    initializerIH functions depth prior .word locals indent first value initializerAccepted
+      valueEquation fresh
   have bodyFresh : ∀ name ∈ temporary value.nextId :: locals,
       OlderThan (value.nextId + 1) name := by
     intro name mem
@@ -117,8 +144,8 @@ theorem renderIH_letE {initializer body : CoreExpr} (initializerIH : RenderIH in
       exact temporary_older value.nextId
     · exact older_mono (fresh name mem) (by omega)
   obtain ⟨bodyStatements, bodyLines, bodyLe, bodyValue, bodyNames, bodySimulates⟩ :=
-    bodyIH (depth + 1) target (temporary value.nextId :: locals) indent (value.nextId + 1) rest
-      bodyAccepted restEquation bodyFresh
+    bodyIH functions (depth + 1) prior target (temporary value.nextId :: locals) indent
+      (value.nextId + 1) rest bodyAccepted restEquation bodyFresh
   refine ⟨initializerStatements ++ [.letDecl (temporary value.nextId) .word (.name value.value)] ++
       bodyStatements, ?_, by omega, ?_, ?_, ?_⟩
   · simp only [Stmt.listLines_append, initializerLines, bodyLines, Stmt.listLines,
@@ -133,24 +160,21 @@ theorem renderIH_letE {initializer body : CoreExpr} (initializerIH : RenderIH in
       Stmt.identifiers, Expr.identifiers, List.append_nil, List.mem_cons,
       List.not_mem_nil, or_false] at mem
     rcases mem with (mem | same | same) | mem
-    · rcases initializerNames name mem with mem | allocated
-      · exact Or.inl mem
-      · exact Or.inr (allocated_mono allocated (Nat.le_refl _) (by omega))
-    · exact Or.inr ⟨value.nextId, same, initializerLe, by omega⟩
+    · exact named_mono (initializerNames name mem) (Nat.le_refl _) (by omega)
+    · exact Or.inr (Or.inr ⟨value.nextId, same, initializerLe, by omega⟩)
     · subst same
-      rcases initializerValue with mem | allocated
-      · exact Or.inl mem
-      · exact Or.inr (allocated_mono allocated (Nat.le_refl _) (by omega))
-    · rcases bodyNames name mem with mem | allocated
+      exact named_of_classified initializerValue (Nat.le_refl _) (by omega)
+    · rcases bodyNames name mem with mem | mem | allocated
       · rcases List.mem_cons.mp mem with same | mem
-        · exact Or.inr ⟨value.nextId, same, initializerLe, by omega⟩
+        · exact Or.inr (Or.inr ⟨value.nextId, same, initializerLe, by omega⟩)
         · exact Or.inl mem
-      · exact Or.inr (allocated_mono allocated (by omega) (Nat.le_refl _))
-  · intro environment store scope outer agree
+      · exact Or.inr (Or.inl mem)
+      · exact Or.inr (Or.inr (allocated_mono allocated (by omega) (Nat.le_refl _)))
+  · intro context environment store scope outer agree lengthOk functionsOk
     obtain ⟨initializerCore, initializerSource, scope₁, outer₁, added₁, initializerEvaluates,
       initializerRepresents, initializerExec, initializerLookup, initializerKeeps,
       initializerShape, initializerScope, initializerAdded⟩ :=
-      initializerSimulates environment store scope outer agree
+      initializerSimulates context environment store scope outer agree lengthOk functionsOk
     obtain ⟨word, rfl, rfl⟩ := initializerRepresents
     have keepsLocals : ∀ name ∈ locals,
         Frames.lookup (scope₁ :: outer₁) name = Frames.lookup (scope :: outer) name :=
@@ -178,8 +202,9 @@ theorem renderIH_letE {initializer body : CoreExpr} (initializerIH : RenderIH in
           exact lookup
     obtain ⟨bodyCore, bodySource, scope₂, outer₂, added₂, bodyEvaluates, bodyRepresents,
       bodyExec, bodyLookup, bodyKeeps, bodyShape, bodyScope, bodyAdded⟩ :=
-      bodySimulates (.word word :: environment) store
+      bodySimulates context (.word word :: environment) store
         ((temporary value.nextId, .word word.val) :: scope₁) outer₁ bodyAgree
+        (by simpa using lengthOk) (by simpa using functionsOk)
     refine ⟨bodyCore, bodySource, scope₂, outer₂, added₂ ++ temporary value.nextId :: added₁,
       ?_, bodyRepresents, ?_, bodyLookup, ?_, bodyShape.trans initializerShape, ?_, ?_⟩
     · simp only [Solcore.Core.Wire.Expr.toCore]
@@ -206,17 +231,25 @@ theorem renderIH_letE {initializer body : CoreExpr} (initializerIH : RenderIH in
       · exact ⟨value.nextId, same, initializerLe, by omega⟩
       · exact allocated_mono (initializerAdded name mem) (Nat.le_refl _) (by omega)
 
-
-theorem classified_mono {locals : List String} {first last first' last' : Nat} {name : String}
-    (classified : name ∈ locals ∨ AllocatedIn first last name) (low : first' ≤ first)
-    (high : last ≤ last') : name ∈ locals ∨ AllocatedIn first' last' name := by
-  rcases classified with mem | allocated
-  · exact Or.inl mem
-  · exact Or.inr (allocated_mono allocated low high)
+/-- After a fresh temporary receives a result, every name outside the
+allocated range keeps its earlier binding. -/
+private theorem result_keeps {first index : Nat} {scope₁ : Scope} {outer₁ : Frames}
+    {scope : Scope} {outer : Frames} {result : Value} (fresh : first ≤ index)
+    (keeps : ∀ name, ¬ AllocatedIn first index name →
+      Frames.lookup (scope₁ :: outer₁) name = Frames.lookup (scope :: outer) name) :
+    ∀ name, ¬ AllocatedIn first (index + 1) name →
+      Frames.lookup (((temporary index, result) :: scope₁) :: outer₁) name =
+        Frames.lookup (scope :: outer) name := by
+  intro name notAllocated
+  have notEarlier : ¬ AllocatedIn first index name := fun allocated =>
+    notAllocated (allocated_mono allocated (Nat.le_refl _) (by omega))
+  have different : temporary index ≠ name := fun same =>
+    notAllocated (same ▸ allocated_temporary fresh (Nat.lt_succ_self _))
+  rw [Frames.lookup_declared, if_neg different, keeps name notEarlier]
 
 theorem renderIH_unary {op : Solcore.Core.Wire.UnaryOp} {operand : CoreExpr}
     (operandIH : RenderIH operand) : RenderIH (.unary op operand) := by
-  intro depth target locals indent first rendered accepted equation fresh
+  intro functions depth prior target locals indent first rendered accepted equation fresh
   rw [RendererEquations.unary] at equation
   cases selected : sourceUnary? op with
   | none => simp [selected] at equation
@@ -229,7 +262,8 @@ theorem renderIH_unary {op : Solcore.Core.Wire.UnaryOp} {operand : CoreExpr}
     dsimp only
     obtain ⟨operandStatements, operandLines, operandLe, operandValue, operandNames,
       operandSimulates⟩ :=
-      operandIH depth _ locals indent first value operandAccepted valueEquation fresh
+      operandIH functions depth prior _ locals indent first value operandAccepted valueEquation
+        fresh
     refine ⟨operandStatements ++ [.letDecl (temporary value.nextId) (LocalType.ofTarget target)
         (.unary sourceOp (.name value.value))], ?_, by omega,
       Or.inr (allocated_temporary operandLe (Nat.lt_succ_self _)), ?_, ?_⟩
@@ -239,31 +273,27 @@ theorem renderIH_unary {op : Solcore.Core.Wire.UnaryOp} {operand : CoreExpr}
         Stmt.identifiers, Expr.identifiers, List.append_nil, List.mem_cons,
         List.not_mem_nil, or_false] at mem
       rcases mem with mem | same | same
-      · exact classified_mono (operandNames name mem) (Nat.le_refl _) (by omega)
-      · exact Or.inr ⟨value.nextId, same, operandLe, by omega⟩
+      · exact named_mono (operandNames name mem) (Nat.le_refl _) (by omega)
+      · exact Or.inr (Or.inr ⟨value.nextId, same, operandLe, by omega⟩)
       · subst same
-        exact classified_mono operandValue (Nat.le_refl _) (by omega)
-    · intro environment store scope outer agree
+        exact named_of_classified operandValue (Nat.le_refl _) (by omega)
+    · intro context environment store scope outer agree lengthOk functionsOk
       obtain ⟨operandCore, operandSource, scope₁, outer₁, added₁, operandEvaluates,
         operandRepresents, operandExec, operandLookup, operandKeeps, operandShape,
-        operandScope, operandAdded⟩ := operandSimulates environment store scope outer agree
+        operandScope, operandAdded⟩ :=
+        operandSimulates context environment store scope outer agree lengthOk functionsOk
       obtain ⟨coreResult, sourceResult, coreApply, sourceApply, resultRepresents⟩ :=
         unary_agree selected operandRepresents
       rw [← targetEq] at resultRepresents
       refine ⟨coreResult, sourceResult, (temporary value.nextId, sourceResult) :: scope₁, outer₁,
-        temporary value.nextId :: added₁, ?_, resultRepresents, ?_, ?_, ?_, operandShape, ?_, ?_⟩
+        temporary value.nextId :: added₁, ?_, resultRepresents, ?_, ?_,
+        result_keeps operandLe operandKeeps, operandShape, ?_, ?_⟩
       · simp only [Solcore.Core.Wire.Expr.toCore]
         exact .unary operandEvaluates coreApply
       · rw [Stmt.execList_append, operandExec]
         simp [Stmt.execList, Stmt.exec, Expr.eval, operandLookup, sourceApply,
           resultRepresents.admits, Frames.declare]
       · simp [Frames.lookup_declared]
-      · intro name notAllocated
-        have notOperand : ¬ AllocatedIn first value.nextId name := fun allocated =>
-          notAllocated (allocated_mono allocated (Nat.le_refl _) (by omega))
-        have different : temporary value.nextId ≠ name := fun same =>
-          notAllocated (same ▸ allocated_temporary operandLe (Nat.lt_succ_self _))
-        rw [Frames.lookup_declared, if_neg different, operandKeeps name notOperand]
       · rw [show Scope.names ((temporary value.nextId, sourceResult) :: scope₁) =
           temporary value.nextId :: scope₁.names from rfl, operandScope]
         simp
@@ -274,7 +304,7 @@ theorem renderIH_unary {op : Solcore.Core.Wire.UnaryOp} {operand : CoreExpr}
 
 theorem renderIH_binary {op : Solcore.Core.Wire.BinaryOp} {left right : CoreExpr}
     (leftIH : RenderIH left) (rightIH : RenderIH right) : RenderIH (.binary op left right) := by
-  intro depth target locals indent first rendered accepted equation fresh
+  intro functions depth prior target locals indent first rendered accepted equation fresh
   rw [RendererEquations.binary] at equation
   cases selected : sourceBinary? op with
   | none => simp [selected] at equation
@@ -287,12 +317,13 @@ theorem renderIH_binary {op : Solcore.Core.Wire.BinaryOp} {left right : CoreExpr
     unfold RenderSpec
     dsimp only
     obtain ⟨leftStatements, leftLines, leftLe, leftValueName, leftNames, leftSimulates⟩ :=
-      leftIH depth .word locals indent first leftValue leftAccepted leftEquation fresh
+      leftIH functions depth prior .word locals indent first leftValue leftAccepted leftEquation
+        fresh
     have rightFresh : ∀ name ∈ locals, OlderThan leftValue.nextId name :=
       fun name mem => older_mono (fresh name mem) leftLe
     obtain ⟨rightStatements, rightLines, rightLe, rightValueName, rightNames, rightSimulates⟩ :=
-      rightIH depth .word locals indent leftValue.nextId rightValue rightAccepted rightEquation
-        rightFresh
+      rightIH functions depth prior .word locals indent leftValue.nextId rightValue rightAccepted
+        rightEquation rightFresh
     refine ⟨leftStatements ++ rightStatements ++ [.letDecl (temporary rightValue.nextId)
         (LocalType.ofTarget target)
         (.binary sourceOp (.name leftValue.value) (.name rightValue.value))], ?_, by omega,
@@ -303,23 +334,23 @@ theorem renderIH_binary {op : Solcore.Core.Wire.BinaryOp} {left right : CoreExpr
         Stmt.identifiers, Expr.identifiers, List.append_nil, List.mem_cons,
         List.not_mem_nil, or_false] at mem
       rcases mem with (mem | mem) | same | same | same
-      · exact classified_mono (leftNames name mem) (Nat.le_refl _) (by omega)
-      · exact classified_mono (rightNames name mem) leftLe (by omega)
-      · exact Or.inr ⟨rightValue.nextId, same, by omega, by omega⟩
+      · exact named_mono (leftNames name mem) (Nat.le_refl _) (by omega)
+      · exact named_mono (rightNames name mem) leftLe (by omega)
+      · exact Or.inr (Or.inr ⟨rightValue.nextId, same, by omega, by omega⟩)
       · subst same
-        exact classified_mono leftValueName (Nat.le_refl _) (by omega)
+        exact named_of_classified leftValueName (Nat.le_refl _) (by omega)
       · subst same
-        exact classified_mono rightValueName leftLe (by omega)
-    · intro environment store scope outer agree
+        exact named_of_classified rightValueName leftLe (by omega)
+    · intro context environment store scope outer agree lengthOk functionsOk
       obtain ⟨leftCore, leftSource, scope₁, outer₁, added₁, leftEvaluates, leftRepresents,
         leftExec, leftLookup, leftKeeps, leftShape, leftScope, leftAdded⟩ :=
-        leftSimulates environment store scope outer agree
+        leftSimulates context environment store scope outer agree lengthOk functionsOk
       have rightAgree : LocalsAgree (scope₁ :: outer₁) locals environment :=
         agree.transfer fun name mem =>
           leftKeeps name (not_allocated_of_older (fresh name mem) (Nat.le_refl first))
       obtain ⟨rightCore, rightSource, scope₂, outer₂, added₂, rightEvaluates, rightRepresents,
         rightExec, rightLookup, rightKeeps, rightShape, rightScope, rightAdded⟩ :=
-        rightSimulates environment store scope₁ outer₁ rightAgree
+        rightSimulates context environment store scope₁ outer₁ rightAgree lengthOk functionsOk
       obtain ⟨leftWord, rfl, rfl⟩ := leftRepresents
       obtain ⟨rightWord, rfl, rfl⟩ := rightRepresents
       obtain ⟨coreResult, sourceResult, coreApply, sourceApply, resultRepresents⟩ :=
@@ -329,24 +360,22 @@ theorem renderIH_binary {op : Solcore.Core.Wire.BinaryOp} {left right : CoreExpr
           Frames.lookup (scope₂ :: outer₂) leftValue.value = some (.word leftWord.val) := by
         rw [rightKeeps _ (value_not_reallocated fresh leftLe leftValueName)]
         exact leftLookup
+      have keeps : ∀ name, ¬ AllocatedIn first rightValue.nextId name →
+          Frames.lookup (scope₂ :: outer₂) name = Frames.lookup (scope :: outer) name := by
+        intro name notAllocated
+        rw [rightKeeps name fun allocated =>
+            notAllocated (allocated_mono allocated leftLe (Nat.le_refl _)),
+          leftKeeps name fun allocated =>
+            notAllocated (allocated_mono allocated (Nat.le_refl _) rightLe)]
       refine ⟨coreResult, sourceResult, (temporary rightValue.nextId, sourceResult) :: scope₂,
         outer₂, temporary rightValue.nextId :: (added₂ ++ added₁), ?_, resultRepresents, ?_, ?_,
-        ?_, rightShape.trans leftShape, ?_, ?_⟩
+        result_keeps (by omega) keeps, rightShape.trans leftShape, ?_, ?_⟩
       · simp only [Solcore.Core.Wire.Expr.toCore]
         exact .binary leftEvaluates rightEvaluates coreApply
       · rw [Stmt.execList_append, Stmt.execList_append, leftExec]
         simp [Stmt.execList, Stmt.exec, Expr.eval, rightExec, leftSurvives, rightLookup,
           sourceApply, resultRepresents.admits, Frames.declare]
       · simp [Frames.lookup_declared]
-      · intro name notAllocated
-        have notLeft : ¬ AllocatedIn first leftValue.nextId name := fun allocated =>
-          notAllocated (allocated_mono allocated (Nat.le_refl _) (by omega))
-        have notRight : ¬ AllocatedIn leftValue.nextId rightValue.nextId name := fun allocated =>
-          notAllocated (allocated_mono allocated leftLe (by omega))
-        have different : temporary rightValue.nextId ≠ name := fun same =>
-          notAllocated (same ▸ allocated_temporary (by omega) (Nat.lt_succ_self _))
-        rw [Frames.lookup_declared, if_neg different, rightKeeps name notRight,
-          leftKeeps name notLeft]
       · rw [show Scope.names ((temporary rightValue.nextId, sourceResult) :: scope₂) =
           temporary rightValue.nextId :: scope₂.names from rfl, rightScope, leftScope]
         simp
@@ -357,28 +386,107 @@ theorem renderIH_binary {op : Solcore.Core.Wire.BinaryOp} {left right : CoreExpr
         · exact allocated_mono (rightAdded name mem) leftLe (by omega)
         · exact allocated_mono (leftAdded name mem) (Nat.le_refl _) (by omega)
 
+/-- A direct call to an earlier helper: the argument value is passed to the
+helper's denotation in the call context, as Core applies its closure. -/
+theorem renderIH_apply {index : Nat} {argument : CoreExpr} (argumentIH : RenderIH argument) :
+    RenderIH (.apply (.var index) argument) := by
+  intro functions depth prior target locals indent first rendered accepted equation fresh
+  simp only [functionAcceptsAt, Bool.and_eq_true, target_beq_iff] at accepted
+  obtain ⟨⟨targetWord, _⟩, argumentAccepted⟩ := accepted
+  subst targetWord
+  rw [RendererEquations.apply] at equation
+  by_cases rejected : (functions.isEmpty || decide (index < locals.length)) = true
+  · rw [if_pos rejected] at equation
+    cases equation
+  rw [if_neg rejected] at equation
+  have outside : locals.length ≤ index := by
+    simp only [Bool.or_eq_true, decide_eq_true_eq, not_or] at rejected
+    omega
+  cases found : functions[index - locals.length]? with
+  | none => simp [found] at equation
+  | some callee =>
+    simp only [found] at equation
+    obtain ⟨value, valueEquation, equation⟩ := except_bind_eq_ok equation
+    cases equation
+    unfold RenderSpec
+    dsimp only
+    obtain ⟨argumentStatements, argumentLines, argumentLe, argumentValue, argumentNames,
+      argumentSimulates⟩ :=
+      argumentIH functions depth prior .word locals indent first value argumentAccepted
+        valueEquation fresh
+    refine ⟨argumentStatements ++ [.letDecl (temporary value.nextId) .word
+        (.call1 callee (.name value.value))], ?_, by omega,
+      Or.inr (allocated_temporary argumentLe (Nat.lt_succ_self _)), ?_, ?_⟩
+    · simp only [Stmt.listLines_append, argumentLines, Stmt.listLines, List.append_nil]
+    · intro name mem
+      simp only [Stmt.listIdentifiers_append, List.mem_append, Stmt.listIdentifiers,
+        Stmt.identifiers, Expr.identifiers, List.append_nil, List.mem_cons,
+        List.not_mem_nil, or_false] at mem
+      rcases mem with mem | same | same | same
+      · exact named_mono (argumentNames name mem) (Nat.le_refl _) (by omega)
+      · exact Or.inr (Or.inr ⟨value.nextId, same, argumentLe, by omega⟩)
+      · subst same
+        exact Or.inr (Or.inl (List.mem_of_getElem? found))
+      · subst same
+        exact named_of_classified argumentValue (Nat.le_refl _) (by omega)
+    · intro context environment store scope outer agree lengthOk functionsOk
+      obtain ⟨argumentCore, argumentSource, scope₁, outer₁, added₁, argumentEvaluates,
+        argumentRepresents, argumentExec, argumentLookup, argumentKeeps, argumentShape,
+        argumentScope, argumentAdded⟩ :=
+        argumentSimulates context environment store scope outer agree lengthOk functionsOk
+      obtain ⟨word, rfl, rfl⟩ := argumentRepresents
+      obtain ⟨parameterType, resultType, body, captured, closureFound, behaves⟩ :=
+        functionsOk (index - locals.length) callee found
+      obtain ⟨result, bodyEvaluates, called⟩ := behaves word store
+      have closureAt : environment[index]? =
+          some (.closure parameterType resultType body captured) := by
+        rw [List.getElem?_drop] at closureFound
+        have position : locals.length + (index - locals.length) = index := by omega
+        rwa [position] at closureFound
+      refine ⟨.word result, .word result.val, (temporary value.nextId, .word result.val) :: scope₁,
+        outer₁, temporary value.nextId :: added₁, ?_, ⟨result, rfl, rfl⟩, ?_, ?_,
+        result_keeps argumentLe argumentKeeps, argumentShape, ?_, ?_⟩
+      · simp only [Solcore.Core.Wire.Expr.toCore]
+        exact .apply (.var closureAt) argumentEvaluates bodyEvaluates
+      · rw [Stmt.execList_append, argumentExec]
+        simp [Stmt.execList, Stmt.exec, Expr.eval, argumentLookup, called, LocalType.admits,
+          Frames.declare]
+      · simp [Frames.lookup_declared]
+      · rw [show Scope.names ((temporary value.nextId, .word result.val) :: scope₁) =
+          temporary value.nextId :: scope₁.names from rfl, argumentScope]
+        simp
+      · intro name mem
+        rcases List.mem_cons.mp mem with same | mem
+        · exact ⟨value.nextId, same, argumentLe, Nat.lt_succ_self _⟩
+        · exact allocated_mono (argumentAdded name mem) (Nat.le_refl _) (by omega)
+
 /-- A branch block runs in a fresh scope and ends by assigning its value to
 the `if` result, which was declared before the `if`. After the block's scope
 is discarded, only the result binding has changed. -/
 private theorem branch_simulates {expression : CoreExpr} {target : Target}
-    {locals : List String} {low high : Nat} {statements : List Stmt} {valueName result : String}
-    (simulates : Simulates expression target locals low high statements valueName)
-    (resultOutside : ¬ AllocatedIn low high result)
+    {functions locals : List String} {low high : Nat} {statements : List Stmt}
+    {valueName result : String}
+    (simulates : Simulates expression target functions locals low high statements valueName)
+    (resultOutside : ¬ AllocatedIn low high result) {context : Context}
     {environment : Solcore.Core.Environment} {store : Solcore.Core.Store}
     {scope : Scope} {outer : Frames}
     (agree : LocalsAgree ([] :: scope :: outer) locals environment)
+    (lengthOk : locals.length ≤ environment.length)
+    (functionsOk : FunctionsAgree context functions (environment.drop locals.length))
     (declared : Frames.lookup (scope :: outer) result = some (zeroValue target)) :
     ∃ (coreValue : CoreValue) (value : Value) (top scope' : Scope) (outer' : Frames),
       Solcore.Core.Evaluates environment store expression.toCore coreValue store ∧
       Represents target coreValue value ∧
-      Stmt.execList ([] :: scope :: outer) (statements ++ [.assign result (.name valueName)]) =
+      Stmt.execList context ([] :: scope :: outer)
+          (statements ++ [.assign result (.name valueName)]) =
         some (top :: scope' :: outer') ∧
       scope'.names = scope.names ∧ outer'.shape = outer.shape ∧
       ∀ name, ¬ AllocatedIn low high name →
         Frames.lookup (scope' :: outer') name =
           if result = name then some value else Frames.lookup (scope :: outer) name := by
   obtain ⟨coreValue, value, top₁, frames₁, added, evaluates, represents, exec, lookup, keeps,
-    shape, topNames, addedAllocated⟩ := simulates environment store [] (scope :: outer) agree
+    shape, topNames, addedAllocated⟩ :=
+    simulates context environment store [] (scope :: outer) agree lengthOk functionsOk
   have resultFound : Frames.lookup (top₁ :: frames₁) result = some (zeroValue target) := by
     rw [keeps result resultOutside]
     exact declared
@@ -415,8 +523,8 @@ theorem zeroExpr_identifiers (target : Target) : (zeroExpr target).identifiers =
 
 theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condition)
     (yesIH : RenderIH yes) (noIH : RenderIH no) : RenderIH (.ifE condition yes no) := by
-  intro depth target locals indent first rendered accepted equation fresh
-  simp only [acceptsAt, Bool.and_eq_true] at accepted
+  intro functions depth prior target locals indent first rendered accepted equation fresh
+  simp only [functionAcceptsAt, Bool.and_eq_true] at accepted
   obtain ⟨⟨conditionAccepted, yesAccepted⟩, noAccepted⟩ := accepted
   rw [RendererEquations.ifE] at equation
   obtain ⟨tested, testedEquation, equation⟩ := except_bind_eq_ok equation
@@ -427,13 +535,14 @@ theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condi
   dsimp only
   obtain ⟨conditionStatements, conditionLines, conditionLe, conditionValue, conditionNames,
     conditionSimulates⟩ :=
-    conditionIH depth .bool locals indent first tested conditionAccepted testedEquation fresh
+    conditionIH functions depth prior .bool locals indent first tested conditionAccepted
+      testedEquation fresh
   obtain ⟨yesStatements, yesLines, yesLe, yesValue, yesNames, yesSimulates⟩ :=
-    yesIH depth target locals (indent + 4) (tested.nextId + 1) selected yesAccepted
-      selectedEquation (fun name mem => older_mono (fresh name mem) (by omega))
+    yesIH functions depth prior target locals (indent + 4) (tested.nextId + 1) selected
+      yesAccepted selectedEquation (fun name mem => older_mono (fresh name mem) (by omega))
   obtain ⟨noStatements, noLines, noLe, noValue, noNames, noSimulates⟩ :=
-    noIH depth target locals (indent + 4) selected.nextId fallback noAccepted fallbackEquation
-      (fun name mem => older_mono (fresh name mem) (by omega))
+    noIH functions depth prior target locals (indent + 4) selected.nextId fallback noAccepted
+      fallbackEquation (fun name mem => older_mono (fresh name mem) (by omega))
   refine ⟨conditionStatements ++
       [.letDecl (temporary tested.nextId) (LocalType.ofTarget target) (zeroExpr target),
         .ifElse (.name tested.value)
@@ -448,22 +557,23 @@ theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condi
       Stmt.identifiers, Expr.identifiers, zeroExpr_identifiers, List.append_nil,
       List.mem_cons, List.not_mem_nil, or_false] at mem
     rcases mem with mem | same | (same | mem | same | same) | (mem | same | same)
-    · exact classified_mono (conditionNames name mem) (Nat.le_refl _) (by omega)
-    · exact Or.inr ⟨tested.nextId, same, conditionLe, by omega⟩
+    · exact named_mono (conditionNames name mem) (Nat.le_refl _) (by omega)
+    · exact Or.inr (Or.inr ⟨tested.nextId, same, conditionLe, by omega⟩)
     · subst same
-      exact classified_mono conditionValue (Nat.le_refl _) (by omega)
-    · exact classified_mono (yesNames name mem) (by omega) (by omega)
-    · exact Or.inr ⟨tested.nextId, same, conditionLe, by omega⟩
+      exact named_of_classified conditionValue (Nat.le_refl _) (by omega)
+    · exact named_mono (yesNames name mem) (by omega) (by omega)
+    · exact Or.inr (Or.inr ⟨tested.nextId, same, conditionLe, by omega⟩)
     · subst same
-      exact classified_mono yesValue (by omega) (by omega)
-    · exact classified_mono (noNames name mem) (by omega) (Nat.le_refl _)
-    · exact Or.inr ⟨tested.nextId, same, conditionLe, by omega⟩
+      exact named_of_classified yesValue (by omega) (by omega)
+    · exact named_mono (noNames name mem) (by omega) (Nat.le_refl _)
+    · exact Or.inr (Or.inr ⟨tested.nextId, same, conditionLe, by omega⟩)
     · subst same
-      exact classified_mono noValue (by omega) (Nat.le_refl _)
-  · intro environment store scope outer agree
+      exact named_of_classified noValue (by omega) (Nat.le_refl _)
+  · intro context environment store scope outer agree lengthOk functionsOk
     obtain ⟨conditionCore, conditionSource, scope₁, outer₁, added₁, conditionEvaluates,
       conditionRepresents, conditionExec, conditionLookup, conditionKeeps, conditionShape,
-      conditionScope, conditionAdded⟩ := conditionSimulates environment store scope outer agree
+      conditionScope, conditionAdded⟩ :=
+      conditionSimulates context environment store scope outer agree lengthOk functionsOk
     obtain ⟨flag, rfl, rfl⟩ := conditionRepresents
     have resultOlder : ∀ name ∈ locals, temporary tested.nextId ≠ name := by
       intro name mem same
@@ -487,7 +597,7 @@ theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condi
         · exact temporary_not_allocated (Or.inr (Nat.le_refl _)) (same ▸ allocated)
       rw [Frames.lookup_declared, if_neg different]
       exact conditionLookup
-    have prefixExec : Stmt.execList (scope :: outer) (conditionStatements ++
+    have prefixExec : Stmt.execList context (scope :: outer) (conditionStatements ++
         [.letDecl (temporary tested.nextId) (LocalType.ofTarget target) (zeroExpr target)]) =
         some (((temporary tested.nextId, zeroValue target) :: scope₁) :: outer₁) := by
       rw [Stmt.execList_append, conditionExec]
@@ -516,7 +626,7 @@ theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condi
         obtain ⟨branchCore, branchValue, top, scope', outer', branchEvaluates, branchRepresents,
           branchExec, scopeNames, outerShape, branchLookup⟩ :=
           branch_simulates yesSimulates (temporary_not_allocated (Or.inl (Nat.lt_succ_self _)))
-            branchAgree declared
+            branchAgree lengthOk functionsOk declared
         refine ⟨branchCore, branchValue, scope', outer', temporary tested.nextId :: added₁,
           ?_, branchRepresents, ?_, ?_, ?_, outerShape.trans conditionShape,
           scopeNames.trans resultScope, resultAdded⟩
@@ -536,7 +646,7 @@ theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condi
         obtain ⟨branchCore, branchValue, top, scope', outer', branchEvaluates, branchRepresents,
           branchExec, scopeNames, outerShape, branchLookup⟩ :=
           branch_simulates noSimulates (temporary_not_allocated (Or.inl (by omega)))
-            branchAgree declared
+            branchAgree lengthOk functionsOk declared
         refine ⟨branchCore, branchValue, scope', outer', temporary tested.nextId :: added₁,
           ?_, branchRepresents, ?_, ?_, ?_, outerShape.trans conditionShape,
           scopeNames.trans resultScope, resultAdded⟩
@@ -554,20 +664,21 @@ theorem renderIH_ifE {condition yes no : CoreExpr} (conditionIH : RenderIH condi
           rw [branchLookup name notBranch, if_neg different, keepsOutside name notAllocated]
 
 theorem renderIH_rejected (expression : CoreExpr)
-    (rejected : ∀ (depth : Nat) (target : Target), acceptsAt depth target expression = false) :
+    (rejected : ∀ (depth prior : Nat) (target : Target),
+      functionAcceptsAt depth prior target expression = false) :
     RenderIH expression := by
-  intro depth target _ _ _ _ accepted
-  rw [rejected depth target] at accepted
+  intro _ depth prior target _ _ _ _ accepted
+  rw [rejected depth prior target] at accepted
   cases accepted
 
 /-- The renderer rejects ternary operations, which the fragment admits. -/
 theorem renderIH_ternary (op : Solcore.Core.Wire.TernaryOp) (first second third : CoreExpr) :
     RenderIH (.ternary op first second third) := by
-  intro depth target locals indent next rendered _ equation
-  simp [ScalarRenderer.render, ScalarRenderer.renderWithFunctions] at equation
+  intro functions depth prior target locals indent next rendered _ equation
+  simp [ScalarRenderer.renderWithFunctions] at equation
 
 /-- Every admitted expression that the actual renderer accepts satisfies its
-rendering specification. -/
+rendering specification, with or without earlier helpers. -/
 theorem render_spec : (expression : CoreExpr) → RenderIH expression
   | .word value => renderIH_word value
   | .bool value => renderIH_bool value
@@ -578,20 +689,28 @@ theorem render_spec : (expression : CoreExpr) → RenderIH expression
   | .unary _ operand => renderIH_unary (render_spec operand)
   | .binary _ left right => renderIH_binary (render_spec left) (render_spec right)
   | .ternary op first second third => renderIH_ternary op first second third
-  | .unit => renderIH_rejected _ fun _ _ => rfl
-  | .integer _ => renderIH_rejected _ fun _ _ => rfl
-  | .pair _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .first _ => renderIH_rejected _ fun _ _ => rfl
-  | .second _ => renderIH_rejected _ fun _ _ => rfl
-  | .lambda _ _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .apply _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .inLeft _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .inRight _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .caseE _ _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .newCell _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .loadCell _ => renderIH_rejected _ fun _ _ => rfl
-  | .storeCell _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .construct _ _ => renderIH_rejected _ fun _ _ => rfl
-  | .matchData _ _ _ _ => renderIH_rejected _ fun _ _ => rfl
+  | .apply (.var _) argument => renderIH_apply (render_spec argument)
+  | .apply (.word _) _ | .apply (.bool _) _ | .apply .unit _ | .apply (.integer _) _
+  | .apply (.pair _ _) _ | .apply (.first _) _ | .apply (.second _) _
+  | .apply (.lambda _ _ _) _ | .apply (.apply _ _) _ | .apply (.inLeft _ _) _
+  | .apply (.inRight _ _) _ | .apply (.caseE _ _ _) _ | .apply (.newCell _ _) _
+  | .apply (.loadCell _) _ | .apply (.storeCell _ _) _ | .apply (.construct _ _) _
+  | .apply (.matchData _ _ _ _) _ | .apply (.unary _ _) _ | .apply (.binary _ _ _) _
+  | .apply (.ternary _ _ _ _) _ | .apply (.letE _ _) _ | .apply (.ifE _ _ _) _ =>
+      renderIH_rejected _ fun _ _ _ => rfl
+  | .unit => renderIH_rejected _ fun _ _ _ => rfl
+  | .integer _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .pair _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .first _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .second _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .lambda _ _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .inLeft _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .inRight _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .caseE _ _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .newCell _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .loadCell _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .storeCell _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .construct _ _ => renderIH_rejected _ fun _ _ _ => rfl
+  | .matchData _ _ _ _ => renderIH_rejected _ fun _ _ _ => rfl
 
 end Solcore.Synthesis.Source.ScalarMeaning

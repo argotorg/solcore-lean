@@ -1,8 +1,9 @@
 import Solcore.Synthesis.Source.ScalarMeaning.Syntax
 
 /-! Concrete text of the scalar source fragment, in the exact layout used by
-the scalar renderer and its wrappers: four-space indentation steps, one
-statement or brace per line, and a trailing newline. -/
+the scalar renderers and their wrappers: four-space indentation steps, one
+statement or brace per line, a blank line after the imports and after every
+free function, and a trailing newline. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.ScalarMeaning
@@ -19,6 +20,10 @@ def Expr.print : Expr → String
       "(" ++ left.print ++ " " ++ op.spelling ++ " " ++ right.print ++ ")"
   | .typedefRep operand => "Typedef.rep(" ++ operand.print ++ ")"
   | .uint256 operand => "uint256(" ++ operand.print ++ ")"
+  | .call1 callee first => callee ++ "(" ++ first.print ++ ")"
+  | .call2 callee first second => callee ++ "(" ++ first.print ++ ", " ++ second.print ++ ")"
+  | .call3 callee first second third =>
+      callee ++ "(" ++ first.print ++ ", " ++ second.print ++ ", " ++ third.print ++ ")"
 
 mutual
 
@@ -49,13 +54,37 @@ theorem Stmt.listLines_append (indent : Nat) (first second : List Stmt) :
   | cons statement rest ih =>
       simp [Stmt.listLines, ih, List.append_assoc]
 
+/-- The parameter list between a free function's parentheses. -/
+def FunctionDecl.parameterText (parameters : List (String × LocalType)) : String :=
+  String.intercalate ", " (parameters.map fun parameter =>
+    parameter.1 ++ ": " ++ parameter.2.spelling)
+
+/-- A free function, followed by one blank line. -/
+def FunctionDecl.lines (function : FunctionDecl) : List String :=
+  ["function " ++ function.name ++ "(" ++ FunctionDecl.parameterText function.parameters ++
+      ") returns (" ++ function.resultType.spelling ++ ") {"] ++
+    Stmt.listLines 4 function.body ++
+    ["    return " ++ function.result.print ++ ";", "}", ""]
+
 /-- The parameter list between the method's parentheses. -/
 def Method.parameterText (parameters : List String) : String :=
   String.intercalate ", " (parameters.map (· ++ ": uint256"))
 
+/-- `import { opcode as alias, ... } from std.opcodes;` -/
+def aliasImportLine (aliases : List (String × String)) : String :=
+  "import { " ++ String.intercalate ", " (aliases.map fun alias =>
+    alias.1 ++ " as " ++ alias.2) ++ " } from std.opcodes;"
+
+/-- No line without aliases. -/
+def aliasImportLines : List (String × String) → List String
+  | [] => []
+  | alias :: rest => [aliasImportLine (alias :: rest)]
+
 def SourceFile.lines (file : SourceFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;", "",
-    "contract " ++ file.contract ++ " {",
+  ["import * from std;", "import * from std.dispatch;"] ++
+  aliasImportLines file.opcodeAliases ++ [""] ++
+  file.functions.flatMap FunctionDecl.lines ++
+  ["contract " ++ file.contract ++ " {",
     "    function " ++ file.method.name ++ "(" ++ Method.parameterText file.method.parameters ++
       ") public returns (uint256) {"] ++
   Stmt.listLines 8 file.method.body ++

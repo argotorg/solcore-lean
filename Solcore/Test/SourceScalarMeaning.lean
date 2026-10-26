@@ -1,5 +1,6 @@
 import Solcore.Synthesis.Core.Generator
-import Solcore.Synthesis.Source.ScalarMeaning.Emitter
+import Solcore.Synthesis.Source.ScalarMeaning.FunctionEmitter
+import Solcore.Test.SourceFunctionEmitter
 import Solcore.Test.SourceInputEmitter
 import Solcore.Test.SourceSynthesisEmitter
 
@@ -71,6 +72,25 @@ private def checkInput (label : String) (function : CheckedWordFunction) : IO Un
   ensure (sourceCall emitted.source "run" [] == none)
     s!"input method accepted a missing argument: {label}"
 
+/-- Named helpers become free functions; each runtime input is compared with
+the original Core binding chain. -/
+private def checkFunctions (label : String) (helpers : List Wire.Expr) (entry : Wire.Expr) :
+    IO Unit := do
+  let some graph := CheckedWordFunctionDAG.ofParts? helpers entry |
+    throw (IO.userError s!"named-helper fixture failed its checker: {label}")
+  let emitted ← match Function.emit graph with
+    | .ok value => pure value
+    | .error error => throw (IO.userError s!"named-helper emission failed: {label}: {reprStr error}")
+  checkReprint label emitted.source
+  for input in boundaryInputs do
+    let expected ← coreWord (graph.instantiate (Word.ofNatModulo input)).toCore
+    ensure (sourceCall emitted.source "run" [input] == some expected)
+      s!"named-helper source meaning differs from Core: {label} at {input}"
+  let undeclared := emitted.source.replace "= sc_fn0(" "= sc_fnx("
+  ensure (undeclared != emitted.source) s!"named-helper fixture has no call to sc_fn0: {label}"
+  ensure ((parseSource undeclared).isSome && sourceCall undeclared "run" [1] == none)
+    s!"a call to an undeclared helper received a meaning: {label}"
+
 /-- Hand-known Words for the wrap-around and bitwise fixtures, independent of
 both Core and the source semantics. -/
 private def knownClosedResults : List (String × Nat) := [
@@ -140,13 +160,16 @@ def testSourceScalarMeaning : IO Unit := do
   checkKnown
   for (label, body) in Tests.SourceInputEmitter.fixtures do
     checkInput label (← checkedFunction body)
+  for (label, helpers, entry) in Tests.SourceFunctionEmitter.fixtures do
+    checkFunctions label helpers entry
   checkRejections
   let (checked, excluded) ← checkGenerated
   ensure (checked ≥ 16) s!"too few generated programs reached the source meaning: {checked}"
   let closed := Tests.SourceSynthesisEmitter.fixtures.length
   let inputs := Tests.SourceInputEmitter.fixtures.length
-  IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures x " ++
-    s!"{boundaryInputs.length} inputs, {checked} generated programs ({excluded} excluded) " ++
-    "agree with Core")
+  let graphs := Tests.SourceFunctionEmitter.fixtures.length
+  IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures and " ++
+    s!"{graphs} named-helper graphs x {boundaryInputs.length} inputs, {checked} generated " ++
+    s!"programs ({excluded} excluded) agree with Core")
 
 end Tests.SourceScalarMeaning

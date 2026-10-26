@@ -63,51 +63,51 @@ def sourceBinary? : Solcore.Core.Wire.BinaryOp → Option BinaryOp
 
 namespace RendererEquations
 
-theorem word (target : Target) (locals : List String) (indent first : Nat)
+theorem word (functions : List String) (target : Target) (locals : List String) (indent first : Nat)
     (value : Solcore.Core.Word) :
-    ScalarRenderer.render target locals indent first (.word value) =
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.word value) =
       .ok ⟨Stmt.lines indent (.letDecl (temporary first) .word (.number value.val)),
         temporary first, first + 1⟩ := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   rfl
 
-theorem bool (target : Target) (locals : List String) (indent first : Nat) (value : Bool) :
-    ScalarRenderer.render target locals indent first (.bool value) =
+theorem bool (functions : List String) (target : Target) (locals : List String) (indent first : Nat) (value : Bool) :
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.bool value) =
       .ok ⟨Stmt.lines indent (.letDecl (temporary first) .bool (.bool value)),
         temporary first, first + 1⟩ := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   rfl
 
-theorem var (target : Target) (locals : List String) (indent first index : Nat) :
-    ScalarRenderer.render target locals indent first (.var index) =
+theorem var (functions : List String) (target : Target) (locals : List String) (indent first index : Nat) :
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.var index) =
       match locals[index]? with
       | some binding => .ok ⟨[], binding, first⟩
       | none => .error (.unboundLocal index) := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   cases locals[index]? <;> rfl
 
-theorem letE (target : Target) (locals : List String) (indent first : Nat)
+theorem letE (functions : List String) (target : Target) (locals : List String) (indent first : Nat)
     (initializer body : Solcore.Core.Wire.Expr) :
-    ScalarRenderer.render target locals indent first (.letE initializer body) =
-      (ScalarRenderer.render .word locals indent first initializer).bind fun value =>
-        (ScalarRenderer.render target (temporary value.nextId :: locals) indent (value.nextId + 1)
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.letE initializer body) =
+      (ScalarRenderer.renderWithFunctions functions .word locals indent first initializer).bind fun value =>
+        (ScalarRenderer.renderWithFunctions functions target (temporary value.nextId :: locals) indent (value.nextId + 1)
           body).bind
           fun rest =>
             .ok ⟨value.lines ++
                 Stmt.lines indent (.letDecl (temporary value.nextId) .word (.name value.value)) ++
                 rest.lines,
               rest.value, rest.nextId⟩ := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   rfl
 
 /-- The `if` result is declared with its zero value, then assigned at the end
 of each branch block. -/
-theorem ifE (target : Target) (locals : List String) (indent first : Nat)
+theorem ifE (functions : List String) (target : Target) (locals : List String) (indent first : Nat)
     (condition yes no : Solcore.Core.Wire.Expr) :
-    ScalarRenderer.render target locals indent first (.ifE condition yes no) =
-      (ScalarRenderer.render .bool locals indent first condition).bind fun tested =>
-        (ScalarRenderer.render target locals (indent + 4) (tested.nextId + 1) yes).bind fun selected =>
-          (ScalarRenderer.render target locals (indent + 4) selected.nextId no).bind fun fallback =>
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.ifE condition yes no) =
+      (ScalarRenderer.renderWithFunctions functions .bool locals indent first condition).bind fun tested =>
+        (ScalarRenderer.renderWithFunctions functions target locals (indent + 4) (tested.nextId + 1) yes).bind fun selected =>
+          (ScalarRenderer.renderWithFunctions functions target locals (indent + 4) selected.nextId no).bind fun fallback =>
             .ok ⟨tested.lines ++
                 [indentLine indent ("let " ++ temporary tested.nextId ++ ": " ++
                   (LocalType.ofTarget target).spelling ++ " = " ++ zeroText target ++ ";")] ++
@@ -118,39 +118,63 @@ theorem ifE (target : Target) (locals : List String) (indent first : Nat)
                 [indentLine (indent + 4) (temporary tested.nextId ++ " = " ++ fallback.value ++ ";"),
                   indentLine indent "}"],
               temporary tested.nextId, fallback.nextId⟩ := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   cases target <;> rfl
 
-theorem unary (target : Target) (locals : List String) (indent first : Nat)
+theorem unary (functions : List String) (target : Target) (locals : List String) (indent first : Nat)
     (op : Solcore.Core.Wire.UnaryOp) (operand : Solcore.Core.Wire.Expr) :
-    ScalarRenderer.render target locals indent first (.unary op operand) =
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.unary op operand) =
       match sourceUnary? op with
       | some sourceOp =>
-          (ScalarRenderer.render (if op == .boolNot then .bool else .word) locals indent first
+          (ScalarRenderer.renderWithFunctions functions (if op == .boolNot then .bool else .word) locals indent first
             operand).bind
             fun value =>
               .ok ⟨value.lines ++ Stmt.lines indent (.letDecl (temporary value.nextId)
                   (LocalType.ofTarget target) (.unary sourceOp (.name value.value))),
                 temporary value.nextId, value.nextId + 1⟩
       | none => .error (.unsupportedUnary op) := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   cases op <;> cases target <;> rfl
 
-theorem binary (target : Target) (locals : List String) (indent first : Nat)
+theorem binary (functions : List String) (target : Target) (locals : List String) (indent first : Nat)
     (op : Solcore.Core.Wire.BinaryOp) (left right : Solcore.Core.Wire.Expr) :
-    ScalarRenderer.render target locals indent first (.binary op left right) =
+    ScalarRenderer.renderWithFunctions functions target locals indent first (.binary op left right) =
       match sourceBinary? op with
       | some sourceOp =>
-          (ScalarRenderer.render .word locals indent first left).bind fun leftValue =>
-            (ScalarRenderer.render .word locals indent leftValue.nextId right).bind fun rightValue =>
+          (ScalarRenderer.renderWithFunctions functions .word locals indent first left).bind fun leftValue =>
+            (ScalarRenderer.renderWithFunctions functions .word locals indent leftValue.nextId right).bind fun rightValue =>
               .ok ⟨leftValue.lines ++ rightValue.lines ++
                   Stmt.lines indent (.letDecl (temporary rightValue.nextId)
                     (LocalType.ofTarget target)
                     (.binary sourceOp (.name leftValue.value) (.name rightValue.value))),
                 temporary rightValue.nextId, rightValue.nextId + 1⟩
       | none => .error (.unsupportedBinary op) := by
-  simp only [ScalarRenderer.render, ScalarRenderer.renderWithFunctions]
+  simp only [ScalarRenderer.renderWithFunctions]
   cases op <;> cases target <;> rfl
+
+/-- A direct call to an earlier helper: the argument is rendered first and the
+call result is bound to a fresh `word` temporary. -/
+theorem apply (functions : List String) (target : Target) (locals : List String)
+    (indent first index : Nat) (argument : Solcore.Core.Wire.Expr) :
+    ScalarRenderer.renderWithFunctions functions target locals indent first
+        (.apply (.var index) argument) =
+      if functions.isEmpty || index < locals.length then .error (.unsupportedExpression "apply")
+      else
+        match functions[index - locals.length]? with
+        | none => .error (.unsupportedExpression "apply")
+        | some callee =>
+            (ScalarRenderer.renderWithFunctions functions .word locals indent first
+              argument).bind fun value =>
+              .ok ⟨value.lines ++ Stmt.lines indent (.letDecl (temporary value.nextId) .word
+                  (.call1 callee (.name value.value))),
+                temporary value.nextId, value.nextId + 1⟩ := by
+  simp only [ScalarRenderer.renderWithFunctions]
+  by_cases rejected : (functions.isEmpty || decide (index < locals.length)) = true
+  · simp only [rejected, if_true]
+    rfl
+  · simp only [Bool.not_eq_true] at rejected
+    simp only [rejected, Bool.false_eq_true, if_false]
+    cases functions[index - locals.length]? <;> rfl
 
 end RendererEquations
 
