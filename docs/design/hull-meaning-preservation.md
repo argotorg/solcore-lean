@@ -522,6 +522,41 @@ message, a full 32-byte message, and a short message written over an earlier
 word at offset zero. Runtime checks compare the revert bytes of a full run and
 of a resumption.
 
+Inline Yul is connected for a first fragment through the call-mode and
+root-reentry public theorems. `YulSemantics` specifies an assembly block of one
+statement that calls `mstore`, `mstore8`, `return` or `revert` on two literal
+words. Number and hexadecimal literals denote words as Hull word literals do,
+and `true` and `false` denote one and zero. The arguments are evaluated from
+right to left, as in Yul; literals have no effect, so the fragment cannot
+observe the order. The call is the independent memory write or termination on
+the frame: a returning call continues after the block, and a fault, including
+the termination sentinel, stops it. The call-mode effects use this rule at
+every frame height. `ExecutableStatement` accepts an assembly block when
+`YulFragment.Eligible` holds, that is, one call statement on two literals
+whose name is supported. The common recursive proof discharges it through a
+separate obligation, `AssemblyPreservation`, which
+`assemble_recursive_program_effects` meets by default for the effect layers
+without an assembly rule. The other layers' theorems therefore admit programs
+with such a block but say nothing about a run that reaches one. No public
+theorem statement changes.
+
+The proof (`YulBuiltinCorrespondence.preserves`) connects the actual
+`YulLowering.lowerStatements` code. `YulLowering` keeps its builders private
+and mutually recursive, and a public copy is not equal to them by `rfl`, so
+the proof instead peels the accepted lowering of the fixed block shape with
+`change`, which unfolds the private definitions definitionally. The lowering
+binds the second literal and then the first, its words agree with the source
+literals, and the actual `mstore`, `mstore8` and termination code run on them.
+The frame, linked world and captured context relations carry over as for the
+explicit revert.
+
+`Tests.RustHullAssemblyCorrespondence.public_resumes` applies the call-mode
+theorem to four independent source scenarios, each writing memory in one block
+and ending the frame in another: an `mstore` returned as a word, an `mstore8`
+of a hexadecimal byte, an `mstore` whose last byte is reverted, and an
+`mstore` of `true` whose last byte is returned. Runtime checks compare the
+returned or reverted bytes of a full run and of a resumption.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -531,7 +566,7 @@ of a resumption.
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity, SHA-256 and RIPEMD-160 precompiles, account destruction, refused CREATE/CREATE2 attempts and admitted attempts without an init frame reach public receipts, including finite nested children, transfers, return data, checkpoint rollback, new accounts and transaction finalization. ECRECOVER, P256VERIFY and creation with init frames remain. | In progress |
-| 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
+| 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. One-call blocks of memory writes and terminations on literals are connected; several statements, variables, assignments, nested calls, control flow, local functions and Hull locals remain. | In progress |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
 Priorities 1 and 2 close gaps in the existing pure Hull theorem. Priorities 3
@@ -553,9 +588,9 @@ execution. ECRECOVER and P256VERIFY still need independent elliptic-curve
 semantics connected to their Jacobian implementations; the missing pieces are
 listed with the precompile connection above. Creation attempts refused before
 init code runs, collisions, deployments of empty init code and the faults
-after the nonce advance are connected, and so is Hull's explicit revert;
-creation with init frames and assembly follow as their proof domains are
-connected. Each proof step must derive
+after the nonce advance are connected, and so are Hull's explicit revert and
+one-call inline Yul blocks; creation with init frames and the rest of assembly
+follow as their proof domains are connected. Each proof step must derive
 runtime inputs from actual initialization and end in a public theorem
 consumer. Executable support and test agreement alone do not close these
 obligations.
@@ -573,7 +608,7 @@ DELEGATECALL are covered by the same finite nested-child connection.
 | --- | --- | --- |
 | 1 | Contract calls | Connect ECRECOVER (1) and P256VERIFY (0x100) through independent affine elliptic-curve semantics, with field arithmetic, Jacobian-formula identities and ladder correctness. Reuse the connected dispatch, Keccak, checkpoint restoration and public resumptions. |
 | 2 | Contract creation | Connect init frames: nonempty init code at the next depth in a deployment context, runtime-code validation, installation of the exact image and failure rollback. Their source rule needs an init-template catalog, which changes the public theorem statements. Also connect existing empty accounts at the address. Refusals, collisions, empty init code, unknown targets and endowment overflow are connected. |
-| 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Hull's string revert is connected through its memory write and termination. |
+| 3 | Assembly and source revert | Extend the connected Yul fragment, one call on two literals, to independent Yul evaluation with its argument order: several statements, variables and assignments, nested calls, control flow, local functions and Hull locals. Hull's string revert is connected through its memory write and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
 
 Creation's refusals, collisions, deployments of empty init code and the two
@@ -608,12 +643,14 @@ premise describes. The source rule therefore needs an init-template catalog
 keyed by init bytes, and the public theorems need a premise connecting its
 entries to the compiled `isInit` definitions.
 
-Hull assembly blocks can follow the pattern of the explicit revert without a
-public statement change: an `ExecutableStatement` case for `assembly`, an
-`assembly` rule in the call-mode effects given by an independent Yul
-evaluation over the frame and the Hull locals it reads, and a separate
-obligation in the common recursive proof for the actual
-`YulLowering.lowerStatements` code, met by default by the other effect layers.
+Larger Yul fragments keep the same public statements and the same assembly
+obligation, but their proof needs the lowering of statement lists of any
+length. The private recursive builders of `YulLowering` (`lowerSequence`,
+`lowerBlock`, `lowerExpr`) unfold definitionally only on lists of known shape,
+and a public copy is not provably equal to them by `rfl`. A general proof
+therefore needs those builders made public, or a way for the proof to refer to
+the private constants; with either, an induction over the statements can
+follow the peeling of the one-call block.
 
 Lower-level helpers or isolated builtin results do not complete any row without
 its actual public execution consumer.
