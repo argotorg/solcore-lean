@@ -133,10 +133,12 @@ private def admissionChecks : IO Unit := do
       source.deployPath == ["SynthesizedStorageDeploy"] &&
       source.runtimePath == ["SynthesizedStorageDeploy", "SynthesizedStorage"])
       "storage wrapper metadata changed"
-  let unsupported ← checked [.binary .wordDiv (.var 0) (word 1)]
-  match Storage.emit unsupported with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported step arithmetic was silently emitted")
+  -- Raw primitives join the existing opcode import only when a step uses them.
+  let divided ← checked [.binary .wordDiv (.var 0) (word 1)]
+  match Storage.emit divided with
+  | .ok emitted => unless (emitted.source.splitOn "import {sload, sstore, div as sc_div, mod as sc_mod, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+      throw (IO.userError "Storage emission lost the merged raw division alias or its snapshots")
+  | .error error => throw (IO.userError s!"Storage raw division was rejected: {reprStr error}")
 
 private def executionChecks : IO Unit := do
   let inputs := [Word.zero, Word.ofNatModulo 1, Word.ofNatModulo 3, Word.maximum,
@@ -183,7 +185,7 @@ private def formattingChecks : IO Unit := do
     "    let sc_v0: word = sc_fn0(sc_arg);", "    let sc_v1: word = 10;",
     "    let sc_v2: word = (sc_v0 + sc_v1);", "    return sc_v2;", "}"]))
     "storage wrapper ignored the arbitrary checked entry"
-  ensure (Storage.emitterVersion == "solcore-source-storage-v1" &&
+  ensure (Storage.emitterVersion == "solcore-source-storage-v2" &&
     Storage.wrapperVersion == "solcore-word-storage-contract-v1" &&
     Storage.selector == "0xa444f5e9" && StorageContract.version == "core-storage-contract-v1")
     "storage provenance changed"

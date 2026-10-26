@@ -198,11 +198,13 @@ private def executionChecks : IO Unit := do
   match (pair.instantiate Word.zero).toCore.runStateful 0 with
   | .outOfFuel _ => pure ()
   | _ => throw (IO.userError "zero fuel was treated as a completed aggregate computation")
-  let unsupported := Wire.Expr.caseE (.inLeft .word (.var 0))
+  -- Raw primitives render through the call-graph helpers with the alias import.
+  let divided := Wire.Expr.caseE (.inLeft .word (.var 0))
     (.binary .wordDiv (.var 0) (word 1)) (.var 0)
-  match Aggregate.emit (← checked [unsupported]) with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported aggregate arithmetic was silently emitted")
+  match Aggregate.emit (← checked [divided]) with
+  | .ok emitted => unless (emitted.source.splitOn "import { div as sc_div, mod as sc_mod, ").length == 2 && (emitted.source.splitOn " = sc_div(sc_v").length == 2 do
+      throw (IO.userError "aggregate emission lost the raw division alias")
+  | .error error => throw (IO.userError s!"aggregate raw division was rejected: {reprStr error}")
 
 private def contains (source fragment : String) : Bool := (source.splitOn fragment).length > 1
 
@@ -255,7 +257,7 @@ private def formattingChecks : IO Unit := do
   let graph ← checked [aggregateCaseBody]
   for feature in ["pair", "first", "second", "inLeft", "inRight", "case", "functionCall"] do
     ensure (graph.features.contains feature) s!"missing aggregate AST feature {feature}"
-  ensure (Aggregate.emitterVersion == "solcore-source-aggregates-v1" &&
+  ensure (Aggregate.emitterVersion == "solcore-source-aggregates-v2" &&
     Aggregate.wrapperVersion == "solcore-word-aggregates-contract-v1" &&
     Aggregate.selector == "0xa444f5e9" && Aggregates.version == "core-aggregate-dag-v1")
     "aggregate provenance changed"

@@ -138,12 +138,20 @@ private def admissionChecks : IO Unit := do
   for body in [.var 0, .loadCell (.newCell .word (word 7))] do
     ensure (CheckedWordProgram.ofProgram? {resultType := .word, dataDefinitions := [], body}).isNone
       "module plan admitted an open or effectful constant"
+  -- Constants keep the scalar renderer; step functions render raw primitives.
   let unsupported ← constant (.ifE (.bool true) (word 0) (.binary .wordDiv (word 1) (word 1)))
-  let unsupportedStep ← step [.binary .wordDiv (.var 0) (word 1)] (.var 0)
-  for plan in [← checked unsupported (← step [identityWithCell]), ← checked closed unsupportedStep] do
-    match Solcore.Synthesis.Source.Modules.emit plan with
-    | .error (.unsupportedBinary .wordDiv) => pure ()
-    | _ => throw (IO.userError "module emission silently omitted an unsupported original expression")
+  let dividedStep ← step [.binary .wordDiv (.var 0) (word 1)] (.var 0)
+  match Solcore.Synthesis.Source.Modules.emit (← checked unsupported (← step [identityWithCell])) with
+  | .error (.unsupportedBinary .wordDiv) => pure ()
+  | _ => throw (IO.userError "module emission silently omitted an unsupported original constant")
+  match Solcore.Synthesis.Source.Modules.emit (← checked closed dividedStep) with
+  | .ok bundle =>
+      let some left := bundle.files.find? (·.path == "left.sol") | throw (IO.userError "module bundle lost left.sol")
+      unless (left.source.splitOn "import { div as sc_div, mod as sc_mod, ").length == 2 &&
+          (left.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 &&
+          bundle.files.all (fun file => file.path == "left.sol" || (file.source.splitOn "sc_div").length == 1) do
+        throw (IO.userError "module step lost the raw division alias, its snapshots or its file")
+  | .error error => throw (IO.userError s!"module raw division was rejected: {reprStr error}")
 
 private def contains (source fragment : String) : Bool := (source.splitOn fragment).length > 1
 
@@ -209,7 +217,7 @@ private def formattingChecks : IO Unit := do
     bundle.deployPath == ["SynthesizedModulesDeploy"] &&
     bundle.runtimePath == ["SynthesizedModulesDeploy", "SynthesizedModules"] &&
     Modules.version == "core-module-composition-plan-v1" &&
-    Solcore.Synthesis.Source.Modules.emitterVersion == "solcore-source-modules-v1" &&
+    Solcore.Synthesis.Source.Modules.emitterVersion == "solcore-source-modules-v2" &&
     Solcore.Synthesis.Source.Modules.wrapperVersion == "solcore-word-modules-contract-v1")
     "module provenance or contract metadata changed"
 

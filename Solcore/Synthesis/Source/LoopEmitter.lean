@@ -11,7 +11,7 @@ namespace Solcore.Synthesis.Source.Loop
 
 open Solcore.Synthesis.Core.BoundedLoop (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-loops-v1"
+def emitterVersion : String := "solcore-source-loops-v2"
 def wrapperVersion : String := "solcore-word-loops-contract-v1"
 def contractName : String := "SynthesizedLoops"
 def methodName : String := "run"
@@ -22,7 +22,8 @@ def runtimePath : List String := ["SynthesizedLoopsDeploy", "SynthesizedLoops"]
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", ""]
+  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+    AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ [""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered

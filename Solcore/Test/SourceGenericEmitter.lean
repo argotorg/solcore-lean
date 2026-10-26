@@ -99,11 +99,15 @@ private def admissionChecks : IO Unit := do
       ensure ((← emitted plan) == (← emitted plan)) "generic source emission is nondeterministic"
   for invalid in ["", "Word", "tuple", "sum<word,word>", "word "] do
     ensure (Variant.ofString? invalid).isNone "generic variant parsing accepted noncanonical metadata"
-  let unsupported ← step [.binary .wordDiv (.var 0) (word 1)]
+  -- Raw primitives render through the call-graph helpers with the alias import.
+  let divided ← step [.binary .wordDiv (.var 0) (word 1)]
   for variant in Variant.all do
-    match Solcore.Synthesis.Source.Generic.emit (← checked unsupported variant) with
-    | .error (.unsupportedBinary .wordDiv) => pure ()
-    | _ => throw (IO.userError "generic emission silently discarded an unsupported candidate step")
+    match Solcore.Synthesis.Source.Generic.emit (← checked divided variant) with
+    | .ok emitted =>
+        unless (emitted.source.splitOn "import { div as sc_div, mod as sc_mod, ").length == 2 &&
+            (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+          throw (IO.userError "generic emission lost the raw division alias or its operand snapshots")
+    | .error error => throw (IO.userError s!"generic raw division was rejected: {reprStr error}")
 
 private def contains (source fragment : String) : Bool := (source.splitOn fragment).length > 1
 
@@ -145,7 +149,7 @@ private def formattingChecks : IO Unit := do
           contains source.source "case inl(sc_payload)" && contains source.source "case inr(sc_payload)" &&
           contains source.source "sc_result = sc_payload + 1;")
           "sum generic instantiation lost its constructor-dependent result"
-  ensure (Solcore.Synthesis.Source.Generic.emitterVersion == "solcore-source-generics-v1" &&
+  ensure (Solcore.Synthesis.Source.Generic.emitterVersion == "solcore-source-generics-v2" &&
     Solcore.Synthesis.Source.Generic.wrapperVersion == "solcore-word-generics-contract-v1" &&
     Solcore.Synthesis.Source.Generic.selector == "0xa444f5e9" &&
     Generic.version == "core-generic-selection-plan-v1") "generic provenance changed"

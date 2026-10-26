@@ -12,7 +12,7 @@ open Solcore.Synthesis.Core.Closure (CheckedPlan)
 
 def caseSchema : String := "solcore-lean.semantic-closure-case.v1"
 def planSchema : String := "solcore-lean.closure-plan.v1"
-def profileVersion : String := "runtime-closures-v1/capture-seed-v1"
+def profileVersion : String := "runtime-closures-v2/capture-seed-v1"
 def templateVersion : String := "word-closure-snapshot-v1"
 
 def boundaryInputs : List Word :=

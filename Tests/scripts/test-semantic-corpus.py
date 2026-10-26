@@ -28,6 +28,13 @@ MUTATION_VERSIONS = ("profileVersion", "functionVersion", "templateVersion")
 LOOP_STEP_VERSIONS = ("stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion")
 MUTATION_FEATURES = {"newCell", "loadCell", "storeCell", "unitLiteral"}
 AGGREGATE_FEATURES = {"pair", "first", "second", "inLeft", "inRight", "case"}
+# Raw primitive aliases rendered by the aggregate step renderer; constants stay
+# on the original scalar set.
+PRIMITIVE_FEATURES = {"unary:Solcore.Core.Wire.UnaryOp.wordClz"} | {
+    f"binary:Solcore.Core.Wire.BinaryOp.{operation}"
+    for operation in ("wordDiv", "wordMod", "wordShl", "wordShr", "wordSar", "wordSdiv", "wordSmod",
+                      "wordSgt", "wordByte", "wordPow", "wordSignExtend")
+} | {f"ternary:Solcore.Core.Wire.TernaryOp.{operation}" for operation in ("wordAddMod", "wordMulMod")}
 FEATURES = {"wordLiteral", "boolLiteral", "local", "let", "if"} | {
     f"unary:Solcore.Core.Wire.UnaryOp.{operation}"
     for operation in ("boolNot", "wordNot")
@@ -69,8 +76,8 @@ def ast_coverage(value: object, function_calls: bool = False,
             features.add(tag)
         if tag == "word":
             literals.add(int(value["value"], 16))
-        if tag in ("unary", "binary"):
-            constructor = "UnaryOp" if tag == "unary" else "BinaryOp"
+        if tag in ("unary", "binary", "ternary"):
+            constructor = {"unary": "UnaryOp", "binary": "BinaryOp", "ternary": "TernaryOp"}[tag]
             features.add(f"{tag}:Solcore.Core.Wire.{constructor}.{value['op']}")
         if function_calls and tag == "apply":
             require(value.get("function", {}).get("tag") == "var",
@@ -283,7 +290,7 @@ def validate(manifest: dict, tool: Path, fuel: int) -> dict:
         if template_profile:
             allowed_features |= MUTATION_FEATURES
         if aggregate_profile:
-            allowed_features |= AGGREGATE_FEATURES
+            allowed_features |= AGGREGATE_FEATURES | PRIMITIVE_FEATURES
         require(required_features and required_features <= allowed_features, "unsupported runtime body features")
         if function_profile:
             require("functionCall" in required_features, "function corpus must require helper calls")

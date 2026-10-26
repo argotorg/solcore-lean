@@ -109,11 +109,15 @@ private def admissionChecks : IO Unit := do
       ensure ((← emitted plan) == (← emitted plan)) "closure source emission is nondeterministic"
   for invalid in ["", "Snapshot", "alias", "independent ", "word"] do
     ensure (Variant.ofString? invalid).isNone "closure variant parsing accepted noncanonical metadata"
-  let unsupported ← step [.binary .wordDiv (.var 0) (word 1)]
+  -- Raw primitives render through the call-graph helpers with the alias import.
+  let divided ← step [.binary .wordDiv (.var 0) (word 1)]
   for variant in Variant.all do
-    match Solcore.Synthesis.Source.Closure.emit (← checked unsupported variant) with
-    | .error (.unsupportedBinary .wordDiv) => pure ()
-    | _ => throw (IO.userError "closure emission silently discarded an unsupported step")
+    match Solcore.Synthesis.Source.Closure.emit (← checked divided variant) with
+    | .ok emitted =>
+        unless (emitted.source.splitOn "import { div as sc_div, mod as sc_mod, ").length == 2 &&
+            (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+          throw (IO.userError "closure emission lost the raw division alias or its operand snapshots")
+    | .error error => throw (IO.userError s!"closure raw division was rejected: {reprStr error}")
 
 private def contains (source fragment : String) : Bool := (source.splitOn fragment).length > 1
 
@@ -156,7 +160,7 @@ private def formattingChecks : IO Unit := do
           "            return sc_cap + sc_arg;", "        };", "        sc_cap = sc_cap + 2;"]) &&
           (source.source.splitOn " = lam (").length == 3)
           "independent source lost the second capture's distinct creation time"
-  ensure (Solcore.Synthesis.Source.Closure.emitterVersion == "solcore-source-closures-v1" &&
+  ensure (Solcore.Synthesis.Source.Closure.emitterVersion == "solcore-source-closures-v2" &&
     Solcore.Synthesis.Source.Closure.wrapperVersion == "solcore-word-closures-contract-v1" &&
     Solcore.Synthesis.Source.Closure.selector == "0xa444f5e9" &&
     Closure.version == "core-closure-capture-plan-v1") "closure provenance changed"

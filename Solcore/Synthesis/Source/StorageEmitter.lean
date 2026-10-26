@@ -11,7 +11,7 @@ namespace Solcore.Synthesis.Source.Storage
 
 open Solcore.Synthesis.Core.StorageContract (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-storage-v1"
+def emitterVersion : String := "solcore-source-storage-v2"
 def wrapperVersion : String := "solcore-word-storage-contract-v1"
 def contractName : String := "SynthesizedStorage"
 def methodName : String := "run"
@@ -23,7 +23,8 @@ def runtimePath : List String := ["SynthesizedStorageDeploy", "SynthesizedStorag
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
   let mut lines := ["import * from std;", "import * from std.dispatch;",
-    "import {sload, sstore} from std.opcodes;", ""]
+    AggregateRenderer.opcodeImportWith ["sload", "sstore"]
+      (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered

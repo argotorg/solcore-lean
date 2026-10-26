@@ -10,7 +10,7 @@ namespace Solcore.Synthesis.Source.Generic
 
 open Solcore.Synthesis.Core.Generic (CheckedPlan Variant)
 
-def emitterVersion : String := "solcore-source-generics-v1"
+def emitterVersion : String := "solcore-source-generics-v2"
 def wrapperVersion : String := "solcore-word-generics-contract-v1"
 def contractName : String := "SynthesizedGenerics"
 def methodName : String := "run"
@@ -45,7 +45,8 @@ private def selectedResult : Variant → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "",
+  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+    AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_select<a>(flag: bool, left: a, right: a) returns (a) {",
     "    if (flag) {", "        return left;", "    }", "    return right;", "}", ""]
   for (body, index) in plan.step.helpers.zipIdx do

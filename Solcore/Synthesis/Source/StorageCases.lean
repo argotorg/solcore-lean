@@ -14,7 +14,7 @@ open Solcore.Synthesis.Stateful.StorageExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-storage-case.v1"
 def planSchema : String := "solcore-lean.storage-plan.v1"
-def profileVersion : String := "stateful-storage-v1/sequence-seed-v1"
+def profileVersion : String := "stateful-storage-v2/sequence-seed-v1"
 def templateVersion : String := "two-slot-feedback-v1"
 def storageCorpusSchema : String := "solcore-lean.semantic-storage-corpus.v1"
 

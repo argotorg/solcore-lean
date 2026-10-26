@@ -140,10 +140,12 @@ private def admissionChecks : IO Unit := do
           "rollback wrapper ignored its arbitrary entry closure"
     | _ => throw (IO.userError "rollback wrapper lost its initial closure binding")
     ensure ((← emitted plan) == (← emitted plan)) "rollback emission is nondeterministic"
-  let unsupported ← checked [.binary .wordDiv (.var 0) (word 1)]
-  match Solcore.Synthesis.Source.StorageRollback.emit unsupported with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported rollback step was silently emitted")
+  -- Raw primitives join the existing opcode import only when a step uses them.
+  let divided ← checked [.binary .wordDiv (.var 0) (word 1)]
+  match Solcore.Synthesis.Source.StorageRollback.emit divided with
+  | .ok emitted => unless (emitted.source.splitOn "import {sload, sstore, mstore, revert_, div as sc_div, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+      throw (IO.userError "StorageRollback emission lost the merged raw division alias or its snapshots")
+  | .error error => throw (IO.userError s!"StorageRollback raw division was rejected: {reprStr error}")
 
 private def expectedBasic : String := String.intercalate "\n" [
   "import * from std;", "import * from std.dispatch;",
@@ -172,7 +174,7 @@ private def formattingChecks : IO Unit := do
     source.deployPath == ["SynthesizedRollbackDeploy"] &&
     source.runtimePath == ["SynthesizedRollbackDeploy", "SynthesizedRollback"])
     "rollback wrapper metadata changed"
-  ensure (Solcore.Synthesis.Source.StorageRollback.emitterVersion == "solcore-source-storage-rollback-v1" &&
+  ensure (Solcore.Synthesis.Source.StorageRollback.emitterVersion == "solcore-source-storage-rollback-v2" &&
     Solcore.Synthesis.Source.StorageRollback.wrapperVersion == "solcore-word-storage-rollback-contract-v1" &&
     Solcore.Synthesis.Source.StorageRollback.selector == "0xa444f5e9" &&
     StorageRollback.version == "core-storage-rollback-contract-v1") "rollback provenance changed"

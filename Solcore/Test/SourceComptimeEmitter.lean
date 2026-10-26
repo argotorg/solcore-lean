@@ -140,14 +140,17 @@ private def admissionChecks : IO Unit := do
   for body in [.var 0, .loadCell (.newCell .word (word 7))] do
     ensure (CheckedWordProgram.ofProgram? {resultType := .word, dataDefinitions := [], body}).isNone
       "comptime plan admitted an open or effectful constant"
+  -- Constants keep the scalar renderer; step functions render raw primitives.
   let unsupported ← constant (.ifE (.bool true) (word 0) (.binary .wordDiv (word 1) (word 1)))
-  let unsupportedStep ← step [.binary .wordDiv (.var 0) (word 1)]
+  let dividedStep ← step [.binary .wordDiv (.var 0) (word 1)]
   for variant in Variant.all do
-    for plan in [← checked unsupported (← step [identityWithCell]) variant,
-      ← checked closed unsupportedStep variant] do
-      match Solcore.Synthesis.Source.Comptime.emit plan with
-      | .error (.unsupportedBinary .wordDiv) => pure ()
-      | _ => throw (IO.userError "comptime emission discarded an unsupported original expression")
+    match Solcore.Synthesis.Source.Comptime.emit (← checked unsupported (← step [identityWithCell]) variant) with
+    | .error (.unsupportedBinary .wordDiv) => pure ()
+    | _ => throw (IO.userError "comptime emission discarded an unsupported original constant")
+    match Solcore.Synthesis.Source.Comptime.emit (← checked closed dividedStep variant) with
+    | .ok emitted => unless (emitted.source.splitOn "import { div as sc_div, mod as sc_mod, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+        throw (IO.userError "comptime step lost the raw division alias or its operand snapshots")
+    | .error error => throw (IO.userError s!"comptime raw division was rejected: {reprStr error}")
 
 private def contains (source fragment : String) : Bool := (source.splitOn fragment).length > 1
 
@@ -181,7 +184,7 @@ private def formattingChecks : IO Unit := do
         ensure (contains source.source "let sc_scale: word = sc_constant_value | 1;" &&
           contains source.source "sc_step(sc_input) * sc_scale + sc_constant_value;")
           "scale staging lost its odd multiplier or result offset"
-  ensure (Solcore.Synthesis.Source.Comptime.emitterVersion == "solcore-source-comptime-v1" &&
+  ensure (Solcore.Synthesis.Source.Comptime.emitterVersion == "solcore-source-comptime-v2" &&
     Solcore.Synthesis.Source.Comptime.wrapperVersion == "solcore-word-comptime-contract-v1" &&
     Solcore.Synthesis.Source.Comptime.selector == "0xa444f5e9" &&
     Comptime.version == "core-comptime-word-plan-v1") "comptime provenance changed"

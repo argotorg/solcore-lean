@@ -143,10 +143,12 @@ private def admissionChecks : IO Unit := do
           "child wrapper ignored its arbitrary aggregate entry"
     | _ => throw (IO.userError "child wrapper lost its closed entry binding")
     ensure ((← emitted plan) == (← emitted plan)) "nested source emission is nondeterministic"
-  let unsupported ← checked [.binary .wordDiv (.var 0) (word 1)]
-  match Solcore.Synthesis.Source.NestedCall.emit unsupported with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported child step was silently emitted")
+  -- Raw primitives join the existing opcode import only when a step uses them.
+  let divided ← checked [.binary .wordDiv (.var 0) (word 1)]
+  match Solcore.Synthesis.Source.NestedCall.emit divided with
+  | .ok emitted => unless (emitted.source.splitOn "log1 as log1_, div as sc_div, mod as sc_mod, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+      throw (IO.userError "NestedCall emission lost the merged raw division alias or its snapshots")
+  | .error error => throw (IO.userError s!"NestedCall raw division was rejected: {reprStr error}")
 
 private def formattingChecks : IO Unit := do
   let emitted ← emitted (← checked [.var 0])
@@ -166,7 +168,7 @@ private def formattingChecks : IO Unit := do
     "if ((sc_input & 1) == 1)", "if ((sc_input & 2) == 2)", "if ((sc_input & 4) == 4)"] do
     ensure ((emitted.source.splitOn fragment).length == 2)
       s!"nested source lost or duplicated its protocol fragment: {fragment}"
-  ensure (Solcore.Synthesis.Source.NestedCall.emitterVersion == "solcore-source-nested-call-v1" &&
+  ensure (Solcore.Synthesis.Source.NestedCall.emitterVersion == "solcore-source-nested-call-v2" &&
     Solcore.Synthesis.Source.NestedCall.wrapperVersion == "solcore-word-nested-call-v1" &&
     NestedCall.version == "core-nested-word-call-v1") "nested provenance changed"
 

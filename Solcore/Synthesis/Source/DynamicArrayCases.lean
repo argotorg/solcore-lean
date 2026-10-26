@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.DynamicArrayExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-dynamic-array-case.v1"
 def planSchema : String := "solcore-lean.dynamic-array-plan.v1"
-def profileVersion : String := "stateful-dynamic-array-v1/array-sequence-seed-v1"
+def profileVersion : String := "stateful-dynamic-array-v2/array-sequence-seed-v1"
 def templateVersion : String := "array-fold-slots-count-revert-odd-flags-v1"
 def arrayCorpusSchema : String := "solcore-lean.semantic-dynamic-array-corpus.v1"
 

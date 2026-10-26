@@ -130,10 +130,12 @@ private def admissionChecks : IO Unit := do
           "array wrapper ignored its arbitrary entry closure"
     | _ => throw (IO.userError "array wrapper lost its initial closure binding")
     ensure ((← emitted plan) == (← emitted plan)) "array emission is nondeterministic"
-  let unsupported ← checked [.binary .wordDiv (.var 0) (word 1)]
-  match Solcore.Synthesis.Source.DynamicArray.emit unsupported with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported array step was silently emitted")
+  -- Raw primitives join the existing opcode import only when a step uses them.
+  let divided ← checked [.binary .wordDiv (.var 0) (word 1)]
+  match Solcore.Synthesis.Source.DynamicArray.emit divided with
+  | .ok emitted => unless (emitted.source.splitOn "import {sload, sstore, mstore, revert_, div as sc_div, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+      throw (IO.userError "DynamicArray emission lost the merged raw division alias or its snapshots")
+  | .error error => throw (IO.userError s!"DynamicArray raw division was rejected: {reprStr error}")
 
 private def elementLines (index : Nat) : List String :=
   ["        if (sc_length > " ++ toString index ++ ") {",
@@ -168,7 +170,7 @@ private def formattingChecks : IO Unit := do
     source.deployPath == ["SynthesizedDynamicArrayDeploy"] &&
     source.runtimePath == ["SynthesizedDynamicArrayDeploy", "SynthesizedDynamicArray"])
     "array wrapper metadata changed"
-  ensure (Solcore.Synthesis.Source.DynamicArray.emitterVersion == "solcore-source-dynamic-array-v1" &&
+  ensure (Solcore.Synthesis.Source.DynamicArray.emitterVersion == "solcore-source-dynamic-array-v2" &&
     Solcore.Synthesis.Source.DynamicArray.wrapperVersion == "solcore-word-dynamic-array-contract-v1" &&
     Solcore.Synthesis.Source.DynamicArray.selector == "0x9a94c44b" &&
     DynamicArray.version == "core-dynamic-array-contract-v1" && DynamicArray.maxElements == 3)

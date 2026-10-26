@@ -10,7 +10,7 @@ namespace Solcore.Synthesis.Source.NestedCall
 
 open Solcore.Synthesis.Core.NestedCall (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-nested-call-v1"
+def emitterVersion : String := "solcore-source-nested-call-v2"
 def wrapperVersion : String := "solcore-word-nested-call-v1"
 def parentContractName : String := "SynthesizedCaller"
 def childContractName : String := "SynthesizedCallee"
@@ -40,7 +40,9 @@ structure EmittedContracts where
 def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
   let mut names : List String := []
   let mut lines := ["import * from std;", "import * from std.dispatch;",
-    "import {sload, sstore, mload, mstore, calldataload, gas, call, returndatasize, return_, revert_, invalid, log1 as log1_} from std.opcodes;", ""]
+    AggregateRenderer.opcodeImportWith ["sload", "sstore", "mload", "mstore", "calldataload", "gas", "call",
+      "returndatasize", "return_", "revert_", "invalid", "log1 as log1_"]
+      (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered

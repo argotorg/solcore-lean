@@ -12,7 +12,7 @@ open Solcore.Synthesis.Core.Generic (CheckedPlan)
 
 def caseSchema : String := "solcore-lean.semantic-generic-case.v1"
 def planSchema : String := "solcore-lean.generic-plan.v1"
-def profileVersion : String := "runtime-generics-v1/select-seed-v1"
+def profileVersion : String := "runtime-generics-v2/select-seed-v1"
 def templateVersion : String := "eager-generic-select-v1"
 
 def boundaryInputs : List Word :=

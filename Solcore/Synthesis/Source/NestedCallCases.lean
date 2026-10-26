@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.NestedCallExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-call-case.v1"
 def planSchema : String := "solcore-lean.call-plan.v1"
-def profileVersion : String := "stateful-calls-v1/sequence-seed-v1"
+def profileVersion : String := "stateful-calls-v2/sequence-seed-v1"
 def templateVersion : String := "two-account-word-call-v1"
 def callCorpusSchema : String := "solcore-lean.semantic-call-corpus.v1"
 

@@ -10,7 +10,7 @@ namespace Solcore.Synthesis.Source.Closure
 
 open Solcore.Synthesis.Core.Closure (CheckedPlan Variant)
 
-def emitterVersion : String := "solcore-source-closures-v1"
+def emitterVersion : String := "solcore-source-closures-v2"
 def wrapperVersion : String := "solcore-word-closures-contract-v1"
 def contractName : String := "SynthesizedClosures"
 def methodName : String := "run"
@@ -28,7 +28,8 @@ private def secondClosure : Variant → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "",
+  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+    AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_apply<a>(f: function (a) returns (a), x: a) returns (a) {",
     "    return f(x);", "}", ""]
   for (body, index) in plan.step.helpers.zipIdx do

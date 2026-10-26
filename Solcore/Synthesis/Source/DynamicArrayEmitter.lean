@@ -13,7 +13,7 @@ namespace Solcore.Synthesis.Source.DynamicArray
 
 open Solcore.Synthesis.Core.DynamicArray (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-dynamic-array-v1"
+def emitterVersion : String := "solcore-source-dynamic-array-v2"
 def wrapperVersion : String := "solcore-word-dynamic-array-contract-v1"
 def contractName : String := "SynthesizedDynamicArray"
 def methodName : String := "run"
@@ -33,7 +33,8 @@ private def elementLines (index : Nat) : List String :=
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
   let mut lines := ["import * from std;", "import * from std.dispatch;",
-    "import {sload, sstore, mstore, revert_} from std.opcodes;", ""]
+    AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
+      (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered

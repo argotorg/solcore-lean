@@ -130,10 +130,12 @@ private def admissionChecks : IO Unit := do
           "keyed wrapper ignored its arbitrary entry closure"
     | _ => throw (IO.userError "keyed wrapper lost its initial closure binding")
     ensure ((← emitted plan) == (← emitted plan)) "keyed emission is nondeterministic"
-  let unsupported ← checked [.binary .wordDiv (.var 0) (word 1)]
-  match Solcore.Synthesis.Source.KeyedStorage.emit unsupported with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported keyed step was silently emitted")
+  -- Raw primitives join the existing opcode import only when a step uses them.
+  let divided ← checked [.binary .wordDiv (.var 0) (word 1)]
+  match Solcore.Synthesis.Source.KeyedStorage.emit divided with
+  | .ok emitted => unless (emitted.source.splitOn "import {sload, sstore, mstore, revert_, div as sc_div, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+      throw (IO.userError "KeyedStorage emission lost the merged raw division alias or its snapshots")
+  | .error error => throw (IO.userError s!"KeyedStorage raw division was rejected: {reprStr error}")
 
 private def expectedBasic : String := String.intercalate "\n" [
   "import * from std;", "import * from std.dispatch;",
@@ -166,7 +168,7 @@ private def formattingChecks : IO Unit := do
     source.deployPath == ["SynthesizedKeyedStorageDeploy"] &&
     source.runtimePath == ["SynthesizedKeyedStorageDeploy", "SynthesizedKeyedStorage"])
     "keyed wrapper metadata changed"
-  ensure (Solcore.Synthesis.Source.KeyedStorage.emitterVersion == "solcore-source-keyed-storage-v1" &&
+  ensure (Solcore.Synthesis.Source.KeyedStorage.emitterVersion == "solcore-source-keyed-storage-v2" &&
     Solcore.Synthesis.Source.KeyedStorage.wrapperVersion == "solcore-word-keyed-storage-contract-v1" &&
     Solcore.Synthesis.Source.KeyedStorage.selector == "0x7357f5d2" &&
     KeyedStorage.version == "core-keyed-storage-contract-v1" && KeyedStorage.counterSlot == 0)

@@ -49,7 +49,7 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
-                         "runtime-aggregate-call-graphs", "stateful-keyed-storage", "stateful-dynamic-array")), 312)
+                         "runtime-aggregate-call-graphs", "stateful-keyed-storage", "stateful-dynamic-array")), 378)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
         self.assertGreater(suite.requested(args, "runtime-aggregate-call-graphs"), 0)
@@ -101,7 +101,7 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 393, 19), ('sonatina-o2', 393, 19), ('yul', 357, 14)):
+        for backend, old_count, profile_count in (('sonatina-o0', 459, 19), ('sonatina-o2', 459, 19), ('yul', 417, 14)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
@@ -371,7 +371,7 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(len(args.profile), 14)
         self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile
             if profile not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
-                               "runtime-aggregate-call-graphs")), 276)
+                               "runtime-aggregate-call-graphs")), 336)
         self.assertIn("runtime-primitives", args.profile)
         self.assertIn("runtime-call-graph-loops", args.profile)
         self.assertIn("runtime-aggregate-call-graphs", args.profile)

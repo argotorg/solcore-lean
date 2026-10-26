@@ -2,20 +2,32 @@
   "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
   "profile": "stateful-dynamic-array",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "profileVersion": "stateful-dynamic-array-v1/array-sequence-seed-v1",
+  "profileVersion": "stateful-dynamic-array-v2/array-sequence-seed-v1",
   "functionVersion": "core-dynamic-array-contract-v1",
   "templateVersion": "array-fold-slots-count-revert-odd-flags-v1",
-  "stepProfileVersion": "runtime-aggregates-v1/template-seed-v1",
+  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
   "stepFunctionVersion": "core-aggregate-dag-v1",
   "stepTemplateVersion": "word-aggregate-templates-v1",
-  "emitterVersion": "solcore-source-dynamic-array-v1",
+  "emitterVersion": "solcore-source-dynamic-array-v2",
   "wrapperVersion": "solcore-word-dynamic-array-contract-v1",
   "coverageKind": "step-core-ast-features",
   "requiredFeatures": [
     "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+    "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+    "binary:Solcore.Core.Wire.BinaryOp.wordEq",
     "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMod",
     "binary:Solcore.Core.Wire.BinaryOp.wordMul",
     "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordPow",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
     "binary:Solcore.Core.Wire.BinaryOp.wordSub",
     "binary:Solcore.Core.Wire.BinaryOp.wordXor",
     "boolLiteral",
@@ -32,7 +44,10 @@
     "pair",
     "second",
     "storeCell",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
     "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordClz",
     "unary:Solcore.Core.Wire.UnaryOp.wordNot",
     "wordLiteral"
   ],
@@ -2012,6 +2027,364 @@
             {
               "slot": "4",
               "value": "1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "primitives-243",
+      "generation": {
+        "seed": "243",
+        "maxProgramNodes": 384
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "boolLiteral",
+        "case",
+        "functionCall",
+        "if",
+        "inLeft",
+        "inRight",
+        "let",
+        "loadCell",
+        "local",
+        "newCell",
+        "storeCell",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ],
+      "expectedHistory": [
+        {
+          "id": "tx-0",
+          "status": "returned",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "id": "tx-1",
+          "status": "reverted",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "id": "tx-2",
+          "status": "returned",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000000d",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "10"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "7"
+            },
+            {
+              "slot": "3",
+              "value": "10"
+            },
+            {
+              "slot": "4",
+              "value": "3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "primitives-63",
+      "generation": {
+        "seed": "63",
+        "maxProgramNodes": 384
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "boolLiteral",
+        "case",
+        "functionCall",
+        "if",
+        "inLeft",
+        "inRight",
+        "let",
+        "loadCell",
+        "local",
+        "newCell",
+        "storeCell",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ],
+      "expectedHistory": [
+        {
+          "id": "tx-0",
+          "status": "returned",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "id": "tx-1",
+          "status": "reverted",
+          "output": "0x80000000000000000000000000000000000000000000000000000000000000f9",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "id": "tx-2",
+          "status": "returned",
+          "output": "0x00000000000000000000000000000000000000000000000000000000000000fc",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "249"
+            },
+            {
+              "slot": "1",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564820216"
+            },
+            {
+              "slot": "2",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819969"
+            },
+            {
+              "slot": "3",
+              "value": "249"
+            },
+            {
+              "slot": "4",
+              "value": "3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "primitives-0",
+      "generation": {
+        "seed": "0",
+        "maxProgramNodes": 384
+      },
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "boolLiteral",
+        "first",
+        "functionCall",
+        "if",
+        "let",
+        "loadCell",
+        "local",
+        "newCell",
+        "pair",
+        "second",
+        "storeCell",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral"
+      ],
+      "expectedHistory": [
+        {
+          "id": "tx-0",
+          "status": "returned",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "2"
+            },
+            {
+              "slot": "1",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+            },
+            {
+              "slot": "2",
+              "value": "2"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "2"
+            }
+          ]
+        },
+        {
+          "id": "tx-1",
+          "status": "returned",
+          "output": "0x8000000000000000000000000000000000000000000000000000000000000009",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819972"
+            },
+            {
+              "slot": "1",
+              "value": "5"
+            },
+            {
+              "slot": "2",
+              "value": "4"
+            },
+            {
+              "slot": "3",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819972"
+            },
+            {
+              "slot": "4",
+              "value": "5"
+            }
+          ]
+        },
+        {
+          "id": "tx-2",
+          "status": "returned",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000000a",
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "4"
+            },
+            {
+              "slot": "1",
+              "value": "4"
+            },
+            {
+              "slot": "2",
+              "value": "4"
+            },
+            {
+              "slot": "3",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819972"
+            },
+            {
+              "slot": "4",
+              "value": "6"
             }
           ]
         }

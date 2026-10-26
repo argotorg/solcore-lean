@@ -129,10 +129,12 @@ private def executionChecks : IO Unit := do
   match (maximum.instantiate (Word.ofNatModulo 7)).toCore.runStateful 0 with
   | .outOfFuel _ => pure ()
   | _ => throw (IO.userError "zero fuel was confused with a completed bounded loop")
-  let unsupported ← step [.binary .wordDiv (.var 0) (word 1)]
-  match Loop.emit (← checked unsupported 0) with
-  | .error (.unsupportedBinary .wordDiv) => pure ()
-  | _ => throw (IO.userError "unsupported step was silently discarded for a zero-trip loop")
+  -- Raw primitives render through the call-graph helpers with the alias import.
+  let divided ← step [.binary .wordDiv (.var 0) (word 1)]
+  match Loop.emit (← checked divided 0) with
+  | .ok emitted => unless (emitted.source.splitOn "import { div as sc_div, mod as sc_mod, ").length == 2 && (emitted.source.splitOn "    let sc_v3: word = sc_div(sc_v0, sc_v2);").length == 2 do
+      throw (IO.userError "loop emission lost the raw division alias or its operand snapshots")
+  | .error error => throw (IO.userError s!"loop raw division was rejected: {reprStr error}")
 
 private def expectedIncrement : String := String.intercalate "\n" [
   "import * from std;", "import * from std.dispatch;", "",
@@ -178,7 +180,7 @@ private def formattingChecks : IO Unit := do
   let mutable ← emitted (← checked (← step [mutableStep]) 7)
   ensure (contains mutable.source "function sc_fn0(sc_arg: word) returns (word) {\n    let sc_c0: word = sc_arg;" &&
     !contains mutable.source "sc_acc = sc_fn0") "private step allocation moved outside its function"
-  ensure (Loop.emitterVersion == "solcore-source-loops-v1" &&
+  ensure (Loop.emitterVersion == "solcore-source-loops-v2" &&
     Loop.wrapperVersion == "solcore-word-loops-contract-v1" &&
     Loop.selector == "0xa444f5e9" && BoundedLoop.version == "core-bounded-loop-plan-v1")
     "loop provenance changed"

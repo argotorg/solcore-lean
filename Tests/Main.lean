@@ -2154,6 +2154,7 @@ import Solcore.Test.SourceKeyedStorageCorpus
 import Solcore.Test.SourceDynamicArrayEmitter
 import Solcore.Test.SourceDynamicArrayCases
 import Solcore.Test.SourceDynamicArrayCorpus
+import Solcore.Test.SourceAggregatePrimitives
 set_option autoImplicit false
 
 open Solcore
@@ -4102,5 +4103,6 @@ def main : IO UInt32 := do
   Tests.SourceDynamicArrayEmitter.testSourceDynamicArrayEmitter
   Tests.SourceDynamicArrayCases.testSourceDynamicArrayCases
   Tests.SourceDynamicArrayCorpus.testSourceDynamicArrayCorpus
+  Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   IO.println "solcore-lean tests passed"
   return 0

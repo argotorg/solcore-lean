@@ -27,7 +27,7 @@ pure = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pure)
 require, run, canonical_word = pure.require, pure.run, pure.canonical_word
 VERSIONS = pure.VERSIONS + pure.MUTATION_VERSIONS + pure.LOOP_STEP_VERSIONS
-FEATURES = pure.FEATURES | pure.MUTATION_FEATURES | pure.AGGREGATE_FEATURES | {"functionCall"}
+FEATURES = pure.FEATURES | pure.MUTATION_FEATURES | pure.AGGREGATE_FEATURES | pure.PRIMITIVE_FEATURES | {"functionCall"}
 BOUNDARIES = (0, 1, (1 << 256) - 1, 1 << 255)
 BRANCHES = {"even", "odd"}
 SOURCE_PATHS = ["case.sol", "common.sol", "left.sol", "right.sol"]

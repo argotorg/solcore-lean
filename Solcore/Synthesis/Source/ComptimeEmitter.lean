@@ -10,7 +10,7 @@ namespace Solcore.Synthesis.Source.Comptime
 
 open Solcore.Synthesis.Core.Comptime (CheckedPlan Variant)
 
-def emitterVersion : String := "solcore-source-comptime-v1"
+def emitterVersion : String := "solcore-source-comptime-v2"
 def wrapperVersion : String := "solcore-word-comptime-contract-v1"
 def contractName : String := "SynthesizedComptime"
 def methodName : String := "run"
@@ -28,7 +28,8 @@ private def runtimeLines : Variant → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let constant ← ScalarRenderer.render .word [] 4 0 plan.constant.program.body
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "",
+  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+    AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_static(comptime value: word) returns (comptime<word>) {",
     "    return value;", "}", "",
     "function sc_constant() returns (comptime<word>) {"] ++ constant.lines ++

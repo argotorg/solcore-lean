@@ -12,7 +12,7 @@ open Solcore.Synthesis.Core.Modules (CheckedPlan)
 
 def caseSchema : String := "solcore-lean.semantic-module-case.v1"
 def planSchema : String := "solcore-lean.module-plan.v1"
-def profileVersion : String := "runtime-modules-v1/bundle-seed-v1"
+def profileVersion : String := "runtime-modules-v2/bundle-seed-v1"
 def templateVersion : String := "original-four-module-mix-v1"
 
 def boundaryInputs : List Word :=

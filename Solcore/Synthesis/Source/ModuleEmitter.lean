@@ -11,7 +11,7 @@ namespace Solcore.Synthesis.Source.Modules
 
 open Solcore.Synthesis.Core.Modules (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-modules-v1"
+def emitterVersion : String := "solcore-source-modules-v2"
 def wrapperVersion : String := "solcore-word-modules-contract-v1"
 def sourceBundleSchema : String := "solcore-lean.source-bundle.v1"
 def contractName : String := "SynthesizedModules"
@@ -63,8 +63,8 @@ private def commonSource (plan : CheckedPlan) : Except EmitError String := do
     "    if (flag) {", "        return left;", "    }", "    return right;", "}"])
 
 private def leftSource (plan : CheckedPlan) : Except EmitError String := do
-  let mut lines := ["import * from std;", "import { sc_apply } from common;",
-    "export { sc_left };", ""]
+  let mut lines := ["import * from std;", "import { sc_apply } from common;"] ++
+    AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["export { sc_left };", ""]
   let mut names : List String := []
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body

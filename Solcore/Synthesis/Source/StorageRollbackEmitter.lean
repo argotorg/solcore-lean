@@ -11,7 +11,7 @@ namespace Solcore.Synthesis.Source.StorageRollback
 
 open Solcore.Synthesis.Core.StorageRollback (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-storage-rollback-v1"
+def emitterVersion : String := "solcore-source-storage-rollback-v2"
 def wrapperVersion : String := "solcore-word-storage-rollback-contract-v1"
 def contractName : String := "SynthesizedRollback"
 def methodName : String := "run"
@@ -23,7 +23,8 @@ def runtimePath : List String := ["SynthesizedRollbackDeploy", "SynthesizedRollb
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
   let mut lines := ["import * from std;", "import * from std.dispatch;",
-    "import {sload, sstore, mstore, revert_} from std.opcodes;", ""]
+    AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
+      (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered

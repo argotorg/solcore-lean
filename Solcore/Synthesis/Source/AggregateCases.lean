@@ -10,7 +10,7 @@ namespace Solcore.Synthesis.Source.Aggregate
 open Lean Solcore.Core Solcore.Synthesis.Core
 
 def caseSchema : String := "solcore-lean.semantic-aggregate-case.v1"
-def profileVersion : String := "runtime-aggregates-v1/template-seed-v1"
+def profileVersion : String := "runtime-aggregates-v2/template-seed-v1"
 def templateVersion : String := "word-aggregate-templates-v1"
 
 structure CheckedInput where

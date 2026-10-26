@@ -12,7 +12,7 @@ open Solcore.Synthesis.Core.Comptime (CheckedPlan)
 
 def caseSchema : String := "solcore-lean.semantic-comptime-case.v1"
 def planSchema : String := "solcore-lean.comptime-plan.v1"
-def profileVersion : String := "runtime-comptime-v1/constant-step-seed-v1"
+def profileVersion : String := "runtime-comptime-v2/constant-step-seed-v1"
 def templateVersion : String := "original-word-comptime-v1"
 
 def boundaryInputs : List Word :=

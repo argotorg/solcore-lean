@@ -16,7 +16,7 @@ open Solcore.Synthesis.Stateful.KeyedStorageExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-keyed-storage-case.v1"
 def planSchema : String := "solcore-lean.keyed-storage-plan.v1"
-def profileVersion : String := "stateful-keyed-storage-v1/keyed-sequence-seed-v1"
+def profileVersion : String := "stateful-keyed-storage-v2/keyed-sequence-seed-v1"
 def templateVersion : String := "keyed-slot-successor-counter-revert-odd-v1"
 def keyedCorpusSchema : String := "solcore-lean.semantic-keyed-storage-corpus.v1"
 

@@ -12,7 +12,7 @@ open Solcore.Synthesis.Core.BoundedLoop (CheckedPlan)
 
 def caseSchema : String := "solcore-lean.semantic-loop-case.v1"
 def planSchema : String := "solcore-lean.loop-plan.v1"
-def profileVersion : String := "runtime-loops-v1/bounded-while-seed-v1"
+def profileVersion : String := "runtime-loops-v2/bounded-while-seed-v1"
 def templateVersion : String := "bounded-word-loops-v1"
 
 def boundaryInputs : List Word :=
