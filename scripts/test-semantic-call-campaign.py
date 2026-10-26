@@ -584,5 +584,84 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(campaign.common.read_json(output / "summary.json")["backend"], "sonatina-o2")
 
 
+def forward_case(rows=((0, 7, 5), (1, 0, 2**70), (2, 1, 1))):
+    value = fixtures.forward_case(rows)
+    value["forwardPlan"]["stepProgram"] = case()["callPlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def forward_report(value):
+    histories = fixtures.forward_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories, "bindings": copy.deepcopy(fixtures.BINDINGS),
+            "comparison": campaign.adapter.compare(histories, value, fixtures.BINDINGS)}
+
+
+class ForwardedValueCampaignTests(unittest.TestCase):
+    def test_forward_dimensions_record_values_forwards_and_refunds(self):
+        value = forward_case()
+        self.assertEqual(campaign.PROFILES["stateful-forwarded-value"]["dimensions"],
+                         campaign.DIMENSIONS[:-1] + ("Values", "ForwardedValues", "RefundedForwards", "RevertedValues"))
+        self.assertEqual(campaign.value_coverage(value, ["returned", "returned", "reverted"]),
+                         {"Values": {"7", "0", "1"}, "ForwardedValues": {"5", str(2**70), "1"},
+                          "RefundedForwards": {str(2**70)}, "RevertedValues": {"1"}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-forwarded-value"))
+            instance.summary["coverage"].update(requiredValues=["0", "7", str(2**64)], requiredRefundedForwards=[str(2**70)],
+                                                requiredCallModes=[0, 1, 2, 3])
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", forward_report(value)["histories"], fixtures.BINDINGS)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedValues"], coverage["matchedRefundedForwards"], coverage["matchedCallModes"],
+                              coverage["matchedRevertedValues"]), (["0", "1", "7"], [str(2**70)], [0, 1, 2], ["1"]))
+            self.assertEqual((coverage["missingValues"], coverage["missingCallModes"]), ([str(2**64)], [3]))
+            self.assertNotIn("matchedLogPatterns", coverage)
+            self.assertEqual(instance.summary["configuration"]["profile"], "stateful-forwarded-value")
+        with tempfile.TemporaryDirectory() as directory:
+            legacy = campaign.Campaign(options(directory)).summary["coverage"]
+            self.assertIn("requiredLogPatterns", legacy)
+            self.assertNotIn("requiredValues", legacy)
+
+    def test_forward_manifest_requires_value_dimensions_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-forward-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        changes = [lambda m: m.pop("requiredValues"), lambda m: m.update(requiredCallModes=[4]),
+            lambda m: m.update(requiredLogPatterns=[""]), lambda m: m.update(requiredRefundedForwards=[]),
+            lambda m: m.update(requiredValues=["07"]), lambda m: m.update(requiredRevertedValues=[str(2**70 + 1)]),
+            lambda m: m["cases"][0].update(callPlan=m["cases"][0].pop("forwardPlan"))]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        calls = json.loads((ROOT / "scripts/semantic-call-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(calls), calls)
+        calls["requiredValues"] = ["0"]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(calls)
+
+    def test_forward_fingerprints_injection_and_prefix_counts(self):
+        value = forward_case()
+        raw = forward_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        changed = campaign.analyze(raw, value, "importedHull", "tx-0", "child:balance")
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((changed["comparison"]["category"], fingerprint["accountFields"], fingerprint["transactionId"]),
+                         ("semantic-mismatch", ["child:balance"], "tx-0"))
+        self.assertTrue(campaign.same_failure(fingerprint, campaign.analyze(forward_report(value), value, "importedHull", "tx-0", "child:balance")))
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value, fixtures.BINDINGS), {"executed": 3, "completed": 3, "matched": 3})
+        for history in raw["histories"].values():
+            history["initialAccounts"] = campaign.adapter.initial_accounts(fixtures.BINDINGS)
+        initial = campaign.analyze({**raw, "comparison": campaign.adapter.compare(raw["histories"], value, fixtures.BINDINGS)}, value)
+        self.assertEqual(campaign.fingerprint(initial)["accountFields"], ["parent:balance"])
+        self.assertEqual((campaign.helper_count(value), campaign.recipes(value)), (1, set()))
+        generated = forward_case()
+        generated["provenance"]["origin"] = {"kind": "forward-generated", "stepOrigin": {"kind": "aggregate-generated", "helpers": [{"template": 2}]}}
+        self.assertEqual(campaign.recipes(generated), {2})
+        self.assertNotEqual(campaign.case_hash(value), campaign.case_hash(forward_case(rows=((0, 7, 6), (1, 0, 2**70), (2, 1, 1)))))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -45,6 +45,8 @@ TARGETS = {
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",
     "semanticBytesTool": "semantic-bytes-tool",
+    "semanticForwardTool": "semantic-forward-tool",
+    "rustHullForwardScenario": "rust-hull-forward-scenario",
 }
 PATCHES = {
     "crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),

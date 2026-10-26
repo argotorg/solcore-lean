@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Compare bounded parent/child calls, committed accounts and logs on three paths.
 
-The original checked Core contracts execute through the public nested runtime.
+Two profiles share this adapter: `stateful-calls` (zero-value transactions and
+a fixed eight-unit parent) and `stateful-forwarded-value` (payable transactions
+whose parent forwards bank amounts to the child). The original checked Core
+contracts execute through the public nested runtime.
 Rust supplies independently compiled Hull and linked EVM images. Every EVM
 observation belongs to an actual mined transaction; no Python transition model
 or saved expected output supplies the reference result.
@@ -33,6 +36,22 @@ HISTORY_SCHEMA = "solcore-lean.call-history.v1"
 BINDINGS_SCHEMA = "solcore-lean.call-bindings.v1"
 SELECTOR = "0x7357f5d2"
 ROLES = ("parent", "child")
+FORWARD_CASE_SCHEMA = "solcore-lean.semantic-forward-case.v1"
+FORWARD_HISTORY_SCHEMA = "solcore-lean.forward-history.v1"
+FORWARD_SELECTOR = "0x24b912e5"
+# The forwarding parent's endowment covers three forwards of the largest bank
+# value; original Core and Hull fund the caller with 2^80.
+ENDOWMENT, CALLER_FUNDS, MAX_VALUE = 2**72, 2**80, 2**70
+PROFILES = {
+    "stateful-calls": {"caseSchema": CASE_SCHEMA, "historySchema": HISTORY_SCHEMA, "planKey": "callPlan",
+        "planSchema": "solcore-lean.call-plan.v1", "caseTool": "semantic-call-tool", "coreRunner": "rust-hull-call-scenario",
+        "scenarioSchema": "solcore-lean.call-contract-scenario.v1", "forwarding": False,
+        "scope": "depth-one fixed Word calls; funded parent8/child0; both accounts' slots0/1, balances, root outcome and ordered committed logs; no gas/nonce equivalence"},
+    "stateful-forwarded-value": {"caseSchema": FORWARD_CASE_SCHEMA, "historySchema": FORWARD_HISTORY_SCHEMA, "planKey": "forwardPlan",
+        "planSchema": "solcore-lean.forward-plan.v1", "caseTool": "semantic-forward-tool", "coreRunner": "rust-hull-forward-scenario",
+        "scenarioSchema": "solcore-lean.forward-contract-scenario.v1", "forwarding": True,
+        "scope": "depth-one Word calls forwarding bank amounts; payable root values; parent endowment 2^72/child0; both accounts' slots0/1, balances, root outcome and empty logs; no sender-balance, gas or nonce equivalence"},
+}
 
 
 def save(path, value):
@@ -56,7 +75,33 @@ def validate_bindings(value):
     return value
 
 
-def contract_metadata():
+def profile(case):
+    """The call-family profile a case schema selects."""
+    if isinstance(case, dict):
+        for value in PROFILES.values():
+            if case.get("schema") == value["caseSchema"]:
+                return value
+    raise ValueError("unsupported nested-call case schema")
+
+
+def forwarding(case):
+    return profile(case)["forwarding"]
+
+
+def endowment(forwards=False):
+    return str(ENDOWMENT) if forwards else "8"
+
+
+def contract_metadata(forwards=False):
+    if forwards:
+        parent, child = "SynthesizedForwarder", "SynthesizedRecipient"
+        return {
+            "parent": {"name": parent, "method": "run", "signature": "run(uint256,uint256,uint256)", "selector": FORWARD_SELECTOR,
+                "payable": True, "deployPath": [parent + "Deploy"], "runtimePath": [parent + "Deploy", parent],
+                "constructorCalldata": "0x", "constructorValue": str(ENDOWMENT)},
+            "child": {"name": child, "entry": "fallback", "payable": True, "inputBytes": 32,
+                "deployPath": [child + "Deploy"], "runtimePath": [child + "Deploy", child],
+                "constructorCalldata": "0x", "constructorValue": "0"}}
     parent, child = "SynthesizedCaller", "SynthesizedCallee"
     return {
         "parent": {"name": parent, "method": "run", "signature": "run(uint256,uint256)", "selector": SELECTOR,
@@ -68,17 +113,18 @@ def contract_metadata():
 
 
 def validate_case(case):
-    if not isinstance(case, dict) or case.get("schema") != CASE_SCHEMA:
-        raise ValueError("unsupported nested-call case schema")
-    plan = case.get("callPlan")
-    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-plan.v1" or not isinstance(plan.get("stepProgram"), dict):
+    selected = profile(case)
+    forwards = selected["forwarding"]
+    plan = case.get(selected["planKey"])
+    if not isinstance(plan, dict) or plan.get("schema") != selected["planSchema"] or not isinstance(plan.get("stepProgram"), dict):
         raise ValueError("call case requires its checked child step")
     programs = case.get("programs")
     if not isinstance(programs, dict) or set(programs) != set(ROLES) or any(not isinstance(programs[role], dict) for role in ROLES):
         raise ValueError("call case requires both original Core programs")
-    if not isinstance(case.get("source"), str) or case.get("contracts") != contract_metadata():
+    if not isinstance(case.get("source"), str) or case.get("contracts") != contract_metadata(forwards):
         raise ValueError("call source or fixed ABI metadata changed")
-    initial = {"accounts": [{"role": role, "balance": "8" if role == "parent" else "0", "storage": []} for role in ROLES], "callerBalance": "0"}
+    initial = {"accounts": [{"role": role, "balance": endowment(forwards) if role == "parent" else "0", "storage": []} for role in ROLES],
+               "callerBalance": str(CALLER_FUNDS) if forwards else "0"}
     if case.get("initialState") != initial or case.get("observedSlots") != list(SLOTS):
         raise Finding("unsupported-scope", "input", "call profile requires its fixed initial accounts and observed slots")
     provenance = case.get("provenance")
@@ -90,23 +136,31 @@ def validate_case(case):
         raise ValueError("call case requires one to three transactions")
     ids = set()
     for tx in transactions:
-        if not isinstance(tx, dict) or set(tx) != {"id", "input", "value", "target", "callee"}:
+        keys = {"id", "input", "value", "target", "callee"} | ({"amount"} if forwards else set())
+        if not isinstance(tx, dict) or set(tx) != keys:
             raise ValueError("call transactions retain symbolic roles, not invented calldata")
         identifier = tx["id"]
         if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identifier) or identifier in ids:
             raise ValueError("transaction IDs must be unique bounded identifiers")
         ids.add(identifier)
         common.word(tx["input"], "transaction input")
-        if (tx["target"], tx["callee"], tx["value"]) != ("parent", "child", "0"):
+        if forwards:
+            if any(int(common.word(tx[key], "transaction " + key)) > MAX_VALUE for key in ("value", "amount")):
+                raise ValueError("forwarded-value call values and amounts are at most 2^70")
+            if (tx["target"], tx["callee"]) != ("parent", "child"):
+                raise Finding("unsupported-scope", "input", "call transactions must use the fixed roles")
+        elif (tx["target"], tx["callee"], tx["value"]) != ("parent", "child", "0"):
             raise Finding("unsupported-scope", "input", "call transactions must use the fixed roles and zero root value")
 
 
 def calldata(bindings, tx):
+    if "amount" in tx:
+        return FORWARD_SELECTOR + f"{int(bindings['child']):064x}{int(tx['input']):064x}{int(tx['amount']):064x}"
     return SELECTOR + f"{int(bindings['child']):064x}{int(tx['input']):064x}"
 
 
-def initial_accounts(bindings):
-    return [{"role": role, "address": bindings[role], "balance": "8" if role == "parent" else "0",
+def initial_accounts(bindings, forwards=False):
+    return [{"role": role, "address": bindings[role], "balance": endowment(forwards) if role == "parent" else "0",
              "storage": [{"slot": slot, "value": "0"} for slot in SLOTS]} for role in ROLES]
 
 
@@ -136,7 +190,7 @@ def logs(rows):
 
 
 def normalize_history(history, case, bindings):
-    if not isinstance(history, dict) or history.get("schema") != HISTORY_SCHEMA:
+    if not isinstance(history, dict) or history.get("schema") != profile(case)["historySchema"]:
         raise ValueError("unsupported call history")
     initial = accounts(history.get("initialAccounts"), bindings)
     rows = history.get("transactions")
@@ -180,6 +234,35 @@ def expected_status(tx):
     return "reverted" if int(tx["input"]) & 2 else "returned"
 
 
+def account(rows, role):
+    return next(row for row in rows if row["role"] == role)
+
+
+def slot(row, name):
+    return int(next(entry["value"] for entry in row["storage"] if entry["slot"] == name))
+
+
+def forwarding_fields(case, rows, values, index):
+    """Fields of completed forwarded-value rows that break the fixed protocol:
+    committed logs must stay empty, a child revert under a committed root keeps
+    the child's account, the child holds exactly its slot one, and both
+    balances sum to the endowment plus every committed call value. A root
+    revert is checked by the shared rollback rule."""
+    fields = set()
+    for path, row in rows.items():
+        prior = values[path]["transactions"][index - 1]["committedAccounts"] if index else values[path]["initialAccounts"]
+        accepted = sum(int(tx["value"]) for tx, earlier in zip(case["transactions"][:index + 1], values[path]["transactions"][:index + 1])
+                       if earlier["status"] == "returned")
+        if row["logs"]:
+            fields.add("logs")
+        child, parent = account(row["committedAccounts"], "child"), account(row["committedAccounts"], "parent")
+        if row["status"] == "returned" and int(case["transactions"][index]["input"]) & 1 and child != account(prior, "child"):
+            fields.add("committedAccounts")
+        if int(child["balance"]) != slot(child, "1") or int(parent["balance"]) + int(child["balance"]) != ENDOWMENT + accepted:
+            fields.add("committedAccounts")
+    return sorted(fields)
+
+
 def compare(histories, case, bindings):
     if set(histories) != set(PATHS):
         return {"category": "adapter-error", "stage": "comparison", "detail": "three histories required", "pairs": {}}
@@ -190,7 +273,7 @@ def compare(histories, case, bindings):
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
     initial = {path: values[path]["initialAccounts"] for path in PATHS}
     pairs = storage.pairwise(initial)
-    if not all(pairs.values()) or any(state != initial_accounts(bindings) for state in initial.values()):
+    if not all(pairs.values()) or any(state != initial_accounts(bindings, forwarding(case)) for state in initial.values()):
         return {"category": "semantic-mismatch", "stage": "initial-accounts", "fields": ["committedAccounts"], "pairs": pairs}
     for index, tx in enumerate(case["transactions"]):
         where = {"stage": "transaction", "index": index, "transactionId": tx["id"]}
@@ -209,6 +292,8 @@ def compare(histories, case, bindings):
                 for field, correct in (("committedAccounts", row["committedAccounts"] == prior), ("logs", row["logs"] == [])):
                     if not correct and field not in fields:
                         fields.append(field)
+        if forwarding(case):
+            fields += [field for field in forwarding_fields(case, rows, values, index) if field not in fields]
         if not all(pairs.values()) or not normal or fields:
             return {"category": "semantic-mismatch", **where, "pairs": pairs, "fields": fields or ["status", "output", "logs"]}
     return {"category": "matched", "stage": "completed-history", "pairs": storage.pairwise(values)}
@@ -283,7 +368,7 @@ def hull_history(stdout, exit_code, case, bindings, runtimes):
     complete = len(calls) == len(case["transactions"]) and all(row.get("status") in ("returned", "reverted") for row in calls)
     if complete and exit_code:
         raise ValueError("unexplained Hull failure after complete call history")
-    history = {"schema": HISTORY_SCHEMA, "initialAccounts": initial, "transactions": calls,
+    history = {"schema": profile(case)["historySchema"], "initialAccounts": initial, "transactions": calls,
         "finalAccounts": calls[-1].get("committedAccounts") if calls else initial,
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
     normalize_history(history, case, bindings)
@@ -300,6 +385,7 @@ def execute(args, report):
     runner = common.Runner(args, report)
     case = common.read_json(args.replay / "case.json" if args.replay else args.case)
     validate_case(case)
+    selected = profile(case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
     save(case_path, case)
     source.write_text(case["source"])
@@ -328,7 +414,7 @@ def execute(args, report):
     report["repository"] = {"revision": revision["stdout"].strip(), "trackedDiffSha256": common.digest(diff["stdout"].encode())}
     refreshed = common.checked_process(runner, "direct-core-replay", [str(args.case_tool), "replay", str(case_path), str(args.direct_fuel)])
     fresh = json.loads(refreshed["stdout"])
-    for key in ("programs", "source", "provenance", "contracts", "transactions", "callPlan", "initialState", "observedSlots"):
+    for key in ("programs", "source", "provenance", "contracts", "transactions", selected["planKey"], "initialState", "observedSlots"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"native call replay changed {key}")
     save(args.output / "replayed-case.json", fresh)
@@ -390,11 +476,15 @@ def execute(args, report):
         normalize_history(direct, case, bindings)
         save(args.output / "direct-history.json", direct)
         report["histories"]["directCore"] = direct
-        scenario = {"schema": "solcore-lean.call-contract-scenario.v1", "hull": str(hull), "images": str(images_path),
-            "bindings": bindings, "initialBalances": {"parent": "8", "child": "0"}, "observedSlots": list(SLOTS),
+        scenario = {"schema": selected["scenarioSchema"], "hull": str(hull), "images": str(images_path),
+            "bindings": bindings, "initialBalances": {"parent": endowment(selected["forwarding"]), "child": "0"}, "observedSlots": list(SLOTS),
             "fuel": args.core_fuel, "availableGas": str(args.gas),
             **{role + field[0].upper() + field[1:]: case["contracts"][role][field] for role in ROLES for field in ("deployPath", "runtimePath")},
             "calls": [{"id": tx["id"], "input": tx["input"], "calldata": calldata(bindings, tx), "value": "0", "persist": True} for tx in case["transactions"]]}
+        if selected["forwarding"]:
+            scenario["callerFunds"] = str(CALLER_FUNDS)
+            scenario["calls"] = [{"id": tx["id"], "input": tx["input"], "amount": tx["amount"], "calldata": calldata(bindings, tx),
+                                  "value": tx["value"], "persist": True} for tx in case["transactions"]]
         scenario_path = args.output / "scenario.json"
         save(scenario_path, scenario)
         imported = runner.process("imported-hull", [str(args.core_runner), str(scenario_path)])
@@ -406,7 +496,7 @@ def execute(args, report):
         def checkpoint(pending=None):
             complete = len(evm_rows) == len(case["transactions"]) and all(row["status"] in ("returned", "reverted") for row in evm_rows)
             remaining = [tx["id"] for tx in case["transactions"][len(evm_rows):]]
-            report["histories"]["rustEvm"] = {"schema": HISTORY_SCHEMA, "initialAccounts": initial,
+            report["histories"]["rustEvm"] = {"schema": selected["historySchema"], "initialAccounts": initial,
                 "transactions": list(evm_rows), "finalAccounts": None if pending else evm_rows[-1]["committedAccounts"] if evm_rows else initial,
                 "status": "complete" if complete else "incomplete", "unobserved": [pending] if pending else [],
                 "unexecuted": remaining[1:] if pending else remaining}
@@ -417,7 +507,7 @@ def execute(args, report):
             checkpoint(tx["id"])
             try:
                 tx_hash = storage.submit(rpc, {"from": sender, "to": "0x" + f"{int(bindings['parent']):040x}",
-                    "data": calldata(bindings, tx), "value": "0x0", "gas": gas}, record)
+                    "data": calldata(bindings, tx), "value": hex(int(tx["value"])), "gas": gas}, record)
             except BaseException:
                 if record.get("submission") == "rejected":
                     checkpoint()
@@ -455,8 +545,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=common.SONATINA_BACKENDS,
         help="default sonatina-o0; exact replay inherits its saved backend")
-    parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-call-tool")
-    parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-call-scenario")
+    parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")
+    parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
@@ -466,7 +556,10 @@ def main():
         parser.add_argument("--" + key.replace("_", "-"), type=float if "timeout" in key else int)
     args = parser.parse_args()
     try:
+        selected = profile(common.read_json(args.replay / "case.json" if args.replay else args.case))
         validate_case(common.read_json(args.replay / "case.json" if args.replay else args.case))
+        args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
+        args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
         saved_report = common.read_json(args.replay / "report.json", defaults["artifact_limit"]) if args.replay else None
         if args.replay and not isinstance(saved_report, dict):
             raise ValueError("saved report must be an object")
@@ -491,7 +584,7 @@ def main():
             setattr(args, key, getattr(args, key).resolve())
     args.output.mkdir(parents=True, exist_ok=False)
     report = {"schema": REPORT_SCHEMA, "backend": args.backend, "processes": [], "histories": {}, "budgets": {key: getattr(args, key) for key in defaults},
-        "scope": "depth-one fixed Word calls; funded parent8/child0; both accounts' slots0/1, balances, root outcome and ordered committed logs; no gas/nonce equivalence"}
+        "scope": selected["scope"]}
     previous = signal.getsignal(signal.SIGTERM)
     def interrupted(_signal, _frame):
         signal.signal(signal.SIGTERM, signal.SIG_IGN)

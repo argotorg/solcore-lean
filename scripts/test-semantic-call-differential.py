@@ -305,5 +305,149 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(report["backend"], "sonatina-o2")
 
 
+FORWARD_ENDOWMENT = 2**72
+
+
+def forward_case(rows=((0, 7, 5), (1, 0, 2**70), (2, 1, 1))):
+    """Envelope fixture only: native replay checks the actual forwarding programs."""
+    return {"schema": adapter.FORWARD_CASE_SCHEMA, "forwardPlan": {"schema": "solcore-lean.forward-plan.v1", "stepProgram": {}},
+        "programs": {"parent": {}, "child": {}}, "source": "protocol fixture only; no checked AST",
+        "contracts": adapter.contract_metadata(True), "observedSlots": ["0", "1"],
+        "initialState": {"accounts": [{"role": "parent", "balance": str(FORWARD_ENDOWMENT), "storage": []},
+            {"role": "child", "balance": "0", "storage": []}], "callerBalance": str(2**80)},
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "transactions": [{"id": f"tx-{index}", "input": str(given), "value": str(value), "amount": str(amount),
+            "target": "parent", "callee": "child"} for index, (given, value, amount) in enumerate(rows)]}
+
+
+def forward_history(value):
+    """Rows that follow the forwarding protocol: slots zero are fixtures, the
+    child's slot one is what it accepted and equals its balance, a child revert
+    keeps the child and its amount with the parent, a root revert keeps both,
+    and the balances sum to the endowment plus every committed call value."""
+    parent, child = [FORWARD_ENDOWMENT, 0, 0], [0, 0, 0]
+    rows = []
+    for index, tx in enumerate(value["transactions"]):
+        given, sent, amount = int(tx["input"]), int(tx["value"]), int(tx["amount"])
+        if not given & 2:
+            parent = [parent[0] + sent, index + 10, index + 20]
+            if not given & 1:
+                parent[0] -= amount
+                child = [child[0] + amount, index + 30, child[2] + amount]
+        rows.append({"id": tx["id"], "index": index, "status": "reverted" if given & 2 else "returned", "output": word(index + 3),
+                     "committedAccounts": account_rows(parent[0], parent[1:], child[0], child[1:]), "logs": []})
+    return {"schema": adapter.FORWARD_HISTORY_SCHEMA, "initialAccounts": adapter.initial_accounts(BINDINGS, True),
+        "transactions": rows, "finalAccounts": copy.deepcopy(rows[-1]["committedAccounts"]), "status": "complete", "unexecuted": []}
+
+
+def forward_histories(value=None):
+    value = forward_case() if value is None else value
+    return {path: forward_history(value) for path in adapter.PATHS}
+
+
+class ForwardedValueTests(unittest.TestCase):
+    def test_forward_case_requires_payable_bank_values_and_three_word_calldata(self):
+        value = forward_case()
+        adapter.validate_case(value)
+        self.assertTrue(adapter.forwarding(value))
+        self.assertFalse(adapter.forwarding(case()))
+        self.assertEqual((adapter.profile(value)["caseTool"], adapter.profile(value)["coreRunner"]),
+                         ("semantic-forward-tool", "rust-hull-forward-scenario"))
+        # `cast calldata "run(uint256,uint256,uint256)" 102 5 1180591620717411303424`
+        self.assertEqual(adapter.calldata(BINDINGS, {"input": "5", "amount": str(2**70)}),
+                         "0x24b912e5" + f"{102:064x}{5:064x}" + "0" * 46 + "40" + "0" * 16)
+        self.assertEqual(adapter.calldata(BINDINGS, case()["transactions"][0]), "0x7357f5d2" + f"{102:064x}{4:064x}")
+        self.assertEqual(adapter.initial_accounts(BINDINGS, True)[0]["balance"], str(FORWARD_ENDOWMENT))
+        adapter.validate_case(forward_case(rows=((0, 2**70, 2**70),) * 3))
+        for field, changed in (("value", str(2**70 + 1)), ("amount", str(2**70 + 1)), ("amount", "05"), ("value", None),
+                               ("callee", "parent"), ("input", "01")):
+            invalid = forward_case()
+            invalid["transactions"][0][field] = changed
+            with self.subTest(field=field, changed=changed), self.assertRaises((ValueError, adapter.Finding)):
+                adapter.validate_case(invalid)
+        missing = forward_case()
+        del missing["transactions"][0]["amount"]
+        with self.assertRaises(ValueError):
+            adapter.validate_case(missing)
+        for change in (lambda v: v["contracts"]["parent"].update(constructorValue="8"),
+                       lambda v: v.update(contracts=adapter.contract_metadata()),
+                       lambda v: v.update(forwardPlan={"schema": "solcore-lean.call-plan.v1", "stepProgram": {}})):
+            invalid = forward_case()
+            change(invalid)
+            with self.assertRaises(ValueError):
+                adapter.validate_case(invalid)
+        for change in (lambda v: v["initialState"].update(callerBalance="0"),
+                       lambda v: v["initialState"]["accounts"][0].update(balance="8")):
+            invalid = forward_case()
+            change(invalid)
+            with self.assertRaises(adapter.Finding):
+                adapter.validate_case(invalid)
+        legacy = case()
+        legacy["transactions"][0]["amount"] = "1"
+        with self.assertRaises(ValueError):
+            adapter.validate_case(legacy)
+
+    def test_forwarding_histories_match_and_refund_rules_hold_on_every_path(self):
+        value = forward_case()
+        self.assertEqual(adapter.compare(forward_histories(value), value, BINDINGS)["category"], "matched")
+        # One path that kept a child-reverted forward differs pairwise and breaks the refund rule.
+        for path in adapter.PATHS:
+            observed = forward_histories(value)
+            row = observed[path]["transactions"][1]
+            parent, child = row["committedAccounts"]
+            parent["balance"] = str(int(parent["balance"]) - 2**70)
+            child["balance"] = str(int(child["balance"]) + 2**70)
+            child["storage"][1]["value"] = str(int(child["storage"][1]["value"]) + 2**70)
+            result = adapter.compare(observed, value, BINDINGS)
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-1", ["committedAccounts"]))
+                self.assertFalse(all(result["pairs"].values()))
+        # All paths agreeing on a balance that breaks the accounting still fail.
+        for name, change in (("child balance", lambda accounts: accounts[1].update(balance=str(int(accounts[1]["balance"]) + 1))),
+                             ("conservation", lambda accounts: accounts[0].update(balance=str(int(accounts[0]["balance"]) + 1))),
+                             ("child slot", lambda accounts: accounts[1]["storage"][1].update(value="6"))):
+            agreed = forward_histories(value)
+            for history in agreed.values():
+                change(history["transactions"][0]["committedAccounts"])
+            result = adapter.compare(agreed, value, BINDINGS)
+            with self.subTest(change=name):
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-0", ["committedAccounts"]))
+        logged = forward_histories(value)
+        for history in logged.values():
+            history["transactions"][0]["logs"] = [event("parent", 1, 4)]
+        result = adapter.compare(logged, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-0", ["logs"]))
+        legacy_endowment = forward_histories(value)
+        for history in legacy_endowment.values():
+            history["initialAccounts"] = adapter.initial_accounts(BINDINGS)
+        self.assertEqual(adapter.compare(legacy_endowment, value, BINDINGS)["stage"], "initial-accounts")
+        call_schema = forward_histories(value)
+        call_schema["directCore"]["schema"] = adapter.HISTORY_SCHEMA
+        self.assertEqual(adapter.compare(call_schema, value, BINDINGS)["category"], "adapter-error")
+        # The nested-call profile keeps its eight-unit endowment and log rules.
+        self.assertEqual(adapter.compare(histories(), case(), BINDINGS)["category"], "matched")
+
+    def test_forward_hull_history_uses_its_schema_and_endowment(self):
+        value = forward_case()
+        runtimes = {"parent": b"\x60\x01", "child": b"\x60\x02"}
+        rows = [{"stage": "deployment-" + role, "status": "returned", "output": "0x" + runtimes[role].hex(),
+                 "imageVerified": True, "codeBytes": 2} for role in ("child", "parent")]
+        rows += [{"stage": "initialization", "committedAccounts": adapter.initial_accounts(BINDINGS, True)}]
+        rows += [{**row, "stage": "execution"} for row in forward_history(value)["transactions"]]
+        encode = lambda values: "\n".join(json.dumps(row) for row in values)
+        history = adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
+        self.assertEqual((history["schema"], history["status"]), (adapter.FORWARD_HISTORY_SCHEMA, "complete"))
+        self.assertEqual(adapter.compare({**forward_histories(value), "importedHull": history}, value, BINDINGS)["category"], "matched")
+        rejected = rows[:4] + [{"stage": "execution", "id": "tx-1", "index": 1, "status": "transfer-rejected",
+                                "committedAccounts": rows[3]["committedAccounts"], "logs": None}]
+        observed = adapter.hull_history(encode(rejected), 1, value, BINDINGS, runtimes)
+        self.assertEqual(observed["status"], "incomplete")
+        self.assertEqual(adapter.compare({**forward_histories(value), "importedHull": observed}, value, BINDINGS)["category"],
+                         "execution-error")
+
+
 if __name__ == "__main__":
     unittest.main()

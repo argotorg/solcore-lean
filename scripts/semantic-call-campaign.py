@@ -44,8 +44,21 @@ SHRINKABLE = legacy.SHRINKABLE
 VERSIONS = ("generatorVersion", "profileVersion", "functionVersion", "templateVersion", "stepProfileVersion",
             "stepFunctionVersion", "stepTemplateVersion", "emitterVersion", "wrapperVersion")
 DIMENSIONS = ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templates", "CallModes", "Outcomes", "LogPatterns")
+# Call values, forwarded amounts, the amounts a child revert keeps with the
+# parent and the call values a root revert returns to the sender.
+VALUE_DIMENSIONS = ("Values", "ForwardedValues", "RefundedForwards", "RevertedValues")
+FORWARD_DIMENSIONS = DIMENSIONS[:-1] + VALUE_DIMENSIONS
+NUMERIC_DIMENSIONS = ("Inputs",) + VALUE_DIMENSIONS
 TEST_FIELDS = ("output", "parent:balance", "child:balance", "parent:storage:0", "parent:storage:1", "child:storage:0", "child:storage:1", "logs:data")
 LOG_PATTERNS = ("", "parent:1,parent:3", "parent:1,child:2,parent:3")
+FORWARD_CORPUS_SCHEMA = "solcore-lean.semantic-forward-corpus.v1"
+# Profile rules; the adapter selects schemas, programs and protocols by case schema.
+PROFILES = {
+    "stateful-calls": {"dimensions": DIMENSIONS, "modeMask": 7, "corpusSchema": CORPUS_SCHEMA, "originKind": "call-generated",
+        "scope": "one child call; fixed parent8/child0; committed slots0/1, contract balances and ordered logs; zero root value; no gas/nonce or arbitrary-world equivalence"},
+    "stateful-forwarded-value": {"dimensions": FORWARD_DIMENSIONS, "modeMask": 3, "corpusSchema": FORWARD_CORPUS_SCHEMA, "originKind": "forward-generated",
+        "scope": "one value-forwarding child call; parent endowment 2^72/child0; committed slots0/1, contract balances and empty logs; payable root values; no sender-balance, gas/nonce or arbitrary-world equivalence"},
+}
 
 
 def case_hash(case):
@@ -54,7 +67,7 @@ def case_hash(case):
 
 
 def helper_count(case):
-    step = case["callPlan"]["stepProgram"]
+    step = case[adapter.profile(case)["planKey"]]["stepProgram"]
     if step.get("resultType") != {"tag": "function", "parameter": "word", "result": "word"} or step.get("dataDefinitions") != []:
         raise ValueError("call step must be a closed Word function graph")
     return legacy.bound_helper_count(step.get("body"))
@@ -62,7 +75,7 @@ def helper_count(case):
 
 def recipes(case):
     origin = case["provenance"].get("origin", {})
-    if origin.get("kind") != "call-generated":
+    if origin.get("kind") != ("forward-generated" if adapter.forwarding(case) else "call-generated"):
         return set()
     step = origin.get("stepOrigin")
     if not isinstance(step, dict) or step.get("kind") != "aggregate-generated":
@@ -79,9 +92,20 @@ def recipes(case):
     return result
 
 
+def value_coverage(case, statuses):
+    """Call values and amounts, the amounts child reverts kept with a committed
+    parent, and the call values root reverts returned to the sender."""
+    transactions = case["transactions"]
+    return {"Values": {tx["value"] for tx in transactions}, "ForwardedValues": {tx["amount"] for tx in transactions},
+            "RefundedForwards": {tx["amount"] for tx, status in zip(transactions, statuses) if status == "returned" and int(tx["input"]) & 1},
+            "RevertedValues": {tx["value"] for tx, status in zip(transactions, statuses) if status == "reverted"}}
+
+
 def validate_manifest(manifest):
-    if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("profile") != "stateful-calls":
+    if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("profile") not in PROFILES:
         raise ValueError("unsupported call corpus manifest")
+    forwards = manifest["profile"] == "stateful-forwarded-value"
+    plan_key, plan_schema = ("forwardPlan", "solcore-lean.forward-plan.v1") if forwards else ("callPlan", "solcore-lean.call-plan.v1")
     if manifest.get("coverageKind") != "step-core-ast-features":
         raise ValueError("call corpus coverage must name the step AST")
     for key in VERSIONS:
@@ -104,14 +128,27 @@ def validate_manifest(manifest):
     if not isinstance(values, list) or any(type(v) is not int or v not in range(4) for v in values) or len(set(values)) != len(values):
         raise ValueError("invalid call template requirements")
     modes = manifest.get("requiredCallModes")
-    if not isinstance(modes, list) or any(type(v) is not int or v not in range(8) for v in modes) or len(set(modes)) != len(modes):
+    if not isinstance(modes, list) or any(type(v) is not int or v not in range(PROFILES[manifest["profile"]]["modeMask"] + 1) for v in modes) or len(set(modes)) != len(modes):
         raise ValueError("requiredCallModes must name unique prescribed input-bit combinations")
     outcomes = manifest.get("requiredOutcomes")
     if not isinstance(outcomes, list) or any(not isinstance(v, str) for v in outcomes) or sorted(outcomes) != ["returned", "reverted"]:
         raise ValueError("call coverage requires returned and reverted root outcomes")
-    patterns = manifest.get("requiredLogPatterns")
-    if not isinstance(patterns, list) or any(not isinstance(v, str) or v not in LOG_PATTERNS for v in patterns) or len(set(patterns)) != len(patterns):
-        raise ValueError("invalid committed log pattern requirements")
+    if forwards:
+        if "requiredLogPatterns" in manifest:
+            raise ValueError("the forwarded-value profile commits no logs")
+        for dimension in VALUE_DIMENSIONS:
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(not isinstance(v, str) for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"forwarded-value coverage requires unique required{dimension}")
+            for value in values:
+                if int(common.word(value, "required " + dimension)) > adapter.MAX_VALUE:
+                    raise ValueError(f"required{dimension} exceed 2^70")
+    else:
+        if any("required" + dimension in manifest for dimension in VALUE_DIMENSIONS):
+            raise ValueError("value coverage belongs to the forwarded-value profile")
+        patterns = manifest.get("requiredLogPatterns")
+        if not isinstance(patterns, list) or any(not isinstance(v, str) or v not in LOG_PATTERNS for v in patterns) or len(set(patterns)) != len(patterns):
+            raise ValueError("invalid committed log pattern requirements")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -120,9 +157,10 @@ def validate_manifest(manifest):
             raise ValueError("corpus IDs must be unique bounded identifiers")
         ids.add(entry["id"])
         generated = "generation" in entry
-        if generated == ("callPlan" in entry) or ("transactions" in entry) == generated:
-            raise ValueError("corpus entry requires generation XOR callPlan+transactions")
-        if any(key in entry for key in ("program", "programs", "storagePlan", "loopPlan", "input")):
+        if generated == (plan_key in entry) or ("transactions" in entry) == generated:
+            raise ValueError(f"corpus entry requires generation XOR {plan_key}+transactions")
+        if any(key in entry for key in ("program", "programs", "storagePlan", "loopPlan", "input",
+                                        "callPlan" if forwards else "forwardPlan")):
             raise ValueError("call corpus uses a plan and transaction sequence")
         expected = entry.get("expectedFeatures")
         if not isinstance(expected, list) or any(not isinstance(v, str) for v in expected) or len(set(expected)) != len(expected):
@@ -136,7 +174,7 @@ def validate_manifest(manifest):
             if int(seed) >= 2**64 or type(nodes) is not int or not 1 <= nodes <= 512:
                 raise ValueError("call generation request exceeds bounds")
         else:
-            if not isinstance(entry["callPlan"], dict) or entry["callPlan"].get("schema") != "solcore-lean.call-plan.v1":
+            if not isinstance(entry[plan_key], dict) or entry[plan_key].get("schema") != plan_schema:
                 raise ValueError("invalid imported call plan")
             # Full source/host checking and canonical ABI validation are native.
             if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3:
@@ -223,6 +261,7 @@ def fingerprint(analysis):
             return account.get("balance")
         storage = account.get("storage", [])
         return next((slot.get("value") for slot in storage if isinstance(slot, dict) and slot.get("slot") == field), None) if isinstance(storage, list) else None
+    forwards = any(isinstance(history, dict) and history.get("schema") == adapter.FORWARD_HISTORY_SCHEMA for history in histories.values())
     differences = set()
     for role in adapter.ROLES:
         for field in ("balance", *adapter.SLOTS):
@@ -232,7 +271,7 @@ def fingerprint(analysis):
                 if comparison.get("stage") == "initial-accounts" and isinstance(bindings, dict):
                     try:
                         adapter.validate_bindings(bindings)
-                        expected = adapter.initial_accounts(bindings)
+                        expected = adapter.initial_accounts(bindings, forwards)
                     except ValueError:
                         continue
                 elif rows[path].get("status") == "reverted":
@@ -286,7 +325,7 @@ def transaction_counts(histories, case, bindings):
         prefix = prefix and complete
         if prefix:
             prefix_case = {**case, "transactions": case["transactions"][:index + 1]}
-            prefix_histories = {path: {"schema": adapter.HISTORY_SCHEMA, "initialAccounts": value["initialAccounts"],
+            prefix_histories = {path: {"schema": adapter.profile(case)["historySchema"], "initialAccounts": value["initialAccounts"],
                 "transactions": value["transactions"][:index + 1], "finalAccounts": value["transactions"][index]["committedAccounts"],
                 "status": "complete", "unexecuted": []} for path, value in values.items()}
             prefix = adapter.compare(prefix_histories, prefix_case, bindings)["category"] == "matched"
@@ -322,7 +361,9 @@ class Campaign:
     def __init__(self, args):
         self.args, self.started = args, time.monotonic()
         self.backend = common.resolve_sonatina_backend(getattr(args, "backend", None))
-        self.profile = "stateful-calls"
+        self.profile = getattr(args, "profile", "stateful-calls")
+        self.specification = PROFILES[self.profile]
+        self.dimensions = self.specification["dimensions"]
         self.deadline = self.started + args.seconds
         self.reserve = min(40 * 1024 * 1024, args.disk_bytes // 4)
         self.work = args.output / ".work"
@@ -335,8 +376,8 @@ class Campaign:
             "tools": {"campaignSha256": common.file_digest(Path(__file__)), "differentialSha256": common.file_digest(ROOT / "scripts/semantic-call-differential.py"), "caseTool": str(args.case_tool)},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "transactionCounts": {"kind": "observed on any path; completed on all three; matched ordered prefixes; shrink executions excluded", "planned": 0, "executed": 0, "completed": 0, "matched": 0, "actualMatched": 0},
-            "coverage": {"kind": "step AST features and declared helpers; native-verified recipes; call modes are prescribed input&7, not internal traces; outcome/log-pattern coverage only from complete actual matched scenarios",
-                         **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in DIMENSIONS}},
+            "coverage": {"kind": f"step AST features and declared helpers; native-verified recipes; call modes are prescribed input&{self.specification['modeMask']}, not internal traces; outcome/log-pattern coverage only from complete actual matched scenarios",
+                         **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in self.dimensions}},
             "cases": [], "materializedIds": [], "findings": [], "secondaryFindings": [],
             "retention": "input cases/compact receipts; complete archives for original/final/secondary findings; matched exports removed (use --case; exact archive replay unavailable)"}
         self.checkpoint()
@@ -346,8 +387,8 @@ class Campaign:
         counts["unexecuted"] = counts["generated"] - counts["executed"]
         tx = self.summary["transactionCounts"]
         tx["unobserved"] = tx["planned"] - tx["executed"]
-        for dimension in DIMENSIONS:
-            coverage["missing" + dimension] = sorted(set(coverage["required" + dimension]) - set(coverage["matched" + dimension]), key=int if dimension == "Inputs" else None)
+        for dimension in self.dimensions:
+            coverage["missing" + dimension] = sorted(set(coverage["required" + dimension]) - set(coverage["matched" + dimension]), key=int if dimension in NUMERIC_DIMENSIONS else None)
         self.summary.update(elapsedSeconds=round(time.monotonic() - self.started, 3), retainedBytes=directory_bytes(self.args.output), shrinkAttempts=self.shrink_attempts)
         save_json(self.args.output / "summary.json", self.summary)
 
@@ -375,20 +416,29 @@ class Campaign:
     def record_coverage(self, case, prefix, histories=None, bindings=None):
         values = {"Features": set(case["provenance"]["features"]), "Inputs": {tx["input"] for tx in case["transactions"]},
                   "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case),
-                  "CallModes": {int(tx["input"]) & 7 for tx in case["transactions"]}, "Outcomes": set(), "LogPatterns": set()}
+                  "CallModes": {int(tx["input"]) & self.specification["modeMask"] for tx in case["transactions"]}, "Outcomes": set()}
+        forwards = self.profile == "stateful-forwarded-value"
+        if not forwards:
+            values["LogPatterns"] = set()
         if prefix == "matched":
             if histories is None or adapter.compare(histories, case, bindings)["category"] != "matched":
                 raise ValueError("coverage requires actual matched histories")
             for row in histories["directCore"]["transactions"]:
                 values["Outcomes"].add(row["status"])
-                values["LogPatterns"].add(",".join(next(role for role in adapter.ROLES if bindings[role] == event["address"]) + ":" + event["topics"][0] for event in row["logs"]))
+                if not forwards:
+                    values["LogPatterns"].add(",".join(next(role for role in adapter.ROLES if bindings[role] == event["address"]) + ":" + event["topics"][0] for event in row["logs"]))
+            statuses = [row["status"] for row in histories["directCore"]["transactions"]]
+        else:
+            statuses = [adapter.expected_status(tx) for tx in case["transactions"]]
+        if forwards:
+            values.update(value_coverage(case, statuses))
         for dimension, observed in values.items():
             key = prefix + dimension
-            self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension == "Inputs" else None)
+            self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
 
     def add_case(self, case, identifier):
         adapter.validate_case(case)
-        if case["schema"] != adapter.CASE_SCHEMA:
+        if case["schema"] != adapter.PROFILES[self.profile]["caseSchema"]:
             raise ValueError("case differs from the selected campaign profile")
         index = len(self.materialized)
         save_json(self.args.output / "cases" / f"{index:04d}.json", case)
@@ -405,7 +455,7 @@ class Campaign:
             return
         if not self.args.corpus:
             response = self.tool(["generate", self.args.seed, self.args.nodes, self.args.cases, self.args.attempts, self.args.direct_fuel], "generation")
-            if response.get("schema") != CORPUS_SCHEMA or not isinstance(response.get("cases"), list) or len(response["cases"]) > self.args.cases:
+            if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > self.args.cases:
                 raise ValueError("invalid native call corpus")
             excluded = response.get("excluded", [])
             self.summary["counts"]["excluded"] = len(excluded)
@@ -423,7 +473,7 @@ class Campaign:
         for dimension in ("Features", "Inputs", "HelperCounts", "TransactionCounts"):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
-        for dimension in ("CallModes", "Outcomes", "LogPatterns"):
+        for dimension in ("CallModes", "Outcomes") + (VALUE_DIMENSIONS if self.profile == "stateful-forwarded-value" else ("LogPatterns",)):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         self.checkpoint()
         exclusions = []
@@ -432,7 +482,7 @@ class Campaign:
             if "generation" in entry:
                 request = entry["generation"]
                 response = self.tool(["generate", request["seed"], request["maxProgramNodes"], 1, 1, self.args.direct_fuel], "corpus-generation")
-                if response.get("schema") != CORPUS_SCHEMA or not isinstance(response.get("cases"), list) or len(response["cases"]) > 1:
+                if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > 1:
                     raise ValueError("invalid bounded corpus generation")
                 if not response["cases"]:
                     exclusions.append({"id": entry["id"], "detail": response})
@@ -443,11 +493,11 @@ class Campaign:
                     continue
                 case = response["cases"][0]
                 origin = case["provenance"]["origin"]
-                if origin.get("kind") != "call-generated" or any(origin.get(key) != request[key] for key in ("seed", "maxProgramNodes")):
+                if origin.get("kind") != self.specification["originKind"] or any(origin.get(key) != request[key] for key in ("seed", "maxProgramNodes")):
                     raise ValueError("native generation differs from requested seed/budget")
             else:
                 plan_path, tx_path = self.work / "plan.json", self.work / "transactions.json"
-                save_json(plan_path, entry["callPlan"])
+                save_json(plan_path, entry["forwardPlan" if self.profile == "stateful-forwarded-value" else "callPlan"])
                 save_json(tx_path, entry["transactions"])
                 try:
                     case = self.tool(["emit", plan_path, tx_path, self.args.direct_fuel], "corpus-emission")
@@ -479,7 +529,7 @@ class Campaign:
         args = self.case_args(input_path, folder)
         report = {"schema": adapter.REPORT_SCHEMA, "backend": self.backend, "processes": [], "histories": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-            "scope": "one child call; fixed parent8/child0; committed slots0/1, contract balances and ordered logs; zero root value; no gas/nonce or arbitrary-world equivalence"}
+            "scope": self.specification["scope"]}
         interrupted = False
         try:
             adapter.execute(args, report)
@@ -532,7 +582,7 @@ class Campaign:
                 limit = min(self.args.shrink_candidates, self.args.shrink_attempts - self.shrink_attempts)
                 response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
                 candidates = response.get("cases")
-                if response.get("schema") != CORPUS_SCHEMA or not isinstance(candidates, list) or len(candidates) > limit:
+                if response.get("schema") != self.specification["corpusSchema"] or not isinstance(candidates, list) or len(candidates) > limit:
                     raise ValueError("invalid native bounded shrink response")
                 accepted = False
                 for candidate in candidates:
@@ -642,7 +692,7 @@ def main():
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path)
     selection.add_argument("--case", type=Path)
-    parser.add_argument("--profile", choices=("stateful-calls",), default="stateful-calls")
+    parser.add_argument("--profile", choices=tuple(PROFILES), default="stateful-calls")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--nodes", type=int, default=384)
     parser.add_argument("--cases", type=int)
@@ -655,8 +705,8 @@ def main():
     parser.add_argument("--direct-fuel", type=int, default=1000000)
     parser.add_argument("--core-fuel", type=int, default=10000000)
     parser.add_argument("--gas", type=int, default=10000000)
-    parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-call-tool")
-    parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-call-scenario")
+    parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")
+    parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
@@ -664,6 +714,9 @@ def main():
     parser.add_argument("--test-transaction-id")
     parser.add_argument("--test-field", choices=TEST_FIELDS, default="output")
     args = parser.parse_args()
+    selected = adapter.PROFILES[args.profile]
+    args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
+    args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
     try:
         if args.corpus:
             validate_manifest(common.read_json(args.corpus))
