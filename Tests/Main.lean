@@ -2166,6 +2166,7 @@ import Solcore.Test.SourceCallValueCases
 import Solcore.Test.SourceCallValueCorpus
 import Solcore.Test.RustHullCreationAddressVectors
 import Solcore.Test.RustHullCreationAdmittedCorrespondence
+import Solcore.Test.SourceCallGraphLoopMeaning
 set_option autoImplicit false
 
 open Solcore
@@ -4125,5 +4126,6 @@ def main : IO UInt32 := do
   Tests.SourceCallValueCases.testSourceCallValueCases
   Tests.SourceCallValueCorpus.testSourceCallValueCorpus
   Tests.RustHullCreationAdmittedCorrespondence.run
+  Tests.SourceCallGraphLoopMeaning.testSourceCallGraphLoopMeaning
   IO.println "solcore-lean tests passed"
   return 0

@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate and aggregate call-graph emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph and call-graph loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection with derived read and write inputs; remaining expression forms and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -608,10 +608,27 @@ renderer's Word, Boolean, pair and sum bindings to aggregate bindings and
 reuses the aggregate invariant and lemmas; as in the call-graph emitter, the
 file always imports the aliases. The renderer refuses cells and the
 executable checks observe an empty final Core store, but the theorem keeps the
-store-aware statement. The other emitters that render with the aggregate
-renderer (loops, generic, closures, comptime, modules, storage, storage
-rollback, keyed storage, dynamic arrays and calls) and `CallGraphLoopEmitter`
-are not covered; their text uses forms outside the source fragment.
+store-aware statement.
+
+`CallGraphLoop.emit_source_meaning` covers the `runtime-call-graph-loops`
+emitter, whose method applies a scalar call-graph step `input & mask` times in
+a source `while` loop. The loop has its own grammar and fuel-indexed meaning,
+next to the loop-free ones: `parseLoopSource` also reads
+`while (a op b) { ... }` at the top level of a method body, and
+`loopSourceCall fuel` lets each loop evaluate its condition at most `fuel`
+times. More fuel never changes a result, and on every text that `parseSource`
+accepts, `loopSourceCall` equals `sourceCall`, so no existing statement
+changed. The theorem states that every fuel above the mask returns the Word
+that Core's bounded-loop reference returns, with its final store. The proof
+prints the entry as one more helper, `sc_step`, and relates Core's ordinal
+guards, restated from a private definition, to the counting loop by induction.
+The step is pure in Core, so the proof tracks only the accumulator cell, which
+the executable checks observe as the final store. The other emitters that
+render with the aggregate renderer (loops, generic, closures, comptime,
+modules, storage, storage rollback, keyed storage, dynamic arrays and calls)
+are not covered. The aggregate loop emitter prints the same wrapper, but its
+step may allocate cells across iterations, and the other texts use forms
+outside the source fragment.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -632,8 +649,15 @@ graphs, 28 raw primitive bodies inside pairs and sums and 24 generated graphs
 at eight boundary inputs; all agree with Core, every Core run ends with an
 empty store, and the fixed graphs also match hand-known results. A helper
 applied to a pair or returning one, a helper that calls a later helper and a
-primitive text without its import line are rejected. The full Lean build
-(10,014 jobs), registered tests and the semantic-kernel policy passed.
+primitive text without its import line are rejected. The registered
+`SourceCallGraphLoopMeaning` test runs two closed-form plans, the identity step
+under every admitted mask, two mixed call-graph plans, fourteen raw primitive
+steps and 24 generated plans at eleven or more inputs. Each call agrees with
+Core at one more unit of fuel than its iterations and has no meaning with less,
+and every Core run ends with the one accumulator cell. Loop-free texts keep
+their `sourceCall` meaning, and altered loops lose or change their meaning. The
+full Lean build (10,035 jobs), registered tests and the semantic-kernel policy
+passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or
