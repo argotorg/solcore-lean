@@ -2098,6 +2098,98 @@ parity. Coverage adds the keys and three static alias kinds: a repeated key,
 a key that is another key's successor, and the maximum key, whose successor
 wraps to zero.
 
+### Running and validation
+
+```sh
+lake build semanticMappingTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-mapping-cases
+.lake/build/bin/semantic-mapping-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-mapping-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-mapping-corpus.json \
+  --output .upstream/semantic-mapping-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-mapping \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-mapping-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the other storage tools. Plans use `solcore-lean.mapping-plan.v1`
+under the case field `mappingPlan`; cases use
+`solcore-lean.semantic-mapping-case.v1`. Transactions are
+`{id, flags, key, input, calldata, value}`, and `value` is always zero. The
+tool and the adapter both reject calldata that is not the selector followed
+by the saved flags, key and input as three Words. A case's `observedSlots`
+must equal the slots the profile derives from its keys. The tool derives them
+with `Solcore.Abi.V1.Keccak256` and the adapter with its own Keccak-256, which
+the Python tests check against `cast keccak`. The calldata of all 33 fixed and
+48 random transactions matched `cast calldata "run(uint256,uint256,uint256)"`
+from the pinned Foundry release byte for byte; the Lean tests retain one such
+vector. Histories use `solcore-lean.mapping-history.v1` with the keyed history
+fields, and the declared-slot Hull runner `rust-hull-keyed-storage-scenario`
+serves the profile unchanged.
+
+The Keccak closure converted from the Core builders has 2,654 Wire nodes. A
+Lean test checks it, the ABI Keccak and the observer's slots against `cast
+keccak` for six keys and two further 64-byte inputs. The closure lies outside
+the node budget, so generation reserves only the measured 93-node wrapper and
+the 384-node default leaves 291 nodes for the step. All 300 of the first 300
+seeds were accepted. Generated scenarios must complete with the prescribed
+outcomes, and each returned transaction must increment the counter and return
+the sum of the two entries and the counter. One original Core transaction
+needs about 164,000 fuel units, within the default 1,000,000. Because a case
+embeds the closure (about 120 to 160 KB), a native shrink response for this
+profile carries at most 16 candidates, the profile's `shrinkBatch`, to stay
+within the campaign's 4 MiB bound on tool output. Other profiles keep
+`--shrink-candidates`.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with new keys, inputs and
+flags, and four generated seeds. Its expected slots and histories were
+computed outside Lean, with slots from `cast keccak`, by a separate evaluator
+of the step programs and a direct model of the protocol. `Tests/Main.lean`
+registers a validator that compares every status, payload and declared slot
+with original Core and every declared slot list with the independent one. It
+rejects tampered outputs, counters and entries, a declared or committed slot
+in Solidity's order, a missing or extra declared slot, and a consistently
+re-encoded key change. Required coverage is all 39 step AST features in the
+corpus, the six storage boundary inputs, the whole key bank (0, 1, 6, 7,
+2^255 and 2^256 - 1), the three alias kinds, one to three helpers and
+transactions, all four templates, both outcomes and six completion patterns.
+
+Local validation used committed code with frozen scripts and native tools; the
+seventeen existing native tools are byte-identical to main's. The fixed suite
+matched all twelve scenarios and 33 prefixes on Sonatina O0 and O2, with
+complete coverage, in 75.3 and 75.0 seconds. The recorded random suite (root
+seed `20261026`, sixteen cases, 2,048 attempts) accepted sixteen scenarios
+from sixteen attempts with no exclusions. All sixteen scenarios and 48
+prefixes matched on both levels in 105.1 and 102.7 seconds. They covered the
+whole key bank, all three alias kinds and the four generated completion
+patterns. Neither run produced a finding.
+
+A copied `importedHull` difference in the entry slot of key 7 at `tx-2` of
+the `fresh-cell-high-key` scenario was reduced on each level to that
+transaction with key 6, zero input and flags and a reduced step: seven
+accepted reductions in eleven candidate executions, all of whose actual
+comparisons matched. Key 6 keeps the slot as its successor's entry. The four
+rejected candidates lowered the key to 0 or 1, whose declared slots exclude
+it, and matched as ordinary executions. A copied counter difference at the
+reverted `tx-2` of the `generated-15` scenario was reduced on each level to
+that transaction with key and input zero and a reduced step: 37 accepted
+reductions in 38 candidate executions. It still reverts, because clearing its
+revert bit changed the completion and was rejected. Early native shrink
+responses of both reductions reached the sixteen-candidate bound, and each
+such batch still held an accepted candidate. The original and reduced
+archives replayed exactly with three-way agreement (eight replays), and
+synthetic replays reproduced the fingerprints. Core or Hull fuel one was
+classified as inconclusive. With the extended adapter, campaign and suite, the
+two-slot storage, rollback, call, keyed, dynamic-array, log, call-value, bytes
+and forwarded-value fixed corpora still matched all 119 scenarios and 329
+prefixes on each level.
+
+This profile does not compare gas, balances, nonces, code or memory, other key
+or value types, other base slots, nested mappings or Solidity's slot order.
+Agreement is test evidence, not a preservation proof.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

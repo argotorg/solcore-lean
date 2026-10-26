@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop and generic emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; Keccak-addressed mappings defined; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection and one concrete instance; remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and Hull's explicit revert connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1179,6 +1179,62 @@ definitions were fixed before execution:
   revert bit cleared, ordered by transaction count, program complexity, then
   the sum of flags, keys and inputs. Candidates rederive their declared slots;
   a candidate that no longer declares a finding's slot cannot keep it.
+
+Original Core hashes with the Keccak closure that `Wire.Expr.ofCore?` converts
+from the proved builders, 2,654 Wire nodes outside the step budget, and needs
+about 164,000 fuel units per transaction. Its observer derives the declared
+slots separately, with `Solcore.Abi.V1.Keccak256`, and the adapter checks
+them with its own Keccak-256. Lean and Python tests check all three against
+`cast keccak`. The declared-slot Hull runner serves the profile unchanged.
+The profile is a twenty-fourth suite profile with one new native tool; the
+seventeen other native tools are byte-identical to main's. Generation reserves
+the measured 93-node wrapper before generating the step. Three keys from a
+bank with successor pairs and the maximum, three inputs and one of four
+completion patterns come from a separate high-bit stream. All 300 of the
+first 300 seeds at 384 nodes were accepted. A case embeds the closure, so a
+native shrink response carries at most sixteen candidates to fit the
+campaign's 4 MiB bound on tool output.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions. Its slots, from `cast keccak`, and its histories were computed
+outside Lean by a separate evaluator of the step programs and a direct model
+of the protocol. A registered Lean validator confirmed every declared slot
+list, status, payload and slot against original Core and rejected tampered
+entries, including slots in Solidity's order. Coverage includes all 39 step
+features of the corpus, the six storage boundary inputs, the whole key bank
+(0, 1, 6, 7, 2^255 and 2^256 - 1), the three static alias kinds (a repeated
+key, a successor key and the maximum key, whose successor wraps), one to
+three helpers and transactions, four templates, both outcomes and six
+completion patterns. The calldata of all 33 fixed and 48 random transactions
+matched `cast calldata`.
+
+The full Lean build (10,067 jobs), registered tests, kernel policy and 516
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (75.3 and 75.0 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+sixteen attempts with no exclusions. Both levels matched all sixteen and 48
+prefixes (105.1 and 102.7 seconds), covering the whole key bank and all three
+alias kinds. Neither random run produced a finding.
+
+A copied Hull difference in the entry slot of key 7 at the last of three
+transactions was reduced on each level to that transaction with key 6, whose
+successor entry is that slot, zero input and flags and a reduced step: seven
+accepted reductions in eleven actual candidate executions. The four rejected
+candidates lowered the key to 0 or 1 and no longer declared the slot. A copied
+counter difference at a reverted last transaction was reduced on each level
+to that transaction, still reverting, with key and input zero: 37 accepted
+reductions in 38. Original and reduced archives replayed exactly with
+agreement (eight replays), and synthetic fingerprints reproduced. Core or Hull
+fuel one was inconclusive. With the extended storage and suite scripts, the
+storage, rollback, call, keyed, dynamic-array, log, call-value, bytes and
+forwarded-value fixed corpora still matched all 119 scenarios and 329
+prefixes on both levels. An offline preparation of the worktree's cloned
+cache verified all eighteen native tools as ready. Hosted CI has not been
+run.
+
+This scope does not compare gas, balances, nonces, code or memory, other key
+or value types, other base slots, nested mappings or Solidity's slot order.
+Agreement is test evidence, not a preservation proof.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or multiple callers, needs its
