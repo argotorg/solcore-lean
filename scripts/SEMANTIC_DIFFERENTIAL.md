@@ -1714,6 +1714,80 @@ the Word outcome convention cannot express. Agreement is test evidence, not a
 preservation proof.
 
 
+## Compare bounded dynamic bytes
+
+The `stateful-bytes` profile adds one bounded dynamic `bytes` value. Each
+transaction calls `SynthesizedBytes.run(uint256 flags, bytes payload)`,
+selector `0x220eb9b6`, with a payload of 0 to 64 bytes in the canonical
+head/tail encoding: flags, the tail offset 64 relative to the arguments, the
+length, the payload bytes and zero padding to a multiple of 32 bytes. The
+calldata is therefore 100, 132 or 164 bytes long. The pinned dialect decodes
+`bytes` only into memory, so the source parameter is `payload: memory<bytes>`
+(`data` is a keyword). Its decoder follows the head offset, checks the range,
+copies the length Word and the payload into fresh memory with `calldatacopy`
+and zeroes the padding. Original Core reads calldata directly.
+
+The contract reads `acc = sload(0)`. For each present 32-byte chunk `k`
+(chunk 0 when the length exceeds 0, chunk 1 when it exceeds 32) it computes
+`acc = step(acc + chunk_k)` with the checked aggregate step and writes slot
+`1 + k`; in a chunk, payload bytes at or past the length read as zero. It then
+writes `acc` to slot 0, adds the payload length to a running byte count in
+slot 3 and writes the last payload byte, or zero for an empty payload, to
+slot 4. The result is `sload(0) + sload(3) + sload(4) + calldatasize()`. Odd
+flags revert with it as a 32-byte payload after the writes; other flags
+return it. Shorter payloads leave slot 2, or slots 1 and 2, untouched.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Payload scope.** A payload has 0 to 64 bytes, including lengths that are
+  not multiples of 32, and its calldata is exactly the canonical encoding
+  above. Non-canonical offsets, truncated or longer payloads and nonzero
+  padding are outside the profile. On truncated input the Rust decoder reverts
+  with a 4-byte error that the Word outcome convention cannot express, while
+  Core reads an absent Word or byte as zero.
+- **Reading.** Original Core follows the head offset to the length with
+  `inputDataWordBE?`. It reads each chunk Word the same way and masks it to
+  the payload length, so padding never contributes. It reads the last payload
+  byte with `inputDataByte?` and the calldata size with `inputDataSize`. Core
+  and its host interface are unchanged. The source reads the decoded copy:
+  the length as `mload(data)` and chunk `k` as `mload(data + 32 + 32k)`, which
+  the decoder zero-padded. It reads the last byte as `mload(data + length) &
+  255`, an unaligned load of the Word that ends at that byte; for an empty
+  payload that Word is the zero length itself.
+- **Committed observation.** After every transaction all three paths report
+  status, payload and slots 0 through 4. The keyed profile's containment rules
+  apply: the Hull and EVM paths must show no nonzero committed slot outside
+  them. Memory is per call and not observed.
+- **Committed comparison.** All three paths must agree on every observed field
+  after every transaction. Each path must also follow the fixed protocol: the
+  flags parity selects the completion and the payload is one Word. A revert
+  keeps the prior slots. A returned transaction adds its payload length to
+  slot 3, leaves its last payload byte (zero when empty) in slot 4 and returns
+  the sum of the committed slots 0, 3 and 4 plus its calldata size.
+- **Rollback.** A revert keeps the prior committed slots on every path, chosen
+  by `ContractRuntime` for original Core. An incomplete transaction ends the
+  sequence.
+- **Deployment.** The constructor is empty and receives zero value. Every
+  declared slot is zero afterwards, and no undeclared slot is nonzero on the
+  Hull and EVM paths. Original Core starts from the declared post-deployment
+  world.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, truncate one
+  payload to a shorter length from the generation bank, set every byte of one
+  payload to zero, or reduce one transaction's flags to their parity or clear
+  its revert bit. They are ordered by transaction count, complete program
+  complexity, total payload length, then the sum of all flags and payload
+  bytes.
+
+Generation draws three payload lengths from the bank 0, 1, 17, 31, 32, 33,
+48, 63 and 64, a byte pattern for each (zeros, `0xff`, the ramp 1, 2, 3, ...
+or seeded bytes) and one of four completion patterns from a separate high-bit
+stream; flags are just the parity. Coverage adds two dimensions: the payload
+lengths, and the payload lengths of reverted transactions, whose slot writes
+rollback must discard. The chunk Words are the runtime inputs.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

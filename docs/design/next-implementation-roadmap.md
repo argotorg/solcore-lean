@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph and call-graph loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; bounded `bytes` extension defined; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection with derived read and write inputs; remaining expression forms and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -917,9 +917,50 @@ This scope does not compare the sender's balance, gas, nonces or code, value
 sent by contracts, values above the local sender's funds or non-payable
 methods. Agreement is test evidence, not a preservation proof.
 
-Further state/ABI work, such as nested or multi-word ABI elements, `bytes`,
-ABI-encoded return values or multiple callers, needs its own observation,
-rollback, deployment and reduction definitions first.
+The fifth extension, `stateful-bytes`, adds one bounded dynamic `bytes`
+value. The pinned dialect decodes `bytes` without upstream changes, but only
+into memory: `memory<bytes>` has an ABI decoder and the `bytes` signature
+string. A probe that stored a decoded payload's length, Words and last byte
+gave the expected values on Sonatina O0 and O2 and through the declared-slot
+Hull runner, so the sender-dependent fallback was not needed. Its definitions
+were fixed before execution:
+
+- Transactions: one to three zero-value calls of `run(uint256 flags, bytes
+  payload)` with a payload of 0 to 64 bytes, including lengths that are not
+  multiples of 32, in the canonical encoding: flags, the tail offset 64, the
+  length, the payload and zero padding to a whole Word. Non-canonical offsets,
+  truncated or longer payloads and nonzero padding are outside the scope.
+- Effects: fold each present 32-byte chunk of the payload (at most two, with
+  bytes at or past the length read as zero) through the checked step from
+  slot zero, writing slot `1 + k` after chunk `k`. Then write the accumulator
+  to slot zero, a running byte count to slot three and the last payload byte
+  (zero when empty) to slot four. The result is the sum of slots zero, three
+  and four, read back, plus the calldata size. Odd flags revert with it after
+  the writes.
+- Reading: original Core follows the head offset with `inputDataWordBE?`,
+  reads each chunk Word with it and masks the chunk to the payload length, and
+  reads the last byte with `inputDataByte?` and the calldata size with
+  `inputDataSize`; Core is unchanged. The source receives `memory<bytes>` and
+  reads the decoder's zero-padded copy with `mload`, the last byte through an
+  unaligned load of the Word that ends at it.
+- Committed observations, rollback and deployment: as for the dynamic-array
+  profile, with the fixed slots zero to four. Status, payload and those slots
+  are compared after every transaction on all three paths, and the Hull and
+  EVM paths must show no nonzero committed slot outside them. A revert keeps
+  the prior committed slots, and an empty zero-value constructor leaves every
+  slot zero. Every committed row must also follow the protocol: a returned
+  transaction adds its payload length to slot three, leaves its last byte in
+  slot four and returns the sum of the committed slots zero, three and four
+  plus its calldata size.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, truncation of one payload to a shorter bank length, zeroing one
+  payload's bytes, and flags reduced to their parity or with the revert bit
+  cleared, ordered by transaction count, program complexity, total payload
+  length, then the sum of flags and payload bytes.
+
+Further state/ABI work, such as nested or multi-word ABI elements, longer
+`bytes` or strings, ABI-encoded return values or multiple callers, needs its
+own observation, rollback, deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
