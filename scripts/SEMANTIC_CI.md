@@ -52,16 +52,16 @@ in a separate job with separate reports and artifacts; failure in one does not
 cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
 
-`--backend yul` selects the fourteen pure profiles by default (535 fixed cases).
+`--backend yul` selects the fourteen pure profiles by default (595 fixed cases).
 Explicitly selecting a stateful profile fails before execution. Each random
 Yul run with `--cases 16` requests 224 cases. The shared preparation command
 builds Rust and Lean tools; solc is supplied and checked separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 595 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 595 | Sonatina O2 | Sonatina O2 |
-| `yul` | 535, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
+| `sonatina-o0` | 666 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 666 | Sonatina O2 | Sonatina O2 |
+| `yul` | 595, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
 linked layout is not supplied to the Hull importer. Its pure result can still
@@ -70,7 +70,7 @@ remain unsupported. Reports record this distinction in `pathBackends`.
 
 The default selection is all nineteen profiles: fourteen pure profiles, storage,
 storage rollback, parent/child calls, keyed storage and dynamic arrays. Fixed
-mode runs all 595 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
+mode runs all 666 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
 than silently truncating required coverage. Repeat `--profile NAME` to select a
 smaller suite.
 

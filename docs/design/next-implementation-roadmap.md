@@ -356,6 +356,25 @@ original and final exact archive replay (six replays), and repeated synthetic
 fingerprints on O0, O2 and Yul. All raw runtime reports remained actual matches;
 these controlled differences are test infrastructure checks, not upstream bugs.
 
+The same raw primitives now render in the eleven profiles whose step functions
+use `AggregateRenderer` (aggregates, loops, generics, closures, comptime and
+module steps, storage, rollback, calls, keyed storage and dynamic arrays). The
+renderer reuses the call-graph helpers, snapshots, reversed shift arguments and
+alias spellings; programs without a primitive emit byte-identical source, and
+the aliases are imported only when used. Emitter and profile versions moved to
+`v2`; the 202 legacy cases of the six affected pure profiles are rejected by the
+version check and the other 347 replay identically. In the recorded random
+allocation, operator exclusions fell from 42/23/33/47/376/574/206/206/149/180/163
+to zero, except 17 comptime and 9 module exclusions from their scalar constants.
+Each affected corpus gained entries covering all fourteen primitive features.
+`ScalarRenderer`, `MutationRenderer` and template-budget exclusions are
+unchanged. Fixed suites matched all 256 pure cases on O0, O2 and Yul and all 71
+stateful scenarios on O0 and O2; random seed `20261026` matched all 96 pure
+cases on the three backends and all 80 stateful scenarios on O0. On O2 the
+stateful random suite failed: one dynamic-array scenario, which matched on O0,
+crashed code-image export with the Q013 panic, and reduction kept a large
+constant left shift. The finding is retained; hosted CI has not been run.
+
 ## 4–8. Subsequent work
 
 **Richer grammar:** vary typed expression and body composition beyond the

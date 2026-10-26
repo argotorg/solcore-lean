@@ -383,6 +383,107 @@ Native commands are `primitive-generate SEED NODES COUNT ATTEMPTS FUEL` and
 dispatch the new schema. Use `replay` to authenticate a saved case; `observe`
 only executes its admitted Core program and does not authenticate saved source.
 
+## Raw primitives in aggregate-based step functions
+
+Eleven profiles render their checked aggregate step functions with
+`AggregateRenderer`: `runtime-aggregates`, `runtime-loops`,
+`runtime-generics`, `runtime-closures`, the step functions of
+`runtime-comptime` and `runtime-modules`, and the five stateful profiles
+(storage, rollback, parent/child calls, keyed storage and dynamic arrays).
+Since emitter version 2 these step functions also render the fourteen raw
+primitives: Clz, unsigned and signed division and remainder, signed
+greater-than, the three shifts, byte selection, exponentiation, sign
+extension, and the ternary `addmod`/`mulmod`. Previously every generated
+program containing one of them was an operator exclusion.
+
+The renderer uses the call-graph helpers exactly as the aggregate call-graph
+renderer does. Each primitive operand is snapshotted into a fresh local in
+Core evaluation order before the alias is called; shifts print
+`shl(shift, value)` from those snapshots; signed comparison is converted with
+`tobool`; ternary operands are all snapshotted. The original operations
+(`+ - * & | ^ == > ! ~`) keep their exact unsnapshotted text, so every program
+without a raw primitive emits byte-identical source. The aliases are imported
+only when a rendered step uses one: profiles without another opcode import add
+the primitive profile's `import { div as sc_div, ... } from std.opcodes;`, and
+the stateful profiles append the same aliases to their existing `std.opcodes`
+import. Pair, sum, case and private-cell scoping are unchanged.
+
+Every affected emitter version and profile version moved to `v2`, including the
+shared aggregate step profile version, because accepted programs changed. Saved
+cases of the older versions are rejected by the explicit version check rather
+than re-emitted: all 202 legacy cases of the six affected pure profiles fail
+with `profileVersion changed`, while all 347 legacy cases of the other eight
+pure profiles replay to identical JSON.
+
+Out of scope and unchanged: `ScalarRenderer`, which the priority-5 emitter
+proof unfolds, and its users (`closed-g0`, `runtime-word`, `runtime-functions`
+and the compile-time constants of `runtime-comptime` and `runtime-modules`);
+`MutationRenderer` (`runtime-mutation`, 22 operator exclusions in the recorded
+random allocation); and the exclusions for node budgets too small for an
+aggregate template.
+
+Operator exclusions for root seed `20261026`, sixteen cases and 2,048 attempts
+(the recorded random suite allocation, generation only):
+
+| Profile | Before | After | Attempts before → after |
+| --- | ---: | ---: | --- |
+| runtime-aggregates | 42 | 0 | 46 → 4 |
+| runtime-loops | 23 | 0 | 26 → 3 |
+| runtime-generics | 33 | 0 | 37 → 4 |
+| runtime-closures | 47 | 0 | 51 → 4 |
+| runtime-comptime | 376 | 17 (constants) | 382 → 32 |
+| runtime-modules | 574 | 9 (constants) | 636 → 18 |
+| stateful-storage | 206 | 0 | 222 → 16 |
+| stateful-storage-rollback | 206 | 0 | 222 → 16 |
+| stateful-calls | 149 | 0 | 180 → 18 |
+| stateful-keyed-storage | 180 | 0 | 196 → 16 |
+| stateful-dynamic-array | 163 | 0 | 195 → 17 |
+
+The remaining comptime and module operator exclusions come only from their
+`ScalarRenderer` constants. Template-budget exclusions are unchanged in kind
+(1 for modules, 2 for calls and 1 for dynamic arrays in this allocation).
+
+Each affected fixed corpus gained generated entries whose step functions cover
+all fourteen primitive AST features, and requires them: two or three seeds per
+profile at every boundary input for the pure profiles, and two or three
+scenarios for the stateful ones. Expected keyed and dynamic-array histories were
+computed by an independent Python evaluator with the documented EVM primitive
+semantics and matched original Core. The native corpus validators now admit
+primitive step features (constants still admit only the original scalar set)
+and count ternary nodes like `if` nodes, as the Wire measure does.
+
+| Corpus | v1 cases | v2 cases |
+| --- | ---: | ---: |
+| aggregates | 32 | 44 |
+| loops | 48 | 60 |
+| generics | 28 | 36 |
+| closures | 24 | 32 |
+| comptime | 32 | 40 |
+| modules | 32 | 44 |
+| storage | 10 | 12 |
+| storage rollback | 12 | 14 |
+| calls | 14 | 16 |
+| keyed storage | 12 | 14 |
+| dynamic arrays | 12 | 15 |
+
+Local validation ran on commit `660a2729b` with frozen scripts and native
+tools; all 1,358 per-case reports record that commit and a clean tracked tree.
+The fixed suites matched all 256 pure cases on O0, O2 and Yul (1,429.9, 1,441.0
+and 2,324.3 seconds) and all 71 stateful scenarios and 197 transaction prefixes
+on O0 and O2 (416.4 and 423.1 seconds), with complete coverage including every
+primitive feature. The random suites (root seed `20261026`, sixteen cases and
+2,048 attempts per profile) matched all 96 pure cases on O0, O2 and Yul (556.2,
+557.8 and 863.9 seconds) and all 80 stateful scenarios and 240 prefixes on O0
+(485.6 seconds); 92 of the 96 accepted pure cases and 73 of the 80 stateful
+scenarios call at least one alias. The O2 stateful random suite failed:
+storage, rollback, calls and keyed storage matched 16 of 16 each, but dynamic
+arrays matched fifteen and one scenario crashed O2 code-image export with the
+panic recorded as Q013 (`Integer overflow when casting to usize`). The same
+scenario matched on O0. Automatic reduction kept the crash fingerprint through
+thirteen accepted candidates before its attempt limit; the reduced case still
+shifts left by a large constant count. The crash is retained as a finding and
+was neither suppressed nor reclassified, so that O2 gate did not pass.
+
 ## Compare directly generated call graphs
 
 `runtime-call-graphs` generates typed Word/Bool expressions with the runtime
@@ -530,8 +631,10 @@ python3 scripts/test-source-aggregate-rust.py
 Native commands are `aggregate-generate SEED NODES COUNT ATTEMPTS FUEL` and
 `aggregate-emit FUNCTION.json INPUT [FUEL]`. The campaign defaults to 256 nodes
 for this profile; its hard limit remains 512 nodes for the complete applied
-graph. Fixed seeds use individual budgets within that limit. Unsupported G0
-scalar operations still produce explicit exclusions.
+graph. Fixed seeds use individual budgets within that limit. Since emitter
+version 2 the raw primitives render as described in
+[Raw primitives in aggregate-based step functions](#raw-primitives-in-aggregate-based-step-functions);
+integer operations remain explicit exclusions.
 
 Pair operands evaluate left to right and retain their values across later
 writes. Projections and sum scrutinees evaluate once. The emitter uses tuple
@@ -1451,8 +1554,10 @@ records both seeds and node allocations, reserves at most eight nodes for the
 generated constant, requires an actual operation in that AST, and uses the
 four standard boundary inputs. Random comptime campaigns default to 512
 generation attempts; other profiles retain 256. Larger imported constants
-remain supported within the full-program budget. Unsupported
-operations and fuel exhaustion remain explicit exclusions. Imported and
+remain supported within the full-program budget. Constants still render only
+the original scalar operations, so other constant operations and fuel
+exhaustion remain explicit exclusions; step functions render the raw
+primitives. Imported and
 reduced constants may be literals.
 
 Replay reconstructs both ASTs, source and wrapper, independently of any saved

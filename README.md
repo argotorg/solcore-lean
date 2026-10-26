@@ -172,6 +172,12 @@ and modular arithmetic through raw opcode wrappers. Its 81-case corpus covers
 zero divisors/moduli, signed and 256-bit boundaries, and argument ordering.
 Generated cases, typed reduction and strict replay use a separate version so
 older profiles retain their saved-case semantics.
+The eleven profiles whose step functions use the aggregate renderer
+(aggregates, loops, generics, closures, comptime and module steps, and the five
+stateful profiles) render the same raw primitives since emitter version 2,
+importing the aliases only when a step uses one. Programs without a primitive
+keep byte-identical source; older saved cases of these profiles are rejected by
+their version check. See [raw primitives in aggregate-based step functions](scripts/SEMANTIC_DIFFERENTIAL.md#raw-primitives-in-aggregate-based-step-functions).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
