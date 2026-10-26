@@ -1846,6 +1846,9 @@ import Solcore.Test.SourceCallGraphCorpus
 import Solcore.Test.SourceCallGraphLoopEmitter
 import Solcore.Test.SourceCallGraphLoopCases
 import Solcore.Test.SourceCallGraphLoopCorpus
+import Solcore.Test.SourceAggregateCallGraphEmitter
+import Solcore.Test.SourceAggregateCallGraphCases
+import Solcore.Test.SourceAggregateCallGraphCorpus
 import Solcore.Test.SourceFunctionEmitter
 import Solcore.Test.SourceFunctionCases
 import Solcore.Test.SourceMutationEmitter
@@ -3925,6 +3928,9 @@ def run : IO Unit := do
   SourceCallGraphLoopEmitter.testSourceCallGraphLoopEmitter
   SourceCallGraphLoopCases.testSourceCallGraphLoopCases
   SourceCallGraphLoopCorpus.testSourceCallGraphLoopCorpus
+  SourceAggregateCallGraphEmitter.testSourceAggregateCallGraphEmitter
+  SourceAggregateCallGraphCases.testSourceAggregateCallGraphCases
+  SourceAggregateCallGraphCorpus.testSourceAggregateCallGraphCorpus
   SourceFunctionEmitter.testSourceFunctionEmitter
   SourceFunctionCases.testSourceFunctionCases
   SourceMutationEmitter.testSourceMutationEmitter

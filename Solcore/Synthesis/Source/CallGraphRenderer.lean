@@ -38,25 +38,25 @@ private def zero : Target → String
 
 private def name (index : Nat) : String := "sc_v" ++ toString index
 
-private def line (indent : Nat) (text : String) : String :=
+def line (indent : Nat) (text : String) : String :=
   String.ofList (List.replicate indent ' ') ++ text
 
-private def bindValue (target : Target) (indent nextId : Nat) (value : String) : Rendered :=
+def bindValue (target : Target) (indent nextId : Nat) (value : String) : Rendered :=
   ⟨[line indent ("let " ++ name nextId ++ ": " ++ typeName target ++ " = " ++ value ++ ";")],
     name nextId, nextId + 1⟩
 
-private def snapshot (indent : Nat) (value : Rendered) : Rendered :=
+def snapshot (indent : Nat) (value : Rendered) : Rendered :=
   let captured := bindValue .word indent value.nextId value.value
   ⟨value.lines ++ captured.lines, captured.value, captured.nextId⟩
 
-private def unaryValue (operation : UnaryOp) (operand : String) : Except EmitError String :=
+def unaryValue (operation : UnaryOp) (operand : String) : Except EmitError String :=
   match operation with
   | .boolNot => .ok ("(!" ++ operand ++ ")")
   | .wordNot => .ok ("(~" ++ operand ++ ")")
   | .wordClz => .ok ("sc_clz(" ++ operand ++ ")")
   | _ => .error (.unsupportedUnary operation)
 
-private def binaryValue (operation : BinaryOp) (left right : String) : Except EmitError String :=
+def binaryValue (operation : BinaryOp) (left right : String) : Except EmitError String :=
   let infixValue (token : String) := "(" ++ left ++ " " ++ token ++ " " ++ right ++ ")"
   let call (callee first second : String) := callee ++ "(" ++ first ++ ", " ++ second ++ ")"
   match operation with
@@ -81,7 +81,7 @@ private def binaryValue (operation : BinaryOp) (left right : String) : Except Em
   | .wordSignExtend => .ok (call "sc_signextend" left right)
   | _ => .error (.unsupportedBinary operation)
 
-private def ternaryValue (operation : TernaryOp) (first second third : String) : String :=
+def ternaryValue (operation : TernaryOp) (first second third : String) : String :=
   let callee := match operation with
     | .wordAddMod => "sc_addmod"
     | .wordMulMod => "sc_mulmod"

@@ -9,6 +9,7 @@ import Solcore.Synthesis.Source.ModuleCases
 import Solcore.Synthesis.Source.PrimitiveCases
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopCases
+import Solcore.Synthesis.Source.AggregateCallGraphCases
 
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false
@@ -41,6 +42,15 @@ private def fuelValue (rest : List String) : IO Nat := do
 
 private def execute (args : List String) : IO Json := do
   match args with
+  | ["aggregate-call-graph-generate", seed, nodes, count, attempts, fuel] =>
+      let count ← natural "case count" count 1024
+      unless count > 0 do throw (IO.userError "case count must be positive")
+      return AggregateCallGraph.generateCases (Solcore.Synthesis.Core.Seed.ofNat
+        (← natural "seed" seed (2 ^ 64 - 1)))
+        (← natural "node budget" nodes 512)
+        count
+        (← natural "attempt limit" attempts 10000)
+        (← natural "execution fuel" fuel 10000000)
   | ["call-graph-loop-generate", seed, nodes, count, attempts, fuel] =>
       let count ← natural "case count" count 1024
       unless count > 0 do throw (IO.userError "case count must be positive")
@@ -167,6 +177,11 @@ private def execute (args : List String) : IO Json := do
       let input ← get (Input.inputWord input)
       get (Input.emitCase function input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
+  | "aggregate-call-graph-emit" :: file :: input :: rest =>
+      let function ← get (AggregateCallGraph.checkedFunction (← readJson file))
+      let input ← get (AggregateCallGraph.inputWord input)
+      get (AggregateCallGraph.emitCase function input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
   | "call-graph-loop-emit" :: file :: input :: rest =>
       let plan ← get (CallGraphLoop.checkedPlan (← readJson file))
       let input ← get (CallGraphLoop.inputWord input)
@@ -258,6 +273,9 @@ private def execute (args : List String) : IO Json := do
       else if (json.getObjValAs? String "schema").toOption == some CallGraphLoop.caseSchema then
         let checked ← get (CallGraphLoop.caseProgram json)
         return CallGraphLoop.observe checked.plan checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some AggregateCallGraph.caseSchema then
+        let checked ← get (AggregateCallGraph.caseProgram json)
+        return AggregateCallGraph.observe checked.function checked.input fuel
       else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
         let checked ← get (Primitive.caseProgram json)
         return Primitive.observe checked.function checked.input fuel
@@ -289,6 +307,8 @@ private def execute (args : List String) : IO Json := do
           CallGraph.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some CallGraphLoop.caseSchema then
           CallGraphLoop.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some AggregateCallGraph.caseSchema then
+          AggregateCallGraph.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.replayCase json fuel else replayCase json fuel)
   | "shrink" :: file :: limit :: rest =>
@@ -317,9 +337,11 @@ private def execute (args : List String) : IO Json := do
           CallGraph.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some CallGraphLoop.caseSchema then
           CallGraphLoop.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some AggregateCallGraph.caseSchema then
+          AggregateCallGraph.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

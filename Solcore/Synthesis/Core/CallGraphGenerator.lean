@@ -149,11 +149,11 @@ end Generated
 
 /-- Use the upper half of each full LCG draw. Consecutive low-bit parity choices
 would correlate constructor selection with operation and variable selection. -/
-private def choose (seed : Seed) (bound : Nat) : Nat × Seed :=
+def choose (seed : Seed) (bound : Nat) : Nat × Seed :=
   let (value, next) := seed.draw
   if bound = 0 then (0, next) else ((value.toNat / 2 ^ 32) % bound, next)
 
-private def edgeWord : Nat → Word
+def edgeWord : Nat → Word
   | 0 => Word.zero
   | 1 => Word.ofNatModulo 1
   | 2 => Word.ofNatModulo 2
@@ -165,7 +165,7 @@ private def edgeWord : Nat → Word
   | 8 => Word.ofNatModulo (2 ^ 255 - 1)
   | _ => Word.maximum
 
-private def drawWord (seed : Seed) : Word × Seed :=
+def drawWord (seed : Seed) : Word × Seed :=
   let (kind, seed) := choose seed 3
   let (high, seed) := seed.draw
   let (next, seed) := seed.draw
@@ -213,11 +213,11 @@ private def partition : Nat → Nat → Seed → List Nat × Seed
       let (remaining, seed) := partition (count + 1) (total - first) seed
       (first :: remaining, seed)
 
-private def wordUnary : List UnaryOp := [.wordNot, .wordClz]
-private def wordBinary : List BinaryOp :=
+def wordUnary : List UnaryOp := [.wordNot, .wordClz]
+def wordBinary : List BinaryOp :=
   [.wordAdd, .wordSub, .wordMul, .wordDiv, .wordMod, .wordAnd, .wordOr, .wordXor,
    .wordShl, .wordShr, .wordByte, .wordSar, .wordPow, .wordSignExtend, .wordSdiv, .wordSmod]
-private def boolBinary : List BinaryOp := [.wordEq, .wordGt, .wordSgt]
+def boolBinary : List BinaryOp := [.wordEq, .wordGt, .wordSgt]
 
 /-- Structural fuel is independent of arithmetic budget reasoning. Every body
 starts with its actual Word parameter in scope; let adds another Word local. -/
