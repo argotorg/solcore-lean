@@ -429,8 +429,9 @@ private theorem admitted_related (passive : CallPassive layout slots)
   exact sharedFinal.linked
 
 /-- Admitted attempts that run no init frame, through the actual transport and
-dispatcher: a collision returns zero, and a deployment returns the new address
-with the account changes published in the shared cells. -/
+dispatcher: a collision returns zero, a deployment returns the new address with
+the account changes published in the shared cells, and the faults after the
+nonce advance return their reason with only the advance kept. -/
 theorem expression_admitted
     (compiled : CompiledReferences scope references)
     (invalidCompiled : Effects.terminate scope 3 (.word Word.zero) (.word Word.zero) = .ok invalid)
@@ -665,6 +666,69 @@ theorem expression_admitted
         (mutableFrame lengthLe kept)
       rw [creatorKey] at finalRelated
       exact ⟨_, final, .value (.word _), invoked available evaluated admitted.notStatic admitted.bounded,
+        finalRelated, closures⟩
+  | unknown admitted copied derived unknown =>
+      rename_i size target account initCode
+      obtain ⟨gas, available⟩ := admitted.available
+      obtain ⟨final, evaluated, localFinal, sharedFinal, lengthLe, kept⟩ :=
+        CreationCorrespondence.invoke_failed (reason := Word.ofNatModulo 7)
+          (next := {RuntimeCallEffectsSemantics.shared state.external with
+            world := CreationCorrespondence.advancedWorld (RuntimeCallEffectsSemantics.shared state.external)
+              ((state.external.runtime.runtime.runtime.runtime.runtime.storage.address.bitAnd
+                CreationCorrespondence.addressMask).bitAnd CreationCorrespondence.addressMask) account})
+          (packedInvoke gas) localRelated admitted.touched
+          (allowedDepth admitted.allowed) admitted.bounded handler.read handler.outside handler.closure sharedLinked separate
+          (fun initCode' copiedInit => by
+            obtain rfl := Copy.deterministic copiedInit copied
+            refine .unknown (account := account) (target := target)
+              (keyed (property := fun key =>
+                ¬value > StorageSemantics.readWord key state.external.runtime.runtime.balances)
+                (Nat.not_lt.mpr admitted.funded))
+              (keyed (property := fun key => StorageSemantics.get state.external.runtime.runtime.runtime.runtime.runtime.storage.world
+                key state.external.runtime.runtime.runtime.runtime.runtime.storage.complete = .ok account) admitted.found)
+              (nonceBelow admitted.belowLimit) admitted.bounded ?_ ?_
+            · rw [← selected] at derived
+              exact keyed (property := fun key => CreationAddressSemantics.Derived key account.nonce initCode' length
+                (if create2 then CreationAddressSemantics.Scheme.create2 salt else .create) target) derived
+            · exact keyed (property := fun key => CreationSemantics.Unknown (CreationCorrespondence.advancedWorld
+                (RuntimeCallEffectsSemantics.shared state.external) key account) target
+                state.external.runtime.runtime.runtime.runtime.runtime.storage.complete) unknown)
+      obtain ⟨finalRelated, closures⟩ := admitted_related callPassive stateRelated localFinal sharedFinal
+        (mutableFrame lengthLe kept)
+      rw [creatorKey] at finalRelated
+      exact ⟨_, final, .language _, invoked available evaluated admitted.notStatic admitted.bounded,
+        finalRelated, closures⟩
+  | overflow admitted copied derived absent complete overflowed =>
+      rename_i size target account initCode
+      obtain ⟨gas, available⟩ := admitted.available
+      obtain ⟨final, evaluated, localFinal, sharedFinal, lengthLe, kept⟩ :=
+        CreationCorrespondence.invoke_failed (reason := Word.ofNatModulo 12)
+          (next := {RuntimeCallEffectsSemantics.shared state.external with
+            world := CreationCorrespondence.advancedWorld (RuntimeCallEffectsSemantics.shared state.external)
+              ((state.external.runtime.runtime.runtime.runtime.runtime.storage.address.bitAnd
+                CreationCorrespondence.addressMask).bitAnd CreationCorrespondence.addressMask) account})
+          (packedInvoke gas) localRelated admitted.touched
+          (allowedDepth admitted.allowed) admitted.bounded handler.read handler.outside handler.closure sharedLinked separate
+          (fun initCode' copiedInit => by
+            obtain rfl := Copy.deterministic copiedInit copied
+            refine .overflow (account := account) (target := target)
+              (keyed (property := fun key =>
+                ¬value > StorageSemantics.readWord key state.external.runtime.runtime.balances)
+                (Nat.not_lt.mpr admitted.funded))
+              (keyed (property := fun key => StorageSemantics.get state.external.runtime.runtime.runtime.runtime.runtime.storage.world
+                key state.external.runtime.runtime.runtime.runtime.runtime.storage.complete = .ok account) admitted.found)
+              (nonceBelow admitted.belowLimit) admitted.bounded ?_ ?_ complete ?_
+            · rw [← selected] at derived
+              exact keyed (property := fun key => CreationAddressSemantics.Derived key account.nonce initCode' length
+                (if create2 then CreationAddressSemantics.Scheme.create2 salt else .create) target) derived
+            · exact keyed (property := fun key => StorageSemantics.lookup target (CreationCorrespondence.advancedWorld
+                (RuntimeCallEffectsSemantics.shared state.external) key account) = none) absent
+            · exact keyed (property := fun key => AccountCallSemantics.transfer key target value
+                state.external.runtime.runtime.balances = .error (Word.ofNatModulo 12)) overflowed)
+      obtain ⟨finalRelated, closures⟩ := admitted_related callPassive stateRelated localFinal sharedFinal
+        (mutableFrame lengthLe kept)
+      rw [creatorKey] at finalRelated
+      exact ⟨_, final, .language _, invoked available evaluated admitted.notStatic admitted.bounded,
         finalRelated, closures⟩
 
 theorem projectArgument_rename (index count : Nat) (expr : Core.Expr) (mapping : Renaming) :

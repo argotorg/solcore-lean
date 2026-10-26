@@ -7,7 +7,8 @@ before any frame cell changes. Otherwise memory covers the init range and
 return data is cleared; at the depth limit the attempt returns zero, and below
 it the init bytes are copied into fresh scratch cells and the installed
 handler's response is published: a refusal, or an admitted attempt that runs
-no init frame together with its shared account changes. -/
+no init frame together with its shared account changes. A fault of the
+handler is returned as is, and return data stays cleared. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.CreationCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder CallTransportCorrespondence
@@ -536,6 +537,107 @@ theorem invoke_admitted {locations : Locations} {callback : Nat} {arguments : Ar
       (Nat.le_trans rewrites.length_le publishFrame.length)
   · intro location value outside unshared found
     exact publishFrame.read location value outside (rewrites.read location value unshared (keep outside found))
+
+/-- Below the depth limit an admitted attempt that faults after the nonce
+advance returns its failure reason. Return data stays cleared, and the shared
+cells hold the changes the handler keeps. -/
+theorem invoke_failed {locations : Locations} {callback : Nat} {arguments : Arguments}
+    {state : CallTransportSemantics.State} {environment : Environment} {initial store : Store}
+    {memoryReference sizeReference returnDataReference returnSizeReference callbackReference
+      creatorAddress depth transferredValue saltValue isCreate2 suppliedGas offset length : Core.Expr}
+    {sharedLocations : AccountCallCorrespondence.SharedLocations} {shared next : AccountCallSemantics.Shared}
+    {anchors : List CatalogWorldCorrespondence.Anchor} {function : Value} {reason : Word}
+    (packed : Evaluates environment initial
+      (bundle [memoryReference, sizeReference, returnDataReference, returnSizeReference,
+        callbackReference, creatorAddress, depth, transferredValue, saltValue, isCreate2,
+        suppliedGas, offset, length])
+      (bundleValues (argumentValues locations callback arguments)) store)
+    (related : StateRel locations state store) {size : Word}
+    (touchedSize : MemorySemantics.touchSize? state.memory.size arguments.offset arguments.length = some size)
+    (allowed : ¬arguments.depth > Word.ofNatModulo 1023)
+    (bounded : arguments.length.val ≤ CreationSemantics.maxInitCodeSize)
+    (callbackRead : store.read? callback = some (.inRight .unit function))
+    (callbackOutside : callback ∉ locations.resources.all)
+    (handler : HandlerClosure sharedLocations function)
+    (sharedRelated : AccountCallCorrespondence.LinkedSharedStateRel anchors sharedLocations shared store)
+    (separate : ∀ location ∈ sharedLocations.all, location ∉ locations.resources.all)
+    (admitting : ∀ initCode,
+      MemoryCopySemantics.Copy state.memory.words Word.zero arguments.offset arguments.length [] initCode →
+      Admitting shared (request arguments initCode) (.inLeft Creation.responseType (.word reason)) next) :
+    ∃ final, Evaluates environment initial
+      (Creation.invoke memoryReference sizeReference returnDataReference returnSizeReference callbackReference
+        creatorAddress depth transferredValue saltValue isCreate2 suppliedGas offset length)
+      (.inLeft .word (.word reason)) final ∧
+      StateRel locations (cleared state size) final ∧
+      AccountCallCorrespondence.LinkedSharedStateRel anchors sharedLocations next final ∧
+      store.length ≤ final.length ∧
+      ∀ location value, location ∉ locations.resources.all →
+        location ∉ [sharedLocations.world, sharedLocations.balances] →
+        store.read? location = some value → final.read? location = some value := by
+  rw [CreationImplementation.invoke_eq]
+  have inputs := input_initial locations callback arguments environment
+  have touched := MemoryCorrespondence.touch_evaluates (size := state.memory.size)
+    ((input_part inputs (index := 1) rfl).evaluates store)
+    ((input_part inputs (index := 11) rfl).evaluates store)
+    ((input_part inputs (index := 12) rfl).evaluates store) related.memorySize
+  simp only [MemoryCorrespondence.touchResult, touchedSize] at touched
+  let inputStore := MemoryCorrespondence.touchStore store locations.memorySize state.memory.size
+    arguments.offset arguments.length
+  have inputRelated : StateRel locations {state with memory := {state.memory with size := size}} inputStore :=
+    related.touch touchedSize
+  have inputFrame := LogsCorrespondence.Frame.touch locations.resources store state.memory.size
+    arguments.offset arguments.length
+  let clearedStore := publishStore locations inputStore [] Word.zero
+  have clearedRelated : StateRel locations (cleared state size) clearedStore := published inputRelated [] Word.zero
+  have clearFrame := LogsCorrespondence.Frame.publish locations.resources inputStore [] Word.zero
+  have framed := inputFrame.trans clearFrame
+  have dispatchInputs := inputs.prepend [.unit, .unit, .unit]
+  obtain ⟨extra, copiedStore, initCode, input, extraLength, retained, inputs', initRelated, copiedInit, initRead, entered⟩ :=
+    snapshot_evaluates dispatchInputs clearedRelated bounded
+  have keep {location : Nat} {value : Value} (outside : location ∉ locations.resources.all)
+      (found : store.read? location = some value) : copiedStore.read? location = some value := by
+    have afterClear := framed.read location value outside found
+    exact (retained.read location (List.getElem?_eq_some_iff.mp afterClear).1).trans afterClear
+  have callbackFound := keep callbackOutside callbackRead
+  have functionRead := OptionalCell.read_success Creation.unavailableReason
+    ((input_part inputs' (index := 4) rfl).evaluates copiedStore) callbackFound
+  have sharedCopied := LinkedSharedStateRel.preserved sharedRelated
+    (fun location member _ found => keep (separate location member) found)
+  have functionCode := CodeValue.bound (0 + [Value.unit, Value.unit, Value.unit].length + 4)
+    (extra ++ ([.unit, .unit, .unit] ++ bundleValues (argumentValues locations callback arguments) :: environment)) function
+  have callInputs := inputs'.prepend [function]
+  have requestEvaluated : Evaluates (function :: extra ++ ([.unit, .unit, .unit] ++
+      bundleValues (argumentValues locations callback arguments) :: environment)) copiedStore
+      (CreationImplementation.request initCode (0 + 3 + 4 + 1))
+      (requestValue (request arguments input)) copiedStore := by
+    refine .pair (.binary ((input_part callInputs (index := 5) rfl).evaluates copiedStore) .word rfl) ?_
+    refine .pair ((input_part callInputs (index := 7) rfl).evaluates copiedStore) ?_
+    refine .pair ((input_part callInputs (index := 8) rfl).evaluates copiedStore) ?_
+    refine .pair ((input_part callInputs (index := 9) rfl).evaluates copiedStore) ?_
+    refine .pair (.binary ((input_part callInputs (index := 6) rfl).evaluates copiedStore) .word rfl) ?_
+    refine .pair ((input_part callInputs (index := 10) rfl).evaluates copiedStore) ?_
+    exact .pair (.loadCell ((initRelated.prepend [function]).evaluates copiedStore) initRead)
+      ((input_part callInputs (index := 12) rfl).evaluates copiedStore)
+  obtain ⟨afterCall, called, nextRelated, rewrites⟩ := handler.apply_admitted sharedCopied
+    (admitting input copiedInit) (functionCode.evaluates copiedStore) requestEvaluated
+  have localSeparate : ∀ location ∈ [sharedLocations.world, sharedLocations.balances],
+      location ∉ locations.resources.all := by
+    intro location member
+    apply separate
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl <;> simp [AccountCallCorrespondence.SharedLocations.all]
+  have afterRelated := state_rewritten (state_retained clearedRelated retained) rewrites localSeparate
+  refine ⟨afterCall, .letE packed ?_, afterRelated, nextRelated, ?_, ?_⟩
+  · apply LanguageResult.bind_success .word touched
+    apply clear_evaluates (inputs.prepend [.unit]) inputRelated
+    apply Evaluates.ifFalse (.binary ((input_part dispatchInputs (index := 6) rfl).evaluates _) .word
+      (by simp [BinaryOp.apply, Creation.depthLimit, allowed]))
+    apply entered
+    apply LanguageResult.bind_success .word functionRead
+    exact LanguageResult.bind_failure .word called
+  · exact Nat.le_trans (Nat.le_trans framed.length retained.length_le) rewrites.length_le
+  · intro location value outside unshared found
+    exact rewrites.read location value unshared (keep outside found)
 
 set_option linter.unusedSimpArgs false in
 set_option maxRecDepth 10000 in

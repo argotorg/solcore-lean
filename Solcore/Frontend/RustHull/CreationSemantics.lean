@@ -6,8 +6,8 @@ static frame or init code longer than EIP-3860's 49,152 bytes halts the frame
 exceptionally; the depth limit, an insufficient endowment and EIP-2681's
 2^64 − 1 nonce limit make the attempt return zero. Refusals never advance the
 creator nonce; admitted attempts do, before the new address is examined. The
-admitted rules cover collisions and deployments of empty init code; init
-frames are not described here. -/
+admitted rules cover collisions, deployments of empty init code and the two
+faults after the nonce advance; init frames are not described here. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.CreationSemantics
 open Core
@@ -118,14 +118,26 @@ def deployed (state : State) (target : Word) (balances : StorageSemantics.Words)
       world := StorageSemantics.put target (createdAccount target) shared.world, balances := balances})
     {(frame state).memory with size := size} [] Word.zero
 
+/-- A target account that the world does not determine: absent from an
+incomplete world, or recorded with a zero nonce and unknown code. -/
+inductive Unknown (world : StorageSemantics.World) (target : Word) (complete : Bool) : Prop where
+  | absent (absent : StorageSemantics.lookup target world = none) (incomplete : complete = false)
+  | unknownCode {existing : AccountState.Account}
+      (found : StorageSemantics.lookup target world = some existing)
+      (zero : existing.nonce = Word.zero) (unknown : existing.code = none)
+
 /-- An admitted attempt copies its init bytes from memory, advances the
 creator nonce and derives the new address. Following EIP-684, an account with
 a nonzero nonce or code size at that address is a collision: the attempt
 returns zero and keeps the advanced nonce. An address absent from a complete
 world receives a new account and the endowment; with empty init code no init
 frame runs, the deployed code is empty and the attempt returns the address.
-Nonempty init code, an unknown or existing empty account at the address, and an
-endowment that overflows its recipient's balance are not described here. -/
+An unknown account at the address is language fault 7, and an endowment that
+overflows the new account's balance is language fault 12. Both faults restore
+the checkpoint taken after the nonce advance: only the advanced nonce remains,
+and memory and return data are as for a refusal. Nonempty init code and an
+existing account with a zero nonce and known empty code at the address are not
+described here. -/
 inductive Admitted (scheme : CreationAddressSemantics.Scheme) (value offset length : Word) :
     State → Semantics.Result Semantics.Value → State → Prop where
   | collision {state : State} {size target : Word} {account existing : AccountState.Account}
@@ -149,5 +161,24 @@ inductive Admitted (scheme : CreationAddressSemantics.Scheme) (value offset leng
         (RuntimeCallEffectsSemantics.shared state).balances = .ok balances) :
       Admitted scheme value offset length state (.value (.word target))
         (deployed (advanced state account) target balances size)
+  | unknown {state : State} {size target : Word} {account : AccountState.Account}
+      {initCode : MemorySemantics.Entries}
+      (admitted : Admission value offset length state size account)
+      (copied : MemoryCopySemantics.Copy (frame state).memory.words Word.zero offset length [] initCode)
+      (derived : CreationAddressSemantics.Derived (creator state) account.nonce initCode length scheme target)
+      (unknown : Unknown (frame (advanced state account)).storage.world target (frame state).storage.complete) :
+      Admitted scheme value offset length state (.fault (.language (Word.ofNatModulo 7)))
+        (refused (advanced state account) size)
+  | overflow {state : State} {size target : Word} {account : AccountState.Account}
+      {initCode : MemorySemantics.Entries}
+      (admitted : Admission value offset length state size account)
+      (copied : MemoryCopySemantics.Copy (frame state).memory.words Word.zero offset length [] initCode)
+      (derived : CreationAddressSemantics.Derived (creator state) account.nonce initCode length scheme target)
+      (absent : StorageSemantics.lookup target (frame (advanced state account)).storage.world = none)
+      (complete : (frame state).storage.complete = true)
+      (overflowed : AccountCallSemantics.transfer (creator state) target value
+        (RuntimeCallEffectsSemantics.shared state).balances = .error (Word.ofNatModulo 12)) :
+      Admitted scheme value offset length state (.fault (.language (Word.ofNatModulo 12)))
+        (refused (advanced state account) size)
 
 end Solcore.Frontend.RustHull.CreationSemantics

@@ -8,8 +8,10 @@ import Solcore.Frontend.RustHull.CreationSemantics
 frame. The actual dispatcher derives the address, advances the creator nonce,
 loads its checkpoint and examines the target: a nonzero nonce or code size is a
 collision that returns zero, and an address absent from a complete world
-receives a new account, the endowment and the empty runtime image. Catalog
-code links survive both outcomes. -/
+receives a new account, the endowment and the empty runtime image. An unknown
+target and an endowment overflow fail with reasons 7 and 12; the protection
+then runs the checkpoint's restoration, so only the nonce advance remains.
+Catalog code links survive every outcome. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.CreationCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder AccountCallCorrespondence
@@ -256,6 +258,62 @@ theorem checkpoint_evaluates {depth : Nat} {environment : Environment} {store fi
   apply Evaluates.letE (.loadCell ((logSizeCode.prepend [logsValue, balancesValue, worldValue]).evaluates store) logSizeRead)
   exact continued
 
+/-- The restoration stores the four values loaded by the checkpoint. -/
+theorem restoreCode_evaluates {checkpoint depth : Nat} {environment : Environment} {store : Store}
+    {world balances logs logSize : Code} {worldType balancesType logsType logSizeType : Core.Ty}
+    {worldLocation balancesLocation logsLocation logSizeLocation : Nat}
+    {worldValue balancesValue logsValue logSizeValue : Value}
+    (worldCode : CodeValue depth environment world (.cellRef worldType worldLocation))
+    (balancesCode : CodeValue depth environment balances (.cellRef balancesType balancesLocation))
+    (logsCode : CodeValue depth environment logs (.cellRef logsType logsLocation))
+    (logSizeCode : CodeValue depth environment logSize (.cellRef logSizeType logSizeLocation))
+    (savedWorld : CodeValue depth environment (fun here => .var (here - checkpoint - 1)) worldValue)
+    (savedBalances : CodeValue depth environment (fun here => .var (here - (checkpoint + 1) - 1)) balancesValue)
+    (savedLogs : CodeValue depth environment (fun here => .var (here - (checkpoint + 2) - 1)) logsValue)
+    (savedLogSize : CodeValue depth environment (fun here => .var (here - (checkpoint + 3) - 1)) logSizeValue)
+    (worldBound : worldLocation < store.length) (balancesBound : balancesLocation < store.length)
+    (logsBound : logsLocation < store.length) (logSizeBound : logSizeLocation < store.length) :
+    Evaluates environment store (restoreCode world balances logs logSize checkpoint depth) .unit
+      ((((store.set logSizeLocation logSizeValue).set logsLocation logsValue).set balancesLocation balancesValue).set
+        worldLocation worldValue) := by
+  have logsBound' : logsLocation < (store.set logSizeLocation logSizeValue).length := by
+    simpa only [List.length_set] using logsBound
+  have balancesBound' : balancesLocation <
+      ((store.set logSizeLocation logSizeValue).set logsLocation logsValue).length := by
+    simpa only [List.length_set] using balancesBound
+  have worldBound' : worldLocation <
+      (((store.set logSizeLocation logSizeValue).set logsLocation logsValue).set balancesLocation balancesValue).length := by
+    simpa only [List.length_set] using worldBound
+  unfold restoreCode
+  apply Evaluates.letE (.storeCell (logSizeCode.evaluates store) (List.getElem?_eq_getElem logSizeBound)
+    (savedLogSize.evaluates store) (Store.write?_eq_some_iff.mpr ⟨logSizeBound, rfl⟩))
+  apply Evaluates.letE (.storeCell ((logsCode.prepend [.unit]).evaluates _) (List.getElem?_eq_getElem logsBound')
+    ((savedLogs.prepend [.unit]).evaluates _) (Store.write?_eq_some_iff.mpr ⟨logsBound', rfl⟩))
+  apply Evaluates.letE (.storeCell ((balancesCode.prepend [.unit, .unit]).evaluates _)
+    (List.getElem?_eq_getElem balancesBound') ((savedBalances.prepend [.unit, .unit]).evaluates _)
+    (Store.write?_eq_some_iff.mpr ⟨balancesBound', rfl⟩))
+  apply Evaluates.letE (.storeCell ((worldCode.prepend [.unit, .unit, .unit]).evaluates _)
+    (List.getElem?_eq_getElem worldBound') ((savedWorld.prepend [.unit, .unit, .unit]).evaluates _)
+    (Store.write?_eq_some_iff.mpr ⟨worldBound', rfl⟩))
+  exact .unit
+
+/-- A successful attempt passes through the protection unchanged. -/
+theorem protect_succeeded {depth : Nat} {environment : Environment} {store final : Store}
+    {restore attempt : Code} {payload : Value}
+    (attempted : Evaluates environment store (attempt depth) (.inRight .word payload) final) :
+    Evaluates environment store (CreationImplementation.protect restore attempt depth) (.inRight .word payload) final :=
+  .caseRight attempted (.inRight (.var rfl))
+
+/-- A failed attempt restores the checkpoint and keeps its reason. -/
+theorem protect_failed {depth : Nat} {environment : Environment} {store current final : Store}
+    {restore attempt : Code} {reason : Word} {failedType : Core.Ty}
+    (attempted : Evaluates environment store (attempt depth) (.inLeft failedType (.word reason)) current)
+    (restored : Evaluates (.word reason :: environment) current (restore (depth + 1)) .unit final) :
+    Evaluates environment store (CreationImplementation.protect restore attempt depth)
+      (.inLeft Creation.responseType (.word reason)) final :=
+  .caseLeft attempted (.letE restored
+    (.inLeft (((CodeValue.bound depth environment (.word reason)).prepend [.unit]).evaluates final)))
+
 /-- The endowment moves from the creator to a different new account, using the
 creator balance already read by the funds check. -/
 theorem transfer_evaluates {depth : Nat} {environment : Environment} {store : Store}
@@ -332,6 +390,50 @@ theorem transfer_evaluates {depth : Nat} {environment : Environment} {store : St
       (Store.write?_eq_some_iff.mpr ⟨bound, rfl⟩))
   · change (third.set location _)[location]? = _
     rw [List.getElem?_set_self bound]
+
+/-- An endowment that would overflow the target balance is failure 12 and
+changes no balance. -/
+theorem transfer_overflow {depth : Nat} {environment : Environment} {store : Store}
+    {balancesCode creatorCode targetCode valueCode creatorBalanceCode : Code}
+    {location : Nat} {creator target value : Word} {balances : StorageSemantics.Words}
+    (reference : CodeValue depth environment balancesCode (.cellRef WordMapping.type location))
+    (targetValue : CodeValue depth environment targetCode (.word target))
+    (valueValue : CodeValue depth environment valueCode (.word value))
+    (balancesRead : store.read? location = some (WordMapping.encode balances))
+    (overflowed : AccountCallSemantics.transfer creator target value balances = .error (Word.ofNatModulo 12)) :
+    ∃ final, Evaluates environment store
+        (CreationImplementation.transfer balancesCode creatorCode targetCode valueCode creatorBalanceCode depth)
+        (.inLeft .unit (.word (Word.ofNatModulo 12))) final ∧ StoreRetains store final := by
+  unfold CreationImplementation.transfer
+  by_cases zero : value == Word.zero
+  · simp only [AccountCallSemantics.transfer, zero, ↓reduceIte] at overflowed
+    cases overflowed
+  have zeroFalse : (value == Word.zero) = false := Bool.eq_false_iff.mpr zero
+  let targetBalance := StorageSemantics.readWord target balances
+  have overflow : targetBalance > Word.maximum.sub value := by
+    by_cases same : creator == target
+    · simp only [AccountCallSemantics.transfer, zeroFalse, same, Bool.false_eq_true, ↓reduceIte] at overflowed
+      cases overflowed
+    by_cases fits : targetBalance > Word.maximum.sub value
+    · exact fits
+    simp only [AccountCallSemantics.transfer, zeroFalse, same, Bool.false_eq_true, ↓reduceIte] at overflowed
+    rw [if_neg fits] at overflowed
+    cases overflowed
+  obtain ⟨first, targetLooked, firstRetained⟩ := lookup_preserves
+    (.loadCell (reference.evaluates store) balancesRead) (targetValue.evaluates store)
+  have targetBound := CodeValue.bound depth environment (.word targetBalance)
+  let firstEnv : Environment := [.word targetBalance]
+  have overflowTest : Evaluates (firstEnv ++ environment) first
+      (binary .wordGt (fun here => .var (here - depth - 1))
+        (binary .wordSub (number (wordModulus - 1)) valueCode) (depth + 1))
+      (.bool (decide (targetBalance > Word.maximum.sub value))) first :=
+    .binary (targetBound.evaluates first) (.binary .word ((valueValue.prepend firstEnv).evaluates first) rfl) rfl
+  refine ⟨first, ?_, firstRetained⟩
+  apply Evaluates.ifFalse (.binary (valueValue.evaluates store) .word
+    (by change some (Value.bool (value == Word.zero)) = some (Value.bool _); simp only [zeroFalse]))
+  apply LanguageResult.bind_success .unit targetLooked
+  exact .ifTrue (by simpa only [overflow, decide_true, firstEnv, List.cons_append, List.nil_append] using overflowTest)
+    (.inLeft .word)
 
 /-- Writes that change only the listed cells and append helper cells. -/
 structure Rewrites (changed : List Nat) (initial final : Store) : Prop where
@@ -744,8 +846,10 @@ def deployedValue (target : Word) : Value :=
   .inRight .word (bundleValues [.word target, WordMapping.encode [], .word (Word.ofNatModulo 0)])
 
 /-- Admitted attempts that the dispatcher completes without an init frame:
-a collision, and a deployment of empty init code at an address absent from a
-complete world. -/
+a collision, a deployment of empty init code at an address absent from a
+complete world, and the two faults after the nonce advance, an unknown target
+(failure 7) and an endowment overflow (failure 12). The faults restore the
+checkpoint, so only the nonce advance remains. -/
 inductive Admitting (state : AccountCallSemantics.Shared) (request : Request) :
     Value → AccountCallSemantics.Shared → Prop where
   | collision {account existing : AccountState.Account} {target : Word}
@@ -778,10 +882,236 @@ inductive Admitting (state : AccountCallSemantics.Shared) (request : Request) :
           world := (StorageSemantics.put target (CreationSemantics.createdAccount target)
             (advancedWorld state (request.creator.bitAnd addressMask) account))
           balances := balances}
+  | unknown {account : AccountState.Account} {target : Word}
+      (funded : ¬request.value > StorageSemantics.readWord (request.creator.bitAnd addressMask) state.balances)
+      (found : StorageSemantics.get state.world (request.creator.bitAnd addressMask) state.complete = .ok account)
+      (belowLimit : ¬account.nonce > Word.ofNatModulo (2 ^ 64 - 2))
+      (bounded : request.initLength.val ≤ 49152)
+      (derived : CreationAddressSemantics.Derived (request.creator.bitAnd addressMask) account.nonce
+        request.initCode request.initLength request.scheme target)
+      (unknown : CreationSemantics.Unknown (advancedWorld state (request.creator.bitAnd addressMask) account) target
+        state.complete) :
+      Admitting state request (.inLeft Creation.responseType (.word (Word.ofNatModulo 7)))
+        {state with world := advancedWorld state (request.creator.bitAnd addressMask) account}
+  | overflow {account : AccountState.Account} {target : Word}
+      (funded : ¬request.value > StorageSemantics.readWord (request.creator.bitAnd addressMask) state.balances)
+      (found : StorageSemantics.get state.world (request.creator.bitAnd addressMask) state.complete = .ok account)
+      (belowLimit : ¬account.nonce > Word.ofNatModulo (2 ^ 64 - 2))
+      (bounded : request.initLength.val ≤ 49152)
+      (derived : CreationAddressSemantics.Derived (request.creator.bitAnd addressMask) account.nonce
+        request.initCode request.initLength request.scheme target)
+      (absent : StorageSemantics.lookup target (advancedWorld state (request.creator.bitAnd addressMask) account) = none)
+      (complete : state.complete = true)
+      (overflowed : AccountCallSemantics.transfer (request.creator.bitAnd addressMask) target request.value
+        state.balances = .error (Word.ofNatModulo 12)) :
+      Admitting state request (.inLeft Creation.responseType (.word (Word.ofNatModulo 12)))
+        {state with world := advancedWorld state (request.creator.bitAnd addressMask) account}
 
 theorem Rewrites.ofRetains {changed : List Nat} {initial final : Store} (retained : StoreRetains initial final) :
     Rewrites changed initial final :=
   ⟨retained.length_le, fun other _ _ found => (retained.read other (List.getElem?_eq_some_iff.mp found).1).trans found⟩
+
+/-- An endowment overflow after the new record is inserted is failure 12; the
+world keeps the inserted record until the checkpoint is restored. -/
+theorem deployment_overflow {depth : Nat} {environment : Environment} {store : Store}
+    {runInit installRuntime : Code → Code → Code}
+    {locations : SharedLocations} {world balances creator value creatorBalance request target restore : Code}
+    {accounts : StorageCorrespondence.Accounts} {before : StorageSemantics.Words}
+    {creatorWord valueWord targetWord : Word}
+    (worldCode : CodeValue depth environment world (.cellRef AccountState.type locations.world))
+    (balancesCode : CodeValue depth environment balances (.cellRef WordMapping.type locations.balances))
+    (valueValue : CodeValue depth environment value (.word valueWord))
+    (targetValue : CodeValue depth environment target (.word targetWord))
+    (worldRead : store.read? locations.world = some (StorageCorrespondence.world accounts))
+    (balancesRead : store.read? locations.balances = some (WordMapping.encode before))
+    (worldBalances : locations.world ≠ locations.balances)
+    (overflowed : AccountCallSemantics.transfer creatorWord targetWord valueWord before = .error (Word.ofNatModulo 12)) :
+    ∃ final, Evaluates environment store
+        (CreationImplementation.deployment runInit installRuntime world balances creator value creatorBalance request
+          target restore depth)
+        (.inLeft Creation.responseType (.word (Word.ofNatModulo 12))) final ∧
+      Rewrites [locations.world] store final := by
+  let created := CreationSemantics.createdAccount targetWord
+  have createdRecord (env : Environment) (current : Store) : Evaluates env current
+      (AccountState.replace (AccountState.replace AccountState.defaultRecord 2 (.word (Word.ofNatModulo 1))) 7 (.bool true))
+      (StorageCorrespondence.record created 0) current :=
+    replace_evaluates (fields := (fields {address := targetWord} 0).set 2 (.word (Word.ofNatModulo 1))) 7 rfl
+      (replace_evaluates (fields := fields {address := targetWord} 0) 2 rfl
+        (StorageCorrespondence.default_evaluates targetWord env current) .word) .bool
+  have inserted := StorageCorrespondence.put_evaluates (environment := environment)
+    (initial := store) (mappingStore := store) (addressStore := store) (final := store)
+    accounts targetWord created 0 (.loadCell (worldCode.evaluates store) worldRead) (targetValue.evaluates store)
+    (createdRecord _ _)
+  let insertedValue := StorageCorrespondence.world (StorageCorrespondence.put targetWord created 0 accounts)
+  let store1 := StorageCorrespondence.putStore accounts targetWord created 0 environment store
+  obtain ⟨suffix1, same1⟩ := putStore_extension accounts targetWord created 0 environment store
+  have keep1 {location : Nat} {old : Value} (found : store.read? location = some old) : store1.read? location = some old := by
+    change (StorageCorrespondence.putStore accounts targetWord created 0 environment store).read? location = _
+    rw [same1]
+    exact StorageCorrespondence.appended_read found _
+  have bound1 := (List.getElem?_eq_some_iff.mp (keep1 worldRead)).1
+  let store2 : Store := store1.set locations.world insertedValue
+  have stored : Evaluates (insertedValue :: environment) store1
+      (CodeBuilder.store world (fun here => .var (here - depth - 1)) (depth + 1)) .unit store2 :=
+    .storeCell ((worldCode.prepend [insertedValue]).evaluates store1) (keep1 worldRead)
+      ((CodeValue.bound depth environment insertedValue).evaluates store1) (Store.write?_eq_some_iff.mpr ⟨bound1, rfl⟩)
+  have balancesRead2 : store2.read? locations.balances = some (WordMapping.encode before) := by
+    change (store1.set locations.world insertedValue)[locations.balances]? = _
+    rw [List.getElem?_set_ne worldBalances]
+    exact keep1 balancesRead
+  have frame2 : Rewrites [locations.world] store store2 := by
+    refine ⟨?_, fun other old outside found => ?_⟩
+    · change store.length ≤ (store1.set _ _).length
+      rw [List.length_set]
+      change store.length ≤ (StorageCorrespondence.putStore accounts targetWord created 0 environment store).length
+      rw [same1]; simp
+    · change (store1.set locations.world insertedValue)[other]? = _
+      rw [List.getElem?_set_ne (fun same => outside (by simp [same]))]
+      exact keep1 found
+  obtain ⟨store3, failed, retained⟩ := transfer_overflow (creatorCode := creator) (creatorBalanceCode := creatorBalance)
+    (balancesCode.prepend [.unit, insertedValue]) (targetValue.prepend [.unit, insertedValue])
+    (valueValue.prepend [.unit, insertedValue]) balancesRead2 overflowed
+  refine ⟨store3, ?_, frame2.trans (Rewrites.ofRetains retained)⟩
+  unfold CreationImplementation.deployment
+  apply LanguageResult.bind_success _ inserted
+  apply Evaluates.letE stored
+  exact LanguageResult.bind_failure _ failed
+
+/-- A target absent from an incomplete world is failure 7. -/
+theorem attempt_absent {depth : Nat} {environment : Environment} {store : Store}
+    {runInit installRuntime : Code → Code → Code}
+    {world balances complete creator value creatorBalance request target restore : Code}
+    {location : Nat} {accounts : StorageCorrespondence.Accounts} {targetWord : Word}
+    (worldCode : CodeValue depth environment world (.cellRef AccountState.type location))
+    (targetValue : CodeValue depth environment target (.word targetWord))
+    (completeValue : CodeValue depth environment complete (.bool false))
+    (worldRead : store.read? location = some (StorageCorrespondence.world accounts))
+    (absent : StorageCorrespondence.lookup targetWord accounts = none) :
+    ∃ final, Evaluates environment store
+        (CreationImplementation.attempt runInit installRuntime world balances complete creator value creatorBalance
+          request target restore depth) (.inLeft Creation.responseType (.word (Word.ofNatModulo 7))) final ∧
+      StoreRetains store final := by
+  have fetched := StorageCorrespondence.get_evaluates (environment := environment) (initial := store)
+    (worldStore := store) (addressStore := store) (final := store) accounts targetWord false
+    (.loadCell (worldCode.evaluates store) worldRead) (targetValue.evaluates store) (completeValue.evaluates store)
+  have obtained : StorageCorrespondence.get accounts targetWord false = .error (Word.ofNatModulo 7) := by
+    simp only [StorageCorrespondence.get, absent, Bool.false_eq_true, ↓reduceIte]
+  rw [obtained] at fetched
+  refine ⟨StorageCorrespondence.getStore accounts targetWord false environment store, ?_, StoreRetains.append _ _⟩
+  unfold CreationImplementation.attempt
+  exact LanguageResult.bind_failure _ fetched
+
+/-- A record with a zero nonce and unknown code is failure 7. -/
+theorem attempt_unknownCode {depth : Nat} {environment : Environment} {store : Store}
+    {runInit installRuntime : Code → Code → Code}
+    {world balances complete creator value creatorBalance request target restore : Code}
+    {location : Nat} {accounts : StorageCorrespondence.Accounts} {targetWord : Word} {completeFlag : Bool}
+    {existing : AccountState.Account} {identity : Nat}
+    (worldCode : CodeValue depth environment world (.cellRef AccountState.type location))
+    (targetValue : CodeValue depth environment target (.word targetWord))
+    (completeValue : CodeValue depth environment complete (.bool completeFlag))
+    (worldRead : store.read? location = some (StorageCorrespondence.world accounts))
+    (obtained : StorageCorrespondence.get accounts targetWord completeFlag = .ok (existing, identity))
+    (zero : existing.nonce = Word.zero) (unknown : existing.code = none) :
+    ∃ final, Evaluates environment store
+        (CreationImplementation.attempt runInit installRuntime world balances complete creator value creatorBalance
+          request target restore depth) (.inLeft Creation.responseType (.word (Word.ofNatModulo 7))) final ∧
+      StoreRetains store final := by
+  have fetched := StorageCorrespondence.get_evaluates (environment := environment) (initial := store)
+    (worldStore := store) (addressStore := store) (final := store) accounts targetWord completeFlag
+    (.loadCell (worldCode.evaluates store) worldRead) (targetValue.evaluates store) (completeValue.evaluates store)
+  rw [obtained] at fetched
+  let fetchedStore := StorageCorrespondence.getStore accounts targetWord completeFlag environment store
+  let recordValue := StorageCorrespondence.record existing identity
+  have recordCode := CodeValue.bound depth environment recordValue
+  have nonceZero : ¬existing.nonce > Word.ofNatModulo 0 := by rw [zero]; decide
+  have sizeZero : ¬Word.ofNatModulo (existing.code.getD []).length > Word.ofNatModulo 0 := by rw [unknown]; decide
+  refine ⟨fetchedStore, ?_, StoreRetains.append _ _⟩
+  unfold CreationImplementation.attempt
+  apply LanguageResult.bind_success _ fetched
+  apply Evaluates.ifFalse (.binary ((recordCode.part (index := 2) rfl).evaluates fetchedStore) .word
+    (by simp only [BinaryOp.apply, nonceZero, decide_false]))
+  apply Evaluates.ifFalse (.binary ((recordCode.part (index := 5) rfl).evaluates fetchedStore) .word
+    (by simp only [BinaryOp.apply, sizeZero, decide_false]))
+  exact .ifFalse ((recordCode.part (index := 6) (value := .bool false) (by simp [unknown])).evaluates
+    fetchedStore) (.inLeft .word)
+
+/-- A target absent from a complete world whose endowment would overflow is
+failure 12 after the new record is inserted. -/
+theorem attempt_overflow {depth : Nat} {environment : Environment} {store : Store}
+    {runInit installRuntime : Code → Code → Code} {locations : SharedLocations}
+    {world balances complete creator value creatorBalance request target restore : Code}
+    {accounts : StorageCorrespondence.Accounts} {before : StorageSemantics.Words}
+    {creatorWord valueWord targetWord : Word}
+    (worldCode : CodeValue depth environment world (.cellRef AccountState.type locations.world))
+    (balancesCode : CodeValue depth environment balances (.cellRef WordMapping.type locations.balances))
+    (completeValue : CodeValue depth environment complete (.bool true))
+    (valueValue : CodeValue depth environment value (.word valueWord))
+    (targetValue : CodeValue depth environment target (.word targetWord))
+    (worldRead : store.read? locations.world = some (StorageCorrespondence.world accounts))
+    (balancesRead : store.read? locations.balances = some (WordMapping.encode before))
+    (worldBalances : locations.world ≠ locations.balances)
+    (absent : StorageCorrespondence.lookup targetWord accounts = none)
+    (overflowed : AccountCallSemantics.transfer creatorWord targetWord valueWord before = .error (Word.ofNatModulo 12)) :
+    ∃ final, Evaluates environment store
+        (CreationImplementation.attempt runInit installRuntime world balances complete creator value creatorBalance
+          request target restore depth) (.inLeft Creation.responseType (.word (Word.ofNatModulo 12))) final ∧
+      Rewrites [locations.world] store final := by
+  have fetched := StorageCorrespondence.get_evaluates (environment := environment) (initial := store)
+    (worldStore := store) (addressStore := store) (final := store) accounts targetWord true
+    (.loadCell (worldCode.evaluates store) worldRead) (targetValue.evaluates store) (completeValue.evaluates store)
+  have obtained : StorageCorrespondence.get accounts targetWord true = .ok ({address := targetWord}, 0) := by
+    simp only [StorageCorrespondence.get, absent, ↓reduceIte]
+  rw [obtained] at fetched
+  let fetchedStore := StorageCorrespondence.getStore accounts targetWord true environment store
+  obtain ⟨suffix, _, same⟩ := StorageCorrespondence.getStore_extension accounts targetWord true environment store
+  have keep {location : Nat} {old : Value} (found : store.read? location = some old) :
+      fetchedStore.read? location = some old := by
+    change (StorageCorrespondence.getStore accounts targetWord true environment store).read? location = _
+    rw [same]
+    exact StorageCorrespondence.appended_read found _
+  let recordValue := StorageCorrespondence.record {address := targetWord} 0
+  have recordCode := CodeValue.bound depth environment recordValue
+  obtain ⟨final, failed, frame⟩ := deployment_overflow (runInit := runInit) (installRuntime := installRuntime)
+    (creator := creator) (creatorBalance := creatorBalance) (request := request) (restore := restore)
+    (worldCode.prepend [recordValue]) (balancesCode.prepend [recordValue]) (valueValue.prepend [recordValue])
+    (targetValue.prepend [recordValue]) (keep worldRead) (keep balancesRead) worldBalances overflowed
+  refine ⟨final, ?_, ?_⟩
+  · unfold CreationImplementation.attempt
+    apply LanguageResult.bind_success _ fetched
+    apply Evaluates.ifFalse (.binary ((recordCode.part (index := 2) rfl).evaluates fetchedStore) .word
+      (by simp [BinaryOp.apply]; decide))
+    apply Evaluates.ifFalse (.binary ((recordCode.part (index := 5) rfl).evaluates fetchedStore) .word
+      (by simp [BinaryOp.apply]))
+    exact .ifTrue ((recordCode.part (index := 6) rfl).evaluates fetchedStore) failed
+  · have appended : Rewrites [locations.world] store fetchedStore := by
+      change Rewrites _ store (StorageCorrespondence.getStore accounts targetWord true environment store)
+      rw [same]
+      exact Rewrites.append _ _ _
+    exact appended.trans frame
+
+theorem Rewrites.set_member {changed : List Nat} {initial current : Store} {location : Nat} {value : Value}
+    (rewrites : Rewrites changed initial current) (member : location ∈ changed) :
+    Rewrites changed initial (current.set location value) :=
+  ⟨by simpa only [List.length_set] using rewrites.length_le, fun other old outside found => by
+    change (current.set location value)[other]? = _
+    rw [List.getElem?_set_ne (fun same : location = other => outside (same ▸ member))]
+    exact rewrites.read other old outside found⟩
+
+/-- Restoring a cell to its initial value keeps the frame. -/
+theorem Rewrites.set_same {changed : List Nat} {initial current : Store} {location : Nat} {value : Value}
+    (rewrites : Rewrites changed initial current) (found : initial.read? location = some value) :
+    Rewrites changed initial (current.set location value) := by
+  refine ⟨by simpa only [List.length_set] using rewrites.length_le, fun other old outside foundOther => ?_⟩
+  change (current.set location value)[other]? = _
+  by_cases same : location = other
+  · subst same
+    have bound : location < current.length :=
+      Nat.lt_of_lt_of_le (List.getElem?_eq_some_iff.mp found).1 rewrites.length_le
+    rw [List.getElem?_set_self bound]
+    exact found.symm.trans foundOther
+  · rw [List.getElem?_set_ne same]
+    exact rewrites.read other old outside foundOther
 
 theorem source_get {accounts : StorageCorrespondence.Accounts} {world : StorageSemantics.World}
     (same : accounts.map Prod.fst = world) {address : Word} {complete : Bool} {account : AccountState.Account}
@@ -795,13 +1125,14 @@ theorem source_get {accounts : StorageCorrespondence.Accounts} {world : StorageS
       simp only [obtained, Except.map, Except.ok.injEq] at sourced
       exact ⟨entry.2, by rw [← sourced]⟩
 
-/-- The admitted remainder up to the attempt on the target: the address, the
-nonce advance and the checkpoint. The attempt is evaluated after the nonce write. -/
+/-- The admitted remainder up to the protected attempt on the target: the
+address, the nonce advance and the checkpoint. The protected attempt is
+evaluated after the nonce write. -/
 theorem admitted_prefix {depth : Nat} {environment : Environment} {store : Store}
     {runInit installRuntime : Code → Code → Code} {args creatorBalance creatorRecord : Code}
     {locations : SharedLocations} {accounts : StorageCorrespondence.Accounts} {account : AccountState.Account}
     {identity : Nat} {target : Word} {complete : Bool} {balances : StorageSemantics.Words}
-    {logs : MemorySemantics.Entries} {logSize : Word} {request : Request} {payload : Value}
+    {logs : MemorySemantics.Entries} {logSize : Word} {request : Request} {result : Value}
     {property : Store → Prop}
     (argsCode : CodeValue depth environment args (bundleValues [.cellRef AccountState.type locations.world,
       .cellRef WordMapping.type locations.balances, .cellRef WordMapping.type locations.logs,
@@ -823,14 +1154,16 @@ theorem admitted_prefix {depth : Nat} {environment : Environment} {store : Store
           StorageCorrespondence.world (StorageCorrespondence.put (request.creator.bitAnd addressMask)
             {account with nonce := account.nonce.add (Word.ofNatModulo 1)} identity accounts),
           .unit, .word target] ++ environment) current
-        (CreationImplementation.attempt runInit installRuntime (part 0 6 args) (part 1 6 args) (part 4 6 args)
-          (address (part 0 8 (part 5 6 args))) (part 1 8 (part 5 6 args)) creatorBalance (part 5 6 args)
-          (fun here => .var (here - depth - 1))
-          (restoreCode (part 0 6 args) (part 1 6 args) (part 2 6 args) (part 3 6 args) (depth + 2)) (depth + 6))
-        (.inRight .word payload) final ∧ property final) :
+        (CreationImplementation.protect
+          (restoreCode (part 0 6 args) (part 1 6 args) (part 2 6 args) (part 3 6 args) (depth + 2))
+          (CreationImplementation.attempt runInit installRuntime (part 0 6 args) (part 1 6 args) (part 4 6 args)
+            (address (part 0 8 (part 5 6 args))) (part 1 8 (part 5 6 args)) creatorBalance (part 5 6 args)
+            (fun here => .var (here - depth - 1))
+            (restoreCode (part 0 6 args) (part 1 6 args) (part 2 6 args) (part 3 6 args) (depth + 2))) (depth + 6))
+        result final ∧ property final) :
     ∃ final, Evaluates environment store
       (CreationImplementation.admitted runInit installRuntime args creatorBalance creatorRecord depth)
-      (.inRight .word payload) final ∧ property final := by
+      result final ∧ property final := by
   simp only [SharedLocations.all, List.nodup_cons, List.mem_cons, List.not_mem_nil, or_false, not_or,
     List.nodup_nil, and_true] at distinct
   obtain ⟨⟨worldLogs, worldSize, worldBalances, _⟩, _, _, _⟩ := distinct
@@ -870,7 +1203,7 @@ theorem admitted_prefix {depth : Nat} {environment : Environment} {store : Store
     (((argsCode.part (index := 2) rfl).prepend [.unit, .word target]))
     (((argsCode.part (index := 3) rfl).prepend [.unit, .word target])) worldRead5
     (keep5 (Ne.symm worldBalances) balancesRead) (keep5 (Ne.symm worldLogs) logsRead) (keep5 (Ne.symm worldSize) logSizeRead)
-  exact .caseRight attemptEvaluated (.inRight (.var rfl))
+  exact attemptEvaluated
 
 /-- The six dispatcher arguments as the handler packs them. -/
 def argumentsValue (locations : SharedLocations) (complete : Bool) (request : Request) : Value :=
@@ -893,14 +1226,81 @@ def advancedAccounts (accounts : StorageCorrespondence.Accounts) (creator : Word
     (identity : Nat) : StorageCorrespondence.Accounts :=
   StorageCorrespondence.put creator {account with nonce := account.nonce.add (Word.ofNatModulo 1)} identity accounts
 
+/-- The checkpoint restoration seen by the attempt of a dispatcher whose
+arguments are bound at `depth`. -/
+def attemptRestore (depth : Nat) : Code :=
+  restoreCode (part 0 6 (fun here => .var (here - depth - 1))) (part 1 6 (fun here => .var (here - depth - 1)))
+    (part 2 6 (fun here => .var (here - depth - 1))) (part 3 6 (fun here => .var (here - depth - 1))) (depth + 5)
+
+/-- A failed attempt inside the dispatcher restores the four checkpointed
+cells: the world keeps the nonce advance, and balances and logs return to their
+values before the attempt. -/
+theorem attempt_restored {depth : Nat} {environment : Environment} {store current failed : Store}
+    {locations : SharedLocations} {state : AccountCallSemantics.Shared} {request : Request}
+    {account : AccountState.Account} {identity : Nat} {target : Word} {advanced : StorageCorrespondence.Accounts}
+    {attempt : Code} {reason : Word} {failedType : Core.Ty}
+    (related : SharedStateRel locations state store)
+    (attempted : Evaluates (attemptEnvironment environment locations state request account identity target advanced)
+      current (attempt (depth + 9)) (.inLeft failedType (.word reason)) failed)
+    (rewrites : Rewrites [locations.world, locations.balances] store failed) :
+    ∃ final, Evaluates (attemptEnvironment environment locations state request account identity target advanced)
+        current (CreationImplementation.protect (attemptRestore depth) attempt (depth + 9))
+        (.inLeft Creation.responseType (.word reason)) final ∧
+      final.read? locations.world = some (StorageCorrespondence.world advanced) ∧
+      final.read? locations.balances = some (WordMapping.encode state.balances) ∧
+      final.read? locations.logs = some (WordMapping.encode state.logs) ∧
+      final.read? locations.logSize = some (.word state.logSize) ∧
+      Rewrites [locations.world, locations.balances] store final := by
+  have distinct := related.distinct
+  simp only [SharedLocations.all, List.nodup_cons, List.mem_cons, List.not_mem_nil, or_false, not_or,
+    List.nodup_nil, and_true] at distinct
+  obtain ⟨⟨worldLogs, worldSize, worldBalances, _⟩, ⟨logsSize, logsBalances, _⟩, ⟨sizeBalances, _⟩, _⟩ := distinct
+  obtain ⟨_, _, worldRead⟩ := related.world
+  have bound {location : Nat} {value : Value} (found : store.read? location = some value) :
+      location < failed.length :=
+    Nat.lt_of_lt_of_le (List.getElem?_eq_some_iff.mp found).1 rewrites.length_le
+  let argsValue := argumentsValue locations state.complete request
+  let creatorBalance : Value := .word (StorageSemantics.readWord (request.creator.bitAnd addressMask) state.balances)
+  let below : Environment := [.unit, .word target, StorageCorrespondence.record account identity, creatorBalance,
+    argsValue] ++ environment
+  have args := (CodeValue.bound depth environment argsValue).prepend [.word reason, .word state.logSize,
+    WordMapping.encode state.logs, WordMapping.encode state.balances, StorageCorrespondence.world advanced, .unit,
+    .word target, StorageCorrespondence.record account identity, creatorBalance]
+  have savedWorld := (CodeValue.bound (depth + 5) below (StorageCorrespondence.world advanced)).prepend
+    [.word reason, .word state.logSize, WordMapping.encode state.logs, WordMapping.encode state.balances]
+  have savedBalances := (CodeValue.bound (depth + 6) (StorageCorrespondence.world advanced :: below)
+    (WordMapping.encode state.balances)).prepend [.word reason, .word state.logSize, WordMapping.encode state.logs]
+  have savedLogs := (CodeValue.bound (depth + 7)
+    (WordMapping.encode state.balances :: StorageCorrespondence.world advanced :: below)
+    (WordMapping.encode state.logs)).prepend [.word reason, .word state.logSize]
+  have savedLogSize := (CodeValue.bound (depth + 8)
+    (WordMapping.encode state.logs :: WordMapping.encode state.balances :: StorageCorrespondence.world advanced :: below)
+    (.word state.logSize)).prepend [.word reason]
+  have restored := restoreCode_evaluates (checkpoint := depth + 5) (args.part (index := 0) rfl)
+    (args.part (index := 1) rfl) (args.part (index := 2) rfl) (args.part (index := 3) rfl)
+    savedWorld savedBalances savedLogs savedLogSize (bound worldRead) (bound related.balances) (bound related.logs)
+    (bound related.logSize)
+  refine ⟨_, protect_failed attempted restored, ?_, ?_, ?_, ?_,
+    (((rewrites.set_same related.logSize).set_same related.logs).set_member (by simp)).set_member (by simp)⟩
+  · change (List.set _ locations.world _)[locations.world]? = _
+    rw [List.getElem?_set_self (by simp only [List.length_set]; exact bound worldRead)]
+  · change (List.set _ locations.world _)[locations.balances]? = _
+    rw [List.getElem?_set_ne worldBalances, List.getElem?_set_self (by simp only [List.length_set]; exact bound related.balances)]
+  · change (List.set _ locations.world _)[locations.logs]? = _
+    rw [List.getElem?_set_ne worldLogs, List.getElem?_set_ne (Ne.symm logsBalances),
+      List.getElem?_set_self (by simp only [List.length_set]; exact bound related.logs)]
+  · change (List.set _ locations.world _)[locations.logSize]? = _
+    rw [List.getElem?_set_ne worldSize, List.getElem?_set_ne (Ne.symm sizeBalances), List.getElem?_set_ne logsSize,
+      List.getElem?_set_self (bound related.logSize)]
+
 /-- The funds and nonce checks pass, the creator record is read and the
-admitted remainder runs; the attempt on the target is supplied. -/
+admitted remainder runs; the protected attempt on the target is supplied. -/
 theorem dispatchWith_admit {depth : Nat} {environment : Environment} {store : Store}
     {shared : AccountRuntime.References} {locations : SharedLocations}
     {requestCode : Code} {request : Request} {state : AccountCallSemantics.Shared}
     {runInit : Code → Code → Code} {identify : Code → Code}
     {accounts : StorageCorrespondence.Accounts} {account : AccountState.Account} {target : Word}
-    {payload : Value} {property : Store → Prop}
+    {result : Value} {property : Store → Prop}
     (references : SharedReferences depth environment shared locations)
     (requestRelated : CodeValue depth environment requestCode (requestValue request))
     (related : SharedStateRel locations state store)
@@ -919,22 +1319,22 @@ theorem dispatchWith_admit {depth : Nat} {environment : Environment} {store : St
         (advancedAccounts accounts (request.creator.bitAnd addressMask) account identity)) →
       ∃ final, Evaluates (attemptEnvironment environment locations state request account identity target
           (advancedAccounts accounts (request.creator.bitAnd addressMask) account identity)) current
-        (CreationImplementation.attempt runInit (CreationImplementation.installWith identify shared)
-          (part 0 6 (fun here => .var (here - depth - 1))) (part 1 6 (fun here => .var (here - depth - 1)))
-          (part 4 6 (fun here => .var (here - depth - 1)))
-          (address (part 0 8 (part 5 6 (fun here => .var (here - depth - 1)))))
-          (part 1 8 (part 5 6 (fun here => .var (here - depth - 1)))) (fun here => .var (here - (depth + 1) - 1))
-          (part 5 6 (fun here => .var (here - depth - 1))) (fun here => .var (here - (depth + 3) - 1))
-          (restoreCode (part 0 6 (fun here => .var (here - depth - 1))) (part 1 6 (fun here => .var (here - depth - 1)))
-            (part 2 6 (fun here => .var (here - depth - 1))) (part 3 6 (fun here => .var (here - depth - 1))) (depth + 5))
+        (CreationImplementation.protect (attemptRestore depth)
+          (CreationImplementation.attempt runInit (CreationImplementation.installWith identify shared)
+            (part 0 6 (fun here => .var (here - depth - 1))) (part 1 6 (fun here => .var (here - depth - 1)))
+            (part 4 6 (fun here => .var (here - depth - 1)))
+            (address (part 0 8 (part 5 6 (fun here => .var (here - depth - 1)))))
+            (part 1 8 (part 5 6 (fun here => .var (here - depth - 1)))) (fun here => .var (here - (depth + 1) - 1))
+            (part 5 6 (fun here => .var (here - depth - 1))) (fun here => .var (here - (depth + 3) - 1))
+            (attemptRestore depth))
           (depth + 9))
-        (.inRight .word payload) final ∧ property final) :
+        result final ∧ property final) :
     ∃ final, Evaluates environment store
       (CreationImplementation.dispatchWith (AccountRuntime.reference shared "world")
         (AccountRuntime.reference shared "balances") (AccountRuntime.reference shared "logs")
         (AccountRuntime.reference shared "logSize") (load (AccountRuntime.reference shared "worldComplete"))
         requestCode (CreationImplementation.admitted runInit (CreationImplementation.installWith identify shared)) depth)
-        (.inRight .word payload) final ∧ property final := by
+        result final ∧ property final := by
   let argsValue := argumentsValue locations state.complete request
   have packed : Evaluates environment store
       (packet [AccountRuntime.reference shared "world", AccountRuntime.reference shared "balances",
@@ -1072,7 +1472,8 @@ theorem dispatchWith_admitted {depth : Nat} {environment : Environment} {store :
           obtain ⟨final, evaluated, retained⟩ := attempt_collision (runInit := runInit)
             (installRuntime := CreationImplementation.installWith identify shared)
             (args9.part (index := 0) rfl) target9 (args9.part (index := 4) rfl) read obtainedE used
-          exact ⟨final, evaluated, (retained.read locations.world (List.getElem?_eq_some_iff.mp read).1).trans read,
+          exact ⟨final, protect_succeeded evaluated,
+            (retained.read locations.world (List.getElem?_eq_some_iff.mp read).1).trans read,
             (Rewrites.ofOverwrites overwrites (by simp)).trans (Rewrites.ofRetains retained)⟩)
       refine ⟨final, evaluated, ⟨⟨⟨advanced, advancedSame, worldFinal⟩, ?_, ?_, ?_, ?_, sharedRelated.distinct⟩,
         ⟨advanced, advancedSame, links_put_same links got rfl, worldFinal⟩⟩, rewrites.mono (by simp)⟩
@@ -1135,7 +1536,7 @@ theorem dispatchWith_admitted {depth : Nat} {environment : Environment} {store :
             (references.prepend (extra ++ [argsValue])) (args9.part (index := 0) rfl) (args9.part (index := 1) rfl)
             complete9 creator9 (request9.part (index := 1) rfl) balance9 request9 target9 read balancesRead completeRead
             sharedRelated.distinct absentAdvanced different emptyInit transferred
-          exact ⟨final, evaluated, worldFinal, balancesFinal,
+          exact ⟨final, protect_succeeded evaluated, worldFinal, balancesFinal,
             (Rewrites.ofOverwrites overwrites (by simp)).trans rewrites⟩)
       refine ⟨final, evaluated, ⟨⟨⟨deployedAccounts, ?_, worldFinal⟩, ?_, ?_, balancesFinal, ?_, sharedRelated.distinct⟩,
         ⟨deployedAccounts, ?_, links_put_absent (accounts := advanced)
@@ -1146,6 +1547,102 @@ theorem dispatchWith_admitted {depth : Nat} {environment : Environment} {store :
       · exact rewrites.read _ _ (by simp [Ne.symm worldSize, sizeBalances]) sharedRelated.logSize
       · exact rewrites.read _ _ (by simp [Ne.symm worldComplete, Ne.symm balancesComplete.1]) sharedRelated.complete
       · rw [StorageCorrespondence.put_source, advancedSame]
+  | unknown funded found belowLimit bounded derived unknown =>
+      rename_i account target
+      obtain ⟨identity, got⟩ := source_get worldSame found
+      let advanced := advancedAccounts accounts key account identity
+      have advancedSame := advanced_source worldSame key account identity
+      obtain ⟨final, evaluated, worldFinal, balancesFinal, logsFinal, logSizeFinal, rewrites⟩ := dispatchWith_admit
+        (runInit := runInit) (identify := identify)
+        (property := fun final => final.read? locations.world = some (StorageCorrespondence.world advanced) ∧
+          final.read? locations.balances = some (WordMapping.encode state.balances) ∧
+          final.read? locations.logs = some (WordMapping.encode state.logs) ∧
+          final.read? locations.logSize = some (.word state.logSize) ∧
+          Rewrites [locations.world, locations.balances] store final)
+        references requestRelated sharedRelated worldSame worldRead funded found belowLimit bounded derived
+        (fun other gotOther current overwrites read => by
+          have same := identityOf got gotOther
+          subst same
+          let extra : Environment := [.word state.logSize, WordMapping.encode state.logs,
+            WordMapping.encode state.balances, StorageCorrespondence.world advanced, .unit, .word target,
+            StorageCorrespondence.record account identity, .word (StorageSemantics.readWord key state.balances)]
+          have args9 := argsCode.prepend extra
+          have target9 := (CodeValue.bound (depth + 3) ([StorageCorrespondence.record account identity,
+            .word (StorageSemantics.readWord key state.balances)] ++ argsValue :: environment) (.word target)).prepend
+            [.word state.logSize, WordMapping.encode state.logs, WordMapping.encode state.balances,
+              StorageCorrespondence.world advanced, .unit]
+          cases unknown with
+          | absent absent incomplete =>
+              have absentAdvanced : StorageCorrespondence.lookup target advanced = none := by
+                have sourced := StorageCorrespondence.lookup_source advanced target
+                rw [advancedSame, absent] at sourced
+                cases lookedUp : StorageCorrespondence.lookup target advanced with
+                | none => rfl
+                | some entry => simp [lookedUp] at sourced
+              have complete9 := args9.part (index := 4) rfl
+              rw [incomplete] at complete9
+              obtain ⟨failed, attempted, retained⟩ := attempt_absent (runInit := runInit)
+                (installRuntime := CreationImplementation.installWith identify shared)
+                (args9.part (index := 0) rfl) target9 complete9 read absentAdvanced
+              exact attempt_restored sharedRelated attempted
+                ((Rewrites.ofOverwrites overwrites (by simp)).trans (Rewrites.ofRetains retained))
+          | unknownCode occupied zero unknownCode =>
+              rename_i existing
+              obtain ⟨identityE, lookedUp⟩ := CatalogWorldCorrespondence.lookup_of_source
+                (accounts := advanced) (by rw [advancedSame]; exact occupied)
+              have obtainedE : StorageCorrespondence.get advanced target state.complete = .ok (existing, identityE) := by
+                simp only [StorageCorrespondence.get, lookedUp]
+              obtain ⟨failed, attempted, retained⟩ := attempt_unknownCode (runInit := runInit)
+                (installRuntime := CreationImplementation.installWith identify shared)
+                (args9.part (index := 0) rfl) target9 (args9.part (index := 4) rfl) read obtainedE zero unknownCode
+              exact attempt_restored sharedRelated attempted
+                ((Rewrites.ofOverwrites overwrites (by simp)).trans (Rewrites.ofRetains retained)))
+      refine ⟨final, evaluated, ⟨⟨⟨advanced, advancedSame, worldFinal⟩, logsFinal, logSizeFinal, balancesFinal, ?_,
+        sharedRelated.distinct⟩, ⟨advanced, advancedSame, links_put_same links got rfl, worldFinal⟩⟩, rewrites⟩
+      exact rewrites.read _ _ (by simp [Ne.symm worldComplete, Ne.symm balancesComplete.1]) sharedRelated.complete
+  | overflow funded found belowLimit bounded derived absent complete overflowed =>
+      rename_i account target
+      obtain ⟨identity, got⟩ := source_get worldSame found
+      let advanced := advancedAccounts accounts key account identity
+      have advancedSame := advanced_source worldSame key account identity
+      have absentAdvanced : StorageCorrespondence.lookup target advanced = none := by
+        have sourced := StorageCorrespondence.lookup_source advanced target
+        rw [advancedSame, absent] at sourced
+        cases lookedUp : StorageCorrespondence.lookup target advanced with
+        | none => rfl
+        | some entry => simp [lookedUp] at sourced
+      obtain ⟨final, evaluated, worldFinal, balancesFinal, logsFinal, logSizeFinal, rewrites⟩ := dispatchWith_admit
+        (runInit := runInit) (identify := identify)
+        (property := fun final => final.read? locations.world = some (StorageCorrespondence.world advanced) ∧
+          final.read? locations.balances = some (WordMapping.encode state.balances) ∧
+          final.read? locations.logs = some (WordMapping.encode state.logs) ∧
+          final.read? locations.logSize = some (.word state.logSize) ∧
+          Rewrites [locations.world, locations.balances] store final)
+        references requestRelated sharedRelated worldSame worldRead funded found belowLimit bounded derived
+        (fun other gotOther current overwrites read => by
+          have same := identityOf got gotOther
+          subst same
+          let extra : Environment := [.word state.logSize, WordMapping.encode state.logs,
+            WordMapping.encode state.balances, StorageCorrespondence.world advanced, .unit, .word target,
+            StorageCorrespondence.record account identity, .word (StorageSemantics.readWord key state.balances)]
+          have args9 := argsCode.prepend extra
+          have target9 := (CodeValue.bound (depth + 3) ([StorageCorrespondence.record account identity,
+            .word (StorageSemantics.readWord key state.balances)] ++ argsValue :: environment) (.word target)).prepend
+            [.word state.logSize, WordMapping.encode state.logs, WordMapping.encode state.balances,
+              StorageCorrespondence.world advanced, .unit]
+          have request9 := args9.part (index := 5) rfl
+          have complete9 := args9.part (index := 4) rfl
+          rw [complete] at complete9
+          have balancesRead := overwrites.read _ _ (Ne.symm worldBalances) sharedRelated.balances
+          obtain ⟨failed, attempted, frame⟩ := attempt_overflow (runInit := runInit)
+            (installRuntime := CreationImplementation.installWith identify shared)
+            (args9.part (index := 0) rfl) (args9.part (index := 1) rfl) complete9 (request9.part (index := 1) rfl)
+            target9 read balancesRead worldBalances absentAdvanced overflowed
+          exact attempt_restored sharedRelated attempted
+            ((Rewrites.ofOverwrites overwrites (by simp)).trans (frame.mono (by simp))))
+      refine ⟨final, evaluated, ⟨⟨⟨advanced, advancedSame, worldFinal⟩, logsFinal, logSizeFinal, balancesFinal, ?_,
+        sharedRelated.distinct⟩, ⟨advanced, advancedSame, links_put_same links got rfl, worldFinal⟩⟩, rewrites⟩
+      exact rewrites.read _ _ (by simp [Ne.symm worldComplete, Ne.symm balancesComplete.1]) sharedRelated.complete
 
 /-- Applying the actual installed closure to an admitted attempt without an
 init frame returns its response and publishes its shared changes. -/
