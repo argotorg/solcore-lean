@@ -143,10 +143,20 @@ not record a match receipt's compilation context, so `Covered` requires it to be
 admitted (`Admitted`: the checked catalog's initial values, the body's own
 allocator and definitions extended by the indexed layouts);
 `AcceptedNamedBodyFlow.Tree.refine` builds its match receipts at its
-policy-success context but does not state it.
-`Covered` excludes generalized declarations and writes and matches under
-contextual metadata views, and it requires a function-mode fallthrough to have
-Unit result and a final bare value to have the declared result type. The
+policy-success context but does not state it. Generalized declarations are
+closed through `CellAwareInvocationGeneralizedAcceptedAllocation` when their
+initializer is a direct lambda without requirements or coercions and the
+`CellAwareInvocationAcceptedInputs.Generalized` inputs hold: the captured-scope
+descriptor attachment, the residual entry of a contextual invocation (trivial
+for named rows) and the body's diagnostic issuer. For this the closure carries
+the compiler's statement sites (`ActualBodyInvocation.Index.Site`) and also
+concludes that every native typing of the emitted code has a Word failure
+component
+([CellAwareInvocationAcceptedNative](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNative.lean));
+that fixes the initializer's native type at its language result.
+`Covered` excludes writes and matches under contextual metadata views, and it
+requires a function-mode fallthrough to have Unit result and a final bare value
+to have the declared result type. The
 closure threads the Source context's signatures through declarations. The
 caller also supplies Core typing of the compiled body, fixed-control checker
 typing and the result projection; for an actual prepared named header,
@@ -168,9 +178,12 @@ recognizer until it appears universal or assuming a body-execution law.
 On the accepted-body route above, the next connected steps are:
 
 - Close the remaining compiler branches in `Covered`: writes and matches under
-  contextual metadata views, and generalized declarations. Record the match
-  compilation context in the refined tree so that `Admitted` follows from the
-  body policy. Statements after an always-returning prefix in a non-Unit
+  contextual metadata views. Record the match compilation context in the
+  refined tree so that `Admitted` follows from the body policy, derive the
+  lambda shape of generalized initializers from the compiler's initializer
+  receipt, and derive the `Generalized` issuer at actual headers from the public
+  diagnostic receipt (as `CellAwareNamedDiagnosticIssuer.of_prepared` does).
+  Statements after an always-returning prefix in a non-Unit
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Discharge `Expressions` by an expression closure over the actual accepted

@@ -23,6 +23,8 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationProjectedBitNotFl
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeNative
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedMatches
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNative
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationGeneralizedAcceptedAllocation
 
 /-! The actual accepted compiler tree closes the mixed-cell statement flows.
 Every child is the action run by the compiler at its original source, scope and
@@ -43,44 +45,61 @@ section Coverage
 variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {result : Ty}
   {reasonAt : ExpressionId → Word}
 
+/-- A generalized declaration's initializer is a direct lambda without
+requirements or coercions. -/
+def LambdaInitializer (semantic : TypedSource) (expression : ExpressionId) : Prop :=
+  ∀ node, semantic.lookupExpression? expression = some node →
+    (∃ parameters result body, node.form = .lambda parameters result body) ∧
+      node.requirements = [] ∧ node.coercions = []
+
 /-- Compiler branches whose statement flow is closed below. Function-mode
 fallthrough is admitted only at a Unit result, and a final bare value only at
 the declared result type of its original node. A nonfinal bare value in
 function mode has no Source rule and is outside this closure. Bare and
 projected assignments and bit-not updates are closed when the compiler view is
 the original Source, as for named rows. A match receipt is closed under the
-same view when its compilation context is `admitted`. -/
+same view when its compilation context is `admitted`, and a generalized
+declaration when its inputs are `generalized` and its initializer is a direct
+lambda. -/
 def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
-    (admitted : SourceCoreCompatibleDataMatches.Context → Prop) {mode : Bool} {escaped : Word}
-    {fuel scope statements code}
+    (admitted : SourceCoreCompatibleDataMatches.Context → Prop) (generalized : Prop)
+    {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Prop :=
   match tree with
   | .nil => mode = false ∨ expected = .unit
   | .returning .. | .returnUnit .. | .breaking .. | .continuing .. => True
   | @Tree.tailValue _ _ _ _ _ _ _ _ _ _ expression _ _ _ _ _ _ =>
       ∀ node, semantic.lookupExpression? expression = some node → node.type = expected
-  | @Tree.initialized _ _ _ _ _ _ _ _ _ _ _ _ binder _ _ _ _ _ _ _ _ _ _ _ remaining _ =>
-      binder.scheme.quantified = [] ∧ Covered semantic expected admitted remaining
-  | .absent _ _ _ _ remaining _ => Covered semantic expected admitted remaining
-  | .assigned _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
-  | .bitNotted _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
-  | .projectedAssigned _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
-  | .projectedBitNotted _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
-  | .discard _ _ _ _ _ tail => Covered semantic expected admitted tail
-  | .valueDiscard _ _ _ _ _ _ tail => mode = false ∧ Covered semantic expected admitted tail
-  | .block _ _ inner tail => Covered semantic expected admitted inner ∧ Covered semantic expected admitted tail
+  | @Tree.initialized _ _ _ _ _ _ _ _ _ _ _ _ binder expression _ _ _ _ _ _ _ _ _ _ remaining _ =>
+      (binder.scheme.quantified = [] ∨ generalized ∧ LambdaInitializer semantic expression) ∧
+        Covered semantic expected admitted generalized remaining
+  | .absent _ _ _ _ remaining _ => Covered semantic expected admitted generalized remaining
+  | .assigned _ _ _ remaining _ _ =>
+      source = semantic ∧ Covered semantic expected admitted generalized remaining
+  | .bitNotted _ _ _ remaining _ _ =>
+      source = semantic ∧ Covered semantic expected admitted generalized remaining
+  | .projectedAssigned _ _ _ remaining _ _ =>
+      source = semantic ∧ Covered semantic expected admitted generalized remaining
+  | .projectedBitNotted _ _ _ remaining _ _ =>
+      source = semantic ∧ Covered semantic expected admitted generalized remaining
+  | .discard _ _ _ _ _ tail => Covered semantic expected admitted generalized tail
+  | .valueDiscard _ _ _ _ _ _ tail => mode = false ∧ Covered semantic expected admitted generalized tail
+  | .block _ _ inner tail =>
+      Covered semantic expected admitted generalized inner ∧ Covered semantic expected admitted generalized tail
   | .conditional _ _ _ _ _ left right tail =>
-      Covered semantic expected admitted left ∧ Covered semantic expected admitted right ∧
-        Covered semantic expected admitted tail
+      Covered semantic expected admitted generalized left ∧
+        Covered semantic expected admitted generalized right ∧ Covered semantic expected admitted generalized tail
   | @Tree.matched _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ compilation _ _ _ branches tail =>
       admitted compilation ∧ source = semantic ∧
-        (∀ request member, Covered semantic expected admitted (branches request member)) ∧
-        Covered semantic expected admitted tail
+        (∀ request member, Covered semantic expected admitted generalized (branches request member)) ∧
+        Covered semantic expected admitted generalized tail
   | .whileLoop _ _ _ _ _ _ inner tail =>
-      Covered semantic expected admitted inner ∧ Covered semantic expected admitted tail
+      Covered semantic expected admitted generalized inner ∧ Covered semantic expected admitted generalized tail
   | .forLoop _ _ _ _ _ _ initial inner after tail =>
-      CellAwareInvocationAcceptedForItems.ItemsCovered semantic initial ∧ Covered semantic expected admitted inner ∧
-        CellAwareInvocationAcceptedForItems.ItemsCovered semantic after ∧ Covered semantic expected admitted tail
+      CellAwareInvocationAcceptedForItems.ItemsCovered semantic initial ∧
+        Covered semantic expected admitted generalized inner ∧
+        CellAwareInvocationAcceptedForItems.ItemsCovered semantic after ∧
+        Covered semantic expected admitted generalized tail
   | _ => False
 
 end Coverage
@@ -162,8 +181,9 @@ theorem correct (budget : Nat)
     {expected : TypeSystem.Ty} :
     ∀ {mode escaped fuel scope statements code}
       (tree : Tree index.policy index.compilerSource index.result index.reasonAt mode escaped fuel scope statements code),
-      Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index) tree →
-      (∀ id ∈ statements, index.Reached (.statement id)) →
+      Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index)
+        (CellAwareInvocationAcceptedInputs.Generalized (attachment := attachment) index) tree →
+      (∀ id ∈ statements, index.Site (.statement id)) →
       ∀ {control : ControlContext} {context final : SourceSemantics.Context} {facts : BodyFacts},
         control.returnType = expected →
         context.signatures = whole.compatible.checked.signatures →
@@ -173,7 +193,9 @@ theorem correct (budget : Nat)
         CellAwareInvocationFlowBounds.PreservesAtMost (attachment := attachment) bridge context model index producer
           registry invocation faults administrative scope mode statements expected index.result code budget ∧
         CellAwareInvocationFlowBounds.ReflectsAtMost (attachment := attachment) bridge context model index producer
-          registry invocation faults administrative scope mode statements expected index.result code budget := by
+          registry invocation faults administrative scope mode statements expected index.result code budget ∧
+        CellAwareInvocationAcceptedNative.WordFailure (SourceCoreLocalCell.coreContext scope ++ administrative) code
+          whole.indexed.layouts.definitions := by
   have sourceUnique : NodeOccurrencesUnique index.source := sourceEq ▸ unique
   have catalog := CellAwareInvocationAcceptedMatches.catalog artifact checked
   intro mode escaped fuel scope statements code tree
@@ -183,10 +205,11 @@ theorem correct (budget : Nat)
     exact ⟨fun size _ => CellAwareInvocationEmptyFlow.preserves bridge context model index producer
         registry invocation faults administrative _ _ expected index.result allowed size,
       fun size _ => CellAwareInvocationEmptyFlow.reflects bridge context model index producer
-        registry invocation faults administrative _ _ expected index.result allowed size⟩
+        registry invocation faults administrative _ _ expected index.result allowed size,
+      CellAwareInvocationAcceptedNative.fallthrough_word _⟩
   | @returning mode escaped fuel scope id rest node stored expression read form statementType child generated childType =>
     intro _ reached control context final facts result signatures typed _
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, _restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -204,10 +227,11 @@ theorem correct (budget : Nat)
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationScopedTerminalFlow.reflects bridge producer head
           (sourceEq ▸ expressionFound) (sourceEq ▸ expressionTyped) generated budget
-          ((expressions fuel context runtime covers ledger).2)⟩
+          ((expressions fuel context runtime covers ledger).2),
+      CellAwareInvocationAcceptedNative.returnValue_word _ _⟩
   | @returnUnit mode escaped fuel scope id rest node stored read form statementType unitType =>
     intro _ reached control context final facts result signatures typed _
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, _restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -218,48 +242,104 @@ theorem correct (budget : Nat)
     exact ⟨fun size _ => CellAwareInvocationScopedTerminalFlow.unit_preserves bridge producer
         (fun _ _ => CompatiblePayload.ValueRep.unit) found form unique size,
       fun size _ => CellAwareInvocationScopedTerminalFlow.unit_reflects bridge producer
-        (fun _ _ => CompatiblePayload.ValueRep.unit) found form size⟩
+        (fun _ _ => CompatiblePayload.ValueRep.unit) found form size,
+      CellAwareInvocationAcceptedNative.returned_word _⟩
   | @initialized mode escaped fuel scope id rest node stored binder initializer payload tail code
       read form statementType projected child generated childType remaining allocated tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨mono, tailCovered⟩ := covered
+    obtain ⟨shape, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
-    have typedInitializer : ExpressionHasType index.source context initializer binder.scheme.body ∧
-        BinderExtends index.source.owner context binder middle := by
-      cases formTyped with
-      | letInitialized initializerTyped _ extension => exact ⟨initializerTyped, extension⟩
-      | letInitializedGeneralized polymorphic => exact False.elim (polymorphic mono)
-    obtain ⟨initializerTyped, extended⟩ := typedInitializer
-    have nextSignatures : middle.signatures = whole.compatible.checked.signatures := by
-      cases extended
-      exact signatures
-    obtain ⟨initializerNode, initializerFound, valueType, initializerTyped⟩ :=
-      expression_node sourceUnique initializerTyped
     have payloadEq : payload = child.type := ensure_eq childType
     subst payloadEq
     obtain ⟨allocation, annotation, same, emitted⟩ := index.let_initialized_receipt allocated
-    obtain ⟨_, native⟩ := native
+    obtain ⟨nativeType, native⟩ := native
     have tailNative := TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ native)
-    have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
-      result nextSignatures restTyped ⟨_, tailNative⟩
-    exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
-        fun runtime covers ledger => CellAwareInvocationOrdinaryAcceptedAllocation.preserves bridge bindings model
-          index producer registered registry invocation faults headReached read form mono extended childType
-          allocated sourceEq initializerFound valueType initializerTyped generated budget
-          (expressions fuel context runtime covers ledger).1 tailBounds.1,
-      reflects_of_valid bridge index producer registry invocation faults administrative
-        fun runtime covers ledger => CellAwareInvocationOrdinaryAcceptedAllocation.reflects bridge bindings model
-          index producer registered registry invocation faults headReached read form mono extended childType
-          allocated sourceEq initializerFound valueType initializerTyped generated budget
-          (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+    by_cases mono : binder.scheme.quantified = []
+    · have typedInitializer : ExpressionHasType index.source context initializer binder.scheme.body ∧
+          BinderExtends index.source.owner context binder middle := by
+        cases formTyped with
+        | letInitialized initializerTyped _ extension => exact ⟨initializerTyped, extension⟩
+        | letInitializedGeneralized polymorphic => exact False.elim (polymorphic mono)
+      obtain ⟨initializerTyped, extended⟩ := typedInitializer
+      have nextSignatures : middle.signatures = whole.compatible.checked.signatures := by
+        cases extended
+        exact signatures
+      obtain ⟨initializerNode, initializerFound, valueType, initializerTyped⟩ :=
+        expression_node sourceUnique initializerTyped
+      have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
+        result nextSignatures restTyped ⟨_, tailNative⟩
+      exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
+          fun runtime covers ledger => CellAwareInvocationOrdinaryAcceptedAllocation.preserves bridge bindings model
+            index producer registered registry invocation faults headReached.reached read form mono extended
+            childType allocated sourceEq initializerFound valueType initializerTyped generated budget
+            (expressions fuel context runtime covers ledger).1 tailBounds.1,
+        reflects_of_valid bridge index producer registry invocation faults administrative
+          fun runtime covers ledger => CellAwareInvocationOrdinaryAcceptedAllocation.reflects bridge bindings model
+            index producer registered registry invocation faults headReached.reached read form mono extended
+            childType allocated sourceEq initializerFound valueType initializerTyped generated budget
+            (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+        by
+          intro _ typed
+          exact tailBounds.2.2 (TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ typed))⟩
+    · obtain ⟨generalized, lambdaShape⟩ := shape.resolve_left mono
+      have typedInitializer : ExpressionHasType index.source (localSchemeInitializerContext context binder)
+            initializer binder.scheme.body ∧ BinderExtends index.source.owner context binder middle := by
+        cases formTyped with
+        | letInitialized _ monomorphic _ => exact False.elim (mono monomorphic)
+        | letInitializedGeneralized _ _ _ initializerTyped extension => exact ⟨initializerTyped, extension⟩
+      obtain ⟨initializerTyped, extended⟩ := typedInitializer
+      have nextSignatures : middle.signatures = whole.compatible.checked.signatures := by
+        cases extended
+        exact signatures
+      obtain ⟨initializerNode, initializerFound, valueType, _⟩ := expression_node sourceUnique initializerTyped
+      obtain ⟨⟨parameters, lambdaResult, lambdaBody, initializerForm⟩, requirements, coercions⟩ :=
+        lambdaShape initializerNode initializerFound
+      have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
+        result nextSignatures restTyped ⟨_, tailNative⟩
+      have word : CellAwareInvocationAcceptedNative.WordFailure (SourceCoreLocalCell.coreContext scope ++ administrative)
+          code whole.indexed.layouts.definitions := by
+        intro _ typed
+        exact tailBounds.2.2 (TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ typed))
+      obtain ⟨success, nativeEq⟩ := word native
+      subst nativeEq
+      rw [emitted] at native
+      have nativeTyped := CellAwareInvocationAcceptedNative.initialized_initializer allocation annotation same native
+      obtain ⟨attachmentEq, entry, issuer⟩ := generalized
+      subst attachmentEq
+      refine ⟨?_, ?_, word⟩
+      · intro size within mapping world actualContext environment canonical actual before store embedding
+          environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+          initial admitted authority physical owner sameLocation ready finalContext outcome after trace
+        obtain ⟨_, declaration, ordinary⟩ := SourceLetDeclarationFacts.of_lookup physical.ownership statementFound form
+        exact CellAwareInvocationGeneralizedAcceptedAllocation.preserves bridge bindings model index producer
+          registered registry invocation faults (artifact := artifact) (checked := checked) (entry := entry)
+          (site := headReached) (read := read) (form := form) (projected := projected) (generated := generated)
+          (issuer := issuer fuel scope initializer) (declaration := declaration) (polymorphic := mono)
+          (extended := extended) (ordinary := ordinary) (nativeTyped := nativeTyped) (childType := childType)
+          (allocated := allocated) (sourceEq := sourceEq) budget tailBounds.1 size within environments heaps
+          locals agrees actualTyped runtime covers sameLedger sourceTyped initial admitted authority physical owner
+          sameLocation ready trace
+      · intro size within mapping world actualContext environment canonical actual before store embedding value
+          finalStore environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+          initial admitted authority physical owner sameLocation ready completed
+        obtain ⟨_, declaration, ordinary⟩ := SourceLetDeclarationFacts.of_lookup physical.ownership statementFound form
+        exact CellAwareInvocationGeneralizedAcceptedAllocation.reflects bridge bindings model index producer
+          registered registry invocation faults (artifact := artifact) (checked := checked) (entry := entry)
+          (site := headReached) (read := read) (form := form) (projected := projected) (generated := generated)
+          (issuer := issuer fuel scope initializer) (declaration := declaration) (polymorphic := mono)
+          (extended := extended) (ordinary := ordinary) (nativeTyped := nativeTyped) (childType := childType)
+          (allocated := allocated) (sourceEq := sourceEq) (initializerFound := initializerFound)
+          (initializerForm := initializerForm) (valueType := valueType) (requirements := requirements)
+          (coercions := coercions) budget tailBounds.2.1 size within environments heaps locals agrees actualTyped
+          runtime covers sameLedger sourceTyped initial admitted authority physical owner sameLocation ready completed
   | @absent mode escaped fuel scope id rest node stored binder payload tail code
       read form statementType projected remaining allocated tailIH =>
     intro covered reached control context final facts result signatures typed native
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -274,17 +354,20 @@ theorem correct (budget : Nat)
     have tailBounds := tailIH covered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result nextSignatures restTyped ⟨_, tailNative⟩
     exact ⟨CellAwareInvocationAbsentAcceptedAllocation.preserves bridge bindings model index producer registered
-        registry invocation faults headReached read form mono extended allocated sourceEq payloadProjected
+        registry invocation faults headReached.reached read form mono extended allocated sourceEq payloadProjected
         budget tailBounds.1,
       CellAwareInvocationAbsentAcceptedAllocation.reflects bridge bindings model index producer registered
-        registry invocation faults headReached read form mono extended allocated sourceEq payloadProjected
-        budget tailBounds.2⟩
+        registry invocation faults headReached.reached read form mono extended allocated sourceEq payloadProjected
+        budget tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (TypedLexicalWhile.Native.absent_child allocation annotation same (emitted ▸ typed))⟩
   | assigning => intro covered; cases covered
   | @assigned mode escaped fuel scope id rest node stored assignment operator expression tail code
       read form statementType remaining receipt targetType tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨sameSource, tailCovered⟩ := covered
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -307,12 +390,15 @@ theorem correct (budget : Nat)
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationBareAssignmentFlow.reflects bridge transport functions
           producer sourceEq unique (sourceEq ▸ statementFound) form head receipt.bare writes.extension token budget
-          (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (TypedImperative.Native.execute_continuation typed)⟩
   | @projectedAssigned mode escaped fuel scope id rest node stored assignment operator expression tail code
       read form statementType remaining receipt route tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨sameSource, tailCovered⟩ := covered
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -337,13 +423,16 @@ theorem correct (budget : Nat)
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationProjectedAssignmentFlow.reflects bridge transport functions
           producer sourceEq unique found form head receipt.projected writes.extension writes.faithful writes.observations shapes
-          writes.functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          writes.functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (TypedImperative.Native.execute_continuation typed)⟩
   | bitNotting => intro covered; cases covered
   | @bitNotted mode escaped fuel scope id rest node stored assignment tail code
       read form statementType remaining receipt targetType tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨sameSource, tailCovered⟩ := covered
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -362,12 +451,15 @@ theorem correct (budget : Nat)
     exact ⟨CellAwareInvocationBareBitNotFlow.preserves bridge transport functions producer head sourceEq unique
         (sourceEq ▸ statementFound) form errors budget tailBounds.1,
       CellAwareInvocationBareBitNotFlow.reflects bridge transport functions producer head sourceEq unique
-        (sourceEq ▸ statementFound) form errors budget tailBounds.2⟩
+        (sourceEq ▸ statementFound) form errors budget tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (TypedImperative.Native.execute_continuation typed)⟩
   | @projectedBitNotted mode escaped fuel scope id rest node stored assignment tail code
       read form statementType remaining receipt route tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨sameSource, tailCovered⟩ := covered
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -396,10 +488,13 @@ theorem correct (budget : Nat)
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationProjectedBitNotFlow.reflects bridge transport functions
           producer sourceEq unique found form head receipt.projected writes.extension writes.faithful writes.observations reachedErrors
-          writes.functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          writes.functionTypes budget (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (TypedImperative.Native.execute_continuation typed)⟩
   | @discard mode escaped fuel scope id rest node stored expression tail read form child generated statementType remaining tailIH =>
     intro covered reached control context final facts result signatures typed native
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -418,10 +513,13 @@ theorem correct (budget : Nat)
         fun runtime covers ledger => CellAwareInvocationDiscardFlow.reflects bridge context model index producer
           registry invocation faults administrative scope mode expected index.result sourceEq unique
           (sourceEq ▸ statementFound) form (.inl rfl) (sourceEq ▸ expressionFound) (sourceEq ▸ expressionTyped)
-          generated budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          generated budget (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (CellAwareInvocationAcceptedNative.discard_tail typed)⟩
   | @tailValue escaped fuel scope id node stored expression read form child generated statementType childType =>
     intro covered reached control context final facts result signatures typed _
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, _restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -438,11 +536,12 @@ theorem correct (budget : Nat)
       reflects_of_valid bridge index producer registry invocation faults administrative
         fun runtime covers ledger => CellAwareInvocationScopedTerminalFlow.reflects bridge producer head
           (sourceEq ▸ expressionFound) (sourceEq ▸ expressionTyped) generated budget
-          ((expressions fuel context runtime covers ledger).2)⟩
+          ((expressions fuel context runtime covers ledger).2),
+      CellAwareInvocationAcceptedNative.returnValue_word _ _⟩
   | @valueDiscard mode escaped fuel scope id rest node stored expression tail read form notTail child generated statementType remaining tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨modeFalse, covered⟩ := covered
-    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
@@ -461,20 +560,23 @@ theorem correct (budget : Nat)
         fun runtime covers ledger => CellAwareInvocationDiscardFlow.reflects bridge context model index producer
           registry invocation faults administrative scope mode expected index.result sourceEq unique
           (sourceEq ▸ statementFound) form (.inr modeFalse) (sourceEq ▸ expressionFound) (sourceEq ▸ expressionTyped)
-          generated budget (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
+          generated budget (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (CellAwareInvocationAcceptedNative.discard_tail typed)⟩
   | @block mode escaped fuel scope id rest node stored statements innerCode tail read form inner remaining innerIH tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨innerCovered, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | block innerTyped =>
     obtain ⟨_, native⟩ := native
     obtain ⟨⟨_, innerNative⟩, ⟨_, tailNative⟩⟩ := TypedLexicalWhile.Native.sequence_children native
-    have innerReached : ∀ other ∈ statements, index.Reached (.statement other) := fun other member =>
-      index.statement_child headReached read (by rw [form]; simp [StatementForm.references, member])
+    have innerReached : ∀ other ∈ statements, index.Site (.statement other) := fun other member =>
+      headReached.statement_source_child statementFound (by rw [form]; simp [StatementForm.references, member])
     have innerBounds := innerIH innerCovered innerReached result signatures innerTyped ⟨_, innerNative⟩
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result signatures restTyped ⟨_, tailNative⟩
@@ -483,13 +585,14 @@ theorem correct (budget : Nat)
         innerBounds.1 tailBounds.1,
       CellAwareInvocationBlockFlow.reflects bridge context model index producer registry invocation faults
         administrative scope mode expected index.result sourceEq unique (sourceEq ▸ statementFound) form budget
-        innerBounds.2 tailBounds.2⟩
+        innerBounds.2.1 tailBounds.2.1,
+      CellAwareInvocationAcceptedNative.sequence_word _ _ _⟩
   | @conditional mode escaped fuel scope id rest node stored condition thenBody elseBody thenCode elseCode tail
       read form child generated conditionType left right remaining leftIH rightIH tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨leftCovered, rightCovered, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     cases child with
     | mk childType childCode =>
@@ -499,11 +602,11 @@ theorem correct (budget : Nat)
     obtain ⟨_, native⟩ := native
     obtain ⟨⟨_, branchNative⟩, ⟨_, tailNative⟩⟩ := TypedLexicalWhile.Native.sequence_children native
     obtain ⟨⟨_, thenNative⟩, ⟨_, elseNative⟩⟩ := TypedLexicalWhile.Native.conditional_children branchNative
-    have thenReached : ∀ other ∈ thenBody, index.Reached (.statement other) := fun other member =>
-      index.statement_child headReached read (by rw [form]; simp [StatementForm.references, member])
-    have elseReached : ∀ other ∈ elseBody.getD [], index.Reached (.statement other) := fun other member =>
-      index.statement_child headReached read (by rw [form]; simp [StatementForm.references, member])
-    have tailReached : ∀ other ∈ rest, index.Reached (.statement other) := fun other member =>
+    have thenReached : ∀ other ∈ thenBody, index.Site (.statement other) := fun other member =>
+      headReached.statement_source_child statementFound (by rw [form]; simp [StatementForm.references, member])
+    have elseReached : ∀ other ∈ elseBody.getD [], index.Site (.statement other) := fun other member =>
+      headReached.statement_source_child statementFound (by rw [form]; simp [StatementForm.references, member])
+    have tailReached : ∀ other ∈ rest, index.Site (.statement other) := fun other member =>
       reached other (List.mem_cons_of_mem _ member)
     rw [form] at formTyped
     have branches : ∃ conditionTyped : ExpressionHasType index.source context condition .bool,
@@ -532,14 +635,15 @@ theorem correct (budget : Nat)
           (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
           (sourceEq ▸ conditionFound) nodeType (sourceEq ▸ conditionTyped) generated sourceEq unique
           (sourceEq ▸ statementFound) form budget (expressions fuel context runtime covers ledger).2
-          leftBounds.2 rightBounds.2 tailBounds.2⟩
+          leftBounds.2.1 rightBounds.2.1 tailBounds.2.1,
+      CellAwareInvocationAcceptedNative.sequence_word _ _ _⟩
   | matching => intro covered; cases covered
   | @matched mode escaped fuel scope id rest node stored resolution matchedCode tail compilation
       read form receipt branches remaining branchIH tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨admitted, sameSource, branchesCovered, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     have sameMiddle : middle = context := by cases formTyped <;> rfl
@@ -549,9 +653,9 @@ theorem correct (budget : Nat)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result signatures restTyped ⟨_, tailNative⟩
     have branchReached : ∀ request (member : request ∈ receipt.requests),
-        ∀ other ∈ request.statements, index.Reached (.statement other) := by
+        ∀ other ∈ request.statements, index.Site (.statement other) := by
       intro request member other otherMember
-      apply index.statement_child headReached read
+      apply headReached.statement_source_child statementFound
       rw [form]
       simp only [StatementForm.references, MatchResolution.references]
       rcases receipt.original request member with ⟨arm, armMember, same⟩ | same
@@ -559,20 +663,22 @@ theorem correct (budget : Nat)
           (List.mem_flatMap.mpr ⟨arm, armMember, List.mem_map.mpr ⟨other, same ▸ otherMember, rfl⟩⟩))
       · rw [same, Option.getD_some]
         exact List.mem_append_right _ (List.mem_map.mpr ⟨other, otherMember, rfl⟩)
-    exact CellAwareInvocationAcceptedMatches.correct bridge bindings index producer registered registry invocation
-      faults administrative budget expressions writes catalog sourceEq unique headReached read form receipt admitted
-      sameSource
+    have matchBounds := CellAwareInvocationAcceptedMatches.correct bridge bindings index producer registered
+      registry invocation faults administrative budget expressions writes catalog sourceEq unique headReached.reached
+      read form receipt admitted sameSource
       (by
         intro request member _ _ _ _ childResult childSignatures childTyped childNative
-        exact branchIH request member (branchesCovered request member) (branchReached request member)
-          childResult childSignatures childTyped childNative)
-      result signatures typed ⟨_, matchedNative⟩ tailBounds
+        have branchBounds := branchIH request member (branchesCovered request member) (branchReached request member)
+          childResult childSignatures childTyped childNative
+        exact ⟨branchBounds.1, branchBounds.2.1⟩)
+      result signatures typed ⟨_, matchedNative⟩ ⟨tailBounds.1, tailBounds.2.1⟩
+    exact ⟨matchBounds.1, matchBounds.2, CellAwareInvocationAcceptedNative.sequence_word _ _ _⟩
   | @whileLoop mode escaped fuel scope id rest node stored condition body loopCode tail read form statementType
       child generated conditionType inner remaining innerIH tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨innerCovered, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     cases child with
     | mk childType childCode =>
@@ -586,13 +692,13 @@ theorem correct (budget : Nat)
     obtain ⟨_, native⟩ := native
     obtain ⟨⟨_, loopNative⟩, ⟨_, tailNative⟩⟩ := TypedLexicalWhile.Native.sequence_children native
     obtain ⟨⟨_, bodyNative⟩, loopTyped⟩ := TypedLexicalWhile.Native.while_body loopNative
-    have innerReached : ∀ other ∈ body, index.Reached (.statement other) := fun other member =>
-      index.statement_child headReached read (by rw [form]; simp [StatementForm.references, member])
+    have innerReached : ∀ other ∈ body, index.Site (.statement other) := fun other member =>
+      headReached.statement_source_child statementFound (by rw [form]; simp [StatementForm.references, member])
     have innerBounds := innerIH innerCovered innerReached (control := control.enterLoop) result signatures bodyTyped
       ⟨_, bodyNative⟩
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result signatures restTyped ⟨_, tailNative⟩
-    refine ⟨?_, ?_⟩
+    refine ⟨?_, ?_, CellAwareInvocationAcceptedNative.sequence_word _ _ _⟩
     · intro size within mapping world actualContext environment canonical actual before store embedding
         environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
         initial admitted authority physical owner sameLocation ready finalContext outcome after trace
@@ -608,30 +714,32 @@ theorem correct (budget : Nat)
       exact CellAwareInvocationLoopSequences.reflects bridge model producer transport
         (fun represented => CompatibleExpressionPrimitives.bool_fields represented) sourceEq
         (expressions fuel context runtime covers sameLedger).2 (sourceEq ▸ conditionFound) nodeType
-        (sourceEq ▸ conditionTyped) generated loopTyped innerBounds.2 (sourceEq ▸ statementFound) form
-        tailBounds.2 within environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
+        (sourceEq ▸ conditionTyped) generated loopTyped innerBounds.2.1 (sourceEq ▸ statementFound) form
+        tailBounds.2.1 within environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
         initial admitted authority physical owner sameLocation ready completed
   | @breaking mode escaped fuel scope id rest node stored read form statementType =>
     intro _ reached control context final facts _ _ _ _
-    have found := sourceEq ▸ index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have found := sourceEq ▸ index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     exact ⟨fun size _ => CellAwareInvocationTransferFlow.breaking_preserves bridge context model index producer
         registry invocation faults administrative scope mode expected index.result unique found form size,
       fun size _ => CellAwareInvocationTransferFlow.breaking_reflects bridge context model index producer
-        registry invocation faults administrative scope mode expected index.result found form size⟩
+        registry invocation faults administrative scope mode expected index.result found form size,
+      CellAwareInvocationAcceptedNative.breaking_word _⟩
   | @continuing mode escaped fuel scope id rest node stored read form statementType =>
     intro _ reached control context final facts _ _ _ _
-    have found := sourceEq ▸ index.statement_read_reached (reached id (List.mem_cons_self ..)) read
+    have found := sourceEq ▸ index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     exact ⟨fun size _ => CellAwareInvocationTransferFlow.continuing_preserves bridge context model index producer
         registry invocation faults administrative scope mode expected index.result unique found form size,
       fun size _ => CellAwareInvocationTransferFlow.continuing_reflects bridge context model index producer
-        registry invocation faults administrative scope mode expected index.result found form size⟩
+        registry invocation faults administrative scope mode expected index.result found form size,
+      CellAwareInvocationAcceptedNative.continuing_word _⟩
   | @forLoop mode escaped fuel scope id rest node stored initializer condition post body loopScope postScope
       loopCode postCode initialCode tail read form statementType child generated conditionType initial inner after
       remaining innerIH tailIH =>
     intro covered reached control context final facts result signatures typed native
     obtain ⟨initialCovered, innerCovered, afterCovered, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
-    have statementFound := index.statement_read_reached headReached read
+    have statementFound := index.statement_read_reached headReached.reached read
     have compilerFound := CellAwareInvocationAcceptedSourceFacts.compiler_read index read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     cases child with
@@ -646,8 +754,8 @@ theorem correct (budget : Nat)
     obtain ⟨conditionNode, conditionFound, nodeType, conditionTyped⟩ := expression_node sourceUnique conditionTyped
     obtain ⟨_, native⟩ := native
     obtain ⟨⟨_, initialNative⟩, ⟨_, tailNative⟩⟩ := TypedLexicalWhile.Native.sequence_children native
-    have innerReached : ∀ other ∈ body, index.Reached (.statement other) := fun other member =>
-      index.statement_child headReached read (by rw [form]; simp [StatementForm.references, member])
+    have innerReached : ∀ other ∈ body, index.Site (.statement other) := fun other member =>
+      headReached.statement_source_child statementFound (by rw [form]; simp [StatementForm.references, member])
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result signatures restTyped ⟨_, tailNative⟩
     have terminal : (∃ nativeType, HasType (SourceCoreLocalCell.coreContext loopScope ++ administrative)
@@ -667,7 +775,7 @@ theorem correct (budget : Nat)
       have postBounds := CellAwareInvocationAcceptedForItems.post_correct (expected := expected) bridge bindings
         transport index producer registered registry invocation faults administrative budget expressions writes sourceEq
         unique artifact checked
-        headReached compilerFound form after afterCovered (fun item member => List.mem_append_right _ member)
+        headReached.reached compilerFound form after afterCovered (fun item member => List.mem_append_right _ member)
         loopSignatures postTyped ⟨_, postNative⟩
       exact ⟨CellAwareInvocationAcceptedForItems.initial_preserves_of_valid bridge index producer registry invocation
           faults administrative fun runtime covers ledger => CellAwareInvocationForInitialTerminal.preserves bridge
@@ -679,13 +787,13 @@ theorem correct (budget : Nat)
           faults administrative fun runtime covers ledger => CellAwareInvocationForInitialTerminal.reflects bridge
             model producer transport (fun represented => CompatibleExpressionPrimitives.bool_fields represented)
             (expressions fuel _ runtime covers ledger).2 (sourceEq ▸ conditionFound) nodeType
-            (sourceEq ▸ conditionTyped) generated loopTyped innerBounds.2 postBounds.2 ⟨_, _, _, bodyTyped⟩
+            (sourceEq ▸ conditionTyped) generated loopTyped innerBounds.2.1 postBounds.2 ⟨_, _, _, bodyTyped⟩
             ⟨_, _, postTyped⟩⟩
     have initialBounds := CellAwareInvocationAcceptedForItems.initial_correct bridge bindings transport index producer
       registered registry invocation faults administrative budget expressions writes sourceEq unique artifact checked
-      headReached compilerFound form terminal initial initialCovered (fun item member => List.mem_append_left _ member)
+      headReached.reached compilerFound form terminal initial initialCovered (fun item member => List.mem_append_left _ member)
       signatures initialTyped ⟨_, initialNative⟩
-    refine ⟨?_, ?_⟩
+    refine ⟨?_, ?_, CellAwareInvocationAcceptedNative.sequence_word _ _ _⟩
     · intro size within mapping world actualContext environment canonical actual before store embedding
         environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
         initial admitted authority physical owner sameLocation ready finalContext outcome after trace
@@ -696,7 +804,7 @@ theorem correct (budget : Nat)
         environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped
         initial admitted authority physical owner sameLocation ready completed
       exact CellAwareInvocationForSequences.reflects bridge model producer sourceEq initialBounds.2
-        (sourceEq ▸ statementFound) form tailBounds.2 within environments heaps locals agrees actualTyped runtime covers
+        (sourceEq ▸ statementFound) form tailBounds.2.1 within environments heaps locals agrees actualTyped runtime covers
         sameLedger sourceTyped initial admitted authority physical owner sameLocation ready completed
   | forBoundary => intro covered; cases covered
   | boundary => intro covered; cases covered
@@ -721,7 +829,8 @@ theorem body_preserves (budget : Nat)
     (projection : whole.compatible.checked.catalog.project expected = .ok index.result)
     (body : AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope index.statements
       index.result index.reasonAt index.fellThrough index.escaped index.body)
-    (covered : Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index) body.tree)
+    (covered : Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index)
+      (CellAwareInvocationAcceptedInputs.Generalized (attachment := attachment) index) body.tree)
     (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) index.body
       nativeType whole.indexed.layouts.definitions) :
     ∀ {size}, size ≤ budget →
@@ -770,7 +879,7 @@ theorem body_preserves (budget : Nat)
     rw [body.emitted] at native
     exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
-    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.body_root member)
+    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.site_root member)
     result signatures sourceTyped flowNative).1
   intro size within
   rw [body.emitted]
@@ -796,7 +905,8 @@ theorem body_reflects (budget : Nat)
     (projection : whole.compatible.checked.catalog.project expected = .ok index.result)
     (body : AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope index.statements
       index.result index.reasonAt index.fellThrough index.escaped index.body)
-    (covered : Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index) body.tree)
+    (covered : Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index)
+      (CellAwareInvocationAcceptedInputs.Generalized (attachment := attachment) index) body.tree)
     (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) index.body
       nativeType whole.indexed.layouts.definitions) :
     ∀ {size}, size ≤ budget →
@@ -845,8 +955,8 @@ theorem body_reflects (budget : Nat)
     rw [body.emitted] at native
     exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
-    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.body_root member)
-    result signatures sourceTyped flowNative).2
+    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.site_root member)
+    result signatures sourceTyped flowNative).2.1
   intro size within
   rw [body.emitted]
   exact CellAwareInvocationBodyFinish.reflects bridge producer bound sourceEq sourceTyped depth projection

@@ -1,10 +1,15 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedTerminals
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationAssignmentPolicy
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalCapturedScopes
+import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalDiagnosticIssuer
+import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationInitializerReceipt
+import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationResidualEntry
 
 /-! Inputs of the accepted-body closure that are not statement flow: meaning of
-the expressions the compiler actually accepted, and the fault interpretation,
-reached place diagnostics and identity views used by writes. -/
+the expressions the compiler actually accepted, the fault interpretation,
+reached place diagnostics and identity views used by writes, and the inputs of
+generalized declarations. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedInputs
@@ -54,5 +59,14 @@ structure Writes where
   placeDiagnostics : PreparedAssignmentReachedDiagnostics.Ready (values := .initial whole.compatible.checked)
     (ambient := CallableIndexedAmbient.ambientDefinitions whole.indexed) functions protocol invocation.source
     index.invalidProjection index.missingDefault receiving (fun reason token => faults (.semantic reason) token)
+
+/-- Inputs of generalized declarations: the captured-scope descriptor
+attachment, the residual entry of a contextual invocation (trivial for named
+rows), and the body's diagnostic issuer at every generalized initializer. -/
+structure Generalized : Prop where
+  attachment : attachment = GeneralizedLocalCapturedScopes.Attachment
+  entry : index.ResidualEntry
+  issuer : ∀ fuel scope initializer, GeneralizedLocalDiagnosticIssuer.Receipt whole.indexed
+    (index.initializerInputs fuel scope initializer index.reasonAt)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedInputs

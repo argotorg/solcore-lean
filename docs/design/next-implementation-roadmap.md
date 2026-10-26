@@ -665,13 +665,14 @@ the actual accepted compiler tree of any named or contextual body invocation,
 and composes the result with the actual function footer
 (`CellAwareInvocationAcceptedFlow.body_preserves` and `body_reflects`). Covered
 branches are returns, final values, discards, transfers, blocks, conditionals,
-`while` and `for` loops, monomorphic declarations, and bare and projected
-assignments, bit-not updates and matches of named-row bodies. At an actual
+`while` and `for` loops, monomorphic declarations, generalized declarations with
+direct lambda initializers, and bare and projected assignments, bit-not updates
+and matches of named-row bodies. At an actual
 prepared named header, checker certification and the cached body's Core typing
 discharge the static premises (`CellAwareInvocationAcceptedNamedHeaders.static_inputs`).
-Accepted-expression meaning is still a premise, generalized declarations and
-contextual-view writes and matches are not yet closed, and the public session
-does not yet use these theorems. The design document lists the remaining
+Accepted-expression meaning is still a premise, contextual-view writes and
+matches are not yet closed, and the public session does not yet use these
+theorems. The design document lists the remaining
 premises.
 
 **Hull connections:** preserve the exact existing
