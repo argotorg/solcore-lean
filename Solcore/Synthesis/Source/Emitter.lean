@@ -2,7 +2,8 @@ import Solcore.Synthesis.Source.ScalarRenderer
 
 /-! Deterministic source emission for the initial differential-testing subset.
 The input is checker-sealed Core. Source rendering is tested against the pinned
-Rust frontend; preservation of source meaning is not a theorem of this module. -/
+Rust frontend. `ScalarMeaning.emit_source_meaning` relates the emitted text to
+the original Core result under an independent source semantics. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source

@@ -136,7 +136,10 @@ The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
 Emitter regressions include actual checked Rust compilation and imported-Hull
-execution. Core typing does not establish the emitter's meaning preservation.
+execution. Core typing does not establish the emitter's meaning preservation;
+a separate [scalar emitter theorem](docs/design/scalar-emitter-meaning.md)
+connects the closed and runtime-input emitters' text to Core under an
+independent source semantics and a stated Rust-pipeline boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A

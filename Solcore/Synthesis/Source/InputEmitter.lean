@@ -2,8 +2,8 @@ import Solcore.Synthesis.Core.WordFunction
 import Solcore.Synthesis.Source.ScalarRenderer
 
 /-! Source emission for a checked scalar function with one runtime Word input.
-The ABI wrapper is separate from G0. Source meaning preservation remains a
-tested printer obligation, not a theorem of this module. -/
+The ABI wrapper is separate from G0. `ScalarMeaning.Input.emit_source_meaning`
+relates the emitted text to the original Core application for every input. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Input

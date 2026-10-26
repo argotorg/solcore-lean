@@ -179,7 +179,8 @@ Delivered M1:
 See [generated semantic comparisons](../../scripts/SEMANTIC_DIFFERENTIAL.md)
 for commands. Closed G0 cases may be constant-folded by Rust; source-feature
 coverage must not be reported as runtime opcode coverage. Source-emitter
-meaning preservation remains unproved.
+meaning preservation was unproved at this milestone; the scalar emitters now
+have the theorem described in [scalar emitter meaning](scalar-emitter-meaning.md).
 
 ### M2: direct execution comparison
 

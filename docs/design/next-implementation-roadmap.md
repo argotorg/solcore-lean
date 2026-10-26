@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Planned | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | Existing partial proofs; deferred to this order | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -524,6 +524,31 @@ fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
 the parsing/typing boundary and any remaining compiler assumptions. A proof
 about native Lean frontend syntax, or Core typing alone, is not this result.
+
+The minimal theorem is kernel-checked; [scalar emitter meaning](scalar-emitter-meaning.md)
+states it and its boundary. `emit_source_meaning` and
+`Input.emit_source_meaning` start from a successful actual emission. They lex
+and parse the emitted `String`, then call `run()` or `run(uint256)` under an
+independent source semantics. The returned word equals the Word that Core's
+`runStateful` returns for the original program, or for the original lambda at
+every input. The semantics gives `word` operators the EVM instructions selected
+by the pinned standard library, and models lexical scopes, typed `let`,
+assignment and `if`. `render_spec` unfolds the actual `ScalarRenderer.render`;
+no substitute printer or native frontend syntax is involved. The proofs use only
+Lean's standard axioms, and the semantic-kernel policy now covers them.
+
+The remaining Rust pipeline is assumed, not proved: parsing the text as the
+modeled grammar, name resolution and typing, the transcribed standard-library
+meaning, lowering, backend compilation, EVM execution and ABI dispatch.
+Differential tests still provide the only evidence for those steps. Helper
+calls, raw primitive aliases and the aggregate, loop, mutation, storage, call,
+closure, generic, comptime and module emitters are not covered.
+
+The registered `SourceScalarMeaning` test runs actual emitted texts through
+the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
+fixtures at eight boundary inputs and twenty generated programs agree with
+Core; malformed and meaningless texts are rejected. The full Lean build (9,939
+jobs), registered tests and the semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or
