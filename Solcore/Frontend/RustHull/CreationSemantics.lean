@@ -40,11 +40,12 @@ def refused (state : State) (size : Word) : State :=
   RuntimeCallEffectsSemantics.withReturned state {(frame state).memory with size := size} [] Word.zero
 
 /-- The checks run in this order. A static frame or oversized init code
-halts the frame without expanding memory, which the halt discards anyway.
-Without a gas observation the attempt is a language fault. An unaddressable
-init range is a memory fault that keeps the previous return data. The
-remaining refusals expand memory over the init range, clear return data and
-return zero. -/
+halts the frame exceptionally. The EVM charges memory expansion first, but the
+halt discards the frame, so these rules leave memory unchanged, as the static
+guards of SSTORE and LOG do. Without a gas observation the attempt is a
+language fault. An unaddressable init range is a memory fault that keeps the
+previous return data. The remaining refusals expand memory over the init
+range, clear return data and return zero. -/
 inductive Refused (value offset length : Word) : State → Semantics.Result Semantics.Value → State → Prop where
   | staticFrame (state : State) (isStatic : (frame state).storage.isStatic = true) :
       Refused value offset length state

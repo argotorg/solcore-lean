@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation and aggregate emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array and event-log extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree and a first expression subset for named rows; remaining expression forms and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles and refused CREATE/CREATE2 attempts connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -858,11 +858,25 @@ SHA-256 and RIPEMD-160 digests of "abc"; runtime checks compare bytes, balances
 and retained snapshots. ECRECOVER and P256VERIFY are not connected: an
 independent affine specification would need field arithmetic, identities for
 every Jacobian formula and ladder correctness, which do not fit in one
-connected unit without an algebra library. Creation has no connected first
-step yet: even its early refusals need a call-mode source rule, `supported`
-entries, a create-handler closure correspondence and the actual creation
-transport and dispatcher prefix. Creation/deployment, assembly and source revert, and object linking
-also remain, in that order.
+connected unit without an algebra library.
+
+Creation attempts refused before init code runs are connected. Independent
+rules cover a static frame, init code over EIP-3860's 49,152 bytes, a missing
+gas observation, an unaddressable init range, the depth limit, an insufficient
+endowment and EIP-2681's nonce limit. Refusals keep the creator nonce,
+balances, accounts and logs; the last three expand memory over the init range
+and clear return data. The proof reaches the actual CREATE lowering,
+`Creation.invoke`, the funds and nonce checks of `CreationRuntime.dispatch` and
+the create handler installed by `objectHandlers`, all restated by `rfl`. The
+call-mode and root-reentry public theorems cover the refusals without
+statement changes. Eight independent source scenarios reach the call-mode
+theorem, with runtime checks of receipts, balances and nonces; the depth
+refusal has no public consumer because it needs a frame at depth 1024.
+Successful creation is the next unit: the nonce increment, RLP and Keccak
+address derivation, collision checks, the init frame in a deployment context,
+runtime-code validation and installation, and rollback; the Hull design
+document lists its source rules and proof obligations. Assembly and source
+revert, and object linking, also remain, in that order.
 
 ## Handoff rules
 
