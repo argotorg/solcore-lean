@@ -16,38 +16,41 @@ open Solcore.Synthesis.Source.ScalarRenderer (Rendered)
 
 /-! ### The emitter's helper loop -/
 
-/-- The helper loop of `Function.emit`, by structural recursion. -/
-def helperLoop : List CoreExpr → Nat → List String → List String →
+/-- The helper loop of the named-helper emitters, by structural recursion,
+for the renderer each emitter uses. -/
+def helperLoop (render : RenderFn) : List CoreExpr → Nat → List String → List String →
     Except EmitError (List String × List String)
   | [], _, names, lines => .ok (names, lines)
   | body :: rest, index, names, lines =>
-      (ScalarRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 body).bind fun rendered =>
-        helperLoop rest (index + 1) (Function.helperName index :: names)
-          (lines ++ ["function " ++ Function.helperName index ++ "(sc_arg: word) returns (word) {"] ++
+      (render names .word ["sc_arg"] 4 0 body).bind fun rendered =>
+        helperLoop render rest (index + 1) (Function.helperName index :: names)
+          (lines ++
+            ["function " ++ Function.helperName index ++ "(sc_arg: word) returns (word) {"] ++
             rendered.lines ++ ["    return " ++ rendered.value ++ ";", "}", ""])
 
-theorem forIn_helperLoop
+theorem forIn_helperLoop {render : RenderFn}
     {step : CoreExpr × Nat → List String × List String →
       Except EmitError (ForInStep (List String × List String))}
     (stepEq : ∀ body index names lines, step (body, index) (names, lines) =
-      (ScalarRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 body).bind fun rendered =>
+      (render names .word ["sc_arg"] 4 0 body).bind fun rendered =>
         .ok (.yield (Function.helperName index :: names,
-          lines ++ ["function " ++ Function.helperName index ++ "(sc_arg: word) returns (word) {"] ++
+          lines ++
+            ["function " ++ Function.helperName index ++ "(sc_arg: word) returns (word) {"] ++
             rendered.lines ++ ["    return " ++ rendered.value ++ ";", "}", ""]))) :
     ∀ (bodies : List CoreExpr) (start : Nat) (names lines : List String),
-      forIn (bodies.zipIdx start) (names, lines) step = helperLoop bodies start names lines
+      forIn (bodies.zipIdx start) (names, lines) step = helperLoop render bodies start names lines
   | [], _, _, _ => rfl
   | body :: rest, start, names, lines => by
       rw [List.zipIdx_cons, List.forIn_cons, stepEq, helperLoop]
-      cases ScalarRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 body with
+      cases render names .word ["sc_arg"] 4 0 body with
       | error error => rfl
       | ok rendered => exact forIn_helperLoop stepEq rest (start + 1) _ _
 
 theorem Function.emit_success {graph : CheckedWordFunctionDAG} {emitted : EmittedProgram}
     (emitted_eq : Function.emit graph = .ok emitted) :
     ∃ (names lines : List String) (entry : Rendered),
-      helperLoop graph.helpers 0 [] ["import * from std;", "import * from std.dispatch;", ""] =
-        .ok (names, lines) ∧
+      helperLoop ScalarRenderer.renderWithFunctions graph.helpers 0 []
+        ["import * from std;", "import * from std.dispatch;", ""] = .ok (names, lines) ∧
       ScalarRenderer.renderWithFunctions names .word ["sc_input"] 8 0 graph.entry = .ok entry ∧
       emitted.source = String.intercalate "\n" (lines ++
         ["contract " ++ Function.contractName ++ " {",
@@ -56,9 +59,10 @@ theorem Function.emit_success {graph : CheckedWordFunctionDAG} {emitted : Emitte
         ["        return uint256(" ++ entry.value ++ ");", "    }", "}"]) ++ "\n" := by
   unfold Function.emit at emitted_eq
   dsimp only at emitted_eq
-  rw [forIn_helperLoop (fun _ _ _ _ => rfl)] at emitted_eq
-  cases loop : helperLoop graph.helpers 0 [] ["import * from std;", "import * from std.dispatch;",
-    ""] with
+  rw [forIn_helperLoop (render := ScalarRenderer.renderWithFunctions) (fun _ _ _ _ => rfl)]
+    at emitted_eq
+  cases loop : helperLoop ScalarRenderer.renderWithFunctions graph.helpers 0 []
+    ["import * from std;", "import * from std.dispatch;", ""] with
   | error error =>
       rw [loop] at emitted_eq
       cases emitted_eq
@@ -178,15 +182,15 @@ theorem Context.call_cons_other {name other : String} (different : name ≠ othe
 /-- A newly declared helper extends the agreement between helper names and
 Core closures. -/
 theorem FunctionsAgree.extend {functions : List (String × (List Value → Option Value))}
-    {names : List String} {closures : List CoreValue}
-    (agree : FunctionsAgree ⟨functions, []⟩ names closures) {name : String}
+    {aliases : List (String × String)} {names : List String} {closures : List CoreValue}
+    (agree : FunctionsAgree ⟨functions, aliases⟩ names closures) {name : String}
     (fresh : name ∉ names) {meaning : List Value → Option Value}
     {parameterType resultType : Solcore.Core.Ty} {body : Solcore.Core.Expr}
     (behaves : ∀ (argument : Solcore.Core.Word) (store : Solcore.Core.Store),
       ∃ result : Solcore.Core.Word,
         Solcore.Core.Evaluates (.word argument :: closures) store body (.word result) store ∧
         meaning [.word argument.val] = some (.word result.val)) :
-    FunctionsAgree ⟨(name, meaning) :: functions, []⟩ (name :: names)
+    FunctionsAgree ⟨(name, meaning) :: functions, aliases⟩ (name :: names)
       (.closure parameterType resultType body closures :: closures) := by
   intro index found foundName
   cases index with
@@ -222,26 +226,38 @@ private theorem string_eq_of_toList' {first second : String}
   String.toList_inj.mp same
 
 /-- The helper loop prints free functions whose meanings agree with the Core
-closures of the binding chain. -/
-theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
-    (lines names' lines' : List String)
-    (functions : List (String × (List Value → Option Value))) (closures : List CoreValue),
-    helperLoop bodies start (helperNames start) lines = .ok (names', lines') →
+closures of the binding chain. It holds for any renderer that meets its
+rendering specification in the admitted call contexts, provided that adding a
+helper keeps a context admitted. -/
+theorem helperLoop_spec {render : RenderFn} {admits : Context → Prop} {called : List String}
+    {aliases : List (String × String)}
+    (renderSpec : ∀ expression, RenderIH render admits called expression)
+    (calledOk : ∀ callee ∈ called, ValidIdentifier callee ∧ isReserved callee = false)
+    (extendAdmits : ∀ (functions : List (String × (List Value → Option Value))) (index : Nat)
+      (meaning : List Value → Option Value), admits ⟨functions, aliases⟩ →
+      admits ⟨(Function.helperName index, meaning) :: functions, aliases⟩) :
+    ∀ (bodies : List CoreExpr) (start : Nat) (lines names' lines' : List String)
+      (functions : List (String × (List Value → Option Value))) (closures : List CoreValue),
+    helperLoop render bodies start (helperNames start) lines = .ok (names', lines') →
     (∀ (index : Nat) (body : CoreExpr), bodies[index]? = some body →
       functionAcceptsAt 1 (start + index) .word body = true) →
-    FunctionsAgree ⟨functions, []⟩ (helperNames start) closures →
+    admits ⟨functions, aliases⟩ →
+    FunctionsAgree ⟨functions, aliases⟩ (helperNames start) closures →
     ∃ declarations : List FunctionDecl,
       lines' = lines ++ declarations.flatMap FunctionDecl.lines ∧
       names' = helperNames (start + bodies.length) ∧
       (∀ declaration ∈ declarations, declaration.NamesOk ∧
         ∀ name ∈ declaration.identifiers, ValidIdentifier name) ∧
-      FunctionsAgree ⟨declareFunctions [] functions declarations, []⟩ names'
+      admits ⟨declareFunctions aliases functions declarations, aliases⟩ ∧
+      FunctionsAgree ⟨declareFunctions aliases functions declarations, aliases⟩ names'
         (bodies.foldl closureStep closures)
-  | [], start, lines, names', lines', functions, closures, loop, _, agree => by
+  | [], start, lines, names', lines', functions, closures, loop, _, admitted, agree => by
       simp only [helperLoop, Except.ok.injEq, Prod.mk.injEq] at loop
       obtain ⟨rfl, rfl⟩ := loop
-      exact ⟨[], by simp, by simp, by simp, by simpa [declareFunctions] using agree⟩
-  | body :: rest, start, lines, names', lines', functions, closures, loop, accepted, agree => by
+      exact ⟨[], by simp, by simp, by simp, by simpa [declareFunctions] using admitted,
+        by simpa [declareFunctions] using agree⟩
+  | body :: rest, start, lines, names', lines', functions, closures, loop, accepted, admitted,
+      agree => by
       simp only [helperLoop] at loop
       obtain ⟨rendered, renderedEquation, loop⟩ := except_bind_eq_ok loop
       have fresh : ∀ name ∈ ["sc_arg"], OlderThan 0 name := by
@@ -250,15 +266,14 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
         subst mem
         exact absurd same (argument_not_temporary index)
       obtain ⟨statements, lines₁, _, valueName, names, simulates⟩ :=
-        render_spec (fun _ => True) [] body (helperNames start) 1 start .word ["sc_arg"] 4 0
-          rendered
+        renderSpec body (helperNames start) 1 start .word ["sc_arg"] 4 0 rendered
           (by simpa using accepted 0 body rfl) renderedEquation fresh
       let declaration := helperDecl start statements rendered.value
       have behaves : ∀ (argument : Solcore.Core.Word) (store : Solcore.Core.Store),
           ∃ result : Solcore.Core.Word,
             Solcore.Core.Evaluates (.word argument :: closures) store body.toCore
               (.word result) store ∧
-            declaration.denote ⟨functions, []⟩ [.word argument.val] =
+            declaration.denote ⟨functions, aliases⟩ [.word argument.val] =
               some (.word result.val) := by
         intro argument store
         have localsAgree : LocalsAgree [[], [("sc_arg", .word argument.val)]] ["sc_arg"]
@@ -271,8 +286,8 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
               exact ⟨argument, rfl, by simp [Frames.lookup, Scope.get?]⟩
           | succ index => simp at found
         obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
-          simulates ⟨functions, []⟩ (.word argument :: closures) store [] _ trivial localsAgree
-            (by simp) (by simpa using agree)
+          simulates ⟨functions, aliases⟩ (.word argument :: closures) store [] _ admitted
+            localsAgree (by simp) (by simpa using agree)
         obtain ⟨result, rfl, rfl⟩ := represents
         refine ⟨result, evaluates, ?_⟩
         simp [declaration, helperDecl, FunctionDecl.denote, FunctionDecl.bindParameters,
@@ -285,9 +300,11 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
         intro index body found
         have accepted' := accepted (index + 1) body (by simpa using found)
         rwa [show start + (index + 1) = start + 1 + index by omega] at accepted'
-      obtain ⟨declarations, rest₁, rest₂, rest₃, rest₄⟩ :=
-        helperLoop_spec rest (start + 1) _ names' lines' _ _ loop restAccepted extended
-      have block : ["function " ++ Function.helperName start ++ "(sc_arg: word) returns (word) {"] ++
+      obtain ⟨declarations, rest₁, rest₂, rest₃, rest₄, rest₅⟩ :=
+        helperLoop_spec renderSpec calledOk extendAdmits rest (start + 1) _ names' lines' _ _
+          loop restAccepted (extendAdmits functions start _ admitted) extended
+      have block :
+          ["function " ++ Function.helperName start ++ "(sc_arg: word) returns (word) {"] ++
           rendered.lines ++ ["    return " ++ rendered.value ++ ";", "}", ""] =
           declaration.lines := by
         simp only [declaration, helperDecl, FunctionDecl.lines, lines₁, List.cons_append,
@@ -296,7 +313,7 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
         · apply string_eq_of_toList'
           simp [FunctionDecl.parameterText, LocalType.spelling]
         · simp [Expr.print]
-      refine ⟨declaration :: declarations, ?_, ?_, ?_, ?_⟩
+      refine ⟨declaration :: declarations, ?_, ?_, ?_, rest₄, rest₅⟩
       · rw [rest₁, List.flatMap_cons, ← block]
         simp [List.append_assoc]
       · rw [rest₂]
@@ -313,8 +330,7 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
             subst mem
             exact ⟨keyword_valid (by decide), by decide⟩
           have bodyOk := fun name mem =>
-            rendered_identifier_ok localsOk helperNames_ok
-              (fun _ absent => absurd absent List.not_mem_nil) (names name mem)
+            rendered_identifier_ok localsOk helperNames_ok calledOk (names name mem)
           have valueOk := rendered_name_ok localsOk valueName
           refine ⟨⟨helperName_not_reserved start, ?_, fun name mem => (bodyOk name mem).2, ?_⟩,
             ?_⟩
@@ -336,7 +352,6 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
             · exact (bodyOk name mem).1
             · exact valueOk.1
         · exact rest₃ other mem
-      · exact rest₄
 
 theorem helpers_accepted {helpers : List CoreExpr}
     (accepted : functionHelpersAccepted helpers = true) :
@@ -373,9 +388,11 @@ theorem Function.emit_preserves_meaning {graph : CheckedWordFunctionDAG}
         file.call "run" [input.val] = some word.val ∧
         CoreReturns (graph.instantiate input).toCore word := by
   obtain ⟨names, lines, entry, loop, entryEquation, source⟩ := Function.emit_success emitted_eq
-  obtain ⟨declarations, linesEq, namesEq, declarationsOk, agree⟩ :=
-    helperLoop_spec graph.helpers 0 _ names lines [] [] loop
-      (helpers_accepted graph.helperScopes) (fun _ _ found => by simp [helperNames] at found)
+  obtain ⟨declarations, linesEq, namesEq, declarationsOk, _, agree⟩ :=
+    helperLoop_spec (render_spec (fun _ => True) [])
+      (fun _ absent => absurd absent List.not_mem_nil) (fun _ _ _ _ => trivial) graph.helpers 0 _
+      names lines [] [] loop (helpers_accepted graph.helperScopes) trivial
+      (fun _ _ found => by simp [helperNames] at found)
   have fresh : ∀ name ∈ ["sc_input"], OlderThan 0 name := by
     intro name mem index same
     simp only [List.mem_singleton] at mem
@@ -398,8 +415,8 @@ theorem Function.emit_preserves_meaning {graph : CheckedWordFunctionDAG}
   have printed : emitted.source = file.print := by
     have functionLine :
         "    function " ++ Function.methodName ++ "(input: uint256) public returns (uint256) {" =
-          "    function " ++ file.method.name ++ "(" ++ Method.parameterText file.method.parameters ++
-            ") public returns (uint256) {" := by
+          "    function " ++ file.method.name ++ "(" ++
+            Method.parameterText file.method.parameters ++ ") public returns (uint256) {" := by
       apply string_eq_of_toList'
       simp [file, functionsFile, Method.parameterText, Function.methodName]
     have returnLine : "        return uint256(" ++ entry.value ++ ");" =

@@ -1,6 +1,8 @@
 import Solcore.Synthesis.Core.Generator
+import Solcore.Synthesis.Source.ScalarMeaning.CallGraphEmitter
 import Solcore.Synthesis.Source.ScalarMeaning.FunctionEmitter
 import Solcore.Synthesis.Source.ScalarMeaning.PrimitiveEmitter
+import Solcore.Test.SourceCallGraphEmitter
 import Solcore.Test.SourceFunctionEmitter
 import Solcore.Test.SourceInputEmitter
 import Solcore.Test.SourcePrimitiveEmitter
@@ -186,6 +188,64 @@ private def checkPrimitiveImports : IO Unit := do
   ensure (sourceCall swapped "run" [7] == some 1)
     "an alias did not take the meaning of the opcode it imports"
 
+private def callExpr (index : Nat) (argument : Wire.Expr) : Wire.Expr :=
+  .apply (.var index) argument
+
+/-- Call graphs: helpers may call earlier helpers and the raw opcode aliases.
+Each input is compared with the original Core binding chain, and the listed
+pairs also with hand-known Words from the Core regression in
+`SourceCallGraphEmitter`. -/
+private def checkCallGraph (label : String) (helpers : List Wire.Expr) (entry : Wire.Expr)
+    (known : List (Nat × Nat)) : IO Unit := do
+  let some graph := CheckedWordFunctionDAG.ofParts? helpers entry |
+    throw (IO.userError s!"call-graph fixture failed its checker: {label}")
+  let emitted ← match CallGraph.emit graph with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"call-graph emission failed: {label}: {reprStr error}")
+  checkReprint label emitted.source
+  for input in known.map Prod.fst ++ boundaryInputs do
+    let expected ← coreWord (graph.instantiate (Word.ofNatModulo input)).toCore
+    ensure (sourceCall emitted.source "run" [input] == some expected)
+      s!"call-graph source meaning differs from Core: {label} at {input}"
+  for (input, expected) in known do
+    ensure (sourceCall emitted.source "run" [input] == some expected)
+      s!"call-graph source meaning differs from its hand-known result: {label} at {input}"
+
+/-- Raw opcodes applied to helper results, through an identity helper. -/
+private def callGraphPrimitives : List (String × Wire.Expr × Nat × Nat) :=
+  let c := callExpr 1
+  [("clz", .unary .wordClz (c (.var 0)), 0, 256),
+    ("div", .binary .wordDiv (c (.var 0)) (c (wordExpr 2)), 5, 2),
+    ("mod", .binary .wordMod (c (.var 0)) (c (wordExpr 0)), maximum, 0),
+    ("shl", .binary .wordShl (c (wordExpr 1)) (c (.var 0)), 255, high),
+    ("shr", .binary .wordShr (c (wordExpr maximum)) (c (.var 0)), 256, 0),
+    ("sar", .binary .wordSar (c (wordExpr high)) (c (.var 0)), maximum, maximum),
+    ("sdiv", .binary .wordSdiv (c (.var 0)) (c (wordExpr maximum)), high, high),
+    ("smod", .binary .wordSmod (c (.var 0)) (c (wordExpr 2)), maximum - 6, maximum),
+    ("sgt", .ifE (.binary .wordSgt (c (.var 0)) (c (wordExpr 0))) (wordExpr 1) (wordExpr 0),
+      high - 1, 1),
+    ("byte", .binary .wordByte (c (.var 0)) (c (wordExpr 0x1234)), 31, 0x34),
+    ("pow", .binary .wordPow (c (wordExpr maximum)) (c (.var 0)), maximum, maximum),
+    ("signextend", .binary .wordSignExtend (c (wordExpr 0)) (c (.var 0)), 0x80, maximum - 0x7f),
+    ("addmod", .ternary .wordAddMod (c (.var 0)) (c (wordExpr 1)) (c (wordExpr maximum)),
+      maximum, 1),
+    ("mulmod", .ternary .wordMulMod (c (.var 0)) (c (wordExpr 2)) (c (wordExpr maximum)),
+      high, 1)]
+
+private def checkCallGraphs : IO Unit := do
+  checkCallGraph "mixed" Tests.SourceCallGraphEmitter.mixedHelpers
+    Tests.SourceCallGraphEmitter.mixedEntry [(0, 11), (1, 6), (maximum, 1), (high, high / 2)]
+  checkCallGraph "branch calls" [.binary .wordAdd (.var 0) (wordExpr 1)]
+    (.ifE (.binary .wordEq (callExpr 1 (.var 0)) (wordExpr 1))
+      (.letE (wordExpr 7) (callExpr 2 (.binary .wordAdd (.var 0) (.var 1))))
+      (callExpr 1 (callExpr 1 (.var 0))))
+    [(0, 8), (1, 3), (maximum, 1)]
+  for (label, body, input, expected) in callGraphPrimitives do
+    checkCallGraph s!"helper operands of {label}" [.var 0] body [(input, expected)]
+  for (label, helpers, entry) in Tests.SourceFunctionEmitter.fixtures do
+    checkCallGraph s!"named helpers {label}" helpers entry []
+
 /-- Hand-known Words for the wrap-around and bitwise fixtures, independent of
 both Core and the source semantics. -/
 private def knownClosedResults : List (String × Nat) := [
@@ -263,6 +323,7 @@ def testSourceScalarMeaning : IO Unit := do
     checkPrimitive label body inputs
   checkKnownPrimitives
   checkPrimitiveImports
+  checkCallGraphs
   checkRejections
   let (checked, excluded) ← checkGenerated
   ensure (checked ≥ 16) s!"too few generated programs reached the source meaning: {checked}"
@@ -270,9 +331,10 @@ def testSourceScalarMeaning : IO Unit := do
   let inputs := Tests.SourceInputEmitter.fixtures.length
   let graphs := Tests.SourceFunctionEmitter.fixtures.length
   let primitives := Tests.SourcePrimitiveEmitter.fixtures.length + primitiveBoundaries.length
+  let callGraphs := 2 + callGraphPrimitives.length + graphs
   IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures, " ++
-    s!"{graphs} named-helper graphs and {primitives} raw primitive bodies x at least " ++
-    s!"{boundaryInputs.length} inputs, {checked} generated programs ({excluded} excluded) " ++
-    s!"agree with Core")
+    s!"{graphs} named-helper graphs, {primitives} raw primitive bodies and {callGraphs} " ++
+    s!"call graphs x at least {boundaryInputs.length} inputs, {checked} generated programs " ++
+    s!"({excluded} excluded) agree with Core")
 
 end Tests.SourceScalarMeaning

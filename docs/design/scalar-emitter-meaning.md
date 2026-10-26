@@ -17,8 +17,9 @@ semantic-kernel policy check now covers.
 | `Input.emit_source_meaning` | If `Input.emit function = .ok emitted`, then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
 | `Function.emit_source_meaning` | If `Function.emit graph = .ok emitted` (profile `runtime-functions`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
 | `Primitive.emit_source_meaning` | If `Primitive.emit function = .ok emitted` (profile `runtime-primitives`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
-| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `render_spec`, `primitive_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers) and `PrimitiveRenderer.render`, described below. |
+| `CallGraph.emit_source_meaning` | If `CallGraph.emit graph = .ok emitted` (profile `runtime-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
+| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
+| `render_spec`, `primitive_render_spec`, `callGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render` and `CallGraphRenderer.renderWithFunctions`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
@@ -26,8 +27,8 @@ the source semantics below. `CoreReturns core w` states that Core's
 `runStateful` returns `.done (.word w) []` for all sufficiently large fuel, and
 that every completed run returns exactly that Word and store. This is the Core
 machine used as the differential-testing oracle; for the runtime-input,
-named-helper and raw-primitive profiles it runs the original lambda or binding
-chain applied to the input. Unsupported operations remain explicit emitter errors; the theorems
+named-helper, raw-primitive and call-graph profiles it runs the original lambda
+or binding chain applied to the input. Unsupported operations remain explicit emitter errors; the theorems
 say nothing about failed emissions.
 
 ## Independent source meaning
@@ -163,7 +164,16 @@ the actual `for` loop, and shows by induction that each printed
 [PrimitiveEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveEmitter.lean)
 proves that the actual import line of `Primitive.emit` is the printing of the
 fourteen `opcode as alias` pairs, so the file's call context satisfies
-`PrimitiveContext`. Core machine results follow from `runStateful_evaluation_sound`,
+`PrimitiveContext`. The helper loop proof is generic over the renderer and the
+call context. [CallGraphEquations](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphEquations.lean)
+and [CallGraphPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphPreservation.lean)
+prove `callGraph_render_spec` for `CallGraphRenderer.renderWithFunctions`. It
+prints raw opcodes as the primitive renderer does, and copies a helper call's
+argument into a fresh temporary before the call.
+[CallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphEmitter.lean)
+shows that the helper names `sc_fn<k>` never shadow an opcode alias or
+`tobool`, so every helper body runs in a primitive call context. Core machine
+results follow from `runStateful_evaluation_sound`,
 `evaluation_runStateful_complete_with_sufficient_fuel` and determinism of
 `Evaluates`.
 
@@ -200,13 +210,13 @@ in a corpus also does not replace this theorem for the printer.
 
 ## Scope
 
-The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`
-and four actual emitters: closed G0 (`closed-g0`), runtime input
-(`runtime-word`), named helpers (`runtime-functions`) and raw primitive aliases
-(`runtime-primitives`). They do not yet cover call graphs (`CallGraphRenderer`),
-aggregates, mutation, loops, storage, contract calls, closures, generic,
-comptime or module emitters. The planned order is call graphs, then mutation,
-aggregates and loops.
+The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
+`CallGraphRenderer.renderWithFunctions` and five actual emitters: closed G0
+(`closed-g0`), runtime input (`runtime-word`), named helpers
+(`runtime-functions`), raw primitive aliases (`runtime-primitives`) and call
+graphs (`runtime-call-graphs`). They do not yet cover aggregates, mutation,
+loops, storage, contract calls, closures, generic, comptime or module emitters.
+The planned order is mutation, aggregates and loops.
 
 ## Executable checks
 
@@ -220,7 +230,11 @@ use the same eight inputs and their own boundary values. They cover zero
 divisors and moduli, shifts of 256 or more, negative signed operands, byte and
 sign positions and large exponents. Thirty-three primitive results are also
 checked against hand-known Words. A call to an alias that is not imported is
-rejected; swapping two aliases in the import line swaps their meanings.
+rejected; swapping two aliases in the import line swaps their meanings. The
+call-graph emitter runs on twenty graphs at the same inputs. These are the
+mixed and branch-call graphs of its regression, fourteen opcodes applied to
+helper results, and the four named-helper graphs. Twenty-one of their results
+also match hand-known Words.
 Twenty programs from the first 96 G0 generator seeds
 with a 40-node budget are emitted; the others are generator or emitter
 exclusions. Each accepted text must reparse and print back to itself. Extra or
