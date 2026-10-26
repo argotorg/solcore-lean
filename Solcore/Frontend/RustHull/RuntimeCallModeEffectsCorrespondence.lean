@@ -6,9 +6,9 @@ import Solcore.Frontend.RustHull.ChildCallBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RuntimeLinkedReturnDataEffectsCorrespondence
 import Solcore.Frontend.RustHull.CreationBuiltinCorrespondence
 
-/-! Message calls, account destruction and refused creation attempts join the
-existing concrete effects in the recursive Hull proof. Actual installation
-supplies captured handlers. -/
+/-! Message calls, account destruction and creation attempts join the existing
+concrete effects in the recursive Hull proof. Actual installation supplies
+captured handlers. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeEffectsCorrespondence
 open Correspondence ScalarExecution DerivationCorrespondence
@@ -124,6 +124,26 @@ theorem external_preserves (layout : Layout) (baseline : Nat → Option Core.Val
           obtain ⟨gasLocation, gasMember⟩ := createSlots.gas
           obtain ⟨target, finalStore, resultRelated, evaluated, finalState, retained⟩ :=
             CreationBuiltinCorrespondence.create2_preserves compiled computed related runtime passive callPassive
+              memoryMember memorySizeMember dataMember dataSizeMember addressMember callDepthMember staticMember
+              exitMember offsetMember sizeMember gasMember state
+              ⟨handlers.create.location, handlers.create.value, create_read state,
+                handlers.create.local_outside, handlers.create.closure⟩ createSlots.handler packed
+          exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
+      | createAdmitted computed =>
+          intro typeFuel expected typeCompiled scope arguments lowered compiled world mapping environment initialStore argumentStore targets codes locations captured related packed runtime state installed
+          obtain ⟨gasLocation, gasMember⟩ := createSlots.gas
+          obtain ⟨target, finalStore, resultRelated, evaluated, finalState, retained⟩ :=
+            CreationBuiltinCorrespondence.createAdmitted_preserves compiled computed related runtime passive callPassive
+              memoryMember memorySizeMember dataMember dataSizeMember addressMember callDepthMember staticMember
+              exitMember offsetMember sizeMember gasMember state
+              ⟨handlers.create.location, handlers.create.value, create_read state,
+                handlers.create.local_outside, handlers.create.closure⟩ createSlots.handler packed
+          exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
+      | create2Admitted computed =>
+          intro typeFuel expected typeCompiled scope arguments lowered compiled world mapping environment initialStore argumentStore targets codes locations captured related packed runtime state installed
+          obtain ⟨gasLocation, gasMember⟩ := createSlots.gas
+          obtain ⟨target, finalStore, resultRelated, evaluated, finalState, retained⟩ :=
+            CreationBuiltinCorrespondence.create2Admitted_preserves compiled computed related runtime passive callPassive
               memoryMember memorySizeMember dataMember dataSizeMember addressMember callDepthMember staticMember
               exitMember offsetMember sizeMember gasMember state
               ⟨handlers.create.location, handlers.create.value, create_read state,

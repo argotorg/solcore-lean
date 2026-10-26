@@ -1,12 +1,13 @@
-import Solcore.Frontend.RustHull.CreationHandlerCorrespondence
+import Solcore.Frontend.RustHull.CreationAdmittedCorrespondence
 import Solcore.Frontend.RustHull.CreationSemantics
 import Solcore.Frontend.RustHull.CallTransportCorrespondence
 
-/-! The actual `Creation.invoke` transport for attempts refused before init
-code runs. An unaddressable init range faults before any frame cell changes.
-Otherwise memory covers the init range and return data is cleared; at the
-depth limit the attempt returns zero, and below it the init bytes are copied
-into fresh scratch cells and the installed handler's refusal is published. -/
+/-! The actual `Creation.invoke` transport. An unaddressable init range faults
+before any frame cell changes. Otherwise memory covers the init range and
+return data is cleared; at the depth limit the attempt returns zero, and below
+it the init bytes are copied into fresh scratch cells and the installed
+handler's response is published: a refusal, or an admitted attempt that runs
+no init frame together with its shared account changes. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.CreationCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder CallTransportCorrespondence
@@ -131,6 +132,7 @@ private theorem snapshot_evaluates {depth : Nat} {environment : Environment} {st
       extra.length = 4 ∧ StoreRetains store copiedStore ∧
       Inputs (depth + 4) (extra ++ environment) locations callback arguments ∧
       CodeValue (depth + 4) (extra ++ environment) initCode (.cellRef WordMapping.type store.length) ∧
+      MemoryCopySemantics.Copy state.memory.words Word.zero arguments.offset arguments.length [] input ∧
       copiedStore.read? store.length = some (WordMapping.encode input) ∧
       ∀ target final,
         Evaluates (extra ++ environment) copiedStore
@@ -195,7 +197,7 @@ private theorem snapshot_evaluates {depth : Nat} {environment : Environment} {st
               (by simpa only [allocated, Store.read?, List.getElem?_append_left bounded] using found)
           exact after.trans found.symm
       refine ⟨.unit :: extraInput, copiedStore, inputCode, words, rfl, retained, inputs.prepend (.unit :: extraInput),
-        inputRelated.prepend [.unit, sizeRef], inputMemory.memory, ?_⟩
+        inputRelated.prepend [.unit, sizeRef], copiedWords, inputMemory.memory, ?_⟩
       intro target final completed
       unfold CreationImplementation.dispatch CodeBuilder.bind
       apply Evaluates.letE (.loadCell ((input_part inputs (index := 0) rfl).evaluates store) related.memory)
@@ -209,16 +211,19 @@ private theorem snapshot_evaluates {depth : Nat} {environment : Environment} {st
               (initialStore := store ++ [WordMapping.encode []]) Evaluates.word (initialValue := .word Word.zero))
         · exact LanguageResult.bind_success .word evaluated completed
 
+/-- The payload of a handler response with empty revert data. -/
+def responsePayload (address : Word) : Value := bundleValues [.word address, WordMapping.encode [], .word Word.zero]
+
 /-- The payload of the refused handler response. -/
-def refusedPayload : Value := bundleValues [.word Word.zero, WordMapping.encode [], .word Word.zero]
+def refusedPayload : Value := responsePayload Word.zero
 
 private theorem finish_evaluates {depth : Nat} {environment : Environment} {store : Store}
     {locations : Locations} {callback : Nat} {arguments : Arguments} {state : CallTransportSemantics.State}
-    (inputs : Inputs depth environment locations callback arguments)
+    (address : Word) (inputs : Inputs depth environment locations callback arguments)
     (related : StateRel locations state store) :
-    Evaluates (refusedPayload :: environment) store
+    Evaluates (responsePayload address :: environment) store
       (CreationImplementation.finish (fun here => .var (here - depth - 1)) (depth + 1))
-      (.inRight .word (.word Word.zero)) (publishStore locations store [] Word.zero) := by
+      (.inRight .word (.word address)) (publishStore locations store [] Word.zero) := by
   let writtenData : Store := store.set locations.returnData (WordMapping.encode [])
   have distinct := related.distinct
   simp [Locations.resources, LogsCorrespondence.Locations.all] at distinct
@@ -230,13 +235,13 @@ private theorem finish_evaluates {depth : Nat} {environment : Environment} {stor
   have sizeWritten : writtenData.write? locations.returnDataSize (.word Word.zero) =
       some (publishStore locations store [] Word.zero) :=
     Store.write?_eq_some_iff.mpr ⟨(List.getElem?_eq_some_iff.mp sizeFound).1, rfl⟩
-  have payloadCode := CodeValue.bound depth environment refusedPayload
+  have payloadCode := CodeValue.bound depth environment (responsePayload address)
   unfold CreationImplementation.finish CodeBuilder.bind
   apply Evaluates.letE (bodyStore := writtenData)
-  · exact .storeCell (((input_part inputs (index := 2) rfl).prepend [refusedPayload]).evaluates store)
+  · exact .storeCell (((input_part inputs (index := 2) rfl).prepend [responsePayload address]).evaluates store)
       related.logs ((payloadCode.part (index := 1) rfl).evaluates store) dataWritten
   · apply Evaluates.letE (bodyStore := publishStore locations store [] Word.zero)
-    · exact .storeCell (((input_part inputs (index := 3) rfl).prepend [.unit, refusedPayload]).evaluates writtenData)
+    · exact .storeCell (((input_part inputs (index := 3) rfl).prepend [.unit, responsePayload address]).evaluates writtenData)
         sizeFound (((payloadCode.part (index := 2) rfl).prepend [.unit]).evaluates writtenData) sizeWritten
     · exact .inRight (((payloadCode.part (index := 0) rfl).prepend [.unit, .unit]).evaluates _)
 
@@ -352,7 +357,7 @@ theorem invoke_refused {locations : Locations} {callback : Nat} {arguments : Arg
   have clearFrame := LogsCorrespondence.Frame.publish locations.resources inputStore [] Word.zero
   have framed := inputFrame.trans clearFrame
   have dispatchInputs := inputs.prepend [.unit, .unit, .unit]
-  obtain ⟨extra, copiedStore, initCode, input, extraLength, retained, inputs', initRelated, initRead, entered⟩ :=
+  obtain ⟨extra, copiedStore, initCode, input, extraLength, retained, inputs', initRelated, _, initRead, entered⟩ :=
     snapshot_evaluates dispatchInputs clearedRelated bounded
   have keep {location : Nat} {value : Value} (outside : location ∉ locations.resources.all)
       (found : store.read? location = some value) : copiedStore.read? location = some value := by
@@ -387,7 +392,7 @@ theorem invoke_refused {locations : Locations} {callback : Nat} {arguments : Arg
   obtain ⟨afterCall, called, callRetained⟩ := handler.apply_refused sharedCopied (refusing input)
     ((functionCode.evaluates copiedStore)) requestEvaluated
   have afterRelated := state_retained clearedRelated (retained.trans callRetained)
-  have finished := finish_evaluates callInputs afterRelated
+  have finished := finish_evaluates Word.zero callInputs afterRelated
   refine ⟨publishStore locations afterCall [] Word.zero, .letE packed ?_, published afterRelated [] Word.zero,
     (framed.trans (retained_frame locations (retained.trans callRetained))).trans
       (LogsCorrespondence.Frame.publish locations.resources afterCall [] Word.zero)⟩
@@ -399,6 +404,138 @@ theorem invoke_refused {locations : Locations} {callback : Nat} {arguments : Arg
   apply LanguageResult.bind_success .word functionRead
   apply LanguageResult.bind_success .word called
   exact finished
+
+theorem state_rewritten {locations : Locations} {state : CallTransportSemantics.State} {initial final : Store}
+    {changed : List Nat} (related : StateRel locations state initial) (rewrites : Rewrites changed initial final)
+    (separate : ∀ location ∈ changed, location ∉ locations.resources.all) : StateRel locations state final := by
+  have outside {location : Nat} (member : location ∈ locations.resources.all) : location ∉ changed :=
+    fun inside => separate location inside member
+  refine ⟨related.distinct, ?_, ?_, ?_, ?_⟩
+  · exact rewrites.read _ _ (outside (by simp [Locations.resources, LogsCorrespondence.Locations.all])) related.memory
+  · exact rewrites.read _ _ (outside (by simp [Locations.resources, LogsCorrespondence.Locations.all])) related.memorySize
+  · exact rewrites.read _ _ (outside (by simp [Locations.resources, LogsCorrespondence.Locations.all])) related.logs
+  · exact rewrites.read _ _ (outside (by simp [Locations.resources, LogsCorrespondence.Locations.all])) related.logSize
+
+theorem LinkedSharedStateRel.preserved {anchors : List CatalogWorldCorrespondence.Anchor}
+    {locations : AccountCallCorrespondence.SharedLocations} {state : AccountCallSemantics.Shared} {initial final : Store}
+    (related : AccountCallCorrespondence.LinkedSharedStateRel anchors locations state initial)
+    (preserved : ∀ location ∈ locations.all, ∀ value, initial.read? location = some value → final.read? location = some value) :
+    AccountCallCorrespondence.LinkedSharedStateRel anchors locations state final := by
+  obtain ⟨⟨⟨accounts, worldSame, worldRead⟩, logs, logSize, balances, complete, distinct⟩, linked⟩ := related
+  refine ⟨⟨⟨accounts, worldSame, preserved _ (by simp [AccountCallCorrespondence.SharedLocations.all]) _ worldRead⟩,
+    preserved _ (by simp [AccountCallCorrespondence.SharedLocations.all]) _ logs,
+    preserved _ (by simp [AccountCallCorrespondence.SharedLocations.all]) _ logSize,
+    preserved _ (by simp [AccountCallCorrespondence.SharedLocations.all]) _ balances,
+    preserved _ (by simp [AccountCallCorrespondence.SharedLocations.all]) _ complete, distinct⟩,
+    linked.read_preserved (preserved _ (by simp [AccountCallCorrespondence.SharedLocations.all]))⟩
+
+/-- Below the depth limit an admitted attempt that runs no init frame returns
+its address with empty return data, and its shared account changes are
+published. The handler and the shared state are those of the creating frame. -/
+theorem invoke_admitted {locations : Locations} {callback : Nat} {arguments : Arguments}
+    {state : CallTransportSemantics.State} {environment : Environment} {initial store : Store}
+    {memoryReference sizeReference returnDataReference returnSizeReference callbackReference
+      creatorAddress depth transferredValue saltValue isCreate2 suppliedGas offset length : Core.Expr}
+    {sharedLocations : AccountCallCorrespondence.SharedLocations} {shared next : AccountCallSemantics.Shared}
+    {anchors : List CatalogWorldCorrespondence.Anchor} {function : Value} {address : Word}
+    (packed : Evaluates environment initial
+      (bundle [memoryReference, sizeReference, returnDataReference, returnSizeReference,
+        callbackReference, creatorAddress, depth, transferredValue, saltValue, isCreate2,
+        suppliedGas, offset, length])
+      (bundleValues (argumentValues locations callback arguments)) store)
+    (related : StateRel locations state store) {size : Word}
+    (touchedSize : MemorySemantics.touchSize? state.memory.size arguments.offset arguments.length = some size)
+    (allowed : ¬arguments.depth > Word.ofNatModulo 1023)
+    (bounded : arguments.length.val ≤ CreationSemantics.maxInitCodeSize)
+    (callbackRead : store.read? callback = some (.inRight .unit function))
+    (callbackOutside : callback ∉ locations.resources.all)
+    (handler : HandlerClosure sharedLocations function)
+    (sharedRelated : AccountCallCorrespondence.LinkedSharedStateRel anchors sharedLocations shared store)
+    (separate : ∀ location ∈ sharedLocations.all, location ∉ locations.resources.all)
+    (admitting : ∀ initCode,
+      MemoryCopySemantics.Copy state.memory.words Word.zero arguments.offset arguments.length [] initCode →
+      Admitting shared (request arguments initCode) (.inRight .word (responsePayload address)) next) :
+    ∃ final, Evaluates environment initial
+      (Creation.invoke memoryReference sizeReference returnDataReference returnSizeReference callbackReference
+        creatorAddress depth transferredValue saltValue isCreate2 suppliedGas offset length)
+      (.inRight .word (.word address)) final ∧
+      StateRel locations (cleared state size) final ∧
+      AccountCallCorrespondence.LinkedSharedStateRel anchors sharedLocations next final ∧
+      store.length ≤ final.length ∧
+      ∀ location value, location ∉ locations.resources.all →
+        location ∉ [sharedLocations.world, sharedLocations.balances] →
+        store.read? location = some value → final.read? location = some value := by
+  rw [CreationImplementation.invoke_eq]
+  have inputs := input_initial locations callback arguments environment
+  have touched := MemoryCorrespondence.touch_evaluates (size := state.memory.size)
+    ((input_part inputs (index := 1) rfl).evaluates store)
+    ((input_part inputs (index := 11) rfl).evaluates store)
+    ((input_part inputs (index := 12) rfl).evaluates store) related.memorySize
+  simp only [MemoryCorrespondence.touchResult, touchedSize] at touched
+  let inputStore := MemoryCorrespondence.touchStore store locations.memorySize state.memory.size
+    arguments.offset arguments.length
+  have inputRelated : StateRel locations {state with memory := {state.memory with size := size}} inputStore :=
+    related.touch touchedSize
+  have inputFrame := LogsCorrespondence.Frame.touch locations.resources store state.memory.size
+    arguments.offset arguments.length
+  let clearedStore := publishStore locations inputStore [] Word.zero
+  have clearedRelated : StateRel locations (cleared state size) clearedStore := published inputRelated [] Word.zero
+  have clearFrame := LogsCorrespondence.Frame.publish locations.resources inputStore [] Word.zero
+  have framed := inputFrame.trans clearFrame
+  have dispatchInputs := inputs.prepend [.unit, .unit, .unit]
+  obtain ⟨extra, copiedStore, initCode, input, extraLength, retained, inputs', initRelated, copiedInit, initRead, entered⟩ :=
+    snapshot_evaluates dispatchInputs clearedRelated bounded
+  have keep {location : Nat} {value : Value} (outside : location ∉ locations.resources.all)
+      (found : store.read? location = some value) : copiedStore.read? location = some value := by
+    have afterClear := framed.read location value outside found
+    exact (retained.read location (List.getElem?_eq_some_iff.mp afterClear).1).trans afterClear
+  have callbackFound := keep callbackOutside callbackRead
+  have functionRead := OptionalCell.read_success Creation.unavailableReason
+    ((input_part inputs' (index := 4) rfl).evaluates copiedStore) callbackFound
+  have sharedCopied := LinkedSharedStateRel.preserved sharedRelated
+    (fun location member _ found => keep (separate location member) found)
+  have functionCode := CodeValue.bound (0 + [Value.unit, Value.unit, Value.unit].length + 4)
+    (extra ++ ([.unit, .unit, .unit] ++ bundleValues (argumentValues locations callback arguments) :: environment)) function
+  have callInputs := inputs'.prepend [function]
+  have requestEvaluated : Evaluates (function :: extra ++ ([.unit, .unit, .unit] ++
+      bundleValues (argumentValues locations callback arguments) :: environment)) copiedStore
+      (CreationImplementation.request initCode (0 + 3 + 4 + 1))
+      (requestValue (request arguments input)) copiedStore := by
+    refine .pair (.binary ((input_part callInputs (index := 5) rfl).evaluates copiedStore) .word rfl) ?_
+    refine .pair ((input_part callInputs (index := 7) rfl).evaluates copiedStore) ?_
+    refine .pair ((input_part callInputs (index := 8) rfl).evaluates copiedStore) ?_
+    refine .pair ((input_part callInputs (index := 9) rfl).evaluates copiedStore) ?_
+    refine .pair (.binary ((input_part callInputs (index := 6) rfl).evaluates copiedStore) .word rfl) ?_
+    refine .pair ((input_part callInputs (index := 10) rfl).evaluates copiedStore) ?_
+    exact .pair (.loadCell ((initRelated.prepend [function]).evaluates copiedStore) initRead)
+      ((input_part callInputs (index := 12) rfl).evaluates copiedStore)
+  obtain ⟨afterCall, called, nextRelated, rewrites⟩ := handler.apply_admitted sharedCopied
+    (admitting input copiedInit) (functionCode.evaluates copiedStore) requestEvaluated
+  have localSeparate : ∀ location ∈ [sharedLocations.world, sharedLocations.balances],
+      location ∉ locations.resources.all := by
+    intro location member
+    apply separate
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl <;> simp [AccountCallCorrespondence.SharedLocations.all]
+  have afterRelated := state_rewritten (state_retained clearedRelated retained) rewrites localSeparate
+  have finished := finish_evaluates address callInputs afterRelated
+  have publishFrame := LogsCorrespondence.Frame.publish locations.resources afterCall [] Word.zero
+  refine ⟨publishStore locations afterCall [] Word.zero, .letE packed ?_, published afterRelated [] Word.zero,
+    LinkedSharedStateRel.preserved nextRelated
+      (fun location member value found => publishFrame.read location value (separate location member) found),
+    ?_, ?_⟩
+  · apply LanguageResult.bind_success .word touched
+    apply clear_evaluates (inputs.prepend [.unit]) inputRelated
+    apply Evaluates.ifFalse (.binary ((input_part dispatchInputs (index := 6) rfl).evaluates _) .word
+      (by simp [BinaryOp.apply, Creation.depthLimit, allowed]))
+    apply entered
+    apply LanguageResult.bind_success .word functionRead
+    apply LanguageResult.bind_success .word called
+    exact finished
+  · exact Nat.le_trans (Nat.le_trans framed.length retained.length_le)
+      (Nat.le_trans rewrites.length_le publishFrame.length)
+  · intro location value outside unshared found
+    exact publishFrame.read location value outside (rewrites.read location value unshared (keep outside found))
 
 set_option linter.unusedSimpArgs false in
 set_option maxRecDepth 10000 in

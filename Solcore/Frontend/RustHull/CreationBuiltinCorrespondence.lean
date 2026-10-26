@@ -5,11 +5,12 @@ import Solcore.Frontend.RustHull.RuntimeCallCallbackCorrespondence
 import Solcore.Frontend.RustHull.MemoryCopyBuiltinCorrespondence
 import Solcore.Frontend.RustHull.AccountObservationBuiltinCompiler
 
-/-! Actual CREATE and CREATE2 lowering preserves every refusal of
+/-! Actual CREATE and CREATE2 lowering preserves every rule of
 `CreationSemantics`. The static and init-size guards halt the frame through
 the actual termination code, a missing gas observation faults, and the other
-refusals run the actual transport and the installed create handler. The
-handler cell, its closure and the shared state come from the frame model. -/
+refusals and the admitted attempts run the actual transport and the installed
+create handler. The handler cell, its closure and the shared state come from
+the frame model. -/
 set_option autoImplicit false
 set_option linter.unusedSimpArgs false
 namespace Solcore.Frontend.RustHull.CreationBuiltinCorrespondence
@@ -388,6 +389,284 @@ theorem expression_preserves
       obtain ⟨finalRelated, closures⟩ := refused_related callPassive stateRelated localFinal frame
       exact ⟨_, final, .value (.word _), invoked available evaluated notStatic bounded, finalRelated, closures⟩
 
+theorem Copy.deterministic {sourceWords : MemorySemantics.Entries} {destination source length : Word}
+    {destinationWords first second : MemorySemantics.Entries}
+    (left : MemoryCopySemantics.Copy sourceWords destination source length destinationWords first)
+    (right : MemoryCopySemantics.Copy sourceWords destination source length destinationWords second) :
+    first = second := by
+  induction left generalizing second with
+  | empty =>
+      cases right with
+      | empty => rfl
+      | step nonempty _ => exact absurd rfl nonempty
+  | step nonempty rest ih =>
+      cases right with
+      | empty => exact absurd rfl nonempty
+      | step _ rest' => exact ih rest'
+
+/-- An admitted attempt without an init frame publishes the cleared caller
+cells and the handler's shared account changes. -/
+private theorem admitted_related (passive : CallPassive layout slots)
+    (stateRelated : StateRel (model layout baseline slots image handlers anchors context) world state store)
+    {final : Store} {size : Word} {next : AccountCallSemantics.Shared}
+    (localFinal : CallTransportCorrespondence.StateRel (localLocations layout)
+      (CreationCorrespondence.cleared (RuntimeCallEffectsSemantics.transport state.external) size) final)
+    (sharedFinal : AccountCallCorrespondence.LinkedSharedStateRel anchors (sharedLocations layout) next final)
+    (frame : RuntimeCallEffectsCorrespondence.Frame layout store final) :
+    StateRel (model layout baseline slots image handlers anchors context) world
+      {state with external := (RuntimeCallEffectsSemantics.withTransport state.external
+        (CreationCorrespondence.cleared (RuntimeCallEffectsSemantics.transport state.external) size) next)} final ∧
+    ClosuresPreserved store final := by
+  have base := base_related stateRelated
+  have baseFinal := RuntimeCallEffectsCorrespondence.transport_updated passive base localFinal sharedFinal.shared frame
+  refine ⟨of_base baseFinal ?_ (context.updated base baseFinal stateRelated.external.2.2.1.2),
+    RuntimeCallEffectsCorrespondence.frame_closures base frame⟩
+  have same : RuntimeChildCallEffectsCorrespondence.sourceWorld (RuntimeCallEffectsSemantics.withTransport state.external
+      (CreationCorrespondence.cleared (RuntimeCallEffectsSemantics.transport state.external) size) next) = next.world := by
+    simp only [RuntimeChildCallEffectsCorrespondence.sourceWorld, RuntimeCallEffectsSemantics.withTransport,
+      RuntimeCallEffectsSemantics.shared_withReturned, RuntimeCallEffectsSemantics.shared_withShared]
+  rw [same]
+  exact sharedFinal.linked
+
+/-- Admitted attempts that run no init frame, through the actual transport and
+dispatcher: a collision returns zero, and a deployment returns the new address
+with the account changes published in the shared cells. -/
+theorem expression_admitted
+    (compiled : CompiledReferences scope references)
+    (invalidCompiled : Effects.terminate scope 3 (.word Word.zero) (.word Word.zero) = .ok invalid)
+    {scheme : CreationAddressSemantics.Scheme}
+    (selected : (if create2 then CreationAddressSemantics.Scheme.create2 salt else .create) = scheme)
+    (computed : CreationSemantics.Admitted scheme value offset length state.external result finalState)
+    (runtime : EffectEnvironmentRel slots scope mapping environment)
+    (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
+    (callPassive : CallPassive layout slots)
+    (memoryMember : ⟨"memory", WordMapping.type, layout.memory⟩ ∈ slots)
+    (memorySizeMember : ⟨"memorySize", .word, layout.storage.memorySize⟩ ∈ slots)
+    (dataMember : ⟨"returnData", WordMapping.type, layout.returnData⟩ ∈ slots)
+    (dataSizeMember : ⟨"returnDataSize", .word, layout.returnDataSize⟩ ∈ slots)
+    (addressMember : ⟨"address", .word, layout.storage.address⟩ ∈ slots)
+    (depthMember : ⟨"callDepth", .word, layout.callDepth⟩ ∈ slots)
+    (staticMember : ⟨"isStatic", .bool, layout.storage.isStatic⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, layout.storage.exit⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, layout.storage.returnOffset⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, layout.storage.returnSize⟩ ∈ slots)
+    {gasLocation : Nat} (gasMember : ⟨"availableGas", .sum .unit .word, gasLocation⟩ ∈ slots)
+    (stateRelated : StateRel (model layout baseline slots image handlers anchors context) world state store)
+    (handler : Handler layout store)
+    (handlerMember : ⟨"createHandler", OptionalCell.cellType Creation.callbackType, handler.location⟩ ∈ slots)
+    (lengthEvaluated : Evaluates environment store (lengthExpr.rename mapping) (.word length) store)
+    (valueWeakened : ∀ inserted, Evaluates (inserted :: environment) store
+      ((valueExpr.rename mapping).weakenAt 0) (.word value) store)
+    (offsetWeakened : ∀ inserted, Evaluates (inserted :: environment) store
+      ((offsetExpr.rename mapping).weakenAt 0) (.word offset) store)
+    (lengthWeakened : ∀ inserted, Evaluates (inserted :: environment) store
+      ((lengthExpr.rename mapping).weakenAt 0) (.word length) store)
+    (saltWeakened : ∀ inserted, Evaluates (inserted :: environment) store
+      ((saltExpr.rename mapping).weakenAt 0) (.word salt) store) :
+    ∃ resultValue final, ResultRel .word result resultValue ∧
+      Evaluates environment store
+        ((expression references create2 invalid valueExpr offsetExpr lengthExpr saltExpr).rename mapping)
+        resultValue final ∧
+      StateRel (model layout baseline slots image handlers anchors context) world {state with external := finalState} final ∧
+      ClosuresPreserved store final := by
+  rw [expression_rename]
+  have base := base_related stateRelated
+  have beforeRuntime := RuntimeEnvironmentEffectsCorrespondence.runtime_related
+    (RuntimeLogEffectsCorrespondence.runtime_related (RuntimeAccountEffectsCorrespondence.runtime_related (account_related base)))
+  have memory := RuntimeEffectsCorrespondence.memory_related beforeRuntime
+  have storage := RuntimeEffectsCorrespondence.storage_related beforeRuntime
+  have observed := RuntimeEnvironmentEffectsCorrespondence.observations_related
+    (RuntimeLogEffectsCorrespondence.runtime_related (RuntimeAccountEffectsCorrespondence.runtime_related (account_related base)))
+  have staticEvaluated : Evaluates environment store (Core.Expr.loadCell (references.isStatic.rename mapping))
+      (.bool state.external.runtime.runtime.runtime.runtime.runtime.storage.isStatic) store :=
+    .loadCell (reference_evaluates runtime staticMember compiled.isStatic store) storage.isStatic
+  have gasRead := observed _ gasMember _ (show EnvironmentBuiltinCorrespondence.observation
+    state.external.runtime.runtime.runtime.runtime.environment "availableGas" (.sum .unit .word) =
+      some (EnvironmentBuiltinCorrespondence.wordOption state.external.runtime.runtime.runtime.runtime.environment.gas) from rfl)
+  have gasLoaded : Evaluates environment store (Core.Expr.loadCell (references.gas.rename mapping))
+      (EnvironmentBuiltinCorrespondence.wordOption state.external.runtime.runtime.runtime.runtime.environment.gas) store :=
+    .loadCell (reference_evaluates runtime gasMember compiled.gas store) gasRead
+  have lengthGuard : Evaluates environment store
+      (.binary .wordGt (lengthExpr.rename mapping) (.word (Word.ofNatModulo 49152)))
+      (.bool (decide (CreationSemantics.maxInitCodeSize < length.val))) store :=
+    .binary lengthEvaluated .word (by simp only [BinaryOp.apply, length_guard])
+  have staticGuard (isStatic : Bool)
+      (same : (CreationSemantics.frame state.external).storage.isStatic = isStatic) :
+      Evaluates environment store (Core.Expr.loadCell (references.isStatic.rename mapping)) (.bool isStatic) store := by
+    rw [← same]
+    exact staticEvaluated
+  have halted : ∃ resultValue final, ResultRel .word (RuntimeCallEffectsSemantics.invalid state.external).1 resultValue ∧
+      Evaluates environment store (LanguageResult.bind .word (invalid.rename mapping)
+        (LanguageResult.success (.word Word.zero))) resultValue final ∧
+      StateRel (model layout baseline slots image handlers anchors context) world
+        {state with external := (RuntimeCallEffectsSemantics.invalid state.external).2} final ∧
+      ClosuresPreserved store final := by
+    have terminated := TerminationBuiltinCorrespondence.terminate_evaluates invalidCompiled runtime
+      memorySizeMember exitMember offsetMember sizeMember storage memory.size Word.zero Word.zero
+      (fun _ _ => .word) (fun _ _ => .word)
+    obtain ⟨_, memoryFinal, storageFinal, frame⟩ :=
+      TerminationBuiltinCorrespondence.terminate_state memory storage 3 Word.zero Word.zero
+    have finalRelated := RuntimeCallEffectsCorrespondence.runtime_updated base
+      (RuntimeReturnDataEffectsCorrespondence.runtime_updated passive (runtime_related base) memoryFinal storageFinal frame) rfl
+    have strengthened := of_base finalRelated (invalid_linked stateRelated)
+      (context.updated base finalRelated stateRelated.external.2.2.1.2)
+    exact ⟨.inLeft .word (.word Word.maximum), _, .language _, LanguageResult.bind_failure .word terminated,
+      strengthened, TerminationBuiltinCorrespondence.terminate_closures memory storage 3 Word.zero Word.zero⟩
+  have invoked {gas : Word} (available : CreationSemantics.availableGas state.external = some gas)
+      {target : Value} {final : Store}
+      (called : Evaluates (.word gas :: environment) store
+        (Creation.invoke (references.memory.rename mapping.lift) (references.memorySize.rename mapping.lift)
+          (references.returnData.rename mapping.lift) (references.returnDataSize.rename mapping.lift)
+          (references.handler.rename mapping.lift) (.loadCell (references.address.rename mapping.lift))
+          (.loadCell (references.depth.rename mapping.lift)) ((valueExpr.rename mapping).weakenAt 0)
+          ((saltExpr.rename mapping).weakenAt 0) (.bool create2) (.var 0) ((offsetExpr.rename mapping).weakenAt 0)
+          ((lengthExpr.rename mapping).weakenAt 0)) target final)
+      (notStatic : (CreationSemantics.frame state.external).storage.isStatic = false)
+      (bounded : length.val ≤ CreationSemantics.maxInitCodeSize) :
+      Evaluates environment store
+        ((expression (references.rename mapping) create2 (invalid.rename mapping) (valueExpr.rename mapping)
+          (offsetExpr.rename mapping) (lengthExpr.rename mapping) (saltExpr.rename mapping))) target final := by
+    have gasSome : Evaluates environment store (Core.Expr.loadCell (references.gas.rename mapping))
+        (.inRight .unit (.word gas)) store := by
+      have same : state.external.runtime.runtime.runtime.runtime.environment.gas = some gas := available
+      simpa only [same, EnvironmentBuiltinCorrespondence.wordOption] using gasLoaded
+    apply Evaluates.ifFalse (staticGuard false notStatic)
+    apply Evaluates.ifFalse (by simpa only [decide_eq_false_iff_not, Nat.not_lt] using
+      (show decide (CreationSemantics.maxInitCodeSize < length.val) = false by simpa using bounded) ▸ lengthGuard)
+    exact .caseRight gasSome called
+  have inner {gas : Word} := runtime.temporary .word (.word gas)
+  have packedInvoke (gas : Word) : Evaluates (.word gas :: environment) store
+      (bundle [references.memory.rename mapping.lift, references.memorySize.rename mapping.lift,
+        references.returnData.rename mapping.lift, references.returnDataSize.rename mapping.lift,
+        references.handler.rename mapping.lift, .loadCell (references.address.rename mapping.lift),
+        .loadCell (references.depth.rename mapping.lift), (valueExpr.rename mapping).weakenAt 0,
+        (saltExpr.rename mapping).weakenAt 0, .bool create2, .var 0, (offsetExpr.rename mapping).weakenAt 0,
+        (lengthExpr.rename mapping).weakenAt 0])
+      (bundleValues (CreationCorrespondence.argumentValues (localLocations layout) handler.location
+        ⟨state.external.runtime.runtime.runtime.runtime.runtime.storage.address, state.external.callDepth,
+          value, salt, create2, gas, offset, length⟩)) store :=
+    .pair (reference_evaluates (inner (gas := gas)) memoryMember compiled.memory store)
+      (.pair (reference_evaluates (inner (gas := gas)) memorySizeMember compiled.memorySize store)
+      (.pair (reference_evaluates (inner (gas := gas)) dataMember compiled.returnData store)
+      (.pair (reference_evaluates (inner (gas := gas)) dataSizeMember compiled.returnDataSize store)
+      (.pair (reference_evaluates (inner (gas := gas)) handlerMember compiled.handler store)
+      (.pair (.loadCell (reference_evaluates (inner (gas := gas)) addressMember compiled.address store) storage.address)
+      (.pair (.loadCell (reference_evaluates (inner (gas := gas)) depthMember compiled.depth store)
+          (RuntimeCallEffectsCorrespondence.depth_related base))
+      (.pair (valueWeakened _) (.pair (saltWeakened _) (.pair .bool (.pair (.var rfl)
+        (.pair (offsetWeakened _) (lengthWeakened _))))))))))))
+  have separate : ∀ location ∈ (sharedLocations layout).all,
+      location ∉ (localLocations layout).resources.all := by
+    intro location member
+    apply RuntimeCallEffectsCorrespondence.shared_local_separation layout
+    simp only [sharedLocations, AccountCallCorrespondence.SharedLocations.all, List.mem_cons,
+      List.not_mem_nil, or_false] at member ⊢
+    rcases member with rfl | rfl | rfl | rfl | rfl <;> simp
+  have creatorKey : (state.external.runtime.runtime.runtime.runtime.runtime.storage.address.bitAnd
+      CreationCorrespondence.addressMask).bitAnd CreationCorrespondence.addressMask =
+      CreationSemantics.creator state.external :=
+    CreationCorrespondence.mask_idempotent _
+  have allowedDepth {depth : Word} (allowed : depth.val < CreationSemantics.depthLimit) :
+      ¬depth > Word.ofNatModulo 1023 := by
+    have limit : (Word.ofNatModulo 1023).val = 1023 := Nat.mod_eq_of_lt (by decide)
+    simp only [CreationSemantics.depthLimit] at allowed
+    simp only [GT.gt, Fin.lt_def, limit]
+    omega
+  have sharedLinked : AccountCallCorrespondence.LinkedSharedStateRel anchors (sharedLocations layout)
+      (RuntimeCallEffectsSemantics.shared state.external) store :=
+    ⟨RuntimeCallEffectsCorrespondence.shared_related base, linked_related stateRelated⟩
+  have localRelated := RuntimeCallEffectsCorrespondence.local_related base
+  have mutableFrame {final : Store} (lengthLe : store.length ≤ final.length)
+      (kept : ∀ location value, location ∉ (localLocations layout).resources.all →
+        location ∉ [(sharedLocations layout).world, (sharedLocations layout).balances] →
+        store.read? location = some value → final.read? location = some value) :
+      RuntimeCallEffectsCorrespondence.Frame layout store final := by
+    refine ⟨lengthLe, fun location value outside found => kept location value ?_ ?_ found⟩
+    · intro member
+      apply outside
+      simp only [localLocations, CallTransportCorrespondence.Locations.resources, LogsCorrespondence.Locations.all,
+        List.mem_cons, List.not_mem_nil, or_false] at member
+      simp only [RuntimeCallEffectsCorrespondence.callMutable, List.mem_cons, List.not_mem_nil, or_false]
+      rcases member with rfl | rfl | rfl | rfl <;> simp
+    · intro member
+      apply outside
+      simp only [sharedLocations, List.mem_cons, List.not_mem_nil, or_false] at member
+      simp only [RuntimeCallEffectsCorrespondence.callMutable, List.mem_cons, List.not_mem_nil, or_false]
+      rcases member with rfl | rfl <;> simp
+  have keyed {property : Word → Prop}
+      (holds : property (CreationSemantics.creator state.external)) :
+      property ((state.external.runtime.runtime.runtime.runtime.runtime.storage.address.bitAnd
+        CreationCorrespondence.addressMask).bitAnd CreationCorrespondence.addressMask) := by
+    rw [creatorKey]
+    exact holds
+  have nonceBelow {account : AccountState.Account} (below : account.nonce.val < CreationSemantics.maxNonce) :
+      ¬account.nonce > Word.ofNatModulo (2 ^ 64 - 2) := fun large => Nat.not_le.mpr below ((nonce_guard _).mp large)
+  cases computed with
+  | collision admitted copied derived occupied used =>
+      rename_i size target account existing initCode
+      obtain ⟨gas, available⟩ := admitted.available
+      obtain ⟨final, evaluated, localFinal, sharedFinal, lengthLe, kept⟩ :=
+        CreationCorrespondence.invoke_admitted (address := Word.zero)
+          (next := {RuntimeCallEffectsSemantics.shared state.external with
+            world := CreationCorrespondence.advancedWorld (RuntimeCallEffectsSemantics.shared state.external)
+              ((state.external.runtime.runtime.runtime.runtime.runtime.storage.address.bitAnd
+                CreationCorrespondence.addressMask).bitAnd CreationCorrespondence.addressMask) account})
+          (packedInvoke gas) localRelated admitted.touched
+          (allowedDepth admitted.allowed) admitted.bounded handler.read handler.outside handler.closure sharedLinked separate
+          (fun initCode' copiedInit => by
+            obtain rfl := Copy.deterministic copiedInit copied
+            refine .collision (account := account) (existing := existing) (target := target)
+              (keyed (property := fun key =>
+                ¬value > StorageSemantics.readWord key state.external.runtime.runtime.balances)
+                (Nat.not_lt.mpr admitted.funded))
+              (keyed (property := fun key => StorageSemantics.get state.external.runtime.runtime.runtime.runtime.runtime.storage.world
+                key state.external.runtime.runtime.runtime.runtime.runtime.storage.complete = .ok account) admitted.found)
+              (nonceBelow admitted.belowLimit) admitted.bounded ?_ ?_ used
+            · rw [← selected] at derived
+              exact keyed (property := fun key => CreationAddressSemantics.Derived key account.nonce initCode' length
+                (if create2 then CreationAddressSemantics.Scheme.create2 salt else .create) target) derived
+            · exact keyed (property := fun key => StorageSemantics.lookup target (CreationCorrespondence.advancedWorld
+                (RuntimeCallEffectsSemantics.shared state.external) key account) = some existing) occupied)
+      obtain ⟨finalRelated, closures⟩ := admitted_related callPassive stateRelated localFinal sharedFinal
+        (mutableFrame lengthLe kept)
+      rw [creatorKey] at finalRelated
+      exact ⟨_, final, .value (.word _), invoked available evaluated admitted.notStatic admitted.bounded,
+        finalRelated, closures⟩
+  | deployed admitted copied derived absent complete emptyInit transferred =>
+      rename_i size target account initCode balances
+      obtain ⟨gas, available⟩ := admitted.available
+      obtain ⟨final, evaluated, localFinal, sharedFinal, lengthLe, kept⟩ :=
+        CreationCorrespondence.invoke_admitted (address := target)
+          (next := {RuntimeCallEffectsSemantics.shared state.external with
+            world := (StorageSemantics.put target (CreationSemantics.createdAccount target)
+              (CreationCorrespondence.advancedWorld (RuntimeCallEffectsSemantics.shared state.external)
+                ((state.external.runtime.runtime.runtime.runtime.runtime.storage.address.bitAnd
+                  CreationCorrespondence.addressMask).bitAnd CreationCorrespondence.addressMask) account))
+            balances := balances})
+          (packedInvoke gas) localRelated admitted.touched
+          (allowedDepth admitted.allowed) admitted.bounded handler.read handler.outside handler.closure sharedLinked separate
+          (fun initCode' copiedInit => by
+            obtain rfl := Copy.deterministic copiedInit copied
+            refine .deployed (account := account) (target := target)
+              (keyed (property := fun key =>
+                ¬value > StorageSemantics.readWord key state.external.runtime.runtime.balances)
+                (Nat.not_lt.mpr admitted.funded))
+              (keyed (property := fun key => StorageSemantics.get state.external.runtime.runtime.runtime.runtime.runtime.storage.world
+                key state.external.runtime.runtime.runtime.runtime.runtime.storage.complete = .ok account) admitted.found)
+              (nonceBelow admitted.belowLimit) admitted.bounded ?_ ?_ complete emptyInit ?_
+            · rw [← selected] at derived
+              exact keyed (property := fun key => CreationAddressSemantics.Derived key account.nonce initCode' length
+                (if create2 then CreationAddressSemantics.Scheme.create2 salt else .create) target) derived
+            · exact keyed (property := fun key => StorageSemantics.lookup target (CreationCorrespondence.advancedWorld
+                (RuntimeCallEffectsSemantics.shared state.external) key account) = none) absent
+            · exact keyed (property := fun key => AccountCallSemantics.transfer key target value
+                state.external.runtime.runtime.balances = .ok balances) transferred)
+      obtain ⟨finalRelated, closures⟩ := admitted_related callPassive stateRelated localFinal sharedFinal
+        (mutableFrame lengthLe kept)
+      rw [creatorKey] at finalRelated
+      exact ⟨_, final, .value (.word _), invoked available evaluated admitted.notStatic admitted.bounded,
+        finalRelated, closures⟩
+
 theorem projectArgument_rename (index count : Nat) (expr : Core.Expr) (mapping : Renaming) :
     (projectArgument index count expr).rename mapping = projectArgument index count (expr.rename mapping) := by
   induction count generalizing index expr with
@@ -526,6 +805,108 @@ theorem create2_preserves {expected : Core.Ty} {arguments : List Lowered} {lower
     expression_preserves (create2 := true) (salt := salt)
       (valueExpr := projectArgument 0 4 (.var 0)) (offsetExpr := projectArgument 1 4 (.var 0))
       (lengthExpr := projectArgument 2 4 (.var 0)) (saltExpr := projectArgument 3 4 (.var 0)) referencesCompiled invalidCompiled computed runtime'
+      passive callPassive memoryMember memorySizeMember dataMember dataSizeMember addressMember depthMember
+      staticMember exitMember offsetMember sizeMember gasMember stateRelated handler handlerMember
+      (.first (.second (.second (.var rfl)))) (weakened (fun _ => .first (.var rfl)))
+      (weakened (fun _ => .first (.second (.var rfl)))) (weakened (fun _ => .first (.second (.second (.var rfl)))))
+      (weakened (fun _ => .second (.second (.second (.var rfl)))))
+  exact ⟨resultValue, final, resultRelated, LanguageResult.bind_success .word packed evaluated, finalRelated, retained⟩
+
+/-- Admitted CREATE attempts that run no init frame. -/
+theorem createAdmitted_preserves {expected : Core.Ty} {arguments : List Lowered} {lowered : Lowered}
+    {targets : List Core.Value} {initial : Store}
+    (compiledBuiltin : lowerBuiltin scope "create" expected arguments = .ok lowered)
+    (computed : CreationSemantics.Admitted .create value offset length state.external result finalState)
+    (related : ArgumentsRel arguments [.word value, .word offset, .word length] targets)
+    (runtime : EffectEnvironmentRel slots scope mapping environment)
+    (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
+    (callPassive : CallPassive layout slots)
+    (memoryMember : ⟨"memory", WordMapping.type, layout.memory⟩ ∈ slots)
+    (memorySizeMember : ⟨"memorySize", .word, layout.storage.memorySize⟩ ∈ slots)
+    (dataMember : ⟨"returnData", WordMapping.type, layout.returnData⟩ ∈ slots)
+    (dataSizeMember : ⟨"returnDataSize", .word, layout.returnDataSize⟩ ∈ slots)
+    (addressMember : ⟨"address", .word, layout.storage.address⟩ ∈ slots)
+    (depthMember : ⟨"callDepth", .word, layout.callDepth⟩ ∈ slots)
+    (staticMember : ⟨"isStatic", .bool, layout.storage.isStatic⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, layout.storage.exit⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, layout.storage.returnOffset⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, layout.storage.returnSize⟩ ∈ slots)
+    {gasLocation : Nat} (gasMember : ⟨"availableGas", .sum .unit .word, gasLocation⟩ ∈ slots)
+    (stateRelated : StateRel (model layout baseline slots image handlers anchors context) world state store)
+    (handler : Handler layout store)
+    (handlerMember : ⟨"createHandler", OptionalCell.cellType Creation.callbackType, handler.location⟩ ∈ slots)
+    (packed : Evaluates environment initial ((packArguments arguments).expression.rename mapping)
+      (.inRight .word (bundleValues targets)) store) :
+    ∃ resultValue final, ResultRel lowered.type result resultValue ∧
+      Evaluates environment initial (lowered.expression.rename mapping) resultValue final ∧
+      StateRel (model layout baseline slots image handlers anchors context) world {state with external := finalState} final ∧
+      ClosuresPreserved store final := by
+  obtain ⟨words, raw, rawCompiled, typed, loweredEqual⟩ := outer_components (by rfl) compiledBuiltin
+  have arity : arguments.length = 3 := by
+    simpa only [List.length_map, List.length_range] using create_arity rawCompiled
+  obtain ⟨valueExpr, offsetExpr, lengthExpr, value', offset', length', rfl, same, rfl⟩ :=
+    MemoryCopyBuiltinCorrespondence.three_words related words arity
+  cases same
+  obtain ⟨references, invalid, referencesCompiled, invalidCompiled, rfl⟩ := create_lowered rawCompiled
+  cases typed
+  cases loweredEqual
+  let input := bundleValues [.word value, .word offset, .word length]
+  have runtime' := runtime.temporary (bundleType [.word, .word, .word]) input
+  obtain ⟨resultValue, final, resultRelated, evaluated, finalRelated, retained⟩ :=
+    expression_admitted (create2 := false) (salt := Word.zero)
+      (valueExpr := projectArgument 0 3 (.var 0)) (offsetExpr := projectArgument 1 3 (.var 0))
+      (lengthExpr := projectArgument 2 3 (.var 0)) (saltExpr := .word Word.zero) referencesCompiled invalidCompiled rfl computed runtime'
+      passive callPassive memoryMember memorySizeMember dataMember dataSizeMember addressMember depthMember
+      staticMember exitMember offsetMember sizeMember gasMember stateRelated handler handlerMember
+      (.second (.second (.var rfl))) (weakened (fun _ => .first (.var rfl)))
+      (weakened (fun _ => .first (.second (.var rfl)))) (weakened (fun _ => .second (.second (.var rfl))))
+      (fun _ => by simp only [Core.Expr.rename, Core.Expr.weakenAt]; exact .word)
+  exact ⟨resultValue, final, resultRelated, LanguageResult.bind_success .word packed evaluated, finalRelated, retained⟩
+
+/-- Admitted CREATE2 attempts that run no init frame; the salt enters the address. -/
+theorem create2Admitted_preserves {expected : Core.Ty} {arguments : List Lowered} {lowered : Lowered}
+    {targets : List Core.Value} {initial : Store}
+    (compiledBuiltin : lowerBuiltin scope "create2" expected arguments = .ok lowered)
+    (computed : CreationSemantics.Admitted (.create2 salt) value offset length state.external result finalState)
+    (related : ArgumentsRel arguments [.word value, .word offset, .word length, .word salt] targets)
+    (runtime : EffectEnvironmentRel slots scope mapping environment)
+    (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
+    (callPassive : CallPassive layout slots)
+    (memoryMember : ⟨"memory", WordMapping.type, layout.memory⟩ ∈ slots)
+    (memorySizeMember : ⟨"memorySize", .word, layout.storage.memorySize⟩ ∈ slots)
+    (dataMember : ⟨"returnData", WordMapping.type, layout.returnData⟩ ∈ slots)
+    (dataSizeMember : ⟨"returnDataSize", .word, layout.returnDataSize⟩ ∈ slots)
+    (addressMember : ⟨"address", .word, layout.storage.address⟩ ∈ slots)
+    (depthMember : ⟨"callDepth", .word, layout.callDepth⟩ ∈ slots)
+    (staticMember : ⟨"isStatic", .bool, layout.storage.isStatic⟩ ∈ slots)
+    (exitMember : ⟨"exit", .word, layout.storage.exit⟩ ∈ slots)
+    (offsetMember : ⟨"returnOffset", .word, layout.storage.returnOffset⟩ ∈ slots)
+    (sizeMember : ⟨"returnSize", .word, layout.storage.returnSize⟩ ∈ slots)
+    {gasLocation : Nat} (gasMember : ⟨"availableGas", .sum .unit .word, gasLocation⟩ ∈ slots)
+    (stateRelated : StateRel (model layout baseline slots image handlers anchors context) world state store)
+    (handler : Handler layout store)
+    (handlerMember : ⟨"createHandler", OptionalCell.cellType Creation.callbackType, handler.location⟩ ∈ slots)
+    (packed : Evaluates environment initial ((packArguments arguments).expression.rename mapping)
+      (.inRight .word (bundleValues targets)) store) :
+    ∃ resultValue final, ResultRel lowered.type result resultValue ∧
+      Evaluates environment initial (lowered.expression.rename mapping) resultValue final ∧
+      StateRel (model layout baseline slots image handlers anchors context) world {state with external := finalState} final ∧
+      ClosuresPreserved store final := by
+  obtain ⟨words, raw, rawCompiled, typed, loweredEqual⟩ := outer_components (by rfl) compiledBuiltin
+  have arity : arguments.length = 4 := by
+    simpa only [List.length_map, List.length_range] using create2_arity rawCompiled
+  obtain ⟨valueExpr, offsetExpr, lengthExpr, saltExpr, value', offset', length', salt', rfl, same, rfl⟩ :=
+    AccountObservationBuiltinCorrespondence.four_words related words arity
+  cases same
+  obtain ⟨references, invalid, referencesCompiled, invalidCompiled, rfl⟩ := create2_lowered rawCompiled
+  cases typed
+  cases loweredEqual
+  let input := bundleValues [.word value, .word offset, .word length, .word salt]
+  have runtime' := runtime.temporary (bundleType [.word, .word, .word, .word]) input
+  obtain ⟨resultValue, final, resultRelated, evaluated, finalRelated, retained⟩ :=
+    expression_admitted (create2 := true) (salt := salt)
+      (valueExpr := projectArgument 0 4 (.var 0)) (offsetExpr := projectArgument 1 4 (.var 0))
+      (lengthExpr := projectArgument 2 4 (.var 0)) (saltExpr := projectArgument 3 4 (.var 0)) referencesCompiled invalidCompiled rfl computed runtime'
       passive callPassive memoryMember memorySizeMember dataMember dataSizeMember addressMember depthMember
       staticMember exitMember offsetMember sizeMember gasMember stateRelated handler handlerMember
       (.first (.second (.second (.var rfl)))) (weakened (fun _ => .first (.var rfl)))

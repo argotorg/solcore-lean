@@ -297,7 +297,7 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     (by simpa only [callReady.baseEqual] using boundary)
     (by simpa only [callReady.baseEqual] using baseMembers)
     (fun cell member => by simpa only [callReady.dispatcherEqual] using delegateObserved cell member)
-  obtain ⟨runInit, installRuntime, createShape⟩ := CreationImplementation.objectHandlers_create
+  obtain ⟨runInit, identify, createShape⟩ := CreationImplementation.objectHandlers_create
     (RuntimeExtendedInitializedEffects.slots true) (others.length + 1) images catalog capture.functions capture.shared
     capture.dispatcher capture.creator
   let createHandler : RuntimeCallModeEffectsCorrespondence.CreateHandler callReady.layout := {
@@ -310,7 +310,7 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
       captured := .unit :: capture.environment
       shared := capture.shared
       runInit := runInit
-      installRuntime := installRuntime
+      identify := identify
       closure := by rw [← createShape]; exact createCaptured
       references := (inventory_references inventory capture.references).prepend [.unit] } }
   let handlers : RuntimeCallModeEffectsCorrespondence.ModeHandlers callReady.layout := {

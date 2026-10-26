@@ -113,10 +113,46 @@ def transfer (balances creator target value creatorBalance : Code) : Code :=
   bindResult .unit (insert debited target (binary .wordAdd targetBalance value)) fun credited =>
   success (store balances credited)
 
+/-- A new account at an unused target: insert the record, move the endowment,
+run init code unless it is empty, validate the returned image and install it.
+Failures after the checkpoint restore it. -/
+def deployment (runInit installRuntime : Code → Code → Code)
+    (world balances creator value creatorBalance request target restore : Code) : Code :=
+  let rollback (result : Code) := bind restore fun _ => result
+  bindResult Creation.responseType (fun depth => AccountState.put (load world depth) (target depth)
+    (AccountState.replace (AccountState.replace AccountState.defaultRecord 2 (number 1 depth)) 7 (.bool true))) fun inserted =>
+  bind (store world inserted) fun _ =>
+  bindResult Creation.responseType (transfer balances creator target value creatorBalance) fun _ =>
+  bindResult Creation.responseType
+    (choose (binary .wordEq (part 7 8 request) (number 0))
+      (success (packet [CodeBuilder.boolean true, empty, number 0])) (runInit target request)) fun child =>
+  choose (part 0 3 child)
+    (choose (binary .wordGt (part 2 3 child) (number 24576)) (rollback refused) <|
+      bindResult Creation.responseType (fun depth =>
+        Memory.readMemoryByte (part 1 3 child depth) (number 0 depth)) fun first =>
+      let invalidPrefix := choose (binary .wordGt (part 2 3 child) (number 0))
+        (binary .wordEq first (number 0xef)) (CodeBuilder.boolean false)
+      choose invalidPrefix (rollback refused) <|
+      bindResult Creation.responseType (installRuntime target child) fun _ =>
+      response target empty (number 0))
+    (rollback (response (number 0) (part 1 3 child) (part 2 3 child)))
+
+/-- The checks on the target after the checkpoint: an account with a nonzero
+nonce or code size is a collision, and unknown code is failure 7. -/
+def attempt (runInit installRuntime : Code → Code → Code)
+    (world balances complete creator value creatorBalance request target restore : Code) : Code :=
+  bindResult Creation.responseType (fun depth => AccountState.get (load world depth) (target depth)
+    (complete depth)) fun existing =>
+  choose (binary .wordGt (part 2 9 existing) (number 0)) refused <|
+  choose (binary .wordGt (part 5 9 existing) (number 0)) refused <|
+  choose (part 6 9 existing)
+    (deployment runInit installRuntime world balances creator value creatorBalance request target restore)
+    (failure Creation.responseType (number 7))
+
 /-- The dispatcher after both refusal checks: address derivation, the nonce
-increment, the checkpoint, collision checks, init execution and installation.
-`args` binds the six dispatcher arguments; the balance and creator record are
-the values already read by the checks. -/
+increment, the checkpoint and the attempt on the target. `args` binds the six
+dispatcher arguments; the balance and creator record are the values already
+read by the checks. -/
 def admitted (runInit installRuntime : Code → Code → Code)
     (args creatorBalance creatorRecord : Code) : Code :=
   let world := part 0 6 args
@@ -132,31 +168,8 @@ def admitted (runInit installRuntime : Code → Code → Code)
   bindResult Creation.responseType (fun depth => AccountState.writeField (world depth) (creator depth)
     (complete depth) 2 (binary .wordAdd nonce (number 1) depth)) fun _ =>
   checkpoint [world, balances, logs, logSize] fun restore =>
-  let rollback (result : Code) := bind restore fun _ => result
-  protect restore <|
-  bindResult Creation.responseType (fun depth => AccountState.get (load world depth) (target depth)
-    (complete depth)) fun existing =>
-  choose (binary .wordGt (part 2 9 existing) (number 0)) refused <|
-  choose (binary .wordGt (part 5 9 existing) (number 0)) refused <|
-  choose (part 6 9 existing)
-    (bindResult Creation.responseType (fun depth => AccountState.put (load world depth) (target depth)
-      (AccountState.replace (AccountState.replace AccountState.defaultRecord 2 (number 1 depth)) 7 (.bool true))) fun inserted =>
-      bind (store world inserted) fun _ =>
-      bindResult Creation.responseType (transfer balances creator target value creatorBalance) fun _ =>
-      bindResult Creation.responseType
-        (choose (binary .wordEq (part 7 8 request) (number 0))
-          (success (packet [CodeBuilder.boolean true, empty, number 0])) (runInit target request)) fun child =>
-      choose (part 0 3 child)
-        (choose (binary .wordGt (part 2 3 child) (number 24576)) (rollback refused) <|
-          bindResult Creation.responseType (fun depth =>
-            Memory.readMemoryByte (part 1 3 child depth) (number 0 depth)) fun first =>
-          let invalidPrefix := choose (binary .wordGt (part 2 3 child) (number 0))
-            (binary .wordEq first (number 0xef)) (CodeBuilder.boolean false)
-          choose invalidPrefix (rollback refused) <|
-          bindResult Creation.responseType (installRuntime target child) fun _ =>
-          response target empty (number 0))
-        (rollback (response (number 0) (part 1 3 child) (part 2 3 child))))
-    (failure Creation.responseType (number 7))
+  protect restore
+    (attempt runInit installRuntime world balances complete creator value creatorBalance request target restore)
 
 /-- The dispatcher's funds check and creator-nonce check, before `rest`. -/
 def dispatchWith (worldReference balancesReference logsReference logSizeReference complete request : Code)
@@ -182,18 +195,97 @@ theorem dispatch_eq (worldReference balancesReference logsReference logSizeRefer
       dispatchWith worldReference balancesReference logsReference logSizeReference complete request
         (admitted runInit installRuntime) := rfl
 
-/-- The create handler installed by the actual object initializer; its init
-selection and runtime installation stay abstract. -/
+/-- Runtime-image installation: an empty image has identity zero, any other
+image is identified by `identify`, and the identity and exact bytes are
+recorded in the target's account record. -/
+def installWith (identify : Code → Code) (shared : AccountRuntime.References) (target response : Code) : Code :=
+  bindResult .unit
+    (choose (binary .wordEq (part 2 3 response) (number 0)) (success (number 0)) (identify response)) fun identity =>
+  bindResult .unit (AccountRuntime.worldGet shared target) fun record =>
+  let updated := fun depth =>
+    AccountState.replace (AccountState.replace (AccountState.replace
+      (AccountState.replace (record depth) 3 (identity depth))
+      4 (part 1 3 response depth)) 5 (part 2 3 response depth)) 6 (.bool true)
+  bindResult .unit (fun depth => AccountState.put (load (AccountRuntime.reference shared "world") depth)
+    (target depth) (updated depth)) fun world => success (store (AccountRuntime.reference shared "world") world)
+
+/-- The create handler installed by the actual object initializer, with its
+actual runtime installation. Init selection and the identification of a
+nonempty runtime image stay abstract. -/
 theorem objectHandlers_create (slots : List (String × Core.Ty)) (count : Nat)
     (images : List (Nat × List UInt8)) (catalog : List AccountRuntime.CodeDefinition)
     (functions : Code) (shared : AccountRuntime.References) (dispatcher creator : Code) :
-    ∃ runInit installRuntime : Code → Code → Code,
+    ∃ (runInit : Code → Code → Code) (identify : Code → Code),
       (AccountRuntime.objectHandlers slots count images catalog functions shared dispatcher creator).2 =
         lambda Creation.requestType (LanguageResult.resultType Creation.responseType) fun request =>
           CreationRuntime.dispatch (AccountRuntime.reference shared "world")
             (AccountRuntime.reference shared "balances") (AccountRuntime.reference shared "logs")
             (AccountRuntime.reference shared "logSize")
-            (load (AccountRuntime.reference shared "worldComplete")) request runInit installRuntime :=
+            (load (AccountRuntime.reference shared "worldComplete")) request runInit (installWith identify shared) :=
   ⟨_, _, rfl⟩
+
+/-! The address builders of `Creation`, with their scratch memory. -/
+
+def writeByte (memory size offset value : Code) : Code := fun depth =>
+  Memory.mstore8 (memory depth) (size depth) (offset depth) (value depth)
+def writeWord (memory size offset value : Code) : Code := fun depth =>
+  Memory.mstore (memory depth) (size depth) (offset depth) (value depth)
+def hash (memory size offset length : Code) : Code := fun depth =>
+  Keccak.hash (memory depth) (size depth) (offset depth) (length depth)
+def scratch (body : Code → Code → Code) : Code :=
+  bind (allocate WordMapping.type empty) fun memory =>
+  bind (allocate .word (number 0)) fun size => body memory size
+
+/-- Hash the CREATE preimage and keep its low 160 bits. -/
+def createFinish (memory size encodedLength : Code) : Code :=
+  bindResult .word (hash memory size (number 0) (binary .wordAdd (number 22) encodedLength)) fun digest =>
+    success (address digest)
+
+/-- The RLP list header, the address header and the address. -/
+def createPrefix (creator memory size encodedLength rest : Code) : Code :=
+  bindResult .word (writeByte memory size (number 0) (binary .wordAdd (number 213) encodedLength)) fun _ =>
+  bindResult .word (writeByte memory size (number 1) (number 148)) fun _ =>
+  bindResult .word (writeWord memory size (number 2) (binary .wordShl (address creator) (number 96))) fun _ =>
+  rest
+
+/-- The RLP of the nonce, then the hash. -/
+def createTail (memory size nonce byteCount encodedLength : Code) : Code :=
+  choose (binary .wordEq nonce (number 0))
+    (bindResult .word (writeByte memory size (number 22) (number 128)) fun _ =>
+      createFinish memory size encodedLength)
+    (choose (binary .wordGt nonce (number 127))
+      (bindResult .word (writeByte memory size (number 22) (binary .wordAdd (number 128) byteCount)) fun _ =>
+        bindResult .word (writeWord memory size (number 23)
+          (binary .wordShl nonce (binary .wordMul (binary .wordSub (number 32) byteCount) (number 8)))) fun _ =>
+        createFinish memory size encodedLength)
+      (bindResult .word (writeByte memory size (number 22) nonce) fun _ =>
+        createFinish memory size encodedLength))
+
+def createAddressCode : Code :=
+  let creator := part 0 2 (fun depth => .var depth)
+  let nonce := part 1 2 (fun depth => .var depth)
+  bind (binary .wordSub (number 32)
+    (binary .wordDiv (fun depth => .unary .wordClz (nonce depth)) (number 8))) fun byteCount =>
+  bind (choose (binary .wordGt nonce (number 127))
+    (binary .wordAdd byteCount (number 1)) (number 1)) fun encodedLength =>
+  scratch fun memory size =>
+  createPrefix creator memory size encodedLength (createTail memory size nonce byteCount encodedLength)
+
+theorem createAddress_eq (creator nonce : Core.Expr) :
+    Creation.createAddress creator nonce = .letE (.pair creator nonce) (createAddressCode 0) := rfl
+
+def create2AddressCode : Code :=
+  let input (index : Nat) := part index 6 (fun depth => .var depth)
+  bindResult .word (hash (input 0) (input 1) (input 4) (input 5)) fun initHash =>
+  scratch fun memory size =>
+  bindResult .word (writeByte memory size (number 0) (number 255)) fun _ =>
+  bindResult .word (writeWord memory size (number 1) (binary .wordShl (address (input 2)) (number 96))) fun _ =>
+  bindResult .word (writeWord memory size (number 21) (input 3)) fun _ =>
+  bindResult .word (writeWord memory size (number 53) initHash) fun _ =>
+  bindResult .word (hash memory size (number 0) (number 85)) fun digest => success (address digest)
+
+theorem create2Address_eq (memoryReference sizeReference creator salt offset length : Core.Expr) :
+    Creation.create2Address memoryReference sizeReference creator salt offset length =
+      .letE (bundle [memoryReference, sizeReference, creator, salt, offset, length]) (create2AddressCode 0) := rfl
 
 end Solcore.Frontend.RustHull.CreationImplementation

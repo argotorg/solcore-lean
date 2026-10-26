@@ -4,8 +4,8 @@ import Solcore.Frontend.RustHull.AccountCallCheckpointCorrespondence
 /-! The create handler installed by the object initializer refuses an attempt
 whose endowment exceeds the creator's balance, or whose creator nonce is
 exhausted, before it derives an address. The closure records the actual
-captured shared references; its init and installation callbacks stay
-abstract and are not reached by a refusal. -/
+captured shared references and runtime installation; init selection and the
+identification of a nonempty runtime image stay abstract. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.CreationCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder AccountCallCorrespondence
@@ -43,13 +43,13 @@ structure HandlerClosure (locations : SharedLocations) (value : Value) where
   captured : Environment
   shared : AccountRuntime.References
   runInit : Code → Code → Code
-  installRuntime : Code → Code → Code
+  identify : Code → Code
   closure : CapturedClosure
     (lambda Creation.requestType (LanguageResult.resultType Creation.responseType) (fun request =>
       CreationRuntime.dispatch (AccountRuntime.reference shared "world")
         (AccountRuntime.reference shared "balances") (AccountRuntime.reference shared "logs")
         (AccountRuntime.reference shared "logSize") (load (AccountRuntime.reference shared "worldComplete"))
-        request runInit installRuntime) depth) captured value
+        request runInit (CreationImplementation.installWith identify shared)) depth) captured value
   references : SharedReferences depth captured shared locations
 
 /-- The dispatcher's two refusals, read from the shared account state. -/
@@ -163,9 +163,10 @@ theorem HandlerClosure.apply_refused {locations : SharedLocations} {value : Valu
     (supplied : Evaluates environment middle argument (requestValue request) initial) :
     ∃ final, Evaluates environment before (.apply function argument) refusedValue final ∧
       StoreRetains initial final := by
-  rcases closure with ⟨depth, captured, shared, runInit, installRuntime, capturedClosure, references⟩
+  rcases closure with ⟨depth, captured, shared, runInit, identify, capturedClosure, references⟩
   cases capturedClosure
-  obtain ⟨final, evaluated, retained⟩ := dispatchWith_refused (CreationImplementation.admitted runInit installRuntime)
+  obtain ⟨final, evaluated, retained⟩ := dispatchWith_refused
+    (CreationImplementation.admitted runInit (CreationImplementation.installWith identify shared))
     (references.prepend [requestValue request]) (CodeValue.bound depth captured (requestValue request))
     related refusing
   exact ⟨final, .apply resolved supplied evaluated, retained⟩

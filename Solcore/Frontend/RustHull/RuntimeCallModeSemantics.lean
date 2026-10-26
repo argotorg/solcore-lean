@@ -6,7 +6,7 @@ import Solcore.Frontend.RustHull.CreationSemantics
 mode controls the handler, caller observation and stipend checks; account
 dispatch controls execution address and balance transfer separately. Account
 destruction shares the same frame state and transaction world, and so do
-creation attempts refused before init code runs. -/
+creation attempts. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeSemantics
 open Core
@@ -108,6 +108,12 @@ inductive Builtin (children : State → AccountCallSemantics.Children) (image : 
       Builtin children image "create" type [.word value, .word offset, .word length] state result final
   | create2 {type state result final value offset length salt}
       (computed : CreationSemantics.Refused value offset length state result final) :
+      Builtin children image "create2" type [.word value, .word offset, .word length, .word salt] state result final
+  | createAdmitted {type state result final value offset length}
+      (computed : CreationSemantics.Admitted .create value offset length state result final) :
+      Builtin children image "create" type [.word value, .word offset, .word length] state result final
+  | create2Admitted {type state result final value offset length salt}
+      (computed : CreationSemantics.Admitted (.create2 salt) value offset length state result final) :
       Builtin children image "create2" type [.word value, .word offset, .word length, .word salt] state result final
 
 def effectsWith (children : State → AccountCallSemantics.Children) (image : Option (List UInt8)) :
