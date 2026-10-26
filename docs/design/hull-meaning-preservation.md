@@ -505,8 +505,9 @@ Yul backend does. The call-mode effects use this rule at every frame height.
 supported, and the common recursive proof discharges it through a separate
 obligation, `RevertPreservation`. Effect layers without a revert rule meet the
 obligation vacuously, and `assemble_recursive_program_effects` supplies that
-case by default, so only the call-mode layer gives a proof. No public theorem
-statement changes.
+case by default, so only the call-mode layer gives a proof. The other layers'
+theorems therefore admit programs with an explicit revert but say nothing about
+a run that reaches one. No public theorem statement changes.
 
 The proof (`RevertBuiltinCorrespondence.preserves`) connects the actual
 `Effects.revertMessage` code. The word the lowering computes is the specified

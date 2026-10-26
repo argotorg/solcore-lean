@@ -4,7 +4,9 @@ import Solcore.Synthesis.Source.AggregateRenderer
 /-! Emit an actual source while loop. Its counter implementation is separate
 from the finite ordinal guards in the checked Core reference. Every arbitrary
 aggregate-DAG entry is emitted as `sc_step`; the last helper is not assumed to
-be the entry. Source-printing preservation is tested, not formally asserted. -/
+be the entry. `ScalarMeaning.Loop.emit_source_meaning` relates the emitted
+text to the original Core result under an independent fuel-indexed loop
+semantics; see `docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Loop

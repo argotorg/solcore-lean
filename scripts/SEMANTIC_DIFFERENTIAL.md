@@ -79,7 +79,7 @@ original Core result. Temporary source files and exports are removed at the end.
 This command does not execute an EVM. It verifies source acceptance and the
 imported-Hull path; it is not the complete three-path differential campaign.
 For the closed G0, runtime-input, named-helper, raw-primitive, call-graph,
-private-mutation, aggregate, aggregate call-graph and call-graph loop emitters, a kernel-checked theorem relates the emitted text to
+private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters, a kernel-checked theorem relates the emitted text to
 the original Core result under an independent source semantics. It assumes Rust parsing, typing, compilation and execution; see
 [scalar emitter meaning](../docs/design/scalar-emitter-meaning.md). Core typing
 of admitted generated/reduced programs is established by the existing checker

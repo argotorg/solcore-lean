@@ -139,9 +139,9 @@ Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
 connects the closed, runtime-input, named-helper, raw-primitive, call-graph,
-private-mutation, Word-aggregate, aggregate call-graph and call-graph loop
-emitters' text to Core under an independent source semantics and a stated
-Rust-pipeline boundary.
+private-mutation, Word-aggregate, aggregate call-graph, call-graph loop and
+aggregate loop emitters' text to Core under an independent source semantics and
+a stated Rust-pipeline boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A
@@ -164,7 +164,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same twenty-two-profile suite runs locally with shared time and disk limits.
+The same twenty-three-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -301,6 +301,19 @@ scenarios and sixteen recorded random scenarios match on both Sonatina levels,
 with reduction of transactions, payloads and the step and exact archive
 replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-dynamic-bytes).
+
+The forwarded-value profile has one contract send value to another. The sender
+pays the parent a call value, and the parent forwards a bank amount to the
+child through the pinned raw `call` wrapper; original Core uses its
+value-carrying contract call. Each contract folds the value it receives into
+its own slots, and the input selects whether the child, the parent, both or
+neither revert. Both contracts' committed balances are observed: a child
+revert must leave the amount with the parent, a root revert must keep both
+accounts, and the balances must account for every committed call value. Its
+twelve fixed scenarios match on both Sonatina levels, as do the sixteen
+recorded random scenarios on O0. On O2 fourteen match and two crash the
+compiler, retained findings. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-value-forwarded-by-contracts).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases
