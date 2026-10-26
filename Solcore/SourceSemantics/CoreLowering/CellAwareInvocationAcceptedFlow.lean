@@ -22,6 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationProjectedAssignme
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationProjectedBitNotFlow
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeNative
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedMatches
 
 /-! The actual accepted compiler tree closes the mixed-cell statement flows.
 Every child is the action run by the compiler at its original source, scope and
@@ -47,8 +48,10 @@ fallthrough is admitted only at a Unit result, and a final bare value only at
 the declared result type of its original node. A nonfinal bare value in
 function mode has no Source rule and is outside this closure. Bare and
 projected assignments and bit-not updates are closed when the compiler view is
-the original Source, as for named rows. -/
-def Covered (semantic : TypedSource) (expected : TypeSystem.Ty) {mode : Bool} {escaped : Word}
+the original Source, as for named rows. A match receipt is closed under the
+same view when its compilation context is `admitted`. -/
+def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
+    (admitted : SourceCoreCompatibleDataMatches.Context → Prop) {mode : Bool} {escaped : Word}
     {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Prop :=
   match tree with
@@ -57,21 +60,27 @@ def Covered (semantic : TypedSource) (expected : TypeSystem.Ty) {mode : Bool} {e
   | @Tree.tailValue _ _ _ _ _ _ _ _ _ _ expression _ _ _ _ _ _ =>
       ∀ node, semantic.lookupExpression? expression = some node → node.type = expected
   | @Tree.initialized _ _ _ _ _ _ _ _ _ _ _ _ binder _ _ _ _ _ _ _ _ _ _ _ remaining _ =>
-      binder.scheme.quantified = [] ∧ Covered semantic expected remaining
-  | .absent _ _ _ _ remaining _ => Covered semantic expected remaining
-  | .assigned _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected remaining
-  | .bitNotted _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected remaining
-  | .projectedAssigned _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected remaining
-  | .projectedBitNotted _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected remaining
-  | .discard _ _ _ _ _ tail => Covered semantic expected tail
-  | .valueDiscard _ _ _ _ _ _ tail => mode = false ∧ Covered semantic expected tail
-  | .block _ _ inner tail => Covered semantic expected inner ∧ Covered semantic expected tail
+      binder.scheme.quantified = [] ∧ Covered semantic expected admitted remaining
+  | .absent _ _ _ _ remaining _ => Covered semantic expected admitted remaining
+  | .assigned _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
+  | .bitNotted _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
+  | .projectedAssigned _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
+  | .projectedBitNotted _ _ _ remaining _ _ => source = semantic ∧ Covered semantic expected admitted remaining
+  | .discard _ _ _ _ _ tail => Covered semantic expected admitted tail
+  | .valueDiscard _ _ _ _ _ _ tail => mode = false ∧ Covered semantic expected admitted tail
+  | .block _ _ inner tail => Covered semantic expected admitted inner ∧ Covered semantic expected admitted tail
   | .conditional _ _ _ _ _ left right tail =>
-      Covered semantic expected left ∧ Covered semantic expected right ∧ Covered semantic expected tail
-  | .whileLoop _ _ _ _ _ _ inner tail => Covered semantic expected inner ∧ Covered semantic expected tail
+      Covered semantic expected admitted left ∧ Covered semantic expected admitted right ∧
+        Covered semantic expected admitted tail
+  | @Tree.matched _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ compilation _ _ _ branches tail =>
+      admitted compilation ∧ source = semantic ∧
+        (∀ request member, Covered semantic expected admitted (branches request member)) ∧
+        Covered semantic expected admitted tail
+  | .whileLoop _ _ _ _ _ _ inner tail =>
+      Covered semantic expected admitted inner ∧ Covered semantic expected admitted tail
   | .forLoop _ _ _ _ _ _ initial inner after tail =>
-      CellAwareInvocationAcceptedForItems.ItemsCovered semantic initial ∧ Covered semantic expected inner ∧
-        CellAwareInvocationAcceptedForItems.ItemsCovered semantic after ∧ Covered semantic expected tail
+      CellAwareInvocationAcceptedForItems.ItemsCovered semantic initial ∧ Covered semantic expected admitted inner ∧
+        CellAwareInvocationAcceptedForItems.ItemsCovered semantic after ∧ Covered semantic expected admitted tail
   | _ => False
 
 end Coverage
@@ -153,7 +162,7 @@ theorem correct (budget : Nat)
     {expected : TypeSystem.Ty} :
     ∀ {mode escaped fuel scope statements code}
       (tree : Tree index.policy index.compilerSource index.result index.reasonAt mode escaped fuel scope statements code),
-      Covered index.source expected tree →
+      Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index) tree →
       (∀ id ∈ statements, index.Reached (.statement id)) →
       ∀ {control : ControlContext} {context final : SourceSemantics.Context} {facts : BodyFacts},
         control.returnType = expected →
@@ -166,6 +175,7 @@ theorem correct (budget : Nat)
         CellAwareInvocationFlowBounds.ReflectsAtMost (attachment := attachment) bridge context model index producer
           registry invocation faults administrative scope mode statements expected index.result code budget := by
   have sourceUnique : NodeOccurrencesUnique index.source := sourceEq ▸ unique
+  have catalog := CellAwareInvocationAcceptedMatches.catalog artifact checked
   intro mode escaped fuel scope statements code tree
   induction tree with
   | nil =>
@@ -524,7 +534,39 @@ theorem correct (budget : Nat)
           (sourceEq ▸ statementFound) form budget (expressions fuel context runtime covers ledger).2
           leftBounds.2 rightBounds.2 tailBounds.2⟩
   | matching => intro covered; cases covered
-  | matched => intro covered; cases covered
+  | @matched mode escaped fuel scope id rest node stored resolution matchedCode tail compilation
+      read form receipt branches remaining branchIH tailIH =>
+    intro covered reached control context final facts result signatures typed native
+    obtain ⟨admitted, sameSource, branchesCovered, tailCovered⟩ := covered
+    have headReached := reached id (List.mem_cons_self ..)
+    have statementFound := index.statement_read_reached headReached read
+    obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
+    rw [form] at formTyped
+    have sameMiddle : middle = context := by cases formTyped <;> rfl
+    subst middle
+    obtain ⟨_, native⟩ := native
+    obtain ⟨⟨_, matchedNative⟩, ⟨_, tailNative⟩⟩ := TypedLexicalWhile.Native.sequence_children native
+    have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
+      result signatures restTyped ⟨_, tailNative⟩
+    have branchReached : ∀ request (member : request ∈ receipt.requests),
+        ∀ other ∈ request.statements, index.Reached (.statement other) := by
+      intro request member other otherMember
+      apply index.statement_child headReached read
+      rw [form]
+      simp only [StatementForm.references, MatchResolution.references]
+      rcases receipt.original request member with ⟨arm, armMember, same⟩ | same
+      · exact List.mem_append_left _ (List.mem_append_right _
+          (List.mem_flatMap.mpr ⟨arm, armMember, List.mem_map.mpr ⟨other, same ▸ otherMember, rfl⟩⟩))
+      · rw [same, Option.getD_some]
+        exact List.mem_append_right _ (List.mem_map.mpr ⟨other, otherMember, rfl⟩)
+    exact CellAwareInvocationAcceptedMatches.correct bridge bindings index producer registered registry invocation
+      faults administrative budget expressions writes catalog sourceEq unique headReached read form receipt admitted
+      sameSource
+      (by
+        intro request member _ _ _ _ childResult childSignatures childTyped childNative
+        exact branchIH request member (branchesCovered request member) (branchReached request member)
+          childResult childSignatures childTyped childNative)
+      result signatures typed ⟨_, matchedNative⟩ tailBounds
   | @whileLoop mode escaped fuel scope id rest node stored condition body loopCode tail read form statementType
       child generated conditionType inner remaining innerIH tailIH =>
     intro covered reached control context final facts result signatures typed native
@@ -679,7 +721,7 @@ theorem body_preserves (budget : Nat)
     (projection : whole.compatible.checked.catalog.project expected = .ok index.result)
     (body : AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope index.statements
       index.result index.reasonAt index.fellThrough index.escaped index.body)
-    (covered : Covered index.source expected body.tree)
+    (covered : Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index) body.tree)
     (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) index.body
       nativeType whole.indexed.layouts.definitions) :
     ∀ {size}, size ≤ budget →
@@ -754,7 +796,7 @@ theorem body_reflects (budget : Nat)
     (projection : whole.compatible.checked.catalog.project expected = .ok index.result)
     (body : AcceptedNamedBodyFlow.Body index.policy index.fuel index.compilerSource index.scope index.statements
       index.result index.reasonAt index.fellThrough index.escaped index.body)
-    (covered : Covered index.source expected body.tree)
+    (covered : Covered index.source expected (CellAwareInvocationAcceptedMatches.Admitted index) body.tree)
     (native : ∃ nativeType, HasType (SourceCoreLocalCell.coreContext index.scope ++ administrative) index.body
       nativeType whole.indexed.layouts.definitions) :
     ∀ {size}, size ≤ budget →

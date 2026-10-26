@@ -131,12 +131,25 @@ key and right-hand lowerings and the body's actual assignment policy
 headers are closed by two further inductions over the compiler's header items
 ([CellAwareInvocationAcceptedForItems](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedForItems.lean));
 their declarations are authenticated by the original compilation receipt.
-`Covered` excludes matches and generalized declarations, and it requires a
-function-mode fallthrough to have Unit result and a final bare value to have the
-declared result type. The closure threads the Source context's signatures
-through declarations. The caller also supplies Core typing of
-the compiled body, fixed-control checker typing and the result projection; for
-an actual prepared named header,
+Matches are closed under the same Source view
+([CellAwareInvocationAcceptedMatches](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedMatches.lean)):
+the tree's match receipt supplies the certificate, the scrutinee lowering and
+the finite branch requests; each arm is the compiler's own request at its
+original pattern context with the match's control, typed natively through the
+match certificate; and the hidden scrutinee and pattern binders are non-inputs
+by the body's runtime local-identity ownership. The checker run of the original
+compilation receipt supplies the well-formed signature catalog. The tree does
+not record a match receipt's compilation context, so `Covered` requires it to be
+admitted (`Admitted`: the checked catalog's initial values, the body's own
+allocator and definitions extended by the indexed layouts);
+`AcceptedNamedBodyFlow.Tree.refine` builds its match receipts at its
+policy-success context but does not state it.
+`Covered` excludes generalized declarations and writes and matches under
+contextual metadata views, and it requires a function-mode fallthrough to have
+Unit result and a final bare value to have the declared result type. The
+closure threads the Source context's signatures through declarations. The
+caller also supplies Core typing of the compiled body, fixed-control checker
+typing and the result projection; for an actual prepared named header,
 [CellAwareInvocationAcceptedNamedHeaders.static_inputs](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedHeaders.lean)
 derives all three from checker certification and the cached body's Core typing.
 The invocation's physical entry state, the original compilation receipt, and
@@ -154,8 +167,10 @@ recognizer until it appears universal or assuming a body-execution law.
 
 On the accepted-body route above, the next connected steps are:
 
-- Close the remaining compiler branches in `Covered`: writes under contextual
-  metadata views, matches and generalized declarations. Statements after an always-returning prefix in a non-Unit
+- Close the remaining compiler branches in `Covered`: writes and matches under
+  contextual metadata views, and generalized declarations. Record the match
+  compilation context in the refined tree so that `Admitted` follows from the
+  body policy. Statements after an always-returning prefix in a non-Unit
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Discharge `Expressions` by an expression closure over the actual accepted
