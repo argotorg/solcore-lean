@@ -49,7 +49,7 @@ jobs:
       - name: Kernel policy and adapter regressions
         run: |
           node scripts/check-kernel.mjs
-          for test in scripts/test-semantic-*.py scripts/test-prepare-semantic-tools.py; do
+          for test in scripts/test-semantic-*.py scripts/test-prepare-semantic-tools.py scripts/test-export-rust-*.py; do
             python3 "$test"
           done
           git diff --check
@@ -61,6 +61,10 @@ jobs:
   differential:
     runs-on: ubuntu-24.04
     timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sonatina-o0, sonatina-o2]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -94,11 +98,13 @@ jobs:
       - name: Run every fixed corpus
         run: >-
           python3 scripts/semantic-suite.py --mode fixed
+          --backend ${{ matrix.backend }}
           --seconds 7200 --profile-seconds 900
           --output .upstream/semantic-ci-fixed
       - name: Verify mismatch reduction, replay and resource classification
         run: >-
           python3 scripts/check-semantic-findings.py
+          --backend ${{ matrix.backend }}
           --case .upstream/semantic-ci-fixed/00-closed-g0/cases/0006.json
           --output .upstream/semantic-ci-findings
       - name: Run new deterministic seed cases
@@ -107,6 +113,7 @@ jobs:
           SEMANTIC_SEED: ${{ inputs.seed || github.run_number }}
         run: >-
           python3 scripts/semantic-suite.py --mode random
+          --backend ${{ matrix.backend }}
           --seed "$SEMANTIC_SEED" --cases 16 --attempts 2048
           --seconds 3600 --profile-seconds 600
           --output .upstream/semantic-ci-random
@@ -114,7 +121,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: semantic-${{ github.run_id }}-${{ github.run_attempt }}
+          name: semantic-${{ matrix.backend }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             .upstream/semantic-ci-fixed
             .upstream/semantic-ci-findings

@@ -20,7 +20,9 @@ python3 scripts/build-rust-directive-resolver.py
 These commands build small packages against the pinned upstream dependencies.
 They use Cargo offline and share `.upstream/rust-parity-target`. The original
 compiler checking pipeline remains enabled. The code-image tool compiles actual
-Sonatina O0 bytes and linker extents; it never executes EVM instructions.
+Sonatina bytes and linker extents; it never executes EVM instructions. The
+default optimization is O0; `--optimization O2` selects the real O2 pipeline.
+Both levels use the same pinned backend and pass the same strict image checks.
 
 ## Execute the inventories
 

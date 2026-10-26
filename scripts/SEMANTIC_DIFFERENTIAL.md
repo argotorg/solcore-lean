@@ -122,10 +122,17 @@ python3 scripts/semantic-differential.py \
 ```
 
 The output directory must be new. A run rechecks and re-emits the case, computes
-the original Core result, compiles checked Rust Hull and exact Sonatina O0
+the original Core result, compiles checked Rust Hull and exact Sonatina
 images, deploys those bytes on Anvil, and executes the same imported contract
 through Core. Every passing run has three completed observations and three
 matching pairwise comparisons. No saved expected result is trusted.
+
+The default backend is `sonatina-o0`. Select `--backend sonatina-o2` to compile
+the same source with the real O2 pipeline. Both choices use the pinned
+Sonatina revision and its authoritative linker symbol extents. The pure,
+storage and call adapters, their campaigns and `semantic-suite.py` accept the
+same option. Run separate output directories for each backend; each has its
+own observations, compilation failures and finding fingerprint.
 
 The result is `report.json`. It records tool versions and hashes, pinned
 compiler/exporter receipts, source and artifact hashes, deployment and call
@@ -142,8 +149,11 @@ python3 scripts/semantic-differential.py \
 ```
 
 Replay verifies all recorded archive members, rejects missing or changed files
-and tool drift, restores the saved budgets, and performs fresh executions.
-To deliberately change budgets or tools, use the saved `case.json` with
+and tool drift, restores the saved budgets and backend, and performs fresh
+executions. An explicit conflicting backend is rejected. A legacy report with
+no backend field denotes O0; invalid or null fields do not. Both artifact and
+export provenance must agree with the selected optimization level.
+To deliberately change budgets, backend or tools, use the saved `case.json` with
 `--case` instead. This starts a new experiment rather than an exact replay.
 
 Useful limits are `--direct-fuel`, `--core-fuel`, `--gas`, `--timeout`,
@@ -561,7 +571,7 @@ python3 scripts/semantic-storage-differential.py \
 ```
 
 Both output directories must be new. The runner compiles checked Rust Hull and
-linked Sonatina O0 images, verifies the deployed runtime bytes, and sends actual
+linked Sonatina images at the selected O0/O2 level, verifies the deployed runtime bytes, and sends actual
 transactions on its owned local Anvil. Return bytes come from each mined
 transaction's trace; slot snapshots come from `eth_getStorageAt` at that
 receipt's block. The separate Hull runner reports committed slots explicitly,

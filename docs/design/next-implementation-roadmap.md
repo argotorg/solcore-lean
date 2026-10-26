@@ -9,9 +9,10 @@ milestones. Delivery and verification are recorded separately below.
 emission, three-way execution, bounded campaigns, failure-preserving reduction
 and strict replay. The primary oracle executes the original generated Core;
 the other paths execute Rust-produced EVM bytecode and imported Rust Hull.
-Generated EVM comparisons currently use Sonatina O0. The separate upstream
-fixture harness runs Sonatina O0/O2 and Yul, but that does not add those backends
-to generated semantic campaigns.
+Generated EVM comparisons support Sonatina O0 and O2 across all thirteen
+profiles. Generated Yul comparison is being connected for the ten pure profiles
+under the explicit boundary below. The separate upstream fixture harness also
+runs Yul; its results are distinct from generated semantic campaigns.
 
 Ten pure profiles and three stateful profiles are available locally. The
 [CI workflow](../../.github/workflows/semantic.yml) and
@@ -153,6 +154,84 @@ Acceptance criteria:
 5. Existing O0 cases and replay behavior remain valid. A changed exact tool
    hash may require a fresh run from the saved case; never silently accept an
    archive produced by different tools as exact replay.
+
+O2 implementation is connected across all thirteen profiles. `--backend
+sonatina-o2` selects the actual Sonatina optimization pipeline; each report,
+failure fingerprint and reduced run retains the selection. Exact replay
+inherits it and rejects a conflicting override. Exported image metadata,
+sidecar provenance and the Lean decoder check the pinned backend and admitted
+optimization level. The same compiler executable supports both levels.
+The CI matrix keeps O0 and O2 jobs and artifacts separate. The O2 fixed suite
+passed all 312 cases/scenarios across thirteen profiles, including 98 stateful
+transaction prefixes, with zero mismatches, errors, rejections, incomplete
+cases or missing coverage. It took 1,621.804 seconds locally and retained
+19,552,501 bytes. This completed the local O2 gate; hosted execution still
+requires publication and observation of a real workflow run.
+The O2 random suite passed all 208 cases/scenarios across thirteen profiles
+with seed `20261026`, sixteen cases and 2,048 attempts per profile. It recorded
+1,850 generation exclusions, zero resource exclusions, 144 matched stateful
+transaction prefixes and no mismatches, rejections, errors, incomplete cases
+or missing coverage. Its local elapsed time was 1,074.688 seconds and retained
+output was 12,333,641 bytes, overlapping the fixed suite and other validation.
+
+The exporter/decoder boundary passed focused Lean checks, four Rust unit tests
+and six Python protocol tests. Real default and explicit O0 exports were
+identical; O2 changed the bytes while preserving the exact embedded-child
+ranges and the same checked Hull. The eight native tools built successfully.
+The full Lean build (9,900 jobs), registered tests and complete Python policy
+suite (303 tests) passed. The eight native executable hashes were unchanged
+by the full build/test run. Default-O0 regression
+across closed values, runtime inputs and nested calls passed all 46 cases.
+
+The O2 finding check passed actual execution, accepted synthetic reduction,
+exact reduced archive replay, synthetic replay and fuel-one classification.
+Separate storage, rollback and call checks accepted six reductions each:
+committed slot zero, reverted output and ordered log data respectively.
+Original and reduced archives all replayed with inherited O2 and actual
+three-way agreement (six exact replays); three reduced-case synthetic replays
+preserved the backend, transaction identity and mismatch fields. These
+controlled differences do not represent upstream bugs.
+
+### Initial Yul boundary
+
+The initial generated Yul comparison is restricted to pure Word ABI profiles.
+Compile the checked Rust driver's Yul through solc
+`0.8.35+commit.47b9dedd`, with its optimizer enabled and Osaka selected. The
+same standard-JSON compilation must supply both creation and deployed bytes.
+Record the exact Yul, compiler input/output, flags, tool hashes and selected
+wrapper. Verify the deployed bytes on the local EVM and retain all artifacts
+needed for exact replay and reduction.
+
+Solc does not supply the complete named child-offset map expected by the
+current Hull code-image importer. Actual probes showed omitted unused children
+and two distinct identical children sharing one physical offset, including
+with optimization disabled. Assembly source spans are not byte offsets.
+Consequently, the initial comparison will report three explicit paths:
+original generated Core, actual Yul EVM, and imported Hull linked with Sonatina
+O0 images. The last is an additional reference for the same pure result, not
+Yul-linked Hull execution. Do not infer a linker map by searching byte strings,
+mislabel Sonatina images as Yul, or weaken the code-image invariant.
+
+Admit only the generated creation/runtime wrapper pair with actual runtime
+output and no unresolved libraries or immutable references. Stateful Yul,
+code-observing programs and arbitrary nested objects remain excluded until
+their layout and observation boundary are connected explicitly. This scope
+does not require bytecode-layout or gas equality between the three paths.
+
+Before adapter integration, eight real Yul EVM probes matched freshly replayed
+original Core: addition, an input-dependent high-bit branch, ordered local
+mutation, a seven-iteration loop, both closure capture variants, comptime and
+the four-module bundle. Every deployed runtime matched the bytes from the same
+solc compilation; bundle and pinned library hashes were audited. This probe
+does not establish the campaign/replay connection or Yul-linked Hull execution.
+The separate exporter passed thirteen protocol and process tests, including
+termination of a compiler that ignores graceful cancellation.
+The evidence transport passed eleven policy tests and an actual export moved
+to a new directory containing spaces after the original location was removed.
+It checks the main Hull bytes and sidecar as well as the separate Yul Hull,
+reconstructs the exact solc input from saved Yul and settings, and derives the
+accepted bytes again from the retained solc output. These are artifact checks;
+the normal campaign connection remains in progress.
 
 ## 3. Missing runtime operation mappings
 

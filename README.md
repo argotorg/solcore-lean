@@ -144,7 +144,9 @@ single-case runner compares the original generated Core result, Rust-produced
 EVM execution, and execution of Rust Hull on Lean Core. It saves all three
 observations and verifies tools and artifact hashes during replay. A campaign
 runner reduces failures while preserving their classification and disagreeing
-paths, with explicit time, disk and attempt limits. The fixed sixteen-case
+paths, with explicit time, disk and attempt limits. Sonatina O0 is the default;
+`--backend sonatina-o2` selects O2 for pure and stateful comparisons. Saved
+archives and reductions retain that choice. The fixed sixteen-case
 corpus covers the enabled source operations and boundary values; all sixteen
 cases match across the three execution paths. Core fuel, EVM gas and process
 timeouts remain separate resource limits.

@@ -41,6 +41,12 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
   --output .upstream/semantic-random
 ```
 
+Use `--backend sonatina-o2` with either suite command to compare the same cases
+after O2 compilation. O0 remains the default. The CI matrix runs each backend
+in a separate job with separate reports and artifacts; failure in one does not
+cancel the other. Random generation uses the same recorded seeds independently
+of backend selection, so optimization does not change the generated inputs.
+
 The default selection is all thirteen profiles: ten pure profiles, storage,
 storage rollback and parent/child calls. Fixed mode runs all 312 manifest cases
 or scenarios. It rejects `--cases` and `--nodes` overrides rather than silently
@@ -88,6 +94,8 @@ real agreement. It requires an accepted reduction, exact replay of the reduced
 actual archive, reproduction of the synthetic fingerprint, and an actual
 fuel-one run classified as inconclusive. The original runtime observations
 remain untouched. A compiler or runtime failure during this check fails it.
+The check also accepts `--backend sonatina-o2`; reduced cases and exact replay
+retain that selection, including its mismatch fingerprint.
 
 ## Workflow behavior
 
