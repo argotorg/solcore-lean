@@ -34,6 +34,8 @@ import Solcore.Synthesis.Source.KeyedStorageEmitter
 import Solcore.Synthesis.Source.KeyedStorageCases
 import Solcore.Synthesis.Source.DynamicArrayEmitter
 import Solcore.Synthesis.Source.DynamicArrayCases
+import Solcore.Synthesis.Source.EventLogEmitter
+import Solcore.Synthesis.Source.EventLogCases
 import Solcore.Synthesis.Source.NestedCallEmitter
 import Solcore.Synthesis.Source.NestedCallCases
 

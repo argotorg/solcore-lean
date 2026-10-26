@@ -2156,6 +2156,9 @@ import Solcore.Test.SourceDynamicArrayCases
 import Solcore.Test.SourceDynamicArrayCorpus
 import Solcore.Test.SourceAggregatePrimitives
 import Solcore.Test.SourceAggregateMeaning
+import Solcore.Test.SourceEventLogEmitter
+import Solcore.Test.SourceEventLogCases
+import Solcore.Test.SourceEventLogCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4106,5 +4109,8 @@ def main : IO UInt32 := do
   Tests.SourceDynamicArrayCorpus.testSourceDynamicArrayCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   Tests.SourceAggregateMeaning.testSourceAggregateMeaning
+  Tests.SourceEventLogEmitter.testSourceEventLogEmitter
+  Tests.SourceEventLogCases.testSourceEventLogCases
+  Tests.SourceEventLogCorpus.testSourceEventLogCorpus
   IO.println "solcore-lean tests passed"
   return 0

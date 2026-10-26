@@ -59,3 +59,7 @@ lean_exe rustHullKeyedStorageScenario where
 lean_exe semanticDynamicArrayTool where
   root := `Tests.SemanticDynamicArrayTool
   exeName := "semantic-dynamic-array-tool"
+
+lean_exe semanticEventLogTool where
+  root := `Tests.SemanticEventLogTool
+  exeName := "semantic-log-tool"
