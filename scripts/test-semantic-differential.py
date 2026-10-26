@@ -263,6 +263,183 @@ class CallGraphProfileTests(unittest.TestCase):
                 'sonatina-o0' if backend == 'yul' else backend)
 
 
+class CallGraphLoopProfileTests(unittest.TestCase):
+    NAME = 'SynthesizedCallGraphLoops'
+    SHAPES = ['nested-call', 'predicate-call']
+
+    def plan(self, mask=7):
+        # Envelope only; the native tool separately reseals the scalar graph and the loop.
+        return {'schema': 'solcore-lean.call-graph-loop-plan.v1', 'mask': mask, 'stepProgram': {}}
+
+    def case(self, value=7, mask=7):
+        case = CaseProfileTests().input_case(value)
+        case['schema'] = runner.CALL_GRAPH_LOOP_CASE_SCHEMA
+        case['source'] = '// call-graph loop admission fixture; no simulated execution'
+        case['loopPlan'] = self.plan(mask)
+        case['provenance'].update({key: 'policy' for key in runner.CALL_GRAPH_LOOP_VERSIONS})
+        case['provenance'].update(helperCount=2, callShapes=list(self.SHAPES))
+        case['contract'].update(name=self.NAME, deployPath=[self.NAME + 'Deploy'],
+            runtimePath=[self.NAME + 'Deploy', self.NAME])
+        return case
+
+    def test_schema_registers_a_distinct_profile_contract_and_version_inventory(self):
+        schema = runner.CALL_GRAPH_LOOP_CASE_SCHEMA
+        self.assertEqual(schema, 'solcore-lean.semantic-call-graph-loop-case.v1')
+        self.assertEqual(runner.CASE_PROFILES[schema], 'runtime-call-graph-loops')
+        self.assertEqual(runner.CASE_CONTRACTS[schema], self.NAME)
+        others = (runner.CALL_GRAPH_CASE_SCHEMA, runner.LOOP_CASE_SCHEMA)
+        self.assertNotIn(schema, others)
+        self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 3)
+        self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
+        self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))
+        self.assertEqual(runner.CALL_GRAPH_LOOP_VERSIONS, ('profileVersion', 'functionVersion', 'loopVersion',
+            'stepFunctionVersion', 'aggregateVersion', 'boundaryVersion', 'stepBoundaryVersion', 'callShapeVersion'))
+        self.assertTrue(set(runner.CALL_GRAPH_VERSIONS) < set(runner.CALL_GRAPH_LOOP_VERSIONS))
+
+    def test_all_six_loop_inputs_and_masks_have_exact_abi_and_a_distinct_wrapper(self):
+        for value in (0, 1, 3, 7, 2**256 - 1, 2**255):
+            for mask in (0, 1, 3, 7):
+                case = self.case(value, mask)
+                runner.validate_case(case)
+                self.assertEqual(runner.CASE_PROFILES[case['schema']], 'runtime-call-graph-loops')
+            with self.assertRaisesRegex(ValueError, 'calldata differs'):
+                runner.validate_case({**case, 'input': str(value ^ 1)})
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'schema': runner.CALL_GRAPH_CASE_SCHEMA})
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'schema': runner.INPUT_CASE_SCHEMA})
+
+    def test_plan_envelope_requires_its_own_schema_a_bounded_mask_and_the_original_step_graph(self):
+        for mask in (0, 1, 3, 7):
+            runner.validate_call_graph_loop_plan(self.plan(mask))
+        for mask in (True, False, -1, 2, 4, 8, '7', 7.0, None):
+            with self.assertRaisesRegex(ValueError, 'mask'):
+                runner.validate_call_graph_loop_plan(self.plan(mask))
+        plan = self.plan()
+        for invalid in (None, [], 'plan', {}, {**plan, 'schema': 'unknown'},
+                        {**plan, 'schema': 'solcore-lean.loop-plan.v1'}):
+            with self.assertRaisesRegex(ValueError, 'schema'):
+                runner.validate_call_graph_loop_plan(invalid)
+        for key in ('mask', 'stepProgram'):
+            missing = dict(plan); del missing[key]
+            with self.assertRaises(ValueError): runner.validate_call_graph_loop_plan(missing)
+        for step in (None, [], 'program', 0):
+            with self.assertRaisesRegex(ValueError, 'scalar step graph'):
+                runner.validate_call_graph_loop_plan({**plan, 'stepProgram': step})
+        # The ordinary loop plan and this plan are separate envelopes.
+        with self.assertRaises(ValueError):
+            runner.validate_loop_plan(plan)
+        with self.assertRaises(ValueError):
+            runner.validate_call_graph_loop_plan({**plan, 'schema': 'solcore-lean.loop-plan.v1'})
+
+    def test_case_requires_a_valid_loop_plan(self):
+        case = self.case()
+        missing = dict(case); del missing['loopPlan']
+        invalid = [missing, {**case, 'loopPlan': None}, {**case, 'loopPlan': {}},
+                   {**case, 'loopPlan': {**self.plan(), 'schema': 'solcore-lean.loop-plan.v1'}},
+                   {**case, 'loopPlan': {**self.plan(), 'schema': 'unknown'}}]
+        invalid += [{**case, 'loopPlan': self.plan(mask)} for mask in (2, 8, True, '7')]
+        for key in ('mask', 'stepProgram'):
+            plan = self.plan(); del plan[key]
+            invalid.append({**case, 'loopPlan': plan})
+        invalid.append({**case, 'loopPlan': {**self.plan(), 'stepProgram': None}})
+        for value in invalid:
+            with self.assertRaises(ValueError):
+                runner.validate_case(value)
+        # A loop plan supplies no substitute for the plain call-graph or loop profiles' own envelopes.
+        plain = self.case(); plain['schema'] = runner.LOOP_CASE_SCHEMA
+        with self.assertRaises(ValueError):
+            runner.validate_case(plain)
+        runner.validate_case(case)
+
+    def test_every_call_graph_loop_version_receipt_is_required(self):
+        for key in runner.CALL_GRAPH_LOOP_VERSIONS:
+            case = self.case(); del case['provenance'][key]
+            with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+            for value in (None, '', 1, True, []):
+                case = self.case(); case['provenance'][key] = value
+                with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+        for key in ('loopVersion', 'stepFunctionVersion', 'aggregateVersion', 'stepBoundaryVersion'):
+            # These loop-specific receipts are not part of the plain call-graph inventory.
+            self.assertNotIn(key, runner.CALL_GRAPH_VERSIONS)
+        for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion'):
+            case = self.case(); del case['provenance'][key]
+            with self.assertRaisesRegex(ValueError, key): runner.validate_case(case)
+        case = self.case(); case['provenance'] = {key: 'policy' for key in runner.CALL_GRAPH_VERSIONS}
+        case['provenance'].update(helperCount=2, callShapes=list(self.SHAPES),
+            **{key: 'policy' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion')})
+        with self.assertRaisesRegex(ValueError, 'loopVersion'): runner.validate_case(case)
+
+    def test_helper_count_is_one_to_three(self):
+        for value in (1, 2, 3):
+            case = self.case(); case['provenance']['helperCount'] = value
+            runner.validate_case(case)
+        for value in (None, True, False, 0, 4, -1, 2.0, '2'):
+            case = self.case(); case['provenance']['helperCount'] = value
+            with self.assertRaisesRegex(ValueError, 'helperCount'): runner.validate_case(case)
+        case = self.case(); del case['provenance']['helperCount']
+        with self.assertRaisesRegex(ValueError, 'helperCount'): runner.validate_case(case)
+
+    def test_call_shapes_keep_one_canonical_order_and_no_unknown_or_duplicate_items(self):
+        for values in ([], ['diamond'], list(runner.CALL_SHAPES)):
+            case = self.case(); case['provenance']['callShapes'] = values
+            runner.validate_case(case)
+        for values in (None, {}, 'diamond', [1], ['recursive'], ['diamond', 'diamond'],
+                       ['predicate-call', 'nested-call'], list(reversed(runner.CALL_SHAPES))):
+            case = self.case(); case['provenance']['callShapes'] = values
+            with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_case(case)
+        case = self.case(); del case['provenance']['callShapes']
+        with self.assertRaisesRegex(ValueError, 'canonical'): runner.validate_case(case)
+
+    def test_wrapper_name_object_paths_and_calldata_cannot_change(self):
+        case = self.case()
+        for name in ('SynthesizedLoops', 'SynthesizedCallGraphs', 'SynthesizedInput', 'SynthesizedG0'):
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'contract': {**case['contract'], 'name': name}})
+        for key, value in (('method', 'other'), ('signature', 'run()')):
+            with self.assertRaises(runner.Finding):
+                runner.validate_case({**case, 'contract': {**case['contract'], key: value}})
+        for deploy, runtime in ((['SynthesizedLoopsDeploy'], ['SynthesizedLoopsDeploy', 'SynthesizedLoops']),
+                                (['SynthesizedCallGraphsDeploy'], ['SynthesizedCallGraphsDeploy', 'SynthesizedCallGraphs']),
+                                ([self.NAME], [self.NAME + 'Deploy', self.NAME]),
+                                ([self.NAME + 'Deploy'], [self.NAME + 'Deploy']),
+                                ([self.NAME + 'Deploy'], [self.NAME, self.NAME + 'Deploy'])):
+            with self.assertRaisesRegex(ValueError, 'object paths'):
+                runner.validate_case({**case, 'contract': {**case['contract'], 'deployPath': deploy, 'runtimePath': runtime}})
+        for calldata in ('0xa444f5e9', case['contract']['calldata'] + '00', '0xc0406226' + '00' * 32):
+            with self.assertRaisesRegex(ValueError, 'calldata differs'):
+                runner.validate_case({**case, 'contract': {**case['contract'], 'calldata': calldata}})
+        with self.assertRaises(runner.Finding):
+            runner.validate_case({**case, 'contract': {**case['contract'], 'constructorCalldata': '0x00'}})
+        with self.assertRaisesRegex(ValueError, 'only admitted by the module profile'):
+            runner.validate_case({**case, 'sourceBundle': {}})
+
+    def test_native_replay_must_authenticate_the_loop_plan_call_shapes_and_helper_count(self):
+        case = self.case()
+        runner.validate_replayed_case(case, copy.deepcopy(case))
+        runner.validate_replayed_case({**case, 'directCore': {'word': 'fake'}}, case)
+        for key, value in [('loopPlan', self.plan(3)),
+                ('loopPlan', {**self.plan(), 'stepProgram': {'unsealed': True}}),
+                ('source', case['source'] + 'changed'),
+                ('provenance', {**case['provenance'], 'callShapes': ['diamond']}),
+                ('provenance', {**case['provenance'], 'helperCount': 1}),
+                ('provenance', {**case['provenance'], 'stepBoundaryVersion': 'forged'})]:
+            with self.assertRaisesRegex(ValueError, 'case replay changed'):
+                runner.validate_replayed_case(case, {**case, key: value})
+        with self.assertRaisesRegex(ValueError, 'case replay changed'):
+            runner.validate_replayed_case(case, self.case(3))
+
+    def test_backend_receipts_keep_yul_and_linked_hull_distinct(self):
+        self.assertEqual(runner.CASE_CONTRACTS[runner.CALL_GRAPH_LOOP_CASE_SCHEMA], self.NAME)
+        for backend in runner.BACKENDS:
+            self.assertEqual(runner.resolve_backend(None, {'backend': backend}), backend)
+            self.assertEqual(runner.path_backends(backend)['importedHull'],
+                'sonatina-o0' if backend == 'yul' else backend)
+            other = 'sonatina-o2' if backend != 'sonatina-o2' else 'yul'
+            with self.assertRaises(ValueError):
+                runner.resolve_backend(other, {'backend': backend})
+
+
 class ClassificationTests(unittest.TestCase):
     def test_three_completed_paths_required(self):
         actual = observations()

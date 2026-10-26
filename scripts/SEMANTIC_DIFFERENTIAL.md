@@ -134,7 +134,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the twelve pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the thirteen pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -593,6 +593,65 @@ literal coverage remains separate.
 The external 24-case suite checks zero and positive iterations, arbitrary step
 entries, pair/sum branches, fresh helper-local cells per iteration and Word
 wrap, followed by exact replay.
+
+## Compare bounded loops over call graphs
+
+`runtime-call-graph-loops` uses a directly generated scalar call graph as the
+step of the bounded loop above. Its unchanged helpers and arbitrary entry are
+resealed by the aggregate DAG checker and then by the existing bounded-loop
+plan; the executed step program is the scalar graph's exact declaration chain.
+The finite ordinal-guard Core reference and its typing are reused, with no new
+evaluator or Core primitive. The source emits the helpers, then the entry as
+`sc_step`, with the call-graph renderer and raw `std.opcodes` aliases, inside
+the same `while (limit > counter)` wrapper. The older `runtime-loops` emitter
+and its narrower renderer are unchanged. The ABI is
+`SynthesizedCallGraphLoops.run(uint256)`.
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-call-graph-loops \
+  --backend sonatina-o0 --output .upstream/semantic-call-graph-loops-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-call-graph-loops \
+  --seed 20261026 --cases 16 --attempts 2048 \
+  --output .upstream/semantic-call-graph-loops-random
+```
+
+A plan has schema `solcore-lean.call-graph-loop-plan.v1`, a scalar
+`stepProgram` and a `mask` of zero, one, three or seven. Generation first draws
+mask one, three or seven, subtracts that mask's measured wrapper overhead from
+the complete applied-program budget, generates the step with the
+`runtime-call-graphs` grammar and remeasures the complete loop. The default
+budget is 256 nodes; the admitted range is 39–512, and the mask-seven wrapper
+alone needs 111. An accepted plan needs an entry call, step results that vary
+over the eight primitive inputs and a positive-trip loop input whose final
+value differs from that input. Imported and reduced plans may be constant or
+use mask zero. Each plan yields up to six inputs: zero, one, three, seven,
+maximum Word and the high bit. Attempts count plans; cases count inputs.
+
+`call-graph-loop-generate SEED NODES COUNT ATTEMPTS FUEL` and
+`call-graph-loop-emit PLAN.json INPUT [FUEL]` produce the case schema
+`solcore-lean.semantic-call-graph-loop-case.v1`. Every origin rebuilds the
+canonical applied reference from the saved plan. Replay regenerates generated
+plans with their step origin and budget, and checks canonical source, ABI,
+versions, features, helper count and call shapes. Reduction retains helper
+bindings, reseals each candidate as a plan, never raises the mask and requires
+a strictly smaller complete application; smaller masks remove whole guards.
+A reduced origin names its parent plan and input.
+
+The fixed corpus has eight imported and three generated plans at all six inputs.
+Its expected Words were computed outside Lean from EVM Word semantics and the
+loop definition; the native corpus test checks each against original Core.
+It requires all thirty scalar AST features including calls, one to three
+helpers, the nine call shapes, and masks and iterations zero, one, three and
+seven. `loopCoverage` and `callShapeCoverage` count only three-way matches.
+Neither inventory is an executed trace, call path or opcode measurement.
+
+Native validation confirmed all 66 expected Words and replayed 264 strictly
+smaller typed reductions. All 66 fixed cases matched on O0, O2 and Yul; the
+first O2 run had stopped on one host adapter error before any execution, and a
+fresh run matched all 66. Random seed `20261026` with sixteen cases and 2,048
+attempts matched all sixteen on each backend. A controlled synthetic reduction
+accepted four typed reductions per backend, all keeping three helpers, and
+original and reduced archives replayed exactly.
 
 ## Compare ordered storage transactions
 

@@ -37,10 +37,11 @@ def hull_output():
 
 
 class YulProtocolTests(unittest.TestCase):
-    def test_all_twelve_pure_contracts_are_admitted_but_stateful_wrappers_are_not(self):
-        self.assertEqual(len(exporter.CONTRACTS), 12)
+    def test_all_thirteen_pure_contracts_are_admitted_but_stateful_wrappers_are_not(self):
+        self.assertEqual(len(exporter.CONTRACTS), 13)
         self.assertIn("SynthesizedPrimitives", exporter.CONTRACTS)
         self.assertIn("SynthesizedCallGraphs", exporter.CONTRACTS)
+        self.assertIn("SynthesizedCallGraphLoops", exporter.CONTRACTS)
         for contract in exporter.CONTRACTS:
             exporter.validate_contract(contract)
         for contract in ("Root", "SynthesizedStorage", "SynthesizedRollback", "SynthesizedCaller", "SynthesizedCallee", None):

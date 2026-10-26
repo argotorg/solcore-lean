@@ -15,7 +15,7 @@ is connected to the runners; its random O2 gate exposed a compiler crash.
 The separate upstream fixture harness also
 runs Yul; its results are distinct from generated semantic campaigns.
 
-Twelve pure profiles and three stateful profiles are available locally. The
+Thirteen pure profiles and three stateful profiles are available locally. The
 [CI workflow](../../.github/workflows/semantic.yml) and
 [suite commands](../../scripts/SEMANTIC_CI.md) connect the fixed and random
 runners with shared limits, preparation and retained findings. Hosted execution
@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; hosted run pending | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call graphs validated; loop and aggregate consumers remain | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call graphs and call-graph loops validated; aggregate consumer remains | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Planned | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -413,27 +413,65 @@ The raw actual reports remained unchanged. Suite totals are now 449 fixed
 cases/scenarios for Sonatina and 413 pure cases for Yul; the existing and new
 families were validated in separate runs. Hosted CI still has not been run.
 
-The next implementation unit is a separate `runtime-call-graph-loops` family:
+The second family, `runtime-call-graph-loops`, is now connected to the
+ordinary case tool, adapters, campaigns and suites. Its checked plan reseals an
+unchanged `CheckedWordFunctionDAG` through `Aggregates.CheckedDAG.ofParts?`
+and `BoundedLoop.CheckedPlan.ofParts?`, and retains equality between the scalar
+helpers/entry and the executed loop step. It reuses the finite ordinal-guard
+Core reference and its typing; no evaluator or Core primitive was added. A
+separate emitter prints the arbitrary entry as `sc_step` with
+`CallGraphRenderer` and raw primitive aliases; `LoopEmitter` is unchanged.
 
-- Reseal `CheckedWordFunctionDAG.helpers` and `entry` with
-  `Aggregates.CheckedDAG.ofParts?`, then `BoundedLoop.CheckedPlan.ofParts?`.
-  Keep the scalar step and the executed plan's step program identical. Reuse
-  the existing finite Core reference and typing; add no evaluator or primitive.
-- Emit the arbitrary entry as `sc_step`, using `CallGraphRenderer` and raw
-  primitive imports inside the existing bounded `while` wrapper. The old
-  `LoopEmitter` uses the narrower scalar renderer and must remain unchanged.
-- Generate masks 1, 3 and 7; allow mask 0 for imported/reduced cases. Budget
-  the complete application, subtracting the existing measured loop overhead
-  before generating the step and rechecking the final 512-node limit.
-- Preserve versioned plans, typed strict reduction and exact replay. Require
-  an entry call, input-sensitive step results and a positive-iteration Core
-  observation that changes the input. Fixed cases must cover 0/1/3/7 iterations,
-  nested/shared/branch/local calls and signed/shift/ternary operations.
-- Connect fixed/random O0/O2/Yul execution and original/reduced replay before
-  enabling the new suite profile. Then add a genuinely richer aggregate
-  consumer composing pairs, sums and case payload/projection scopes with calls.
-  Resealing a scalar graph as an aggregate graph alone does not complete that
-  aggregate work or priority 4.
+Generation selects mask one, three or seven, subtracts the measured wrapper
+overhead of 26, 50 or 98 nodes from the complete budget, generates the step
+with the call-graph grammar and remeasures the full application. Admission
+requires an entry call, step results varying over the eight primitive inputs
+and a positive-trip loop input whose result changes. Imported and reduced plans
+may use mask zero. Native tests check exact overhead accounting, agreement of
+the loop reference with repeated scalar graph applications for 64 generated
+plans, canonical provenance, tampering rejection, strict replay and typed
+reductions that keep every helper binding and never raise the mask.
+
+The fixed corpus contains 66 cases from eleven plans, eight imported and three
+generated, at the six loop inputs. Its expected Words were computed outside
+Lean from EVM Word semantics and the loop definition; native validation
+confirmed all 66 against original Core and replayed 264 strictly smaller typed
+reductions. It covers all thirty scalar AST features, one to three helpers,
+the nine call shapes, and masks and iterations zero, one, three and seven.
+
+Focused Lean builds, the source library (9,920 jobs) and the full registered
+Lean test driver passed. The full Python policy suite passed 404 tests. All
+425 retained older cases replayed with identical complete JSON and Core
+observations; the other seven native tools kept their hashes.
+
+All 66 fixed cases matched on O0 and Yul with complete feature, input, helper,
+mask, iteration and call-shape coverage. The first O2 fixed run matched 65; the
+other case stopped with a host `Operation not permitted` error raised inside
+the adapter before any execution path ran, while parallel suites and
+process-spawning tests heavily loaded the machine. It is retained as a failed
+run and was not reproduced at normal load; a fresh O2 run matched all 66.
+Local fixed times were 415.034 seconds (O0), 421.204 seconds (O2 rerun) and
+618.790 seconds (Yul), overlapping other runs. Random seed `20261026`, sixteen
+cases and 2,048 attempts accepted three plans from fourteen attempts, using
+masks one, three and seven, with eleven ordinary exclusions and no resource
+exclusions. All sixteen cases matched on each backend, in 95.945, 97.129 and
+153.216 seconds. This allocation did not reproduce the O2 compiler panic
+recorded for the primitive and call-graph families.
+
+A seven-iteration, three-helper fixed case passed controlled synthetic
+reduction on each backend: twelve accepted typed reductions kept every helper
+binding and the mask. Original and final archives replayed exactly with
+three-way agreement (six replays), synthetic fingerprints reproduced and
+fuel-one executions were inconclusive. Raw actual reports remained matches.
+Suite totals are now 515 fixed cases/scenarios for Sonatina and 479 pure cases
+for Yul. Hosted CI still has not been run.
+
+The next implementation unit is a genuinely richer aggregate consumer of the
+call-graph grammar: generated pairs, sums, projections and case payload scopes
+composed with helper calls in the same typed expressions. Resealing a scalar
+graph as an aggregate graph does not complete that work. Priority 4 remains
+incomplete until that family has passed the same fixed, random, reduction and
+replay gates.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

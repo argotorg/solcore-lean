@@ -38,6 +38,9 @@ CALL_GRAPH_CASE_SCHEMA = "solcore-lean.semantic-call-graph-case.v1"
 CALL_SHAPES = ("skipped-helper", "multiple-callees", "shared-callee", "nested-call",
                "branch-call", "local-call", "diamond", "predicate-call", "primitive-operand-call")
 CALL_GRAPH_VERSIONS = ("profileVersion", "functionVersion", "boundaryVersion", "callShapeVersion")
+CALL_GRAPH_LOOP_CASE_SCHEMA = "solcore-lean.semantic-call-graph-loop-case.v1"
+CALL_GRAPH_LOOP_VERSIONS = ("profileVersion", "functionVersion", "loopVersion", "stepFunctionVersion",
+                            "aggregateVersion", "boundaryVersion", "stepBoundaryVersion", "callShapeVersion")
 PRIMITIVE_CASE_SCHEMA = "solcore-lean.semantic-primitive-case.v1"
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
@@ -49,11 +52,13 @@ COMPTIME_CASE_SCHEMA = "solcore-lean.semantic-comptime-case.v1"
 MODULE_CASE_SCHEMA = "solcore-lean.semantic-module-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  PRIMITIVE_CASE_SCHEMA: "runtime-primitives", CALL_GRAPH_CASE_SCHEMA: "runtime-call-graphs",
+                 CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime-call-graph-loops",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
                  AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
+                  CALL_GRAPH_LOOP_CASE_SCHEMA: "SynthesizedCallGraphLoops",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
                   AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules"}
@@ -228,6 +233,17 @@ def validate_loop_plan(plan) -> dict:
     return plan
 
 
+def validate_call_graph_loop_plan(plan) -> dict:
+    """Validate the envelope; native replay reseals the scalar graph and loop."""
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
+        raise ValueError("unsupported call-graph loop plan schema")
+    if type(plan.get("mask")) is not int or plan["mask"] not in (0, 1, 3, 7):
+        raise ValueError("loop mask must be zero, one, three or seven")
+    if not isinstance(plan.get("stepProgram"), dict):
+        raise ValueError("call-graph loop plan requires its original scalar step graph")
+    return plan
+
+
 def validate_generic_plan(plan) -> dict:
     """Check the transport envelope; native replay authenticates the full plan."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.generic-plan.v1":
@@ -284,6 +300,8 @@ def validate_case(case: dict) -> None:
         raise ValueError("case requires its original Core program and emitted source")
     if case["schema"] == LOOP_CASE_SCHEMA:
         validate_loop_plan(case.get("loopPlan"))
+    if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
+        validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == GENERIC_CASE_SCHEMA:
         validate_generic_plan(case.get("genericPlan"))
     if case["schema"] == CLOSURE_CASE_SCHEMA:
@@ -306,8 +324,9 @@ def validate_case(case: dict) -> None:
                     "baseGeneratorVersion", "boundaryVersion"):
             if not isinstance(provenance.get(key), str) or not provenance[key]:
                 raise ValueError(f"missing primitive provenance {key}")
-    if case["schema"] == CALL_GRAPH_CASE_SCHEMA:
-        for key in CALL_GRAPH_VERSIONS:
+    if case["schema"] in (CALL_GRAPH_CASE_SCHEMA, CALL_GRAPH_LOOP_CASE_SCHEMA):
+        versions = CALL_GRAPH_VERSIONS if case["schema"] == CALL_GRAPH_CASE_SCHEMA else CALL_GRAPH_LOOP_VERSIONS
+        for key in versions:
             if not isinstance(provenance.get(key), str) or not provenance[key]:
                 raise ValueError(f"missing call-graph provenance {key}")
         if type(provenance.get("helperCount")) is not int or not 1 <= provenance["helperCount"] <= 3:
@@ -649,6 +668,7 @@ def execute(args, report: dict) -> None:
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
         PRIMITIVE_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated acyclic Word helper graphs, Sonatina O0, run(uint256) ABI Word",
+        CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, directly generated acyclic Word helper step graph, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

@@ -150,7 +150,7 @@ archives and reductions retain that choice. Core fuel, EVM gas and process
 timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twelve pure profiles with `--backend yul`. Its EVM bytes are
+available for the thirteen pure profiles with `--backend yul`. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images;
 Yul object linking and stateful Yul are outside this comparison.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
@@ -159,7 +159,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same fifteen-profile suite runs locally with shared time and disk limits.
+The same sixteen-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -175,6 +175,10 @@ runtime input in scope. One to three helpers may call any earlier helper inside
 operands, local bindings and branches. Its 56-case corpus checks shared callees,
 nested arguments and nine syntactic call structures, alongside typed reduction
 and strict replay. These structural checks do not measure executed call paths.
+The `runtime-call-graph-loops` profile uses such a graph as the step of an
+actual bounded source `while` loop, compared with the existing finite Core loop
+reference. Its 66-case corpus covers masks and iteration counts of zero, one,
+three and seven alongside the same nine call structures.
 
 A separate runtime-input profile applies checked Word-to-Word functions to
 recorded ABI inputs. Identity and input-dependent branch cases agree across all

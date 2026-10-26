@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Campaign policy tests; real compiler/EVM runs are checked separately."""
 import copy
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import importlib.util
 import io
 import json
@@ -140,6 +140,21 @@ def module_policy_case(value=1, helpers=2):
         runtimePath=['SynthesizedModulesDeploy', 'SynthesizedModules'])
     case['provenance']['origin'].update(kind='module-generated')
     case['provenance']['origin'].pop('variant')
+    return case
+
+
+def call_graph_loop_policy_case(mask=7, value=7, helpers=2, shapes=('nested-call', 'local-call')):
+    """Call-graph loop envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = loop_policy_case(mask, value, helpers)
+    case.update(schema=campaign.m2.CALL_GRAPH_LOOP_CASE_SCHEMA)
+    case['loopPlan']['schema'] = 'solcore-lean.call-graph-loop-plan.v1'
+    case['program']['body']['argument']['value'] = '0x' + f'{value:064x}'
+    case['contract'].update(name='SynthesizedCallGraphLoops', deployPath=['SynthesizedCallGraphLoopsDeploy'],
+        runtimePath=['SynthesizedCallGraphLoopsDeploy', 'SynthesizedCallGraphLoops'])
+    case['provenance'] = {key: 'test' for key in
+        ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.m2.CALL_GRAPH_LOOP_VERSIONS)}
+    case['provenance'].update(features=['functionCall', 'local'], helperCount=helpers, callShapes=list(shapes),
+        origin={'kind': 'call-graph-loop-generated', 'seed': '1', 'maxProgramNodes': 256})
     return case
 
 
@@ -1630,6 +1645,548 @@ class CallGraphCoverageTests(unittest.TestCase):
                 config.test_perturb_path = 'rustEvm'; config.upstream, config.target_dir = Path('/unused/u'), Path('/unused/t')
                 instance = campaign.Campaign(config); selected = []
                 original, candidate = self.case('255'), self.case('1')
+                def execute(args, report):
+                    selected.append(args.backend); report.update(matched(), backend=args.backend)
+                    campaign.save_json(args.output/'case.json', json.loads(args.case.read_text()))
+                with patch.object(campaign.m2, 'execute', side_effect=execute):
+                    folder, report, analysis = instance.execute_case(original)
+                    finding = instance.retain_finding(0, folder, original, report, analysis)
+                    instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
+                    instance.shrink(original, finding)
+                self.assertEqual(selected, [backend, backend])
+                history = json.loads((Path(directory)/finding['history']).read_text())
+                self.assertTrue(history['steps'][0]['accepted'])
+                self.assertEqual(history['steps'][0]['actualComparison']['category'], 'matched')
+                self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
+
+
+class CallGraphLoopCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-call-graph-loops'
+    CORPUS = ROOT / 'scripts/semantic-call-graph-loop-corpus.json'
+    SHAPES = ('nested-call', 'local-call')
+    VERSIONS = ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.m2.CALL_GRAPH_LOOP_VERSIONS)
+
+    def case(self, mask=7, value=7, helpers=2, shapes=SHAPES):
+        return call_graph_loop_policy_case(mask, value, helpers, shapes)
+
+    def manifest(self, generated=False):
+        case = self.case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in self.VERSIONS},
+            'requiredFeatures': ['functionCall', 'local'], 'requiredWordLiterals': [],
+            'requiredInputs': list(campaign.LOOP_INPUTS), 'requiredHelperCounts': [1, 2, 3],
+            'requiredCallShapes': list(campaign.m2.CALL_SHAPES),
+            'loopRequirements': {'masks': [0, 1, 3, 7], 'iterations': [0, 1, 3, 7]},
+            'cases': [{'id': 'graph', 'input': '7', 'expectedFeatures': ['functionCall', 'local'],
+                'expectedCallShapes': list(self.SHAPES), 'expectedHelperCount': 2,
+                **({'generation': {'seed': '1', 'maxProgramNodes': 256}} if generated else {'loopPlan': case['loopPlan']})}]}
+
+    def committed(self):
+        return json.loads(self.CORPUS.read_text())
+
+    def run_main(self, *argv, prepare=True):
+        """Parse the real command line and capture native commands without running a campaign."""
+        with tempfile.TemporaryDirectory() as directory:
+            configured, seen = [], []
+            def run(instance):
+                configured.append(instance.args)
+                instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                if prepare: instance.prepare_cases()
+                instance.summary['status'] = 'generation-exhausted'
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory) / 'run'), *argv]), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                campaign.main()
+            return configured[0], seen
+
+    def test_profile_is_registered_in_the_loop_call_shape_and_helper_policy_tables(self):
+        self.assertIn(self.PROFILE, campaign.PROFILES)
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.CALL_GRAPH_LOOP_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+            ('call-graph-loop-generate', 'call-graph-loop-emit', 'call-graph-loop-generated'))
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], campaign.m2.CALL_GRAPH_LOOP_VERSIONS)
+        for group in (campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
+            self.assertIn(self.PROFILE, group)
+        # Neighbouring profiles keep their own policy membership.
+        self.assertNotIn('runtime-loops', campaign.CALL_GRAPH_PROFILES)
+        self.assertNotIn('runtime-call-graphs', campaign.LOOP_PROFILES)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.LOOP_INPUTS)
+        self.assertEqual(len(campaign.LOOP_INPUTS), 6)
+        self.assertEqual(campaign.profile_inputs('runtime-loops'), campaign.LOOP_INPUTS)
+        self.assertEqual(campaign.profile_inputs('runtime-call-graphs'), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual({profile: campaign.minimum_nodes(profile) for profile in
+            (self.PROFILE, 'runtime-call-graphs', 'runtime-primitives', 'runtime-loops', 'closed-g0')},
+            {self.PROFILE: 39, 'runtime-call-graphs': 13, 'runtime-primitives': 8, 'runtime-loops': 3, 'closed-g0': 3})
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['configuration']['profile'], self.PROFILE)
+            self.assertIn('callShapeCoverage', instance.summary)
+            self.assertEqual(instance.summary['callShapeCoverage']['requiredShapes'], [])
+            self.assertEqual(instance.summary['loopCoverage']['requiredMasks'], [])
+
+    def test_committed_corpus_validates_and_its_entries_deliver_every_requirement(self):
+        manifest = self.committed()
+        campaign.validate_manifest(manifest)
+        self.assertEqual(manifest['profile'], self.PROFILE)
+        self.assertEqual(set(manifest['requiredInputs']), set(campaign.LOOP_INPUTS))
+        self.assertEqual(manifest['requiredHelperCounts'], [1, 2, 3])
+        self.assertEqual(campaign.call_shape_requirements(manifest), list(campaign.m2.CALL_SHAPES))
+        self.assertEqual(campaign.loop_requirements(manifest), {'masks': [0, 1, 3, 7], 'iterations': [0, 1, 3, 7]})
+        masks, iterations, counts, shapes, inputs = set(), set(), set(), set(), set()
+        fixed = generated = 0
+        for entry in manifest['cases']:
+            inputs.add(entry['input']); shapes |= set(entry['expectedCallShapes']); counts.add(entry['expectedHelperCount'])
+            if 'generation' in entry:
+                generated += 1
+                self.assertIn(entry['input'], campaign.LOOP_INPUTS)
+                continue
+            fixed += 1
+            case = {'schema': campaign.m2.CALL_GRAPH_LOOP_CASE_SCHEMA, 'input': entry['input'], 'loopPlan': entry['loopPlan'],
+                'provenance': {'helperCount': entry['expectedHelperCount'], 'callShapes': entry['expectedCallShapes']}}
+            loops = campaign.specified_loops(case)
+            masks |= loops['Masks']; iterations |= loops['Iterations']
+            # The declared helper count must equal the actual step-graph declaration inventory.
+            self.assertEqual(campaign.helper_counts(case), {entry['expectedHelperCount']})
+            self.assertEqual(campaign.call_shapes(case), set(entry['expectedCallShapes']))
+        self.assertTrue(fixed and generated)
+        self.assertEqual(masks, {0, 1, 3, 7})
+        self.assertEqual(iterations, {0, 1, 3, 7})
+        self.assertEqual(counts, {1, 2, 3})
+        self.assertEqual(shapes, set(campaign.m2.CALL_SHAPES))
+        self.assertLessEqual(set(campaign.LOOP_INPUTS), inputs)
+
+    def test_committed_corpus_is_not_admitted_as_another_profile(self):
+        manifest = self.committed()
+        for profile in ('runtime-loops', 'runtime-call-graphs', 'runtime-aggregates', 'runtime-functions'):
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, 'profile': profile})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**LoopCoverageTests().manifest(), 'profile': self.PROFILE})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**self.manifest(), 'profile': 'runtime-loops'})
+
+    def test_manifest_inputs_versions_requirements_and_node_gates(self):
+        for generated in (False, True):
+            manifest = self.manifest(generated)
+            campaign.validate_manifest(manifest)
+            for field in campaign.m2.CALL_GRAPH_LOOP_VERSIONS:
+                missing = dict(manifest); del missing[field]
+                with self.assertRaisesRegex(ValueError, field): campaign.validate_manifest(missing)
+                with self.assertRaisesRegex(ValueError, field): campaign.validate_manifest({**manifest, field: ''})
+            for field in ('requiredInputs', 'requiredCallShapes', 'requiredHelperCounts'):
+                missing = dict(manifest); del missing[field]
+                with self.assertRaises(ValueError): campaign.validate_manifest(missing)
+            for value in (None, 'nested-call', ['unknown'], ['nested-call', 'nested-call'], ['local-call', 'nested-call']):
+                with self.assertRaisesRegex(ValueError, 'canonical'):
+                    campaign.validate_manifest({**manifest, 'requiredCallShapes': value})
+            for invalid in (None, {}, {'masks': [2], 'iterations': []}, {'masks': [True], 'iterations': []},
+                    {'masks': [1, 1], 'iterations': []}, {'masks': [], 'iterations': [8]}, {'masks': [], 'iterations': [1.0]}):
+                with self.assertRaises(ValueError):
+                    campaign.validate_manifest({**manifest, 'loopRequirements': invalid})
+            # Each of the six loop boundary inputs is individually required; extras are allowed.
+            for missing in campaign.LOOP_INPUTS:
+                changed = {**manifest, 'requiredInputs': [v for v in campaign.LOOP_INPUTS if v != missing]}
+                with self.assertRaisesRegex(ValueError, 'six loop boundary'): campaign.validate_manifest(changed)
+            with self.assertRaisesRegex(ValueError, 'six loop boundary'):
+                campaign.validate_manifest({**manifest, 'requiredInputs': list(campaign.PRIMITIVE_INPUTS)})
+            with self.assertRaisesRegex(ValueError, 'six loop boundary'):
+                campaign.validate_manifest({**manifest, 'requiredInputs': ['0']})
+            campaign.validate_manifest({**manifest, 'requiredInputs': [*campaign.LOOP_INPUTS, '2']})
+            with self.assertRaisesRegex(ValueError, 'one to three'):
+                campaign.validate_manifest({**manifest, 'requiredHelperCounts': [0]})
+        manifest = self.manifest(True)
+        for value in (38, 513, True, 3, '256'):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['maxProgramNodes'] = value
+            with self.assertRaises(ValueError): campaign.validate_manifest(changed)
+        for value in (39, 256, 512):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['generation']['maxProgramNodes'] = value
+            campaign.validate_manifest(changed)
+        # Generated requests select a loop boundary input; fixed plans may carry any Word.
+        for value in campaign.LOOP_INPUTS:
+            changed = copy.deepcopy(manifest); changed['cases'][0]['input'] = value
+            campaign.validate_manifest(changed)
+        for value in ('2', '255', str(2**255 - 1)):
+            changed = copy.deepcopy(manifest); changed['cases'][0]['input'] = value
+            with self.assertRaisesRegex(ValueError, 'boundary value'): campaign.validate_manifest(changed)
+            fixed = self.manifest(); fixed['cases'][0]['input'] = value
+            campaign.validate_manifest(fixed)
+
+    def test_expected_call_shapes_and_helper_count_validate_for_this_profile(self):
+        for generated in (False, True):
+            manifest = self.manifest(generated)
+            for value in (None, 'diamond', ['unknown'], ['diamond', 'diamond'], ['local-call', 'nested-call']):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedCallShapes'] = value
+                with self.assertRaisesRegex(ValueError, 'expectedCallShapes'): campaign.validate_manifest(changed)
+            for value in (0, 4, True, '2', 2.0, None):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedHelperCount'] = value
+                with self.assertRaisesRegex(ValueError, 'expectedHelperCount'): campaign.validate_manifest(changed)
+            for value in (1, 2, 3):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedHelperCount'] = value
+                campaign.validate_manifest(changed)
+            for value in ([], list(campaign.m2.CALL_SHAPES)):
+                changed = copy.deepcopy(manifest); changed['cases'][0]['expectedCallShapes'] = value
+                campaign.validate_manifest(changed)
+            optional = copy.deepcopy(manifest)
+            del optional['cases'][0]['expectedCallShapes'], optional['cases'][0]['expectedHelperCount']
+            campaign.validate_manifest(optional)
+
+    def test_entry_source_and_plan_validator_belong_to_this_profile(self):
+        manifest = self.manifest()
+        entry = manifest['cases'][0]
+        for changed in ({**entry, 'program': {}}, {**entry, 'genericPlan': entry['loopPlan']},
+                        {**entry, 'generation': {'seed': '1', 'maxProgramNodes': 256}},
+                        {key: value for key, value in entry.items() if key != 'loopPlan'},
+                        {**{k: v for k, v in entry.items() if k != 'loopPlan'}, 'program': {}}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, 'cases': [changed]})
+        plan = entry['loopPlan']
+        invalid_plans = [{**plan, 'schema': 'solcore-lean.loop-plan.v1'}, {**plan, 'schema': 'unknown'},
+            {**plan, 'mask': 2}, {**plan, 'mask': True}, {**plan, 'stepProgram': None}, [], None]
+        invalid_plans.append({key: value for key, value in plan.items() if key != 'stepProgram'})
+        for invalid in invalid_plans:
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, 'cases': [{**entry, 'loopPlan': invalid}]})
+        with self.assertRaisesRegex(ValueError, 'call-graph loop plan schema'):
+            campaign.validate_manifest({**manifest, 'cases': [{**entry, 'loopPlan': invalid_plans[0]}]})
+        # The ordinary loop corpus keeps its own envelope: the call-graph loop schema is not admitted there.
+        ordinary = LoopCoverageTests().manifest()
+        campaign.validate_manifest(ordinary)
+        ordinary['cases'][0]['loopPlan'] = {**ordinary['cases'][0]['loopPlan'], 'schema': plan['schema']}
+        with self.assertRaisesRegex(ValueError, 'unsupported loop plan schema'):
+            campaign.validate_manifest(ordinary)
+
+    def test_unrelated_profiles_cannot_use_call_shape_loop_or_recipe_requirements(self):
+        shapes, loops = {'requiredCallShapes': ['nested-call']}, {'masks': [1], 'iterations': [1]}
+        for profile in ('closed-g0', 'runtime-loops', 'runtime-aggregates', 'runtime-generics'):
+            with self.assertRaisesRegex(ValueError, 'only call-graph'):
+                campaign.call_shape_requirements({'profile': profile, **shapes})
+            self.assertEqual(campaign.call_shape_requirements({'profile': profile}), [])
+        for profile in ('closed-g0', 'runtime-call-graphs', 'runtime-aggregates', 'runtime-functions'):
+            with self.assertRaisesRegex(ValueError, 'only loop'):
+                campaign.loop_requirements({'profile': profile, 'loopRequirements': loops})
+            self.assertEqual(campaign.loop_requirements({'profile': profile}), {'masks': [], 'iterations': []})
+        self.assertEqual(campaign.loop_requirements({'profile': self.PROFILE, 'loopRequirements': loops}), loops)
+        self.assertEqual(campaign.call_shape_requirements({'profile': self.PROFILE, **shapes}), ['nested-call'])
+        with self.assertRaises(ValueError):  # call-graph profiles must state their shape requirements
+            campaign.call_shape_requirements({'profile': self.PROFILE})
+        old = LoopCoverageTests().manifest()
+        with self.assertRaisesRegex(ValueError, 'only call-graph'):
+            campaign.validate_manifest({**old, **shapes})
+        old = CallGraphCoverageTests().manifest(True)
+        with self.assertRaisesRegex(ValueError, 'only loop'):
+            campaign.validate_manifest({**old, 'loopRequirements': {'masks': [1], 'iterations': []}})
+        # Neither recipe nor other step-based requirements are inherited from the wrapped aggregate step.
+        for key, value in (('generationRecipeRequirements', {'templates': [1], 'updates': []}),
+                           ('genericRequirements', {'instantiations': ['word:even']}),
+                           ('closureRequirements', {'variants': ['snapshot']}),
+                           ('comptimeRequirements', {'variants': ['offset']}),
+                           ('moduleRequirements', {'branches': ['even']}),
+                           ('requiredConstantFeatures', ['wordLiteral'])):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                campaign.validate_manifest({**self.manifest(), key: value})
+        self.assertEqual(campaign.generation_recipes(self.case()), {'Templates': set(), 'Updates': set()})
+
+    def test_helper_count_is_checked_against_the_step_graph_not_claimed_origin(self):
+        for count in (1, 2, 3):
+            case = self.case(helpers=count)
+            case['program'] = {}  # The plan graph, not the loop scaffold, supplies the inventory.
+            case['provenance']['origin']['helperCount'] = 99
+            self.assertEqual(campaign.helper_counts(case), {count})
+            case['provenance']['helperCount'] = 1 if count != 1 else 2
+            with self.assertRaisesRegex(ValueError, 'step declaration'): campaign.helper_counts(case)
+            del case['provenance']['helperCount']
+            with self.assertRaisesRegex(ValueError, 'step declaration'): campaign.helper_counts(case)
+        for mutate in (lambda s: s.update(resultType='word'), lambda s: s.update(dataDefinitions=[{}]),
+                       lambda s: s.update(body={'tag': 'word', 'value': '0x' + '00' * 32}),
+                       lambda s: s.update(body=function_case(4)['program']['body']['function'])):
+            case = self.case()
+            mutate(case['loopPlan']['stepProgram'])
+            with self.assertRaises(ValueError): campaign.helper_counts(case)
+        case = self.case(); case['loopPlan']['schema'] = 'solcore-lean.loop-plan.v1'
+        with self.assertRaisesRegex(ValueError, 'call-graph loop plan schema'): campaign.helper_counts(case)
+        case = loop_policy_case(); case['loopPlan']['schema'] = 'solcore-lean.call-graph-loop-plan.v1'
+        with self.assertRaisesRegex(ValueError, 'unsupported loop plan schema'): campaign.helper_counts(case)
+        self.assertEqual(campaign.helper_counts(loop_policy_case(helpers=3)), {3})
+
+    def test_call_shapes_come_only_from_the_canonical_provenance_inventory(self):
+        self.assertEqual(campaign.call_shapes(self.case()), set(self.SHAPES))
+        self.assertEqual(campaign.call_shapes(self.case(shapes=campaign.m2.CALL_SHAPES)), set(campaign.m2.CALL_SHAPES))
+        self.assertEqual(campaign.call_shapes(self.case(shapes=())), set())
+        for value in (None, 'diamond', ['unknown'], ['diamond', 'diamond'], ['local-call', 'nested-call']):
+            case = self.case(); case['provenance']['callShapes'] = value
+            with self.assertRaisesRegex(ValueError, 'canonical'): campaign.call_shapes(case)
+        # An ordinary loop case claims no call shapes, even if its provenance said otherwise.
+        ordinary = loop_policy_case(); ordinary['provenance']['callShapes'] = ['diamond']
+        self.assertEqual(campaign.call_shapes(ordinary), set())
+
+    def test_specified_loops_use_this_profiles_mask_and_input(self):
+        for mask, value, iterations in ((0, 7, 0), (1, 7, 1), (1, 2, 0), (3, 7, 3), (3, 2**255, 0), (3, 2**256 - 1, 3),
+                                        (7, 7, 7), (7, 3, 3), (7, 1, 1), (7, 0, 0), (7, 2**256 - 1, 7), (7, 2**255, 0)):
+            with self.subTest(mask=mask, value=value):
+                self.assertEqual(campaign.specified_loops(self.case(mask, value)), {'Masks': {mask}, 'Iterations': {iterations}})
+                self.assertEqual(campaign.specified_loops(self.case(mask, value)),
+                    campaign.specified_loops(loop_policy_case(mask, value)))
+        for invalid in ({'mask': 2}, {'mask': True}, {'mask': 8}, {'stepProgram': None}, {'schema': 'solcore-lean.loop-plan.v1'}):
+            case = self.case(); case['loopPlan'].update(invalid)
+            with self.assertRaises(ValueError): campaign.specified_loops(case)
+        case = self.case(); del case['loopPlan']
+        with self.assertRaises(ValueError): campaign.specified_loops(case)
+        case = loop_policy_case(); case['loopPlan']['schema'] = 'solcore-lean.call-graph-loop-plan.v1'
+        with self.assertRaises(ValueError): campaign.specified_loops(case)
+        for other in (function_case(1), CallGraphCoverageTests().case()):
+            self.assertEqual(campaign.specified_loops(other), {'Masks': set(), 'Iterations': set()})
+
+    def test_materialization_routes_six_inputs_and_matches_expected_metadata(self):
+        tampers = (None, 'shapes', 'helper', 'features', 'seed', 'kind', 'nodes', 'input',
+                   *('version:' + key for key in self.VERSIONS))
+        for generated in (False, True):
+            for tamper in tampers:
+                if not generated and tamper in ('seed', 'kind', 'nodes'): continue
+                with self.subTest(generated=generated, tamper=tamper), tempfile.TemporaryDirectory() as directory:
+                    config = options(directory); config.profile, config.cases = self.PROFILE, 1
+                    config.corpus = Path(directory) / 'manifest.json'
+                    manifest = self.manifest(generated); config.corpus.write_text(json.dumps(manifest))
+                    instance = campaign.Campaign(config); calls = []; plans = []; case = self.case()
+                    if tamper == 'shapes': case['provenance']['callShapes'] = ['diamond']
+                    if tamper == 'helper': case['provenance']['helperCount'] = 3
+                    if tamper == 'features': case['provenance']['features'] = ['functionCall']
+                    if tamper == 'seed': case['provenance']['origin']['seed'] = '9'
+                    if tamper == 'kind': case['provenance']['origin']['kind'] = 'call-graph-generated'
+                    if tamper == 'nodes': case['provenance']['origin']['maxProgramNodes'] = 128
+                    if tamper == 'input': case = self.case(7, 3)
+                    if tamper and tamper.startswith('version:'): case['provenance'][tamper[8:]] = 'wrong'
+                    def tool(arguments, stage):
+                        calls.append((arguments, stage))
+                        if generated: return {'cases': [case]}
+                        plans.append(json.loads(Path(arguments[1]).read_text()))
+                        return case
+                    instance.tool = tool
+                    if generated and tamper == 'input':
+                        # A generated request keeps only the case with the requested boundary input.
+                        response = instance.prepare_cases()
+                        self.assertEqual(response['cases'], [])
+                        self.assertEqual(response['excluded'][0]['stage'], 'generation')
+                    elif tamper:
+                        with self.assertRaises(ValueError): instance.prepare_cases()
+                    else:
+                        self.assertEqual(instance.prepare_cases()['cases'], [case])
+                        summary = instance.summary
+                        self.assertEqual(summary['callShapeCoverage']['generatedShapes'], list(self.SHAPES))
+                        self.assertEqual(summary['callShapeCoverage']['matchedShapes'], [])
+                        self.assertEqual(summary['callShapeCoverage']['requiredShapes'], list(campaign.m2.CALL_SHAPES))
+                        self.assertEqual(summary['loopCoverage']['generatedMasks'], [7])
+                        self.assertEqual(summary['loopCoverage']['generatedIterations'], [7])
+                        self.assertEqual(summary['loopCoverage']['matchedMasks'], [])
+                        self.assertEqual(summary['loopCoverage']['requiredMasks'], [0, 1, 3, 7])
+                        self.assertEqual(summary['loopCoverage']['requiredIterations'], [0, 1, 3, 7])
+                        self.assertEqual(summary['coverage']['generatedHelperCounts'], [2])
+                        self.assertEqual(summary['coverage']['generatedInputs'], ['7'])
+                        self.assertEqual(summary['coverage']['requiredInputs'], sorted(campaign.LOOP_INPUTS, key=int))
+                        self.assertEqual(summary['recipeCoverage']['generatedTemplates'], [])
+                    if generated:
+                        self.assertEqual(calls, [(['call-graph-loop-generate', '1', '256', '6', '1', '1000'], 'corpus-generation')])
+                    else:
+                        self.assertEqual(len(calls), 1)
+                        self.assertEqual(calls[0][1], 'corpus-emission')
+                        self.assertEqual(calls[0][0][0], 'call-graph-loop-emit')
+                        self.assertEqual(calls[0][0][2:], ['7', '1000'])
+                        self.assertEqual(plans, [manifest['cases'][0]['loopPlan']])
+
+    def test_committed_corpus_routes_every_entry_to_its_native_command(self):
+        manifest = self.committed(); entries = manifest['cases']
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile, config.cases, config.attempts = self.PROFILE, len(entries), len(entries)
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(manifest))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                entry = entries[len(calls)]
+                case = self.case(7, int(entry['input']), entry['expectedHelperCount'], entry['expectedCallShapes'])
+                case['provenance'].update({key: manifest[key] for key in self.VERSIONS})
+                case['provenance']['features'] = list(entry['expectedFeatures'])
+                if 'generation' in entry:
+                    request = entry['generation']
+                    case['provenance']['origin'].update(seed=request['seed'], maxProgramNodes=request['maxProgramNodes'])
+                    calls.append((arguments, stage))
+                    return {'cases': [case]}
+                case['loopPlan'] = copy.deepcopy(entry['loopPlan'])
+                self.assertEqual(json.loads(Path(arguments[1]).read_text()), entry['loopPlan'])
+                calls.append((arguments, stage))
+                return case
+            instance.tool = tool
+            response = instance.prepare_cases()
+        self.assertEqual(len(response['cases']), len(entries))
+        self.assertEqual(response['excluded'], [])
+        self.assertEqual(len(calls), len(entries))
+        for (arguments, stage), entry in zip(calls, entries):
+            if 'generation' in entry:
+                request = entry['generation']
+                self.assertEqual((arguments, stage), (['call-graph-loop-generate', request['seed'],
+                    str(request['maxProgramNodes']), '6', '1', '1000'], 'corpus-generation'))
+            else:
+                self.assertEqual((arguments[0], arguments[2:], stage), ('call-graph-loop-emit', [entry['input'], '1000'], 'corpus-emission'))
+        summary = instance.summary
+        self.assertEqual(summary['counts']['generated'], len(entries))
+        self.assertEqual(summary['loopCoverage']['generatedMasks'], [0, 1, 3, 7])
+        self.assertEqual(summary['loopCoverage']['generatedIterations'], [0, 1, 3, 7])
+        self.assertEqual(summary['loopCoverage']['requiredMasks'], [0, 1, 3, 7])
+        self.assertEqual(summary['loopCoverage']['matchedMasks'], [])
+        self.assertEqual(summary['callShapeCoverage']['generatedShapes'], list(campaign.m2.CALL_SHAPES))
+        self.assertEqual(summary['callShapeCoverage']['requiredShapes'], list(campaign.m2.CALL_SHAPES))
+        self.assertEqual(summary['coverage']['generatedHelperCounts'], [1, 2, 3])
+        self.assertEqual(summary['coverage']['generatedInputs'], sorted(campaign.LOOP_INPUTS, key=int))
+
+    def test_only_actual_matched_cases_satisfy_loop_shape_and_helper_requirements(self):
+        for category in ('matched', 'inconclusive-resource', 'source-rejected', 'semantic-mismatch'):
+            with self.subTest(category=category), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+                instance = campaign.Campaign(config); case = self.case(3, 7, 3)
+                def prepare():
+                    instance.summary['callShapeCoverage']['requiredShapes'] = list(campaign.m2.CALL_SHAPES)
+                    instance.summary['loopCoverage'].update(requiredMasks=[0, 1, 3, 7], requiredIterations=[0, 1, 3, 7])
+                    instance.summary['coverage']['requiredHelperCounts'] = [1, 2, 3]
+                    return {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [case], 'excluded': [],
+                        'requested': 1, 'attempted': 1, 'status': 'complete'}
+                def execute(_case):
+                    folder = instance.work / 'candidate'; folder.mkdir()
+                    report = matched()
+                    if category != 'matched': report['comparison'] = {'category': category, 'pairs': {}}
+                    return folder, report, campaign.analyze(report)
+                instance.prepare_cases, instance.execute_case = prepare, execute
+                with redirect_stdout(io.StringIO()): instance.run()
+                ok = category == 'matched'
+                loops, shapes, coverage = (instance.summary[key] for key in ('loopCoverage', 'callShapeCoverage', 'coverage'))
+                self.assertEqual(loops['generatedMasks'], [3]); self.assertEqual(loops['generatedIterations'], [3])
+                self.assertEqual(loops['matchedMasks'], [3] if ok else [])
+                self.assertEqual(loops['matchedIterations'], [3] if ok else [])
+                self.assertEqual(loops['missingMasks'], [0, 1, 7] if ok else [0, 1, 3, 7])
+                self.assertEqual(loops['missingIterations'], [0, 1, 7] if ok else [0, 1, 3, 7])
+                self.assertEqual(shapes['generatedShapes'], list(self.SHAPES))
+                self.assertEqual(shapes['matchedShapes'], list(self.SHAPES) if ok else [])
+                self.assertEqual(shapes['missingShapes'], [s for s in campaign.m2.CALL_SHAPES if not ok or s not in self.SHAPES])
+                self.assertEqual(coverage['generatedHelperCounts'], [3])
+                self.assertEqual(coverage['matchedHelperCounts'], [3] if ok else [])
+                self.assertEqual(coverage['missingHelperCounts'], [1, 2] if ok else [1, 2, 3])
+                self.assertEqual(instance.summary['generation']['attemptUnit'], 'function graph candidates')
+                self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_complete_coverage_is_the_union_of_matched_cases_and_other_profiles_are_separate(self):
+        shapes = campaign.m2.CALL_SHAPES
+        cases = [self.case(3, 3, shapes=shapes[6:]), self.case(0, 7, shapes=shapes[:3]),
+                 self.case(7, 7, shapes=shapes[3:6]), self.case(1, 1, shapes=())]
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            instance.summary['callShapeCoverage']['requiredShapes'] = list(shapes)
+            instance.summary['loopCoverage'].update(requiredMasks=[0, 1, 3, 7], requiredIterations=[0, 1, 3, 7])
+            for case in cases:  # Generated-only cases never satisfy a requirement.
+                instance.record_loops(case); instance.record_call_shapes(case)
+            instance.checkpoint()
+            self.assertEqual(instance.summary['loopCoverage']['matchedMasks'], [])
+            self.assertEqual(instance.summary['loopCoverage']['generatedIterations'], [0, 1, 3, 7])
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+            for step, case in enumerate(cases):
+                instance.record_loops(case, matched=True); instance.record_call_shapes(case, matched=True); instance.checkpoint()
+                self.assertEqual(campaign.missing_coverage(instance.summary), step < len(cases) - 1)
+            summary = instance.summary
+            self.assertEqual(summary['loopCoverage']['matchedMasks'], [0, 1, 3, 7])
+            self.assertEqual(summary['loopCoverage']['matchedIterations'], [0, 1, 3, 7])
+            self.assertEqual(summary['loopCoverage']['missingMasks'], [])
+            self.assertEqual(summary['loopCoverage']['missingIterations'], [])
+            self.assertEqual(summary['callShapeCoverage']['matchedShapes'], list(shapes))
+            self.assertEqual(summary['callShapeCoverage']['missingShapes'], [])
+        # Neither older profile gains the other's coverage group or accumulates this profile's claims.
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = 'runtime-loops'
+            instance = campaign.Campaign(config)
+            self.assertNotIn('callShapeCoverage', instance.summary)
+            instance.record_call_shapes(self.case()); instance.checkpoint()
+            self.assertNotIn('callShapeCoverage', instance.summary)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = 'runtime-call-graphs'
+            instance = campaign.Campaign(config)
+            instance.record_loops(CallGraphCoverageTests().case(), matched=True); instance.checkpoint()
+            self.assertEqual(instance.summary['loopCoverage']['generatedMasks'], [])
+            self.assertEqual(instance.summary['loopCoverage']['matchedMasks'], [])
+
+    def test_missing_loop_or_shape_coverage_fails_an_otherwise_matched_campaign(self):
+        for gap, code, missing_iterations, missing_shapes in (('none', 0, [], []), ('iterations', 1, [0, 3], []),
+                ('shapes', 1, [], ['primitive-operand-call'])):
+            with self.subTest(gap=gap), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'campaign'
+                def run(instance, gap=gap):
+                    shapes = list(campaign.m2.CALL_SHAPES)
+                    instance.summary['status'] = 'complete'
+                    instance.summary['counts'].update(generated=1, executed=1, completed=1, matched=1)
+                    instance.summary['loopCoverage'].update(requiredMasks=[1, 3], requiredIterations=[0, 1, 3],
+                        generatedMasks=[1, 3], matchedMasks=[1, 3], generatedIterations=[0, 1, 3],
+                        matchedIterations=[1] if gap == 'iterations' else [0, 1, 3])
+                    instance.summary['callShapeCoverage'].update(requiredShapes=shapes, generatedShapes=shapes,
+                        matchedShapes=shapes[:-1] if gap == 'shapes' else shapes)
+                with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', self.PROFILE, '--cases', '1']), \
+                        patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                    self.assertEqual(campaign.main(), code)
+                summary = json.loads((output / 'summary.json').read_text())
+                self.assertEqual(summary['status'], 'complete' if gap == 'none' else 'coverage-incomplete')
+                self.assertEqual(summary['loopCoverage']['missingIterations'], missing_iterations)
+                self.assertEqual(summary['loopCoverage']['missingMasks'], [])
+                self.assertEqual(summary['callShapeCoverage']['missingShapes'], missing_shapes)
+
+    def test_case_tool_responses_must_use_this_profiles_schema(self):
+        for profile, case in ((self.PROFILE, loop_policy_case()), (self.PROFILE, CallGraphCoverageTests().case()),
+                              ('runtime-loops', self.case()), ('runtime-call-graphs', self.case())):
+            with self.subTest(profile=profile, schema=case['schema']), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.cases = profile, 1
+                instance = campaign.Campaign(config)
+                instance.prepare_cases = lambda case=case: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [case],
+                    'excluded': [], 'requested': 1, 'attempted': 1, 'status': 'complete'}
+                with self.assertRaisesRegex(ValueError, 'different generation profile'): instance.run()
+
+    def test_cli_infers_profile_and_defaults_from_corpus_or_saved_case(self):
+        count = len(self.committed()['cases'])
+        args, _ = self.run_main('--corpus', str(self.CORPUS), prepare=False)
+        self.assertEqual((args.profile, args.cases, args.nodes, args.attempts), (self.PROFILE, count, 256, 256))
+        self.assertEqual(args.corpus, self.CORPUS)
+        args, _ = self.run_main('--profile', self.PROFILE, '--corpus', str(self.CORPUS), '--cases', '3', prepare=False)
+        self.assertEqual((args.profile, args.cases), (self.PROFILE, 3))
+        with tempfile.TemporaryDirectory() as directory:
+            saved = Path(directory) / 'case.json'; saved.write_text(json.dumps(self.case()))
+            args, seen = self.run_main('--case', str(saved))
+            self.assertEqual((args.profile, args.cases, args.nodes), (self.PROFILE, 1, 256))
+            self.assertEqual(seen, [])
+            for profile in ('runtime-loops', 'runtime-call-graphs'):
+                with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    self.run_main('--profile', profile, '--case', str(saved), prepare=False)
+        for profile in ('runtime-loops', 'runtime-call-graphs', 'closed-g0'):
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.run_main('--profile', profile, '--corpus', str(self.CORPUS), prepare=False)
+
+    def test_default_random_limits_and_explicit_limits_route_unchanged(self):
+        for extra, expected in (([], ['256', '1', '256']), (['--nodes', '128', '--attempts', '7'], ['128', '1', '7']),
+                                (['--nodes', '39'], ['39', '1', '256']), (['--nodes', '512'], ['512', '1', '256'])):
+            with self.subTest(extra=extra):
+                args, seen = self.run_main('--profile', self.PROFILE, '--cases', '1', *extra)
+                self.assertEqual(seen, [['call-graph-loop-generate', '1', *expected, '1000000']])
+        # Neighbouring defaults are untouched.
+        for profile, command, nodes, attempts in (('runtime-loops', 'loop-generate', '384', '256'),
+                ('runtime-call-graphs', 'call-graph-generate', '192', '1024'),
+                ('runtime-aggregates', 'aggregate-generate', '256', '256'),
+                ('runtime-primitives', 'primitive-generate', '96', '512')):
+            _, seen = self.run_main('--profile', profile, '--cases', '1')
+            self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000']])
+        for nodes in ('38', '3', '513'):
+            with self.subTest(nodes=nodes), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.run_main('--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        # The lower bound is specific to this profile: the ordinary loop profile still accepts 38.
+        _, seen = self.run_main('--profile', 'runtime-loops', '--cases', '1', '--nodes', '38')
+        self.assertEqual(seen, [['loop-generate', '1', '38', '1', '256', '1000000']])
+
+    def test_call_graph_loop_shrink_keeps_schema_backend_and_explicit_synthetic_separation(self):
+        for backend in campaign.m2.BACKENDS:
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+                config = options(directory); config.profile, config.backend = self.PROFILE, backend
+                config.test_perturb_path = 'rustEvm'; config.upstream, config.target_dir = Path('/unused/u'), Path('/unused/t')
+                instance = campaign.Campaign(config); selected = []
+                original, candidate = self.case(7, 7), self.case(7, 1)
                 def execute(args, report):
                     selected.append(args.backend); report.update(matched(), backend=args.backend)
                     campaign.save_json(args.output/'case.json', json.loads(args.case.read_text()))

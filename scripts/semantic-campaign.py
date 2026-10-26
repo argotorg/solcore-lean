@@ -35,6 +35,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-word": ("input-generate", "input-emit", "input-generated"),
                     "runtime-primitives": ("primitive-generate", "primitive-emit", "primitive-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
+                    "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
                     "runtime-functions": ("function-generate", "function-emit", "function-generated"),
                     "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated"),
                     "runtime-aggregates": ("aggregate-generate", "aggregate-emit", "aggregate-generated"),
@@ -43,7 +44,9 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-closures": ("closure-generate", "closure-emit", "closure-generated"),
                     "runtime-comptime": ("comptime-generate", "comptime-emit", "comptime-generated"),
                     "runtime-modules": ("module-generate", "module-emit", "module-generated")}
-HELPER_PROFILES = ("runtime-call-graphs", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
+CALL_GRAPH_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops")
+LOOP_PROFILES = ("runtime-loops", "runtime-call-graph-loops")
+HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 LOOP_INPUTS = ("0", "1", "3", "7", str(2**256 - 1), str(2**255))
 PRIMITIVE_INPUTS = ("0", "1", "2", "255", "256", str(2**256 - 1), str(2**255), str(2**255 - 1))
@@ -59,6 +62,7 @@ PRIMITIVE_VERSIONS = (*INPUT_VERSIONS, "baseGeneratorVersion", "boundaryVersion"
 PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-primitives": PRIMITIVE_VERSIONS,
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
+                          "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
                           "runtime-functions": INPUT_VERSIONS,
                           "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion"),
                           "runtime-aggregates": ("profileVersion", "functionVersion", "templateVersion"),
@@ -158,26 +162,34 @@ def helper_counts(case: dict) -> set[int]:
         if case.get("provenance", {}).get("helperCount") != count:
             raise ValueError("call-graph helperCount differs from its declaration inventory")
         return {count}
+    if case.get("schema") == m2.CALL_GRAPH_LOOP_CASE_SCHEMA:
+        step = m2.validate_call_graph_loop_plan(case.get("loopPlan"))["stepProgram"]
+        if step.get("resultType") != {"tag": "function", "parameter": "word", "result": "word"} or step.get("dataDefinitions") != []:
+            raise ValueError("plan step must be a closed Word function graph")
+        count = bound_helper_count(step.get("body"))
+        if case.get("provenance", {}).get("helperCount") != count:
+            raise ValueError("call-graph loop helperCount differs from its step declaration inventory")
+        return {count}
     return {declared_helper_count(case["program"])} if m2.CASE_PROFILES.get(case.get("schema")) in HELPER_PROFILES else set()
 
 
 def call_shape_requirements(manifest: dict) -> list[str]:
     profile = manifest.get("profile", "closed-g0")
     values = m2.validate_call_shapes(manifest.get("requiredCallShapes",
-        None if profile == "runtime-call-graphs" else []), "requiredCallShapes")
-    if profile != "runtime-call-graphs" and values:
+        None if profile in CALL_GRAPH_PROFILES else []), "requiredCallShapes")
+    if profile not in CALL_GRAPH_PROFILES and values:
         raise ValueError("only call-graph corpora can require call shapes")
     return values
 
 
 def call_shapes(case: dict) -> set[str]:
-    if case.get("schema") != m2.CALL_GRAPH_CASE_SCHEMA:
+    if case.get("schema") not in (m2.CALL_GRAPH_CASE_SCHEMA, m2.CALL_GRAPH_LOOP_CASE_SCHEMA):
         return set()
     return set(m2.validate_call_shapes(case.get("provenance", {}).get("callShapes")))
 
 
 def minimum_nodes(profile: str) -> int:
-    return {"runtime-primitives": 8, "runtime-call-graphs": 13}.get(profile, 3)
+    return {"runtime-primitives": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39}.get(profile, 3)
 
 
 def loop_requirements(manifest: dict) -> dict:
@@ -188,16 +200,18 @@ def loop_requirements(manifest: dict) -> dict:
         values = requirements[key]
         if not isinstance(values, list) or any(type(v) is not int or v not in allowed for v in values) or len(values) != len(set(values)):
             raise ValueError(f"invalid loop {key} requirements")
-    if manifest.get("profile", "closed-g0") != "runtime-loops" and any(requirements.values()):
+    if manifest.get("profile", "closed-g0") not in LOOP_PROFILES and any(requirements.values()):
         raise ValueError("only loop corpora can require masks and specified iterations")
     return requirements
 
 
 def specified_loops(case: dict) -> dict[str, set[int]]:
     """Prescribed iteration counts, never a claim of measured execution traces."""
-    if case.get("schema") != m2.LOOP_CASE_SCHEMA:
+    validators = {m2.LOOP_CASE_SCHEMA: m2.validate_loop_plan,
+                  m2.CALL_GRAPH_LOOP_CASE_SCHEMA: m2.validate_call_graph_loop_plan}
+    if case.get("schema") not in validators:
         return {"Masks": set(), "Iterations": set()}
-    plan = m2.validate_loop_plan(case.get("loopPlan"))
+    plan = validators[case["schema"]](case.get("loopPlan"))
     return {"Masks": {plan["mask"]}, "Iterations": {int(m2.word(case.get("input"))) & plan["mask"]}}
 
 
@@ -400,6 +414,8 @@ def validate_manifest(manifest) -> dict:
             raise ValueError("primitive corpus must require all eight boundary inputs")
     if profile == "runtime-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph corpus must require all eight boundary inputs")
+    if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
+        raise ValueError("call-graph loop corpus must require all six loop boundary inputs")
     required_helpers = manifest.get("requiredHelperCounts", None if profile in HELPER_PROFILES else [])
     if not isinstance(required_helpers, list) or any(type(value) is not int or not 1 <= value <= 3 for value in required_helpers):
         raise ValueError("corpus requiredHelperCounts must be an array of integers from one to three")
@@ -422,7 +438,7 @@ def validate_manifest(manifest) -> dict:
         ids.add(entry["id"])
         if sum(key in entry for key in ("generation", "program", "loopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -434,7 +450,7 @@ def validate_manifest(manifest) -> dict:
             raise ValueError("closed G0 corpus entries cannot specify a runtime input")
         if not isinstance(entry.get("expectedFeatures"), list) or any(not isinstance(value, str) for value in entry["expectedFeatures"]):
             raise ValueError("expectedFeatures must be an array of strings")
-        if profile == "runtime-call-graphs":
+        if profile in CALL_GRAPH_PROFILES:
             if "expectedCallShapes" in entry:
                 m2.validate_call_shapes(entry["expectedCallShapes"], "expectedCallShapes")
             if "expectedHelperCount" in entry and (type(entry["expectedHelperCount"]) is not int or not 1 <= entry["expectedHelperCount"] <= 3):
@@ -453,7 +469,7 @@ def validate_manifest(manifest) -> dict:
             if int(seed) >= 2**64 or type(nodes) is not int or not minimum_nodes(profile) <= nodes <= 512:
                 raise ValueError("generation request exceeds seed or node limits")
         elif "loopPlan" in entry:
-            m2.validate_loop_plan(entry["loopPlan"])
+            (m2.validate_call_graph_loop_plan if profile == "runtime-call-graph-loops" else m2.validate_loop_plan)(entry["loopPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -468,7 +484,7 @@ def validate_manifest(manifest) -> dict:
 
 
 def profile_inputs(profile: str) -> tuple[str, ...]:
-    if profile == "runtime-loops":
+    if profile in LOOP_PROFILES:
         return LOOP_INPUTS
     if profile in ("runtime-primitives", "runtime-call-graphs"):
         return PRIMITIVE_INPUTS
@@ -604,7 +620,7 @@ class Campaign:
             "moduleCoverage": {"classification": "prescribed mixed-module selection branches; canonical bundles verified by native replay; not measured import or opcode coverage",
                 "generatedBranches": [], "matchedBranches": [], "requiredBranches": []},
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
-        if args.profile == "runtime-call-graphs":
+        if args.profile in CALL_GRAPH_PROFILES:
             self.summary["callShapeCoverage"] = {
                 "classification": "original Core syntactic call shapes; matched cases authenticated by native replay; not measured calls or opcode coverage",
                 "requiredShapes": [], "generatedShapes": [], "matchedShapes": [], "missingShapes": []}
@@ -920,7 +936,7 @@ class Campaign:
                 case = generated[0]
             elif any(key in entry for key in ("program", "loopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -943,7 +959,7 @@ class Campaign:
                 raise ValueError(f"corpus feature inventory changed for {entry['id']}")
             if profile in ("runtime-comptime", "runtime-modules") and set(entry["expectedConstantFeatures"]) != constant_features(case):
                 raise ValueError(f"corpus constant feature inventory changed for {entry['id']}")
-            if profile == "runtime-call-graphs":
+            if profile in CALL_GRAPH_PROFILES:
                 if "expectedCallShapes" in entry and entry["expectedCallShapes"] != case["provenance"]["callShapes"]:
                     raise ValueError(f"corpus call shape inventory changed for {entry['id']}")
                 if "expectedHelperCount" in entry and entry["expectedHelperCount"] != case["provenance"]["helperCount"]:
@@ -1052,7 +1068,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates, 192 for mutation/call graphs, 96 for primitives, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
@@ -1090,7 +1106,7 @@ def main() -> int:
     if args.attempts is None:
         args.attempts = 1024 if args.profile == "runtime-call-graphs" else 512 if args.profile in ("runtime-primitives", "runtime-comptime", "runtime-modules") else 256
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16
