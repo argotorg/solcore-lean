@@ -696,8 +696,13 @@ class SuiteTests(unittest.TestCase):
                     self.assertEqual(code, expected)
                     self.assertIsNone(reason)
                     pid = int(pidfile.read_text())
-                    state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
-                    self.assertTrue(not state or state.startswith("Z"))
+                    # SIGKILL delivery is asynchronous; an untracked child would sleep for 60 s.
+                    for _ in range(40):
+                        state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+                        if not state or state.startswith("Z"):
+                            break
+                        time.sleep(.05)
+                    self.assertTrue(not state or state.startswith("Z"), f"tracked descendant survived exit: state {state!r}")
                 finally:
                     if pidfile.exists():
                         with contextlib.suppress(ProcessLookupError):
