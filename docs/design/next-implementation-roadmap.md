@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive and call-graph emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph and private-mutation emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -579,18 +579,25 @@ reuses the shared cases.
 `CallGraph.emit_source_meaning` covers the `runtime-call-graphs` emitter, whose
 helpers and entry may call earlier helpers and the raw opcode aliases. The
 helper loop proof is now generic over the renderer and the call context, and
-helper names never shadow an alias. The aggregate, loop, mutation, storage,
-call, closure, generic, comptime and module emitters are not covered; mutation,
-aggregates and loops come next.
+helper names never shadow an alias.
+
+`Mutation.emit_source_meaning` covers the `runtime-mutation` emitter, whose
+private mutable Word locals live in the Core store. Each source `sc_c<n>` local
+holds the Word of its Core cell, every read is copied before a later write, and
+helpers keep their caller's store. Because such a program ends with its cells
+in the store, the result is stated for some final store that every completed
+run reaches. The aggregate, loop, storage, call, closure, generic, comptime and
+module emitters are not covered. Aggregates need a larger source grammar, and
+the loop emitters build on the aggregate renderer.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
-fixtures, four named-helper graphs, 39 raw primitive bodies and twenty call
-graphs at eight or more boundary inputs, and twenty generated programs, agree
-with Core. Fifty-four primitive and call-graph results also match hand-known
-Words. Malformed and meaningless texts,
+fixtures, four named-helper graphs, 39 raw primitive bodies, twenty call graphs
+and six mutation graphs at eight or more boundary inputs, and twenty generated
+programs, agree with Core. Fifty-four primitive and call-graph results and the
+mutation results also match hand-known Words. Malformed and meaningless texts,
 including calls to aliases that are not imported, are rejected. The full Lean
-build (9,947 jobs), registered tests and the semantic-kernel policy passed.
+build (9,951 jobs), registered tests and the semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

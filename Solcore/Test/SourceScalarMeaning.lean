@@ -1,10 +1,12 @@
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Source.ScalarMeaning.CallGraphEmitter
 import Solcore.Synthesis.Source.ScalarMeaning.FunctionEmitter
+import Solcore.Synthesis.Source.ScalarMeaning.MutationEmitter
 import Solcore.Synthesis.Source.ScalarMeaning.PrimitiveEmitter
 import Solcore.Test.SourceCallGraphEmitter
 import Solcore.Test.SourceFunctionEmitter
 import Solcore.Test.SourceInputEmitter
+import Solcore.Test.SourceMutationEmitter
 import Solcore.Test.SourcePrimitiveEmitter
 import Solcore.Test.SourceSynthesisEmitter
 
@@ -246,6 +248,49 @@ private def checkCallGraphs : IO Unit := do
   for (label, helpers, entry) in Tests.SourceFunctionEmitter.fixtures do
     checkCallGraph s!"named helpers {label}" helpers entry []
 
+/-- Hand-known results of the mutation fixtures, copied from the Core regression
+in `SourceMutationEmitter`. -/
+private def knownMutation : List (String × (Nat → Nat)) := [
+  ("load-before-store", fun input => (input + 2) % 2 ^ 256),
+  ("independent-cells", fun input => (input + 11) % 2 ^ 256),
+  ("callee-isolation", fun input => (2 * input + 3) % 2 ^ 256),
+  ("unit-before-call", fun _ => 20),
+  ("bool-and-unit", fun input => if input == 0 then 0 else (input + 1) % 2 ^ 256),
+  ("nested-store-value", fun _ => 5)]
+
+/-- Private mutable locals: each input is compared with the original Core
+binding chain and with the hand-known result. -/
+private def checkMutation (label : String) (helpers : List Wire.Expr) (entry : Wire.Expr) :
+    IO Unit := do
+  let some graph := LocalMutation.CheckedDAG.ofParts? helpers entry |
+    throw (IO.userError s!"mutation fixture failed its checker: {label}")
+  let emitted ← match Mutation.emit graph with
+    | .ok value => pure value
+    | .error error =>
+        throw (IO.userError s!"mutation emission failed: {label}: {reprStr error}")
+  checkReprint label emitted.source
+  let some (_, known) := knownMutation.find? (·.1 == label) |
+    throw (IO.userError s!"missing hand-known mutation result: {label}")
+  for input in boundaryInputs do
+    let expected ← coreWord (graph.instantiate (Word.ofNatModulo input)).toCore
+    ensure (sourceCall emitted.source "run" [input] == some expected)
+      s!"mutation source meaning differs from Core: {label} at {input}"
+    ensure (expected == known input)
+      s!"mutation Core result differs from its hand-known result: {label} at {input}"
+
+/-- A write to a cell that was never declared has no meaning. -/
+private def checkMutationRejection : IO Unit := do
+  let some graph := LocalMutation.CheckedDAG.ofParts? [Tests.SourceMutationEmitter.snapshotBody]
+      Tests.SourceMutationEmitter.entry |
+    throw (IO.userError "mutation rejection fixture failed its checker")
+  let emitted ← match Mutation.emit graph with
+    | .ok value => pure value
+    | .error error => throw (IO.userError s!"mutation rejection emission failed: {reprStr error}")
+  let undeclared := emitted.source.replace "sc_c0 = " "sc_c9 = "
+  ensure (undeclared != emitted.source) "mutation fixture has no write to sc_c0"
+  ensure ((parseSource undeclared).isSome && sourceCall undeclared "run" [1] == none)
+    "a write to an undeclared cell received a meaning"
+
 /-- Hand-known Words for the wrap-around and bitwise fixtures, independent of
 both Core and the source semantics. -/
 private def knownClosedResults : List (String × Nat) := [
@@ -324,6 +369,9 @@ def testSourceScalarMeaning : IO Unit := do
   checkKnownPrimitives
   checkPrimitiveImports
   checkCallGraphs
+  for (label, helpers, entry) in Tests.SourceMutationEmitter.fixtures do
+    checkMutation label helpers entry
+  checkMutationRejection
   checkRejections
   let (checked, excluded) ← checkGenerated
   ensure (checked ≥ 16) s!"too few generated programs reached the source meaning: {checked}"
@@ -332,9 +380,10 @@ def testSourceScalarMeaning : IO Unit := do
   let graphs := Tests.SourceFunctionEmitter.fixtures.length
   let primitives := Tests.SourcePrimitiveEmitter.fixtures.length + primitiveBoundaries.length
   let callGraphs := 2 + callGraphPrimitives.length + graphs
+  let mutations := Tests.SourceMutationEmitter.fixtures.length
   IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures, " ++
-    s!"{graphs} named-helper graphs, {primitives} raw primitive bodies and {callGraphs} " ++
-    s!"call graphs x at least {boundaryInputs.length} inputs, {checked} generated programs " ++
-    s!"({excluded} excluded) agree with Core")
+    s!"{graphs} named-helper graphs, {primitives} raw primitive bodies, {callGraphs} " ++
+    s!"call graphs and {mutations} mutation graphs x at least {boundaryInputs.length} " ++
+    s!"inputs, {checked} generated programs ({excluded} excluded) agree with Core")
 
 end Tests.SourceScalarMeaning

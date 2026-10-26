@@ -18,8 +18,9 @@ semantic-kernel policy check now covers.
 | `Function.emit_source_meaning` | If `Function.emit graph = .ok emitted` (profile `runtime-functions`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
 | `Primitive.emit_source_meaning` | If `Primitive.emit function = .ok emitted` (profile `runtime-primitives`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
 | `CallGraph.emit_source_meaning` | If `CallGraph.emit graph = .ok emitted` (profile `runtime-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
-| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `render_spec`, `primitive_render_spec`, `callGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render` and `CallGraphRenderer.renderWithFunctions`, described below. |
+| `Mutation.emit_source_meaning` | If `Mutation.emit graph = .ok emitted` (profile `runtime-mutation`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
+| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
+| `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions` and `MutationRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
@@ -27,9 +28,12 @@ the source semantics below. `CoreReturns core w` states that Core's
 `runStateful` returns `.done (.word w) []` for all sufficiently large fuel, and
 that every completed run returns exactly that Word and store. This is the Core
 machine used as the differential-testing oracle; for the runtime-input,
-named-helper, raw-primitive and call-graph profiles it runs the original lambda
-or binding chain applied to the input. Unsupported operations remain explicit emitter errors; the theorems
-say nothing about failed emissions.
+named-helper, raw-primitive, call-graph and private-mutation profiles it runs
+the original lambda or binding chain applied to the input. A Core program with
+mutable locals ends with its cells in the store, so `CoreReturnsWithStore`
+states the same for some final store that every completed run reaches.
+Unsupported operations remain explicit emitter errors; the theorems say
+nothing about failed emissions.
 
 ## Independent source meaning
 
@@ -172,8 +176,27 @@ prints raw opcodes as the primitive renderer does, and copies a helper call's
 argument into a fresh temporary before the call.
 [CallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphEmitter.lean)
 shows that the helper names `sc_fn<k>` never shadow an opcode alias or
-`tobool`, so every helper body runs in a primitive call context. Core machine
-results follow from `runStateful_evaluation_sound`,
+`tobool`, so every helper body runs in a primitive call context.
+
+[MutationSpec](../../Solcore/Synthesis/Source/ScalarMeaning/MutationSpec.lean),
+[MutationEquations](../../Solcore/Synthesis/Source/ScalarMeaning/MutationEquations.lean)
+and [MutationPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/MutationPreservation.lean)
+prove `mutation_render_spec` for `MutationRenderer.render`. Core keeps each
+mutable Word local in its store and binds a cell reference; the source keeps it
+in an ordinary local `sc_c<n>` that `x = e;` assigns. The invariant relates
+every binding, a Word, a Boolean, a Unit value without a source name, or a
+cell, to the Core environment, the Core store and the source frames. Distinct
+cells hold distinct locations and distinct bindings have distinct names, so
+writing one cell changes no other binding. Evaluation may append cells and
+write the cells of the bindings; every other existing location is unchanged.
+Every read of a cell is copied to a fresh immutable temporary, so a later
+operand that writes the cell cannot change an earlier value. A helper cannot
+reach its caller's cells, and the proof shows that its evaluation keeps every
+existing location. The proofs inspect the profile's acceptance check through
+its public `initializerKind?`, without naming its private helpers.
+[MutationEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/MutationEmitter.lean)
+connects the actual helper loop and wrapper. Core machine results follow from
+`runStateful_evaluation_sound`,
 `evaluation_runStateful_complete_with_sufficient_fuel` and determinism of
 `Evaluates`.
 
@@ -211,12 +234,15 @@ in a corpus also does not replace this theorem for the printer.
 ## Scope
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
-`CallGraphRenderer.renderWithFunctions` and five actual emitters: closed G0
-(`closed-g0`), runtime input (`runtime-word`), named helpers
-(`runtime-functions`), raw primitive aliases (`runtime-primitives`) and call
-graphs (`runtime-call-graphs`). They do not yet cover aggregates, mutation,
-loops, storage, contract calls, closures, generic, comptime or module emitters.
-The planned order is mutation, aggregates and loops.
+`CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render` and six
+actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`), named
+helpers (`runtime-functions`), raw primitive aliases (`runtime-primitives`),
+call graphs (`runtime-call-graphs`) and private mutable locals
+(`runtime-mutation`). They do not yet cover aggregates, loops, storage,
+contract calls, closures, generic, comptime or module emitters. Aggregates
+(pairs, sums and their matches) need source types and a source grammar beyond
+this fragment, and the loop emitters render their bodies with the aggregate
+renderer.
 
 ## Executable checks
 
@@ -234,7 +260,10 @@ rejected; swapping two aliases in the import line swaps their meanings. The
 call-graph emitter runs on twenty graphs at the same inputs. These are the
 mixed and branch-call graphs of its regression, fourteen opcodes applied to
 helper results, and the four named-helper graphs. Twenty-one of their results
-also match hand-known Words.
+also match hand-known Words. The six mutation graphs of the mutation emitter's
+regression run at the same inputs. Their Core results also match the
+regression's hand-known formulas, and a write to an undeclared cell is
+rejected.
 Twenty programs from the first 96 G0 generator seeds
 with a 40-node budget are emitted; the others are generator or emitter
 exclusions. Each accepted text must reparse and print back to itself. Extra or
