@@ -1,11 +1,12 @@
 import Solcore.Synthesis.Source.ScalarMeaning.Lex
 import Solcore.Synthesis.Source.ScalarMeaning.Syntax
 
-/-! Token grammar and recursive-descent parser for the scalar source
-fragment. Operator applications are fully parenthesized, a name followed by
-`(` is a call, statement blocks end at `}` and function bodies end at
-`return`. `parseFile` inverts the token printing of every file whose names
-are not reserved words. -/
+/-! Token grammar and recursive-descent parser for the source fragment.
+Operator applications are fully parenthesized, a parenthesized pair has a
+comma where an infix operator would be, a name followed by `(` is a call,
+statement blocks end at `}` and function bodies end at `return`. `parseFile`
+inverts the token printing of every file whose names are not reserved
+words. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.ScalarMeaning
@@ -13,7 +14,7 @@ namespace Solcore.Synthesis.Source.ScalarMeaning
 /-- Words that cannot name contracts, methods, parameters or locals. -/
 def reservedWords : List String :=
   ["let", "if", "else", "return", "true", "false", "Typedef", "rep", "uint256", "word", "bool",
-    "import", "from", "contract", "function", "public", "returns"]
+    "import", "from", "contract", "function", "public", "returns", "match", "case", "inl", "inr"]
 
 def isReserved (text : String) : Bool := reservedWords.contains text
 
@@ -30,6 +31,14 @@ def BinaryOp.token : BinaryOp → Token
   | .bitXor => .symbol '^'
   | .eq => .equalEqual
   | .gt => .symbol '>'
+
+/-- The tokens of a type annotation. -/
+def LocalType.tokens : LocalType → List Token
+  | .word => [.ident "word"]
+  | .bool => [.ident "bool"]
+  | .wordPair => [.symbol '(', .ident "word", .symbol ',', .ident "word", .symbol ')']
+  | .wordSum =>
+      [.ident "sum", .symbol '<', .ident "word", .symbol ',', .ident "word", .symbol '>']
 
 def Expr.tokens : Expr → List Token
   | .name identifier => [.ident identifier]
@@ -49,18 +58,35 @@ def Expr.tokens : Expr → List Token
   | .call3 callee first second third =>
       [.ident callee, .symbol '('] ++ first.tokens ++ [.symbol ','] ++ second.tokens ++
         [.symbol ','] ++ third.tokens ++ [.symbol ')']
+  | .tuple first second =>
+      [.symbol '('] ++ first.tokens ++ [.symbol ','] ++ second.tokens ++ [.symbol ')']
+  | .inl payload => [.ident "inl", .symbol '('] ++ payload.tokens ++ [.symbol ')']
+  | .inr payload => [.ident "inr", .symbol '('] ++ payload.tokens ++ [.symbol ')']
 
 mutual
 
 def Stmt.tokens : Stmt → List Token
   | .letDecl identifier type initializer =>
-      [.ident "let", .ident identifier, .symbol ':', .ident type.spelling, .symbol '='] ++
+      [.ident "let", .ident identifier, .symbol ':'] ++ type.tokens ++ [.symbol '='] ++
         initializer.tokens ++ [.symbol ';']
   | .assign identifier value => [.ident identifier, .symbol '='] ++ value.tokens ++ [.symbol ';']
   | .ifElse condition thenBlock elseBlock =>
       [.ident "if", .symbol '('] ++ condition.tokens ++ [.symbol ')', .symbol '{'] ++
         Stmt.listTokens thenBlock ++ [.symbol '}', .ident "else", .symbol '{'] ++
         Stmt.listTokens elseBlock ++ [.symbol '}']
+  | .matchPair scrutinee first second body =>
+      [.ident "match", .symbol '('] ++ scrutinee.tokens ++
+        [.symbol ')', .symbol '{', .ident "case", .symbol '(', .ident first, .symbol ',',
+          .ident second, .symbol ')', .symbol '{'] ++
+        Stmt.listTokens body ++ [.symbol '}', .symbol '}']
+  | .matchSum scrutinee left leftBody right rightBody =>
+      [.ident "match", .symbol '('] ++ scrutinee.tokens ++
+        [.symbol ')', .symbol '{', .ident "case", .ident "inl", .symbol '(', .ident left,
+          .symbol ')', .symbol '{'] ++
+        Stmt.listTokens leftBody ++
+        [.symbol '}', .ident "case", .ident "inr", .symbol '(', .ident right, .symbol ')',
+          .symbol '{'] ++
+        Stmt.listTokens rightBody ++ [.symbol '}', .symbol '}']
 
 def Stmt.listTokens : List Stmt → List Token
   | [] => []
@@ -94,16 +120,16 @@ def aliasImportTokens : List (String × String) → List Token
 
 def typedParameterTokens : List (String × LocalType) → List Token
   | [] => []
-  | [parameter] => [.ident parameter.1, .symbol ':', .ident parameter.2.spelling]
+  | [parameter] => [.ident parameter.1, .symbol ':'] ++ parameter.2.tokens
   | parameter :: next :: rest =>
-      [.ident parameter.1, .symbol ':', .ident parameter.2.spelling, .symbol ','] ++
+      [.ident parameter.1, .symbol ':'] ++ parameter.2.tokens ++ [.symbol ','] ++
         typedParameterTokens (next :: rest)
 
 def FunctionDecl.tokens (function : FunctionDecl) : List Token :=
   [.ident "function", .ident function.name, .symbol '('] ++
     typedParameterTokens function.parameters ++
-    [.symbol ')', .ident "returns", .symbol '(', .ident function.resultType.spelling,
-      .symbol ')', .symbol '{'] ++
+    [.symbol ')', .ident "returns", .symbol '('] ++ function.resultType.tokens ++
+    [.symbol ')', .symbol '{'] ++
     Stmt.listTokens function.body ++ [.ident "return"] ++ function.result.tokens ++
     [.symbol ';', .symbol '}']
 
@@ -147,8 +173,21 @@ def parseBinaryOp? : Token → Option BinaryOp
   | .equalEqual => some .eq
   | _ => none
 
-def parseLocalType? : Token → Option LocalType
-  | .ident text => if text = "word" then some .word else if text = "bool" then some .bool else none
+/-- A type annotation: `word`, `bool`, `(word, word)` or `sum<word, word>`. -/
+def parseLocalType : List Token → Option (LocalType × List Token)
+  | .ident text :: rest =>
+      if text = "word" then some (.word, rest)
+      else if text = "bool" then some (.bool, rest)
+      else if text = "sum" then do
+        let rest ← expectTokens
+          [.symbol '<', .ident "word", .symbol ',', .ident "word", .symbol '>'] rest
+        some (.wordSum, rest)
+      else none
+  | .symbol char :: rest =>
+      if char = '(' then do
+        let rest ← expectTokens [.ident "word", .symbol ',', .ident "word", .symbol ')'] rest
+        some (.wordPair, rest)
+      else none
   | _ => none
 
 /-- Parse one expression; `fuel` bounds the nesting depth. -/
@@ -169,6 +208,16 @@ def parseExpr : Nat → List Token → Option (Expr × List Token)
         let (operand, rest) ← parseExpr fuel rest
         let rest ← expectTokens [.symbol ')'] rest
         some (.uint256 operand, rest)
+      else if text = "inl" then do
+        let rest ← expectTokens [.symbol '('] rest
+        let (payload, rest) ← parseExpr fuel rest
+        let rest ← expectTokens [.symbol ')'] rest
+        some (.inl payload, rest)
+      else if text = "inr" then do
+        let rest ← expectTokens [.symbol '('] rest
+        let (payload, rest) ← parseExpr fuel rest
+        let rest ← expectTokens [.symbol ')'] rest
+        some (.inr payload, rest)
       else if isReserved text then none
       else if rest.head? = some (.symbol '(') then do
         let (first, rest) ← parseExpr fuel rest.tail
@@ -199,11 +248,16 @@ def parseExpr : Nat → List Token → Option (Expr × List Token)
                 let (left, rest) ← parseExpr fuel rest
                 match rest with
                 | [] => none
-                | opToken :: rest => do
-                    let op ← parseBinaryOp? opToken
-                    let (right, rest) ← parseExpr fuel rest
-                    let rest ← expectTokens [.symbol ')'] rest
-                    some (.binary op left right, rest)
+                | next :: rest =>
+                    if next = .symbol ',' then do
+                      let (right, rest) ← parseExpr fuel rest
+                      let rest ← expectTokens [.symbol ')'] rest
+                      some (.tuple left right, rest)
+                    else do
+                      let op ← parseBinaryOp? next
+                      let (right, rest) ← parseExpr fuel rest
+                      let rest ← expectTokens [.symbol ')'] rest
+                      some (.binary op left right, rest)
       else none
   | _ + 1, .equalEqual :: _ => none
 
@@ -223,8 +277,8 @@ def parseStmt : Nat → List Token → Option (Stmt × List Token)
           if text = "let" then do
             let (identifier, rest) ← parseName rest
             let rest ← expectTokens [.symbol ':'] rest
-            let type ← (rest.head?).bind parseLocalType?
-            let rest ← expectTokens [.symbol '='] rest.tail
+            let (type, rest) ← parseLocalType rest
+            let rest ← expectTokens [.symbol '='] rest
             let (initializer, rest) ← parseExpr fuel rest
             let rest ← expectTokens [.symbol ';'] rest
             some (.letDecl identifier type initializer, rest)
@@ -237,6 +291,30 @@ def parseStmt : Nat → List Token → Option (Stmt × List Token)
             let (elseBlock, rest) ← parseStmts fuel rest
             let rest ← expectTokens [.symbol '}'] rest
             some (.ifElse condition thenBlock elseBlock, rest)
+          else if text = "match" then do
+            let rest ← expectTokens [.symbol '('] rest
+            let (scrutinee, rest) ← parseExpr fuel rest
+            let rest ← expectTokens [.symbol ')', .symbol '{', .ident "case"] rest
+            if rest.head? = some (.symbol '(') then do
+              let (first, rest) ← parseName rest.tail
+              let rest ← expectTokens [.symbol ','] rest
+              let (second, rest) ← parseName rest
+              let rest ← expectTokens [.symbol ')', .symbol '{'] rest
+              let (body, rest) ← parseStmts fuel rest
+              let rest ← expectTokens [.symbol '}', .symbol '}'] rest
+              some (.matchPair scrutinee first second body, rest)
+            else do
+              let rest ← expectTokens [.ident "inl", .symbol '('] rest
+              let (left, rest) ← parseName rest
+              let rest ← expectTokens [.symbol ')', .symbol '{'] rest
+              let (leftBody, rest) ← parseStmts fuel rest
+              let rest ← expectTokens
+                [.symbol '}', .ident "case", .ident "inr", .symbol '('] rest
+              let (right, rest) ← parseName rest
+              let rest ← expectTokens [.symbol ')', .symbol '{'] rest
+              let (rightBody, rest) ← parseStmts fuel rest
+              let rest ← expectTokens [.symbol '}', .symbol '}'] rest
+              some (.matchSum scrutinee left leftBody right rightBody, rest)
           else if isReserved text then none
           else do
             let rest ← expectTokens [.symbol '='] rest
@@ -303,11 +381,11 @@ def parseTypedParameterList :
   | fuel + 1, tokens => do
       let (parameter, rest) ← parseName tokens
       let rest ← expectTokens [.symbol ':'] rest
-      let type ← rest.head?.bind parseLocalType?
-      if rest.tail.head? = some (.symbol ',') then do
-        let (parameters, rest) ← parseTypedParameterList fuel rest.tail.tail
+      let (type, rest) ← parseLocalType rest
+      if rest.head? = some (.symbol ',') then do
+        let (parameters, rest) ← parseTypedParameterList fuel rest.tail
         some ((parameter, type) :: parameters, rest)
-      else some ([(parameter, type)], rest.tail)
+      else some ([(parameter, type)], rest)
 
 def parseTypedParameters (tokens : List Token) :
     Option (List (String × LocalType) × List Token) :=
@@ -320,8 +398,8 @@ def parseFunction (fuel : Nat) (tokens : List Token) : Option (FunctionDecl × L
   let rest ← expectTokens [.symbol '('] rest
   let (parameters, rest) ← parseTypedParameters rest
   let rest ← expectTokens [.symbol ')', .ident "returns", .symbol '('] rest
-  let resultType ← rest.head?.bind parseLocalType?
-  let rest ← expectTokens [.symbol ')', .symbol '{'] rest.tail
+  let (resultType, rest) ← parseLocalType rest
+  let rest ← expectTokens [.symbol ')', .symbol '{'] rest
   let (body, rest) ← parseStmts fuel rest
   let rest ← expectTokens [.ident "return"] rest
   let (result, rest) ← parseExpr fuel rest
@@ -369,6 +447,8 @@ def Expr.size : Expr → Nat
   | .call1 _ first => first.size + 1
   | .call2 _ first second => first.size + second.size + 1
   | .call3 _ first second third => first.size + second.size + third.size + 1
+  | .tuple first second => first.size + second.size + 1
+  | .inl payload | .inr payload => payload.size + 1
 
 mutual
 
@@ -377,6 +457,9 @@ def Stmt.size : Stmt → Nat
   | .assign _ value => value.size + 1
   | .ifElse condition thenBlock elseBlock =>
       condition.size + Stmt.listSize thenBlock + Stmt.listSize elseBlock + 1
+  | .matchPair scrutinee _ _ body => scrutinee.size + Stmt.listSize body + 1
+  | .matchSum scrutinee _ leftBody _ rightBody =>
+      scrutinee.size + Stmt.listSize leftBody + Stmt.listSize rightBody + 1
 
 def Stmt.listSize : List Stmt → Nat
   | [] => 0
@@ -405,17 +488,25 @@ theorem BinaryOp.parse_token (op : BinaryOp) : parseBinaryOp? op.token = some op
 theorem BinaryOp.token_ne_open (op : BinaryOp) : op.token ≠ .symbol '(' := by
   cases op <;> decide
 
-theorem LocalType.parse_token (type : LocalType) :
-    parseLocalType? (.ident type.spelling) = some type := by
-  cases type <;> rfl
+theorem BinaryOp.token_ne_comma (op : BinaryOp) : op.token ≠ .symbol ',' := by
+  cases op <;> decide
+
+theorem LocalType.parse_tokens (type : LocalType) (rest : List Token) :
+    parseLocalType (type.tokens ++ rest) = some (type, rest) := by
+  cases type <;> simp [LocalType.tokens, parseLocalType, expectTokens]
+
+theorem LocalType.tokens_head (type : LocalType) :
+    ∃ first more, type.tokens = first :: more := by
+  cases type <;> exact ⟨_, _, rfl⟩
 
 /-- Every name in the expression is a non-reserved word. -/
 def Expr.NamesOk (expression : Expr) : Prop :=
   ∀ name ∈ expression.identifiers, isReserved name = false
 
 theorem not_reserved_names {text : String} (notReserved : isReserved text = false) :
-    text ≠ "true" ∧ text ≠ "false" ∧ text ≠ "Typedef" ∧ text ≠ "uint256" := by
-  refine ⟨?_, ?_, ?_, ?_⟩ <;> intro same <;> subst same <;>
+    text ≠ "true" ∧ text ≠ "false" ∧ text ≠ "Typedef" ∧ text ≠ "uint256" ∧ text ≠ "inl" ∧
+      text ≠ "inr" := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro same <;> subst same <;>
     simp [isReserved, reservedWords] at notReserved
 
 theorem Expr.tokens_head (expression : Expr) :
@@ -431,6 +522,9 @@ theorem Expr.tokens_head (expression : Expr) :
   | call1 callee first => exact ⟨_, _, rfl, rfl⟩
   | call2 callee first second => exact ⟨_, _, rfl, rfl⟩
   | call3 callee first second third => exact ⟨_, _, rfl, rfl⟩
+  | tuple first second => exact ⟨_, _, rfl, rfl⟩
+  | inl payload => exact ⟨_, _, rfl, rfl⟩
+  | inr payload => exact ⟨_, _, rfl, rfl⟩
 
 /-- Expression round trip. The next token must not be `(`, which would turn
 a final name into a call; every printed context satisfies this. -/
@@ -440,9 +534,10 @@ theorem parseExpr_tokens : ∀ (expression : Expr) (fuel : Nat) (rest : List Tok
   | .name identifier, fuel + 1, rest, names, _, notOpen => by
       have notReserved : isReserved identifier = false :=
         names identifier (by simp [Expr.identifiers])
-      obtain ⟨notTrue, notFalse, notTypedef, notUint⟩ := not_reserved_names notReserved
-      simp [Expr.tokens, parseExpr, notTrue, notFalse, notTypedef, notUint, notReserved,
-        notOpen]
+      obtain ⟨notTrue, notFalse, notTypedef, notUint, notInl, notInr⟩ :=
+        not_reserved_names notReserved
+      simp [Expr.tokens, parseExpr, notTrue, notFalse, notTypedef, notUint, notInl, notInr,
+        notReserved, notOpen]
   | .number value, fuel + 1, rest, _, _, _ => by simp [Expr.tokens, parseExpr]
   | .bool value, fuel + 1, rest, _, _, _ => by cases value <;> simp [Expr.tokens, parseExpr]
   | .unary op operand, fuel + 1, rest, names, enough, _ => by
@@ -464,7 +559,8 @@ theorem parseExpr_tokens : ∀ (expression : Expr) (fuel : Nat) (rest : List Tok
       simp only [List.append_assoc, List.cons_append, List.nil_append] at leftParse rightParse
       rw [head, List.cons_append] at leftParse
       simp only [Expr.tokens, head, List.append_assoc, List.cons_append, List.nil_append]
-      simp [parseExpr, notUnary, leftParse, BinaryOp.parse_token, rightParse, expectTokens]
+      simp [parseExpr, notUnary, leftParse, BinaryOp.parse_token, BinaryOp.token_ne_comma,
+        rightParse, expectTokens]
   | .typedefRep operand, fuel + 1, rest, names, enough, _ => by
       have operandParse := parseExpr_tokens operand fuel ([.symbol ')'] ++ rest)
         (fun name mem => names name (by simpa [Expr.identifiers] using mem))
@@ -481,16 +577,19 @@ theorem parseExpr_tokens : ∀ (expression : Expr) (fuel : Nat) (rest : List Tok
       simp [parseExpr, operandParse, expectTokens]
   | .call1 callee first, fuel + 1, rest, names, enough, _ => by
       have calleeOk : isReserved callee = false := names callee (by simp [Expr.identifiers])
-      obtain ⟨notTrue, notFalse, notTypedef, notUint⟩ := not_reserved_names calleeOk
+      obtain ⟨notTrue, notFalse, notTypedef, notUint, notInl, notInr⟩ :=
+        not_reserved_names calleeOk
       have firstParse := parseExpr_tokens first fuel ([.symbol ')'] ++ rest)
         (fun name mem => names name (by simp [Expr.identifiers, mem]))
         (by simp only [Expr.size] at enough; omega) (by simp)
       simp only [List.cons_append, List.nil_append] at firstParse
       simp only [Expr.tokens, List.append_assoc, List.cons_append, List.nil_append]
-      simp [parseExpr, notTrue, notFalse, notTypedef, notUint, calleeOk, firstParse]
+      simp [parseExpr, notTrue, notFalse, notTypedef, notUint, notInl, notInr, calleeOk,
+        firstParse]
   | .call2 callee first second, fuel + 1, rest, names, enough, _ => by
       have calleeOk : isReserved callee = false := names callee (by simp [Expr.identifiers])
-      obtain ⟨notTrue, notFalse, notTypedef, notUint⟩ := not_reserved_names calleeOk
+      obtain ⟨notTrue, notFalse, notTypedef, notUint, notInl, notInr⟩ :=
+        not_reserved_names calleeOk
       have secondParse := parseExpr_tokens second fuel ([.symbol ')'] ++ rest)
         (fun name mem => names name (by simp [Expr.identifiers, mem]))
         (by simp only [Expr.size] at enough; omega) (by simp)
@@ -501,11 +600,12 @@ theorem parseExpr_tokens : ∀ (expression : Expr) (fuel : Nat) (rest : List Tok
       simp only [List.append_assoc, List.cons_append, List.nil_append] at firstParse
       simp only [List.cons_append, List.nil_append] at secondParse
       simp only [Expr.tokens, List.append_assoc, List.cons_append, List.nil_append]
-      simp [parseExpr, notTrue, notFalse, notTypedef, notUint, calleeOk, firstParse,
-        secondParse]
+      simp [parseExpr, notTrue, notFalse, notTypedef, notUint, notInl, notInr, calleeOk,
+        firstParse, secondParse]
   | .call3 callee first second third, fuel + 1, rest, names, enough, _ => by
       have calleeOk : isReserved callee = false := names callee (by simp [Expr.identifiers])
-      obtain ⟨notTrue, notFalse, notTypedef, notUint⟩ := not_reserved_names calleeOk
+      obtain ⟨notTrue, notFalse, notTypedef, notUint, notInl, notInr⟩ :=
+        not_reserved_names calleeOk
       have thirdParse := parseExpr_tokens third fuel ([.symbol ')'] ++ rest)
         (fun name mem => names name (by simp [Expr.identifiers, mem]))
         (by simp only [Expr.size] at enough; omega) (by simp)
@@ -522,8 +622,35 @@ theorem parseExpr_tokens : ∀ (expression : Expr) (fuel : Nat) (rest : List Tok
       simp only [List.append_assoc, List.cons_append, List.nil_append] at secondParse
       simp only [List.cons_append, List.nil_append] at thirdParse
       simp only [Expr.tokens, List.append_assoc, List.cons_append, List.nil_append]
-      simp [parseExpr, notTrue, notFalse, notTypedef, notUint, calleeOk, firstParse,
-        secondParse, thirdParse, expectTokens]
+      simp [parseExpr, notTrue, notFalse, notTypedef, notUint, notInl, notInr, calleeOk,
+        firstParse, secondParse, thirdParse, expectTokens]
+  | .tuple first second, fuel + 1, rest, names, enough, _ => by
+      have secondParse := parseExpr_tokens second fuel ([.symbol ')'] ++ rest)
+        (fun name mem => names name (by simp [Expr.identifiers, mem]))
+        (by simp only [Expr.size] at enough; omega) (by simp)
+      have firstParse := parseExpr_tokens first fuel
+        ([.symbol ','] ++ second.tokens ++ [.symbol ')'] ++ rest)
+        (fun name mem => names name (by simp [Expr.identifiers, mem]))
+        (by simp only [Expr.size] at enough; omega) (by simp)
+      obtain ⟨head, tail, headEq, notUnary⟩ := Expr.tokens_head first
+      simp only [List.append_assoc, List.cons_append, List.nil_append] at firstParse secondParse
+      rw [headEq, List.cons_append] at firstParse
+      simp only [Expr.tokens, headEq, List.append_assoc, List.cons_append, List.nil_append]
+      simp [parseExpr, notUnary, firstParse, secondParse, expectTokens]
+  | .inl payload, fuel + 1, rest, names, enough, _ => by
+      have payloadParse := parseExpr_tokens payload fuel ([.symbol ')'] ++ rest)
+        (fun name mem => names name (by simpa [Expr.identifiers] using mem))
+        (by simp only [Expr.size] at enough; omega) (by simp)
+      simp only [Expr.tokens, List.append_assoc, List.cons_append,
+        List.nil_append] at payloadParse ⊢
+      simp [parseExpr, payloadParse, expectTokens]
+  | .inr payload, fuel + 1, rest, names, enough, _ => by
+      have payloadParse := parseExpr_tokens payload fuel ([.symbol ')'] ++ rest)
+        (fun name mem => names name (by simpa [Expr.identifiers] using mem))
+        (by simp only [Expr.size] at enough; omega) (by simp)
+      simp only [Expr.tokens, List.append_assoc, List.cons_append,
+        List.nil_append] at payloadParse ⊢
+      simp [parseExpr, payloadParse, expectTokens]
   | _, 0, _, _, enough, _ => absurd enough (Nat.not_lt_zero _)
 
 def Stmt.NamesOk (statement : Stmt) : Prop :=
@@ -533,8 +660,8 @@ def Stmt.ListNamesOk (statements : List Stmt) : Prop :=
   ∀ name ∈ Stmt.listIdentifiers statements, isReserved name = false
 
 theorem not_reserved_ne {text : String} (notReserved : isReserved text = false) :
-    text ≠ "let" ∧ text ≠ "if" ∧ text ≠ "return" := by
-  refine ⟨?_, ?_, ?_⟩ <;> intro same <;> subst same <;>
+    text ≠ "let" ∧ text ≠ "if" ∧ text ≠ "return" ∧ text ≠ "match" := by
+  refine ⟨?_, ?_, ?_, ?_⟩ <;> intro same <;> subst same <;>
     simp [isReserved, reservedWords] at notReserved
 
 theorem Stmt.blockEnds_tokens (statement : Stmt) (names : statement.NamesOk)
@@ -544,9 +671,11 @@ theorem Stmt.blockEnds_tokens (statement : Stmt) (names : statement.NamesOk)
   | assign identifier value =>
       have notReserved : isReserved identifier = false :=
         names identifier (by simp [Stmt.identifiers])
-      have notReturn := (not_reserved_ne notReserved).2.2
+      have notReturn := (not_reserved_ne notReserved).2.2.1
       simp [Stmt.tokens, blockEnds, notReturn]
   | ifElse condition thenBlock elseBlock => rfl
+  | matchPair scrutinee first second body => rfl
+  | matchSum scrutinee left leftBody right rightBody => rfl
 
 /-- Statement and statement-list round trips, by induction on the fuel. -/
 theorem parseStmt_tokens_all (fuel : Nat) :
@@ -572,18 +701,18 @@ theorem parseStmt_tokens_all (fuel : Nat) :
               (by simp only [Stmt.size] at enough; omega) (by simp)
             simp only [Stmt.tokens, List.append_assoc, List.cons_append, List.nil_append]
               at initializerParse ⊢
-            simp [parseStmt, parseName_cons notReserved, expectTokens, LocalType.parse_token,
+            simp [parseStmt, parseName_cons notReserved, expectTokens, LocalType.parse_tokens,
               initializerParse]
         | assign identifier value =>
             have notReserved : isReserved identifier = false :=
               names identifier (by simp [Stmt.identifiers])
-            obtain ⟨notLet, notIf, _⟩ := not_reserved_ne notReserved
+            obtain ⟨notLet, notIf, _, notMatch⟩ := not_reserved_ne notReserved
             have valueParse := parseExpr_tokens value fuel ([.symbol ';'] ++ rest)
               (fun name mem => names name (by simp [Stmt.identifiers, mem]))
               (by simp only [Stmt.size] at enough; omega) (by simp)
             simp only [Stmt.tokens, List.append_assoc, List.cons_append, List.nil_append]
               at valueParse ⊢
-            simp [parseStmt, notLet, notIf, notReserved, expectTokens, valueParse]
+            simp [parseStmt, notLet, notIf, notMatch, notReserved, expectTokens, valueParse]
         | ifElse condition thenBlock elseBlock =>
             have elseParse := listIH elseBlock ([.symbol '}'] ++ rest)
               (fun name mem => names name (by simp [Stmt.identifiers, mem]))
@@ -604,6 +733,51 @@ theorem parseStmt_tokens_all (fuel : Nat) :
             simp only [List.append_assoc, List.cons_append, List.nil_append] at conditionParse
             simp only [Stmt.tokens, List.append_assoc, List.cons_append, List.nil_append]
             simp [parseStmt, expectTokens, conditionParse, thenParse, elseParse]
+        | matchPair scrutinee first second body =>
+            have firstOk : isReserved first = false :=
+              names first (by simp [Stmt.identifiers])
+            have secondOk : isReserved second = false :=
+              names second (by simp [Stmt.identifiers])
+            have bodyParse := listIH body ([.symbol '}', .symbol '}'] ++ rest)
+              (fun name mem => names name (by simp [Stmt.identifiers, mem]))
+              (by simp only [Stmt.size] at enough; omega) rfl
+            have scrutineeParse := parseExpr_tokens scrutinee fuel
+              ([.symbol ')', .symbol '{', .ident "case", .symbol '(', .ident first, .symbol ',',
+                .ident second, .symbol ')', .symbol '{'] ++ Stmt.listTokens body ++
+                [.symbol '}', .symbol '}'] ++ rest)
+              (fun name mem => names name (by simp [Stmt.identifiers, mem]))
+              (by simp only [Stmt.size] at enough; omega) (by simp)
+            simp only [List.cons_append, List.nil_append] at bodyParse
+            simp only [List.append_assoc, List.cons_append, List.nil_append] at scrutineeParse
+            simp only [Stmt.tokens, List.append_assoc, List.cons_append, List.nil_append]
+            simp [parseStmt, expectTokens, scrutineeParse, parseName_cons firstOk,
+              parseName_cons secondOk, bodyParse]
+        | matchSum scrutinee left leftBody right rightBody =>
+            have leftOk : isReserved left = false :=
+              names left (by simp [Stmt.identifiers])
+            have rightOk : isReserved right = false :=
+              names right (by simp [Stmt.identifiers])
+            have rightParse := listIH rightBody ([.symbol '}', .symbol '}'] ++ rest)
+              (fun name mem => names name (by simp [Stmt.identifiers, mem]))
+              (by simp only [Stmt.size] at enough; omega) rfl
+            have leftParse := listIH leftBody
+              ([.symbol '}', .ident "case", .ident "inr", .symbol '(', .ident right, .symbol ')',
+                .symbol '{'] ++ Stmt.listTokens rightBody ++ [.symbol '}', .symbol '}'] ++ rest)
+              (fun name mem => names name (by simp [Stmt.identifiers, mem]))
+              (by simp only [Stmt.size] at enough; omega) rfl
+            have scrutineeParse := parseExpr_tokens scrutinee fuel
+              ([.symbol ')', .symbol '{', .ident "case", .ident "inl", .symbol '(', .ident left,
+                .symbol ')', .symbol '{'] ++ Stmt.listTokens leftBody ++
+                [.symbol '}', .ident "case", .ident "inr", .symbol '(', .ident right, .symbol ')',
+                  .symbol '{'] ++ Stmt.listTokens rightBody ++ [.symbol '}', .symbol '}'] ++ rest)
+              (fun name mem => names name (by simp [Stmt.identifiers, mem]))
+              (by simp only [Stmt.size] at enough; omega) (by simp)
+            simp only [List.cons_append, List.nil_append] at rightParse
+            simp only [List.append_assoc, List.cons_append, List.nil_append] at leftParse
+            simp only [List.append_assoc, List.cons_append, List.nil_append] at scrutineeParse
+            simp only [Stmt.tokens, List.append_assoc, List.cons_append, List.nil_append]
+            simp [parseStmt, expectTokens, scrutineeParse, parseName_cons leftOk,
+              parseName_cons rightOk, leftParse, rightParse]
       · intro statements rest names enough ends
         cases statements with
         | nil => simp [Stmt.listTokens, parseStmts, ends]
@@ -686,15 +860,15 @@ theorem parseTypedParameterList_tokens :
           simp only [List.head?_cons, Option.some.injEq] at closing
           subst closing
           simp [typedParameterTokens, parseTypedParameterList, parseName_cons notReserved,
-            expectTokens, LocalType.parse_token]
+            expectTokens, LocalType.parse_tokens]
   | parameter :: next :: more, fuel + 1, rest, _, names, enough, closing => by
       have notReserved := names parameter (by simp)
       have tailParse := parseTypedParameterList_tokens (next :: more) fuel rest (by simp)
         (fun name mem => names name (List.mem_cons_of_mem _ mem))
         (by simp only [List.length_cons] at enough ⊢; omega) closing
-      simp only [typedParameterTokens, List.cons_append, List.nil_append]
+      simp only [typedParameterTokens, List.cons_append, List.nil_append, List.append_assoc]
       simp [parseTypedParameterList, parseName_cons notReserved, expectTokens,
-        LocalType.parse_token, tailParse]
+        LocalType.parse_tokens, tailParse]
   | _ :: _, 0, _, _, _, enough, _ => absurd enough (by simp)
 
 theorem typedParameterTokens_length : (parameters : List (String × LocalType)) →
@@ -703,7 +877,8 @@ theorem typedParameterTokens_length : (parameters : List (String × LocalType)) 
   | [_] => by simp [typedParameterTokens]
   | _ :: next :: more => by
       have := typedParameterTokens_length (next :: more)
-      simp only [typedParameterTokens, List.length_append, List.length_cons] at this ⊢
+      simp only [typedParameterTokens, List.length_append, List.length_cons,
+        List.length_nil] at this ⊢
       omega
 
 theorem parseTypedParameters_tokens (parameters : List (String × LocalType))
@@ -783,12 +958,13 @@ theorem parseFunction_tokens (function : FunctionDecl) (names : function.NamesOk
   have resultParse := parseExpr_tokens function.result fuel
     (.symbol ';' :: .symbol '}' :: rest) resultOk resultFuel (by simp)
   have parametersParse := parseTypedParameters_tokens function.parameters
-    (.symbol ')' :: .ident "returns" :: .symbol '(' :: .ident function.resultType.spelling ::
-      .symbol ')' :: .symbol '{' :: (Stmt.listTokens function.body ++ (.ident "return" ::
-        (function.result.tokens ++ (.symbol ';' :: .symbol '}' :: rest))))) parametersOk rfl
+    (.symbol ')' :: .ident "returns" :: .symbol '(' :: (function.resultType.tokens ++
+      (.symbol ')' :: .symbol '{' :: (Stmt.listTokens function.body ++ (.ident "return" ::
+        (function.result.tokens ++ (.symbol ';' :: .symbol '}' :: rest)))))))
+    parametersOk rfl
   simp only [parseFunction, FunctionDecl.tokens, List.append_assoc, List.cons_append,
     List.nil_append]
-  simp [expectTokens, parseName_cons nameOk, parametersParse, LocalType.parse_token,
+  simp [expectTokens, parseName_cons nameOk, parametersParse, LocalType.parse_tokens,
     bodyParse, resultParse]
 
 theorem parseFunctions_tokens : ∀ (functions : List FunctionDecl) (count fuel : Nat)
@@ -846,6 +1022,19 @@ theorem Expr.size_le_tokens : (expression : Expr) → expression.size ≤ expres
       have := Expr.size_le_tokens third
       simp [Expr.size, Expr.tokens]
       omega
+  | .tuple first second => by
+      have := Expr.size_le_tokens first
+      have := Expr.size_le_tokens second
+      simp [Expr.size, Expr.tokens]
+      omega
+  | .inl payload => by
+      have := Expr.size_le_tokens payload
+      simp [Expr.size, Expr.tokens]
+      omega
+  | .inr payload => by
+      have := Expr.size_le_tokens payload
+      simp [Expr.size, Expr.tokens]
+      omega
 
 theorem Stmt.size_bounds (fuel : Nat) :
     (∀ statement : Stmt, statement.size < fuel → statement.size < statement.tokens.length) ∧
@@ -871,6 +1060,17 @@ theorem Stmt.size_bounds (fuel : Nat) :
             have := Expr.size_le_tokens condition
             have := ih.2 thenBlock (by simp only [Stmt.size] at enough; omega)
             have := ih.2 elseBlock (by simp only [Stmt.size] at enough; omega)
+            simp [Stmt.size, Stmt.tokens]
+            omega
+        | matchPair scrutinee first second body =>
+            have := Expr.size_le_tokens scrutinee
+            have := ih.2 body (by simp only [Stmt.size] at enough; omega)
+            simp [Stmt.size, Stmt.tokens]
+            omega
+        | matchSum scrutinee left leftBody right rightBody =>
+            have := Expr.size_le_tokens scrutinee
+            have := ih.2 leftBody (by simp only [Stmt.size] at enough; omega)
+            have := ih.2 rightBody (by simp only [Stmt.size] at enough; omega)
             simp [Stmt.size, Stmt.tokens]
             omega
       · intro statements enough

@@ -1,4 +1,4 @@
-/-! Tokens of the scalar source fragment and a lexer over characters. Spaces
+/-! Tokens of the source fragment and a lexer over characters. Spaces
 and newlines only separate tokens. Identifiers are ASCII letters, digits and
 underscores not starting with a digit; numbers are unsigned decimal; `==` is a
 single token and every other operator or delimiter is one character. -/
@@ -24,7 +24,7 @@ def identifierStarts : List Char :=
 
 /-- Single-character tokens other than `=`. -/
 def symbolChars : List Char :=
-  ['(', ')', '{', '}', ';', ':', ',', '.', '+', '-', '*', '&', '|', '^', '~', '!', '>']
+  ['(', ')', '{', '}', ';', ':', ',', '.', '+', '-', '*', '&', '|', '^', '~', '!', '>', '<']
 
 def isBlank (char : Char) : Bool := blankChars.contains char
 def isDigitChar (char : Char) : Bool := decimalDigits.contains char
@@ -151,7 +151,7 @@ theorem symbol_classes {char : Char} (symbol : isSymbolChar char = true) :
   have mem : char ∈ symbolChars := List.elem_iff.mp symbol
   simp only [symbolChars, List.mem_cons, List.not_mem_nil, or_false] at mem
   rcases mem with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-    rfl | rfl | rfl | rfl <;> decide
+    rfl | rfl | rfl | rfl | rfl <;> decide
 
 theorem identStart_classes {char : Char} (start : isIdentStart char = true) :
     isBlank char = false ∧ isIdentChar char = true := by

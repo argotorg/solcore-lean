@@ -124,6 +124,10 @@ def Expr.pieces : Expr → List Piece
   | .call3 callee first second third =>
       [word callee, sym '('] ++ first.pieces ++ [sym ',', space] ++ second.pieces ++
         [sym ',', space] ++ third.pieces ++ [sym ')']
+  | .tuple first second =>
+      [sym '('] ++ first.pieces ++ [sym ',', space] ++ second.pieces ++ [sym ')']
+  | .inl payload => [word "inl", sym '('] ++ payload.pieces ++ [sym ')']
+  | .inr payload => [word "inr", sym '('] ++ payload.pieces ++ [sym ')']
 
 theorem UnaryOp.spelling_toList (op : UnaryOp) : op.spelling.toList = op.token.chars := by
   cases op <;> rfl
@@ -158,6 +162,15 @@ theorem Expr.print_toList : (expression : Expr) → expression.print.toList = re
   | .call3 callee first second third => by
       simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
         space, Expr.print_toList first, Expr.print_toList second, Expr.print_toList third]
+  | .tuple first second => by
+      simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym,
+        space, Expr.print_toList first, Expr.print_toList second]
+  | .inl payload => by
+      simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
+        Expr.print_toList payload]
+  | .inr payload => by
+      simp [Expr.print, Expr.pieces, render_append, render, Piece.chars, Token.chars, sym, word,
+        Expr.print_toList payload]
 
 theorem Expr.tokensOf_pieces : (expression : Expr) → tokensOf expression.pieces = expression.tokens
   | .name identifier => rfl
@@ -184,6 +197,15 @@ theorem Expr.tokensOf_pieces : (expression : Expr) → tokensOf expression.piece
   | .call3 callee first second third => by
       simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word, space,
         Expr.tokensOf_pieces first, Expr.tokensOf_pieces second, Expr.tokensOf_pieces third]
+  | .tuple first second => by
+      simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, space,
+        Expr.tokensOf_pieces first, Expr.tokensOf_pieces second]
+  | .inl payload => by
+      simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word,
+        Expr.tokensOf_pieces payload]
+  | .inr payload => by
+      simp [Expr.pieces, Expr.tokens, tokensOf_append, tokensOf, sym, word,
+        Expr.tokensOf_pieces payload]
 
 def Expr.IdentifiersValid (expression : Expr) : Prop :=
   ∀ name ∈ expression.identifiers, ValidIdentifier name
@@ -310,6 +332,38 @@ theorem Expr.separated_append : (expression : Expr) → expression.IdentifiersVa
       intro next same
       cases same
       exact sym_safeLeft (by decide)
+  | .tuple first second, valid, rest, separated, safe => by
+      have secondPart := Expr.separated_append second
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ')' :: rest) (Separated.cons_sym (by decide) separated)
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      have firstPart := Expr.separated_append first
+        (fun name mem => valid name (by simp [Expr.identifiers, mem]))
+        (sym ',' :: space :: (second.pieces ++ sym ')' :: rest))
+        (Separated.cons_sym (by decide) (Separated.cons_space secondPart))
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
+      exact Separated.cons_sym (by decide) firstPart
+  | .inl payload, valid, rest, separated, safe => by
+      have inner := Expr.separated_append payload (fun name mem => valid name mem)
+        (sym ')' :: rest) (Separated.cons_sym (by decide) separated)
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
+      refine Separated.cons_before (word_valid (ValidIdentifier.of_check (by decide)))
+        (Separated.cons_sym (by decide) inner) ?_
+      intro next same
+      cases same
+      exact sym_safeLeft (by decide)
+  | .inr payload, valid, rest, separated, safe => by
+      have inner := Expr.separated_append payload (fun name mem => valid name mem)
+        (sym ')' :: rest) (Separated.cons_sym (by decide) separated)
+        (fun next same => by cases same; exact sym_safeLeft (by decide))
+      simp only [Expr.pieces, List.append_assoc, List.cons_append, List.nil_append]
+      refine Separated.cons_before (word_valid (ValidIdentifier.of_check (by decide)))
+        (Separated.cons_sym (by decide) inner) ?_
+      intro next same
+      cases same
+      exact sym_safeLeft (by decide)
 
 theorem Separated.cons_equal {rest : List Piece} (separated : Separated rest)
     (safe : ∀ next ∈ rest.head?, next.startsWithEqual = false) :
@@ -342,10 +396,41 @@ theorem keyword_valid {text : String} (check : validIdentifier text = true) :
     ValidIdentifier text :=
   ValidIdentifier.of_check check
 
-theorem LocalType.spelling_valid (type : LocalType) : ValidIdentifier type.spelling := by
+/-- The printed pieces of a type annotation. -/
+def LocalType.pieces : LocalType → List Piece
+  | .word => [ScalarMeaning.word "word"]
+  | .bool => [ScalarMeaning.word "bool"]
+  | .wordPair =>
+      [sym '(', ScalarMeaning.word "word", sym ',', space, ScalarMeaning.word "word", sym ')']
+  | .wordSum =>
+      [ScalarMeaning.word "sum", sym '<', ScalarMeaning.word "word", sym ',', space,
+        ScalarMeaning.word "word", sym '>']
+
+theorem LocalType.spelling_toList (type : LocalType) :
+    type.spelling.toList = render type.pieces := by
+  cases type <;> simp [LocalType.spelling, LocalType.pieces, render, Piece.chars, Token.chars,
+    ScalarMeaning.word, sym, space]
+
+theorem LocalType.tokensOf_pieces (type : LocalType) : tokensOf type.pieces = type.tokens := by
+  cases type <;> rfl
+
+/-- A type annotation followed by a piece that is safe on its left is
+separated. -/
+theorem LocalType.separated_append (type : LocalType) (rest : List Piece)
+    (separated : Separated rest) (safe : ∀ next ∈ rest.head?, next.SafeLeft) :
+    Separated (type.pieces ++ rest) := by
   cases type
-  · exact keyword_valid (by decide)
-  · exact keyword_valid (by decide)
+  · exact Separated.cons_word (keyword_valid (by decide)) separated safe
+  · exact Separated.cons_word (keyword_valid (by decide)) separated safe
+  · exact Separated.cons_sym (by decide) (Separated.cons_word (keyword_valid (by decide))
+      (Separated.cons_sym (by decide) (Separated.cons_space (Separated.cons_word
+        (keyword_valid (by decide)) (Separated.cons_sym (by decide) separated)
+        (head_sym (by decide))))) (head_sym (by decide)))
+  · exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_sym (by decide)
+      (Separated.cons_word (keyword_valid (by decide)) (Separated.cons_sym (by decide)
+        (Separated.cons_space (Separated.cons_word (keyword_valid (by decide))
+          (Separated.cons_sym (by decide) separated) (head_sym (by decide)))))
+        (head_sym (by decide)))) (head_sym (by decide))
 
 /-! ### Statements -/
 
@@ -353,8 +438,8 @@ mutual
 
 def Stmt.linePieces (indent : Nat) : Stmt → List (List Piece)
   | .letDecl identifier type initializer =>
-      [blanks indent ++ [word "let", space, word identifier, sym ':', space, word type.spelling,
-        space, sym '=', space] ++ initializer.pieces ++ [sym ';']]
+      [blanks indent ++ [word "let", space, word identifier, sym ':', space] ++ type.pieces ++
+        [space, sym '=', space] ++ initializer.pieces ++ [sym ';']]
   | .assign identifier value =>
       [blanks indent ++ [word identifier, space, sym '=', space] ++ value.pieces ++ [sym ';']]
   | .ifElse condition thenBlock elseBlock =>
@@ -363,6 +448,24 @@ def Stmt.linePieces (indent : Nat) : Stmt → List (List Piece)
         Stmt.listLinePieces (indent + 4) thenBlock ++
         [blanks indent ++ [sym '}', space, word "else", space, sym '{']] ++
         Stmt.listLinePieces (indent + 4) elseBlock ++ [blanks indent ++ [sym '}']]
+  | .matchPair scrutinee first second body =>
+      [blanks indent ++ [word "match", space, sym '('] ++ scrutinee.pieces ++
+          [sym ')', space, sym '{'],
+        blanks (indent + 4) ++ [word "case", space, sym '(', word first, sym ',', space,
+          word second, sym ')', space, sym '{']] ++
+        Stmt.listLinePieces (indent + 8) body ++
+        [blanks (indent + 4) ++ [sym '}'], blanks indent ++ [sym '}']]
+  | .matchSum scrutinee left leftBody right rightBody =>
+      [blanks indent ++ [word "match", space, sym '('] ++ scrutinee.pieces ++
+          [sym ')', space, sym '{'],
+        blanks (indent + 4) ++ [word "case", space, word "inl", sym '(', word left, sym ')',
+          space, sym '{']] ++
+        Stmt.listLinePieces (indent + 8) leftBody ++
+        [blanks (indent + 4) ++ [sym '}'],
+          blanks (indent + 4) ++ [word "case", space, word "inr", sym '(', word right, sym ')',
+            space, sym '{']] ++
+        Stmt.listLinePieces (indent + 8) rightBody ++
+        [blanks (indent + 4) ++ [sym '}'], blanks indent ++ [sym '}']]
 
 def Stmt.listLinePieces (indent : Nat) : List Stmt → List (List Piece)
   | [] => []
@@ -380,7 +483,7 @@ theorem Stmt.lines_toList (indent : Nat) : (statement : Stmt) →
     (statement.lines indent).map String.toList = (statement.linePieces indent).map render
   | .letDecl identifier type initializer => by
       simp [Stmt.lines, Stmt.linePieces, indentLine_toList, render_append, render_blanks, render,
-        Piece.chars, Token.chars, word, sym, space, Expr.print_toList]
+        Piece.chars, Token.chars, word, sym, space, Expr.print_toList, LocalType.spelling_toList]
   | .assign identifier value => by
       simp [Stmt.lines, Stmt.linePieces, indentLine_toList, render_append, render_blanks, render,
         Piece.chars, Token.chars, word, sym, space, Expr.print_toList]
@@ -388,6 +491,14 @@ theorem Stmt.lines_toList (indent : Nat) : (statement : Stmt) →
       simp [Stmt.lines, Stmt.linePieces, indentLine_toList, render_append, render_blanks, render,
         Piece.chars, Token.chars, word, sym, space, Expr.print_toList,
         Stmt.listLines_toList (indent + 4) thenBlock, Stmt.listLines_toList (indent + 4) elseBlock]
+  | .matchPair scrutinee first second body => by
+      simp [Stmt.lines, Stmt.linePieces, indentLine_toList, render_append, render_blanks, render,
+        Piece.chars, Token.chars, word, sym, space, Expr.print_toList,
+        Stmt.listLines_toList (indent + 8) body]
+  | .matchSum scrutinee left leftBody right rightBody => by
+      simp [Stmt.lines, Stmt.linePieces, indentLine_toList, render_append, render_blanks, render,
+        Piece.chars, Token.chars, word, sym, space, Expr.print_toList,
+        Stmt.listLines_toList (indent + 8) leftBody, Stmt.listLines_toList (indent + 8) rightBody]
 
 theorem Stmt.listLines_toList (indent : Nat) : (statements : List Stmt) →
     (Stmt.listLines indent statements).map String.toList =
@@ -405,7 +516,7 @@ theorem Stmt.linePieces_tokens (indent : Nat) : (statement : Stmt) →
     ((statement.linePieces indent).map tokensOf).flatten = statement.tokens
   | .letDecl identifier type initializer => by
       simp [Stmt.linePieces, Stmt.tokens, tokensOf_append, tokensOf_blanks, tokensOf, word, sym,
-        space, Expr.tokensOf_pieces]
+        space, Expr.tokensOf_pieces, LocalType.tokensOf_pieces]
   | .assign identifier value => by
       simp [Stmt.linePieces, Stmt.tokens, tokensOf_append, tokensOf_blanks, tokensOf, word, sym,
         space, Expr.tokensOf_pieces]
@@ -413,6 +524,13 @@ theorem Stmt.linePieces_tokens (indent : Nat) : (statement : Stmt) →
       simp [Stmt.linePieces, Stmt.tokens, tokensOf_append, tokensOf_blanks, tokensOf, word, sym,
         space, Expr.tokensOf_pieces, Stmt.listLinePieces_tokens (indent + 4) thenBlock,
         Stmt.listLinePieces_tokens (indent + 4) elseBlock]
+  | .matchPair scrutinee first second body => by
+      simp [Stmt.linePieces, Stmt.tokens, tokensOf_append, tokensOf_blanks, tokensOf, word, sym,
+        space, Expr.tokensOf_pieces, Stmt.listLinePieces_tokens (indent + 8) body]
+  | .matchSum scrutinee left leftBody right rightBody => by
+      simp [Stmt.linePieces, Stmt.tokens, tokensOf_append, tokensOf_blanks, tokensOf, word, sym,
+        space, Expr.tokensOf_pieces, Stmt.listLinePieces_tokens (indent + 8) leftBody,
+        Stmt.listLinePieces_tokens (indent + 8) rightBody]
 
 theorem Stmt.listLinePieces_tokens (indent : Nat) : (statements : List Stmt) →
     ((Stmt.listLinePieces indent statements).map tokensOf).flatten = Stmt.listTokens statements
@@ -434,13 +552,14 @@ theorem Stmt.linePieces_separated (indent : Nat) : (statement : Stmt) →
       have initializerPart := Expr.separated_append initializer
         (fun name mem => valid name (by simp [Stmt.identifiers, mem])) [sym ';']
         (sym_valid (by decide)) (head_sym (by decide))
+      have typePart := LocalType.separated_append type _ (Separated.cons_space
+        (Separated.cons_equal (Separated.cons_space initializerPart)
+          (fun next same => by cases same; rfl))) head_space
       simp only [List.append_assoc, List.cons_append, List.nil_append]
       exact Separated.blanks_append indent (Separated.cons_word (keyword_valid (by decide))
         (Separated.cons_space (Separated.cons_word (valid identifier (by simp [Stmt.identifiers]))
-          (Separated.cons_sym (by decide) (Separated.cons_space (Separated.cons_word
-            (LocalType.spelling_valid type) (Separated.cons_space (Separated.cons_equal
-              (Separated.cons_space initializerPart) (fun next same => by cases same; rfl)))
-            head_space))) (head_sym (by decide))))
+          (Separated.cons_sym (by decide) (Separated.cons_space typePart))
+          (head_sym (by decide))))
         head_space)
   | .assign identifier value, valid, line, mem => by
       simp only [Stmt.linePieces, List.mem_singleton] at mem
@@ -472,6 +591,67 @@ theorem Stmt.linePieces_separated (indent : Nat) : (statement : Stmt) →
             (Separated.cons_space (sym_valid (by decide))) head_space)))
       · exact Stmt.listLinePieces_separated (indent + 4) elseBlock
           (fun name mem => valid name (by simp [Stmt.identifiers, mem])) line mem
+      · subst same
+        exact Separated.blanks_append indent (sym_valid (by decide))
+  | .matchPair scrutinee first second body, valid, line, mem => by
+      simp only [Stmt.linePieces, List.mem_append, List.mem_cons, List.not_mem_nil,
+        or_false] at mem
+      rcases mem with ((same | same) | mem) | same | same
+      · subst same
+        have scrutineePart := Expr.separated_append scrutinee
+          (fun name mem => valid name (by simp [Stmt.identifiers, mem]))
+          [sym ')', space, sym '{'] (Separated.cons_sym (by decide) (Separated.cons_space
+            (sym_valid (by decide)))) (head_sym (by decide))
+        simp only [List.append_assoc, List.cons_append, List.nil_append]
+        exact Separated.blanks_append indent (Separated.cons_word (keyword_valid (by decide))
+          (Separated.cons_space (Separated.cons_sym (by decide) scrutineePart)) head_space)
+      · subst same
+        exact Separated.blanks_append (indent + 4) (Separated.cons_word (keyword_valid (by decide))
+          (Separated.cons_space (Separated.cons_sym (by decide) (Separated.cons_word
+            (valid first (by simp [Stmt.identifiers])) (Separated.cons_sym (by decide)
+              (Separated.cons_space (Separated.cons_word (valid second (by simp [Stmt.identifiers]))
+                (Separated.cons_sym (by decide) (Separated.cons_space (sym_valid (by decide))))
+                (head_sym (by decide))))) (head_sym (by decide))))) head_space)
+      · exact Stmt.listLinePieces_separated (indent + 8) body
+          (fun name mem => valid name (by simp [Stmt.identifiers, mem])) line mem
+      · subst same
+        exact Separated.blanks_append (indent + 4) (sym_valid (by decide))
+      · subst same
+        exact Separated.blanks_append indent (sym_valid (by decide))
+  | .matchSum scrutinee left leftBody right rightBody, valid, line, mem => by
+      simp only [Stmt.linePieces, List.mem_append, List.mem_cons, List.not_mem_nil,
+        or_false] at mem
+      rcases mem with (((((same | same) | mem) | same | same) | mem) | same | same)
+      · subst same
+        have scrutineePart := Expr.separated_append scrutinee
+          (fun name mem => valid name (by simp [Stmt.identifiers, mem]))
+          [sym ')', space, sym '{'] (Separated.cons_sym (by decide) (Separated.cons_space
+            (sym_valid (by decide)))) (head_sym (by decide))
+        simp only [List.append_assoc, List.cons_append, List.nil_append]
+        exact Separated.blanks_append indent (Separated.cons_word (keyword_valid (by decide))
+          (Separated.cons_space (Separated.cons_sym (by decide) scrutineePart)) head_space)
+      · subst same
+        exact Separated.blanks_append (indent + 4) (Separated.cons_word (keyword_valid (by decide))
+          (Separated.cons_space (Separated.cons_word (keyword_valid (by decide))
+            (Separated.cons_sym (by decide) (Separated.cons_word
+              (valid left (by simp [Stmt.identifiers])) (Separated.cons_sym (by decide)
+                (Separated.cons_space (sym_valid (by decide)))) (head_sym (by decide))))
+            (head_sym (by decide)))) head_space)
+      · exact Stmt.listLinePieces_separated (indent + 8) leftBody
+          (fun name mem => valid name (by simp [Stmt.identifiers, mem])) line mem
+      · subst same
+        exact Separated.blanks_append (indent + 4) (sym_valid (by decide))
+      · subst same
+        exact Separated.blanks_append (indent + 4) (Separated.cons_word (keyword_valid (by decide))
+          (Separated.cons_space (Separated.cons_word (keyword_valid (by decide))
+            (Separated.cons_sym (by decide) (Separated.cons_word
+              (valid right (by simp [Stmt.identifiers])) (Separated.cons_sym (by decide)
+                (Separated.cons_space (sym_valid (by decide)))) (head_sym (by decide))))
+            (head_sym (by decide)))) head_space)
+      · exact Stmt.listLinePieces_separated (indent + 8) rightBody
+          (fun name mem => valid name (by simp [Stmt.identifiers, mem])) line mem
+      · subst same
+        exact Separated.blanks_append (indent + 4) (sym_valid (by decide))
       · subst same
         exact Separated.blanks_append indent (sym_valid (by decide))
 
@@ -539,30 +719,33 @@ theorem parameterPieces_separated : (parameters : List String) →
 
 def typedParameterPieces : List (String × LocalType) → List Piece
   | [] => []
-  | [parameter] => [word parameter.1, sym ':', space, word parameter.2.spelling]
+  | [parameter] => [word parameter.1, sym ':', space] ++ parameter.2.pieces
   | parameter :: next :: rest =>
-      [word parameter.1, sym ':', space, word parameter.2.spelling, sym ',', space] ++
+      [word parameter.1, sym ':', space] ++ parameter.2.pieces ++ [sym ',', space] ++
         typedParameterPieces (next :: rest)
 
 theorem typedParameterText_toList : (parameters : List (String × LocalType)) →
     (FunctionDecl.parameterText parameters).toList = render (typedParameterPieces parameters)
   | [] => rfl
   | [parameter] => by
-      simp [FunctionDecl.parameterText, typedParameterPieces, render, Piece.chars, Token.chars,
-        word, sym, space]
+      simp [FunctionDecl.parameterText, typedParameterPieces, render, Piece.chars,
+        Token.chars, word, sym, space, LocalType.spelling_toList]
   | parameter :: next :: rest => by
       have tail := typedParameterText_toList (next :: rest)
       simp only [FunctionDecl.parameterText, List.map_cons] at tail ⊢
       rw [String.intercalate_cons_cons, String.toList_append, String.toList_append, tail]
-      simp [typedParameterPieces, render, Piece.chars, Token.chars, word, sym, space]
+      simp [typedParameterPieces, render, render_append, Piece.chars, Token.chars, word, sym,
+        space, LocalType.spelling_toList]
 
 theorem typedParameterPieces_tokens : (parameters : List (String × LocalType)) →
     tokensOf (typedParameterPieces parameters) = typedParameterTokens parameters
   | [] => rfl
-  | [_] => rfl
-  | parameter :: next :: rest => by
+  | [_] => by
       simp [typedParameterPieces, typedParameterTokens, tokensOf, word, sym, space,
-        typedParameterPieces_tokens (next :: rest)]
+        LocalType.tokensOf_pieces]
+  | parameter :: next :: rest => by
+      simp [typedParameterPieces, typedParameterTokens, tokensOf, tokensOf_append, word, sym,
+        space, LocalType.tokensOf_pieces, typedParameterPieces_tokens (next :: rest)]
 
 theorem typedParameterPieces_separated : (parameters : List (String × LocalType)) →
     (∀ parameter ∈ parameters, ValidIdentifier parameter.1) →
@@ -572,14 +755,14 @@ theorem typedParameterPieces_separated : (parameters : List (String × LocalType
   | [parameter], valid, rest, separated, safe => by
       simp only [typedParameterPieces, List.cons_append, List.nil_append]
       exact Separated.cons_word (valid parameter (by simp)) (Separated.cons_sym (by decide)
-        (Separated.cons_space (Separated.cons_word (LocalType.spelling_valid _) separated safe)))
+        (Separated.cons_space (LocalType.separated_append _ _ separated safe)))
         (head_sym (by decide))
   | parameter :: next :: more, valid, rest, separated, safe => by
       have tail := typedParameterPieces_separated (next :: more)
         (fun name mem => valid name (List.mem_cons_of_mem _ mem)) rest separated safe
-      simp only [typedParameterPieces, List.cons_append, List.nil_append]
+      simp only [typedParameterPieces, List.cons_append, List.nil_append, List.append_assoc]
       exact Separated.cons_word (valid parameter (by simp)) (Separated.cons_sym (by decide)
-        (Separated.cons_space (Separated.cons_word (LocalType.spelling_valid _)
+        (Separated.cons_space (LocalType.separated_append _ _
           (Separated.cons_sym (by decide) (Separated.cons_space tail))
           (head_sym (by decide))))) (head_sym (by decide))
 
@@ -587,8 +770,8 @@ theorem typedParameterPieces_separated : (parameters : List (String × LocalType
 def FunctionDecl.linePieces (function : FunctionDecl) : List (List Piece) :=
   [[word "function", space, word function.name, sym '('] ++
       typedParameterPieces function.parameters ++
-      [sym ')', space, word "returns", space, sym '(', word function.resultType.spelling,
-        sym ')', space, sym '{']] ++
+      [sym ')', space, word "returns", space, sym '('] ++ function.resultType.pieces ++
+        [sym ')', space, sym '{']] ++
     Stmt.listLinePieces 4 function.body ++
     [blanks 4 ++ [word "return", space] ++ function.result.pieces ++ [sym ';'], [sym '}'], []]
 
@@ -596,13 +779,13 @@ theorem FunctionDecl.lines_toList (function : FunctionDecl) :
     function.lines.map String.toList = function.linePieces.map render := by
   simp [FunctionDecl.lines, FunctionDecl.linePieces, Stmt.listLines_toList,
     typedParameterText_toList, Expr.print_toList, render_append, render_blanks, render,
-    Piece.chars, Token.chars, word, sym, space]
+    Piece.chars, Token.chars, word, sym, space, LocalType.spelling_toList]
 
 theorem FunctionDecl.linePieces_tokens (function : FunctionDecl) :
     (function.linePieces.map tokensOf).flatten = function.tokens := by
   simp [FunctionDecl.linePieces, FunctionDecl.tokens, Stmt.listLinePieces_tokens,
     typedParameterPieces_tokens, Expr.tokensOf_pieces, tokensOf_append, tokensOf_blanks,
-    tokensOf, word, sym, space]
+    tokensOf, word, sym, space, LocalType.tokensOf_pieces]
 
 theorem FunctionDecl.linePieces_separated (function : FunctionDecl)
     (valid : ∀ name ∈ function.identifiers, ValidIdentifier name) :
@@ -624,15 +807,15 @@ theorem FunctionDecl.linePieces_separated (function : FunctionDecl)
   rcases mem with (same | mem) | same | same | same
   · subst same
     have parametersPart := typedParameterPieces_separated function.parameters parametersValid
-      [sym ')', space, word "returns", space, sym '(', word function.resultType.spelling,
-        sym ')', space, sym '{']
+      ([sym ')', space, word "returns", space, sym '('] ++ function.resultType.pieces ++
+        [sym ')', space, sym '{'])
       (Separated.cons_sym (by decide) (Separated.cons_space (Separated.cons_word
         (keyword_valid (by decide)) (Separated.cons_space (Separated.cons_sym (by decide)
-          (Separated.cons_word (LocalType.spelling_valid _) (Separated.cons_sym (by decide)
+          (LocalType.separated_append _ _ (Separated.cons_sym (by decide)
             (Separated.cons_space (sym_valid (by decide)))) (head_sym (by decide)))))
         head_space)))
       (head_sym (by decide))
-    simp only [List.cons_append, List.nil_append]
+    simp only [List.cons_append, List.nil_append, List.append_assoc] at parametersPart ⊢
     exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
       (Separated.cons_word nameValid (Separated.cons_sym (by decide) parametersPart)
         (head_sym (by decide)))) head_space

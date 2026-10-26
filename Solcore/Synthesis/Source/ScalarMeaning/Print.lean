@@ -1,9 +1,9 @@
 import Solcore.Synthesis.Source.ScalarMeaning.Syntax
 
-/-! Concrete text of the scalar source fragment, in the exact layout used by
-the scalar renderers and their wrappers: four-space indentation steps, one
-statement or brace per line, a blank line after the imports and after every
-free function, and a trailing newline. -/
+/-! Concrete text of the source fragment, in the exact layout used by the
+source renderers and their wrappers: four-space indentation steps, one
+statement, case header or brace per line, a blank line after the imports and
+after every free function, and a trailing newline. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.ScalarMeaning
@@ -24,11 +24,14 @@ def Expr.print : Expr → String
   | .call2 callee first second => callee ++ "(" ++ first.print ++ ", " ++ second.print ++ ")"
   | .call3 callee first second third =>
       callee ++ "(" ++ first.print ++ ", " ++ second.print ++ ", " ++ third.print ++ ")"
+  | .tuple first second => "(" ++ first.print ++ ", " ++ second.print ++ ")"
+  | .inl payload => "inl(" ++ payload.print ++ ")"
+  | .inr payload => "inr(" ++ payload.print ++ ")"
 
 mutual
 
-/-- The lines of one statement at the given indentation. Branch blocks are
-indented by four further spaces. -/
+/-- The lines of one statement at the given indentation. Branch blocks and
+case headers are indented by four further spaces, case bodies by eight. -/
 def Stmt.lines (indent : Nat) : Stmt → List String
   | .letDecl identifier type initializer =>
       [indentLine indent
@@ -39,6 +42,18 @@ def Stmt.lines (indent : Nat) : Stmt → List String
       [indentLine indent ("if (" ++ condition.print ++ ") {")] ++
         Stmt.listLines (indent + 4) thenBlock ++ [indentLine indent "} else {"] ++
         Stmt.listLines (indent + 4) elseBlock ++ [indentLine indent "}"]
+  | .matchPair scrutinee first second body =>
+      [indentLine indent ("match (" ++ scrutinee.print ++ ") {"),
+        indentLine (indent + 4) ("case (" ++ first ++ ", " ++ second ++ ") {")] ++
+        Stmt.listLines (indent + 8) body ++
+        [indentLine (indent + 4) "}", indentLine indent "}"]
+  | .matchSum scrutinee left leftBody right rightBody =>
+      [indentLine indent ("match (" ++ scrutinee.print ++ ") {"),
+        indentLine (indent + 4) ("case inl(" ++ left ++ ") {")] ++
+        Stmt.listLines (indent + 8) leftBody ++
+        [indentLine (indent + 4) "}", indentLine (indent + 4) ("case inr(" ++ right ++ ") {")] ++
+        Stmt.listLines (indent + 8) rightBody ++
+        [indentLine (indent + 4) "}", indentLine indent "}"]
 
 def Stmt.listLines (indent : Nat) : List Stmt → List String
   | [] => []

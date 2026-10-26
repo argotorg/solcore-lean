@@ -3,11 +3,14 @@ import Solcore.Synthesis.Source.ScalarMeaning.Syntax
 /-! Independent meaning of the emitted Rust-dialect fragment. Words are
 natural numbers below `2^256`; operators follow the EVM instruction that the
 pinned standard library (`std/std.sol` and `std/opcodes.sol` at solcore-rs
-`2a745e12974c373c3799fec81b48a53c7dce2ab4`) selects for `word` operands.
-Locals live in a stack of lexical scopes: `let` declares in the innermost
-scope, assignment updates the nearest binding, and each `if` branch runs in a
-fresh scope that is discarded afterwards. A call resolves to an earlier free
-function, then to an imported `std.opcodes` alias, then to `std.tobool`.
+`2a745e12974c373c3799fec81b48a53c7dce2ab4`) selects for `word` operands. Pairs,
+`sum`, `inl` and `inr` are frontend builtins at the same revision
+(`crates/hir/src/nameres/builtins.rs`); this fragment has pairs of words and
+sums of two words. Locals live in a stack of lexical scopes: `let` declares in
+the innermost scope, assignment updates the nearest binding, and each `if`
+branch or `match` case runs in a fresh scope that is discarded afterwards; a
+case scope starts with its pattern variables. A call resolves to an earlier
+free function, then to an imported `std.opcodes` alias, then to `std.tobool`.
 Nothing here refers to Core. -/
 set_option autoImplicit false
 
@@ -133,23 +136,36 @@ end Evm
 def toBool (word : Nat) : Bool := !(word == 0)
 
 /-- Runtime values of the fragment. `uint256` is the standard library enum
-wrapping one word. -/
+wrapping one word. `pair` is a value of type `(word, word)`; `inl` and `inr`
+are the two tags of `sum<word, word>`, each with one word payload. -/
 inductive Value where
   | word (value : Nat)
   | bool (value : Bool)
   | uint256 (value : Nat)
+  | pair (first second : Nat)
+  | inl (payload : Nat)
+  | inr (payload : Nat)
   deriving Repr, BEq, DecidableEq
 
 def LocalType.admits : LocalType → Value → Bool
   | .word, .word _ => true
   | .bool, .bool _ => true
+  | .wordPair, .pair _ _ => true
+  | .wordSum, .inl _ => true
+  | .wordSum, .inr _ => true
   | _, _ => false
 
-/-- Assignment keeps the type of the existing binding. -/
+/-- Assignment keeps the type of the existing binding. Both sum tags have
+type `sum<word, word>`. -/
 def Value.sameType : Value → Value → Bool
   | .word _, .word _ => true
   | .bool _, .bool _ => true
   | .uint256 _, .uint256 _ => true
+  | .pair _ _, .pair _ _ => true
+  | .inl _, .inl _ => true
+  | .inl _, .inr _ => true
+  | .inr _, .inl _ => true
+  | .inr _, .inr _ => true
   | _, _ => false
 
 /-- `!` is the standard library function `not` on `bool`; `~` is
@@ -259,8 +275,9 @@ def Frames.assign : Frames → String → Value → Option Frames
 def Frames.shape (frames : Frames) : List (List String) := frames.map Scope.names
 
 /-- A decimal literal denotes a word; `word` is the only numeric local type in
-this fragment. Literals of `2^256` or more have no meaning. Arguments are
-evaluated left to right before the call. -/
+this fragment. Literals of `2^256` or more have no meaning. Arguments and pair
+components are evaluated left to right. A pair or a sum payload must be a
+word. -/
 def Expr.eval (context : Context) (frames : Frames) : Expr → Option Value
   | .name identifier => frames.lookup identifier
   | .number value => if value < Evm.modulus then some (.word value) else none
@@ -290,11 +307,27 @@ def Expr.eval (context : Context) (frames : Frames) : Expr → Option Value
       let secondValue ← second.eval context frames
       let thirdValue ← third.eval context frames
       context.call callee [firstValue, secondValue, thirdValue]
+  | .tuple first second => do
+      let firstValue ← first.eval context frames
+      let secondValue ← second.eval context frames
+      match firstValue, secondValue with
+      | .word left, .word right => some (.pair left right)
+      | _, _ => none
+  | .inl payload => do
+      match ← payload.eval context frames with
+      | .word value => some (.inl value)
+      | _ => none
+  | .inr payload => do
+      match ← payload.eval context frames with
+      | .word value => some (.inr value)
+      | _ => none
 
 mutual
 
-/-- Execute one statement. A failed lookup, type mismatch or non-Boolean
-condition has no meaning (`none`). -/
+/-- Execute one statement. A failed lookup, type mismatch, non-Boolean
+condition or unmatched scrutinee has no meaning (`none`). A `match` evaluates
+its scrutinee once; the selected case runs in a fresh scope binding the
+pattern variables to the components or the payload, first component first. -/
 def Stmt.exec (context : Context) : Frames → Stmt → Option Frames
   | frames, .letDecl identifier type initializer =>
       match initializer.eval context frames with
@@ -312,6 +345,25 @@ def Stmt.exec (context : Context) : Frames → Stmt → Option Frames
           | _ => none
       | some (.bool false) =>
           match Stmt.execList context ([] :: frames) elseBlock with
+          | some (_ :: frames') => some frames'
+          | _ => none
+      | _ => none
+  | frames, .matchPair scrutinee first second body =>
+      match scrutinee.eval context frames with
+      | some (.pair left right) =>
+          match Stmt.execList context ([(second, .word right), (first, .word left)] :: frames)
+              body with
+          | some (_ :: frames') => some frames'
+          | _ => none
+      | _ => none
+  | frames, .matchSum scrutinee left leftBody right rightBody =>
+      match scrutinee.eval context frames with
+      | some (.inl payload) =>
+          match Stmt.execList context ([(left, .word payload)] :: frames) leftBody with
+          | some (_ :: frames') => some frames'
+          | _ => none
+      | some (.inr payload) =>
+          match Stmt.execList context ([(right, .word payload)] :: frames) rightBody with
           | some (_ :: frames') => some frames'
           | _ => none
       | _ => none

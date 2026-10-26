@@ -47,9 +47,13 @@ import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
 applications; parenthesized infix `+`, `-`, `*`, `&`, `|`, `^`, `==` and `>`;
-`Typedef.rep(e)`, `uint256(e)` and calls `f(a)`, `f(a, b)` and `f(a, b, c)`.
-Statements are `let x: T = e;` with `T` one of `word` or `bool`, `x = e;`, and
-`if (e) { ... } else { ... }`. A file imports `std` and `std.dispatch`,
+`Typedef.rep(e)`, `uint256(e)`, calls `f(a)`, `f(a, b)` and `f(a, b, c)`, pairs
+`(a, b)` and the sum constructors `inl(e)` and `inr(e)`. Statements are
+`let x: T = e;` with `T` one of `word`, `bool`, `(word, word)` or
+`sum<word, word>`, `x = e;`, `if (e) { ... } else { ... }`, the pair match
+`match (e) { case (x, y) { ... } }` and the sum match
+`match (e) { case inl(x) { ... } case inr(y) { ... } }`. A file imports `std`
+and `std.dispatch`,
 optionally imports `opcode as alias` pairs from `std.opcodes`, declares free
 functions `function f(p: T, ...) returns (T) { ...; return e; }`, and declares
 one contract with one public method whose parameters and declared result have
@@ -58,11 +62,15 @@ type `uint256`, ending in `return e;`.
 Tokens. Spaces and newlines only separate tokens. Identifiers are ASCII
 letters, digits and `_`, not starting with a digit; numbers are unsigned
 decimal; `==` is one token. Every operator application must be parenthesized,
-so the grammar has no precedence rules; a name followed by `(` is a call. Seventeen words are reserved, including
-`let`, `if`, `return`, `true`, `false`, `Typedef`, `rep` and `uint256`.
+so the grammar has no precedence rules; a parenthesized pair has a comma where
+an infix operator would be, and a name followed by `(` is a call. Twenty-one
+words are reserved, including `let`, `if`, `return`, `true`, `false`,
+`Typedef`, `rep`, `uint256`, `match`, `case`, `inl` and `inr`.
 
-Values. A word is a natural number below `2^256`; there are also Booleans and
-`uint256` values wrapping one word. A literal of `2^256` or more has no meaning.
+Values. A word is a natural number below `2^256`; there are also Booleans,
+`uint256` values wrapping one word, pairs of two words, and the tags `inl` and
+`inr` of `sum<word, word>`, each with one word payload. A literal of `2^256` or
+more has no meaning.
 
 Operators follow the pinned standard library (`std/std.sol` and
 `std/opcodes.sol` at solcore-rs `2a745e12974c373c3799fec81b48a53c7dce2ab4`).
@@ -87,6 +95,18 @@ branch runs in a fresh scope that is discarded afterwards. A method binds its
 `uint256` parameters (each below `2^256`) in a parameter scope, runs its body in
 a block scope inside it, and returns the word of a `uint256` result. A failed
 lookup, type mismatch or non-Boolean condition has no meaning (`none`).
+
+Pairs, `sum`, `inl` and `inr` are builtins of the pinned frontend
+(`crates/hir/src/nameres/builtins.rs` at the same revision), not
+standard-library definitions. A pair evaluates its components left to right
+and must hold two words; `inl(e)` and `inr(e)` tag a word. Both tags have type
+`sum<word, word>`, so an assignment may replace one tag by the other. A `match`
+evaluates its scrutinee once. The pair case runs its body in a fresh scope that
+binds its two pattern variables to the components; the sum match runs the
+`inl` or `inr` case, by the scrutinee's tag, in a fresh scope that binds its
+pattern variable to the payload. The case scope is discarded afterwards, so a
+case body changes enclosing locals only by assignment. A scrutinee of another
+shape has no meaning.
 
 Calls evaluate their arguments left to right. A callee resolves to a free
 function declared earlier in the file, then to an imported `std.opcodes`
