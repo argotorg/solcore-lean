@@ -123,19 +123,23 @@ These theorems keep explicit premises. `Expressions` supplies meaning for
 exactly the expressions the compiler accepted, at every compiler fuel; no
 expression closure exists yet. `Covered` admits returns, final values, discards,
 `break`/`continue`, blocks, conditionals, `while` loops, monomorphic initialized
-or uninitialized declarations, and bare assignments and bit-not updates when the
-compiler view is the original Source (as for named rows). Their flow heads come
-from the tree's assignment receipts and the body's actual assignment policy
+or uninitialized declarations, and bare and projected assignments and bit-not
+updates when the compiler view is the original Source (as for named rows). Their
+flow heads come from the tree's assignment receipts, the compiler's own key and
+right-hand lowerings and the body's actual assignment policy
 (`ActualBodyInvocation.Index.assignment_policy` and `bitNot_policy`). `Covered`
-excludes projected writes, matches, `for` loops and generalized declarations,
-and it requires a function-mode fallthrough to have Unit result and a final bare
-value to have the declared result type. The caller also supplies Core typing of
+excludes matches, `for` loops and generalized declarations, and it requires a
+function-mode fallthrough to have Unit result and a final bare value to have the
+declared result type. The closure threads the Source context's signatures
+through declarations. The caller also supplies Core typing of
 the compiled body, fixed-control checker typing and the result projection; for
 an actual prepared named header,
 [CellAwareInvocationAcceptedNamedHeaders.static_inputs](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedHeaders.lean)
 derives all three from checker certification and the cached body's Core typing.
-The invocation's physical entry state and the fault interpretation of the
-body's assignment diagnostic words remain inputs. These theorems are not yet
+The invocation's physical entry state, the fault interpretation of the body's
+assignment diagnostic words and reached place diagnostics
+(`PreparedAssignmentReachedDiagnostics.Ready`), and the function identity
+observations used by projected writes remain inputs. These theorems are not yet
 used by the public session.
 
 ## Remaining work for the second goal
@@ -147,9 +151,8 @@ recognizer until it appears universal or assuming a body-execution law.
 
 On the accepted-body route above, the next connected steps are:
 
-- Close the remaining compiler branches in `Covered`: projected writes, bare
-  writes under contextual metadata views, matches, `for` loops and generalized
-  declarations. Statements after an always-returning prefix in a non-Unit
+- Close the remaining compiler branches in `Covered`: writes under contextual
+  metadata views, matches, `for` loops and generalized declarations. Statements after an always-returning prefix in a non-Unit
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Discharge `Expressions` by an expression closure over the actual accepted

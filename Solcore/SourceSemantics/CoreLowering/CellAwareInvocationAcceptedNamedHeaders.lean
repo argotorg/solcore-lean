@@ -32,14 +32,16 @@ def index : ActualBodyInvocation.Index whole ActualBodyInvocation.ReachedView :=
   .named prepared.compilation (record prepared aligned)
 
 /-- Static inputs of `CellAwareInvocationAcceptedFlow.body_preserves` and
-`body_reflects` at the actual header: fixed-control checker typing of the
-compiled statements, the result projection and the native typing of the body. -/
+`body_reflects` at the actual header: the context signatures, fixed-control
+checker typing of the compiled statements, the result projection and the native
+typing of the body. -/
 theorem static_inputs
     (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
     {entry : SourceCoreCallableIndexedPrograms.Entry whole.indexed.layouts}
     (member : entry ∈ whole.indexed.entries)
     (certified : SelectedCompilationNamedSourceTyping.Certified header) :
     (index prepared aligned).source = header.function.source ∧
+    header.context.signatures = whole.compatible.checked.signatures ∧
     (∃ control : ControlContext, ∃ staticFinal facts,
       control.returnType = header.function.resultType ∧ control.loopDepth = 0 ∧
       StatementsHaveType (index prepared aligned).source control header.context
@@ -66,6 +68,7 @@ theorem static_inputs
       prepared.compilation.body (LanguageResult.resultType header.output) whole.indexed.layouts.definitions := by
     simpa only [CallableIndexedOwnedPreparedStagedNamedLexicalReceipts.parameterScope, aligned.bindings,
       aligned.body] using native
-  exact ⟨sourceEq.symm, ⟨_, final, facts, rfl, rfl, typed⟩, projection, _, bodyTyped⟩
+  exact ⟨sourceEq.symm, RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header),
+    ⟨_, final, facts, rfl, rfl, typed⟩, projection, _, bodyTyped⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNamedHeaders
