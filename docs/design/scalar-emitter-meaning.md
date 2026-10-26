@@ -15,17 +15,19 @@ semantic-kernel policy check now covers.
 | --- | --- |
 | `emit_source_meaning` | If `emit program = .ok emitted`, then for some Word `w`, `sourceCall emitted.source "run" [] = some w.val` and `CoreReturns program.program.toCore w`. |
 | `Input.emit_source_meaning` | If `Input.emit function = .ok emitted`, then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
-| `emit_preserves_meaning`, `Input.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `render_spec` | The induction over the actual `ScalarRenderer.render`, described below. |
+| `Function.emit_source_meaning` | If `Function.emit graph = .ok emitted` (profile `runtime-functions`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
+| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
+| `render_spec` | The induction over the actual `ScalarRenderer.renderWithFunctions`, with or without earlier helpers, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
 the source semantics below. `CoreReturns core w` states that Core's
 `runStateful` returns `.done (.word w) []` for all sufficiently large fuel, and
 that every completed run returns exactly that Word and store. This is the Core
-machine used as the differential-testing oracle; for the runtime-input profile
-it runs the original lambda applied to the input. Unsupported operations remain
-explicit emitter errors; the theorems say nothing about failed emissions.
+machine used as the differential-testing oracle; for the runtime-input and
+named-helper profiles it runs the original lambda or binding chain applied to
+the input. Unsupported operations remain explicit emitter errors; the theorems
+say nothing about failed emissions.
 
 ## Independent source meaning
 
@@ -39,15 +41,18 @@ import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
 applications; parenthesized infix `+`, `-`, `*`, `&`, `|`, `^`, `==` and `>`;
-`Typedef.rep(e)` and `uint256(e)`. Statements are `let x: T = e;` with `T` one
-of `word` or `bool`, `x = e;`, and `if (e) { ... } else { ... }`. A file imports
-`std` and `std.dispatch` and declares one contract with one public method whose
-parameters and declared result have type `uint256`, ending in `return e;`.
+`Typedef.rep(e)`, `uint256(e)` and calls `f(a)`, `f(a, b)` and `f(a, b, c)`.
+Statements are `let x: T = e;` with `T` one of `word` or `bool`, `x = e;`, and
+`if (e) { ... } else { ... }`. A file imports `std` and `std.dispatch`,
+optionally imports `opcode as alias` pairs from `std.opcodes`, declares free
+functions `function f(p: T, ...) returns (T) { ...; return e; }`, and declares
+one contract with one public method whose parameters and declared result have
+type `uint256`, ending in `return e;`.
 
 Tokens. Spaces and newlines only separate tokens. Identifiers are ASCII
 letters, digits and `_`, not starting with a digit; numbers are unsigned
 decimal; `==` is one token. Every operator application must be parenthesized,
-so the grammar has no precedence rules. Seventeen words are reserved, including
+so the grammar has no precedence rules; a name followed by `(` is a call. Seventeen words are reserved, including
 `let`, `if`, `return`, `true`, `false`, `Typedef`, `rep` and `uint256`.
 
 Values. A word is a natural number below `2^256`; there are also Booleans and
@@ -77,6 +82,18 @@ branch runs in a fresh scope that is discarded afterwards. A method binds its
 a block scope inside it, and returns the word of a `uint256` result. A failed
 lookup, type mismatch or non-Boolean condition has no meaning (`none`).
 
+Calls evaluate their arguments left to right. A callee resolves to a free
+function declared earlier in the file, then to an imported `std.opcodes`
+alias, then to `std.tobool`. A free function runs like a method on its typed
+parameters and must return a value of its declared type. Each free function
+sees only the functions declared before it; a call to a later or recursive
+function has no meaning in this fragment. The emitted helpers call only
+earlier helpers, matching the Core binding chain. The `std.opcodes` wrappers
+pass their arguments in order to the EVM instruction of the same name; their
+meanings (division, signed operations, shifts, byte selection, sign
+extension, exponentiation, leading-zero count and modular arithmetic) are
+defined from the EVM specification, but no proved emitter uses them yet.
+
 ## Connection to the actual emitter
 
 [RendererEquations](../../Solcore/Synthesis/Source/ScalarMeaning/RendererEquations.lean)
@@ -92,7 +109,11 @@ source statements. Executing them from frames that agree with a Core
 environment evaluates the expression by Core's big-step `Evaluates` relation.
 The result is bound to the rendered value name. Only temporaries in
 `[first, nextId)` are declared or changed, and enclosing scopes keep their
-declared names. Each `if` result is declared with zero or `false` and assigned
+declared names. The Core environment holds the Word locals followed by the
+helper closures; `FunctionsAgree` states that each rendered helper name
+denotes, in the source call context, the Word function of the corresponding
+closure. A rendered call `sc_fn<k>(x)` then evaluates as Core applies that
+closure. Each `if` result is declared with zero or `false` and assigned
 at the end of both branch blocks. Freshness rests on the injectivity of
 `sc_v<n>` names, derived from Lean's `Nat.toDigits`. Core Word operations are
 related to the EVM formulas above.
@@ -101,6 +122,10 @@ related to the EVM formulas above.
 the wrappers. `emit` prints `run()` returning `uint256(value)`. `Input.emit`
 prints `run(input: uint256)` and first binds `sc_input` to
 `Typedef.rep(input)`, matching Core's application of the lambda to the input.
+[FunctionEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/FunctionEmitter.lean)
+restates the emitter's helper loop by structural recursion, proves it equal to
+the actual `for` loop, and shows by induction that each printed
+`sc_fn<k>(sc_arg: word)` agrees with the closure Core builds for helper `k`.
 Core machine results follow from `runStateful_evaluation_sound`,
 `evaluation_runStateful_complete_with_sufficient_fuel` and determinism of
 `Evaluates`.
@@ -136,23 +161,25 @@ in a corpus also does not replace this theorem for the printer.
 
 ## Scope
 
-The theorem covers the scalar renderer without helper functions
-(`renderWithFunctions []`) and the closed G0 and runtime-input wrappers. It does
-not cover helper calls (`CallGraphRenderer`), raw primitive aliases
-(`PrimitiveRenderer`), aggregates, mutation, loops, storage, calls, closures,
-generic, comptime or module emitters. Extending it next would add named helper
-calls and the `std.opcodes` aliases, whose operand order and `tobool`
-conversions are listed in the roadmap's priority 3 table.
+The theorems cover `ScalarRenderer.renderWithFunctions` and three actual
+emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`) and named
+helpers (`runtime-functions`). They do not yet cover raw primitive aliases
+(`PrimitiveRenderer`, `runtime-primitives`), call graphs (`CallGraphRenderer`),
+aggregates, mutation, loops, storage, contract calls, closures, generic,
+comptime or module emitters. The planned order is primitive aliases, then call
+graphs, then mutation, aggregates and loops.
 
 ## Executable checks
 
 [SourceScalarMeaning](../../Solcore/Test/SourceScalarMeaning.lean) is registered
 in the test driver. It runs actual emitter output through `sourceCall` and
 compares the result with Core's `runStateful`. It covers all fifteen closed
-fixtures, also against hand-known Words, and twelve runtime-input fixtures at
-eight boundary inputs. Twenty programs from the first 96 G0 generator seeds
+fixtures, also against hand-known Words, twelve runtime-input fixtures and the
+four named-helper graphs (single, chain, diamond and branch locals) at eight
+boundary inputs. Twenty programs from the first 96 G0 generator seeds
 with a 40-node budget are emitted; the others are generator or emitter
 exclusions. Each accepted text must reparse and print back to itself. Extra or
 missing arguments, an undeclared method, `= =` in place of `==`, an
-unparenthesized operator, an undeclared local, a mistyped declaration and a
-literal of `2^256` are all rejected rather than given a value.
+unparenthesized operator, an undeclared local, a mistyped declaration, a call
+to an undeclared helper and a literal of `2^256` are all rejected rather than
+given a value.

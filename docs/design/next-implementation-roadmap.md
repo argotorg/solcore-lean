@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input and named-helper emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -559,15 +559,22 @@ Lean's standard axioms, and the semantic-kernel policy now covers them.
 The remaining Rust pipeline is assumed, not proved: parsing the text as the
 modeled grammar, name resolution and typing, the transcribed standard-library
 meaning, lowering, backend compilation, EVM execution and ABI dispatch.
-Differential tests still provide the only evidence for those steps. Helper
-calls, raw primitive aliases and the aggregate, loop, mutation, storage, call,
-closure, generic, comptime and module emitters are not covered.
+Differential tests still provide the only evidence for those steps.
+
+The proof now also covers the `runtime-functions` emitter.
+`Function.emit_source_meaning` states that its text parses to one free function
+per Core helper and that `run(uint256)` returns the Word of the original Core
+binding chain at every input. Each source helper sees only earlier helpers, as
+Core closures capture only earlier helpers. Raw primitive aliases, call graphs
+and the aggregate, loop, mutation, storage, call, closure, generic, comptime and
+module emitters are not covered; primitive aliases and call graphs come next.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
-fixtures at eight boundary inputs and twenty generated programs agree with
-Core; malformed and meaningless texts are rejected. The full Lean build (9,939
-jobs), registered tests and the semantic-kernel policy passed.
+fixtures and four named-helper graphs at eight boundary inputs, and twenty
+generated programs, agree with Core; malformed and meaningless texts are
+rejected. The full Lean build (9,940 jobs), registered tests and the
+semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or
