@@ -166,8 +166,9 @@ derives all three from checker certification and the cached body's Core typing.
 The invocation's physical entry state, the original compilation receipt, and
 the write inputs (`CellAwareInvocationAcceptedInputs.Writes`: fault
 interpretation of the body's assignment diagnostic words, reached place
-diagnostics and function identity views) remain inputs. These theorems are not
-yet used by the public session.
+diagnostics and function identity views) remain inputs of these theorems. The
+public connection below constructs the physical entry state for named rows
+whose accepted expressions lie in the first expression subset.
 
 The first expression closure is
 [CellAwareInvocationAcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressions.lean).
@@ -202,6 +203,44 @@ need the shared size induction across bodies. Indirect, builtin and method
 calls, indices, longer tuples, constructors, builtin references, generalized
 reads, lambdas and coercions are also outside the subset.
 
+The public connection of this subset starts at
+[CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
+Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
+and the public fault receiver, as `CellAwareNamedReadDiagnostics.uninitialized`
+does for the older named family. `preserves_selected` and `reflects_selected`
+run the actual named parameter entry (`CellAwareNamedEntry.prepare_selected`).
+From it they build the physical entry state of the row's own accepted-body
+index: the parameters are monomorphic, so
+`CellAwareInvocationPhysical.Physical.of_monomorphic` and
+`CellAwareScopeAuthority.At.of_monomorphic` apply. They then apply the
+subset's `body_preserves` or `body_reflects` and restore the saved physical
+caller. The caller's heap is represented with the profiled instance model of
+the older family. `cell_of_profiled` embeds each of its cells in the accepted
+instance model with the trivial attachment, and the results are stated in that
+model. At an actual prepared header,
+[CellAwarePublicAcceptedNamedRoot](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedNamedRoot.lean)
+derives the static inputs (`CellAwareInvocationAcceptedNamedHeaders.static_inputs`)
+and the issuer from the public diagnostic receipt. Its
+`checkpoint_has_sufficient_fuel_selected` and `checkpoint_reflects_selected`
+relate a staged Source trace of the body to the native completion of the actual
+public start in both directions, through the unchanged public root.
+[CellAwarePublicAcceptedNamedForward](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedNamedForward.lean)
+`first_value_selected` takes a staged trace that returns a value to a
+successful public resumption (`SourceCoreExecution.Checkpoint.ResumeAt`). The
+resumption carries the exported value and the physical history of the returned
+session.
+
+These public theorems keep as explicit premises `Closed`, the accepted body
+receipt and its `Covered`, `Writes`, and the original compilation receipt.
+They also keep the root, start and caller-state receipts that the older public
+root takes. The trivial attachment does not satisfy `Generalized`, so
+generalized declarations are not connected. The theorems take a staged Source
+trace. Unlike the older imperative family, which lifts an original Source trace
+with its profiled body tree, they do not lift original traces. The reached
+heap and history are in the accepted instance model, and no continuation
+theorem consumes them, so later public calls do not yet chain from them. No
+concrete program instantiates these theorems yet.
+
 ## Remaining work for the second goal
 
 `StaticProfile` deliberately recognizes a strict subset. Successful compilation
@@ -225,14 +264,15 @@ On the accepted-body route above, the next connected steps are:
   across bodies, then indirect and builtin calls, methods, indices, tuples,
   constructors, generalized reads, closures and coercions. Expressions of
   contextual closures need the relation between the compiler view and the
-  Source that their writes and matches also need. Derive `Reads` from the
-  public diagnostic receipt, as `CellAwareNamedReadDiagnostics.uninitialized`
-  does for the older named family.
-- Construct the invocation's physical entry state from the actual named
-  parameter entry, as `CellAwareImperativeNamedInvocation` does for the older
-  scope family, and connect `body_preserves`/`body_reflects` to the cell-aware
-  public body ports. Then issue program support from the receipt without
-  `StaticProfile`.
+  Source that their writes and matches also need.
+- Strengthen the named-row public connection. Derive `Writes` at actual
+  headers from the issued assignment recipes and the public receiver, as the
+  older family does with `CallableIndexedOwnedIssuedAssignmentRecipes.operands`
+  and `CellAwareNamedAssignmentDiagnostics.ready`. Lift original Source traces
+  of accepted bodies to staged traces, and carry the accepted instance model
+  through public histories so that later calls chain. Then instantiate the
+  public theorems on a concrete program, and issue program support from the
+  receipt without `StaticProfile`.
 
 The final connection must:
 

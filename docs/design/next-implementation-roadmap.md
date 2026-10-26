@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation and aggregate emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array and event-log extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree and a first expression subset for named rows; remaining expression forms and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection; remaining expression forms, write inputs and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles and refused CREATE/CREATE2 attempts connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -834,9 +834,21 @@ read-fault interpretation (`Reads`) and selected-body typing of the staged
 registry. Other
 expression forms, including direct calls, which need the shared size induction
 across bodies, and every expression of a contextual closure still need the
-premise. Contextual-view writes and matches are not yet closed, and the public
-session does not yet use these theorems. The design document lists the
-remaining premises.
+premise. Contextual-view writes and matches are not yet closed.
+
+For these named rows the subset is connected to the unchanged public root
+(`CellAwarePublicAcceptedNamedRoot` and `CellAwarePublicAcceptedNamedForward`).
+The actual named parameter entry constructs the body's physical entry state,
+and the public diagnostic receipt supplies `Reads`
+(`CellAwareInvocationAcceptedNamedInvocation`). A staged Source trace is
+related to native completion of the actual public start in both directions. A
+returning trace reaches a successful `SourceCoreExecution` resumption with the
+exported value and the returned session's physical history. `Closed`, the body
+receipt and its coverage, the write inputs and the original compilation receipt
+remain premises. Generalized declarations are not connected, original
+(unstaged) traces are not lifted, and later calls do not yet chain from the
+reached history, which uses the accepted instance model. No concrete program
+uses these theorems yet. The design document lists the remaining premises.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile
