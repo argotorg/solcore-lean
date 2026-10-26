@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value and bounded-`bytes` extensions validated locally; contract-forwarded value defined; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows, its public-root connection and one concrete instance; remaining expression and statement forms, fault lifting and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1053,6 +1053,59 @@ before execution:
   IDs, a bank input, clearing the child or root revert bit, and a smaller bank
   call value or amount, ordered by transaction count, program complexity, then
   the sum of inputs, call values and amounts.
+
+Original Core runs each transaction through `BalancedTopLevelExecution` with a
+registry of both contracts. A new runner, `rust-hull-forward-scenario`, funds
+the caller, endows the parent and performs each top-level transfer in its
+checked ledger; the fixed eight-unit call runner is unchanged. The call
+differential and campaign gained a profile table, and `stateful-calls` keeps
+its schemas, rules and fixed corpus. The profile is a twenty-third suite
+profile with two new native tools; the fifteen other native tools kept their
+hashes. Generation reserves the measured 169-node wrappers before generating
+the step. Three bank inputs, their call modes, three call values and three
+amounts come from a separate high-bit stream. 275 of the first 300 seeds at
+384 nodes were accepted.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions. Its histories, including both balances after every
+transaction, were computed outside Lean by a separate evaluator of the step
+programs and a direct model of the protocol. A registered Lean validator
+confirmed every status, payload, account and empty log list against original
+Core and rejected tampered entries. Coverage includes all 39 step features of
+the corpus, the ten boundary inputs, all four call modes, one to three
+helpers and transactions, four templates and every bank value as a call value
+and as an amount. It also covers forwards of 1, 2^64 and 2^70 that child
+reverts kept with the parent, and call values of 0, 7, 2^64 - 1 and 2^70 that
+root reverts returned.
+
+The full Lean build (10,050 jobs), registered tests, kernel policy and 507
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (71.2 and 77.4 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+seventeen attempts, with one ordinary exclusion and no resource exclusions.
+O0 matched all sixteen and 48 prefixes (98.1 seconds), with child-revert and
+root-revert refunds of every bank value and all four call modes. O2 matched
+fourteen and 42 prefixes. Its other two scenarios crashed the compiler during
+O2 code-image export with the shift-count panic `Integer overflow when
+casting to usize` recorded for Q013. Checked Hull export succeeded, and the
+same scenarios matched on O0. That O2 random gate failed. Per the user's
+instruction, the symptom is recorded in the local `questions.md` without
+upstream investigation, and the findings are retained.
+
+A copied Hull child-balance difference at the last of three transactions was
+reduced on each level to that transaction with zero input, call value and
+amount and a reduced step: nine accepted reductions in nine actual candidate
+executions. Original and reduced archives replayed exactly with agreement
+(four replays), and synthetic fingerprints reproduced. Core or Hull fuel one
+was inconclusive. With the extended call and suite scripts, the storage,
+rollback, call, keyed, dynamic-array, log, call-value and bytes fixed corpora
+still matched all 107 scenarios and 296 prefixes on both levels. An offline
+preparation of the worktree's cloned cache verified all seventeen native
+tools as ready. Hosted CI has not been run.
+
+This scope does not compare the sender's balance, gas, nonces or code,
+forwards the parent cannot pay, value sent by the child, deeper or repeated
+calls, or logs. Agreement is test evidence, not a preservation proof.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or multiple callers, needs its

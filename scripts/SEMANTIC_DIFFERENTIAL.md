@@ -1938,6 +1938,92 @@ Coverage adds the call modes and four value dimensions: call values, forwarded
 amounts, amounts a child revert returns to the parent, and call values a root
 revert returns to the sender.
 
+### Running and validation
+
+```sh
+lake build semanticForwardTool rustHullForwardScenario
+mkdir -p .upstream/semantic-forward-cases
+.lake/build/bin/semantic-forward-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-forward-cases/corpus.json
+python3 scripts/semantic-call-campaign.py --profile stateful-forwarded-value \
+  --corpus scripts/semantic-forward-corpus.json \
+  --output .upstream/semantic-forward-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-forwarded-value \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-forward-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as `semantic-call-tool`, with the same call bindings. Plans use
+`solcore-lean.forward-plan.v1` under the case field `forwardPlan`; cases use
+`solcore-lean.semantic-forward-case.v1`. Transactions are
+`{id, input, value, amount, target, callee}`: `value` is the call value the
+sender pays and `amount` the value the parent forwards, both at most 2^70.
+Histories use `solcore-lean.forward-history.v1` with the call history's
+fields. The call runner fixes the eight-unit endowment and zero top-level
+value, so the new runner `rust-hull-forward-scenario` accepts `callerFunds`,
+the fixed 2^72 endowment and per-call values and amounts in its
+`solcore-lean.forward-contract-scenario.v1` scenarios. It reports a rejected
+transfer as `transfer-rejected`. `semantic-call-differential.py` and
+`semantic-call-campaign.py` select the profile by case schema or `--profile`.
+Without explicit tools they use the profile's native tool and runner, and
+`stateful-calls` keeps its schemas and rules. The calldata of 24 generated
+transactions matched `cast calldata "run(uint256,uint256,uint256)"` from the
+pinned Foundry release byte for byte; the Lean tests retain one such vector.
+
+Generation reserves the measured 169-node wrappers before generating the step,
+so the 384-node default leaves 215 nodes for it. 275 of the first 300 seeds
+were accepted; the others drew a step template that does not fit. Generated
+scenarios must complete with the prescribed root outcomes and satisfy the
+refund and balance rules under original Core.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with new inputs, call values
+and amounts, and four generated seeds. Its expected histories, including both
+accounts after every transaction, were computed outside Lean by a separate
+evaluator of the step programs and a direct model of the protocol.
+`Tests/Main.lean` registers a validator that compares every status, payload,
+account and empty log list with original Core. It rejects tampered outputs,
+balances and logs, a forward committed after a child revert, and changed call
+values and amounts. Required coverage is all 39 step AST features in the
+corpus, the ten boundary inputs, the four call modes, one to three helpers
+and transactions, all four templates, both outcomes, every bank value as a
+call value and as an amount, forwards of 1, 2^64 and 2^70 kept by child
+reverts, and call values of 0, 7, 2^64 - 1 and 2^70 returned by root reverts.
+
+Local validation used committed code with frozen scripts and native tools; the
+fifteen existing native tools kept their hashes. The fixed suite matched all
+twelve scenarios and 33 prefixes on Sonatina O0 and O2, with complete
+coverage, in 71.2 and 77.4 seconds. The recorded random suite (root seed
+`20261026`, sixteen cases, 2,048 attempts) accepted sixteen scenarios from
+seventeen attempts; its one exclusion drew a step template that does not fit.
+On O0 all sixteen scenarios and 48 prefixes matched in 98.1 seconds. They
+covered every bank value as a call value and as an amount, child-revert and
+root-revert refunds of every bank value, and all four call modes. On O2
+fourteen scenarios and 42 prefixes matched. The other two, `generated-12` and
+`generated-14`, crashed the compiler during O2 code-image export with
+`Integer overflow when casting to usize`. Checked Hull export succeeded, and
+both matched on O0. The O2 random gate therefore failed. Its findings are
+recorded in the local `questions.md` without upstream investigation;
+automatic reduction of the first kept the crash fingerprint within its attempt
+limit.
+
+A copied `importedHull` child-balance difference at `tx-2` of the
+`three-helper-forwards` scenario was reduced on each level to that transaction
+with zero input, call value and amount and a reduced step: nine accepted
+reductions in nine candidate executions, all of whose actual comparisons
+matched. The original and reduced archives replayed exactly with three-way
+agreement (four replays), and synthetic replays reproduced the fingerprint.
+Core or Hull fuel one was classified as inconclusive. With the extended call
+and suite scripts, the two-slot storage, rollback, call, keyed, dynamic-array,
+log, call-value and bytes fixed corpora still matched all 107 scenarios and
+296 prefixes on each level. `scripts/test-source-call-rust.py`, run with the
+cloned upstream, still matched all ten parent/child scenarios and 26
+transactions.
+
+This profile does not compare the sender's balance, gas, nonces or code,
+forwards the parent cannot pay, value sent by the child, deeper or repeated
+calls, or logs. Agreement is test evidence, not a preservation proof.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function
