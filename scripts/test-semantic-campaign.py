@@ -154,39 +154,46 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(campaign.fingerprint(optimized)['backend'], 'sonatina-o2')
         self.assertFalse(campaign.same_failure(legacy_fingerprint, optimized))
         self.assertFalse(campaign.same_failure(campaign.fingerprint(optimized), legacy))
-        for invalid in ('yul', None, 2):
+        yul_analysis = campaign.analyze({**matched(), 'backend': 'yul'}, 'rustEvm')
+        self.assertEqual(campaign.fingerprint(yul_analysis)['backend'], 'yul')
+        self.assertFalse(campaign.same_failure(campaign.fingerprint(optimized), yul_analysis))
+        self.assertFalse(campaign.same_failure(campaign.fingerprint(yul_analysis), legacy))
+        for invalid in ('unknown-backend', None, 2):
             with self.assertRaises(ValueError):
                 campaign.analyze({**matched(), 'backend': invalid})
             with self.assertRaises(ValueError):
                 campaign.fingerprint({**legacy, 'backend': invalid})
 
     def test_selected_backend_reaches_original_and_reducer_executions(self):
-        # Adapter boundary policy fixture; this does not pretend to run Rust/EVM.
-        with tempfile.TemporaryDirectory() as directory:
-            args = options(directory)
-            args.backend, args.test_perturb_path = 'sonatina-o2', 'rustEvm'
-            args.upstream, args.target_dir = Path('/unused/upstream'), Path('/unused/target')
-            instance = campaign.Campaign(args)
-            original = {'source': 'policy original', 'program': {'body': {'tag': 'word', 'value': '7'}}}
-            candidate = {'source': 'policy reduced', 'program': {'body': {'tag': 'word', 'value': '0'}}}
-            selected = []
+        for backend in ('sonatina-o2', 'yul'):
+            # Adapter boundary policy fixture; this does not pretend to run Rust/EVM.
+            with tempfile.TemporaryDirectory() as directory:
+                args = options(directory)
+                args.backend, args.test_perturb_path = backend, 'rustEvm'
+                args.solc = Path('/chosen/pinned-solc')
+                args.upstream, args.target_dir = Path('/unused/upstream'), Path('/unused/target')
+                instance = campaign.Campaign(args)
+                original = {'source': 'policy original', 'program': {'body': {'tag': 'word', 'value': '7'}}}
+                candidate = {'source': 'policy reduced', 'program': {'body': {'tag': 'word', 'value': '0'}}}
+                selected = []
 
-            def execute(adapter_args, report):
-                selected.append(adapter_args.backend)
-                report.update(matched(), backend=adapter_args.backend)
-                campaign.save_json(adapter_args.output / 'case.json', json.loads(adapter_args.case.read_text()))
+                def execute(adapter_args, report):
+                    selected.append((adapter_args.backend, adapter_args.solc))
+                    report.update(matched(), backend=adapter_args.backend)
+                    campaign.save_json(adapter_args.output / 'case.json', json.loads(adapter_args.case.read_text()))
 
-            with patch.object(campaign.m2, 'execute', side_effect=execute):
-                folder, report, analysis = instance.execute_case(original)
-                finding = instance.retain_finding(0, folder, original, report, analysis)
-                instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
-                instance.shrink(original, finding)
-            self.assertEqual(selected, ['sonatina-o2', 'sonatina-o2'])
-            self.assertEqual(instance.summary['backend'], 'sonatina-o2')
-            self.assertEqual(instance.summary['configuration']['backend'], 'sonatina-o2')
-            history = json.loads((Path(directory) / finding['history']).read_text())
-            self.assertTrue(history['steps'][0]['accepted'])
-            self.assertEqual(history['steps'][0]['fingerprint']['backend'], 'sonatina-o2')
+                with patch.object(campaign.m2, 'execute', side_effect=execute):
+                    folder, report, analysis = instance.execute_case(original)
+                    finding = instance.retain_finding(0, folder, original, report, analysis)
+                    instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
+                    instance.shrink(original, finding)
+                self.assertEqual(selected, [(backend, args.solc), (backend, args.solc)])
+                self.assertEqual(instance.summary['backend'], backend)
+                self.assertEqual(instance.summary['configuration']['backend'], backend)
+                history = json.loads((Path(directory) / finding['history']).read_text())
+                self.assertTrue(history['steps'][0]['accepted'])
+                self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
+
 
     def test_normal_analysis_never_changes_observations(self):
         report = matched()

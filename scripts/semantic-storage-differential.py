@@ -283,20 +283,20 @@ def trace_result(mined: dict, trace: dict) -> dict:
 
 
 def verify_archive(path: Path, report: dict) -> None:
-    if report.get("schema") != REPORT_SCHEMA:
+    if not isinstance(report, dict) or report.get("schema") != REPORT_SCHEMA:
         raise ValueError("unsupported storage report schema")
-    common.resolve_backend(None, report)
+    common.resolve_sonatina_backend(None, report)
     common.verify_archive(path, {**report, "schema": common.REPORT_SCHEMA})
 
 
 def execute(args, report: dict) -> None:
-    runner = common.Runner(args, report)
     previous = None
     if args.replay:
         previous = common.read_json(args.replay / "report.json", args.artifact_limit)
         verify_archive(args.replay, previous)
-    args.backend = common.resolve_backend(getattr(args, "backend", None), previous)
+    args.backend = common.resolve_sonatina_backend(getattr(args, "backend", None), previous)
     report["backend"] = args.backend
+    runner = common.Runner(args, report)
     case = common.read_json(args.replay / "case.json" if args.replay else args.case)
     validate_case(case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
@@ -441,7 +441,7 @@ def main() -> int:
     selection.add_argument("--case", type=Path)
     selection.add_argument("--replay", type=Path)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--backend", choices=common.BACKENDS,
+    parser.add_argument("--backend", choices=common.SONATINA_BACKENDS,
         help="default sonatina-o0; exact replay inherits its saved backend")
     parser.add_argument("--case-tool", type=Path)
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-storage-scenario")
@@ -457,8 +457,12 @@ def main() -> int:
         selected = common.read_json(args.replay / "case.json" if args.replay else args.case)
         validate_case(selected)
         saved_report = common.read_json(args.replay / "report.json", defaults["artifact_limit"]) if args.replay else None
-        args.backend = common.resolve_backend(args.backend, saved_report)
+        if args.replay and not isinstance(saved_report, dict):
+            raise ValueError("saved report must be an object")
+        args.backend = common.resolve_sonatina_backend(args.backend, saved_report)
         saved = saved_report.get("budgets", {}) if saved_report is not None else {}
+        if not isinstance(saved, dict):
+            raise ValueError("saved budgets must be an object")
         if args.case_tool is None:
             args.case_tool = ROOT / ".lake/build/bin" / profile(selected)["caseTool"]
     except (ValueError, OSError, KeyError, TypeError, Finding) as error:

@@ -171,7 +171,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                         histories[path]["finalStorage"] = copy.deepcopy(row["committedStorage"])
                 synthetic = True
     result = adapter.compare(histories, case) if synthetic else actual
-    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_backend(None, report), "synthetic": synthetic,
+    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_sonatina_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": path, "transactionId": selected, "field": field} if path else None,
             "actualComparison": actual, "comparison": result, "histories": histories}
 
@@ -202,14 +202,14 @@ def fingerprint(analysis):
         values = [value if isinstance(value, str) else None for value in values]
         if len(set(values)) > 1:
             slots.append(slot)
-    return {"backend": common.resolve_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
+    return {"backend": common.resolve_sonatina_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "fields": sorted(comparison.get("fields", [])), "storageSlots": slots,
             "pathShapes": shapes, "synthetic": analysis["synthetic"]}
 
 
 def same_failure(expected, analysis):
-    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": common.resolve_backend(None, expected)}
+    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": common.resolve_sonatina_backend(None, expected)}
 
 
 def transaction_counts(histories, case):
@@ -261,7 +261,7 @@ def count_outcome(counts, analysis, case):
 class Campaign:
     def __init__(self, args):
         self.args, self.started = args, time.monotonic()
-        self.backend = common.resolve_backend(getattr(args, "backend", None))
+        self.backend = common.resolve_sonatina_backend(getattr(args, "backend", None))
         self.profile = getattr(args, "profile", "stateful-storage")
         self.specification = adapter.PROFILES[self.profile]
         self.deadline = self.started + args.seconds
@@ -572,7 +572,7 @@ def missing_coverage(summary):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--backend", choices=common.BACKENDS, default="sonatina-o0")
+    parser.add_argument("--backend", choices=common.SONATINA_BACKENDS, default="sonatina-o0")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path)
     selection.add_argument("--case", type=Path)

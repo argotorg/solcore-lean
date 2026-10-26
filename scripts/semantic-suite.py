@@ -97,6 +97,8 @@ def requested(args, profile):
 
 def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
+    if args.backend == "yul" and family != "pure":
+        raise ValueError("Yul is restricted to the ten pure profiles")
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else args.storage_case_tool,
             "call": args.call_case_tool}[family]
     runner = {"pure": args.core_runner, "storage": args.storage_core_runner, "call": args.call_core_runner}[family]
@@ -104,6 +106,8 @@ def command(args, profile, output, seconds, disk_bytes):
               "--seconds", str(seconds), "--disk-bytes", str(disk_bytes), "--case-tool", str(tool), "--core-runner", str(runner)]
     for key in ("backend", "anvil", "upstream", "target_dir", "direct_fuel", "core_fuel", "gas", "case_timeout", "shrink_attempts", "shrink_candidates"):
         result += ["--" + key.replace("_", "-"), str(getattr(args, key))]
+    if args.backend == "yul":
+        result += ["--solc", str(args.solc)]
     if args.mode == "fixed":
         # Never truncate a fixed corpus and call its missing coverage complete.
         result += ["--corpus", str(manifest(profile)), "--attempts", str(max(args.attempts, requested(args, profile)))]
@@ -351,7 +355,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirteen")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default thirteen for Sonatina, ten pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -369,13 +373,19 @@ def parse_args(argv=None):
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; forwarded only to pure Yul campaigns")
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     args = parser.parse_args(argv)
     if args.mode == "fixed" and (args.cases is not None or args.nodes is not None):
         parser.error("--cases and --nodes apply only to random mode; fixed corpora must remain complete")
     args.cases = args.cases if args.cases is not None else 4
-    args.profile = args.profile or list(PROFILES)
+    if args.backend == "yul":
+        if args.profile and any(PROFILES[profile][1] != "pure" for profile in args.profile):
+            parser.error("--backend yul supports only pure profiles; stateful profiles must use Sonatina")
+        args.profile = args.profile or [profile for profile, (_, family, _) in PROFILES.items() if family == "pure"]
+    else:
+        args.profile = args.profile or list(PROFILES)
     if len(args.profile) != len(set(args.profile)):
         parser.error("duplicate profile selection")
     limits = {"seed": (0, 2**64-1), "shard_count": (1, 1000000), "shard_index": (0, 999999), "cases": (1, 1024),
@@ -394,7 +404,7 @@ def parse_args(argv=None):
         parser.error("--shard-index must be less than --shard-count")
     for key, binary in binaries.items():
         setattr(args, key, (getattr(args, key) or args.bin_dir / binary).resolve())
-    for key in ("output", "bin_dir", "anvil", "upstream", "target_dir"):
+    for key in ("output", "bin_dir", "anvil", "upstream", "target_dir", "solc"):
         setattr(args, key, getattr(args, key).resolve())
     args.reserve_bytes = min(8 * 1024**2, args.disk_bytes // 8)
     return args

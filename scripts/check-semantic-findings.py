@@ -166,6 +166,8 @@ class Verification:
         keys = ("anvil", "upstream", "target_dir", "case_tool", "core_runner")
         if not inherit_backend:
             keys += ("backend",)
+        if self.args.backend == "yul":
+            keys += ("solc",)
         return [part for key in keys
                 for part in ("--" + key.replace("_", "-"), str(getattr(self.args, key)))]
 
@@ -227,6 +229,7 @@ class Verification:
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=m2.BACKENDS, default="sonatina-o0")
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; used only by Yul runs and their exact replay")
     parser.add_argument("--case", required=True, type=Path, help="reducible saved case; use fixed closed-g0 cases/0006.json")
     parser.add_argument("--output", required=True, type=Path, help="new validation directory")
     for key, default in {"anvil": Path(shutil.which("anvil") or "anvil"),
@@ -241,7 +244,7 @@ def parse_args(argv=None):
     for key, low, high in (("seconds", .001, 86400), ("case_timeout", .001, 3600),
                            ("disk_bytes", 32 * 1024**2, 10**10), ("cleanup_seconds", .1, 30)):
         require(math.isfinite(getattr(args, key)) and low <= getattr(args, key) <= high, "invalid limit: " + key)
-    for key in ("case", "output", "anvil", "upstream", "target_dir", "case_tool", "core_runner"):
+    for key in ("case", "output", "anvil", "upstream", "target_dir", "case_tool", "core_runner", "solc"):
         setattr(args, key, getattr(args, key).resolve())
     args.reserve_bytes = min(8 * 1024**2, args.disk_bytes // 8)
     args.output_limit = 2 * 1024**2

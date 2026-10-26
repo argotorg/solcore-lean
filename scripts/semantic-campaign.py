@@ -503,6 +503,7 @@ def compact_report(report: dict) -> dict:
 class Campaign:
     def __init__(self, args):
         args.backend = m2.resolve_backend(getattr(args, "backend", None))
+        args.solc = Path(getattr(args, "solc", shutil.which("solc") or "solc")).resolve()
         self.args = args
         self.started = time.monotonic()
         self.deadline = self.started + args.seconds
@@ -516,6 +517,7 @@ class Campaign:
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path} if args.test_perturb_path else None,
             "configuration": {key: getattr(args, key) for key in ("backend", "profile", "seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
             "tools": {"caseTool": str(args.case_tool), "coreRunner": str(args.core_runner), "anvil": str(args.anvil),
+                      **({"solc": str(args.solc)} if args.backend == "yul" else {}),
                       "campaignSha256": m2.digest(Path(__file__).read_bytes()),
                       "differentialSha256": m2.digest((ROOT / "scripts/semantic-differential.py").read_bytes())},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
@@ -627,7 +629,7 @@ class Campaign:
 
     def case_args(self, case_path: Path, run_dir: Path):
         left = max(0.001, self.deadline - time.monotonic())
-        return SimpleNamespace(case=case_path, replay=None, output=run_dir, backend=self.args.backend,
+        return SimpleNamespace(case=case_path, replay=None, output=run_dir, backend=self.args.backend, solc=self.args.solc,
             case_tool=self.args.case_tool, core_runner=self.args.core_runner, anvil=self.args.anvil,
             upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
@@ -961,6 +963,7 @@ class Campaign:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=m2.BACKENDS, default="sonatina-o0")
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; used only by --backend yul")
     parser.add_argument("--output", type=Path, required=True, help="new campaign directory")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
@@ -1019,7 +1022,7 @@ def main() -> int:
         value = getattr(args, key)
         if not math.isfinite(value) or not lower <= value <= upper:
             parser.error(f"{key} must be between {lower} and {upper}")
-    for key in ("output", "case_tool", "core_runner", "anvil", "upstream", "target_dir"):
+    for key in ("output", "case_tool", "core_runner", "anvil", "upstream", "target_dir", "solc"):
         setattr(args, key, getattr(args, key).resolve())
     if args.corpus:
         args.corpus = args.corpus.resolve()

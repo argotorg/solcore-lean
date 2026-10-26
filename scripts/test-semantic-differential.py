@@ -476,7 +476,7 @@ class BackendTests(unittest.TestCase):
             for other in set(runner.BACKENDS) - {backend}:
                 with self.assertRaisesRegex(ValueError, "retains the saved backend"):
                     runner.resolve_backend(other, {"backend": backend})
-        for invalid in (None, [], {}, True, "O2", "sonatina-o1", "yul"):
+        for invalid in (None, [], {}, True, "O2", "sonatina-o1", "yul-o0"):
             with self.assertRaisesRegex(ValueError, "unsupported saved backend"):
                 runner.resolve_backend(None, {"backend": invalid})
 
@@ -522,6 +522,59 @@ class BackendTests(unittest.TestCase):
                 image.with_suffix(".json.provenance.json").write_text(json.dumps(ip))
                 with self.assertRaisesRegex(ValueError, "backend revision/optimization differs"):
                     runner.validate_export(hull, image, source, 4096, backend)
+
+
+class YulAdapterBoundaryTests(unittest.TestCase):
+    def test_yul_path_labels_keep_linked_hull_separate(self):
+        self.assertEqual(runner.path_backends("yul"), {"directCore": "original-core",
+            "importedHull": "sonatina-o0", "rustEvm": "yul"})
+        for backend in runner.SONATINA_BACKENDS:
+            self.assertEqual(runner.path_backends(backend), {"directCore": "original-core",
+                "importedHull": backend, "rustEvm": backend})
+        with self.assertRaisesRegex(ValueError, "only Sonatina"):
+            runner.optimization_for_backend("yul")
+        for explicit, saved in (("yul", None), (None, {"backend": "yul"})):
+            with self.assertRaisesRegex(ValueError, "stateful comparisons require"):
+                runner.resolve_sonatina_backend(explicit, saved)
+
+    def test_foreign_transport_failure_retains_category_stage_and_detail(self):
+        # The helper has a distinct importlib module/class. This tests exception
+        # transport, not a simulated compiler or runtime result.
+        spec = importlib.util.spec_from_file_location("test_yul_transport", ROOT / "scripts/semantic-yul.py")
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        self.assertIsNot(helper.common.Finding, runner.Finding)
+        for category in ("inconclusive-resource", "compilation-rejected", "compiler-crash", "adapter-error"):
+            def operation():
+                raise helper.common.Finding(category, "rust-yul-evm", "transport test")
+            module = SimpleNamespace(common=helper.common, operation=operation)
+            with patch.object(runner, "_yul_module", module), self.assertRaises(runner.Finding) as caught:
+                runner.yul_transport("operation")
+            self.assertEqual((caught.exception.category, caught.exception.stage, caught.exception.detail),
+                             (category, "rust-yul-evm", "transport test"))
+
+    def test_archive_cannot_relabel_imported_hull_as_yul(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            report = ArtifactTests().archive(directory)
+            report.update(backend="yul", pathBackends={"directCore": "original-core", "importedHull": "yul", "rustEvm": "yul"})
+            with self.assertRaisesRegex(ValueError, "execution path backends differ"):
+                runner.verify_archive(directory, report)
+
+    def test_malformed_replay_report_is_rejected_before_output_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            archive = folder / "archive"
+            archive.mkdir()
+            for value in (None, [], "invalid", {"budgets": None}, {"budgets": []}, {"budgets": "invalid"}):
+                (archive / "report.json").write_text(json.dumps(value))
+                output = folder / "never-created"
+                with patch.object(sys, "argv", ["semantic-differential.py", "--replay", str(archive),
+                        "--output", str(output)]), patch.object(sys, "stderr", io.StringIO()), \
+                        self.assertRaises(SystemExit) as caught:
+                    runner.main()
+                self.assertEqual(caught.exception.code, 2)
+                self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

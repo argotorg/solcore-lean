@@ -173,7 +173,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                         histories[path]["finalAccounts"] = copy.deepcopy(row["committedAccounts"])
                 synthetic = True
     result = adapter.compare(histories, case, bindings) if synthetic else actual
-    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_backend(None, report), "synthetic": synthetic, "bindings": bindings,
+    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_sonatina_backend(None, report), "synthetic": synthetic, "bindings": bindings,
             "testAdapter": {"name": TEST_ADAPTER, "path": path, "transactionId": selected, "field": field,
                             "applied": synthetic} if path else None,
             "actualComparison": actual, "comparison": result, "histories": histories}
@@ -258,7 +258,7 @@ def fingerprint(analysis):
                 log_differences.append(f"{index}:{field}")
     if any(rows[path].get("status") == "reverted" and events[path] for path in PATHS):
         log_differences.append("nonempty-after-root-revert")
-    return {"backend": common.resolve_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
+    return {"backend": common.resolve_sonatina_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "fields": sorted(comparison.get("fields", [])), "accountFields": sorted(differences),
             "logFields": log_differences, "logShapes": {path: log_shape(events[path], bindings) for path in PATHS},
@@ -266,7 +266,7 @@ def fingerprint(analysis):
 
 
 def same_failure(expected, analysis):
-    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": common.resolve_backend(None, expected)}
+    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": common.resolve_sonatina_backend(None, expected)}
 
 
 def transaction_counts(histories, case, bindings):
@@ -321,7 +321,7 @@ def count_outcome(counts, analysis, case):
 class Campaign:
     def __init__(self, args):
         self.args, self.started = args, time.monotonic()
-        self.backend = common.resolve_backend(getattr(args, "backend", None))
+        self.backend = common.resolve_sonatina_backend(getattr(args, "backend", None))
         self.profile = "stateful-calls"
         self.deadline = self.started + args.seconds
         self.reserve = min(40 * 1024 * 1024, args.disk_bytes // 4)
@@ -638,7 +638,7 @@ def missing_coverage(summary):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--backend", choices=common.BACKENDS, default="sonatina-o0")
+    parser.add_argument("--backend", choices=common.SONATINA_BACKENDS, default="sonatina-o0")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path)
     selection.add_argument("--case", type=Path)

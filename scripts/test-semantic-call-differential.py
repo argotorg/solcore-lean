@@ -202,12 +202,12 @@ class ReceiptTests(unittest.TestCase):
 class BackendTests(unittest.TestCase):
     """Backend selection policy only; mocked execution is not an EVM result."""
 
-    def invoke(self, directory, *, backend=None, saved=None):
+    def invoke(self, directory, *, backend=None, saved=...):
         source = directory / "case.json"
         source.write_text(json.dumps(case()))
         output = directory / "run"
         arguments = ["adapter", "--output", str(output)]
-        if saved is not None:
+        if saved is not ...:
             (directory / "report.json").write_text(json.dumps(saved))
             arguments += ["--replay", str(directory)]
         else:
@@ -244,6 +244,34 @@ class BackendTests(unittest.TestCase):
                 directory = Path(temporary)
                 with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
                     self.invoke(directory, backend=explicit, saved=saved)
+                self.assertEqual(caught.exception.code, 2)
+                self.assertFalse((directory / "run").exists())
+
+    def test_yul_cli_is_rejected_before_output_or_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                self.invoke(directory, backend="yul")
+            self.assertEqual(caught.exception.code, 2)
+            self.assertFalse((directory / "run").exists())
+
+    def test_yul_programmatic_execution_and_saved_archive_have_no_fallback(self):
+        args = SimpleNamespace(replay=None, backend="yul")
+        with patch.object(adapter.common, "Runner") as execution:
+            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                adapter.execute(args, {})
+            execution.assert_not_called()
+        with patch.object(adapter.common, "verify_archive") as archive:
+            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                adapter.verify_archive(Path("unused"), {"schema": adapter.REPORT_SCHEMA, "backend": "yul"})
+            archive.assert_not_called()
+
+    def test_invalid_replay_report_and_budgets_fail_before_output(self):
+        for saved in (None, [], ["report"], True, "report", {"budgets": None}, {"budgets": []}):
+            with self.subTest(saved=saved), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                    self.invoke(directory, saved=saved)
                 self.assertEqual(caught.exception.code, 2)
                 self.assertFalse((directory / "run").exists())
 

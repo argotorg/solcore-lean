@@ -53,7 +53,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
-BACKENDS = ("sonatina-o0", "sonatina-o2")
+SONATINA_BACKENDS = ("sonatina-o0", "sonatina-o2")
+BACKENDS = (*SONATINA_BACKENDS, "yul")
 MAX_CASE_BYTES = 4 * 1024 * 1024
 GAS_RESOURCE = re.compile(r"out[ _-]?of[ _-]?gas|intrinsic gas.{0,40}(too low|exceed)|"
                           r"gas (required|limit).{0,40}(allowance|exceed)|gas too low", re.I)
@@ -104,7 +105,46 @@ def resolve_backend(explicit: str | None, saved_report: dict | None = None) -> s
 
 
 def optimization_for_backend(backend: str) -> str:
-    return {"sonatina-o0": "O0", "sonatina-o2": "O2"}[resolve_backend(backend)]
+    if backend not in SONATINA_BACKENDS:
+        raise ValueError("only Sonatina backends supply Hull code images")
+    return {"sonatina-o0": "O0", "sonatina-o2": "O2"}[backend]
+
+
+def image_backend(backend: str) -> str:
+    selected = resolve_backend(backend)
+    return "sonatina-o0" if selected == "yul" else selected
+
+
+def resolve_sonatina_backend(explicit: str | None, saved_report: dict | None = None) -> str:
+    selected = resolve_backend(explicit, saved_report)
+    if selected not in SONATINA_BACKENDS:
+        raise ValueError("stateful comparisons require a Sonatina backend")
+    return selected
+
+
+def path_backends(backend: str) -> dict:
+    return {"directCore": "original-core", "importedHull": image_backend(backend), "rustEvm": backend}
+
+
+_yul_module = None
+
+
+def yul_transport(operation: str, *args):
+    """Load the optional transport lazily; preserve its structured failures.
+
+    Importlib consumers own distinct Finding classes. Translate only this
+    trusted helper's class; native caller failures already use our own class.
+    """
+    global _yul_module
+    if _yul_module is None:
+        spec = importlib.util.spec_from_file_location("semantic_yul_transport", ROOT / "scripts/semantic-yul.py")
+        assert spec and spec.loader
+        _yul_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_yul_module)
+    try:
+        return getattr(_yul_module, operation)(*args)
+    except _yul_module.common.Finding as error:
+        raise Finding(error.category, error.stage, error.detail) from error
 
 
 def validate_image_backend(images: dict, backend: str) -> None:
@@ -134,12 +174,16 @@ def verify_archive(directory: Path, report: dict) -> None:
     if artifacts["case.json"] != report.get("caseSha256"):
         raise ValueError("saved case hash differs from the artifact inventory")
     backend = resolve_backend(None, report)
+    if "pathBackends" in report and report["pathBackends"] != path_backends(backend):
+        raise ValueError("saved execution path backends differ from selected backend")
     if "images.json" in artifacts:
-        validate_image_backend(read_json(directory / "images.json", 64 * 1024 * 1024), backend)
+        validate_image_backend(read_json(directory / "images.json", 64 * 1024 * 1024), image_backend(backend))
     provenance = report.get("exportProvenance", {}).get("images")
     if provenance is not None and (provenance.get("backendRevision") != BACKEND_COMMIT or
-            provenance.get("optimization") != optimization_for_backend(backend)):
+            provenance.get("optimization") != optimization_for_backend(image_backend(backend))):
         raise ValueError("saved export provenance differs from selected backend")
+    if backend == "yul":
+        yul_transport("validate_archive", directory, report, 64 * 1024 * 1024)
 
 
 def json_bytes(value) -> bytes:
@@ -559,6 +603,8 @@ def execute(args, report: dict) -> None:
         original = args.replay / "case.json"
     backend = resolve_backend(getattr(args, "backend", None), previous)
     report["backend"] = backend
+    report["pathBackends"] = path_backends(backend)
+    linked_backend = image_backend(backend)
     case = read_json(original)
     validate_case(case)
     if args.replay and case["schema"] == MODULE_CASE_SCHEMA:
@@ -574,7 +620,8 @@ def execute(args, report: dict) -> None:
         CLOSURE_CASE_SCHEMA: "runtime Word capture, repeated or independent snapshot closures and outer mutation, checked Core lambdas, Sonatina O0, run(uint256) ABI Word",
         COMPTIME_CASE_SCHEMA: "original closed G0 expression evaluated by source comptime versus Core, runtime aggregate step and Word input, Sonatina O0, run(uint256) ABI Word",
         MODULE_CASE_SCHEMA: "four canonical source modules combining generic selection, snapshot closures and comptime with original Core ASTs, Sonatina O0, run(uint256) ABI Word"
-    }[case["schema"]].replace("Sonatina O0", "Sonatina " + optimization_for_backend(backend))
+    }[case["schema"]].replace("Sonatina O0", "Yul EVM and Sonatina O0-linked Hull" if backend == "yul"
+                             else "Sonatina " + optimization_for_backend(backend))
     case_path, source = args.output / "case.json", args.output / "case.sol"
     case_path.write_bytes(json_bytes(case))
     bundle_receipt = None
@@ -612,6 +659,10 @@ def execute(args, report: dict) -> None:
                       ("export-rust-hull.py", "export-rust-code-image.py", "rust-hull-export.rs", "rust-code-image-export.rs")}}
     if bundle_receipt is not None:
         report["tools"]["bundleTransportSha256"] = file_digest(ROOT / "scripts/semantic-source-bundle.py")
+    if backend == "yul":
+        report["tools"].update(solc=runner.identity(args.solc, version=True),
+            yulExporterSha256=file_digest(ROOT / "scripts/export-rust-yul.py"),
+            yulTransportSha256=file_digest(ROOT / "scripts/semantic-yul.py"))
     revision = runner.process("repository-revision", ["git", "rev-parse", "HEAD"], 10)
     dirty = runner.process("repository-diff", ["git", "diff", "--binary", "HEAD"], 10)
     if revision["returncode"] or dirty["returncode"]:
@@ -625,6 +676,13 @@ def execute(args, report: dict) -> None:
         for key in ("caseTool", "coreRunner", "anvil"):
             if report["tools"][key]["sha256"] != previous.get("tools", {}).get(key, {}).get("sha256"):
                 raise Finding("adapter-error", "replay", f"{key} binary changed since saved run")
+        if backend == "yul":
+            for key in ("yulExporterSha256", "yulTransportSha256"):
+                if report["tools"][key] != previous.get("tools", {}).get(key):
+                    raise Finding("adapter-error", "replay", f"{key} changed since saved run")
+            for key in ("sha256", "version"):
+                if report["tools"]["solc"][key] != previous.get("tools", {}).get("solc", {}).get(key):
+                    raise Finding("adapter-error", "replay", f"solc {key} changed since saved run")
     refreshed = checked_process(runner, "direct-core-replay",
         [str(args.case_tool), "replay", str(case_path), str(args.direct_fuel)])
     fresh = json.loads(refreshed["stdout"])
@@ -645,9 +703,9 @@ def execute(args, report: dict) -> None:
     audit_bundle()
     checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *common,
         "--output", str(image_path), "--hull-output", str(hull_path), "--timeout", str(args.timeout),
-        "--optimization", optimization_for_backend(backend)], args.timeout * 3)
+        "--optimization", optimization_for_backend(linked_backend)], args.timeout * 3)
     audit_bundle()
-    report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit, backend)
+    report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit, linked_backend)
     if bundle_receipt is not None:
         bundle_transport.normalized_sources(report["exportProvenance"]["hull"].get("sources"), bundle_receipt, case)
     if args.replay and "exportProvenance" in previous:
@@ -668,6 +726,10 @@ def execute(args, report: dict) -> None:
     images = read_json(image_path, args.artifact_limit)
     init = image_bytes(images, case["contract"]["deployPath"])
     runtime = image_bytes(images, case["contract"]["runtimePath"])
+    if backend == "yul":
+        audit_bundle()
+        init, runtime = yul_transport("execute", args, runner, case, source, hull_path, report, previous)
+        audit_bundle()
     with anvil(runner, args.anvil) as rpc:
         accounts = rpc.call("eth_accounts", [])
         if not accounts or not re.fullmatch(r"0x[0-9a-fA-F]{40}", accounts[0]):
@@ -735,6 +797,7 @@ def main() -> int:
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--backend", choices=BACKENDS, help="default Sonatina O0; exact replay inherits its saved backend")
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc, used only for --backend yul")
     defaults = {"direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000,
                 "timeout": 300, "startup_timeout": 30, "total_timeout": 900,
                 "output_limit": 2 * 1024 * 1024, "artifact_limit": 64 * 1024 * 1024}
@@ -745,7 +808,11 @@ def main() -> int:
     saved_report = None
     if args.replay:
         saved_report = read_json(args.replay / "report.json", defaults["artifact_limit"])
+        if not isinstance(saved_report, dict):
+            parser.error("saved report must be an object")
         saved_budgets = saved_report.get("budgets", {})
+        if not isinstance(saved_budgets, dict):
+            parser.error("saved budgets must be an object")
     try:
         args.backend = resolve_backend(args.backend, saved_report)
     except ValueError as error:
@@ -758,11 +825,11 @@ def main() -> int:
         if args.replay and explicit is not None and value != saved_budgets.get(key):
             parser.error(f"replay must retain the saved {key}; use --case for changed budgets")
         setattr(args, key, value)
-    for key in ("case", "replay", "output", "case_tool", "core_runner", "anvil", "upstream", "target_dir"):
+    for key in ("case", "replay", "output", "case_tool", "core_runner", "anvil", "upstream", "target_dir", "solc"):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
     args.output.mkdir(parents=True, exist_ok=False)
-    report = {"schema": REPORT_SCHEMA, "backend": args.backend, "processes": [], "observations": {}, "rawObservations": {},
+    report = {"schema": REPORT_SCHEMA, "backend": args.backend, "pathBackends": path_backends(args.backend), "processes": [], "observations": {}, "rawObservations": {},
               "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
               "scope": "pure Word ABI; selected backend " + args.backend}
     previous_term = signal.getsignal(signal.SIGTERM)

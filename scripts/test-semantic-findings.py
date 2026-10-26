@@ -95,40 +95,45 @@ class FindingsPolicyTests(unittest.TestCase):
             check.verify_synthetic(folder, 1, True, 'sonatina-o2')
 
     def test_all_validation_commands_keep_selected_backend_except_inherited_exact_replay(self):
-        case = self.root / 'case.json'
-        case.write_text('policy fixture')
-        args = check.parse_args(['--case', str(case), '--output', str(self.root / 'output'),
-                                 '--backend', 'sonatina-o2'])
-        args.output.mkdir()
-        verification = check.Verification(args)
-        commands = []
+        for backend in ('sonatina-o2', 'yul'):
+            case = self.root / 'case.json'
+            case.write_text('policy fixture')
+            args = check.parse_args(['--case', str(case), '--output', str(self.root / ('output-' + backend)),
+                                     '--backend', backend, '--solc', '/chosen/pinned-solc'])
+            args.output.mkdir()
+            verification = check.Verification(args)
+            commands = []
 
-        def process(phase, command):
-            commands.append((phase, command))
-            return {}, 0 if phase == 'exact-replay' else 1
+            def process(phase, command):
+                commands.append((phase, command))
+                return {}, 0 if phase == 'exact-replay' else 1
 
-        result = {'fingerprint': {'backend': 'sonatina-o2'}, 'finalArchive': 'reduced',
-                  'finalProgramSha256': 'policy-reduced'}
-        with patch.object(verification, 'process', side_effect=process), \
-                patch.object(check, 'verify_synthetic', return_value=result) as synthetic, \
-                patch.object(check, 'safe_member', return_value=self.root / 'reduced'), \
-                patch.object(check.m2, 'read_json', return_value={}), \
-                patch.object(check, 'actual_match') as actual, patch.object(check, 'verify_resource') as resource, \
-                patch.object(check.suite, 'digest', return_value='policy-digest'):
-            verification.run()
-        self.assertEqual([phase for phase, _ in commands], list(check.PHASES))
-        for phase, command in commands:
-            if phase == 'exact-replay':
-                self.assertNotIn('--backend', command)
-                self.assertIn('--replay', command)
-            else:
-                self.assertEqual(command[command.index('--backend') + 1], 'sonatina-o2')
-        self.assertEqual([call.args[-1] for call in synthetic.call_args_list], ['sonatina-o2', 'sonatina-o2'])
-        actual.assert_called_once_with({}, 'sonatina-o2')
-        resource.assert_called_once_with({}, 1, 'sonatina-o2')
-        self.assertEqual(verification.report['backend'], 'sonatina-o2')
+            result = {'fingerprint': {'backend': backend}, 'finalArchive': 'reduced',
+                      'finalProgramSha256': 'policy-reduced'}
+            with patch.object(verification, 'process', side_effect=process), \
+                    patch.object(check, 'verify_synthetic', return_value=result) as synthetic, \
+                    patch.object(check, 'safe_member', return_value=self.root / 'reduced'), \
+                    patch.object(check.m2, 'read_json', return_value={}), \
+                    patch.object(check, 'actual_match') as actual, patch.object(check, 'verify_resource') as resource, \
+                    patch.object(check.suite, 'digest', return_value='policy-digest'):
+                verification.run()
+            self.assertEqual([phase for phase, _ in commands], list(check.PHASES))
+            for phase, command in commands:
+                if backend == 'yul':
+                    self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
+                else:
+                    self.assertNotIn('--solc', command)
+                if phase == 'exact-replay':
+                    self.assertNotIn('--backend', command)
+                    self.assertIn('--replay', command)
+                else:
+                    self.assertEqual(command[command.index('--backend') + 1], backend)
+            self.assertEqual([call.args[-1] for call in synthetic.call_args_list], [backend, backend])
+            actual.assert_called_once_with({}, backend)
+            resource.assert_called_once_with({}, 1, backend)
+            self.assertEqual(verification.report['backend'], backend)
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            check.parse_args(['--case', 'policy', '--output', 'policy', '--backend', 'yul'])
+            check.parse_args(['--case', 'policy', '--output', 'policy', '--backend', 'unknown-backend'])
 
     def test_saved_match_cannot_hide_changed_raw_observation(self):
         report = policy_report()

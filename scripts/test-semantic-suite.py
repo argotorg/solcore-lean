@@ -66,7 +66,30 @@ class SuiteTests(unittest.TestCase):
                 command = suite.command(args, profile, self.directory / profile, 30, 64 * 1024**2)
                 self.assertEqual(command[command.index('--backend') + 1], backend)
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            self.args('--backend', 'yul')
+            self.args('--backend', 'unknown-backend')
+
+    def test_yul_defaults_to_all_ten_pure_profiles_and_forwards_only_its_compiler(self):
+        args = self.args('--backend', 'yul', '--solc', '/chosen/pinned-solc')
+        self.assertEqual(len(args.profile), 10)
+        self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile), 276)
+        self.assertTrue(all(suite.PROFILES[profile][1] == 'pure' for profile in args.profile))
+        for profile in args.profile:
+            command = suite.command(args, profile, self.directory / profile, 30, 64 * 1024**2)
+            self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
+        for backend in suite.adapter.SONATINA_BACKENDS:
+            sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
+            self.assertEqual(len(sonatina.profile), 13)
+            for profile in sonatina.profile:
+                self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
+
+    def test_explicit_yul_stateful_profiles_are_errors_instead_of_silent_omissions(self):
+        for profile in ('stateful-storage', 'stateful-storage-rollback', 'stateful-calls'):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.args('--backend', 'yul', '--profile', 'closed-g0', '--profile', profile)
+            with self.assertRaises(ValueError):
+                suite.command(self.args('--backend', 'yul'), profile, self.directory / profile, 30, 64 * 1024**2)
+        selected = self.args('--backend', 'yul', '--profile', 'runtime-modules')
+        self.assertEqual(selected.profile, ['runtime-modules'])
 
     def test_backend_completion_cannot_switch_or_relabel_a_legacy_run(self):
         legacy = completed()

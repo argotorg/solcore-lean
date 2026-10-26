@@ -473,6 +473,34 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(instance.summary["backend"], "sonatina-o2")
             self.assertEqual(instance.summary["configuration"]["backend"], "sonatina-o2")
 
+    def test_yul_campaign_cli_is_rejected_before_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "campaign"
+            arguments = ["campaign", "--output", str(output), "--backend", "yul", "--cases", "1"]
+            with patch.object(sys, "argv", arguments), patch.object(campaign.Campaign, "run") as run, \
+                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                campaign.main()
+            self.assertEqual(caught.exception.code, 2)
+            run.assert_not_called()
+            self.assertFalse(output.exists())
+
+    def test_yul_programmatic_campaign_is_rejected_before_work_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                campaign.Campaign(options(temporary, backend="yul"))
+            self.assertFalse((Path(temporary) / ".work").exists())
+
+    def test_yul_cannot_become_a_stateful_reduction_identity(self):
+        value = case()
+        ordinary = campaign.analyze(report(value), value, "rustEvm", "tx-1")
+        expected = campaign.fingerprint(ordinary)
+        with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+            campaign.fingerprint({**ordinary, "backend": "yul"})
+        with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+            campaign.same_failure({**expected, "backend": "yul"}, ordinary)
+        with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+            campaign.same_failure(expected, {**ordinary, "backend": "yul"})
+
     def test_campaign_cli_selects_backend(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "campaign"
