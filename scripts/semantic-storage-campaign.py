@@ -45,13 +45,22 @@ VERSIONS = ("generatorVersion", "profileVersion", "functionVersion", "templateVe
             "stepFunctionVersion", "stepTemplateVersion", "emitterVersion", "wrapperVersion")
 DIMENSIONS = ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templates", "Outcomes", "CompletionPatterns")
 KEYED_DIMENSIONS = DIMENSIONS + ("Keys", "Aliases")
+ARRAY_DIMENSIONS = DIMENSIONS + ("Lengths",)
+ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
 TEST_FIELD = re.compile(r"output|storage:(?:0|[1-9][0-9]{0,77})")
 
 
 def dimensions(profile_name):
-    return KEYED_DIMENSIONS if adapter.PROFILES[profile_name]["keyed"] else DIMENSIONS
+    return {"keyed": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS}.get(adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
+
+
+def inputs(case):
+    """Runtime Words: the ABI input, or every element of the dynamic arrays."""
+    if adapter.profile(case)["abi"] == "array":
+        return {value for tx in case["transactions"] for value in tx["values"]}
+    return {tx["input"] for tx in case["transactions"]}
 
 
 def aliases(case):
@@ -145,6 +154,12 @@ def validate_manifest(manifest):
             raise ValueError("invalid keyed alias requirements")
     elif "requiredKeys" in manifest or "requiredAliases" in manifest:
         raise ValueError("key coverage belongs to the keyed storage profile")
+    if selected["abi"] == "array":
+        lengths = manifest.get("requiredLengths")
+        if not isinstance(lengths, list) or not lengths or any(type(v) is not int or v not in ARRAY_LENGTHS for v in lengths) or len(set(lengths)) != len(lengths):
+            raise ValueError("dynamic-array coverage requires unique lengths from zero to three")
+    elif "requiredLengths" in manifest:
+        raise ValueError("length coverage belongs to the dynamic-array profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -155,8 +170,8 @@ def validate_manifest(manifest):
         generated = "generation" in entry
         if generated == (selected["planKey"] in entry) or ("transactions" in entry) == generated:
             raise ValueError(f"corpus entry requires generation XOR {selected['planKey']}+transactions")
-        if "expectedHistory" in entry and (not selected["keyed"] or not isinstance(entry["expectedHistory"], list)):
-            raise ValueError("independent expected histories are keyed transaction lists")
+        if "expectedHistory" in entry and (not selected["declared"] or not isinstance(entry["expectedHistory"], list)):
+            raise ValueError("independent expected histories are declared-slot transaction lists")
         if any(key in entry for key in ("program", "loopPlan", "input")):
             raise ValueError("storage corpus uses a plan and transaction sequence")
         expected = entry.get("expectedFeatures")
@@ -186,7 +201,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
     selected = transaction_id or case["transactions"][0]["id"]
     if path is not None:
         if path not in PATHS or not TEST_FIELD.fullmatch(field) or (
-                not adapter.profile(case)["keyed"] and field not in ("output", "storage:0", "storage:1")):
+                not adapter.profile(case)["declared"] and field not in ("output", "storage:0", "storage:1")):
             raise ValueError("unknown synthetic history adapter")
         if actual.get("category") == "matched":
             if adapter.compare(histories, case).get("category") != "matched":
@@ -261,8 +276,8 @@ def fingerprint(analysis):
 
 def keyed_analysis(analysis):
     histories = analysis.get("histories", {})
-    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") == adapter.KEYED_HISTORY_SCHEMA
-                                               for history in histories.values())
+    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
+                                               (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA) for history in histories.values())
 
 
 def same_failure(expected, analysis):
@@ -373,7 +388,7 @@ class Campaign:
         return value
 
     def record_coverage(self, case, prefix, histories=None):
-        values = {"Features": set(case["provenance"]["features"]), "Inputs": {tx["input"] for tx in case["transactions"]},
+        values = {"Features": set(case["provenance"]["features"]), "Inputs": inputs(case),
                   "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case)}
         if prefix == "matched":
             if histories is None or adapter.compare(histories, case)["category"] != "matched":
@@ -382,8 +397,10 @@ class Campaign:
         else:
             statuses = [adapter.expected_status(case, tx) for tx in case["transactions"]]
         values.update(Outcomes=set(statuses), CompletionPatterns={",".join(statuses)})
-        if self.specification["keyed"]:
+        if self.specification["abi"] == "keyed":
             values.update(Keys={tx["key"] for tx in case["transactions"]}, Aliases=aliases(case))
+        elif self.specification["abi"] == "array":
+            values.update(Lengths={len(tx["values"]) for tx in case["transactions"]})
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -427,9 +444,8 @@ class Campaign:
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
-        if self.specification["keyed"]:
-            for dimension in ("Keys", "Aliases"):
-                self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
+        for dimension in {"keyed": ("Keys", "Aliases"), "array": ("Lengths",)}.get(self.specification["abi"], ()):
+            self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []
         for entry in manifest["cases"][:self.args.cases]:
@@ -484,7 +500,7 @@ class Campaign:
         args = self.case_args(input_path, folder)
         report = {"schema": adapter.REPORT_SCHEMA, "backend": self.backend, "processes": [], "histories": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-            "scope": adapter.scope(case) if self.specification["keyed"] else "initially empty committed slots0/1; ordered zero-value run(uint256); no gas/balance/nonce equivalence"}
+            "scope": adapter.scope(case) if self.specification["declared"] else "initially empty committed slots0/1; ordered zero-value run(uint256); no gas/balance/nonce equivalence"}
         interrupted = False
         try:
             adapter.execute(args, report)
@@ -693,7 +709,7 @@ def main():
         parser.error("test transaction ID requires the explicit adapter and a valid ID")
     if args.test_field != "output" and not args.test_perturb_path:
         parser.error("test field requires the explicit synthetic adapter")
-    if not TEST_FIELD.fullmatch(args.test_field) or (not adapter.PROFILES[args.profile]["keyed"] and args.test_field not in ("output", "storage:0", "storage:1")):
+    if not TEST_FIELD.fullmatch(args.test_field) or (not adapter.PROFILES[args.profile]["declared"] and args.test_field not in ("output", "storage:0", "storage:1")):
         parser.error("test field must be output or storage:SLOT for an observed slot")
     limits = {"seed": (0, 2**64 - 1), "nodes": (1, 512), "cases": (1, 1024), "attempts": (0, 10000),
         "seconds": (.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10), "shrink_attempts": (0, 10000),

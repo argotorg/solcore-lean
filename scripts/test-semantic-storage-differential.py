@@ -1006,5 +1006,87 @@ class KeyedStorageTests(unittest.TestCase):
                          "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence")
 
 
+def array_calldata(flags, values):
+    return "0x9a94c44b" + "".join(f"{word:064x}" for word in [flags, 64, len(values), *values])
+
+
+def array_case(rows=((0, (1, 3, 7)), (1, (MAX_WORD,)), (2, ()))):
+    """Envelope fixture only: native replay checks the actual array program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "values": [str(value) for value in values], "value": "0",
+        "calldata": array_calldata(flags, values)} for index, (flags, values) in enumerate(rows)]
+    return {"schema": runner.ARRAY_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "dynamicArrayPlan": {"schema": "solcore-lean.dynamic-array-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": list(runner.ARRAY_SLOTS),
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedDynamicArray", "method": "run", "signature": "run(uint256,uint256[])",
+            "selector": "0x9a94c44b", "deployPath": ["SynthesizedDynamicArrayDeploy"],
+            "runtimePath": ["SynthesizedDynamicArrayDeploy", "SynthesizedDynamicArray"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def array_history(value, path):
+    """Committed count rows; odd flags revert and keep the prior snapshot."""
+    result = keyed_history({**value, "transactions": [{**tx, "input": tx["flags"]} for tx in value["transactions"]]}, path)
+    result["schema"] = runner.ARRAY_HISTORY_SCHEMA
+    return result
+
+
+def array_histories(value=None):
+    value = array_case() if value is None else value
+    return {path: array_history(value, path) for path in runner.PATHS}
+
+
+class DynamicArrayTests(unittest.TestCase):
+    def test_array_case_requires_canonical_head_tail_calldata(self):
+        value = array_case()
+        runner.validate_case(value)
+        # `cast calldata "run(uint256,uint256[])" 1 "[5,6]"`
+        self.assertEqual(array_calldata(1, (5, 6)), "0x9a94c44b" + "".join(
+            f"{word:064x}" for word in (1, 0x40, 2, 5, 6)))
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"]),
+                         ("semantic-dynamic-array-tool", "rust-hull-keyed-storage-scenario", True, "array"))
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2", "3", "4"))
+        for key, changed in (("values", ["1", "2", "3", "4"]), ("values", ["01"]), ("values", "1"), ("flags", "01"),
+                             ("calldata", array_calldata(0, (1, 3))), ("calldata", array_calldata(0, (1, 3, 7))[:-64]),
+                             ("calldata", "0x9a94c44b" + "".join(f"{word:064x}" for word in (0, 0x60, 3, 1, 3, 7))),
+                             ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for slots in (["0", "1", "2", "3"], ["0", "1", "2", "3", "4", "5"], ["1", "0", "2", "3", "4"]):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        mixed = copy.deepcopy(value)
+        mixed["contract"]["selector"] = "0x7357f5d2"
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(mixed)
+        self.assertIn("run(uint256,uint256[])", runner.scope(value))
+
+    def test_flags_parity_selects_completion_and_containment_applies(self):
+        value = array_case()
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual(runner.compare(array_histories(value), value)["category"], "matched")
+        observed = array_histories(value)
+        observed["rustEvm"]["transactions"][2]["undeclaredStorage"] = [{"slot": "5", "value": "1"}]
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["undeclaredPaths"]), ("semantic-mismatch", "tx-2", ["rustEvm"]))
+        flipped = array_histories(value)
+        for history in flipped.values():
+            history["transactions"][1]["status"] = "returned"
+        self.assertEqual(runner.compare(flipped, value)["category"], "semantic-mismatch")
+        keyed_schema = array_histories(value)
+        keyed_schema["directCore"]["schema"] = runner.KEYED_HISTORY_SCHEMA
+        self.assertEqual(runner.compare(keyed_schema, value)["category"], "adapter-error")
+
+    def test_array_hull_history_uses_the_declared_slot_runner_rows(self):
+        value = array_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": keyed_slots(value), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in array_history(value, "importedHull")["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"]), (runner.ARRAY_HISTORY_SCHEMA, list(runner.ARRAY_SLOTS)))
+
+
 if __name__ == "__main__":
     unittest.main()

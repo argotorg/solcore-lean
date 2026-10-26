@@ -647,5 +647,61 @@ class KeyedCampaignTests(unittest.TestCase):
         self.assertTrue(campaign.TEST_FIELD.fullmatch("storage:" + str(fixtures.MAX_WORD)))
 
 
+def array_case(rows=((0, (1, 3, 7)), (1, (fixtures.MAX_WORD,)), (2, ()))):
+    value = fixtures.array_case(rows)
+    value["dynamicArrayPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def array_report(value):
+    histories = fixtures.array_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class DynamicArrayCampaignTests(unittest.TestCase):
+    def test_array_inputs_are_elements_and_lengths_are_their_own_dimension(self):
+        value = array_case()
+        self.assertEqual(campaign.inputs(value), {"1", "3", "7", str(fixtures.MAX_WORD)})
+        self.assertEqual(campaign.dimensions("stateful-dynamic-array"), campaign.DIMENSIONS + ("Lengths",))
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-dynamic-array"))
+            instance.summary["coverage"].update(requiredLengths=[0, 1, 2, 3], requiredInputs=["0", "1"])
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", array_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedLengths"], coverage["missingLengths"]), ([0, 1, 3], [2]))
+            self.assertEqual(coverage["missingInputs"], ["0"])
+            self.assertNotIn("requiredKeys", coverage)
+
+    def test_array_manifest_requires_lengths_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-dynamic-array-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        for change in (lambda m: m.pop("requiredLengths"), lambda m: m.update(requiredLengths=[4]),
+                       lambda m: m.update(requiredLengths=[1, 1]), lambda m: m.update(requiredLengths=[True]),
+                       lambda m: m.update(requiredKeys=["0"]),
+                       lambda m: m["cases"][0].update(keyedStoragePlan=m["cases"][0].pop("dynamicArrayPlan"))):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        keyed = json.loads((ROOT / "scripts/semantic-keyed-storage-corpus.json").read_text())
+        keyed["requiredLengths"] = [0]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(keyed)
+
+    def test_array_slots_are_named_in_fingerprints_and_injection(self):
+        value = array_case()
+        raw = array_report(value)
+        changed = campaign.analyze(raw, value, "importedHull", "tx-0", "storage:3")
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["undeclaredPaths"], fingerprint["transactionId"]), (["3"], [], "tx-0"))
+        self.assertFalse(campaign.analyze(raw, value, "importedHull", "tx-0", "storage:5")["synthetic"])
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+
+
 if __name__ == "__main__":
     unittest.main()

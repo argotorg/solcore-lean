@@ -4,8 +4,9 @@
 The original checked host Core contract is independent of Rust Hull. The EVM
 path mines transactions and reads their actual trace output and receipt-block
 storage. No Python state transition or saved expected value is an oracle.
-The keyed profile declares its observed slots in the case and additionally
-requires the Hull and EVM paths to show no nonzero committed slot outside them.
+The keyed and dynamic-array profiles declare their observed slots in the case
+and additionally require the Hull and EVM paths to show no nonzero committed
+slot outside them.
 """
 from __future__ import annotations
 
@@ -32,7 +33,11 @@ ROLLBACK_CASE_SCHEMA = "solcore-lean.semantic-storage-rollback-case.v1"
 KEYED_CASE_SCHEMA = "solcore-lean.semantic-keyed-storage-case.v1"
 HISTORY_SCHEMA = "solcore-lean.storage-history.v1"
 KEYED_HISTORY_SCHEMA = "solcore-lean.keyed-storage-history.v1"
-_TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "signature": "run(uint256)", "selector": "0xa444f5e9",
+ARRAY_CASE_SCHEMA = "solcore-lean.semantic-dynamic-array-case.v1"
+ARRAY_HISTORY_SCHEMA = "solcore-lean.dynamic-array-history.v1"
+# `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form.
+_TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "declared": False, "abi": "word",
+    "signature": "run(uint256)", "selector": "0xa444f5e9",
     "historySchema": HISTORY_SCHEMA, "coreRunner": "rust-hull-storage-scenario",
     "scenarioSchema": "solcore-lean.storage-contract-scenario.v1"}
 PROFILES = {
@@ -48,14 +53,25 @@ PROFILES = {
         "originKind": "keyed-storage-generated", "contract": "SynthesizedKeyedStorage",
         "caseTool": "semantic-keyed-storage-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KEYED_HISTORY_SCHEMA,
-        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": True},
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": True,
+        "declared": True, "abi": "keyed"},
+    "stateful-dynamic-array": {"caseSchema": ARRAY_CASE_SCHEMA, "planSchema": "solcore-lean.dynamic-array-plan.v1",
+        "planKey": "dynamicArrayPlan", "corpusSchema": "solcore-lean.semantic-dynamic-array-corpus.v1",
+        "originKind": "dynamic-array-generated", "contract": "SynthesizedDynamicArray",
+        "caseTool": "semantic-dynamic-array-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ARRAY_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256[])", "selector": "0x9a94c44b", "rollback": True, "keyed": False,
+        "declared": True, "abi": "array"},
 }
+HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
 PATHS = ("directCore", "importedHull", "rustEvm")
 CONTAINMENT_PATHS = ("importedHull", "rustEvm")
 SLOTS = ("0", "1")
 COUNTER_SLOT = "0"
 MAX_UNDECLARED_SLOTS = 256
+ARRAY_SLOTS = ["0", "1", "2", "3", "4"]
+MAX_ELEMENTS = 3
 RESOURCE_STATUSES = {"out-of-fuel", "out-of-gas", "timeout", "resource-limit", "output-limit"}
 Finding, RpcError = common.Finding, common.RpcError
 
@@ -74,13 +90,18 @@ def profile(case: dict) -> dict:
 
 def expected_status(case: dict, transaction: dict) -> str:
     """The profile fixes completion polarity, not the returned value or world."""
-    return "reverted" if profile(case)["rollback"] and int(common.word(transaction["input"])) % 2 else "returned"
+    parity = transaction["flags" if profile(case)["abi"] == "array" else "input"]
+    return "reverted" if profile(case)["rollback"] and int(common.word(parity)) % 2 else "returned"
 
 
 def scope(case: dict) -> str:
-    if profile(case)["keyed"]:
+    if profile(case)["abi"] == "keyed":
         return ("ordered zero-value run(uint256,uint256) transactions; initially empty storage; committed values at the "
                 "declared counter/key/successor slots on all paths and no nonzero undeclared slot on Hull/EVM; "
+                "no gas/balance/nonce equivalence")
+    if profile(case)["abi"] == "array":
+        return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
+                "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
     return "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence"
 
@@ -95,7 +116,7 @@ def keyed_slots(transactions) -> list[str]:
 
 
 def observed_slots(case: dict) -> tuple:
-    return tuple(case["observedSlots"]) if profile(case)["keyed"] else SLOTS
+    return tuple(case["observedSlots"]) if profile(case)["declared"] else SLOTS
 
 
 def validate_transactions(case: dict, selected: dict) -> None:
@@ -107,8 +128,19 @@ def validate_transactions(case: dict, selected: dict) -> None:
         if not isinstance(tx, dict) or not isinstance(tx.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", tx["id"]) or tx["id"] in ids:
             raise ValueError("transaction IDs must be unique bounded identifiers")
         ids.add(tx["id"])
+        if selected["abi"] == "array":
+            values = tx.get("values")
+            if not isinstance(values, list) or len(values) > MAX_ELEMENTS:
+                raise ValueError("dynamic-array transactions carry zero to three elements")
+            words = [int(common.word(value, "array element")) for value in values]
+            # Canonical head/tail ABI: flags, tail offset 64, length, elements.
+            expected = selected["selector"] + "".join(f"{word:064x}" for word in
+                [int(common.word(tx.get("flags"), "transaction flags")), 64, len(words), *words])
+            if tx.get("calldata") != expected or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
+            continue
         value = int(common.word(tx.get("input"), "transaction input"))
-        words = f"{int(common.word(tx.get('key'), 'transaction key')):064x}" if selected["keyed"] else ""
+        words = f"{int(common.word(tx.get('key'), 'transaction key')):064x}" if selected["abi"] == "keyed" else ""
         if tx.get("calldata") != selected["selector"] + words + f"{value:064x}" or tx.get("value") != "0":
             raise ValueError("transaction calldata/value differs from its original Word input")
 
@@ -120,10 +152,13 @@ def validate_case(case) -> None:
         raise ValueError("storage case requires its original checked step plan")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
-    if selected["keyed"]:
+    if selected["abi"] == "keyed":
         validate_transactions(case, selected)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != keyed_slots(case["transactions"]):
             raise Finding("unsupported-scope", "input", "keyed storage profile starts empty and observes the counter and every key and successor")
+    elif selected["abi"] == "array":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
+            raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
     elif case.get("initialState") != {"storage": []} or case.get("observedSlots") != list(SLOTS):
         raise Finding("unsupported-scope", "input", "storage profile starts empty and observes slots zero and one")
     contract = case.get("contract")
@@ -179,11 +214,11 @@ def normalize_history(history, case: dict, path=None) -> dict:
     slots = observed_slots(case)
     if not isinstance(history, dict) or history.get("schema") != selected["historySchema"]:
         raise ValueError("unsupported storage observation history")
-    if selected["keyed"] and history.get("observedSlots") != list(slots):
+    if selected["declared"] and history.get("observedSlots") != list(slots):
         raise ValueError("history observed slots differ from the case declaration")
     initial = storage(history.get("initialStorage"), slots)
     extra = {}
-    if selected["keyed"]:
+    if selected["declared"]:
         containment(history, extra, path, slots, "initialUndeclaredStorage")
     rows = history.get("transactions")
     if not isinstance(rows, list) or len(rows) > len(case["transactions"]):
@@ -197,7 +232,7 @@ def normalize_history(history, case: dict, path=None) -> dict:
             raise ValueError("missing transaction status")
         value = {"id": row["id"], "index": index, "status": status,
                  "committedStorage": storage(row.get("committedStorage"), slots)}
-        if selected["keyed"]:
+        if selected["declared"]:
             containment(row, value, path, slots)
         if status in {"returned", "reverted"}:
             value["output"] = "0x" + common.hex_bytes(row.get("output"), "transaction output").hex()
@@ -247,7 +282,7 @@ def compare(histories: dict, case: dict) -> dict:
     if set(histories) != set(PATHS):
         return {"category": "adapter-error", "stage": "comparison", "detail": "three histories required", "pairs": {}}
     try:
-        keyed = profile(case)["keyed"]
+        keyed = profile(case)["declared"]
         values = {name: normalize_history(histories[name], case, name) for name in PATHS}
     except (ValueError, KeyError, TypeError) as error:
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
@@ -311,7 +346,7 @@ def hull_history(stdout: str, exit_code: int, case: dict) -> dict:
     history = {"schema": selected["historySchema"], "initialStorage": deployment.get("committedStorage"),
         "transactions": calls, "finalStorage": calls[-1].get("committedStorage") if calls else deployment.get("committedStorage"),
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
-    if selected["keyed"]:
+    if selected["declared"]:
         history.update(observedSlots=list(observed_slots(case)), initialUndeclaredStorage=deployment.get("undeclaredStorage"))
     normalize_history(history, case, "importedHull")
     return history
@@ -509,7 +544,7 @@ def execute(args, report: dict) -> None:
         if common.hex_bytes(rpc.call("eth_getCode", [address, deployed["blockNumber"]]), "deployed runtime") != runtime:
             raise Finding("adapter-error", "evm-deployment", "installed runtime differs from exported code image")
         touched = set()
-        if selected["keyed"]:
+        if selected["declared"]:
             diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
             report["evmDeployment"]["storageDiff"] = diff
             touched |= changed_slots(diff, address)
@@ -537,7 +572,7 @@ def execute(args, report: dict) -> None:
         report["histories"]["importedHull"] = hull_history(result["stdout"], result["returncode"], case)
         initial = evm_storage(rpc, address, deployed["blockNumber"], slots)
         keyed = {"observedSlots": list(slots), "initialUndeclaredStorage":
-            evm_undeclared(rpc, address, deployed["blockNumber"], touched, slots)} if selected["keyed"] else {}
+            evm_undeclared(rpc, address, deployed["blockNumber"], touched, slots)} if selected["declared"] else {}
         evm_rows, records = [], []
         report["evmTransactions"] = records
         def checkpoint(pending=None):
@@ -565,7 +600,7 @@ def execute(args, report: dict) -> None:
             outcome = trace_result(mined, trace)
             state = evm_storage(rpc, address, mined["blockNumber"], slots)
             row = {"id": tx["id"], "index": index, **outcome, "committedStorage": state}
-            if selected["keyed"]:
+            if selected["declared"]:
                 diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
                 record["storageDiff"] = diff
                 touched |= changed_slots(diff, address)
