@@ -10,6 +10,11 @@ records the scope and subsequent priorities.
 Install Python 3.11 or newer, Git, Rust 1.97.0 through rustup, the toolchain in
 `lean-toolchain` through elan, and Anvil 1.5.1. The EVM hardfork is Osaka. The
 bootstrap verifies these versions and never installs system tools itself.
+For Yul comparisons also install solc `0.8.35+commit.47b9dedd`; use `--solc`
+to choose its path. The Yul exporter checks its full version and binary hash.
+The CI Yul job downloads the Linux amd64 release from the
+[official binary inventory](https://binaries.soliditylang.org/linux-amd64/list.json)
+and verifies the pinned SHA256 before making it executable.
 
 ```sh
 python3 scripts/prepare-semantic-tools.py --plan
@@ -46,6 +51,22 @@ after O2 compilation. O0 remains the default. The CI matrix runs each backend
 in a separate job with separate reports and artifacts; failure in one does not
 cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
+
+`--backend yul` selects the ten pure profiles by default (276 fixed cases).
+Explicitly selecting a stateful profile fails before execution. Each random
+Yul run with `--cases 16` requests 160 cases. The shared preparation command
+builds Rust and Lean tools; solc is supplied and checked separately.
+
+| Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
+| --- | ---: | --- | --- |
+| `sonatina-o0` | 312 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 312 | Sonatina O2 | Sonatina O2 |
+| `yul` | 276, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
+
+All rows use the original generated Core as the primary reference. Yul's
+linked layout is not supplied to the Hull importer. Its pure result can still
+be compared with both other paths; code-dependent and stateful Yul observations
+remain unsupported. Reports record this distinction in `pathBackends`.
 
 The default selection is all thirteen profiles: ten pure profiles, storage,
 storage rollback and parent/child calls. Fixed mode runs all 312 manifest cases
@@ -96,6 +117,10 @@ fuel-one run classified as inconclusive. The original runtime observations
 remain untouched. A compiler or runtime failure during this check fails it.
 The check also accepts `--backend sonatina-o2`; reduced cases and exact replay
 retain that selection, including its mismatch fingerprint.
+Use `--backend yul [--solc PATH]` for the same check with actual Yul compilation.
+Yul archives also retain the checked Yul, exact solc request/response, both
+bytecodes and matching Hull/source/tool receipts. Replay verifies these files
+locally, so a moved archive does not depend on its original source directory.
 
 ## Workflow behavior
 

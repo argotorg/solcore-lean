@@ -146,10 +146,13 @@ observations and verifies tools and artifact hashes during replay. A campaign
 runner reduces failures while preserving their classification and disagreeing
 paths, with explicit time, disk and attempt limits. Sonatina O0 is the default;
 `--backend sonatina-o2` selects O2 for pure and stateful comparisons. Saved
-archives and reductions retain that choice. The fixed sixteen-case
-corpus covers the enabled source operations and boundary values; all sixteen
-cases match across the three execution paths. Core fuel, EVM gas and process
+archives and reductions retain that choice. Core fuel, EVM gas and process
 timeouts remain separate resource limits.
+
+Yul compiled by pinned solc is
+available for the ten pure profiles with `--backend yul`. Its EVM bytes are
+compared with original Core and with Hull using Sonatina O0 code images;
+Yul object linking and stateful Yul are outside this comparison.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
 tools, supported operations and validation commands. Closed generated programs
 may be constant-folded; source coverage is not runtime opcode coverage.

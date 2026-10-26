@@ -10,8 +10,9 @@ emission, three-way execution, bounded campaigns, failure-preserving reduction
 and strict replay. The primary oracle executes the original generated Core;
 the other paths execute Rust-produced EVM bytecode and imported Rust Hull.
 Generated EVM comparisons support Sonatina O0 and O2 across all thirteen
-profiles. Generated Yul comparison is being connected for the ten pure profiles
-under the explicit boundary below. The separate upstream fixture harness also
+profiles. Generated Yul comparison is connected for the ten pure profiles
+under the explicit boundary below, with the full fixed/random gate passed.
+The separate upstream fixture harness also
 runs Yul; its results are distinct from generated semantic campaigns.
 
 Ten pure profiles and three stateful profiles are available locally. The
@@ -206,7 +207,7 @@ Solc does not supply the complete named child-offset map expected by the
 current Hull code-image importer. Actual probes showed omitted unused children
 and two distinct identical children sharing one physical offset, including
 with optimization disabled. Assembly source spans are not byte offsets.
-Consequently, the initial comparison will report three explicit paths:
+Consequently, the initial comparison reports three explicit paths:
 original generated Core, actual Yul EVM, and imported Hull linked with Sonatina
 O0 images. The last is an additional reference for the same pure result, not
 Yul-linked Hull execution. Do not infer a linker map by searching byte strings,
@@ -230,8 +231,28 @@ The evidence transport passed eleven policy tests and an actual export moved
 to a new directory containing spaces after the original location was removed.
 It checks the main Hull bytes and sidecar as well as the separate Yul Hull,
 reconstructs the exact solc input from saved Yul and settings, and derives the
-accepted bytes again from the retained solc output. These are artifact checks;
-the normal campaign connection remains in progress.
+accepted bytes again from the retained solc output. These artifact checks complement the execution gate below.
+
+The normal adapter, campaign, reduction, exact replay and suite now accept
+`--backend yul` and `--solc`. Default Yul suites select exactly ten pure
+profiles; explicit stateful requests fail before execution. The complete
+Python policy suite passed 345 tests. The real finding check passed reduction,
+exact replay, repeated synthetic fingerprint and fuel-one classification.
+An actual four-module archive was moved to a path containing spaces, its old
+location removed, and replayed with three-way agreement and the same Yul byte
+artifact. Three accepted module reductions retained the finding; the final
+actual replay agreed on all paths. Fresh Word and nested-call regressions
+also agreed for both Sonatina levels (four runs). The CI Yul job uses a pinned,
+SHA256-checked official solc binary. The random Yul suite passed all 160 cases
+across ten profiles with seed `20261026`, sixteen cases and 2,048 attempts per
+profile. It recorded 1,274 generation exclusions, zero resource exclusions and
+no mismatches, errors, rejections, missing coverage or unexecuted cases. Local
+elapsed time was 1,279.008 seconds and retained output was 9,999,222 bytes,
+overlapping fixed-suite validation and other checks. The fixed Yul suite passed
+all 276 cases across the same ten profiles, with zero mismatches, errors,
+rejections, inconclusive results, missing coverage or unexecuted cases. It took
+2,248.763 seconds and retained 20,489,590 bytes locally. This completes the
+initial local Yul gate; no hosted-run result is claimed.
 
 ## 3. Missing runtime operation mappings
 
@@ -263,12 +284,78 @@ Acceptance criteria for each group:
    runtime opcode coverage. Make the last claim only with execution evidence;
    optimizer folding or lowering may remove the expected opcode.
 
+The initial `runtime-primitives` profile is being prepared in separate new
+modules while the Yul gate runs. Existing profiles and eight active native
+executables remain unchanged until that gate completes. It reuses sealed
+`CheckedWordFunction` values and executes the original applied Core program.
+The source imports explicit aliases from `std.opcodes`; the following table
+describes those raw functions, not similarly named public convenience wrappers.
+
+| Core operation | Raw source call | Boundary rule |
+| --- | --- | --- |
+| `wordDiv(a,b)` | `div(a,b)` | Zero divisor returns zero. |
+| `wordMod(a,b)` | `mod(a,b)` | Zero divisor returns zero. |
+| `wordSdiv(a,b)` | `sdiv(a,b)` | Signed two's-complement division, including minimum / -1. |
+| `wordSmod(a,b)` | `smod(a,b)` | Signed remainder follows the dividend; zero divisor returns zero. |
+| `wordSgt(a,b)` | `tobool(sgt(a,b))` | Convert raw Word 0/1 to the Core Boolean result. |
+| `wordShl(v,n)` | `shl(n,v)` | Reverse only the captured arguments; shifts at least 256 return zero. |
+| `wordShr(v,n)` | `shr(n,v)` | Same argument reversal and large-shift rule. |
+| `wordSar(v,n)` | `sar(n,v)` | Same reversal; large shifts fill with the sign bit. |
+| `wordAddMod(a,b,m)` | `addmod(a,b,m)` | Do not truncate the intermediate addition; modulus zero returns zero. |
+| `wordMulMod(a,b,m)` | `mulmod(a,b,m)` | Do not truncate the intermediate product; modulus zero returns zero. |
+| `wordClz(v)` | `clz(v)` | Zero returns 256. |
+| `wordByte(i,v)` | `byte(i,v)` | Index-first on both sides; indices at least 32 return zero. |
+| `wordSignExtend(i,v)` | `signextend(i,v)` | Index-first on both sides; indices at least 32 preserve the value. |
+| `wordPow(b,e)` | `exp(b,e)` | Modular exponentiation; zero exponent returns one, including 0^0. |
+
+Each operand is evaluated and stored in a fresh temporary in original Core
+order before the call is formed. Public `std.addmod` and `std.mulmod` reject a
+zero modulus, so they are not substitutes for the raw aliases above. Byte and
+sign extension already use index-first Core operands and must not be reversed.
+The Core exponent implementation uses repeated modular squaring, so a Word
+exponent does not require constructing the unbounded mathematical power.
+
+The new renderer's focused build and 155 original Core boundary applications
+passed, including exact source checks for order and aliases. Cases additionally
+check canonical source/provenance, binding-aware shrink/replay, a full applied
+program budget of 8–512 nodes, and eight generator inputs: 0, 1, 2, 255, 256,
+maximum Word, high bit and high bit minus one. Generated functions must vary
+across that bank; imported boundary cases may legitimately be constant.
+A separate preintegration check then ran twenty canonical cases through actual
+O0 and O2 execution: all forty comparisons agreed across original Core, Rust
+EVM and imported Hull. It exercised all fourteen new operations while keeping
+the eight existing native executables unchanged. This is narrower than the
+full fixed/random profile gate, which remains pending.
+The prepared fixed corpus contains 81 cases from 34 functions, with handwritten
+Core results and seventeen distinct inputs. It covers all fourteen additions
+and the required eight generator boundaries. The native corpus validator
+confirmed all 81 results, deterministic source/replay, 319 strictly smaller
+typed candidates and six malformed-corpus rejection checks. The corpus and
+profile registration have not yet been enabled in the shared runners.
+
 ## 4–8. Subsequent work
 
 **Richer grammar:** vary typed expression and body composition beyond the
 current fixed recipes. Add one family at a time, retaining alias/evaluation
 order and binder-aware shrinking. Prefer finite acyclic calls and bounded
 loops before unrestricted recursion. Unsupported combinations stay explicit.
+
+The first family will generate `runtime-call-graphs`: one to three acyclic
+Word-to-Word helpers, with Word/Bool expressions generated directly in the
+runtime parameter's scope. Calls may refer to any earlier helper, occur inside
+operands and local bindings, and appear in either branch. Include shared
+callees, skipped helpers, nested call arguments and the primitive operations
+from priority 3. The current fixed immediate-predecessor chains remain valid
+under their existing versions. Reuse the full Core checker and typed DAG
+reduction; record fresh schema/generator/emitter versions for the new family.
+
+Its gate requires bounded deterministic generation with an actual complete
+program node limit, named call-graph fixtures, strict replay and reduction,
+and agreement under O0, O2 and Yul. Report generation yield and syntactic call
+edges separately from runtime coverage. Prepare new modules in isolation while
+the primitive gate runs, then connect the ordinary runners only after that gate
+passes. Aggregate and bounded-loop consumers of this richer grammar follow as
+separate changes; this first family alone does not complete priority 4.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

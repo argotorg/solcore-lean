@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        backend: [sonatina-o0, sonatina-o2]
+        backend: [sonatina-o0, sonatina-o2, yul]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -84,6 +84,17 @@ jobs:
         run: |
           rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
           lake --version
+      - name: Install the pinned solc binary for Yul
+        if: matrix.backend == 'yul'
+        run: |
+          SEMANTIC_SOLC_DIR="$RUNNER_TEMP/semantic-solc"
+          mkdir -p "$SEMANTIC_SOLC_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            'https://binaries.soliditylang.org/linux-amd64/solc-linux-amd64-v0.8.35+commit.47b9dedd' \
+            --output "$SEMANTIC_SOLC_DIR/solc"
+          printf '%s  %s\n' 'fa8ac9a32d301ad023a36ee5a29f8e291fe3200c60244e43c142539e82a617f4' "$SEMANTIC_SOLC_DIR/solc" | sha256sum --check
+          chmod 755 "$SEMANTIC_SOLC_DIR/solc"
+          echo "$SEMANTIC_SOLC_DIR" >> "$GITHUB_PATH"
       - name: Restore dependency downloads
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:

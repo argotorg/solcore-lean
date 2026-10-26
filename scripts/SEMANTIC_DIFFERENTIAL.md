@@ -134,6 +134,14 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
+For the ten pure profiles, `--backend yul --solc PATH` instead runs the checked
+Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
+enabled. The EVM deploys the creation bytes and checks its installed runtime
+against the deployed bytes from the same solc compilation. Imported Hull uses
+separately validated Sonatina O0 images, recorded explicitly in `pathBackends`.
+This compares the same pure result without claiming Yul-linked Hull execution.
+The stateful adapters reject Yul. No backend silently falls back to another.
+
 The result is `report.json`. It records tool versions and hashes, pinned
 compiler/exporter receipts, source and artifact hashes, deployment and call
 inputs, budgets, process outcomes, raw observations and normalized comparisons.
@@ -153,6 +161,11 @@ and tool drift, restores the saved budgets and backend, and performs fresh
 executions. An explicit conflicting backend is rejected. A legacy report with
 no backend field denotes O0; invalid or null fields do not. Both artifact and
 export provenance must agree with the selected optimization level.
+Yul additionally retains and checks the exact compiler input/output, Yul source,
+compiler identity and matching main/Yul Hull artifacts. Both original and
+reduced module archives can be moved before replay; compiler settings and
+recorded binary hashes remain fixed. `--solc` may identify the same executable
+at another path, but cannot change its hash or full version during exact replay.
 To deliberately change budgets, backend or tools, use the saved `case.json` with
 `--case` instead. This starts a new experiment rather than an exact replay.
 
