@@ -163,7 +163,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same nineteen-profile suite runs locally with shared time and disk limits.
+The same twenty-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -262,6 +262,19 @@ into its own slot, and odd flags revert. Its twelve fixed scenarios and sixteen
 recorded random scenarios match on both Sonatina levels, with reduction of
 transactions and array elements and exact archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-dynamic-arrays).
+
+The event-log profile makes committed logs observations. Up to three static
+sites, each guarded by a flags bit, emit LOG0 to LOG4 through the pinned
+`std.opcodes` wrappers with topics and data derived from the checked step;
+odd flags revert after every log. Each transaction's ordered logs (emitter,
+topics and data) are compared on all three paths, reverted transactions must
+commit none, and the EVM chain's complete log list must equal the committed
+receipts' logs. Core's host offers only a one-topic word log, so the Core
+contract writes each site as a versioned frame of word logs that the observer
+decodes. Its twelve fixed scenarios match on both Sonatina levels, as do the
+sixteen recorded random scenarios on O0. On O2 fifteen match and one crashes
+the compiler, a retained finding. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-committed-event-logs).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases

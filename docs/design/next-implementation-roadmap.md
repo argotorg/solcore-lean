@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation and aggregate emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array and event-log extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree and a first expression subset for named rows; remaining expression forms and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -745,6 +745,59 @@ Its definitions were fixed before execution:
   data Word), and input simplification (a bank input, one of flags bits zero
   to three cleared, or only those four bits kept), ordered by transaction
   count, program complexity and the sum of flags and inputs.
+
+Core and its host interface are unchanged: the Core contract writes each site
+as a frame of `emitLogWord` records under `core-word-log-framing-v1`, and the
+observer decodes the public runtime's committed journal, treating a malformed
+frame as an observer failure. The source calls the pinned `std.opcodes`
+wrappers `log0` to `log4`. The declared-slot Hull runner already exported the
+logs of each receipt and serves this profile unchanged. The profile is a
+twentieth suite profile with a twelfth native tool, `semantic-log-tool`; the
+eleven other native tools kept their hashes. Generation reserves the measured
+wrapper of one to three sites before generating the step. Sites, guards,
+inputs, guard masks, high flags bits and the completion pattern come from a
+separate high-bit stream. 283 of the first 300 seeds at 384 nodes were
+accepted.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions that commit 27 logs. Its histories were computed outside Lean by
+a separate evaluator of the step programs and a direct model of the protocol.
+A registered Lean validator confirmed every status, payload, slot and log
+against original Core and rejected tampered entries. Coverage includes all 39
+step features of the corpus, six inputs, one to three helpers and
+transactions, four templates and six completion patterns. It also includes
+committed log counts zero to three, topic arities zero to four, data lengths
+of 0, 32 and 64 bytes, and reverted transactions discarding zero to three
+guarded sites.
+
+The full Lean build (9,995 jobs), registered tests, kernel policy and 482
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (68.3 and 68.1 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+eighteen attempts, with two ordinary exclusions and no resource exclusions.
+O0 matched all sixteen and 48 prefixes (92.7 seconds), covering every log
+count, topic arity and data length. O2 matched fifteen and 45 prefixes. Its
+remaining scenario crashed the compiler during O2 code-image export with a
+host `arithmetic operation overflow` panic in `primitive-types`, a different
+message from the earlier shift-count panic. Checked Hull export succeeded, and
+the same scenario matched on O0. That O2 random gate failed. Per the user's
+instruction, the symptom is recorded in the local `questions.md` without
+upstream investigation. The attempt-limited automatic reduction kept the
+crash fingerprint.
+
+A copied Hull log difference at the last of three transactions was reduced on
+each level to that transaction with one site and one data Word: twelve
+accepted reductions in 28 actual candidate executions. Original and reduced
+archives replayed exactly with agreement (four replays), and synthetic
+fingerprints reproduced. Core or Hull fuel one was inconclusive. With the
+extended adapter, the storage, rollback, call, keyed and dynamic-array fixed
+corpora still matched all 71 scenarios and 197 prefixes on both levels. An
+offline preparation of the worktree's cloned cache then verified all twelve
+native tools as ready. Hosted CI has not been run.
+
+This scope does not compare gas, balances, nonces or code, constructor logs,
+logs from more than one contract, data lengths other than whole Words, or ABI
+event signatures. Agreement is test evidence, not a preservation proof.
 
 Further state/ABI work, such as nested or multi-word ABI elements, `bytes`,
 ABI-encoded return values, multiple callers or nonzero call value, needs

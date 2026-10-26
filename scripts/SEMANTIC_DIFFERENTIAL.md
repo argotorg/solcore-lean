@@ -1474,6 +1474,97 @@ bytes, and the number of guarded sites of each reverted transaction, whose
 logs rollback must discard. Generated coverage derives them from the plan and
 flags; matched coverage uses the actual original-Core histories.
 
+### Running and validation
+
+```sh
+lake build semanticEventLogTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-log-cases
+.lake/build/bin/semantic-log-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-log-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-log-corpus.json \
+  --output .upstream/semantic-log-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-logs \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-log-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the other storage tools. Plans use `solcore-lean.log-plan.v1`
+under the case field `logPlan`, with the step program and its `sites`; cases
+use `solcore-lean.semantic-log-case.v1` and record `framingVersion` in their
+provenance. Transactions are `{id, flags, input, calldata, value}`.
+Histories use `solcore-lean.log-history.v1`: the storage history fields plus
+`initialLogs`, the per-transaction `logs` (`null` when unknown) and, on the
+EVM path only, `chainLogs`. The declared-slot Hull runner
+`rust-hull-keyed-storage-scenario` already exported every receipt's logs, so
+it serves this profile unchanged. The storage runner and campaign select the
+native tool and comparison rules from the case or manifest profile.
+`--backend sonatina-o2` works as for the other storage profiles; Yul is
+rejected.
+
+Generation measures the wrapper of the chosen sites and gives the remaining
+node budget to the aggregate step generator. A separate high-bit stream
+chooses one to three sites (guards, topic counts and data lengths), three
+boundary inputs, the guard bits of each transaction's flags, whether its flags
+also set the high bits `2^255 + 16`, and one of the four completion patterns.
+Of the first 300 seeds at the 384-node default, 283 were accepted; the others
+left too few nodes for the selected step template. Generated scenarios must
+complete with the prescribed outcomes, and their decoded logs must have the
+static site shapes under original Core.
+
+The synthetic adapter accepts `--test-field log`: it flips the low bit of the
+first committed log's first topic, or of its last data byte when it has no
+topic, in a copied history. A transaction without such a log cannot carry the
+synthetic finding. Fingerprints name `logPaths` for deployment and chain-log
+differences.
+
+The fixed corpus has twelve scenarios and 33 transactions that commit 27 logs:
+eight imported plans, which reuse the dynamic-array corpus steps with new site
+layouts and flags, and four generated seeds. Its expected histories, including
+every topic and data byte, were computed outside Lean by a separate evaluator
+of the step programs and a direct model of the protocol. `Tests/Main.lean`
+registers a validator that compares every status, payload, slot and log with
+original Core and rejects tampered topics, data, emitters and log order.
+Required coverage is all 39 step AST features in the corpus, the six inputs,
+one to three helpers and transactions, all four templates, both outcomes, six
+completion patterns, committed log counts zero to three, topic arities zero to
+four, data lengths of 0, 32 and 64 bytes, and reverted transactions with zero
+to three guarded sites.
+
+Local validation used committed code with frozen scripts and native tools; the
+eleven existing native tools kept their hashes. The fixed suite matched all
+twelve scenarios and 33 prefixes on Sonatina O0 and O2, with complete coverage,
+in 68.3 and 68.1 seconds. The recorded random suite (root seed `20261026`,
+sixteen cases, 2,048 attempts) accepted sixteen scenarios from eighteen
+attempts, with two ordinary exclusions and no resource exclusions. Its 37 sites
+took all fifteen combinations of topic count and data length. O0 matched all
+sixteen scenarios and 48 prefixes in 92.7 seconds, committing 49 logs on each
+path and covering every log count, topic arity and data length, four
+completion patterns and discarded counts zero to two.
+
+The O2 random gate failed. Fifteen scenarios and 45 prefixes matched; scenario
+`generated-14` (seed `11810673490881475037`) crashed the compiler during O2
+code-image export with a host `arithmetic operation overflow` panic in
+`primitive-types`. Checked Hull export succeeded, and the same scenario matched
+on O0. The panic message differs from the earlier `Integer overflow when
+casting to usize` shift-count crashes. Automatic reduction accepted three of
+sixteen candidates before its attempt limit and kept the crash fingerprint;
+the reduced step's only remaining raw opcode call is `signextend` with index
+31. The finding is retained, and the symptom is recorded without upstream
+investigation.
+
+A copied `importedHull` log difference at `tx-2` of the three-site,
+three-transaction `identity-full-frames` scenario was reduced on each level to
+that transaction with flags 2, input zero and one site with one data Word and
+no topic: twelve accepted reductions in 28 candidate executions, all of whose
+actual comparisons matched. The original and reduced archives replayed exactly
+with three-way agreement (four replays), and synthetic replays reproduced the
+fingerprint. Core or Hull fuel one was classified as inconclusive. With the
+extended adapter, the two-slot storage, rollback, call, keyed and
+dynamic-array fixed corpora still matched all 71 scenarios and 197 prefixes on
+each level. Changing the shared adapter invalidates exact replay of earlier
+storage archives, as for any adapter change.
+
 This profile does not compare gas, balances, nonces or code, `LOG` from
 constructors or from more than one contract, memory-dependent data lengths
 other than whole Words, or ABI event signatures and indexing. Agreement is
