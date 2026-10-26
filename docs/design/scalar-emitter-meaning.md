@@ -23,12 +23,16 @@ semantic-kernel policy check now covers.
 | `AggregateCallGraph.emit_source_meaning` | If `AggregateCallGraph.emit graph = .ok emitted` (profile `runtime-aggregate-call-graphs`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (graph.instantiate x).toCore w`. |
 | `CallGraphLoop.emit_source_meaning` | If `CallGraphLoop.emit plan = .ok emitted` (profile `runtime-call-graph-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `Loop.emit_source_meaning` | If `Loop.emit plan = .ok emitted` (profile `runtime-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
+| `Generic.emit_source_meaning` | If `Generic.emit plan = .ok emitted` (profile `runtime-generics`), then for every Word input `x` there is `w` with `genericSourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
 | `CallGraphLoop.emit_preserves_meaning`, `Loop.emit_preserves_meaning` | The same results, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
+| `Generic.emit_preserves_meaning` | The same result, exposing the generic file `file` with `emitted.source = file.print`, `parseGenericSource emitted.source = some file` and `file.call "run" [x.val] = some w.val`. |
 | `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 | `parseLoopSource_print` | The same for loop files under the loop grammar. |
+| `parseGenericSource_print` | The same for generic files under the generic grammar, when every generic function has a type parameter and every method-body `match` is in the generic form that the parser produces. |
 | `loopSourceCall_of_parseSource` | On every text that `parseSource` accepts, `loopSourceCall fuel` is `sourceCall`, for every fuel. |
+| `genericSourceCall_print_loopFree` | On the printing of every loop-free file whose names are lexically valid and not reserved, `genericSourceCall` is `sourceCall`. |
 | `loopSourceCall_mono`, `loopSourceCall_unique` | More fuel keeps the result of a completed loop call, so all completed calls of a text return the same word. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
@@ -39,9 +43,12 @@ machine used as the differential-testing oracle; for the runtime-input,
 named-helper, raw-primitive, call-graph, private-mutation, aggregate and
 aggregate call-graph profiles it runs the original lambda or binding chain
 applied to the input. For the two loop profiles it runs the original
-bounded-loop reference, applied to the input. A Core program with mutable
-locals ends with its cells in the store, so `CoreReturnsWithStore` states the
-same for some final store that every completed run reaches. The aggregate
+bounded-loop reference, applied to the input. For the generic profile it runs
+the original generic reference, applied to the input; that reference selects
+between two step results with a monomorphic curried selector closure. A Core
+program with mutable locals ends with its cells in the store, so
+`CoreReturnsWithStore` states the same for some final store that every
+completed run reaches. The aggregate
 call-graph renderer refuses cells, and the executable checks observe an empty
 final store, but its theorem states only `CoreReturnsWithStore`: the proof
 reuses the store-aware aggregate invariant, which does not track that no cell
@@ -49,7 +56,9 @@ is allocated. The bounded-loop reference keeps its accumulator in a cell, and
 both loop theorems state `CoreReturnsWithStore`. The executable checks observe
 that the final store starts with that cell, holding the result. For the
 call-graph loop it is the only cell; for the aggregate loop the cells that the
-step's calls allocated follow it.
+step's calls allocated follow it. The generic reference allocates no cell of
+its own, and its final store holds the cells that its two step calls
+allocated, so its theorem also states `CoreReturnsWithStore`.
 
 `loopSourceCall fuel` reads a text with the loop grammar below and calls the
 method under the loop meaning, in which each `while` loop may evaluate its
@@ -57,6 +66,11 @@ condition at most `fuel` times. A loop that runs out of fuel has no meaning, so
 `CallGraphLoop.emit_source_meaning` and `Loop.emit_source_meaning` state
 termination: every fuel above the mask, which is at most seven, completes the
 call.
+
+`genericSourceCall` reads a text with the generic grammar below and calls the
+method under the generic meaning. The generic fragment has no loops or
+recursion, so it needs no fuel.
+
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -69,8 +83,11 @@ The source side ([Syntax](../../Solcore/Synthesis/Source/ScalarMeaning/Syntax.le
 [Parse](../../Solcore/Synthesis/Source/ScalarMeaning/Parse.lean),
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) and, for loops,
 [LoopSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LoopSemantics.lean)
-and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean)) does
-not import or mention Core.
+and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean), and,
+for generic programs,
+[GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/GenericSemantics.lean)
+and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean))
+does not import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
 applications; parenthesized infix `+`, `-`, `*`, `&`, `|`, `^`, `==` and `>`;
@@ -181,6 +198,37 @@ evaluate its condition at most `fuel` times and has no meaning when a loop runs
 out. More fuel never changes a result, so all completed calls agree. A text
 that `parseSource` accepts parses under the loop grammar to the same file, and
 its loop meaning is its `sourceCall` meaning for every fuel.
+
+Generics. [GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/GenericSemantics.lean)
+and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean)
+extend the loop-free fragment for the generic selection wrapper, again as a
+separate grammar and meaning. A file may declare generic free functions
+`function f<a, ...>(p: T, ...) returns (T) { ...; return e; }` after its
+imports and before the ordinary functions, where each `T` is a type of the
+fragment or a type parameter. A generic body may contain
+`if (c) { return e; }`, with no `else`, on a local `c`. A method-body
+statement may also be `let x: T = a op b;` or `x = a op b;` with one infix
+operation without parentheses, also in the cases of a `match`. As in the
+pinned frontend, type parameters follow the function name in angle brackets
+(`crates/parser/src/parse/items.rs`), an `if` needs no `else` and `return` is
+a statement (`crates/parser/src/parse/stmt.rs`), and an infix operation needs
+no parentheses (`crates/parser/src/parse/expr_pat.rs`). `parseGenericSource`
+lexes as `parseSource` does and recognizes each extension by its first
+tokens. A generic function has `<` after its name where an ordinary one has
+`(`. A guard starts with `if ( name ) { return`, which no loop-free statement
+starts with. An infix statement goes on with an operator where a `let` or an
+assignment would end with `;`. The meaning is dynamic: a type parameter admits
+every value, and that the frontend instantiates it consistently is part of
+assumption 2. A guard's local must hold a Boolean. When it is `true`, the
+guard evaluates its value in a fresh scope and returns it from the function;
+otherwise the body goes on. The returned value, early or final, must have the
+declared result type. An infix statement means the same statement with the
+operation in parentheses. Generic functions enter the call context before the
+ordinary ones, each seeing only the generic functions declared before it, and
+every ordinary function and the method may call them. A loop-free file is a
+generic file without generic functions and with the same printing; when its
+names are valid and not reserved, its generic meaning is its `sourceCall`
+meaning.
 
 ## Connection to the actual emitter
 
@@ -351,11 +399,42 @@ induction of `boundedLoop_agrees` over such stores: an applied step writes its
 result to the accumulator cell after appending its own cells, and a skipped
 guard keeps the store.
 
+[GenericEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/GenericEmitter.lean)
+connects the actual `Generic.emit` (profile `runtime-generics`). The file
+declares the selector `sc_select<a>(flag: bool, left: a, right: a)`, whose
+guard returns `left` when `flag` holds and which returns `right` otherwise.
+The helpers follow as the aggregate emitter prints them, and the entry as
+`sc_step`, printed by `AggregateRenderer.render`. The method binds `sc_input`,
+applies `sc_step` to it and to `sc_next = sc_input + 1`, and sets `sc_flag` to
+`((sc_input & 1) == 1)`. It then selects between the two step results at
+`word`; at `(word, word)`, pairing each result with its argument and summing
+the selected pair; or at `sum<word, word>`, as `inl` of the first result and
+`inr` of the second, adding one to an `inr` payload. The Core reference
+(`Generic.canonicalProgram`) binds the step closure and a curried selector
+closure at the variant's payload type, and its applied entry evaluates the
+same sequence. These definitions are private to their module, so the proof
+restates the selector, the candidates, the result and the applied entry, and
+shows for each variant that the applied program reduces to the restatement
+(`genericApplied_body`). `genericInner_evaluates` evaluates the restatement
+for both values of the flag. The helpers come from the aggregate emitter's
+helper loop. `sc_select` is declared before them, so a call from the method
+resolves to the selector only if no helper shadows it.
+`aggregateLoop_spec_named` is `aggregateLoop_spec` with one more conjunct,
+that each declared helper is named `sc_fn<k>`; the original statement is
+unchanged. `genericMethod_run` shows that the method returns the reference's
+Word in every call context where `sc_step` computes the entry and `sc_select`
+selects. The first step call runs from the initial store and the second from
+the store the first left, so the final store holds the cells of both calls. As
+for the aggregate emitter, the file imports the fourteen aliases exactly when
+a helper or the entry uses one.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
 [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean) proves
-the same for loop files (`parseLoopSource_print`). The meaning is therefore a
+the same for loop files (`parseLoopSource_print`), and
+[GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean)
+for generic files (`parseGenericSource_print`). The meaning is therefore a
 function of the emitted `String`, not of an internal printer argument.
 
 ## Assumptions outside the theorem
@@ -406,6 +485,23 @@ assumption 2, and its lowering and execution are part of assumption 4.
 The aggregate loop emitter adds no further assumption. Its step uses only the
 forms above, and its wrapper is the same `while` loop.
 
+The generic emitter adds its selector and its unparenthesized infix
+statements. Under assumption 1, the pinned parser reads
+`function sc_select<a>(flag: bool, left: a, right: a) returns (a)` as a
+function with the type parameter `a` (`crates/parser/src/parse/items.rs`), and
+`if (flag) { return left; }` as an `if` statement without `else` whose block
+holds a `return` statement (`crates/parser/src/parse/stmt.rs`). It reads
+`sc_input + 1`, `sc_first + sc_second` and `sc_payload + 1` as the same
+`Add.add` applications as their parenthesized forms
+(`crates/parser/src/parse/expr_pat.rs`). Under assumption 2, the frontend
+accepts the selector and its calls at `word`, `(word, word)` and
+`sum<word, word>`, instantiating `a` consistently; the source meaning does not
+check that instantiation, since a type parameter admits every value. Under
+assumption 3, the `if` statement and an early `return` behave as described
+above. Under assumption 4, the specialization of `sc_select` at each
+instantiation, its lowering and its execution keep that dynamic meaning, so
+each call returns `left` when `flag` holds and `right` otherwise.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -413,20 +509,23 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and ten
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and eleven
 actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
 named helpers (`runtime-functions`), raw primitive aliases
 (`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
 locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`), aggregate
 call graphs (`runtime-aggregate-call-graphs`), call-graph loops
-(`runtime-call-graph-loops`) and aggregate loops (`runtime-loops`). They do not
-yet cover the other emitters that render with `AggregateRenderer` (generic,
-closures, comptime, modules, storage, storage rollback, keyed storage, dynamic
-arrays, dynamic bytes, event logs, call value and contract calls). Their texts
-use forms outside these fragments, such as storage access, external calls,
-lambdas, generic functions and multi-file module bundles. The loop grammar
-admits loops only at the top level of a method body, with a loop-free body and
-an infix condition.
+(`runtime-call-graph-loops`), aggregate loops (`runtime-loops`) and generic
+selection (`runtime-generics`). They do not yet cover the other emitters that
+render with `AggregateRenderer` (closures, comptime, modules, storage, storage
+rollback, keyed storage, dynamic arrays, dynamic bytes, event logs, call
+value, contract calls and forwarded value). Their texts use forms outside
+these fragments, such as storage access, external calls, lambdas and
+multi-file module bundles. The loop grammar admits loops only at the top level
+of a method body, with a loop-free body and an infix condition. The generic
+grammar has no loops, admits early returns only as guards on a local in
+generic function bodies, and admits unparenthesized infix operations only as
+the whole value of a method-body `let` or assignment.
 
 ## Executable checks
 
@@ -533,3 +632,25 @@ cells, a sum and its match, keep their `sourceCall` meaning at fuel 0, 1 and
 its counter step has no meaning once it iterates, a `let` in the body leaves
 the accumulator unchanged, and a step that assigns a cell it never declared has
 no meaning.
+
+[SourceGenericMeaning](../../Solcore/Test/SourceGenericMeaning.lean) is
+registered as well. It runs actual `Generic.emit` output through
+`genericSourceCall` at the eight boundary inputs and compares it with Core. It
+covers the regression plans of the generic emitter's test: an identity step
+that allocates one private cell per call and an increment step, each at the
+three variants, and a constant entry at `word`, with hand-known Words at 0, 1,
+`2^256 - 1` and `2^255`. It also covers the fourteen opcodes applied to a
+helper result at each variant, and 22 generated plans from 24 seeds at the 256
+and 512-node budgets, which together use every variant. Every Core run must end
+with Word cells only; for the regression plans, the store must hold the two
+cells of the identity step's calls and none for the other steps. Each text
+must reparse under the generic grammar, print back to itself, import the
+aliases exactly when a step body uses one, and declare `sc_select` and then
+`sc_step` after one function per helper. `parseSource` must reject it, so
+`sourceCall` gives it no meaning, and an argument of `2^256` has no meaning.
+Two loop-free aggregate texts, with a private cell, a sum and its match, parse
+under the generic grammar and keep their `sourceCall` meaning. A guard
+returning the other candidate and a selector without its guard change the
+result, a `word` flag parameter and a guard on a `word` have no meaning, two
+infix operations without parentheses are rejected, and applying the step to
+the input plus two in place of one changes the result.

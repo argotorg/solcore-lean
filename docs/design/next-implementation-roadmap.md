@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop and generic emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection and one concrete instance; remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and Hull's explicit revert connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -633,11 +633,32 @@ store; the store therefore grows across iterations. The aggregate helper
 relation states that each call keeps every existing location, so the induction
 over the guards carries a growing store in which the accumulator stays in the
 first cell. The theorem is stated with the final store, which the executable
-checks observe as the accumulator cell followed by the step's cells. The other
-emitters that render with the aggregate renderer (generic, closures, comptime,
-modules, storage, storage rollback, keyed storage, dynamic arrays, dynamic
-bytes, event logs, call value and calls) are not covered; their texts use forms
-outside the source fragment.
+checks observe as the accumulator cell followed by the step's cells.
+
+`Generic.emit_source_meaning` covers the `runtime-generics` emitter. Its file
+declares the generic selector `sc_select<a>` before the aggregate helpers and
+the step, and its method applies the step to the input and to the input plus
+one, then selects between the results by the input's low bit at `word`,
+`(word, word)` or `sum<word, word>`. The text needs three forms outside the
+loop-free fragment: a generic function with a type parameter, an `if` without
+`else` that returns early, and a `let` or assignment with one infix operation
+without parentheses. They have their own grammar and meaning, next to the
+loop-free and loop ones: `parseGenericSource` also reads generic functions,
+guards and infix statements, and `genericSourceCall` lets a type parameter
+admit every value, so its consistent instantiation is part of the assumed
+frontend typing. On the printing of every loop-free file with valid,
+non-reserved names, `genericSourceCall` equals `sourceCall`, so no existing
+statement changed. The theorem states that the method returns the Word that
+Core's generic reference returns, with its final store. That reference applies
+a monomorphic curried selector closure; the proof restates it and the applied
+entry from private definitions for each variant. A call resolves to the
+selector only because no helper is named `sc_select`, which a named copy of the
+aggregate helper-loop lemma states; the original lemma is unchanged. The step
+may allocate private cells, so the final store holds the cells of both step
+calls. The other emitters that render with the aggregate renderer (closures,
+comptime, modules, storage, storage rollback, keyed storage, dynamic arrays,
+dynamic bytes, event logs, call value, calls and forwarded value) are not
+covered; their texts use forms outside the source fragments.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -669,8 +690,15 @@ registered `SourceLoopMeaning` test runs eight fixed aggregate steps, including
 one that allocates a cell per call, under every admitted mask, fourteen raw
 primitive steps and 23 generated plans with the same fuel checks. Every Core
 run ends with the accumulator cell followed by the step's cells, and the fixed
-steps also match hand-known formulas and cell counts. The full Lean build
-(10,045 jobs), registered tests and the semantic-kernel policy passed.
+steps also match hand-known formulas and cell counts. The registered
+`SourceGenericMeaning` test runs seven regression plans, including a step that
+allocates a cell per call, fourteen raw primitive steps at each variant and 22
+generated plans at eight or more inputs. All agree with Core, the regression
+plans also match hand-known Words and cell counts, and every Core run ends with
+Word cells only. Loop-free texts keep their `sourceCall` meaning, altered
+selectors lose or change their meaning, and two infix operations without
+parentheses are rejected. The full Lean build (10,064 jobs), registered
+tests and the semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

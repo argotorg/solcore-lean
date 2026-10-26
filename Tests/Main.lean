@@ -2177,6 +2177,7 @@ import Solcore.Test.SourceForwardedCallEmitter
 import Solcore.Test.SourceForwardedCallCases
 import Solcore.Test.SourceForwardedCallCorpus
 import Solcore.Test.RustHullRevertCorrespondence
+import Solcore.Test.SourceGenericMeaning
 set_option autoImplicit false
 
 open Solcore
@@ -4147,5 +4148,6 @@ def main : IO UInt32 := do
   Tests.SourceForwardedCallCases.testSourceForwardedCallCases
   Tests.SourceForwardedCallCorpus.testSourceForwardedCallCorpus
   Tests.RustHullRevertCorrespondence.run
+  Tests.SourceGenericMeaning.testSourceGenericMeaning
   IO.println "solcore-lean tests passed"
   return 0
