@@ -1199,7 +1199,91 @@ This profile does not compare gas, balances, nonces, logs or code, nor
 malformed calldata, Solidity-style hashed mapping layouts, dynamic ABI values,
 multiple callers or nonzero call value. Undeclared-slot containment is checked
 on the Hull and EVM paths only. Agreement in these runs is test evidence, not
-a preservation proof.
+a preservation proof. After the adapter was generalized for dynamic arrays
+below, the keyed fixed and random suites were repeated on both levels with the
+same results.
+
+## Compare bounded dynamic arrays
+
+The `stateful-dynamic-array` profile adds one bounded dynamic ABI value. Each
+transaction calls `SynthesizedDynamicArray.run(uint256 flags, uint256[] values)`,
+selector `0x9a94c44b`, with zero to three elements in the canonical head/tail
+encoding: flags, the tail offset 64 relative to the arguments, the length and
+the elements. The source parameter is a lazily decoded
+`calldata<array<uint256>>`; it reads `values.length()` and `values[uint256(i)]`.
+Original Core follows the head offset to the same length word and element Words
+with `inputDataWordBE?`, as the ABI does.
+
+The contract reads the accumulator from slot 0. For each present element `i`
+(at most three, unrolled in both Core and source) it computes
+`acc = step(acc + values[i])` and writes slot `1 + i`. It then writes the
+accumulator to slot 0, adds the length to a running element count in slot 4,
+and returns the sum of slots 0 and 4. Odd flags revert after those writes with
+the same Word. Shorter arrays leave earlier per-element slots untouched, and an
+empty array still rewrites the accumulator and count. Observed slots are fixed
+at zero through four, and the keyed profile's containment rules apply: the
+Hull and EVM paths must show no nonzero committed slot outside them. The
+declared-slot Hull runner `rust-hull-keyed-storage-scenario` serves both
+profiles because it accepts the declared slots and calldata from the scenario.
+
+```sh
+lake build semanticDynamicArrayTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-dynamic-array-cases
+.lake/build/bin/semantic-dynamic-array-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-dynamic-array-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-dynamic-array-corpus.json \
+  --output .upstream/semantic-dynamic-array-ci --seconds 900
+```
+
+Plans use `solcore-lean.dynamic-array-plan.v1` under `dynamicArrayPlan`; cases
+use `solcore-lean.semantic-dynamic-array-case.v1`. Transactions are
+`{id, flags, values, calldata, value}`; the tool and the adapter both reject
+calldata that is not the canonical encoding of the saved flags and values,
+arrays longer than three elements and noncanonical Words. The calldata of twelve
+generated transactions, including empty arrays, matched `cast calldata` from the
+pinned Foundry release byte for byte; the Lean tests retain two such vectors.
+Non-canonical
+offsets, truncated arrays and the Rust decoder's revert paths are outside this
+profile: Core reads an absent Word as zero, while the Rust ABI decoder reverts.
+
+Generation reuses the aggregate step generator; 235 of the first 3,000 seeds at
+the 384-node default were accepted. Three transactions draw lengths zero to
+three, elements and flags from the six storage boundary inputs, and one of the
+four completion patterns from a separate high-bit stream. Reductions simplify
+the step, remove a transaction, remove one array element, or replace one
+element or the flags by a bank value. They are ordered by transaction count,
+program complexity, total element count, then the sum of flags and elements.
+The campaign records array lengths as a coverage dimension and treats every
+element as a runtime input.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions with independently computed histories, validated against original
+Core by a registered Lean test. It requires all 23 step AST features of the
+corpus, the six boundary elements, lengths zero through three, one to three
+helpers and transactions, all four templates, both outcomes and six completion
+patterns.
+
+Local validation used committed code with frozen scripts and native tools. The
+fixed suite matched all twelve scenarios and 33 prefixes on Sonatina O0 and O2
+with complete coverage, in 94.7 and 94.1 seconds. The recorded random suite
+(root seed `20261026`, sixteen cases, 2,048 attempts) accepted sixteen
+scenarios from 195 attempts, with 179 ordinary exclusions and no resource
+exclusions; all sixteen and 48 prefixes matched on both levels in 109.8 and
+108.4 seconds, covering every length and all four generated completion
+patterns. Neither run produced a finding. A copied `importedHull` difference in
+slot three at `tx-0` of a three-transaction scenario was reduced on each level
+to that transaction with an empty array: six accepted reductions in eight
+candidate executions, all of whose actual comparisons matched. The original and
+reduced archives replayed exactly with three-way agreement (four replays), and
+synthetic replays reproduced the fingerprint. Core or Hull fuel one was
+inconclusive. The keyed, two-slot storage and rollback fixed corpora still
+matched on both levels with the generalized adapter.
+
+This profile compares one dynamic Word array beside one static Word. Nested or
+multi-word element types, `bytes` and strings, ABI-encoded return values and
+dynamic memory are outside it, as are gas, balances, nonces and logs. Agreement
+is test evidence, not a preservation proof.
 
 
 ## Compare generic selection

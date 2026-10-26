@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage extension validated locally; dynamic ABI values pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity and SHA-256 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -610,9 +610,48 @@ pure profiles. Hosted CI has not been run.
 
 This scope does not compare gas, balances, nonces, logs or code, multiple
 callers, nonzero call value or hashed mapping layouts. Agreement is test
-evidence, not a preservation proof. Selected dynamic ABI values are the next
-extension, then account or transaction behaviors, each with its own
-observation, rollback, deployment and reduction definitions.
+evidence, not a preservation proof.
+
+The second extension, `stateful-dynamic-array`, adds one bounded dynamic ABI
+value and is connected as a nineteenth suite profile. Its definitions:
+
+- Transactions: one to three zero-value calls of `run(uint256 flags,
+  uint256[] values)` with zero to three elements in the canonical head/tail
+  encoding. Non-canonical offsets and truncated arrays are outside the scope;
+  there the Rust decoder reverts while Core reads absent Words as zero.
+- Effects: original Core follows the head offset to the length, as the ABI
+  does, and the source reads a lazily decoded calldata array. Each present
+  element is folded through the checked step and written to its own slot; the
+  accumulator, then a running element count, are written last. Odd flags revert.
+- Committed observations, rollback and deployment: as for keyed storage, with
+  the fixed declared slots zero to four and Hull/EVM containment through the
+  same declared-slot Hull runner.
+- Sequence reduction: step reduction, transaction removal, removal of one array
+  element and bank replacement of one element or the flags, ordered by
+  transaction count, program complexity, element count and value weight.
+
+Its fixed corpus has twelve scenarios and 33 transactions whose independently
+computed histories match original Core; generated calldata matched Foundry's
+`cast calldata` encoder. The keyed-only adapter rules became declared-slot
+rules with a per-profile ABI form. The full Lean build (9,941 jobs), registered
+tests, kernel policy and 468 Python policy tests passed, and the ten earlier
+native tools kept their hashes. On O0 and O2 the fixed suite matched all 12
+scenarios and 33 prefixes (94.7 and 94.1 seconds). Random seed `20261026`,
+sixteen cases and 2,048 attempts accepted sixteen scenarios from 195 attempts
+with 179 ordinary exclusions and no resource exclusions; all sixteen and 48
+prefixes matched on both levels, with no finding. A copied Hull slot difference
+reduced to one transaction with an empty array on each level (twelve accepted
+reductions in sixteen actual candidate executions); four exact archive replays
+agreed and synthetic fingerprints reproduced. Core or Hull fuel one was
+inconclusive. With the generalized adapter, the keyed fixed and random suites
+and the two-slot storage and rollback fixed corpora matched again on both
+levels. Hosted CI has not been run.
+
+Further state/ABI work, such as nested or multi-word ABI elements, `bytes`,
+ABI-encoded return values, multiple callers, nonzero call value or logs, needs
+its own observation, rollback, deployment and reduction definitions first.
+Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
+their separate explicit scopes.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).

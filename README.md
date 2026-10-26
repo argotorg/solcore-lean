@@ -162,7 +162,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same eighteen-profile suite runs locally with shared time and disk limits.
+The same nineteen-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -246,6 +246,15 @@ EVM paths must also show no nonzero committed slot outside them. See the
 All twelve fixed scenarios and 33 transaction prefixes match on Sonatina O0 and
 O2, as do the sixteen recorded random scenarios. A slot difference survives
 failure-preserving reduction to one transaction and exact archive replay.
+
+The dynamic-array profile adds a bounded dynamic ABI value: `run(uint256 flags,
+uint256[] values)` with zero to three elements in the canonical ABI encoding.
+The source reads a lazily decoded calldata array; original Core follows the
+same head offset and length. Each element is folded through the checked step
+into its own slot, and odd flags revert. Its twelve fixed scenarios and sixteen
+recorded random scenarios match on both Sonatina levels, with reduction of
+transactions and array elements and exact archive replay. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-dynamic-arrays).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases
