@@ -250,7 +250,8 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
         subst mem
         exact absurd same (argument_not_temporary index)
       obtain ⟨statements, lines₁, _, valueName, names, simulates⟩ :=
-        render_spec body (helperNames start) 1 start .word ["sc_arg"] 4 0 rendered
+        render_spec (fun _ => True) [] body (helperNames start) 1 start .word ["sc_arg"] 4 0
+          rendered
           (by simpa using accepted 0 body rfl) renderedEquation fresh
       let declaration := helperDecl start statements rendered.value
       have behaves : ∀ (argument : Solcore.Core.Word) (store : Solcore.Core.Store),
@@ -270,7 +271,7 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
               exact ⟨argument, rfl, by simp [Frames.lookup, Scope.get?]⟩
           | succ index => simp at found
         obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
-          simulates ⟨functions, []⟩ (.word argument :: closures) store [] _ localsAgree
+          simulates ⟨functions, []⟩ (.word argument :: closures) store [] _ trivial localsAgree
             (by simp) (by simpa using agree)
         obtain ⟨result, rfl, rfl⟩ := represents
         refine ⟨result, evaluates, ?_⟩
@@ -312,7 +313,8 @@ theorem helperLoop_spec : ∀ (bodies : List CoreExpr) (start : Nat)
             subst mem
             exact ⟨keyword_valid (by decide), by decide⟩
           have bodyOk := fun name mem =>
-            rendered_identifier_ok localsOk helperNames_ok (names name mem)
+            rendered_identifier_ok localsOk helperNames_ok
+              (fun _ absent => absurd absent List.not_mem_nil) (names name mem)
           have valueOk := rendered_name_ok localsOk valueName
           refine ⟨⟨helperName_not_reserved start, ?_, fun name mem => (bodyOk name mem).2, ?_⟩,
             ?_⟩
@@ -380,7 +382,8 @@ theorem Function.emit_preserves_meaning {graph : CheckedWordFunctionDAG}
     subst mem
     exact absurd same (input_not_temporary index)
   obtain ⟨statements, entryLines, _, valueName, entryNames, simulates⟩ :=
-    render_spec graph.entry names 1 graph.helpers.length .word ["sc_input"] 8 0 entry
+    render_spec (fun _ => True) [] graph.entry names 1 graph.helpers.length .word ["sc_input"] 8 0
+      entry
       graph.entryScope entryEquation fresh
   let file := functionsFile declarations statements entry.value
   have localsOk : ∀ local_ ∈ ["sc_input"], ValidIdentifier local_ ∧
@@ -418,7 +421,8 @@ theorem Function.emit_preserves_meaning {graph : CheckedWordFunctionDAG}
     rcases mem with rfl | rfl | mem
     · exact ⟨keyword_valid (by decide), by decide⟩
     · exact ⟨keyword_valid (by decide), by decide⟩
-    · exact rendered_identifier_ok localsOk functionNamesOk (entryNames name mem)
+    · exact rendered_identifier_ok localsOk functionNamesOk
+        (fun _ absent => absurd absent List.not_mem_nil) (entryNames name mem)
   have parsed : parseSource emitted.source = some file := by
     rw [printed]
     apply parseSource_print
@@ -460,8 +464,8 @@ theorem Function.emit_preserves_meaning {graph : CheckedWordFunctionDAG}
   have context : file.context = ⟨declareFunctions [] [] declarations, []⟩ := rfl
   obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
     simulates file.context (.word input :: graph.helpers.foldl closureStep []) []
-      [("sc_input", .word input.val)] [[("input", .uint256 input.val)]] localsAgree (by simp)
-      (by rw [context]; simpa using agree)
+      [("sc_input", .word input.val)] [[("input", .uint256 input.val)]] trivial localsAgree
+      (by simp) (by rw [context]; simpa using agree)
   obtain ⟨word, rfl, rfl⟩ := represents
   have applied : Solcore.Core.Evaluates [] []
       (graph.instantiate input).toCore.body (.word word) [] := by

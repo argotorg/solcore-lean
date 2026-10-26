@@ -144,17 +144,20 @@ theorem rendered_name_ok {locals : List String} {name : String} {first last : Na
 
 /-- Every identifier used by rendered statements is a local, a helper name or
 a temporary. -/
-theorem rendered_identifier_ok {locals functions : List String} {name : String}
+theorem rendered_identifier_ok {locals functions called : List String} {name : String}
     {first last : Nat}
     (localsOk : ∀ local_ ∈ locals, ValidIdentifier local_ ∧ isReserved local_ = false)
     (functionsOk : ∀ function ∈ functions, ValidIdentifier function ∧
       isReserved function = false)
-    (classified : name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first last name) :
+    (calledOk : ∀ callee ∈ called, ValidIdentifier callee ∧ isReserved callee = false)
+    (classified : name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first last name ∨
+      name ∈ called) :
     ValidIdentifier name ∧ isReserved name = false := by
-  rcases classified with mem | mem | ⟨index, rfl, _, _⟩
+  rcases classified with mem | mem | ⟨index, rfl, _, _⟩ | mem
   · exact localsOk name mem
   · exact functionsOk name mem
   · exact ⟨temporary_valid index, temporary_not_reserved index⟩
+  · exact calledOk name mem
 
 /-- **Closed G0 emitter preservation.** If the actual emitter succeeds, its
 source text is the printing of a source file and parses back to it. Calling
@@ -167,16 +170,17 @@ theorem emit_preserves_meaning {program : CheckedWordProgram} {emitted : Emitted
       file.call "run" [] = some word.val ∧ CoreReturns program.program.toCore word := by
   obtain ⟨body, rendered, source⟩ := emit_success emitted_eq
   obtain ⟨statements, lines, _, valueName, names, simulates⟩ :=
-    render_spec program.program.body [] 0 0 .word [] 8 0 body
+    render_spec (fun _ => True) [] program.program.body [] 0 0 .word [] 8 0 body
       (acceptsAt_functionAcceptsAt _ 0 program.fragment) rendered
       (fun _ absent => absurd absent List.not_mem_nil)
   obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
-    simulates (closedFile statements body.value).context [] [] [] [[]]
+    simulates (closedFile statements body.value).context [] [] [] [[]] trivial
       (fun index name found => by simp at found) (by simp) (fun _ _ found => by simp at found)
   obtain ⟨word, rfl, rfl⟩ := represents
   have localsOk : ∀ local_ ∈ ([] : List String), ValidIdentifier local_ ∧
       isReserved local_ = false := fun _ absent => absurd absent List.not_mem_nil
-  have bodyOk := fun name mem => rendered_identifier_ok localsOk localsOk (names name mem)
+  have bodyOk := fun name mem =>
+    rendered_identifier_ok localsOk localsOk localsOk (names name mem)
   have printed : emitted.source = (closedFile statements body.value).print := by
     rw [source, SourceFile.print, SourceFile.lines, lines]
     apply string_eq_of_toList
@@ -233,7 +237,7 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     subst mem
     exact absurd same (input_not_temporary index)
   obtain ⟨statements, lines, _, valueName, names, simulates⟩ :=
-    render_spec function.body [] 1 0 .word ["sc_input"] 8 0 body
+    render_spec (fun _ => True) [] function.body [] 1 0 .word ["sc_input"] 8 0 body
       (acceptsAt_functionAcceptsAt _ 0 function.fragment) rendered fresh
   have localsOk : ∀ local_ ∈ ["sc_input"], ValidIdentifier local_ ∧
       isReserved local_ = false := by
@@ -266,7 +270,7 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     · exact ⟨keyword_valid (by decide), by decide⟩
     · exact ⟨keyword_valid (by decide), by decide⟩
     · exact rendered_identifier_ok localsOk (fun _ absent => absurd absent List.not_mem_nil)
-        (names name mem)
+        (fun _ absent => absurd absent List.not_mem_nil) (names name mem)
   have parsed : parseSource emitted.source = some (inputFile statements body.value) := by
     rw [printed]
     apply parseSource_print
@@ -306,7 +310,7 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     | succ index => simp at found
   obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
     simulates (inputFile statements body.value).context [.word input] []
-      [("sc_input", .word input.val)] [[("input", .uint256 input.val)]] agree (by simp)
+      [("sc_input", .word input.val)] [[("input", .uint256 input.val)]] trivial agree (by simp)
       (fun _ _ found => by simp at found)
   obtain ⟨word, rfl, rfl⟩ := represents
   have applied : Solcore.Core.Evaluates [] []

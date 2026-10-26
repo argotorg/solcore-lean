@@ -57,13 +57,16 @@ def FunctionsAgree (context : Context) (functions : List String)
           context.call name [.word argument.val] = some (.word result.val)
 
 /-- Executing `statements` from frames that agree with a Core environment
-evaluates `expression` in that environment. The environment holds the Word
-locals followed by the helper closures. Only temporaries in `[first, last)`
-are declared (in the innermost scope) or changed. -/
-def Simulates (expression : CoreExpr) (target : Target) (functions locals : List String)
-    (first last : Nat) (statements : List Stmt) (valueName : String) : Prop :=
+evaluates `expression` in that environment, in every call context accepted by
+`admits`. The environment holds the Word locals followed by the helper
+closures. Only temporaries in `[first, last)` are declared (in the innermost
+scope) or changed. -/
+def Simulates (admits : Context → Prop) (expression : CoreExpr) (target : Target)
+    (functions locals : List String) (first last : Nat) (statements : List Stmt)
+    (valueName : String) : Prop :=
   ∀ (context : Context) (environment : Solcore.Core.Environment) (store : Solcore.Core.Store)
     (scope : Scope) (outer : Frames),
+    admits context →
     LocalsAgree (scope :: outer) locals environment →
     locals.length ≤ environment.length →
     FunctionsAgree context functions (environment.drop locals.length) →
@@ -79,26 +82,35 @@ def Simulates (expression : CoreExpr) (target : Target) (functions locals : List
       scope'.names = added ++ scope.names ∧
       (∀ name ∈ added, AllocatedIn first last name)
 
-/-- What the renderer establishes for one rendered expression. -/
-def RenderSpec (expression : CoreExpr) (target : Target) (functions locals : List String)
-    (indent first : Nat) (rendered : Rendered) : Prop :=
+/-- What a renderer establishes for one rendered expression. Identifiers are
+locals, helper names, temporaries or the fixed `called` names (raw opcode
+aliases and `tobool`). -/
+def RenderSpec (admits : Context → Prop) (called : List String) (expression : CoreExpr)
+    (target : Target) (functions locals : List String) (indent first : Nat)
+    (rendered : Rendered) : Prop :=
   ∃ statements : List Stmt,
     rendered.lines = Stmt.listLines indent statements ∧
     first ≤ rendered.nextId ∧
     (rendered.value ∈ locals ∨ AllocatedIn first rendered.nextId rendered.value) ∧
     (∀ name ∈ Stmt.listIdentifiers statements,
-      name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first rendered.nextId name) ∧
-    Simulates expression target functions locals first rendered.nextId statements
+      name ∈ locals ∨ name ∈ functions ∨ AllocatedIn first rendered.nextId name ∨
+        name ∈ called) ∧
+    Simulates admits expression target functions locals first rendered.nextId statements
       rendered.value
 
-def RenderIH (expression : CoreExpr) : Prop :=
+/-- The signature shared by the scalar renderers: helper names, target, local
+names, indentation, first temporary and the Core expression. -/
+abbrev RenderFn :=
+  List String → Target → List String → Nat → Nat → CoreExpr → Except EmitError Rendered
+
+def RenderIH (render : RenderFn) (admits : Context → Prop) (called : List String)
+    (expression : CoreExpr) : Prop :=
   ∀ (functions : List String) (depth prior : Nat) (target : Target) (locals : List String)
     (indent first : Nat) (rendered : Rendered),
     functionAcceptsAt depth prior target expression = true →
-    ScalarRenderer.renderWithFunctions functions target locals indent first expression =
-      .ok rendered →
+    render functions target locals indent first expression = .ok rendered →
     (∀ name ∈ locals, OlderThan first name) →
-    RenderSpec expression target functions locals indent first rendered
+    RenderSpec admits called expression target functions locals indent first rendered
 
 /-! ### Auxiliary facts -/
 
