@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate and aggregate call-graph emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log and call-value extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows and its public-root connection; remaining expression forms, write inputs and concrete public use remain | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles and refused CREATE/CREATE2 attempts connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -978,11 +978,22 @@ call-mode and root-reentry public theorems cover the refusals without
 statement changes. Eight independent source scenarios reach the call-mode
 theorem, with runtime checks of receipts, balances and nonces; the depth
 refusal has no public consumer because it needs a frame at depth 1024.
-Successful creation is the next unit: the nonce increment, RLP and Keccak
-address derivation, collision checks, the init frame in a deployment context,
-runtime-code validation and installation, and rollback; the Hull design
-document lists its source rules and proof obligations. Assembly and source
-revert, and object linking, also remain, in that order.
+
+Admitted CREATE and CREATE2 attempts that run no init frame are connected.
+Independent rules derive the CREATE address from the RLP of the creator and
+its nonce, and the CREATE2 address from 0xff, the creator, the salt and the
+init-code hash, using the connected Keccak; the kernel reproduces the 11
+recorded reference vectors. A nonzero nonce or code size at the address is a
+collision that returns zero and keeps the advanced nonce. An address absent
+from a complete world receives a new account and the endowment, and empty
+init code deploys empty code without an init frame. The proof reaches the
+actual address builders, nonce write, checkpoint, collision checks, transfer
+and installation, restated by `rfl`, and four independent source scenarios
+reach the call-mode theorem with runtime checks. Init frames are the next
+unit: nonempty init code in a deployment context, runtime-code validation and
+installation, and rollback with revert bytes; the Hull design document lists
+the remaining source rules and proof obligations. Assembly and source revert,
+and object linking, also remain, in that order.
 
 ## Handoff rules
 

@@ -396,8 +396,7 @@ data. At the depth limit (a frame at depth 1024), with an endowment above the
 creator's balance, or with a creator nonce of at least EIP-2681's 2^64 − 1, the
 attempt returns zero. Memory then covers the init range and return data is
 empty; balances, accounts, logs and the creator nonce are unchanged. Only
-admitted attempts advance the nonce, and the source semantics has no
-derivation for an admitted attempt yet.
+admitted attempts advance the nonce.
 
 `RuntimeCallModeSemantics.Builtin` gains `create` and `create2` constructors
 for these rules, and both names join the call-mode `supported` predicates.
@@ -414,12 +413,12 @@ the invocation transport, the dispatcher and the create handler built by
 `objectHandlers`, and proves each restatement by `rfl`; the dispatcher's
 address derivation, checkpoint and installation form a separate `admitted`
 remainder. `CreationCorrespondence.HandlerClosure` records the installed
-closure and its captured shared references; its init selection and runtime
-installation stay abstract. `ModeHandlers` now carries this handler, its cell
-and its closure. The actual frame allocator identifies each frame's
-create-handler slot with the installed creator cell
-(`allocateFrameSlots_creates`), and a child frame receives the cell's read
-through the call that starts it (`CreateHandler.context`).
+closure, its captured shared references and its runtime installation; init
+selection and the identification of a nonempty runtime image stay abstract.
+`ModeHandlers` now carries this handler, its cell and its closure. The actual
+frame allocator identifies each frame's create-handler slot with the installed
+creator cell (`allocateFrameSlots_creates`), and a child frame receives the
+cell's read through the call that starts it (`CreateHandler.context`).
 
 `Tests.RustHullCreationCorrespondence.public_resumes` applies the call-mode
 theorem to eight independent source scenarios: a static frame, oversized init
@@ -430,6 +429,55 @@ resumption. The depth refusal has no public consumer, because it needs a frame
 at depth 1024 and the outermost frame has depth zero; `Tests.RustHullCreation`
 checks the depth branch of the actual transport at runtime.
 
+`CreationSemantics.Admitted` specifies admitted attempts that run no init
+frame. Such an attempt passes every refusal check, copies its init bytes from
+memory, advances the creator nonce and derives the new address with
+`CreationAddressSemantics`. CREATE hashes the RLP list of the creator address
+and its nonce; CREATE2 hashes 0xff, the creator address, the salt and the
+Keccak-256 of the copied init bytes. RLP follows appendix B of the Yellow
+Paper, and Keccak-256 of a byte string is the connected `KeccakSemantics`
+absorption of the bytes stored from address zero. Following EIP-684, an
+account with a nonzero nonce or code size at the address is a collision: the
+attempt returns zero and keeps the advanced nonce, for init code of any
+length. An address absent from a complete world receives a new account with
+nonce one and the endowment. With empty init code no init frame runs, the
+deployed code is empty and the attempt returns the address; the EVM runs an
+empty init frame here, which has no effect the model observes.
+`RuntimeCallModeSemantics.Builtin` gains `createAdmitted` and
+`create2Admitted`, and the call-mode and root-reentry public theorems keep
+their statements.
+
+The proof connects the actual `admitted` remainder of the dispatcher.
+`CreationImplementation` also restates `Creation.createAddress`,
+`Creation.create2Address` and the runtime installation of `objectHandlers` by
+`rfl`. The address builders write their preimages into fresh scratch cells
+with the actual `mstore8` and `mstore` and hash them with the connected
+Keccak. `CreationBytes` proves byte reads of source memory after byte and word
+writes at any alignment, and that Keccak absorption reads only the absorbed
+bytes; `CreationPreimage` shows that the scratch bytes are the specified
+preimages, so the masked digest is the specified address. The nonce write,
+checkpoint loads, collision checks, record insertion, endowment, empty-init
+validation and installation are evaluated against `StorageCorrespondence`, and
+catalog code links survive both outcomes. The transport publishes the
+handler's account and balance changes through `transport_updated`.
+
+`Tests.RustHullCreationAdmittedCorrespondence.public_resumes` applies the
+call-mode theorem to four independent source scenarios: CREATE and CREATE2
+deployments of empty init code, one with an endowment, and CREATE and CREATE2
+collisions with an account of nonzero nonce and with one that has code. The
+kernel evaluates the derived addresses. Runtime checks compare the returned
+address, balances, the advanced creator nonce and the new account.
+`Tests.RustHullCreationAddressVectors` derives the 11 recorded CREATE and
+CREATE2 address vectors from the specification in the kernel, covering every
+RLP nonce encoding and EIP-2681's largest nonce.
+
+Admitted attempts not yet described: nonempty init code, whose init frame runs
+in a deployment context; an existing account at the address with zero nonce
+and no code, because a catalog link for empty bytes at that address could not
+survive installation, which records identity zero; an unknown account at the
+address, which is failure 7; and an endowment that overflows the new account's
+balance, which is failure 12. The last two restore the post-nonce checkpoint.
+
 ## Priorities
 
 | Priority | Theorem / connection | Completion evidence | Status |
@@ -438,7 +486,7 @@ checks the depth branch of the actual transport at runtime.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity, SHA-256 and RIPEMD-160 precompiles, account destruction and refused CREATE/CREATE2 attempts reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. ECRECOVER, P256VERIFY and successful creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity, SHA-256 and RIPEMD-160 precompiles, account destruction, refused CREATE/CREATE2 attempts and admitted attempts without an init frame reach public receipts, including finite nested children, transfers, return data, checkpoint rollback, new accounts and transaction finalization. ECRECOVER, P256VERIFY and creation with init frames remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -460,52 +508,47 @@ independent gas, byte-copy and digest semantics, actual dispatch and public
 execution. ECRECOVER and P256VERIFY still need independent elliptic-curve
 semantics connected to their Jacobian implementations; the missing pieces are
 listed with the precompile connection above. Creation attempts refused before
-init code runs are connected; successful creation and assembly follow as
-their proof domains are connected. Each proof step must derive runtime inputs from
-actual initialization and end in a public theorem consumer. Executable support
-and test agreement alone do not close these obligations.
+init code runs, collisions and deployments of empty init code are connected;
+creation with init frames and assembly follow as their proof domains are
+connected. Each proof step must derive runtime inputs from actual
+initialization and end in a public theorem consumer. Executable support and
+test agreement alone do not close these obligations.
 
 ## Remaining public connections
 
 `call` and `staticcall` have public connections for calls without child execution,
 finite nested compiled children, root reentry and the identity, SHA-256 and
 RIPEMD-160 precompiles. The elliptic-curve precompile branches remain.
-`create` and `create2` are connected only for attempts refused before init
-code runs. CALLCODE and DELEGATECALL are covered by the same finite
-nested-child connection.
+`create` and `create2` are connected for refusals, collisions and
+deployments of empty init code. CALLCODE and DELEGATECALL are covered by the
+same finite nested-child connection.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
 | 1 | Contract calls | Connect ECRECOVER (1) and P256VERIFY (0x100) through independent affine elliptic-curve semantics, with field arithmetic, Jacobian-formula identities and ladder correctness. Reuse the connected dispatch, Keccak, checkpoint restoration and public resumptions. |
-| 2 | Contract creation | Connect admitted attempts: the creator nonce increment, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. Refused attempts are connected. |
+| 2 | Contract creation | Connect init frames: nonempty init code at the next depth in a deployment context, runtime-code validation, installation of the exact image and failure rollback. Also connect existing empty accounts at the address, unknown targets and endowment overflow. Refusals, collisions and empty init code are connected. |
 | 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
 
-Creation's refusals before init code runs are connected (see above).
-Successful creation is the next unit. Its source rule must specify an
-admitted attempt: the creator nonce increment, which survives a failed init
-frame; the CREATE address, from Keccak of the RLP of creator and nonce, and the
-CREATE2 address, from Keccak of 0xff, creator, salt and the init-code hash; a
-collision at an account with a nonzero nonce or code, which returns zero and
-keeps the incremented nonce; the new account record and the value transfer;
-the init frame at the next depth in a deployment context, with empty
-calldata and the init bytes as code; validation of the returned runtime code
-(24,576 bytes and no 0xef prefix) and installation of the exact image; and
-rollback of accounts, balances and logs to the post-nonce checkpoint when the
-init frame fails, with its revert bytes as return data.
+Creation's refusals, collisions and deployments of empty init code are
+connected (see above). Init frames are the next unit. Their source rule must
+run nonempty init code at the next depth in a deployment context, with empty
+calldata and the init bytes as code; validate the returned runtime code
+(24,576 bytes and no 0xef prefix) and install the exact image; and roll back
+accounts, balances and logs to the post-nonce checkpoint when the init frame
+fails, with its revert bytes as return data.
 
-The proof must then connect the `admitted` remainder of the restated
-dispatcher. That needs the address builders `Creation.createAddress` and
-`Creation.create2Address` against an independent RLP and Keccak specification
-(reusing the connected Keccak), the nonce write, the checkpoint and its
-`protect` rollback, the collision checks and the transfer. It also needs the
-actual `runInit` and `install` captured by `objectHandlers`, which
-`HandlerClosure` keeps abstract: init-template selection by image comparison
-over the catalog's init entries, the child init frame through the
-finite-height catalog induction with a deployment-context allocation, the
-child result conversion, and runtime-image identification. Public deployment
-also needs the theorems' `deploying = false` premise lifted through
-`finishDeployment`.
+The proof must connect the actual `runInit` and the identification step of
+`CreationImplementation.installWith`, which `HandlerClosure` keeps abstract:
+init-template selection by image comparison over the catalog's init entries,
+the child init frame through the finite-height catalog induction with a
+deployment-context allocation, the child result conversion, and runtime-image
+identification. The failure outcomes also need the checkpoint's restoration
+code evaluated (`CreationCorrespondence.restoreCode`). Public deployment also
+needs the theorems' `deploying = false` premise lifted through
+`finishDeployment`. Creation over an existing empty account needs catalog
+links for empty bytes excluded at the address, or installation to keep their
+identity.
 
 Lower-level helpers or isolated builtin results do not complete any row without
 its actual public execution consumer.
