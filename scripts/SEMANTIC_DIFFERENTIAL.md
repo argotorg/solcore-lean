@@ -1863,6 +1863,81 @@ longer than 64 bytes, non-canonical offsets or padding, truncated input and
 the decoder's revert paths, strings, `bytes` return values or nested dynamic
 values. Agreement is test evidence, not a preservation proof.
 
+## Compare value forwarded by contracts
+
+The `stateful-forwarded-value` profile has one contract send value to another.
+It installs `SynthesizedForwarder` and `SynthesizedRecipient`. Each transaction
+calls the payable `SynthesizedForwarder.run(uint256 target, uint256 input,
+uint256 amount)`, selector `0x24b912e5`, with a call value. The target Word is
+the bound child address. The parent forwards `amount` to the child's payable
+fallback through the pinned raw `call` wrapper; original Core's parent calls
+`callContractWordWithValue` with the same value. The `stateful-calls` profile
+already forwards zero or one unit from a fixed eight-unit endowment in
+zero-value transactions. Here the sender funds the parent, and both the call
+value and the amount come from the bank 0, 1, 7, 2^64 - 1, 2^64 and 2^70.
+
+The parent adds the input and its call value to slot 0. It then calls the
+child with the input as one raw 32-byte Word and value `amount`. The child
+reads `old0` and `old1`, computes `step(input + callvalue + old0)` with the
+checked aggregate step and writes it to slot 0, and adds its call value to
+slot 1. An odd input makes it revert with that Word after both writes;
+otherwise it returns it. The parent writes the child's payload to slot 1,
+adding one if the child reverted, and returns `sload(0) + sload(1)`. Inputs
+with bit two set make the parent revert with that Word after both writes. No
+logs are emitted. Call modes are therefore `input & 3`: both return, the child
+reverts, the root reverts, or both revert.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Value observation.** After deployment and after every transaction, all
+  three paths report the root status and payload, and both contracts'
+  balances and slots 0 and 1. Committed logs must be empty. The sender's
+  balance is never observed: on the EVM path it also pays gas. Original Core
+  runs each transaction through `BalancedTopLevelExecution`, which transfers
+  the call value to the parent before the root runs, while the nested runtime
+  transfers `amount` at the child call boundary. The imported-Hull runner
+  performs the same top-level transfer in its checked ledger, and Hull's own
+  call semantics move the forwarded value. The EVM path reads `eth_getBalance`
+  for both contracts at each receipt block.
+- **Funds.** The parent's empty payable constructor receives 2^72; the child
+  deploys with zero value. Every call value and amount is at most 2^70, so the
+  parent can always pay three forwards, and the local Anvil sender can pay
+  the deployment and three call values. Original Core and imported Hull fund
+  the caller with 2^80. A top-level transfer that original Core or Hull
+  rejects is an execution error, never a revert.
+- **Rollback and refunds.** A child revert discards the child's writes and the
+  forwarded value: the child's committed account stays as it was, and the
+  amount stays with the parent. A root revert, with or without a child revert,
+  keeps both prior committed accounts and returns the call value to the
+  sender. An out-of-fuel or otherwise incomplete transaction has unknown
+  accounts and ends the sequence.
+- **Deployment.** Both constructors are empty. Every path starts with the
+  parent holding 2^72, the child holding zero, empty storage and no
+  constructor logs. Original Core starts from that declared post-deployment
+  world.
+- **Committed comparison.** All three paths must agree on every observed field
+  after every transaction. Each path must also follow the fixed protocol: bit
+  two of the input selects the root completion and the payload is one Word. A
+  root revert keeps both accounts, and a child revert under a committed root
+  keeps the child's account. In every committed state the child's balance
+  equals its slot 1, and the two balances sum to 2^72 plus the call values of
+  every committed transaction so far.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, replace one
+  input by a bank input, clear its child or root revert bit, or lower one call
+  value or amount to a smaller bank value. They are ordered by transaction
+  count, complete program complexity, then the sum of all inputs, call values
+  and amounts.
+
+Generation draws, from a separate high-bit stream, three inputs from the
+call profile's ten boundary inputs with their low two bits replaced by one of
+the four call modes, and three call values and three amounts from the bank.
+Coverage adds the call modes and four value dimensions: call values, forwarded
+amounts, amounts a child revert returns to the parent, and call values a root
+revert returns to the sender.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value and bounded-`bytes` extensions validated locally; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value and bounded-`bytes` extensions validated locally; contract-forwarded value defined; O2 random log run has a recorded compiler crash; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows, its public-root connection and one concrete instance; remaining expression and statement forms, fault lifting and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts and admitted attempts without an init frame connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1015,6 +1015,44 @@ This scope does not compare gas, balances, nonces, code or memory, payloads
 longer than 64 bytes, non-canonical encodings and the decoder's revert paths,
 strings, `bytes` return values or nested dynamic values. Agreement is test
 evidence, not a preservation proof.
+
+The sixth extension, `stateful-forwarded-value`, has a contract send value.
+The bounded `stateful-calls` profile already forwards zero or one unit from a
+fixed eight-unit parent endowment in zero-value transactions. This profile
+funds the parent from the sender and forwards bank values. Core and upstream
+stay unchanged: original Core's parent calls the child with
+`callContractWordWithValue`, the source passes the value to the raw `call`
+wrapper, and Hull already transfers nested value. Its definitions were fixed
+before execution:
+
+- Transactions: one to three calls of the payable `run(uint256 target,
+  uint256 input, uint256 amount)` on the parent, each with a call value and an
+  amount from the bank 0, 1, 7, 2^64 - 1, 2^64 and 2^70. The target is the
+  bound child address; malformed calldata is outside the scope.
+- Effects: the parent adds the input and its call value to slot zero, then
+  calls the child's payable fallback with the input Word and value `amount`.
+  The child computes `step(input + callvalue + slot0)` into slot zero and adds
+  its call value to slot one; an odd input makes it revert with that Word after
+  the writes. The parent writes the child's payload to slot one, plus one if
+  the child reverted, and returns the sum of its two slots. Inputs with bit two
+  set make the parent revert after those writes.
+- Committed observations: root status and payload, and both contracts'
+  balances and slots zero and one after every transaction on all three paths.
+  Committed logs must stay empty. The sender's balance is never observed.
+- Rollback and refunds: a child revert leaves the child's account unchanged,
+  so the forwarded amount stays with the parent. A root revert, alone or after
+  a child revert, keeps both prior accounts and returns the call value to the
+  sender. Every committed state satisfies two balance rules: the child holds
+  exactly its slot one, and the two balances sum to the parent's endowment plus
+  every committed call value.
+- Deployment: the child deploys with zero value; the parent's empty payable
+  constructor receives 2^72, which covers three forwards of 2^70. Both start
+  with empty storage and no logs. Original Core starts from the declared
+  post-deployment world, with a caller holding 2^80.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, a bank input, clearing the child or root revert bit, and a smaller bank
+  call value or amount, ordered by transaction count, program complexity, then
+  the sum of inputs, call values and amounts.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or multiple callers, needs its
