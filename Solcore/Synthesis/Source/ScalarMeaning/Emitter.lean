@@ -3,12 +3,13 @@ import Solcore.Synthesis.Core.WordFunction
 import Solcore.Synthesis.Source.Emitter
 import Solcore.Synthesis.Source.InputEmitter
 import Solcore.Synthesis.Source.ScalarMeaning.RendererPreservation
+import Solcore.Synthesis.Source.ScalarMeaning.Text
 
 /-! Meaning preservation for the actual closed G0 wrapper (`emit`, method
 `run()`) and the runtime-input wrapper (`Input.emit`, method `run(uint256)`).
-The emitted source text is the printing of a source file whose independently
-defined method result is the Word returned by the original Core program under
-the Core machine (`runStateful`) used as the differential-testing oracle. -/
+The emitted source text parses to a source file whose independently defined
+method result is the Word returned by the original Core program under the
+Core machine (`runStateful`) used as the differential-testing oracle. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.ScalarMeaning
@@ -104,59 +105,119 @@ theorem Input.emit_success {function : CheckedWordFunction} {emitted : EmittedPr
       cases emitted_eq
       exact ⟨body, rfl, rfl⟩
 
+/-- Core returns `word` with enough fuel, and every completed run returns it
+with an empty store. -/
+def CoreReturns (program : Solcore.Core.Program) (word : Solcore.Core.Word) : Prop :=
+  (∃ required, ∀ fuel, required ≤ fuel → program.runStateful fuel = .done (.word word) []) ∧
+    (∀ fuel value store, program.runStateful fuel = .done value store →
+      value = .word word ∧ store = [])
+
+theorem temporary_valid (index : Nat) : ValidIdentifier (temporary index) := by
+  refine ⟨'s', ['c', '_', 'v'] ++ Nat.toDigits 10 index, by simp [temporary], by decide, ?_⟩
+  intro char mem
+  rcases List.mem_append.mp mem with prefix_ | digit
+  · simp only [List.mem_cons, List.not_mem_nil, or_false] at prefix_
+    rcases prefix_ with rfl | rfl | rfl <;> decide
+  · exact (digit_classes (toDigits_mem digit)).2.2
+
+theorem temporary_not_reserved (index : Nat) : isReserved (temporary index) = false := by
+  have heads : ∀ word ∈ reservedWords, word.toList.head? ≠ some 's' := by decide
+  have absent : temporary index ∉ reservedWords := by
+    intro mem
+    exact heads _ mem (by simp [temporary])
+  cases reserved : isReserved (temporary index)
+  · rfl
+  · exact absurd (List.elem_iff.mp reserved) absent
+
+/-- Every name used by rendered statements is a local or a temporary. -/
+theorem rendered_name_ok {locals : List String} {name : String} {first last : Nat}
+    (localsOk : ∀ local_ ∈ locals, ValidIdentifier local_ ∧ isReserved local_ = false)
+    (classified : name ∈ locals ∨ AllocatedIn first last name) :
+    ValidIdentifier name ∧ isReserved name = false := by
+  rcases classified with mem | ⟨index, rfl, _, _⟩
+  · exact localsOk name mem
+  · exact ⟨temporary_valid index, temporary_not_reserved index⟩
+
 /-- **Closed G0 emitter preservation.** If the actual emitter succeeds, its
-source text is the printing of a source file. Calling `run()` under the
-independent source semantics returns exactly the Word that the original Core
-program returns; Core reaches that Word with sufficient fuel, and every
-completed Core run returns it. -/
+source text is the printing of a source file and parses back to it. Calling
+`run()` under the independent source semantics returns exactly the Word that
+the original Core program returns. -/
 theorem emit_preserves_meaning {program : CheckedWordProgram} {emitted : EmittedProgram}
     (emitted_eq : emit program = .ok emitted) :
     ∃ (file : SourceFile) (word : Solcore.Core.Word),
-      emitted.source = file.print ∧
-      file.call "run" [] = some word.val ∧
-      (∃ required, ∀ fuel, required ≤ fuel →
-        program.program.toCore.runStateful fuel = .done (.word word) []) ∧
-      (∀ fuel value store, program.program.toCore.runStateful fuel = .done value store →
-        value = .word word ∧ store = []) := by
+      emitted.source = file.print ∧ parseSource emitted.source = some file ∧
+      file.call "run" [] = some word.val ∧ CoreReturns program.program.toCore word := by
   obtain ⟨body, rendered, source⟩ := emit_success emitted_eq
-  obtain ⟨statements, lines, _, _, _, simulates⟩ :=
+  obtain ⟨statements, lines, _, valueName, names, simulates⟩ :=
     render_spec program.program.body 0 .word [] 8 0 body program.fragment rendered
       (fun _ absent => absurd absent List.not_mem_nil)
   obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
     simulates [] [] [] [[]] (fun index name found => by simp at found)
   obtain ⟨word, rfl, rfl⟩ := represents
-  refine ⟨closedFile statements body.value, word, ?_, ?_,
-    (runStateful_of_evaluates evaluates).1, (runStateful_of_evaluates evaluates).2⟩
-  · rw [source, SourceFile.print, SourceFile.lines, lines]
+  have localsOk : ∀ local_ ∈ ([] : List String), ValidIdentifier local_ ∧
+      isReserved local_ = false := fun _ absent => absurd absent List.not_mem_nil
+  have printed : emitted.source = (closedFile statements body.value).print := by
+    rw [source, SourceFile.print, SourceFile.lines, lines]
     apply string_eq_of_toList
     simp [closedFile, Method.parameterText, methodName, contractName, Expr.print]
-  · simp [closedFile, SourceFile.call, Method.run, Method.bindParameters, exec, Expr.eval,
-      lookup]
+  have valueOk := rendered_name_ok localsOk valueName
+  have parsed : parseSource emitted.source = some (closedFile statements body.value) := by
+    rw [printed]
+    apply parseSource_print
+    · refine ⟨rfl, rfl, fun _ absent => absurd absent List.not_mem_nil,
+        fun name mem => (rendered_name_ok localsOk (names name mem)).2, ?_⟩
+      intro name mem
+      simp only [closedFile, Expr.identifiers, List.mem_singleton] at mem
+      subst mem
+      exact valueOk.2
+    · refine ⟨keyword_valid (show validIdentifier "SynthesizedG0" = true by decide),
+        keyword_valid (show validIdentifier "run" = true by decide),
+        fun _ absent => absurd absent List.not_mem_nil,
+        fun name mem => (rendered_name_ok localsOk (names name mem)).1, ?_⟩
+      intro name mem
+      simp only [closedFile, Expr.identifiers, List.mem_singleton] at mem
+      subst mem
+      exact valueOk.1
+  refine ⟨closedFile statements body.value, word, printed, parsed, ?_,
+    runStateful_of_evaluates evaluates⟩
+  simp [closedFile, SourceFile.call, Method.run, Method.bindParameters, exec, Expr.eval, lookup]
+
+/-- **Closed G0 emitter preservation, on the emitted text.** -/
+theorem emit_source_meaning {program : CheckedWordProgram} {emitted : EmittedProgram}
+    (emitted_eq : emit program = .ok emitted) :
+    ∃ word : Solcore.Core.Word,
+      sourceCall emitted.source "run" [] = some word.val ∧
+      CoreReturns program.program.toCore word := by
+  obtain ⟨file, word, _, parsed, called, core⟩ := emit_preserves_meaning emitted_eq
+  exact ⟨word, by simp [sourceCall, parsed, called], core⟩
 
 /-- **Runtime-input emitter preservation.** If the actual emitter succeeds,
-its source text is the printing of one source file. For every runtime input,
-calling `run(uint256)` under the independent source semantics returns exactly
-the Word that the original Core function applied to that input returns. -/
+its source text is the printing of one source file and parses back to it.
+For every runtime input, calling `run(uint256)` under the independent source
+semantics returns exactly the Word that the original Core function applied to
+that input returns. -/
 theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     {emitted : EmittedProgram} (emitted_eq : Input.emit function = .ok emitted) :
-    ∃ file : SourceFile, emitted.source = file.print ∧
+    ∃ file : SourceFile, emitted.source = file.print ∧ parseSource emitted.source = some file ∧
       ∀ input : Solcore.Core.Word, ∃ word : Solcore.Core.Word,
         file.call "run" [input.val] = some word.val ∧
-        (∃ required, ∀ fuel, required ≤ fuel →
-          (function.instantiate input).toCore.runStateful fuel = .done (.word word) []) ∧
-        (∀ fuel value store,
-          (function.instantiate input).toCore.runStateful fuel = .done value store →
-          value = .word word ∧ store = []) := by
+        CoreReturns (function.instantiate input).toCore word := by
   obtain ⟨body, rendered, source⟩ := Input.emit_success emitted_eq
   have fresh : ∀ name ∈ ["sc_input"], OlderThan 0 name := by
     intro name mem index same
     simp only [List.mem_singleton] at mem
     subst mem
     exact absurd same (input_not_temporary index)
-  obtain ⟨statements, lines, _, _, _, simulates⟩ :=
+  obtain ⟨statements, lines, _, valueName, names, simulates⟩ :=
     render_spec function.body 1 .word ["sc_input"] 8 0 body function.fragment rendered fresh
-  refine ⟨inputFile statements body.value, ?_, ?_⟩
-  · have functionLine :
+  have localsOk : ∀ local_ ∈ ["sc_input"], ValidIdentifier local_ ∧
+      isReserved local_ = false := by
+    intro local_ mem
+    simp only [List.mem_singleton] at mem
+    subst mem
+    exact ⟨keyword_valid (by decide), by decide⟩
+  have printed : emitted.source = (inputFile statements body.value).print := by
+    have functionLine :
         "    function " ++ Input.methodName ++ "(input: uint256) public returns (uint256) {" =
           "    function " ++ (inputFile statements body.value).method.name ++ "(" ++
             Method.parameterText (inputFile statements body.value).method.parameters ++
@@ -170,35 +231,80 @@ theorem Input.emit_preserves_meaning {function : CheckedWordFunction}
     rw [source, SourceFile.print, SourceFile.lines, lines, inputFile_body_lines, functionLine,
       returnLine]
     rfl
-  · intro input
-    have agree : LocalsAgree [[("sc_input", .word input.val)], [("input", .uint256 input.val)]]
-        ["sc_input"] [.word input] := by
-      intro index name found
-      cases index with
-      | zero =>
-          simp only [List.getElem?_cons_zero, Option.some.injEq] at found
-          subst found
-          exact ⟨input, rfl, by simp [Frames.lookup, Scope.get?]⟩
-      | succ index => simp at found
-    obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
-      simulates [.word input] [] [("sc_input", .word input.val)] [[("input", .uint256 input.val)]]
-        agree
-    obtain ⟨word, rfl, rfl⟩ := represents
-    have applied : Solcore.Core.Evaluates [] []
-        (function.instantiate input).toCore.body (.word word) [] := by
-      simp only [CheckedWordFunction.instantiate, CheckedWordFunction.program,
-        Solcore.Synthesis.Core.wordFunctionProgram, Solcore.Core.Wire.Program.toCore,
-        Solcore.Core.Wire.Expr.toCore]
-      exact .apply .lambda .word evaluates
-    refine ⟨word, ?_, (runStateful_of_evaluates applied).1, (runStateful_of_evaluates applied).2⟩
-    have parameters : Method.bindParameters ["input"] [input.val] =
-        some [("input", .uint256 input.val)] := by
-      simp [Method.bindParameters, word_lt_modulus]
-    have execBody : Stmt.execList [[], [("input", .uint256 input.val)]]
-        (.letDecl "sc_input" .word (.typedefRep (.name "input")) :: statements) =
-          some (scope' :: outer') := by
-      simp only [Stmt.execList, input_declaration]
-      exact exec
-    simp [SourceFile.call, Method.run, parameters, execBody, inputFile, Expr.eval, lookup]
+  have valueOk := rendered_name_ok localsOk valueName
+  have bodyNames : ∀ name ∈ Stmt.listIdentifiers (inputFile statements body.value).method.body,
+      ValidIdentifier name ∧ isReserved name = false := by
+    intro name mem
+    simp only [inputFile, Stmt.listIdentifiers, Stmt.identifiers, Expr.identifiers,
+      List.cons_append, List.nil_append, List.mem_cons] at mem
+    rcases mem with rfl | rfl | mem
+    · exact ⟨keyword_valid (by decide), by decide⟩
+    · exact ⟨keyword_valid (by decide), by decide⟩
+    · exact rendered_name_ok localsOk (names name mem)
+  have parsed : parseSource emitted.source = some (inputFile statements body.value) := by
+    rw [printed]
+    apply parseSource_print
+    · refine ⟨rfl, rfl, ?_, fun name mem => (bodyNames name mem).2, ?_⟩
+      · intro parameter mem
+        simp only [inputFile, List.mem_singleton] at mem
+        subst mem
+        decide
+      · intro name mem
+        simp only [inputFile, Expr.identifiers, List.mem_singleton] at mem
+        subst mem
+        exact valueOk.2
+    · refine ⟨keyword_valid (show validIdentifier "SynthesizedInput" = true by decide),
+        keyword_valid (show validIdentifier "run" = true by decide), ?_,
+        fun name mem => (bodyNames name mem).1, ?_⟩
+      · intro parameter mem
+        simp only [inputFile, List.mem_singleton] at mem
+        subst mem
+        exact keyword_valid (by decide)
+      · intro name mem
+        simp only [inputFile, Expr.identifiers, List.mem_singleton] at mem
+        subst mem
+        exact valueOk.1
+  refine ⟨inputFile statements body.value, printed, parsed, ?_⟩
+  intro input
+  have agree : LocalsAgree [[("sc_input", .word input.val)], [("input", .uint256 input.val)]]
+      ["sc_input"] [.word input] := by
+    intro index name found
+    cases index with
+    | zero =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        subst found
+        exact ⟨input, rfl, by simp [Frames.lookup, Scope.get?]⟩
+    | succ index => simp at found
+  obtain ⟨core, value, scope', outer', _, evaluates, represents, exec, lookup, _⟩ :=
+    simulates [.word input] [] [("sc_input", .word input.val)] [[("input", .uint256 input.val)]]
+      agree
+  obtain ⟨word, rfl, rfl⟩ := represents
+  have applied : Solcore.Core.Evaluates [] []
+      (function.instantiate input).toCore.body (.word word) [] := by
+    simp only [CheckedWordFunction.instantiate, CheckedWordFunction.program,
+      Solcore.Synthesis.Core.wordFunctionProgram, Solcore.Core.Wire.Program.toCore,
+      Solcore.Core.Wire.Expr.toCore]
+    exact .apply .lambda .word evaluates
+  refine ⟨word, ?_, runStateful_of_evaluates applied⟩
+  have parameters : Method.bindParameters ["input"] [input.val] =
+      some [("input", .uint256 input.val)] := by
+    simp [Method.bindParameters, word_lt_modulus]
+  have execBody : Stmt.execList [[], [("input", .uint256 input.val)]]
+      (.letDecl "sc_input" .word (.typedefRep (.name "input")) :: statements) =
+        some (scope' :: outer') := by
+    simp only [Stmt.execList, input_declaration]
+    exact exec
+  simp [SourceFile.call, Method.run, parameters, execBody, inputFile, Expr.eval, lookup]
+
+/-- **Runtime-input emitter preservation, on the emitted text.** -/
+theorem Input.emit_source_meaning {function : CheckedWordFunction}
+    {emitted : EmittedProgram} (emitted_eq : Input.emit function = .ok emitted)
+    (input : Solcore.Core.Word) :
+    ∃ word : Solcore.Core.Word,
+      sourceCall emitted.source "run" [input.val] = some word.val ∧
+      CoreReturns (function.instantiate input).toCore word := by
+  obtain ⟨file, _, parsed, meaning⟩ := Input.emit_preserves_meaning emitted_eq
+  obtain ⟨word, called, core⟩ := meaning input
+  exact ⟨word, by simp [sourceCall, parsed, called], core⟩
 
 end Solcore.Synthesis.Source.ScalarMeaning
