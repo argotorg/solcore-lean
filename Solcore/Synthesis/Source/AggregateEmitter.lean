@@ -1,8 +1,10 @@
 import Solcore.Synthesis.Source.AggregateRenderer
 
 /-! Source pairs and sums remain internal to Word helper functions. The
-original checked Core DAG supplies an independent runtime oracle; this emitter
-does not claim a formal source-printing preservation theorem. -/
+original checked Core DAG supplies an independent runtime oracle.
+`ScalarMeaning.Aggregate.emit_source_meaning` relates the emitted text to the
+original Core result under an independent source semantics; see
+`docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Aggregate
