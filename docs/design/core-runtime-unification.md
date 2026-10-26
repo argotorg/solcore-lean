@@ -107,12 +107,50 @@ statement, loop, assignment, mapping and callable connections. Their exact
 premises matter: a connected restricted profile does not imply coverage of
 all compiler-accepted syntax.
 
+The general accepted-body route starts from the actual compiler receipt of one
+body invocation, `ActualBodyInvocation.Index`: a named cache row or a
+materialized contextual closure. In
+[CellAwareInvocationAcceptedFlow](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedFlow.lean),
+`correct` closes the mixed-cell statement flows by induction over the actual
+accepted compiler tree (`AcceptedNamedBodyFlow.Tree`), not over a Source
+recognizer. Each branch uses the compiler's own read, child lowering, fuel,
+scope and allocation receipt; fixed-control checker typing supplies the Source
+facts. `body_preserves` and `body_reflects` compose it with the actual footer and
+relate `index.body` to independent Source execution in both directions,
+including failures, control transfers and the reached heap.
+
+These theorems keep explicit premises. `Expressions` supplies meaning for
+exactly the expressions the compiler accepted, at every compiler fuel; no
+expression closure exists yet. `Covered` admits returns, final values, discards,
+`break`/`continue`, blocks, conditionals, `while` loops and monomorphic
+initialized or uninitialized declarations. It excludes assignments, bit-not
+updates, matches, `for` loops and generalized declarations, and it requires a
+function-mode fallthrough to have Unit result and a final bare value to have the
+declared result type. The caller also supplies native typing of the flow,
+checker typing of the body and the invocation's physical entry state. These
+theorems are not yet used by the public session.
+
 ## Remaining work for the second goal
 
 `StaticProfile` deliberately recognizes a strict subset. Successful compilation
 cannot imply it for every accepted program. Complete the general body proof
 from actual named and contextual compiler receipts, rather than widening a
 recognizer until it appears universal or assuming a body-execution law.
+
+On the accepted-body route above, the next connected steps are:
+
+- Close the remaining compiler branches in `Covered`: assignments and bit-not
+  updates (heads built from the tree's assignment receipts, including
+  contextual metadata views), matches, `for` loops and generalized
+  declarations. Statements after an always-returning prefix in a non-Unit
+  function, which the existing flows cannot express, need a separate argument.
+- Discharge `Expressions` by an expression closure over the actual accepted
+  expression compiler, with calls, closures, methods and coercions supplied by
+  the shared size induction.
+- Construct the invocation's physical entry state from the actual named
+  parameter entry and connect `body_preserves`/`body_reflects` to the public
+  body ports, then issue program support from the receipt without
+  `StaticProfile`.
 
 The final connection must:
 

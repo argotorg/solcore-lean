@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Scalar renderer and both scalar wrappers proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Planned | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | Existing partial proofs; deferred to this order | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity and SHA-256 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -562,6 +562,16 @@ Use the actual checker-derived cached-body validity, remove the restrictive
 body-profile premise through general accepted-body simulation, and compose
 specialization/evidence/staging/lowering with initialization and public calls.
 Do not resume disconnected small lemmas in place of that public connection.
+
+The first step closes the existing mixed-cell statement flows by induction over
+the actual accepted compiler tree of any named or contextual body invocation,
+and composes the result with the actual function footer
+(`CellAwareInvocationAcceptedFlow.body_preserves` and `body_reflects`). Covered
+branches are returns, final values, discards, transfers, blocks, conditionals,
+`while` loops and monomorphic declarations. Accepted-expression meaning is
+still a premise, assignments, bit-not updates, matches, `for` loops and
+generalized declarations are not yet closed, and the public session does not yet
+use these theorems. The design document lists the remaining premises.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile
