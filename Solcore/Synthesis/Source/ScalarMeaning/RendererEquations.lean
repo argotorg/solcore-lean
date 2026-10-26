@@ -90,7 +90,8 @@ theorem letE (target : Target) (locals : List String) (indent first : Nat)
     (initializer body : Solcore.Core.Wire.Expr) :
     ScalarRenderer.render target locals indent first (.letE initializer body) =
       (ScalarRenderer.render .word locals indent first initializer).bind fun value =>
-        (ScalarRenderer.render target (temporary value.nextId :: locals) indent (value.nextId + 1) body).bind
+        (ScalarRenderer.render target (temporary value.nextId :: locals) indent (value.nextId + 1)
+          body).bind
           fun rest =>
             .ok ⟨value.lines ++
                 Stmt.lines indent (.letDecl (temporary value.nextId) .word (.name value.value)) ++
@@ -125,7 +126,8 @@ theorem unary (target : Target) (locals : List String) (indent first : Nat)
     ScalarRenderer.render target locals indent first (.unary op operand) =
       match sourceUnary? op with
       | some sourceOp =>
-          (ScalarRenderer.render (if op == .boolNot then .bool else .word) locals indent first operand).bind
+          (ScalarRenderer.render (if op == .boolNot then .bool else .word) locals indent first
+            operand).bind
             fun value =>
               .ok ⟨value.lines ++ Stmt.lines indent (.letDecl (temporary value.nextId)
                   (LocalType.ofTarget target) (.unary sourceOp (.name value.value))),

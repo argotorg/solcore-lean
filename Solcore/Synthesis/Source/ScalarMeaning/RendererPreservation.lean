@@ -388,7 +388,8 @@ private theorem branch_simulates {expression : CoreExpr} {target : Target}
     rw [shape₂]
     simp only [Frames.shape, List.map_cons] at shape ⊢
     rw [shape]
-  obtain ⟨top₂, scope', outer', rfl⟩ : ∃ top₂ scope' outer', frames₂ = top₂ :: scope' :: outer' := by
+  obtain ⟨top₂, scope', outer', rfl⟩ :
+      ∃ top₂ scope' outer', frames₂ = top₂ :: scope' :: outer' := by
     match frames₂, shapeCons with
     | top₂ :: scope' :: outer', _ => exact ⟨top₂, scope', outer', rfl⟩
     | [], impossible => simp [Frames.shape] at impossible

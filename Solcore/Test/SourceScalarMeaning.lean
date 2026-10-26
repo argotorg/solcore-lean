@@ -143,6 +143,10 @@ def testSourceScalarMeaning : IO Unit := do
   checkRejections
   let (checked, excluded) ← checkGenerated
   ensure (checked ≥ 16) s!"too few generated programs reached the source meaning: {checked}"
-  IO.println s!"scalar source meaning: {Tests.SourceSynthesisEmitter.fixtures.length} closed fixtures, {Tests.SourceInputEmitter.fixtures.length} input fixtures x {boundaryInputs.length} inputs, {checked} generated programs ({excluded} excluded) agree with Core"
+  let closed := Tests.SourceSynthesisEmitter.fixtures.length
+  let inputs := Tests.SourceInputEmitter.fixtures.length
+  IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures x " ++
+    s!"{boundaryInputs.length} inputs, {checked} generated programs ({excluded} excluded) " ++
+    "agree with Core")
 
 end Tests.SourceScalarMeaning
