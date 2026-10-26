@@ -703,5 +703,143 @@ class DynamicArrayCampaignTests(unittest.TestCase):
         self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
 
 
+
+def log_case(sites=((1, 2, 1), (3, 0, 2)), rows=((2, 5), (11, 1), (8, fixtures.HIGH_WORD))):
+    value = fixtures.log_case(sites, rows)
+    value["logPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.LOG_VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def log_report(value):
+    histories = fixtures.log_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class LogCampaignTests(unittest.TestCase):
+    def test_log_dimensions_come_from_static_shapes_or_actual_core_logs(self):
+        value = log_case()
+        self.assertEqual(campaign.dimensions("stateful-logs"),
+                         campaign.DIMENSIONS + ("LogCounts", "TopicArities", "DataSizes", "DiscardedLogCounts"))
+        self.assertEqual(campaign.versions("stateful-logs"), campaign.VERSIONS + ("framingVersion",))
+        self.assertEqual(campaign.inputs(value), {"5", "1", str(fixtures.HIGH_WORD)})
+        statuses = ["returned", "reverted", "returned"]
+        expected = {"LogCounts": {0, 1}, "TopicArities": {0, 2}, "DataSizes": {32, 64}, "DiscardedLogCounts": {2}}
+        self.assertEqual(campaign.log_coverage(value, statuses), expected)
+        raw = log_report(value)
+        self.assertEqual(campaign.log_coverage(value, statuses, raw["histories"]["directCore"]["transactions"]), expected)
+        # Actual coverage counts the logs original Core committed, not the plan.
+        raw["histories"]["directCore"]["transactions"][0]["logs"].append(fixtures.log_entry([1, 2, 3, 4], []))
+        self.assertEqual(campaign.log_coverage(value, statuses, raw["histories"]["directCore"]["transactions"])["TopicArities"], {0, 2, 4})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-logs"))
+            instance.summary["coverage"].update(requiredLogCounts=[0, 1, 2], requiredTopicArities=[0, 2, 4],
+                                                requiredDataSizes=[0, 32, 64], requiredDiscardedLogCounts=[2, 3])
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", log_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedLogCounts"], coverage["matchedTopicArities"], coverage["matchedDataSizes"],
+                              coverage["matchedDiscardedLogCounts"]), ([0, 1], [0, 2], [32, 64], [2]))
+            self.assertEqual((coverage["missingLogCounts"], coverage["missingTopicArities"], coverage["missingDataSizes"],
+                              coverage["missingDiscardedLogCounts"]), ([2], [4], [0], [3]))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertNotIn("requiredTopicArities", campaign.Campaign(options(directory, profile="stateful-keyed-storage")).summary["coverage"])
+
+    def test_log_manifest_requires_log_dimensions_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-log-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual((manifest["requiredLogCounts"], manifest["requiredTopicArities"], manifest["requiredDataSizes"],
+                          manifest["requiredDiscardedLogCounts"]), ([0, 1, 2, 3], [0, 1, 2, 3, 4], [0, 32, 64], [0, 1, 2, 3]))
+        changes = [lambda m: m.pop("requiredTopicArities"), lambda m: m.update(requiredTopicArities=[5]),
+            lambda m: m.update(requiredDataSizes=[16]), lambda m: m.update(requiredLogCounts=[4]),
+            lambda m: m.update(requiredDiscardedLogCounts=[]), lambda m: m.update(requiredLogCounts=[1, 1]),
+            lambda m: m.update(requiredDataSizes=[True]), lambda m: m.pop("framingVersion"),
+            lambda m: m["cases"][0].update(keyedStoragePlan=m["cases"][0].pop("logPlan"))]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        keyed = json.loads((ROOT / "scripts/semantic-keyed-storage-corpus.json").read_text())
+        for change in (lambda m: m.update(requiredTopicArities=[0]), lambda m: m.update(framingVersion="core-word-log-framing-v1")):
+            invalid = copy.deepcopy(keyed)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_synthetic_log_injection_perturbs_one_committed_log(self):
+        value = log_case()
+        raw = log_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        original = copy.deepcopy(raw)
+        changed = campaign.analyze(raw, value, "importedHull", "tx-0", "log")
+        self.assertEqual(raw, original)
+        self.assertTrue(changed["synthetic"])
+        self.assertEqual((changed["comparison"]["category"], changed["comparison"]["transactionId"], changed["comparison"]["fields"]),
+                         ("semantic-mismatch", "tx-0", ["logs"]))
+        self.assertEqual(changed["histories"]["importedHull"]["transactions"][0]["logs"][0]["topics"][0],
+                         str(int(raw["histories"]["importedHull"]["transactions"][0]["logs"][0]["topics"][0]) ^ 1))
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["fields"], fingerprint["logPaths"], fingerprint["storageSlots"]), (["logs"], [], []))
+        self.assertTrue(campaign.same_failure(fingerprint, campaign.analyze(log_report(value), value, "importedHull", "tx-0", "log")))
+        # A topic-free log carries the change in its last data byte.
+        data = campaign.analyze(raw, value, "rustEvm", "tx-2", "log")
+        before = raw["histories"]["rustEvm"]["transactions"][2]["logs"][0]["data"]
+        after = data["histories"]["rustEvm"]["transactions"][2]["logs"][0]["data"]
+        self.assertEqual((after[:-2], int(after[-2:], 16)), (before[:-2], int(before[-2:], 16) ^ 1))
+        # A reverted transaction, or one whose only log is LOG0 without data,
+        # cannot keep the synthetic finding.
+        for reduced, transaction in ((value, "tx-1"), (log_case(sites=((1, 0, 0),), rows=((2, 0),)), "tx-0")):
+            dropped = campaign.analyze(log_report(reduced), reduced, "rustEvm", transaction, "log")
+            with self.subTest(transaction=transaction):
+                self.assertFalse(dropped["synthetic"])
+                self.assertEqual(dropped["comparison"]["category"], "matched")
+        with self.assertRaises(ValueError):
+            campaign.analyze(keyed_report(keyed_case()), keyed_case(), "rustEvm", "tx-1", "log")
+
+    def test_log_prefix_counts_require_shapes_and_no_deployment_logs(self):
+        value = log_case()
+        raw = log_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+        for history in raw["histories"].values():
+            history["transactions"][2]["logs"] = []
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 2)
+        raw = log_report(value)
+        raw["histories"]["importedHull"]["initialLogs"] = [fixtures.log_entry([], [])]
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 0)
+        raw = log_report(value)
+        raw["histories"]["rustEvm"]["transactions"][0]["logs"][0]["data"] = "0x"
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 0)
+        raw = log_report(value)
+        raw["histories"]["directCore"]["bindings"]["address"] = "0101"
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 0, "completed": 0, "matched": 0})
+
+    def test_log_failure_identity_names_log_paths_only_for_log_histories(self):
+        value = log_case()
+        raw = log_report(value)
+        raw["histories"]["rustEvm"]["chainLogs"].pop()
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], value)
+        fingerprint = campaign.fingerprint(campaign.analyze(raw, value))
+        self.assertEqual((fingerprint["stage"], fingerprint["fields"], fingerprint["logPaths"]),
+                         ("committed-log-history", ["chainLogs"], ["rustEvm"]))
+        self.assertNotIn("logPaths", campaign.fingerprint(campaign.analyze(keyed_report(keyed_case()), keyed_case())))
+
+    def test_log_cli_field_requires_the_log_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "case.json"
+            path.write_text(json.dumps(keyed_case()))
+            with patch.object(sys, "argv", ["campaign", "--output", str(Path(directory) / "run"), "--case", str(path),
+                    "--test-perturb-path", "rustEvm", "--test-field", "log"]), \
+                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+                campaign.main()
+            self.assertEqual(stopped.exception.code, 2)
+        self.assertTrue(campaign.TEST_FIELD.fullmatch("log"))
+        self.assertFalse(campaign.TEST_FIELD.fullmatch("logs"))
+
+
 if __name__ == "__main__":
     unittest.main()

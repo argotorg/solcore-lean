@@ -4,9 +4,11 @@
 The original checked host Core contract is independent of Rust Hull. The EVM
 path mines transactions and reads their actual trace output and receipt-block
 storage. No Python state transition or saved expected value is an oracle.
-The keyed and dynamic-array profiles declare their observed slots in the case
-and additionally require the Hull and EVM paths to show no nonzero committed
-slot outside them.
+The keyed, dynamic-array and log profiles declare their observed slots in the
+case and additionally require the Hull and EVM paths to show no nonzero
+committed slot outside them. The log profile also compares the ordered
+committed logs of every transaction: decoded original-Core journals, Hull
+receipt logs and mined receipt logs, plus the EVM chain's complete log list.
 """
 from __future__ import annotations
 
@@ -35,7 +37,10 @@ HISTORY_SCHEMA = "solcore-lean.storage-history.v1"
 KEYED_HISTORY_SCHEMA = "solcore-lean.keyed-storage-history.v1"
 ARRAY_CASE_SCHEMA = "solcore-lean.semantic-dynamic-array-case.v1"
 ARRAY_HISTORY_SCHEMA = "solcore-lean.dynamic-array-history.v1"
-# `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form.
+LOG_CASE_SCHEMA = "solcore-lean.semantic-log-case.v1"
+LOG_HISTORY_SCHEMA = "solcore-lean.log-history.v1"
+# `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
+# `logs`: ordered committed logs are part of every observation.
 _TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "declared": False, "abi": "word",
     "signature": "run(uint256)", "selector": "0xa444f5e9",
     "historySchema": HISTORY_SCHEMA, "coreRunner": "rust-hull-storage-scenario",
@@ -62,6 +67,13 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ARRAY_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256[])", "selector": "0x9a94c44b", "rollback": True, "keyed": False,
         "declared": True, "abi": "array"},
+    "stateful-logs": {"caseSchema": LOG_CASE_SCHEMA, "planSchema": "solcore-lean.log-plan.v1",
+        "planKey": "logPlan", "corpusSchema": "solcore-lean.semantic-log-corpus.v1",
+        "originKind": "log-generated", "contract": "SynthesizedLogs",
+        "caseTool": "semantic-log-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LOG_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "flags", "logs": True},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
@@ -72,6 +84,9 @@ COUNTER_SLOT = "0"
 MAX_UNDECLARED_SLOTS = 256
 ARRAY_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_ELEMENTS = 3
+LOG_SLOTS = ["0", "1"]
+MAX_SITES, MAX_TOPICS, MAX_DATA_WORDS = 3, 4, 2
+MAX_LOGS = 64
 RESOURCE_STATUSES = {"out-of-fuel", "out-of-gas", "timeout", "resource-limit", "output-limit"}
 Finding, RpcError = common.Finding, common.RpcError
 
@@ -90,8 +105,62 @@ def profile(case: dict) -> dict:
 
 def expected_status(case: dict, transaction: dict) -> str:
     """The profile fixes completion polarity, not the returned value or world."""
-    parity = transaction["flags" if profile(case)["abi"] == "array" else "input"]
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags") else "input"]
     return "reverted" if profile(case)["rollback"] and int(common.word(parity)) % 2 else "returned"
+
+
+def has_logs(case: dict) -> bool:
+    return profile(case).get("logs", False)
+
+
+def log_sites(case: dict) -> list[dict]:
+    """The plan's static sites: increasing guards one to three, each with at
+    most four topics and two data Words. Native replay checks the program."""
+    plan = case.get("logPlan")
+    sites = plan.get("sites") if isinstance(plan, dict) else None
+    if not isinstance(sites, list) or len(sites) > MAX_SITES:
+        raise ValueError("log plan requires at most three sites")
+    previous = 0
+    for site in sites:
+        if not isinstance(site, dict) or set(site) != {"guard", "topics", "dataWords"} or any(type(site[key]) is not int for key in site):
+            raise ValueError("log sites contain exactly integer guard, topics and dataWords")
+        if not previous < site["guard"] <= 3 or not 0 <= site["topics"] <= MAX_TOPICS or not 0 <= site["dataWords"] <= MAX_DATA_WORDS:
+            raise ValueError("log sites need increasing guards one to three, at most four topics and two data Words")
+        previous = site["guard"]
+    return sites
+
+
+def guarded_sites(case: dict, transaction: dict) -> list[dict]:
+    flags = int(common.word(transaction["flags"], "transaction flags"))
+    return [site for site in log_sites(case) if flags >> site["guard"] & 1]
+
+
+def expected_log_shapes(case: dict, transaction: dict) -> list[tuple[int, int]]:
+    """Topic count and data bytes of each committed log: one per guarded site
+    on return, none on revert. Topic and data values are never predicted."""
+    if expected_status(case, transaction) == "reverted":
+        return []
+    return [(site["topics"], 32 * site["dataWords"]) for site in guarded_sites(case, transaction)]
+
+
+def log_shapes(rows) -> list[tuple[int, int]]:
+    return [(len(row["topics"]), len(common.hex_bytes(row["data"], "log data"))) for row in rows]
+
+
+def logs(rows, label="committed logs") -> list[dict]:
+    """Ordered `{address, topics, data}` records with canonical decimal Words."""
+    if not isinstance(rows, list) or len(rows) > MAX_LOGS:
+        raise ValueError(f"{label} must be a bounded ordered list")
+    result = []
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"address", "topics", "data"} or not isinstance(row["topics"], list) or len(row["topics"]) > MAX_TOPICS:
+            raise ValueError("invalid committed log")
+        address = common.word(row["address"], "log address")
+        if int(address) >= 2**160:
+            raise ValueError("log address exceeds 160 bits")
+        result.append({"address": address, "topics": [common.word(topic, "log topic") for topic in row["topics"]],
+                       "data": "0x" + common.hex_bytes(row["data"], "log data").hex()})
+    return result
 
 
 def scope(case: dict) -> str:
@@ -103,6 +172,10 @@ def scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_logs(case):
+        return ("ordered zero-value run(uint256,uint256) transactions; no constructor logs; initially empty storage; "
+                "committed slots 0/1 and ordered committed logs (address, topics, data) on all paths, the EVM chain's "
+                "complete log list, and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce equivalence")
     return "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence"
 
 
@@ -140,7 +213,8 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
         value = int(common.word(tx.get("input"), "transaction input"))
-        words = f"{int(common.word(tx.get('key'), 'transaction key')):064x}" if selected["abi"] == "keyed" else ""
+        prefix = {"keyed": "key", "flags": "flags"}.get(selected["abi"])
+        words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
         if tx.get("calldata") != selected["selector"] + words + f"{value:064x}" or tx.get("value") != "0":
             raise ValueError("transaction calldata/value differs from its original Word input")
 
@@ -159,6 +233,10 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "flags":
+        log_sites(case)
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != LOG_SLOTS:
+            raise Finding("unsupported-scope", "input", "log profile starts empty and observes slots zero and one")
     elif case.get("initialState") != {"storage": []} or case.get("observedSlots") != list(SLOTS):
         raise Finding("unsupported-scope", "input", "storage profile starts empty and observes slots zero and one")
     contract = case.get("contract")
@@ -220,6 +298,13 @@ def normalize_history(history, case: dict, path=None) -> dict:
     extra = {}
     if selected["declared"]:
         containment(history, extra, path, slots, "initialUndeclaredStorage")
+    if selected.get("logs"):
+        extra["initialLogs"] = logs(history.get("initialLogs"), "deployment logs")
+        if path == "rustEvm":
+            chain = history.get("chainLogs")
+            extra["chainLogs"] = None if chain is None else logs(chain, "chain logs")
+        elif "chainLogs" in history:
+            raise ValueError("only the EVM path has a chain-wide log list")
     rows = history.get("transactions")
     if not isinstance(rows, list) or len(rows) > len(case["transactions"]):
         raise ValueError("invalid storage transaction history length")
@@ -236,8 +321,12 @@ def normalize_history(history, case: dict, path=None) -> dict:
             containment(row, value, path, slots)
         if status in {"returned", "reverted"}:
             value["output"] = "0x" + common.hex_bytes(row.get("output"), "transaction output").hex()
+            if selected.get("logs"):
+                value["logs"] = logs(row.get("logs"))
         else:
             value["detail"] = row.get("detail", "")
+            if selected.get("logs"):
+                value["logs"] = None
             if index != len(rows) - 1:
                 raise ValueError("execution continued after an incomplete transaction")
         result.append(value)
@@ -257,12 +346,34 @@ def normalize_history(history, case: dict, path=None) -> dict:
         raise ValueError("an unobserved transaction cannot claim a final committed snapshot")
     if not unobserved and final != (result[-1]["committedStorage"] if result else initial):
         raise ValueError("final committed storage differs from the last observation")
+    if unobserved and extra.get("chainLogs") is not None:
+        raise ValueError("an unobserved transaction cannot claim a chain-wide log list")
     return {"initialStorage": initial, **extra, "transactions": result, "finalStorage": final,
             "status": history["status"], "unexecuted": history["unexecuted"], "unobserved": unobserved}
 
 
 def without_containment(row: dict) -> dict:
     return {key: value for key, value in row.items() if key != "undeclaredStorage"}
+
+
+def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None) -> bool:
+    """The fixed protocol of a completed row: polarity, a one-Word payload,
+    rollback of the committed slots and, for logs, the static log shapes from
+    the contract address; a reverted row commits no logs."""
+    if row["status"] != expected_status(case, tx) or len(common.hex_bytes(row["output"], "output")) != 32:
+        return False
+    if row["status"] == "reverted" and row["committedStorage"] != prior:
+        return False
+    if has_logs(case):
+        return log_shapes(row["logs"]) == expected_log_shapes(case, tx) and (
+            address is None or all(log["address"] == address for log in row["logs"]))
+    return True
+
+
+def log_address(histories: dict):
+    """The emitter all paths share: the binding original Core executed at."""
+    bindings = histories.get("directCore", {}).get("bindings") if isinstance(histories.get("directCore"), dict) else None
+    return common.word(bindings.get("address"), "bound address") if isinstance(bindings, dict) else None
 
 
 def undeclared_paths(values: dict, index=None) -> list[str]:
@@ -284,17 +395,26 @@ def compare(histories: dict, case: dict) -> dict:
     try:
         keyed = profile(case)["declared"]
         values = {name: normalize_history(histories[name], case, name) for name in PATHS}
+        address = log_address(histories) if has_logs(case) else None
     except (ValueError, KeyError, TypeError) as error:
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
     initial = {name: values[name]["initialStorage"] for name in PATHS}
     pairs = pairwise(initial)
     outside = undeclared_paths(values) if keyed else []
     declared = not all(pairs.values()) or any(row["value"] != "0" for state in initial.values() for row in state)
-    if declared or outside:
-        mismatch = {"category": "semantic-mismatch", "stage": "initial-storage", "pairs": pairs, "fields": ["committedStorage"]}
+    # A fixed empty constructor commits no logs; a deployment log is a difference.
+    deployed_logs = sorted(name for name in PATHS if values[name].get("initialLogs")) if has_logs(case) else []
+    if declared or outside or deployed_logs:
+        fields = (["committedStorage"] if declared else []) + (["undeclaredStorage"] if outside else []) + (
+            ["initialLogs"] if deployed_logs else [])
+        mismatch = {"category": "semantic-mismatch", "stage": "initial-storage", "fields": fields,
+            "pairs": pairwise({name: [initial[name], values[name].get("initialLogs")] for name in PATHS}) if deployed_logs else pairs}
         if outside:
-            mismatch.update(fields=["committedStorage", "undeclaredStorage"] if declared else ["undeclaredStorage"], undeclaredPaths=outside)
+            mismatch["undeclaredPaths"] = outside
+        if deployed_logs:
+            mismatch["logPaths"] = deployed_logs
         return mismatch
+    observed = ("status", "output", "committedStorage", "logs") if has_logs(case) else ("status", "output", "committedStorage")
     for index, tx in enumerate(case["transactions"]):
         rows = {name: values[name]["transactions"][index] for name in PATHS if index < len(values[name]["transactions"])}
         where = {"stage": "transaction", "transactionId": tx["id"], "index": index}
@@ -306,13 +426,20 @@ def compare(histories: dict, case: dict) -> dict:
             return {"category": "execution-error", **where, "pairs": {}}
         compared = {name: without_containment(row) for name, row in rows.items()}
         pairs = pairwise(compared)
-        fields = [key for key in ("status", "output", "committedStorage") if len({json.dumps(row[key], sort_keys=True) for row in rows.values()}) != 1]
+        fields = [key for key in observed if len({json.dumps(row[key], sort_keys=True) for row in rows.values()}) != 1]
         normal = all(row["status"] == expected_status(case, tx) and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows.values())
         rollback = all(row["status"] != "reverted" or row["committedStorage"] ==
             (values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])
             for name, row in rows.items())
         if not rollback and "committedStorage" not in fields:
             fields.append("committedStorage")
+        if has_logs(case):
+            # Static shapes cover rollback: an expected revert commits no logs.
+            shaped = all(log_shapes(row["logs"]) == expected_log_shapes(case, tx) and
+                         (address is None or all(log["address"] == address for log in row["logs"])) for row in rows.values())
+            if not shaped and "logs" not in fields:
+                fields.append("logs")
+            normal = normal and shaped
         outside = undeclared_paths(values, index) if keyed else []
         if outside:
             fields.append("undeclaredStorage")
@@ -321,8 +448,16 @@ def compare(histories: dict, case: dict) -> dict:
             if outside:
                 mismatch["undeclaredPaths"] = outside
             return mismatch
+    if has_logs(case):
+        # Logs committed earlier stay: the chain's complete list for the contract
+        # is the deployment logs followed by every committed receipt's logs.
+        evm = values["rustEvm"]
+        if evm["chainLogs"] is None:
+            return {"category": "adapter-error", "stage": "committed-log-history", "detail": "EVM chain logs were not observed", "pairs": {}}
+        if evm["chainLogs"] != evm["initialLogs"] + [log for row in evm["transactions"] for log in row["logs"]]:
+            return {"category": "semantic-mismatch", "stage": "committed-log-history", "pairs": {}, "fields": ["chainLogs"], "logPaths": ["rustEvm"]}
     return {"category": "matched", "stage": "completed-history", "pairs": pairwise(
-        {name: {key: value for key, value in values[name].items() if key != "initialUndeclaredStorage"} | {
+        {name: {key: value for key, value in values[name].items() if key not in ("initialUndeclaredStorage", "chainLogs")} | {
             "transactions": [without_containment(row) for row in values[name]["transactions"]]} for name in PATHS})}
 
 
@@ -348,6 +483,8 @@ def hull_history(stdout: str, exit_code: int, case: dict) -> dict:
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
     if selected["declared"]:
         history.update(observedSlots=list(observed_slots(case)), initialUndeclaredStorage=deployment.get("undeclaredStorage"))
+    if selected.get("logs"):
+        history["initialLogs"] = deployment.get("logs")
     normalize_history(history, case, "importedHull")
     return history
 
@@ -434,6 +571,50 @@ def evm_undeclared(rpc, address: str, block: str, touched: set[str], slots) -> l
     """Every changed slot outside the declaration, reread at the receipt block."""
     outside = sorted((slot for slot in touched if slot not in slots), key=int)
     return [row for row in evm_storage(rpc, address, block, outside) if row["value"] != "0"]
+
+
+def evm_log(event: dict) -> dict:
+    if not isinstance(event, dict) or not isinstance(event.get("address"), str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", event["address"]) or not isinstance(event.get("topics"), list):
+        raise ValueError("invalid mined log")
+    if event.get("removed", False) is not False:
+        raise ValueError("mined log was removed")
+    topics = [common.hex_bytes(topic, "log topic") for topic in event["topics"]]
+    if any(len(topic) != 32 for topic in topics):
+        raise ValueError("mined log topic is not a Word")
+    return {"address": str(int(event["address"], 16)), "topics": [str(int.from_bytes(topic, "big")) for topic in topics],
+            "data": "0x" + common.hex_bytes(event.get("data"), "log data").hex()}
+
+
+def evm_logs(mined: dict) -> list[dict]:
+    """The receipt's own logs in log-index order; each names this receipt."""
+    events = mined.get("logs")
+    if not isinstance(events, list):
+        raise ValueError("mined receipt has no log list")
+    result = []
+    for event in events:
+        if not isinstance(event, dict) or str(event.get("transactionHash", "")).lower() != mined["transactionHash"].lower() or event.get("blockNumber") != mined["blockNumber"]:
+            raise ValueError("mined log is not from the selected transaction block")
+        result.append(evm_log(event))
+    if [quantity(event.get("logIndex"), "log index") for event in events] != sorted(quantity(event.get("logIndex"), "log index") for event in events):
+        raise ValueError("receipt logs are not in log-index order")
+    return logs(result, "receipt logs")
+
+
+def evm_chain_logs(rpc, address: str, receipts: list[dict]) -> list[dict]:
+    """Every log of the contract on the local chain, read once after the
+    sequence and ordered by block and log index. Each must come from a receipt
+    of this case; the comparison requires the committed receipts' logs."""
+    hashes = {mined["transactionHash"].lower() for mined in receipts}
+    last = max(quantity(mined["blockNumber"], "receipt block") for mined in receipts)
+    events = rpc.call("eth_getLogs", [{"address": address, "fromBlock": "0x0", "toBlock": hex(last)}])
+    if not isinstance(events, list) or len(events) > MAX_LOGS:
+        raise ValueError("chain logs must be a bounded list")
+    keyed = []
+    for event in events:
+        if not isinstance(event, dict) or str(event.get("transactionHash", "")).lower() not in hashes:
+            raise ValueError("chain log does not belong to a transaction of this case")
+        keyed.append(((quantity(event.get("blockNumber"), "log block"), quantity(event.get("logIndex"), "log index")), evm_log(event)))
+    return logs([event for _, event in sorted(keyed, key=lambda item: item[0])], "chain logs")
 
 
 def trace_result(mined: dict, trace: dict) -> dict:
@@ -573,7 +754,9 @@ def execute(args, report: dict) -> None:
         initial = evm_storage(rpc, address, deployed["blockNumber"], slots)
         keyed = {"observedSlots": list(slots), "initialUndeclaredStorage":
             evm_undeclared(rpc, address, deployed["blockNumber"], touched, slots)} if selected["declared"] else {}
-        evm_rows, records = [], []
+        if selected.get("logs"):
+            keyed.update(initialLogs=evm_logs(deployed), chainLogs=None)
+        evm_rows, records, mined_receipts = [], [], [deployed]
         report["evmTransactions"] = records
         def checkpoint(pending=None):
             complete = len(evm_rows) == len(case["transactions"]) and all(row["status"] in {"returned", "reverted"} for row in evm_rows)
@@ -595,11 +778,14 @@ def execute(args, report: dict) -> None:
                 raise
             mined = receipt(rpc, tx_hash, runner)
             record["receipt"] = mined
+            mined_receipts.append(mined)
             trace = rpc.call("debug_traceTransaction", [tx_hash, {"disableStorage": True, "disableStack": True, "enableMemory": False}])
             record["trace"] = trace
             outcome = trace_result(mined, trace)
             state = evm_storage(rpc, address, mined["blockNumber"], slots)
             row = {"id": tx["id"], "index": index, **outcome, "committedStorage": state}
+            if selected.get("logs") and outcome["status"] in {"returned", "reverted"}:
+                row["logs"] = evm_logs(mined)
             if selected["declared"]:
                 diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
                 record["storageDiff"] = diff
@@ -609,6 +795,10 @@ def execute(args, report: dict) -> None:
             checkpoint()
             if outcome["status"] not in {"returned", "reverted"}:
                 break
+        if selected.get("logs"):
+            keyed["chainLogs"] = evm_chain_logs(rpc, address, mined_receipts)
+            report["evmChainLogsBlock"] = max(quantity(mined["blockNumber"], "receipt block") for mined in mined_receipts)
+            checkpoint()
     report["comparison"] = compare(report["histories"], case)
 
 

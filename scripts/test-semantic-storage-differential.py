@@ -1088,5 +1088,254 @@ class DynamicArrayTests(unittest.TestCase):
         self.assertEqual((history["schema"], history["observedSlots"]), (runner.ARRAY_HISTORY_SCHEMA, list(runner.ARRAY_SLOTS)))
 
 
+
+HIGH_WORD = 2**255
+
+
+def log_case(sites=((1, 2, 1), (3, 0, 2)), rows=((2, 5), (11, 1), (8, HIGH_WORD))):
+    """Envelope fixture only: native replay checks the actual log program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "value": "0",
+        "calldata": "0x7357f5d2" + f"{flags:064x}" + f"{value:064x}"} for index, (flags, value) in enumerate(rows)]
+    return {"schema": runner.LOG_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "logPlan": {"schema": "solcore-lean.log-plan.v1", "stepProgram": {},
+                    "sites": [{"guard": guard, "topics": topics, "dataWords": data} for guard, topics, data in sites]},
+        "initialState": {"storage": []}, "observedSlots": ["0", "1"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedLogs", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": "0x7357f5d2", "deployPath": ["SynthesizedLogsDeploy"],
+            "runtimePath": ["SynthesizedLogsDeploy", "SynthesizedLogs"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def log_entry(topics, words, address="101"):
+    return {"address": address, "topics": [str(topic) for topic in topics], "data": "0x" + "".join(f"{word:064x}" for word in words)}
+
+
+def log_history(value, path, address="101"):
+    """Rows whose logs have the plan's static shapes; the topic and data values
+    are protocol fixtures, not predictions of any step."""
+    rows, counter = [], 0
+    for index, tx in enumerate(value["transactions"]):
+        reverted = int(tx["flags"]) % 2 == 1
+        counter += 0 if reverted else 1
+        logs = [] if reverted else [log_entry([100 * index + 10 * site["guard"] + j for j in range(1, site["topics"] + 1)],
+                                              [index + site["guard"]] * site["dataWords"], address)
+                                    for site in runner.guarded_sites(value, tx)]
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{index + 3:064x}", "committedStorage": slots(0, counter), "logs": logs}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.LOG_HISTORY_SCHEMA, "observedSlots": ["0", "1"], "initialStorage": slots(),
+        "initialLogs": [], "transactions": rows, "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]),
+        "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    if path == "directCore":
+        result["bindings"] = {"schema": "solcore-lean.storage-bindings.v1", "caller": "17", "address": address}
+    if path == "rustEvm":
+        result["chainLogs"] = [copy.deepcopy(log) for row in rows for log in row["logs"]]
+    return result
+
+
+def log_histories(value=None):
+    value = log_case() if value is None else value
+    return {path: log_history(value, path) for path in runner.PATHS}
+
+
+class EventLogTests(unittest.TestCase):
+    def test_log_case_validates_sites_flags_and_two_word_calldata(self):
+        value = log_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["logs"]),
+                         ("semantic-log-tool", "rust-hull-keyed-storage-scenario", True, "flags", True))
+        self.assertTrue(runner.has_logs(value))
+        self.assertFalse(runner.has_logs(case()))
+        self.assertEqual(runner.observed_slots(value), ("0", "1"))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual([runner.expected_log_shapes(value, tx) for tx in value["transactions"]], [[(2, 32)], [], [(0, 64)]])
+        self.assertEqual([len(runner.guarded_sites(value, tx)) for tx in value["transactions"]], [1, 2, 1])
+        noisy = log_case(rows=((HIGH_WORD + 16 + 2, 0),))
+        self.assertEqual(runner.expected_log_shapes(noisy, noisy["transactions"][0]), [(2, 32)])
+        for sites in ([{"guard": 0, "topics": 0, "dataWords": 0}], [{"guard": 4, "topics": 0, "dataWords": 0}],
+                      [{"guard": 1, "topics": 5, "dataWords": 0}], [{"guard": 1, "topics": 0, "dataWords": 3}],
+                      [{"guard": 2, "topics": 0, "dataWords": 0}, {"guard": 1, "topics": 0, "dataWords": 0}],
+                      [{"guard": 1, "topics": 0, "dataWords": 0, "extra": 1}], [{"guard": True, "topics": 0, "dataWords": 0}],
+                      [{"guard": 1, "topics": 0, "dataWords": 0}] * 4, {"guard": 1}):
+            invalid = copy.deepcopy(value)
+            invalid["logPlan"]["sites"] = sites
+            with self.subTest(sites=sites), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for key, changed in (("flags", "02"), ("flags", str(2**256)), ("input", "05"),
+                             ("calldata", "0x7357f5d2" + "00" * 64), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for slots_value in (["0"], ["1", "0"], ["0", "1", "2"]):
+            with self.subTest(slots=slots_value), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots_value})
+        mixed = copy.deepcopy(value)
+        mixed["contract"]["name"] = "SynthesizedKeyedStorage"
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(mixed)
+        self.assertIn("ordered committed logs", runner.scope(value))
+
+    def test_ordered_committed_logs_are_compared_per_transaction_on_every_path(self):
+        value = log_case()
+        self.assertEqual(runner.compare(log_histories(value), value)["category"], "matched")
+        changes = {"topic": lambda logs: logs[0]["topics"].__setitem__(0, "999"),
+            "data": lambda logs: logs[0].__setitem__("data", "0x" + "00" * 31 + "09"),
+            "address": lambda logs: logs[0].__setitem__("address", "102"),
+            "extra": lambda logs: logs.append(copy.deepcopy(logs[0])),
+            "missing": lambda logs: logs.pop()}
+        for path in runner.PATHS:
+            for name, change in changes.items():
+                observed = log_histories(value)
+                change(observed[path]["transactions"][0]["logs"])
+                if path == "rustEvm":
+                    observed[path]["chainLogs"] = [copy.deepcopy(log) for row in observed[path]["transactions"] for log in row["logs"]]
+                result = runner.compare(observed, value)
+                with self.subTest(path=path, change=name):
+                    self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-0", ["logs"]))
+                    self.assertFalse(all(result["pairs"].values()))
+        reordered = log_case(sites=((1, 1, 0), (2, 1, 0)), rows=((6, 0),))
+        observed = log_histories(reordered)
+        observed["importedHull"]["transactions"][0]["logs"].reverse()
+        self.assertEqual(runner.compare(observed, reordered)["fields"], ["logs"])
+
+    def test_static_shapes_reject_agreed_protocol_violations(self):
+        value = log_case()
+        for name, change in (("dropped", lambda row: row["logs"].pop()),
+                             ("widened", lambda row: row["logs"][0]["topics"].append("1")),
+                             ("foreign", lambda row: row["logs"][0].__setitem__("address", "102"))):
+            observed = log_histories(value)
+            for path, history in observed.items():
+                change(history["transactions"][0])
+            observed["rustEvm"]["chainLogs"] = [log for row in observed["rustEvm"]["transactions"] for log in row["logs"]]
+            result = runner.compare(observed, value)
+            with self.subTest(change=name):
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-0", ["logs"]))
+        committed = log_histories(value)
+        for history in committed.values():
+            history["transactions"][1]["logs"] = [log_entry([1], [])]
+        result = runner.compare(committed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-1", ["logs"]))
+        unbound = log_histories(value)
+        del unbound["directCore"]["bindings"]
+        self.assertEqual(runner.compare(unbound, value)["category"], "matched")
+        for bound in ("0101", None):
+            malformed = log_histories(value)
+            malformed["directCore"]["bindings"]["address"] = bound
+            with self.subTest(bound=bound):
+                self.assertEqual(runner.compare(malformed, value)["category"], "adapter-error")
+
+    def test_deployment_logs_and_the_evm_chain_list_are_committed_observations(self):
+        value = log_case()
+        for path in runner.PATHS:
+            deployed = log_histories(value)
+            deployed[path]["initialLogs"] = [log_entry([], [])]
+            result = runner.compare(deployed, value)
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["stage"], result["fields"], result["logPaths"]),
+                                 ("semantic-mismatch", "initial-storage", ["initialLogs"], [path]))
+        for name, change in (("lost", lambda logs: logs.pop(0)), ("extra", lambda logs: logs.append(log_entry([7], [7]))),
+                             ("reordered", lambda logs: logs.reverse())):
+            observed = log_histories(value)
+            change(observed["rustEvm"]["chainLogs"])
+            result = runner.compare(observed, value)
+            with self.subTest(chain=name):
+                self.assertEqual((result["category"], result["stage"], result["fields"], result["logPaths"]),
+                                 ("semantic-mismatch", "committed-log-history", ["chainLogs"], ["rustEvm"]))
+        unobserved = log_histories(value)
+        unobserved["rustEvm"]["chainLogs"] = None
+        self.assertEqual(runner.compare(unobserved, value)["category"], "adapter-error")
+        for path in ("directCore", "importedHull"):
+            claimed = log_histories(value)
+            claimed[path]["chainLogs"] = []
+            with self.subTest(path=path):
+                self.assertEqual(runner.compare(claimed, value)["category"], "adapter-error")
+
+    def test_log_records_are_canonical_and_unknown_after_incomplete_rows(self):
+        value = log_case()
+        for bad in ({"address": "101", "topics": ["1"] * 5, "data": "0x"}, {"address": str(2**160), "topics": [], "data": "0x"},
+                    {"address": "101", "topics": ["01"], "data": "0x"}, {"address": "101", "topics": [], "data": "0x0"},
+                    {"address": "101", "topics": [], "data": "0x", "extra": 1}, {"address": "101", "topics": "1", "data": "0x"}):
+            observed = log_histories(value)
+            observed["importedHull"]["transactions"][0]["logs"] = [bad]
+            with self.subTest(bad=bad):
+                self.assertEqual(runner.compare(observed, value)["category"], "adapter-error")
+        missing = log_histories(value)
+        del missing["directCore"]["transactions"][0]["logs"]
+        self.assertEqual(runner.compare(missing, value)["category"], "adapter-error")
+        stopped = log_histories(value)
+        history = stopped["directCore"]
+        history["transactions"] = history["transactions"][:2]
+        history["transactions"][1] = {"id": "tx-1", "index": 1, "status": "out-of-fuel", "committedStorage": slots(0, 1), "logs": None}
+        history.update(status="incomplete", unexecuted=["tx-2"], finalStorage=slots(0, 1))
+        normalized = runner.normalize_history(history, value, "directCore")
+        self.assertIsNone(normalized["transactions"][1]["logs"])
+        self.assertEqual(runner.compare(stopped, value)["category"], "inconclusive-resource")
+
+    def test_receipt_logs_name_their_receipt_and_chain_logs_their_case(self):
+        tx_hash, block, address = "0x" + "11" * 32, "0x5", "0x" + "ab" * 20
+        event = lambda index, topics=("0x" + "00" * 31 + "07",), data="0x" + "00" * 31 + "02", hash_value=tx_hash, at=block: {
+            "address": address, "topics": list(topics), "data": data, "transactionHash": hash_value,
+            "blockNumber": at, "logIndex": hex(index), "removed": False}
+        mined = {"transactionHash": tx_hash, "blockNumber": block, "logs": [event(0), event(1, (), "0x")]}
+        self.assertEqual(runner.evm_logs(mined), [{"address": str(int(address, 16)), "topics": ["7"], "data": "0x" + "00" * 31 + "02"},
+                                                  {"address": str(int(address, 16)), "topics": [], "data": "0x"}])
+        for bad in (event(0, hash_value="0x" + "22" * 32), event(0, at="0x6"), {**event(0), "removed": True},
+                    event(0, ("0x07",)), {**event(0), "address": "0x12"}, {**event(0), "logIndex": "0x01"}):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                runner.evm_logs({**mined, "logs": [bad]})
+        with self.assertRaises(ValueError):
+            runner.evm_logs({**mined, "logs": [event(1), event(0)]})
+        with self.assertRaises(ValueError):
+            runner.evm_logs({"transactionHash": tx_hash, "blockNumber": block})
+        later = {"transactionHash": "0x" + "33" * 32, "blockNumber": "0x7", "logs": []}
+        calls = []
+        class Rpc:
+            def __init__(self, events):
+                self.events = events
+            def call(self, method, params):
+                calls.append((method, params))
+                return self.events
+        chain = [event(0, (), "0x", later["transactionHash"], "0x7"), event(0)]
+        self.assertEqual(runner.evm_chain_logs(Rpc(chain), address, [mined, later]),
+                         [runner.evm_log(event(0)), runner.evm_log(chain[0])])
+        self.assertEqual(calls, [("eth_getLogs", [{"address": address, "fromBlock": "0x0", "toBlock": "0x7"}])])
+        with self.assertRaises(ValueError):
+            runner.evm_chain_logs(Rpc([event(0, hash_value="0x" + "44" * 32)]), address, [mined])
+        with self.assertRaises(ValueError):
+            runner.evm_chain_logs(Rpc({}), address, [mined])
+
+    def test_log_hull_history_reads_deployment_and_receipt_logs(self):
+        value = log_case()
+        expected = log_history(value, "importedHull")
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "undeclaredStorage": [], "logs": []}
+        calls = [{"stage": "execution", **row} for row in expected["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["initialLogs"], history["observedSlots"]), (runner.LOG_HISTORY_SCHEMA, [], ["0", "1"]))
+        self.assertEqual([row["logs"] for row in history["transactions"]], [row["logs"] for row in expected["transactions"]])
+        deployment["logs"] = [log_entry([], [])]
+        self.assertEqual(runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)["initialLogs"],
+                         [log_entry([], [])])
+        del deployment["logs"]
+        with self.assertRaises(ValueError):
+            runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+
+    def test_storage_profiles_without_logs_keep_their_observation(self):
+        for value, observed in ((case(), histories(case())), (keyed_case(), keyed_histories()), (array_case(), array_histories())):
+            with self.subTest(schema=value["schema"]):
+                self.assertFalse(runner.has_logs(value))
+                self.assertEqual(runner.compare(observed, value)["category"], "matched")
+                normalized = runner.normalize_history(observed["rustEvm"], value, "rustEvm")
+                self.assertNotIn("initialLogs", normalized)
+                self.assertNotIn("logs", normalized["transactions"][0])
+
+
 if __name__ == "__main__":
     unittest.main()
