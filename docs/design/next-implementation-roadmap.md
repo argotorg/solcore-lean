@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop and aggregate loop emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes` and contract-forwarded value extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset for named rows, its public-root connection and one concrete instance; remaining expression and statement forms, fault lifting and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection and one concrete instance; remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and Hull's explicit revert connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -1160,17 +1160,21 @@ connected, and later calls do not yet chain from the reached history, which
 uses the accepted instance model. The design document lists the remaining
 premises.
 
-One actual row meets every premise (`SourceCoreGeneralizedExportAcceptedTick`).
-At `tick` of the GeneralizedExport program, a runtime check of its expression
-nodes supplies `Closed` (`CellAwareInvocationAcceptedSubsetCheck`), the
-inversion of its returning accepted tree supplies the coverage
-(`CellAwareInvocationAcceptedReturnCoverage`), the public compilation supplies
-the original compilation receipt, and the row's independent Source execution is
-lifted to the staged trace (`CellAwareInvocationAcceptedSourceLifting`). The
-output and both checkpoint theorems are applied together at the first public
-call. The lifting covers value-returning executions of bodies whose terminal
-statement returns, or is, a subset expression; fault outcomes and other
-statement forms are not lifted.
+Statement lists beyond a single return are closed as well
+(`CellAwareInvocationAcceptedBodyShape` and
+`CellAwareInvocationAcceptedStatementLifting`). For returns, monomorphic
+declarations, refined bare assignments, expression statements, blocks and
+conditionals whose expressions are subset sites, every refined accepted tree is
+covered, and every ordinary execution, in both compiler modes and with every
+control outcome, is a staged execution. One actual row meets every premise
+(`SourceCoreGeneralizedExportAcceptedTick`). At `tick` of the GeneralizedExport
+program, runtime checks of its expression nodes and statement shape supply
+`Closed` and the coverage of its refined accepted tree, the public compilation
+supplies the original compilation receipt, and the row's independent Source
+execution is lifted to the staged trace. The output and both checkpoint
+theorems are applied together at the first public call. Fault executions are
+not lifted, and no instance yet exercises declarations, assignments,
+conditionals or operators.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile

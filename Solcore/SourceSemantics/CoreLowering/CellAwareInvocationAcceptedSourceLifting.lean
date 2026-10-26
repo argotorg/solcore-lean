@@ -1,15 +1,13 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedExpressionTrees
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveSource
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageTerminalInversion
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 
 /-! Original Source executions of closed-subset expressions are staged
 executions. A subset expression contains no call, so every original value rule
 at a subset site is the staged rule of the same form, and a generalized local
-read keeps its descriptor and empty coercion path. A body whose terminal
-statement returns, or is, a subset expression therefore stages each of its
-value-returning executions with the same context, value and heap. Fault
-outcomes and other statement forms are not lifted here. -/
+read keeps its descriptor and empty coercion path. Fault outcomes are not
+lifted here; `CellAwareInvocationAcceptedStatementLifting` lifts statement
+lists. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -18,7 +16,6 @@ open Core Frontend SourceInference
 open CallableIndexedNamedGeneration (Prepared)
 open CellAwareNamedExpressionSyntax (Site)
 open CellAwareInvocationAcceptedExpressionTrees (Subset)
-open CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts (Terminal)
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
   {named : SourceCoreGeneralFunctions.Function} {program : Program} {registry : Staging.Recursive.Registry}
@@ -149,35 +146,5 @@ theorem expression_value (unique : NodeOccurrencesUnique scope.source) {id : Exp
           | cons tail =>
             cases tail
             exact .pair (occurrence site form (fun _ _ same => by cases same)) (left first) (right second)
-
-/-- A value-returning execution of a body whose terminal statement returns, or
-is, a subset expression is a staged execution with the same context, value and
-heap, at any scope with the execution's Source and evidence. -/
-theorem returned {source : TypedSource} {evidence : Dynamic.EvidenceEnvironment}
-    (sourceEq : scope.source = source) (evidenceEq : scope.evidence = evidence)
-    (unique : NodeOccurrencesUnique source) {statements : List StatementId}
-    {expression : ExpressionId} (terminal : Terminal source expression statements)
-    (subset : Subset prepared named source expression)
-    {size : Nat} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
-    {finalContext : SourceSemantics.Context} {result : Dynamic.Value}
-    (trace : RecursiveNamedCallBounds.FunctionOutcome program size context evidence source environment
-      before statements finalContext (.returned result) after) :
-    ∃ stagedSize, Staging.Recursive.Size.Statements program registry stagedSize scope context environment before
-      statements finalContext (.returned result) after := by
-  subst sourceEq evidenceEq
-  obtain ⟨_child, outcome, _smaller, rfl, control, inner⟩ :=
-    SelectedCompilationStageTerminalInversion.child_of_body unique terminal trace
-  cases outcome with
-  | fault reason => cases control
-  | value value =>
-    cases control
-    cases inner with
-    | value evaluated =>
-      have staged := expression_value (registry := registry) unique subset evaluated.sound
-      cases terminal with
-      | returning rest found form =>
-        exact Staging.Recursive.Size.Statements.of_trace (.returnValue (lookupStatement?_sound found) form staged)
-      | tail found form =>
-        exact Staging.Recursive.Size.Statements.of_trace (.tail (lookupStatement?_sound found) form staged)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedSourceLifting

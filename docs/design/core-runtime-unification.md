@@ -256,22 +256,37 @@ checks the subset: `nodes?` reads a row's Source nodes and the prepared local
 inventory and returns a proof that every expression node is a `Subset` site. A
 site depends on its row only through the row's key, so `transport` moves the
 proof to every row with that key, and `closed` turns it into `Closed`.
-[CellAwareInvocationAcceptedReturnCoverage](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedReturnCoverage.lean)
-`returning` covers every accepted tree of statements whose first statement
-returns a value: the compiler reads that statement before choosing a branch, so
-the tree is its `returning` branch.
+[CellAwareInvocationAcceptedBodyShape](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedBodyShape.lean)
+`Shape` recognizes, on the Source, statement lists of value and unit returns,
+monomorphic declarations, bare assignments that the compiler refines
+(`Assignable`), expression statements, blocks and conditionals, with every
+expression in a given predicate. A list that may end without returning is a
+branch or block body, or belongs to a Unit function. `covered` shows that every
+refined accepted tree of such a list is covered: the compiler reads each
+statement before choosing its branch, so the tree follows the Source forms, and
+a refined tree keeps the unrefined assignment branch only for writes that are
+not `ValueAssignable`. `CellAwarePublicAcceptedNamedRoot.refined_body` refines
+the actual body receipt at a prepared header with the header's own assignment,
+bit-not and match policies, and `shape?` checks a shape with subset-site
+expressions on an actually compiled row.
 `CellAwarePublicAcceptedNamedRoot.compilation_receipts` derives the original
 compilation receipt from the checked program, its public compilation and the
 issued recipe.
 [CellAwareInvocationAcceptedSourceLifting](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedSourceLifting.lean)
-lifts original Source executions to staged ones. `expression_value` stages
-every value execution of a subset expression, by structural induction on
-`Subset` with no typing or state input: a subset expression contains no call,
-so each original value rule is the staged rule of the same form, and a
-generalized local read keeps its descriptor. `returned` stages every
-value-returning execution of a body whose terminal statement returns, or is, a
-subset expression, with the same context, value and heap. Fault outcomes and
-the other statement forms are not lifted.
+`expression_value` stages every value execution of a subset expression, by
+structural induction on `Subset` with no typing or state input: a subset
+expression contains no call, so each original value rule is the staged rule of
+the same form, and a generalized local read keeps its descriptor.
+[CellAwareInvocationAcceptedStatementLifting](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedStatementLifting.lean)
+`statements` stages every ordinary execution of a shaped list whose expressions
+are subset sites, in both compiler modes, by structural induction on `Shape`:
+declarations allocate the same cell, a bare assignment resolves its target
+without changing the heap and writes it by the same rule
+(`Staging.Recursive.BareTarget.of_resolves`), and blocks and conditional arms
+restore their entry bindings while keeping their heap. Every control outcome is
+carried unchanged, with the context, environment and heap of the original
+execution, and `body` gives the sized staged trace of a function body. Fault
+executions are not lifted.
 
 The test
 [SourceCoreGeneralizedExportAcceptedTick](../../Solcore/Test/SourceCoreGeneralizedExportAcceptedTick.lean)
@@ -280,14 +295,15 @@ takes its `tick` row, whose body returns its Bool parameter. Its
 `accepted_tick` meets every premise of `first_value_selected`,
 `checkpoint_has_sufficient_fuel_selected` and `checkpoint_reflects_selected` at
 the row's first public call, with the existing start receipts: the runtime
-subset check, the return inversion, the body receipt, the compilation receipts
-and the lifted trace of the row's independent Source execution. Program support
-comes from `SelectedCompilationNamedSupport.Support.of_program` with the
-well-formedness that the existing typing observation derives; no
-`StaticProfile` enters. The runtime harness checks the subset, builds this
-kernel-checked plan for both inputs and resumes the actual call. The instance
-exercises one ordinary local read; the theorems it uses are general over the
-subset.
+subset and shape checks, the refined body receipt and its coverage, the
+compilation receipts and the trace of the row's independent Source execution
+lifted through the shape. Program support comes from
+`SelectedCompilationNamedSupport.Support.of_program` with the well-formedness
+that the existing typing observation derives; no `StaticProfile` enters. The
+runtime harness checks the subset and the shape, builds this kernel-checked
+plan for both inputs and resumes the actual call. The instance exercises one
+ordinary local read under a returning first statement; the theorems it uses are
+general over the subset and the shape.
 
 ## Remaining work for the second goal
 
@@ -313,12 +329,15 @@ On the accepted-body route above, the next connected steps are:
   constructors, generalized reads, closures and coercions. Expressions of
   contextual closures need the relation between the compiler view and the
   Source that their writes and matches also need.
-- Strengthen the named-row public connection. Extend the lifting of original
-  Source traces to fault outcomes and to the remaining statement forms of
-  accepted bodies, and the `Covered` inversion beyond a returning first
-  statement; carry the accepted instance model through public histories so that
-  later calls chain; and issue program support from the compiler receipt for
-  every accepted program, rather than from an observation of its typings.
+- Strengthen the named-row public connection. Instantiate the theorems at a
+  body with declarations, assignments, conditionals, operators and pairs: this
+  needs a fixture with the older root's receipts and an independent Source
+  trace of that body, or a proof-producing Source evaluator for the closed
+  subset. Extend the shape, its coverage and the lifting to fault outcomes,
+  projected writes, bit-not updates, tail values and loops; carry the accepted
+  instance model through public histories so that later calls chain; and issue
+  program support from the compiler receipt for every accepted program, rather
+  than from an observation of its typings.
 
 The final connection must:
 

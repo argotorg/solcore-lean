@@ -2,14 +2,14 @@ import Solcore.Test.SourceCoreGeneralizedExportPublic
 import Solcore.Test.SourceCoreGeneralizedExportObserved
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedNamedForward
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedSubsetCheck
-import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedReturnCoverage
-import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedSourceLifting
+import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedStatementLifting
 
 /-! The accepted-body public theorems at one actual named row. `tick` of the
 unchanged three-function program returns its parameter. A runtime check places
-every expression node of its body in the closed expression subset, the return
-inversion covers its accepted tree, and the compile receipts and the lifted
-Source trace supply the remaining inputs. Together with the existing start
+every expression node of its body in the closed expression subset and its
+statement list in the supported shape; the shape covers its refined accepted
+tree, and the compile receipts and the Source trace lifted through the shape
+supply the remaining inputs. Together with the existing start
 receipts they meet every premise of the named-row output, checkpoint and root
 theorems at its first public call. -/
 set_option autoImplicit false
@@ -20,25 +20,53 @@ open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open CallableIndexedOwnedPreparedBootstrapRootState (keys owner)
 open CellAwareInvocationAcceptedExpressionTrees (Subset)
+open CellAwareInvocationAcceptedBodyShape (Shape)
 open CellAwareInvocationAcceptedNamedHeaders (index)
 
-/-- A cache row with the key of `row`, at which every expression node of the
-row's original body is checked to be a closed-subset site. -/
-structure ClosedRow (fixture : ProfiledFixture) (row : Row fixture.original) where
+/-- A cache row with the key of `row`, at which the row's original body is
+checked: every expression node is a closed-subset site, and its statement list
+has a supported shape with those sites. -/
+structure AcceptedRow (fixture : ProfiledFixture) (row : Row fixture.original) where
   named : SourceCoreGeneralFunctions.Function
   key : named.signature.key = row.original.key
   nodes : ∀ id node, row.original.function.typedBody.lookupExpression? id = some node →
     Subset fixture.original.recipe.compiled.indexed named row.original.function.typedBody id
+  statements : List StatementId
+  roots : row.original.function.typedBody.roots = statements.map NodeId.statement
+  shape : Shape row.original.function.typedBody row.original.function.inferredBodyType
+    (Subset fixture.original.recipe.compiled.indexed named row.original.function.typedBody) true statements
 
-def observeClosedRow (fixture : ProfiledFixture) (row : Row fixture.original) : IO (ClosedRow fixture row) := do
+def observeAcceptedRow (fixture : ProfiledFixture) (row : Row fixture.original) :
+    IO (AcceptedRow fixture row) := do
   match found : fixture.original.recipe.compiled.indexed.base.functions.find?
       (fun named => decide (named.signature.key = row.original.key)) with
-  | none => throw (IO.userError "accepted tick cache row")
+  | none => throw (IO.userError "accepted row cache row")
   | some named =>
+    let source := row.original.function.typedBody
     let some ⟨nodes⟩ := CellAwareInvocationAcceptedSubsetCheck.nodes? fixture.original.recipe.compiled.indexed
-        named row.original.function.typedBody
-      | throw (IO.userError "accepted tick outside the closed expression subset")
-    return ⟨named, by simpa using List.find?_some found, nodes⟩
+        named source
+      | throw (IO.userError "accepted row outside the closed expression subset")
+    let statements := source.roots.filterMap fun root =>
+      match root with
+      | .statement id => some id
+      | .expression _ => none
+    let ⟨roots⟩ ← observed (source.roots = statements.map NodeId.statement) "accepted row statement roots"
+    let some ⟨shape⟩ := CellAwareInvocationAcceptedBodyShape.shape? fixture.original.recipe.compiled.indexed named
+        source row.original.function.inferredBodyType (source.nodes.length + 1) true statements
+      | throw (IO.userError "accepted row statement shape")
+    return ⟨named, by simpa using List.find?_some found, nodes, statements, roots, shape⟩
+
+private theorem statement_roots {left right : List StatementId}
+    (same : left.map NodeId.statement = right.map NodeId.statement) : left = right := by
+  induction left generalizing right with
+  | nil => cases right <;> simp at same ⊢
+  | cons head rest ih =>
+    cases right with
+    | nil => simp at same
+    | cons other tail =>
+      simp only [List.map_cons, List.cons.injEq] at same
+      cases same.1
+      exact congrArg (List.cons head) (ih same.2)
 
 variable {fixture : ProfiledFixture} {whole : WholeInventory fixture} {row : Row fixture.original}
 
@@ -73,10 +101,10 @@ structure AcceptedTick (selected : SelectedInventory whole row) (flag : Bool)
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome)
 
 /-- Every premise is an original checked or static observation, a runtime check
-of the row's expression nodes, or an actual public start. The staged Source
-trace is lifted from the row's independent Source execution. -/
+of the row's body, or an actual public start. The staged Source trace is lifted
+from the row's independent Source execution through the checked shape. -/
 theorem accepted_tick (selected : SelectedInventory whole row) (shape : TickShape row.original.function.typedBody)
-    (closedRow : ClosedRow fixture row) (flag : Bool)
+    (acceptedRow : AcceptedRow fixture row) (flag : Bool)
     (wellFormed : ProgramWellFormed (Program.ofChecked fixture.original.recipe.compiled.sourceProgram))
     (started : Started fixture.original row.original.key [.bool flag])
     (callableProfile : fixture.original.recipe.compiled.compatible.checked.catalog.callableContracts = true) :
@@ -102,51 +130,52 @@ theorem accepted_tick (selected : SelectedInventory whole row) (shape : TickShap
     ⟨selected.packet.selected.diagnostics, selected.packet.selected.found, rfl⟩
   obtain ⟨sidecar, _sidecarIssued, bodySelected⟩ := selected.invocation
   have namedSame : prepared.named.specialized = row.original := prepared.same.trans selected.original
-  have keyEq : closedRow.named.signature.key = prepared.named.signature.key :=
-    closedRow.key.trans ((CallableIndexedOwnedPreparedOrdinaryCachedInputs.cached_key _ prepared.selected).trans
+  have keyEq : acceptedRow.named.signature.key = prepared.named.signature.key :=
+    acceptedRow.key.trans ((CallableIndexedOwnedPreparedOrdinaryCachedInputs.cached_key _ prepared.selected).trans
       (congrArg (·.key) namedSame)).symm
   have sourceSame : CallableIndexedNamedGeneration.source prepared.named = row.original.function.typedBody :=
     congrArg (fun specialized => specialized.function.typedBody) namedSame
-  have headerSource : selected.packet.header.function.source = CallableIndexedNamedGeneration.source prepared.named :=
-    selected.source_eq.trans sourceSame.symm
   have closed : CellAwareInvocationAcceptedExpressions.Closed (index prepared selected.packet.aligned) :=
-    CellAwareInvocationAcceptedSubsetCheck.closed prepared.compilation _ keyEq (by rw [sourceSame]; exact closedRow.nodes)
-  obtain ⟨body⟩ := (index prepared selected.packet.aligned).body_receipt
-  have statementsEq : (index prepared selected.packet.aligned).statements = [actualShape.returned.id] := by
+    CellAwareInvocationAcceptedSubsetCheck.closed prepared.compilation _ keyEq (by rw [sourceSame]; exact acceptedRow.nodes)
+  have bodyEq : selected.packet.header.function.body = acceptedRow.statements := by
+    have roots : selected.packet.header.function.source.roots = acceptedRow.statements.map NodeId.statement := by
+      rw [selected.source_eq]
+      exact acceptedRow.roots
+    exact statement_roots (selected.packet.header.agreement.roots.symm.trans roots)
+  have indexStatements : (index prepared selected.packet.aligned).statements = acceptedRow.statements := by
     have same : selected.packet.header.function.body = prepared.compilation.statements := by
       rw [selected.packet.aligned.function]
       rfl
-    exact same.symm.trans (selected.tick_statements actualShape)
-  have returnedFound : (index prepared selected.packet.aligned).compilerSource.lookupStatement? actualShape.returned.id =
-      some actualShape.returned := by
-    change (CallableIndexedNamedGeneration.source prepared.named).lookupStatement? _ = _
-    rw [← headerSource]
-    exact actualShape.returnedFound
+    exact same.symm.trans bodyEq
+  have indexShape : Shape (index prepared selected.packet.aligned).compilerSource
+      selected.packet.header.function.resultType
+      (Subset fixture.original.recipe.compiled.indexed acceptedRow.named row.original.function.typedBody) true
+      (index prepared selected.packet.aligned).statements := by
+    rw [indexStatements, selected.result_eq]
+    show Shape (CallableIndexedNamedGeneration.source prepared.named) _ _ _ _
+    rw [sourceSame]
+    exact acceptedRow.shape
+  have headerShape : Shape selected.packet.header.function.source selected.packet.header.function.resultType
+      (Subset fixture.original.recipe.compiled.indexed acceptedRow.named selected.packet.header.function.source) true
+      selected.packet.header.function.body := by
+    rw [bodyEq, selected.result_eq, selected.source_eq]
+    exact acceptedRow.shape
+  obtain ⟨body, ready⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared selected.packet.aligned
   obtain ⟨sourceCompiled, artifact, checked⟩ := CellAwarePublicAcceptedNamedRoot.compilation_receipts
     fixture.original.checked fixture.original.accepted fixture.original.selected
   obtain ⟨allocated, sourceTrace⟩ := selected.tick_source_body actualShape ⟨[]⟩ flag
-  obtain ⟨_sourceSize, measured⟩ := RecursiveNamedCallBounds.FunctionOutcome.has_size (.control sourceTrace)
-  have terminal : CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.Terminal
-      selected.packet.header.function.source actualShape.read.node.id selected.packet.header.function.body := by
-    rw [selected.tick_statements actualShape]
-    exact .returning [] actualShape.returnedFound actualShape.returnedForm
-  have nodes : ∀ id node, selected.packet.header.function.source.lookupExpression? id = some node →
-      Subset fixture.original.recipe.compiled.indexed closedRow.named selected.packet.header.function.source id := by
-    rw [selected.source_eq]
-    exact closedRow.nodes
-  obtain ⟨_stagedSize, trace⟩ := CellAwareInvocationAcceptedSourceLifting.returned
+  obtain ⟨_stagedSize, trace⟩ := CellAwareInvocationAcceptedStatementLifting.body
     (registry := SelectedCompilationPhysicalProgramSupport.stages fixture.original.recipe.compiled)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.original.recipe.compiled).source bodySelected)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.original.recipe.compiled).evidence bodySelected)
-    (support.certified selected.packet.header).runtime.graph.nodeOccurrencesUnique terminal
-    (nodes _ _ actualShape.read.found) measured
-  have covered := CellAwareInvocationAcceptedReturnCoverage.returning (index prepared selected.packet.aligned) body.tree
+    (support.certified selected.packet.header).runtime.graph.nodeOccurrencesUnique headerShape sourceTrace
+  have covered := CellAwareInvocationAcceptedBodyShape.covered (index prepared selected.packet.aligned) rfl body.tree
     (semantic := (index prepared selected.packet.aligned).source)
     (expected := selected.packet.header.function.resultType)
     (admitted := CellAwareInvocationAcceptedMatches.Admitted (index prepared selected.packet.aligned))
     (generalized := CellAwareInvocationAcceptedInputs.Generalized (attachment := fun _ _ _ => True)
       (index prepared selected.packet.aligned))
-    statementsEq returnedFound actualShape.returnedForm
+    ready indexShape
   obtain ⟨_capture, _value, _finalStore, _finalMap, _finalWorld, requiredExecution, requiredOutput, _result, output⟩ :=
     CellAwarePublicAcceptedNamedForward.first_value_selected callableProfile initial.issued prepared
       selected.packet.aligned fixture.ready diagnostic support start.selected (owner fixture.original.recipe.compiled)
@@ -182,14 +211,14 @@ whatever the observed compile, check and start receipts are; the resume runs the
 real compiled code. -/
 def run : IO Unit := do
   let observed ← observe
-  let closedRow ← observeClosedRow observed.fixture observed.tick
+  let acceptedRow ← observeAcceptedRow observed.fixture observed.tick
   for flag in [true, false] do
     let started ← observeStarted observed.fixture.original observed.tick.original.key [.bool flag]
     have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole observed.tick),
         Nonempty (AcceptedTick selected flag started) := by
       obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.typing.wellFormed
       obtain ⟨selected⟩ := whole.select observed.tick
-      exact ⟨whole, selected, accepted_tick selected observed.tickShape closedRow flag observed.typing.wellFormed
+      exact ⟨whole, selected, accepted_tick selected observed.tickShape acceptedRow flag observed.typing.wellFormed
         started observed.callableProfile⟩
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     match result.val with
