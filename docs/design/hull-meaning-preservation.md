@@ -243,7 +243,7 @@ This theorem permits arbitrary successfully compiled catalogs with the stated
 source-to-catalog correspondence. Selected children use the established effect
 language without further external calls (`CallFree`). Nested calls are covered by the finite-height theorem below. Root reentry
 remains outside these instances; the mode theorem below covers CALLCODE and
-DELEGATECALL. Identity precompile calls are covered as described below.
+DELEGATECALL. Identity and SHA-256 precompile calls are covered as described below.
 
 `Tests.RustHullChildCallCorrespondence.public_resumes` supplies four independent
 source derivations: a child returns after memory, storage, transient storage and
@@ -342,9 +342,24 @@ memory, an underfunded call, a value transfer to address 4 and a static call.
 `Tests.RustHullPrecompileCorrespondence.Modes.public_resumes` applies the
 call-mode theorem to CALLCODE with value and to DELEGATECALL; neither moves
 balances. Runtime checks compare returned bytes, committed balances, repeated
-resumptions and the retained Core snapshot. ECRECOVER, SHA-256, RIPEMD-160 and
-P256VERIFY have no source rule, so the public theorems state nothing about
-calls to them.
+resumptions and the retained Core snapshot.
+
+SHA-256, at address 2, uses the same dispatch path, and the same public call
+theorems cover it without statement changes. `Sha256Semantics` specifies
+FIPS 180-4 independently: the message schedule, 64 rounds and chaining
+addition, big-endian word reads, and padding with the 0x80 marker, zero bytes
+and the 64-bit bit length, including the extra block when the marker leaves no
+room. The rule charges 60 gas plus 12 per started input word and returns the
+32-byte digest. The proof reaches the actual `Sha256.hash` and its
+`HashBlocks` streaming helper, restated by `rfl` in `Sha256Implementation`,
+through the actual precompile branch, its fresh source memory and the
+return-data mapping. `Tests.RustHullPrecompileCorrespondence.Digest` hashes
+"abc" from caller memory and copies the digest back, and also covers an
+underfunded call. Kernel evaluation checks the independent digest against the
+FIPS test vector, and runtime checks compare the returned bytes.
+
+ECRECOVER, RIPEMD-160 and P256VERIFY have no source rule, so the public
+theorems state nothing about calls to them.
 
 ## Priorities
 
@@ -354,7 +369,7 @@ calls to them.
 | 1 | Pattern matching preserves arm selection, binder allocation and control outcomes. | Actual `testPattern` and `lowerAlternatives` feed the mutual derivation proof and public resumptions, including skipped arms and faults. | Connected |
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
-| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity precompile and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. The other four precompiles and creation remain. | In progress |
+| 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity and SHA-256 precompiles and account destruction reach public receipts, including finite nested children, transfers, return data, checkpoint rollback and transaction finalization. The other three precompiles and creation remain. | In progress |
 | 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. | Open |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
@@ -371,26 +386,27 @@ and do not discharge those obligations. The
 continuous bounded campaigns, backend and grammar coverage, and the native
 Source public proof connection before this remaining Hull work.
 
-The identity precompile is connected through its independent byte-copy and
-gas semantics, actual dispatch and public execution. ECRECOVER, SHA-256,
-RIPEMD-160 and P256VERIFY each still need an independent algorithm semantics
-connected to its Core implementation; creation and assembly follow as their
-proof domains are connected. Each proof step must derive runtime inputs from
+The identity and SHA-256 precompiles are connected through their independent
+gas, byte-copy and digest semantics, actual dispatch and public execution.
+ECRECOVER, RIPEMD-160 and P256VERIFY each still need an independent algorithm
+semantics connected to its Core implementation; RIPEMD-160 can reuse the
+connected block-streaming helper. Creation and assembly follow as their proof
+domains are connected. Each proof step must derive runtime inputs from
 actual initialization and end in a public theorem consumer. Executable support
 and test agreement alone do not close these obligations.
 
 ## Remaining public connections
 
 `call` and `staticcall` have public connections for calls without child execution,
-finite nested compiled children, root reentry and the identity precompile. The
-other precompile branches remain.
+finite nested compiled children, root reentry and the identity and SHA-256
+precompiles. The other precompile branches remain.
 Two builtins still have no public effect connection: `create` and
 `create2`. CALLCODE and DELEGATECALL are covered by the same
 finite nested-child connection.
 
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
-| 1 | Contract calls | Connect ECRECOVER (1), SHA-256 (2), RIPEMD-160 (3) and P256VERIFY (0x100) through independent algorithm semantics. Reuse the identity connection's dispatch, checkpoint restoration and public resumptions. |
+| 1 | Contract calls | Connect ECRECOVER (1), RIPEMD-160 (3) and P256VERIFY (0x100) through independent algorithm semantics. Reuse the connected dispatch, block streaming, checkpoint restoration and public resumptions. |
 | 2 | Contract creation | Connect creator nonce changes, address calculation, collision checks, init execution, code installation and failure rollback. Include deployment contexts. |
 | 3 | Assembly and source revert | Define independent Yul evaluation with its argument order, then connect actual statement lowering and Hull assembly to public execution. Connect Hull's string revert through its memory writes and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |

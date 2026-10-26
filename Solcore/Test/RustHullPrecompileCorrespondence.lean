@@ -563,9 +563,274 @@ def run : IO Unit := do
 
 end Modes
 
+namespace Digest
+
+/-- SHA-256 of "abc" from caller memory, copied back into caller memory. The
+underfunded scenario forwards one gas unit less than the 72-gas charge. -/
+inductive Scenario where
+  | funded | underfunded
+  deriving DecidableEq, Repr
+def gasText (scenario : Scenario) : String := if scenario = .underfunded then "71" else "100"
+def gas (scenario : Scenario) : Core.Word := if scenario = .underfunded then w 71 else w 100
+def seeds : List Expr := [call .unit "mstore8" [word "0", word "97"], call .unit "mstore8" [word "1", word "98"],
+  call .unit "mstore8" [word "2", word "99"]]
+def invoked (scenario : Scenario) : Expr :=
+  call .word "call" [word (gasText scenario), word "2", word "0", word "0", word "3", word "32", word "32"]
+def stored (scenario : Scenario) : Expr := call .unit "mstore8" [word "64", invoked scenario]
+def returned : Expr := call .unit "return" [word "32", word "33"]
+def code (scenario : Scenario) : CodeBlock := {
+  stmts := seeds.map expression ++ [expression (stored scenario), expression returned], functions := []}
+def program (scenario : Scenario) : Program :=
+  {entryPoints := [], functions := [], objects := [.object "Digest" (code scenario) []]}
+
+def first : MemorySemantics.State := (MemorySemantics.mstore8 {} (w 0) (w 97)).2
+def second : MemorySemantics.State := (MemorySemantics.mstore8 first (w 1) (w 98)).2
+def third : MemorySemantics.State := (MemorySemantics.mstore8 second (w 2) (w 99)).2
+def afterThird (object : Contract.CompiledObject) : SourceState := withMemory (initial object) third
+
+/-- The three-byte input snapshot copied by the caller. -/
+def input : MemorySemantics.State :=
+  ⟨MemoryCopySemantics.written (MemoryCopySemantics.written (MemoryCopySemantics.written [] (w 0) (w 3)
+      (MemoryCopySemantics.copiedWord third.words (w 0) (w 3))) (w 1) (w 2)
+      (MemoryCopySemantics.copiedWord third.words (w 1) (w 2))) (w 2) (w 1)
+      (MemoryCopySemantics.copiedWord third.words (w 2) (w 1)), w 32⟩
+/-- The independent SHA-256 digest of the snapshot. -/
+def digest : Core.Word :=
+  Sha256Semantics.digest (Sha256Semantics.compress Sha256Semantics.initial
+    (Sha256Semantics.readBlock input.words Core.Word.zero (w 3) (Sha256Semantics.bitLength (w 3)) false))
+def response (scenario : Scenario) : AccountCallSemantics.Response :=
+  if scenario = .underfunded then AccountCallSemantics.emptyResponse false else ⟨true, [(Core.Word.zero, digest)], w 32⟩
+def status (scenario : Scenario) : Core.Word := if scenario = .underfunded then w 0 else w 1
+def copiedMemory (scenario : Scenario) : MemorySemantics.State :=
+  if scenario = .underfunded then ⟨third.words, w 64⟩
+  else ⟨MemoryCopySemantics.written third.words (w 32) (w 32)
+    (MemoryCopySemantics.copiedWord [(Core.Word.zero, digest)] (w 0) (w 32)), w 64⟩
+def nextTransport (scenario : Scenario) : CallTransportSemantics.State :=
+  ⟨copiedMemory scenario, (response scenario).data, (response scenario).size⟩
+def afterCall (object : Contract.CompiledObject) (scenario : Scenario) : SourceState :=
+  ⟨[], RuntimeCallEffectsSemantics.withTransport (afterThird object).external (nextTransport scenario)
+    (RuntimeCallEffectsSemantics.shared (afterThird object).external)⟩
+def afterStore (object : Contract.CompiledObject) (scenario : Scenario) : SourceState :=
+  withMemory (afterCall object scenario) (MemorySemantics.mstore8 (copiedMemory scenario) (w 64) (status scenario)).2
+def finalState (object : Contract.CompiledObject) (scenario : Scenario) : SourceState :=
+  let state := (afterStore object scenario).external
+  ⟨[], {state with runtime := (RuntimeReturnDataEffectsSemantics.withRuntime state.runtime
+    (TerminationSemantics.terminate state.runtime.runtime.runtime.runtime.runtime 1 (w 32) (w 33)).2)}⟩
+
+private theorem first_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none) []
+      (call .unit "mstore8" [word "0", word "97"]) (initial object) (.value .unit) (withMemory (initial object) first) := by
+  apply Semantics.EvalExpr.call rfl
+  · exact .cons (.word (text := "0") rfl) (.cons (.word (text := "97") rfl) .nil)
+  · exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
+
+private theorem second_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none) []
+      (call .unit "mstore8" [word "1", word "98"]) (withMemory (initial object) first) (.value .unit) (withMemory (initial object) second) := by
+  apply Semantics.EvalExpr.call rfl
+  · exact .cons (.word (text := "1") rfl) (.cons (.word (text := "98") rfl) .nil)
+  · exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
+
+private theorem third_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none) []
+      (call .unit "mstore8" [word "2", word "99"]) (withMemory (initial object) second) (.value .unit) (afterThird object) := by
+  apply Semantics.EvalExpr.call rfl
+  · exact .cons (.word (text := "2") rfl) (.cons (.word (text := "99") rfl) .nil)
+  · exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
+
+private theorem input_copied :
+    MemoryCopySemantics.From third.words (w 0) (w 0) (w 3) {} (.value .unit) input := by
+  apply MemoryCopySemantics.From.done (by decide +kernel)
+  apply MemoryCopySemantics.Copy.step (by decide +kernel)
+  apply MemoryCopySemantics.Copy.step (by decide +kernel)
+  apply MemoryCopySemantics.Copy.step (by decide +kernel)
+  rw [show (((w 3).sub (Core.Word.ofNatModulo (MemoryCopySemantics.width (w 3)))).sub
+      (Core.Word.ofNatModulo (MemoryCopySemantics.width ((w 3).sub (Core.Word.ofNatModulo (MemoryCopySemantics.width (w 3))))))).sub
+      (Core.Word.ofNatModulo (MemoryCopySemantics.width (((w 3).sub (Core.Word.ofNatModulo (MemoryCopySemantics.width (w 3)))).sub
+        (Core.Word.ofNatModulo (MemoryCopySemantics.width ((w 3).sub (Core.Word.ofNatModulo (MemoryCopySemantics.width (w 3))))))))) =
+      Core.Word.zero from by decide +kernel]
+  exact .empty _ _ _ _
+
+private theorem output_copied :
+    MemoryCopySemantics.Copy [(Core.Word.zero, digest)] (w 32) Core.Word.zero (w 32) third.words
+      (copiedMemory .funded).words := by
+  apply MemoryCopySemantics.Copy.step (by decide +kernel)
+  rw [show (w 32).sub (Core.Word.ofNatModulo (MemoryCopySemantics.width (w 32))) = Core.Word.zero from by decide +kernel]
+  exact .empty _ _ _ _
+
+private theorem target_masked : (w 2).bitAnd (w (2 ^ 160 - 1)) = w 2 := by decide +kernel
+
+private theorem invoked_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    RuntimeCallEffectsSemantics.Call (fun _ => AccountCallSemantics.noChildren) .ordinary
+      (gas scenario) (w 2) (w 0) (w 0) (w 3) (w 32) (w 32)
+      (afterThird object).external (.value (.word (status scenario))) (afterCall object scenario).external := by
+  apply RuntimeCallEffectsSemantics.Call.invoked (.inr (.inl rfl)) (by intros _ nonzero; exact False.elim (nonzero rfl))
+  apply CallTransportSemantics.Execute.ready (inputSize := w 32) (outputSize := w 64)
+  · change MemorySemantics.touchSize? third.size (w 0) (w 3) = some (w 32)
+    decide +kernel
+  · change MemorySemantics.touchSize? (w 32) (w 32) (w 32) = some (w 64)
+    decide +kernel
+  cases scenario
+  case funded =>
+    apply CallTransportSemantics.Dispatch.returned (input := input) (response := response .funded) (result := .value .unit)
+    · change ¬w 0 > w 1023
+      decide +kernel
+    · exact input_copied
+    · rfl
+    · apply AccountCallSemantics.Dispatch.succeeded
+        (transferred := RuntimeCallEffectsSemantics.shared (afterThird object).external)
+      · exact .inr (by change ¬w 0 > w 10; decide +kernel)
+      · rfl
+      · apply AccountCallSemantics.Run.precompile
+        apply AccountCallSemantics.Precompile.sha256 (size := w 32)
+        · exact target_masked
+        · change MemorySemantics.touchSize? Core.Word.zero Core.Word.zero (w 3) = some (w 32)
+          decide +kernel
+        · change AccountCallSemantics.linearCost 60 12 (w 3) ≤ (w 100).val
+          decide
+        · exact .last (by change ¬w 3 > w 63; decide +kernel) (by change ¬w 3 > w 55; decide +kernel)
+      · rfl
+    · apply MemoryCopySemantics.From.done (size := w 64)
+      · change MemorySemantics.touchSize? (w 64) (w 32) (w 32) = some (w 64)
+        decide +kernel
+      · exact output_copied
+  case underfunded =>
+    apply CallTransportSemantics.Dispatch.returned (input := input) (response := response .underfunded) (result := .value .unit)
+    · change ¬w 0 > w 1023
+      decide +kernel
+    · exact input_copied
+    · rfl
+    · apply AccountCallSemantics.Dispatch.refused
+        (transferred := RuntimeCallEffectsSemantics.shared (afterThird object).external)
+      · exact .inr (by change ¬w 0 > w 10; decide +kernel)
+      · rfl
+      · apply AccountCallSemantics.Run.precompile
+        apply AccountCallSemantics.Precompile.sha256Underfunded (size := w 32)
+        · exact target_masked
+        · change MemorySemantics.touchSize? Core.Word.zero Core.Word.zero (w 3) = some (w 32)
+          decide +kernel
+        · change (w 71).val < AccountCallSemantics.linearCost 60 12 (w 3)
+          decide
+      · rfl
+    · exact .done rfl (.empty _ _ _ _)
+
+private theorem call_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none) [] (invoked scenario)
+      (afterThird object) (.value (.word (status scenario))) (afterCall object scenario) := by
+  cases scenario <;> apply Semantics.EvalExpr.call rfl
+  all_goals first
+    | exact (.cons (.word (text := "100") rfl) (.cons (.word (text := "2") rfl) (.cons (.word (text := "0") rfl) (.cons (.word (text := "0") rfl) (.cons (.word (text := "3") rfl) (.cons (.word (text := "32") rfl) (.cons (.word (text := "32") rfl) .nil)))))))
+    | exact (.cons (.word (text := "71") rfl) (.cons (.word (text := "2") rfl) (.cons (.word (text := "0") rfl) (.cons (.word (text := "0") rfl) (.cons (.word (text := "3") rfl) (.cons (.word (text := "32") rfl) (.cons (.word (text := "32") rfl) .nil)))))))
+    | exact .external (by rfl) rfl (.call (invoked_source object .funded))
+    | exact .external (by rfl) rfl (.call (invoked_source object .underfunded))
+
+private theorem store_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none) [] (stored scenario)
+      (afterThird object) (.value .unit) (afterStore object scenario) := by
+  apply Semantics.EvalExpr.call rfl (.cons (.word (text := "64") rfl) (.cons (call_source object scenario) .nil))
+  cases scenario <;>
+    exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
+
+private theorem return_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none) [] returned
+      (afterStore object scenario) result (finalState object scenario) := by
+  apply Semantics.EvalExpr.call rfl
+  · exact .cons (.word (text := "32") rfl) (.cons (.word (text := "33") rfl) .nil)
+  · cases scenario <;>
+      exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.termination rfl)))))))
+
+theorem source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalFunction [AccountRuntime.frameFunction (code scenario)] (RuntimeCallEffectsSemantics.effects none)
+      (AccountRuntime.frameFunction (code scenario)) [] (initial object) result (finalState object scenario) := by
+  apply Semantics.EvalFunction.body (control := .fault _) rfl
+  apply Semantics.EvalStatements.next (by intros; intro impossible; cases impossible)
+    (.expression rfl (first_source object scenario))
+  apply Semantics.EvalStatements.next (by intros; intro impossible; cases impossible)
+    (.expression rfl (second_source object scenario))
+  apply Semantics.EvalStatements.next (by intros; intro impossible; cases impossible)
+    (.expression rfl (third_source object scenario))
+  apply Semantics.EvalStatements.next (by intros; intro impossible; cases impossible) (.expression rfl (store_source object _))
+  exact .stop (by intros; intro impossible; cases impossible) (.expressionFault rfl (return_source object _))
+    (by intro impossible; cases impossible)
+
+def usedNames : List String := ["mstore8", "call", "return"]
+
+theorem eligible (scenario : Scenario) {supported : String → Prop}
+    (available : ∀ name ∈ usedNames, supported name) :
+    ExecutableProgram supported [AccountRuntime.frameFunction (code scenario)] := by
+  intro function member statement statementMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+  subst function
+  simp only [AccountRuntime.frameFunction, code, seeds, List.map_cons, List.map_nil, List.cons_append,
+    List.nil_append, List.mem_cons, List.not_mem_nil, or_false] at statementMember
+  rcases statementMember with rfl | rfl | rfl | rfl | rfl
+  all_goals simp only [expression, ExecutableStatement]
+  · exact atoms _ .unit "mstore8" ["0", "97"] (available _ (by simp [usedNames])) (by rfl)
+  · exact atoms _ .unit "mstore8" ["1", "98"] (available _ (by simp [usedNames])) (by rfl)
+  · exact atoms _ .unit "mstore8" ["2", "99"] (available _ (by simp [usedNames])) (by rfl)
+  · apply ExecutableExpression.external (name := "mstore8") (available _ (by simp [usedNames])) (by rfl)
+    intro argument member
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl
+    · exact .word _ _ _
+    · cases scenario <;> first
+        | exact atoms _ .word "call" ["100", "2", "0", "0", "3", "32", "32"] (available _ (by simp [usedNames])) (by rfl)
+        | exact atoms _ .word "call" ["71", "2", "0", "0", "3", "32", "32"] (available _ (by simp [usedNames])) (by rfl)
+  · exact atoms _ .unit "return" ["32", "33"] (available _ (by simp [usedNames])) (by rfl)
+
+private theorem names_supported : ∀ name ∈ usedNames, ContractCallCorrespondence.supported false name := by
+  intro name member
+  simp only [usedNames, List.mem_cons, List.not_mem_nil, or_false] at member
+  rcases member with rfl | rfl | rfl
+  · exact .inl (.inl (.inl (.inl (.inl (.inl (.inl (.inl (.inl ⟨.store8, rfl⟩))))))))
+  · exact .inr (.inl rfl)
+  · exact .inl (.inl (.inl (.inl (.inl (.inr ⟨.returned, rfl⟩)))))
+
+/-- Public consumer for SHA-256: actual compilation success is the only
+premise besides the independent source derivation. -/
+theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
+    (accepted : Contract.compileObject (program scenario) ["Digest"] 64 none [] = .ok object) :
+    ∃ value, ContractCallCorrespondence.PublicMessageRel context result (finalState object scenario).external value ∧
+      ∃ required, ∀ initialFuel additional limit last,
+        Contract.ReceiptResumes limit (Contract.runWithReceipt (object.instantiate context) initialFuel limit) additional last →
+        (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
+        ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
+  exact ContractCallCorrespondence.compileObject_resumes_exact (code := code scenario) (by rfl) accepted
+    (eligible scenario names_supported) context rfl (source object scenario)
+
+/-- FIPS 180-4 test vector for "abc", checked against the independent digest. -/
+def abcDigest : Nat := 0xba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+theorem digest_eq : digest = w abcDigest := by decide +kernel
+
+private def digestBytes : List UInt8 := (List.range 32).map fun index => UInt8.ofNat (abcDigest / 256 ^ (31 - index) % 256)
+
+private def check (scenario : Scenario) : IO Unit := do
+  let object ← match Contract.compileObject (program scenario) ["Digest"] 64 none [] with
+    | .ok object => pure object
+    | .error error => throw (IO.userError s!"sha256 correspondence: compile failed: {reprStr error}")
+  let prepared := object.instantiate context
+  let checkpoint ← match (Contract.runWithReceipt prepared 0).outcome with
+    | .outOfFuel checkpoint => pure checkpoint
+    | outcome => throw (IO.userError s!"sha256 correspondence: zero fuel completed: {reprStr outcome}")
+  let expected := if scenario = .underfunded then List.replicate 32 0 ++ [0] else digestBytes ++ [1]
+  for receipt in [Contract.runWithReceipt prepared 100000000, Contract.resumeWithReceipt checkpoint 100000000] do
+    match receipt.outcome with
+    | .returned bytes storage =>
+        unless bytes == expected && storage.isEmpty && receipt.logs.isEmpty && receipt.balances == [(w 0, w 10)] do
+          throw (IO.userError s!"sha256 correspondence: wrong result for {reprStr scenario}: {reprStr receipt}")
+    | outcome => throw (IO.userError s!"sha256 correspondence: expected return for {reprStr scenario}: {reprStr outcome}")
+
+def run : IO Unit := do
+  for scenario in [Scenario.funded, .underfunded] do
+    check scenario
+
+end Digest
+
 def run : IO Unit := do
   for scenario in [Scenario.identity, .underfunded, .transfer, .staticCall] do
     check scenario
   Modes.run
+  Digest.run
 
 end Tests.RustHullPrecompileCorrespondence
