@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input and named-helper emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper and raw-primitive emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -565,16 +565,26 @@ The proof now also covers the `runtime-functions` emitter.
 `Function.emit_source_meaning` states that its text parses to one free function
 per Core helper and that `run(uint256)` returns the Word of the original Core
 binding chain at every input. Each source helper sees only earlier helpers, as
-Core closures capture only earlier helpers. Raw primitive aliases, call graphs
-and the aggregate, loop, mutation, storage, call, closure, generic, comptime and
-module emitters are not covered; primitive aliases and call graphs come next.
+Core closures capture only earlier helpers.
+
+The `runtime-primitives` emitter is covered as well.
+`Primitive.emit_source_meaning` gives the fourteen raw `std.opcodes` aliases the
+EVM instructions they import, and proves that each Core Word operation agrees
+with its instruction. These include signed division and remainder, the
+arithmetic shift, sign extension, exponentiation, `CLZ` and the untruncated
+modular operations. The renderer lemmas are now generic over how a renderer
+prints each constructor and over the call context, so the primitive renderer
+reuses the shared cases. Call graphs and the aggregate, loop, mutation,
+storage, call, closure, generic, comptime and module emitters are not covered;
+call graphs come next.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
-fixtures and four named-helper graphs at eight boundary inputs, and twenty
-generated programs, agree with Core; malformed and meaningless texts are
-rejected. The full Lean build (9,940 jobs), registered tests and the
-semantic-kernel policy passed.
+fixtures, four named-helper graphs and 39 raw primitive bodies at eight or more
+boundary inputs, and twenty generated programs, agree with Core. Thirty-three
+primitive results also match hand-known Words. Malformed and meaningless texts,
+including calls to aliases that are not imported, are rejected. The full Lean
+build (9,944 jobs), registered tests and the semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

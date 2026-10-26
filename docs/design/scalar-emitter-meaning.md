@@ -16,17 +16,18 @@ semantic-kernel policy check now covers.
 | `emit_source_meaning` | If `emit program = .ok emitted`, then for some Word `w`, `sourceCall emitted.source "run" [] = some w.val` and `CoreReturns program.program.toCore w`. |
 | `Input.emit_source_meaning` | If `Input.emit function = .ok emitted`, then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
 | `Function.emit_source_meaning` | If `Function.emit graph = .ok emitted` (profile `runtime-functions`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (graph.instantiate x).toCore w`. |
-| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
-| `render_spec` | The induction over the actual `ScalarRenderer.renderWithFunctions`, with or without earlier helpers, described below. |
+| `Primitive.emit_source_meaning` | If `Primitive.emit function = .ok emitted` (profile `runtime-primitives`), then for every Word input `x` there is `w` with `sourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturns (function.instantiate x).toCore w`. |
+| `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
+| `render_spec`, `primitive_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers) and `PrimitiveRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 
 `sourceCall` lexes the emitted `String`, parses it and calls the method under
 the source semantics below. `CoreReturns core w` states that Core's
 `runStateful` returns `.done (.word w) []` for all sufficiently large fuel, and
 that every completed run returns exactly that Word and store. This is the Core
-machine used as the differential-testing oracle; for the runtime-input and
-named-helper profiles it runs the original lambda or binding chain applied to
-the input. Unsupported operations remain explicit emitter errors; the theorems
+machine used as the differential-testing oracle; for the runtime-input,
+named-helper and raw-primitive profiles it runs the original lambda or binding
+chain applied to the input. Unsupported operations remain explicit emitter errors; the theorems
 say nothing about failed emissions.
 
 ## Independent source meaning
@@ -88,11 +89,25 @@ alias, then to `std.tobool`. A free function runs like a method on its typed
 parameters and must return a value of its declared type. Each free function
 sees only the functions declared before it; a call to a later or recursive
 function has no meaning in this fragment. The emitted helpers call only
-earlier helpers, matching the Core binding chain. The `std.opcodes` wrappers
-pass their arguments in order to the EVM instruction of the same name; their
-meanings (division, signed operations, shifts, byte selection, sign
-extension, exponentiation, leading-zero count and modular arithmetic) are
-defined from the EVM specification, but no proved emitter uses them yet.
+earlier helpers, matching the Core binding chain. An alias means only the
+opcode its import names, and a call to a name that is neither declared nor
+imported has no meaning. The `std.opcodes` wrappers pass their `word`
+arguments, in order, to the EVM instruction of the same name; the source
+semantics defines these instructions from the EVM specification. Signed
+operands are read in two's complement.
+
+| Opcode | Meaning |
+| --- | --- |
+| `div(a, b)`, `mod(a, b)` | unsigned quotient or remainder; zero for `b = 0` |
+| `sdiv(a, b)`, `smod(a, b)` | quotient truncated toward zero, or remainder with the sign of `a`; zero for `b = 0` |
+| `sgt(a, b)` | one if `a > b` as signed words, else zero |
+| `shl(s, v)`, `shr(s, v)` | `v * 2^s mod 2^256` or `v / 2^s`; zero for `s ≥ 256` |
+| `sar(s, v)` | floor of the signed `v / 2^s`; for `s ≥ 256`, all ones if `v` is negative, else zero |
+| `addmod(a, b, m)`, `mulmod(a, b, m)` | `(a + b) mod m` or `(a * b) mod m` without truncation; zero for `m = 0` |
+| `clz(v)` | leading zero bits; `256` for zero |
+| `byte(i, v)` | byte `i` from the most significant end; zero for `i ≥ 32` |
+| `signextend(i, v)` | sign-extends the low `i + 1` bytes; `v` for `i ≥ 31` |
+| `exp(a, b)` | `a^b mod 2^256` |
 
 ## Connection to the actual emitter
 
@@ -102,7 +117,7 @@ definitional equality. It states each rendered case with the source syntax and
 printer; no second renderer is defined.
 
 `render_spec`, in [RendererPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/RendererPreservation.lean),
-covers every Core expression admitted by `acceptsAt` that the renderer accepts:
+covers every Core expression admitted by `functionAcceptsAt` that the renderer accepts:
 literals, locals, `let`, `if`, `!`, `~` and the eight binary operators. For
 temporaries numbered from `first`, the rendered lines are the printing of
 source statements. Executing them from frames that agree with a Core
@@ -118,6 +133,25 @@ at the end of both branch blocks. Freshness rests on the injectivity of
 `sc_v<n>` names, derived from Lean's `Nat.toDigits`. Core Word operations are
 related to the EVM formulas above.
 
+The per-constructor lemmas are generic. Each assumes only how a renderer
+prints its constructor (an inversion property), a predicate on the call
+context, and the fixed callee names the renderer may print. The scalar
+renderer instantiates them with every context and no fixed callees.
+[PrimitiveEquations](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveEquations.lean)
+unfolds the actual `PrimitiveRenderer.render` in the same way, and
+[PrimitivePreservation](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitivePreservation.lean)
+proves `primitive_render_spec`. The primitive renderer copies each raw opcode
+operand into a fresh `word` temporary, left to right, before the call. A copy
+is another rendering of the same operand, so the operand cases are reused.
+Shifts pass the shift amount first, as `sar(shift, value)` expects, and the
+signed comparison is printed as `tobool(sc_sgt(a, b))`. The call context must
+satisfy `PrimitiveContext`: each of the fourteen aliases reaches its opcode and
+`tobool` reaches the standard library function.
+[PrimitiveAgreement](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveAgreement.lean)
+proves that each Core Word operation (`udiv`, `sdiv`, `shiftArithmeticRight`,
+`signExtend`, `pow`, `addMod` and the others) agrees with its formula in the
+table above.
+
 [Emitter](../../Solcore/Synthesis/Source/ScalarMeaning/Emitter.lean) connects
 the wrappers. `emit` prints `run()` returning `uint256(value)`. `Input.emit`
 prints `run(input: uint256)` and first binds `sc_input` to
@@ -126,7 +160,10 @@ prints `run(input: uint256)` and first binds `sc_input` to
 restates the emitter's helper loop by structural recursion, proves it equal to
 the actual `for` loop, and shows by induction that each printed
 `sc_fn<k>(sc_arg: word)` agrees with the closure Core builds for helper `k`.
-Core machine results follow from `runStateful_evaluation_sound`,
+[PrimitiveEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveEmitter.lean)
+proves that the actual import line of `Primitive.emit` is the printing of the
+fourteen `opcode as alias` pairs, so the file's call context satisfies
+`PrimitiveContext`. Core machine results follow from `runStateful_evaluation_sound`,
 `evaluation_runStateful_complete_with_sufficient_fuel` and determinism of
 `Evaluates`.
 
@@ -148,8 +185,10 @@ Rust pipeline are assumed, and are exercised only by the existing tests:
    and `!` to `std.not`; decimal literals elaborate at `word`; the frontend
    accepts every emitted program. Rust acceptance is not proved.
 3. Standard library meaning. The instance chains and opcode wrappers behave as
-   transcribed in the table. The transcription is manual and cites the pinned
-   files; it is not derived from the Rust frontend.
+   transcribed in the tables. The transcription is manual and cites the pinned
+   files; it is not derived from the Rust frontend. In particular, the raw
+   `std.opcodes` wrappers do not revert for a zero modulus, unlike the public
+   `std.addmod` and `std.mulmod`, and the target EVM provides `CLZ`.
 4. Compilation and execution. Specialization, lowering, Sonatina or Yul code
    generation, optimization, EVM execution and `std.dispatch` are assumed.
    This includes selector dispatch, `uint256` ABI decoding and 32-byte result
@@ -161,13 +200,13 @@ in a corpus also does not replace this theorem for the printer.
 
 ## Scope
 
-The theorems cover `ScalarRenderer.renderWithFunctions` and three actual
-emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`) and named
-helpers (`runtime-functions`). They do not yet cover raw primitive aliases
-(`PrimitiveRenderer`, `runtime-primitives`), call graphs (`CallGraphRenderer`),
+The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`
+and four actual emitters: closed G0 (`closed-g0`), runtime input
+(`runtime-word`), named helpers (`runtime-functions`) and raw primitive aliases
+(`runtime-primitives`). They do not yet cover call graphs (`CallGraphRenderer`),
 aggregates, mutation, loops, storage, contract calls, closures, generic,
-comptime or module emitters. The planned order is primitive aliases, then call
-graphs, then mutation, aggregates and loops.
+comptime or module emitters. The planned order is call graphs, then mutation,
+aggregates and loops.
 
 ## Executable checks
 
@@ -176,7 +215,13 @@ in the test driver. It runs actual emitter output through `sourceCall` and
 compares the result with Core's `runStateful`. It covers all fifteen closed
 fixtures, also against hand-known Words, twelve runtime-input fixtures and the
 four named-helper graphs (single, chain, diamond and branch locals) at eight
-boundary inputs. Twenty programs from the first 96 G0 generator seeds
+boundary inputs. The fourteen raw primitive fixtures and 25 boundary bodies
+use the same eight inputs and their own boundary values. They cover zero
+divisors and moduli, shifts of 256 or more, negative signed operands, byte and
+sign positions and large exponents. Thirty-three primitive results are also
+checked against hand-known Words. A call to an alias that is not imported is
+rejected; swapping two aliases in the import line swaps their meanings.
+Twenty programs from the first 96 G0 generator seeds
 with a 40-node budget are emitted; the others are generator or emitter
 exclusions. Each accepted text must reparse and print back to itself. Extra or
 missing arguments, an undeclared method, `= =` in place of `==`, an

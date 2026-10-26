@@ -1,7 +1,9 @@
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Source.ScalarMeaning.FunctionEmitter
+import Solcore.Synthesis.Source.ScalarMeaning.PrimitiveEmitter
 import Solcore.Test.SourceFunctionEmitter
 import Solcore.Test.SourceInputEmitter
+import Solcore.Test.SourcePrimitiveEmitter
 import Solcore.Test.SourceSynthesisEmitter
 
 /-! Executable checks of the scalar source meaning on actual emitter output.
@@ -80,7 +82,8 @@ private def checkFunctions (label : String) (helpers : List Wire.Expr) (entry : 
     throw (IO.userError s!"named-helper fixture failed its checker: {label}")
   let emitted ← match Function.emit graph with
     | .ok value => pure value
-    | .error error => throw (IO.userError s!"named-helper emission failed: {label}: {reprStr error}")
+    | .error error =>
+        throw (IO.userError s!"named-helper emission failed: {label}: {reprStr error}")
   checkReprint label emitted.source
   for input in boundaryInputs do
     let expected ← coreWord (graph.instantiate (Word.ofNatModulo input)).toCore
@@ -90,6 +93,98 @@ private def checkFunctions (label : String) (helpers : List Wire.Expr) (entry : 
   ensure (undeclared != emitted.source) s!"named-helper fixture has no call to sc_fn0: {label}"
   ensure ((parseSource undeclared).isSome && sourceCall undeclared "run" [1] == none)
     s!"a call to an undeclared helper received a meaning: {label}"
+
+private def wordExpr (value : Nat) : Wire.Expr := .word (Word.ofNatModulo value)
+private def high : Nat := 2 ^ 255
+private def maximum : Nat := 2 ^ 256 - 1
+
+private def emitPrimitive (label : String) (function : CheckedWordFunction) :
+    IO EmittedProgram :=
+  match Primitive.emit function with
+  | .ok value => pure value
+  | .error error => throw (IO.userError s!"primitive emission failed: {label}: {reprStr error}")
+
+/-- Raw primitive bodies: each runtime input is compared with the original
+Core function. -/
+private def checkPrimitive (label : String) (body : Wire.Expr) (inputs : List Nat) :
+    IO Unit := do
+  let function ← checkedFunction body
+  let emitted ← emitPrimitive label function
+  checkReprint label emitted.source
+  for input in inputs ++ boundaryInputs do
+    let expected ← coreWord (function.instantiate (Word.ofNatModulo input)).toCore
+    ensure (sourceCall emitted.source "run" [input] == some expected)
+      s!"primitive source meaning differs from Core: {label} at {input}"
+
+/-- Zero divisors and moduli, out-of-range shifts, byte indices and sign
+positions, negative signed operands and large exponents. -/
+private def primitiveBoundaries : List (String × Wire.Expr × List Nat) :=
+  [Wire.BinaryOp.wordDiv, .wordMod, .wordSdiv, .wordSmod].map (fun operation =>
+      ("zero divisor", .binary operation (.var 0) (wordExpr 0), [])) ++
+  [Wire.TernaryOp.wordAddMod, .wordMulMod].flatMap (fun operation =>
+      [("zero modulus", .ternary operation (.var 0) (wordExpr maximum) (wordExpr 0), []),
+        ("unit modulus", .ternary operation (.var 0) (wordExpr maximum) (wordExpr 1), []),
+        ("large modulus",
+          .ternary operation (.var 0) (wordExpr maximum) (wordExpr (maximum - 1)), [])]) ++
+  [("shift left amount", .binary .wordShl (wordExpr 1) (.var 0), [257]),
+    ("shift right amount", .binary .wordShr (wordExpr maximum) (.var 0), [257]),
+    ("arithmetic shift negative", .binary .wordSar (wordExpr high) (.var 0), [257]),
+    ("arithmetic shift positive", .binary .wordSar (wordExpr (high - 1)) (.var 0), [257]),
+    ("signed division negative", .binary .wordSdiv (.var 0) (wordExpr 2), [maximum - 6]),
+    ("signed division both negative", .binary .wordSdiv (.var 0) (wordExpr (maximum - 1)),
+      [maximum - 6]),
+    ("signed remainder negative", .binary .wordSmod (.var 0) (wordExpr (maximum - 1)),
+      [maximum - 6, 7]),
+    ("signed greater negative", .ifE (.binary .wordSgt (.var 0) (wordExpr high)) (wordExpr 1)
+      (wordExpr 0), []),
+    ("byte index", .binary .wordByte (.var 0) (wordExpr (high + 4660)), [30, 31, 32]),
+    ("sign position", .binary .wordSignExtend (.var 0) (wordExpr 128), [31, 32]),
+    ("sign extend word", .binary .wordSignExtend (wordExpr 1) (.var 0), [32768]),
+    ("exponent", .binary .wordPow (wordExpr 2) (.var 0), [254, 257]),
+    ("negative base", .binary .wordPow (wordExpr maximum) (.var 0), [3]),
+    ("zero exponent", .binary .wordPow (.var 0) (wordExpr 0), []),
+    ("nested primitives", .ternary .wordMulMod
+      (.binary .wordShl (.var 0) (.unary .wordClz (.var 0)))
+      (.binary .wordSar (.var 0) (wordExpr 3))
+      (.letE (.binary .wordSmod (.var 0) (wordExpr 1000)) (.binary .wordAdd (.var 0) (.var 1))),
+      [12345])]
+
+/-- Hand-known results of the primitive fixtures, copied from the Core
+regression in `SourcePrimitiveEmitter` and independent of both Core and the
+source semantics. -/
+private def knownPrimitiveResults : List (String × Nat × Nat) := [
+  ("div", 1, 0), ("div", maximum, high - 1), ("mod", maximum, 1),
+  ("shl", maximum, maximum - 1), ("shl", high, 0), ("shr", maximum, high - 1),
+  ("sar", 5, 2), ("sar", maximum, maximum), ("sar", high, high + high / 2),
+  ("sdiv", 7, maximum - 6), ("sdiv", maximum, 1), ("sdiv", high, high),
+  ("smod", 7, 1), ("smod", maximum - 6, maximum), ("smod", high, 0),
+  ("sgt", 1, 1), ("sgt", maximum, 0), ("sgt", high, 0), ("sgt", high - 1, 1),
+  ("addmod", maximum, 1), ("addmod", maximum - 1, 0), ("mulmod", high, 1),
+  ("clz", 0, 256), ("clz", 1, 255), ("clz", high, 0), ("clz", high - 1, 1),
+  ("byte", maximum, 255), ("byte", high, 0), ("pow", maximum, 1), ("pow", high, 0),
+  ("signextend", 127, 127), ("signextend", 128, maximum - 127), ("signextend", 256, 0)]
+
+private def checkKnownPrimitives : IO Unit := do
+  for (label, input, expected) in knownPrimitiveResults do
+    let some (_, body) := Tests.SourcePrimitiveEmitter.fixtures.find? (·.1 == label) |
+      throw (IO.userError s!"missing primitive fixture: {label}")
+    let emitted ← emitPrimitive label (← checkedFunction body)
+    ensure (sourceCall emitted.source "run" [input] == some expected)
+      s!"primitive source meaning differs from its hand-known result: {label} at {input}"
+
+/-- A call reaches only the opcode its alias imports. -/
+private def checkPrimitiveImports : IO Unit := do
+  let emitted ← emitPrimitive "import" (← checkedFunction (.binary .wordDiv (.var 0) (wordExpr 2)))
+  ensure (sourceCall emitted.source "run" [7] == some 3) "the division fixture changed"
+  let dropped := emitted.source.replace "div as sc_div, " ""
+  ensure (dropped != emitted.source) "the import line lost its division alias"
+  ensure ((parseSource dropped).isSome && sourceCall dropped "run" [7] == none)
+    "a call to an alias that is not imported received a meaning"
+  let swapped := emitted.source.replace "div as sc_div, mod as sc_mod"
+    "mod as sc_div, div as sc_mod"
+  ensure (swapped != emitted.source) "the import line changed its first aliases"
+  ensure (sourceCall swapped "run" [7] == some 1)
+    "an alias did not take the meaning of the opcode it imports"
 
 /-- Hand-known Words for the wrap-around and bitwise fixtures, independent of
 both Core and the source semantics. -/
@@ -162,14 +257,22 @@ def testSourceScalarMeaning : IO Unit := do
     checkInput label (← checkedFunction body)
   for (label, helpers, entry) in Tests.SourceFunctionEmitter.fixtures do
     checkFunctions label helpers entry
+  for (label, body) in Tests.SourcePrimitiveEmitter.fixtures do
+    checkPrimitive label body []
+  for (label, body, inputs) in primitiveBoundaries do
+    checkPrimitive label body inputs
+  checkKnownPrimitives
+  checkPrimitiveImports
   checkRejections
   let (checked, excluded) ← checkGenerated
   ensure (checked ≥ 16) s!"too few generated programs reached the source meaning: {checked}"
   let closed := Tests.SourceSynthesisEmitter.fixtures.length
   let inputs := Tests.SourceInputEmitter.fixtures.length
   let graphs := Tests.SourceFunctionEmitter.fixtures.length
-  IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures and " ++
-    s!"{graphs} named-helper graphs x {boundaryInputs.length} inputs, {checked} generated " ++
-    s!"programs ({excluded} excluded) agree with Core")
+  let primitives := Tests.SourcePrimitiveEmitter.fixtures.length + primitiveBoundaries.length
+  IO.println (s!"scalar source meaning: {closed} closed fixtures, {inputs} input fixtures, " ++
+    s!"{graphs} named-helper graphs and {primitives} raw primitive bodies x at least " ++
+    s!"{boundaryInputs.length} inputs, {checked} generated programs ({excluded} excluded) " ++
+    s!"agree with Core")
 
 end Tests.SourceScalarMeaning
