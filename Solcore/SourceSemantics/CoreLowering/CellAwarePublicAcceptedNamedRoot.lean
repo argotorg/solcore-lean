@@ -34,6 +34,22 @@ theorem compilation_receipts {recipe : SourceCoreIndexedSession.Recipe}
   rw [SourceCoreCompiler.compileChecked_program generated]
   exact checked
 
+/-- The accepted body receipt of a prepared header, refined so that every
+assignment the compiler supports carries its receipt. -/
+theorem refined_body {whole : SourceCoreUnifiedCompilation.Compiled} {row : SourceSpecialization.SpecializedFunction}
+    (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared whole row) {instantiation : DeclarationInstantiation}
+    {header : Header whole (Program.ofChecked whole.sourceProgram)}
+    (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header) :
+    ∃ body : AcceptedNamedBodyFlow.Body (index prepared aligned).policy (index prepared aligned).fuel
+        (index prepared aligned).compilerSource (index prepared aligned).scope (index prepared aligned).statements
+        (index prepared aligned).result (index prepared aligned).reasonAt (index prepared aligned).fellThrough
+        (index prepared aligned).escaped (index prepared aligned).body,
+      body.tree.Ready := by
+  obtain ⟨body⟩ := (index prepared aligned).body_receipt
+  obtain ⟨tree, ready⟩ := body.tree.refine (index prepared aligned).assignment_policy
+    (index prepared aligned).bitNot_policy (RecursiveNamedPreparedHeaderPolicies.Prepared.match_success prepared)
+  exact ⟨⟨body.flow, tree, body.emitted⟩, ready⟩
+
 variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header whole (Program.ofChecked whole.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key whole (Program.ofChecked whole.sourceProgram))}
