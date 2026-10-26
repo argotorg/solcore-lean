@@ -11,6 +11,7 @@ import Solcore.Synthesis.Core.ComptimePlan
 import Solcore.Synthesis.Core.ModulePlan
 import Solcore.Synthesis.Core.StorageContract
 import Solcore.Synthesis.Core.StorageRollback
+import Solcore.Synthesis.Core.KeyedStorage
 import Solcore.Synthesis.Core.NestedCall
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink

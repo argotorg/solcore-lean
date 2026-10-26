@@ -47,3 +47,11 @@ lean_exe rustHullScenario where
 lean_exe rustHullContract where
   root := `Tests.RustHullContractRun
   exeName := "rust-hull-contract"
+
+lean_exe semanticKeyedStorageTool where
+  root := `Tests.SemanticKeyedStorageTool
+  exeName := "semantic-keyed-storage-tool"
+
+lean_exe rustHullKeyedStorageScenario where
+  root := `Tests.RustHullKeyedStorageScenarioRun
+  exeName := "rust-hull-keyed-storage-scenario"

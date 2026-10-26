@@ -2148,6 +2148,9 @@ import Solcore.Test.RustHullRootCallRuntime
 import Solcore.Frontend.RustHull.Safety
 import Solcore.Test.SourceScalarMeaning
 import Solcore.Test.RustHullPrecompileCorrespondence
+import Solcore.Test.SourceKeyedStorageEmitter
+import Solcore.Test.SourceKeyedStorageCases
+import Solcore.Test.SourceKeyedStorageCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4090,5 +4093,8 @@ def main : IO UInt32 := do
   Tests.run
   Tests.SourceScalarMeaning.testSourceScalarMeaning
   Tests.RustHullPrecompileCorrespondence.run
+  Tests.SourceKeyedStorageEmitter.testSourceKeyedStorageEmitter
+  Tests.SourceKeyedStorageCases.testSourceKeyedStorageCases
+  Tests.SourceKeyedStorageCorpus.testSourceKeyedStorageCorpus
   IO.println "solcore-lean tests passed"
   return 0
