@@ -62,6 +62,7 @@ theorem compileFrame_call_preserves_observed {program : Program} {code : CodeBlo
     (delegateMember : ⟨"delegateCallHandler", Core.OptionalCell.cellType Calls.callbackType, handlers.delegateCall.location⟩ ∈ slots)
     (callerMember : ∃ location, (⟨"caller", .word, location⟩ : EffectSlot) ∈ slots)
     (valueMember : ∃ location, (⟨"callvalue", .word, location⟩ : EffectSlot) ∈ slots)
+    (createSlots : RuntimeCallModeEffectsCorrespondence.CreateSlots handlers slots)
     (initialRelated : StateRel (model layout (prefixRead layout.boundary store) slots image handlers anchors context) [] ⟨[], initial⟩ store)
     (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
     (callPassive : CallPassive layout slots)
@@ -92,7 +93,7 @@ theorem compileFrame_call_preserves_observed {program : Program} {code : CodeBlo
   obtain ⟨extension, status, bodyStore, related, executed, state, _⟩ :=
     assemble_program layout (prefixRead layout.boundary store) slots image withCode handlers passive callPassive
       memoryMember worldMember addressMember completeMember staticMember memorySizeMember exitMember offsetMember sizeMember
-      logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember anchors context children callbacks assembled selected eligible argumentValues evaluated
+      logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots anchors context children callbacks assembled selected eligible argumentValues evaluated
       (runtimeValues := values.reverse) (caller := bundleValues values :: captured)
       (by simpa [AccountRuntime.frameScope, slotTypes, MemoryFrameCorrespondence.slotTypes] using length)
       (MemoryFrameCorrespondence.frame_coverage _) runtime separated
@@ -173,6 +174,7 @@ theorem compileFrame_call_preserves {program : Program} {code : CodeBlock} {slot
     (delegateMember : ⟨"delegateCallHandler", Core.OptionalCell.cellType Calls.callbackType, handlers.delegateCall.location⟩ ∈ slots)
     (callerMember : ∃ location, (⟨"caller", .word, location⟩ : EffectSlot) ∈ slots)
     (valueMember : ∃ location, (⟨"callvalue", .word, location⟩ : EffectSlot) ∈ slots)
+    (createSlots : RuntimeCallModeEffectsCorrespondence.CreateSlots handlers slots)
     (initialRelated : StateRel (model layout (prefixRead layout.boundary store) slots image handlers anchors context) [] ⟨[], initial⟩ store)
     (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
     (callPassive : CallPassive layout slots)
@@ -194,7 +196,7 @@ theorem compileFrame_call_preserves {program : Program} {code : CodeBlock} {slot
   obtain ⟨extension, status, accounts, finalStore, represented, related, executed, state, _⟩ :=
     compileFrame_call_preserves_observed accepted eligible closureRelated resolved supplied length runtime separated
       memoryMember worldMember addressMember completeMember staticMember memorySizeMember exitMember offsetMember sizeMember
-      logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember initialRelated passive callPassive callbacks evaluated
+      logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots initialRelated passive callPassive callbacks evaluated
   exact ⟨extension, status, accounts, finalStore, represented, related, executed, state⟩
 
 /-- Direct evaluation of freshly compiled frame code is a special case of the
@@ -237,6 +239,7 @@ theorem compileFrame_preserves {program : Program} {code : CodeBlock} {slots : L
     (delegateMember : ⟨"delegateCallHandler", Core.OptionalCell.cellType Calls.callbackType, handlers.delegateCall.location⟩ ∈ slots)
     (callerMember : ∃ location, (⟨"caller", .word, location⟩ : EffectSlot) ∈ slots)
     (valueMember : ∃ location, (⟨"callvalue", .word, location⟩ : EffectSlot) ∈ slots)
+    (createSlots : RuntimeCallModeEffectsCorrespondence.CreateSlots handlers slots)
     (initialRelated : StateRel (model layout (prefixRead layout.boundary store) slots image handlers anchors context) [] ⟨[], initial⟩ store)
     (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
     (callPassive : CallPassive layout slots)
@@ -259,6 +262,6 @@ theorem compileFrame_preserves {program : Program} {code : CodeBlock} {slots : L
   exact compileFrame_call_preserves accepted eligible (CapturedClosure.lambda _ _ _ environment)
     Core.Evaluates.lambda supplied length runtime separated memoryMember worldMember addressMember completeMember
     staticMember memorySizeMember exitMember offsetMember sizeMember logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode
-    callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember initialRelated passive callPassive callbacks evaluated
+    callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots initialRelated passive callPassive callbacks evaluated
 
 end Solcore.Frontend.RustHull.RuntimeCallModeEffectsFrameCorrespondence

@@ -4,9 +4,11 @@ import Solcore.Frontend.RustHull.RuntimeCallModeCompatibility
 import Solcore.Frontend.RustHull.CallModeBuiltinCorrespondence
 import Solcore.Frontend.RustHull.ChildCallBuiltinCorrespondence
 import Solcore.Frontend.RustHull.RuntimeLinkedReturnDataEffectsCorrespondence
+import Solcore.Frontend.RustHull.CreationBuiltinCorrespondence
 
-/-! Message calls and account destruction join the existing concrete effects
-in the recursive Hull proof. Actual installation supplies captured handlers. -/
+/-! Message calls, account destruction and refused creation attempts join the
+existing concrete effects in the recursive Hull proof. Actual installation
+supplies captured handlers. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.RuntimeCallModeEffectsCorrespondence
 open Correspondence ScalarExecution DerivationCorrespondence
@@ -39,6 +41,7 @@ theorem external_preserves (layout : Layout) (baseline : Nat → Option Core.Val
     (delegateMember : ⟨"delegateCallHandler", Core.OptionalCell.cellType Calls.callbackType, handlers.delegateCall.location⟩ ∈ slots)
     (callerMember : ∃ location, (⟨"caller", .word, location⟩ : EffectSlot) ∈ slots)
     (valueMember : ∃ location, (⟨"callvalue", .word, location⟩ : EffectSlot) ∈ slots)
+    (createSlots : CreateSlots handlers slots)
     (anchors : Anchors) (context : Context layout)
     (children : RuntimeCallEffectsSemantics.State → AccountCallSemantics.Children)
     (callbacks : ∀ {world state store},
@@ -106,6 +109,26 @@ theorem external_preserves (layout : Layout) (baseline : Nat → Option Core.Val
               worldMember balancesMember addressMember completeMember staticMember memorySizeMember exitMember offsetMember sizeMember
               state packed
           exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
+      | create computed =>
+          intro typeFuel expected typeCompiled scope arguments lowered compiled world mapping environment initialStore argumentStore targets codes locations captured related packed runtime state installed
+          obtain ⟨gasLocation, gasMember⟩ := createSlots.gas
+          obtain ⟨target, finalStore, resultRelated, evaluated, finalState, retained⟩ :=
+            CreationBuiltinCorrespondence.create_preserves compiled computed related runtime passive callPassive
+              memoryMember memorySizeMember dataMember dataSizeMember addressMember callDepthMember staticMember
+              exitMember offsetMember sizeMember gasMember state
+              ⟨handlers.create.location, handlers.create.value, create_read state,
+                handlers.create.local_outside, handlers.create.closure⟩ createSlots.handler packed
+          exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
+      | create2 computed =>
+          intro typeFuel expected typeCompiled scope arguments lowered compiled world mapping environment initialStore argumentStore targets codes locations captured related packed runtime state installed
+          obtain ⟨gasLocation, gasMember⟩ := createSlots.gas
+          obtain ⟨target, finalStore, resultRelated, evaluated, finalState, retained⟩ :=
+            CreationBuiltinCorrespondence.create2_preserves compiled computed related runtime passive callPassive
+              memoryMember memorySizeMember dataMember dataSizeMember addressMember callDepthMember staticMember
+              exitMember offsetMember sizeMember gasMember state
+              ⟨handlers.create.location, handlers.create.value, create_read state,
+                handlers.create.local_outside, handlers.create.closure⟩ createSlots.handler packed
+          exact ⟨target, finalStore, resultRelated, evaluated, finalState, installed.preserved retained, retained⟩
 
 theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value)
     (slots : List EffectSlot) (image : Option (List UInt8)) (withCode : Bool) (handlers : ModeHandlers layout)
@@ -133,6 +156,7 @@ theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value
     (delegateMember : ⟨"delegateCallHandler", Core.OptionalCell.cellType Calls.callbackType, handlers.delegateCall.location⟩ ∈ slots)
     (callerMember : ∃ location, (⟨"caller", .word, location⟩ : EffectSlot) ∈ slots)
     (valueMember : ∃ location, (⟨"callvalue", .word, location⟩ : EffectSlot) ∈ slots)
+    (createSlots : CreateSlots handlers slots)
     (anchors : Anchors) (context : Context layout)
     (children : RuntimeCallEffectsSemantics.State → AccountCallSemantics.Children)
     (callbacks : ∀ {world state store},
@@ -163,7 +187,7 @@ theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value
       ClosuresPreserved store finalStore :=
   assemble_recursive_program_effects accepted selected
     (external_preserves layout baseline slots image withCode handlers passive callPassive memoryMember worldMember addressMember completeMember staticMember
-      memorySizeMember exitMember offsetMember sizeMember logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember anchors context children callbacks) eligible values evaluated
+      memorySizeMember exitMember offsetMember sizeMember logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots anchors context children callbacks) eligible values evaluated
     runtimeLength covered runtimeRelated separated state
 
 

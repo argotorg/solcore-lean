@@ -388,6 +388,6 @@ theorem names_supported : ∀ name ∈ usedNames, ContractCallModeCorrespondence
   rcases member with prior | rfl | rfl
   · exact .inl (.inl (runtime_supported name prior))
   · exact .inr (.inl rfl)
-  · exact .inr (.inr (.inr (.inr (.inr rfl))))
+  · exact .inr (.inr (.inr (.inr (.inr (.inl rfl)))))
 
 end Tests.RustHullLifecycleCorrespondence

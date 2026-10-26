@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.ChildCatalogExecutionCorrespondence
 import Solcore.Frontend.RustHull.ContractCallModeSupported
 import Solcore.Frontend.RustHull.ChildFrameModeSemantics
+import Solcore.Frontend.RustHull.CreationHandlerCorrespondence
 
 /-! Finite nested child execution uses the same compiled catalog identities.
 Selected child programs may call the installed dispatcher; execution at the
@@ -95,6 +96,8 @@ def FrameExecution (sourceCatalog : ChildFrameSemantics.Catalog)
   ∀ {locations : AccountCallCorrespondence.SharedLocations},
     AccountCallCorrespondence.SharedReferences depth environment capture.shared locations →
     RuntimeLinkedWorldCorrespondence.StateRel anchors sharedState.world locations.world initial →
+  ∀ {createValue : Value}, initial.read? creatorLocation = some (.inRight .unit createValue) →
+    CreationCorrespondence.HandlerClosure locations createValue →
   ∀ {status : Semantics.Result Semantics.Value} {finalSource : Semantics.State RuntimeCallModeSemantics.State}
     {response : Semantics.Result AccountCallSemantics.Response},
     Semantics.EvalFunction source.functions (effects (some source.bytes)) source.entry []

@@ -33,14 +33,14 @@ theorem objectRuntime_preserves {program : Program} {code : CodeBlock} {fuel : N
       MessageRel sourceResult finalSource.external context.address value := by
   obtain ⟨closure, captured⟩ := compileFrame_captures accepted environment
   obtain ⟨values, captures⟩ := catalogCompiled.captures environment
-  apply objectRuntime_evaluates_callbacks
+  apply objectRuntime_evaluates_creator
     (fun value _ => MessageRel sourceResult finalSource.external context.address value)
     (.cons captured captures) (ContractMemoryCorrespondence.sharedValues_related object context contextRelated)
-  intro functions shared dispatcher creator extra allocated cells dispatcherLocation creatorLocation functionsRelated references initialized separate description _ dispatcherRelated creatorRelated creatorFound creatorAfter dispatcherAfter dispatcherBefore capture
+  intro functions shared dispatcher creator extra allocated cells dispatcherLocation creatorLocation functionsRelated references initialized separate description _ dispatcherRelated creatorRelated creatorFound creatorAfter dispatcherAfter dispatcherBefore capture createValue createRead createCaptured
   have entry := ContractCatalogCorrespondence.entry_reference captures functionsRelated
   exact objectFrame_evaluates accepted eligible captured entry object context notDeploying
     (contextRelated.prepend extra) references initialized separate description creatorRelated creatorFound creatorAfter
-    dispatcherRelated dispatcherAfter dispatcherBefore capture catalogCompiled captures connection
+    dispatcherRelated dispatcherAfter dispatcherBefore capture createRead createCaptured catalogCompiled captures connection
     (ModeChildFrameCorrespondence.frame_execution sourceCatalog catalog anchors height) initialLinks evaluated
 
 def PublicMessageRel (context : Contract.Context) (result : Semantics.Result Semantics.Value)

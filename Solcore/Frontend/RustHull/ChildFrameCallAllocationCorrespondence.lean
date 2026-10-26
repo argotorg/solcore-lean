@@ -7,7 +7,9 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.ChildFrameCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder
 
-theorem allocateFrame_initializes_extra {depth : Nat} {environment : Environment} {initial : Store}
+/-- The allocation also identifies the frame's create-handler cell as the
+installed creator cell. -/
+theorem allocateFrame_initializes_creator {depth : Nat} {environment : Environment} {initial : Store}
     {frame dispatcher creator gas code size known : Code} {shared : AccountRuntime.References}
     (parent : RuntimeCallEffectsSemantics.State) (request : AccountCallSemantics.Request)
     (sharedState : AccountCallSemantics.Shared) (bytes : List UInt8)
@@ -40,6 +42,8 @@ theorem allocateFrame_initializes_extra {depth : Nat} {environment : Environment
       (∀ cell ∈ cells, cell.location < initial.length → cell ∈ sharedCells ∨ cell.name = "createHandler") →
       (∀ cell ∈ cells, cell.name ∈ sharedSlotTypes.map Prod.fst → cell ∈ sharedCells) →
       (∀ cell ∈ cells, extraProperty cell) →
+      (∀ cell ∈ cells, cell.name = "createHandler" →
+        cell = ContractRuntimeEffectsCorrespondence.creatorCell creatorLocation creatorValue) →
       Ready cells (initial ++ suffix) (Initial parent request sharedState bytes) bytes →
       ∃ value final, Core.Evaluates (extra ++ environment) (initial ++ suffix)
         (continuation values (depth + extra.length)) value final ∧ observes value final) :
@@ -115,16 +119,72 @@ theorem allocateFrame_initializes_extra {depth : Nat} {environment : Environment
     have same := (Core.evaluation_deterministic evaluated otherEvaluated).1
     subst other
     exact ⟨value, evaluated, origin.1, origin.2, additional⟩
-  obtain ⟨extra, suffix, values, cells, related, stored, signature', valid, locations, evaluates⟩ :=
-    allocateFrameSlots_separates (ContractRuntimeEffectsCorrespondence.FrameInitializersValid.and fresh extra) sharedReady creatorReady (previous := []) (previousCells := [])
+  obtain ⟨extra, suffix, values, cells, related, stored, signature', valid, locations, creators, evaluates⟩ :=
+    allocateFrameSlots_creates (ContractRuntimeEffectsCorrespondence.FrameInitializersValid.and fresh extra) sharedReady creatorReady (previous := []) (previousCells := [])
       .nil (by intro cell member; cases member) (by intro cell member; cases member) knownStored
       (by simpa only [List.append_nil] using knownSeparate)
   simp only [List.reverse_nil, List.nil_append, List.append_nil] at related stored valid locations
   obtain ⟨ready⟩ := initialized_ready parent request sharedState bytes world signature' stored
     (locations.subset (fun _ member => List.mem_append_right _ member)) (fun cell member => (valid cell member).1)
-  obtain ⟨value, final, evaluated, result⟩ := continued extra suffix cells values related stored signature' locations (fun cell member => (valid cell member).2.1) (fun cell member => (valid cell member).2.2.1) (fun cell member => (valid cell member).2.2.2) ready
+  have creatorCells : ∀ cell ∈ cells, cell.name = "createHandler" →
+      cell = ContractRuntimeEffectsCorrespondence.creatorCell creatorLocation creatorValue := by
+    intro cell member named
+    rcases List.mem_append.mp (creators cell member named) with sharedMember | creatorMember
+    · have present := List.mem_map_of_mem (f := fun cell : InitializedCell => (cell.name, cell.type)) sharedMember
+      rw [signature] at present
+      have names := List.mem_map_of_mem (f := Prod.fst) (List.mem_reverse.mp present)
+      change cell.name ∈ sharedSlotTypes.map Prod.fst at names
+      rw [named] at names
+      simp [sharedSlotTypes, Ambient.slots] at names
+    · simpa using creatorMember
+  obtain ⟨value, final, evaluated, result⟩ := continued extra suffix cells values related stored signature' locations (fun cell member => (valid cell member).2.1) (fun cell member => (valid cell member).2.2.1) (fun cell member => (valid cell member).2.2.2) creatorCells ready
   exact ⟨value, final, evaluates continuation value final evaluated, result⟩
 
+
+theorem allocateFrame_initializes_extra {depth : Nat} {environment : Environment} {initial : Store}
+    {frame dispatcher creator gas code size known : Code} {shared : AccountRuntime.References}
+    (parent : RuntimeCallEffectsSemantics.State) (request : AccountCallSemantics.Request)
+    (sharedState : AccountCallSemantics.Shared) (bytes : List UInt8)
+    {accounts : StorageCorrespondence.Accounts} (world : accounts.map Prod.fst = sharedState.world)
+    {sharedCells : List InitializedCell}
+    (references : RuntimeReferences depth environment shared sharedCells)
+    (signature : sharedCells.map (fun cell => (cell.name, cell.type)) = sharedSlotTypes.reverse)
+    (initialized : InitializedCells sharedCells initial) (separate : CellLocations sharedCells)
+    (observed : ∀ cell ∈ sharedCells, Observed accounts (Initial parent request sharedState bytes) bytes cell)
+    {creatorLocation : Nat} {creatorValue : Value}
+    (creatorRelated : CodeValue depth environment creator
+      (.cellRef (OptionalCell.cellType Creation.callbackType) creatorLocation))
+    (creatorFound : initial.read? creatorLocation = some creatorValue)
+    (creatorSeparate : ∀ cell ∈ sharedCells, cell.location ≠ creatorLocation)
+    (frameRelated : CodeValue depth environment frame (CallTransportCorrespondence.requestValue request))
+    (gasRelated : CodeValue depth environment gas (optionalWordValue (some request.gas)))
+    (codeRelated : CodeValue depth environment code (WordMapping.encode (Memory.packBytes bytes)))
+    (sizeRelated : CodeValue depth environment size (.word (Word.ofNatModulo bytes.length)))
+    (knownRelated : CodeValue depth environment known (.bool true))
+    (extraProperty : InitializedCell → Prop)
+    (freshExtra : FrameInitializersValid depth environment initial frame dispatcher gas code size known shared extraProperty)
+    (sharedExtra : ∀ cell ∈ sharedCells, extraProperty cell)
+    (creatorExtra : extraProperty (ContractRuntimeEffectsCorrespondence.creatorCell creatorLocation creatorValue))
+    (continuation : List Code → Code) (observes : Value → Store → Prop)
+    (continued : ∀ extra suffix cells values,
+      CodeValues (depth + extra.length) (extra ++ environment) values (cells.map InitializedCell.reference) →
+      InitializedCells cells (initial ++ suffix) →
+      cells.map (fun cell => (cell.name, cell.type)) = RuntimeExtendedInitializedEffects.slots true →
+      CellLocations (sharedCells ++ [ContractRuntimeEffectsCorrespondence.creatorCell creatorLocation creatorValue] ++ cells) →
+      (∀ cell ∈ cells, cell.location < initial.length → cell ∈ sharedCells ∨ cell.name = "createHandler") →
+      (∀ cell ∈ cells, cell.name ∈ sharedSlotTypes.map Prod.fst → cell ∈ sharedCells) →
+      (∀ cell ∈ cells, extraProperty cell) →
+      Ready cells (initial ++ suffix) (Initial parent request sharedState bytes) bytes →
+      ∃ value final, Core.Evaluates (extra ++ environment) (initial ++ suffix)
+        (continuation values (depth + extra.length)) value final ∧ observes value final) :
+    ∃ value final, Core.Evaluates environment initial
+      (AccountRuntime.allocateFrame (RuntimeExtendedInitializedEffects.slots true) shared
+        frame dispatcher creator gas code size known continuation depth) value final ∧ observes value final := by
+  apply allocateFrame_initializes_creator parent request sharedState bytes world references signature initialized separate
+    observed creatorRelated creatorFound creatorSeparate frameRelated gasRelated codeRelated sizeRelated knownRelated
+    extraProperty freshExtra sharedExtra creatorExtra continuation observes
+  intro extra suffix cells values related stored cellSignature locations origins sharedOrigins additional _ ready
+  exact continued extra suffix cells values related stored cellSignature locations origins sharedOrigins additional ready
 
 private def callMutableSlots (layout : RuntimeCallEffectsCorrespondence.Layout) : List EffectSlot :=
   [⟨"balances", WordMapping.type, layout.balances⟩,

@@ -60,6 +60,7 @@ theorem frameCall_message_evaluates {program : Program} {code : CodeBlock} {slot
     (delegateMember : ⟨"delegateCallHandler", Core.OptionalCell.cellType Calls.callbackType, handlers.delegateCall.location⟩ ∈ slots)
     (callerMember : ∃ location, (⟨"caller", .word, location⟩ : EffectSlot) ∈ slots)
     (valueMember : ∃ location, (⟨"callvalue", .word, location⟩ : EffectSlot) ∈ slots)
+    (createSlots : RuntimeCallModeEffectsCorrespondence.CreateSlots handlers slots)
     (initialRelated : StateRel (RuntimeCallModeEffectsCorrespondence.model layout (prefixRead layout.boundary store) slots image handlers anchors context) [] ⟨[], initial⟩ store)
     (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayout slots)
     (callPassive : RuntimeCallEffectsCorrespondence.CallPassive layout slots)
@@ -83,7 +84,7 @@ theorem frameCall_message_evaluates {program : Program} {code : CodeBlock} {slot
   obtain ⟨extension, status, accounts, bodyStore, represented, statusRelated, executed, related, worldFinal⟩ :=
     RuntimeCallModeEffectsFrameCorrespondence.compileFrame_call_preserves_observed accepted eligible closureRelated resolved supplied length
       runtime separated memoryMember worldMember addressMember completeMember staticMember memorySizeMember exitMember offsetMember sizeMember
-      logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember initialRelated passive callPassive callbacks evaluated
+      logsMember logSizeMember balancesMember codeMembers dataMember dataSizeMember mode callDepthMember callHandlerMember callCodeMember delegateMember callerMember valueMember createSlots initialRelated passive callPassive callbacks evaluated
   have balancesFinal := RuntimeAccountEffectsCorrespondence.balances_related (RuntimeCallEffectsCorrespondence.account_related (RuntimeCallModeEffectsCorrespondence.base_related related))
   let frameResult := frameCompletionValue status (ContractLogCorrespondence.snapshotValues final.external.runtime.runtime.runtime accounts final.external.runtime.runtime.balances)
     (StorageCorrespondence.get accounts final.external.runtime.runtime.runtime.runtime.runtime.storage.address final.external.runtime.runtime.runtime.runtime.runtime.storage.complete)

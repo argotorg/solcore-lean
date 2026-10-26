@@ -14,14 +14,15 @@ theorem frame_execution (sourceCatalog : ChildFrameSemantics.Catalog)
   | zero =>
       apply frame_execution_of_callbacks
       intro fuel others compiled connection captured values closure closures images cells creator layout initial capture
-        inventory references mode parent ambient
+        inventory references create createAt mode parent ambient
       dsimp only
       intro caller request shared response final impossible
       cases impossible
   | succ height induction =>
       apply frame_execution_of_callbacks
       intro fuel others compiled connection captured values closure closures images cells creator layout initial capture
-        inventory references mode parent ambient
-      exact captured_child_runs_preserves connection induction compiled closures capture inventory references mode parent ambient
+        inventory references create createAt mode parent ambient
+      exact captured_child_runs_preserves connection induction compiled closures capture inventory references create createAt
+        mode parent ambient
 
 end Solcore.Frontend.RustHull.ModeChildFrameCorrespondence

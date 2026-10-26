@@ -134,7 +134,9 @@ structure ObjectCallbackCapture (slots : List (String × Core.Ty)) (count : Nat)
   stored : store.read? dispatcherLocation = some (.inRight .unit closure)
 
 
-theorem objectRuntime_evaluates_callbacks {depth : Nat} {environment : Core.Environment}
+/-- The installed callbacks, including the actual create-handler closure and
+its cell. -/
+theorem objectRuntime_evaluates_creator {depth : Nat} {environment : Core.Environment}
     {initial : Core.Store} (observes : Core.Value → Core.Store → Prop)
     {slots : List (String × Core.Ty)} {compiled : Core.Expr} {others : List Core.Expr}
     {images : List (Nat × List UInt8)} {codeBytes : Option (List UInt8)}
@@ -159,8 +161,11 @@ theorem objectRuntime_evaluates_callbacks {depth : Nat} {environment : Core.Envi
       (∀ cell ∈ cells, cell.location < creatorLocation) →
       (∀ cell ∈ cells, cell.location < dispatcherLocation) →
       dispatcherLocation < creatorLocation →
-      ObjectCallbackCapture slots (others.length + 1) images catalog functionsValue cells
-        dispatcherLocation creatorLocation allocated →
+      (capture : ObjectCallbackCapture slots (others.length + 1) images catalog functionsValue cells
+        dispatcherLocation creatorLocation allocated) →
+      ∀ createValue, allocated.read? creatorLocation = some (.inRight .unit createValue) →
+        CapturedClosure ((AccountRuntime.objectHandlers slots (others.length + 1) images catalog capture.functions
+          capture.shared capture.dispatcher capture.creator).2 (capture.depth + 1)) (.unit :: capture.environment) createValue →
       ∃ result final, Core.Evaluates (extra ++ environment) allocated
         (AccountRuntime.objectFrame slots (others.length + 1) images codeBytes context functions shared dispatcher creator
           (depth + extra.length)) result final ∧ observes result final) :
@@ -180,7 +185,7 @@ theorem objectRuntime_evaluates_callbacks {depth : Nat} {environment : Core.Envi
     allocateCallbacks_captures (depth := depth + 1 + sharedExtra.length)
       (environment := sharedExtra ++ bundleValues functionsValue :: environment) (initial := initial ++ suffix)
       (fun dispatcher creator => objectHandlers_lambdas slots (others.length + 1) images catalog functions shared dispatcher creator)
-  obtain ⟨dispatchClosure, createClosure, dispatchCapture, _, dispatchRead, creatorRead⟩ := capturedCallbacks
+  obtain ⟨dispatchClosure, createClosure, dispatchCapture, createCapture, dispatchRead, creatorRead⟩ := capturedCallbacks
   let callbackCapture : ObjectCallbackCapture slots (others.length + 1) images catalog functionsValue cells
       (initial ++ suffix).length ((initial ++ suffix).length + 1) allocated := {
     depth := depth + 1 + sharedExtra.length + 2
@@ -227,10 +232,51 @@ theorem objectRuntime_evaluates_callbacks {depth : Nat} {environment : Core.Envi
       Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using creatorRelated) ⟨_, creatorRead⟩
     (fun cell member => Nat.lt_trans (initialized.location_bound member) (Nat.lt_succ_self _))
     (fun _ member => initialized.location_bound member) (Nat.lt_succ_self _) callbackCapture
+    createClosure creatorRead createCapture
   refine ⟨result, final, Core.Evaluates.letE bundleEvaluated ?_, observed⟩
   apply sharedEvaluated
   apply callbacksEvaluated
   simpa only [List.length_append, List.length_singleton, List.append_assoc, List.singleton_append,
     Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using completed
+
+theorem objectRuntime_evaluates_callbacks {depth : Nat} {environment : Core.Environment}
+    {initial : Core.Store} (observes : Core.Value → Core.Store → Prop)
+    {slots : List (String × Core.Ty)} {compiled : Core.Expr} {others : List Core.Expr}
+    {images : List (Nat × List UInt8)} {codeBytes : Option (List UInt8)}
+    {catalog : List AccountRuntime.CodeDefinition} {context : Code}
+    {functionsValue initialValues : List Core.Value}
+    (captured : CapturedClosures environment (compiled :: others) functionsValue)
+    (inputs : CodeValues depth environment ((AccountRuntime.sharedInitializers context).map (·.2.2)) initialValues)
+    (continued : ∀ functions shared dispatcher creator extra allocated cells dispatcherLocation creatorLocation,
+      CodeValue (depth + extra.length) (extra ++ environment) functions (bundleValues functionsValue) →
+      RuntimeReferences (depth + extra.length) (extra ++ environment) shared cells →
+      InitializedCells cells allocated →
+      CellLocations cells →
+      cells.map (fun cell => (cell.name, cell.type, cell.value)) =
+        (((AccountRuntime.sharedInitializers context).zip initialValues).map
+          (fun (entry, value) => (entry.1, entry.2.1, value))).reverse →
+      StoreRetains initial allocated →
+      CodeValue (depth + extra.length) (extra ++ environment) dispatcher
+        (.cellRef (Core.OptionalCell.cellType AccountRuntime.dispatchCallbackType) dispatcherLocation) →
+      CodeValue (depth + extra.length) (extra ++ environment) creator
+        (.cellRef (Core.OptionalCell.cellType Creation.callbackType) creatorLocation) →
+      (∃ value, allocated.read? creatorLocation = some value) →
+      (∀ cell ∈ cells, cell.location < creatorLocation) →
+      (∀ cell ∈ cells, cell.location < dispatcherLocation) →
+      dispatcherLocation < creatorLocation →
+      ObjectCallbackCapture slots (others.length + 1) images catalog functionsValue cells
+        dispatcherLocation creatorLocation allocated →
+      ∃ result final, Core.Evaluates (extra ++ environment) allocated
+        (AccountRuntime.objectFrame slots (others.length + 1) images codeBytes context functions shared dispatcher creator
+          (depth + extra.length)) result final ∧ observes result final) :
+    ∃ result final, Core.Evaluates environment initial
+      (AccountRuntime.objectRuntime slots compiled others images codeBytes catalog context depth) result final ∧ observes result final := by
+  apply objectRuntime_evaluates_creator observes captured inputs
+  intro functions shared dispatcher creator extra allocated cells dispatcherLocation creatorLocation functionsRelated
+    references initialized separate description retained dispatcherRelated creatorRelated creatorFound creatorAfter
+    dispatcherAfter dispatcherBefore capture _ _ _
+  exact continued functions shared dispatcher creator extra allocated cells dispatcherLocation creatorLocation
+    functionsRelated references initialized separate description retained dispatcherRelated creatorRelated creatorFound
+    creatorAfter dispatcherAfter dispatcherBefore capture
 
 end Solcore.Frontend.RustHull.Correspondence

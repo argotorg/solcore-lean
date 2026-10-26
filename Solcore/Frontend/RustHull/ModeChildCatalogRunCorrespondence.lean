@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.ModeChildCatalogExecutionCorrespondence
 import Solcore.Frontend.RustHull.AccountCallModeRunCorrespondence
 import Solcore.Frontend.RustHull.NestedChildCallbackContextCorrespondence
+import Solcore.Frontend.RustHull.RuntimeCallModeStateCorrespondence
 
 /-! A finite source child tree reaches the actual selected catalog closure.
 The smaller-height frame theorem supplies execution, while refreshed captures
@@ -44,6 +45,7 @@ theorem child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catalog}
     (capture : ObjectCallbackCapture (RuntimeExtendedInitializedEffects.slots true) (others.length + 1) images catalog
       (closure :: values) cells layout.dispatcher creatorLocation initial)
     (inventory : NestedChildCallbackContextCorrespondence.Inventory layout cells creatorLocation)
+    (create : RuntimeCallModeEffectsCorrespondence.CreateHandler layout) (createAt : create.location = creatorLocation)
     (mode : AccountCallSemantics.Mode) (parent : RuntimeCallModeSemantics.State)
     (ambient : ∀ cell ∈ cells, cell.name ∈ Ambient.slots.map Prod.fst →
       ContractEnvironmentCorrespondence.initializedValue parent.runtime.runtime.runtime.runtime.environment cell) :
@@ -52,7 +54,7 @@ theorem child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catalog}
         (others.length + 1) capture.functions capture.shared capture.dispatcher capture.creator)
       (ChildFrameModeSemantics.Children sourceCatalog effects parent)
       (RuntimeChildCallEffectsCorrespondence.childReady layout
-        (NestedChildCallbackContextCorrespondence.context inventory capture.closure))
+        (create.context (NestedChildCallbackContextCorrespondence.context inventory capture.closure)))
       capture.depth capture.environment := by
   intro caller request initialShared response finalShared computed extra store extended precompiled sharedReferences argument related ready
   cases computed with
@@ -70,7 +72,7 @@ theorem child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catalog}
     have afterReady := RuntimeChildCallEffectsCorrespondence.childReady_preserved
       (SharedFrame.ofRetains retained) ready
     obtain ⟨freshAccounts, creatorValue, freshWorld, _, stored, signature, separate, observed, creatorRead, creatorSeparate⟩ :=
-      ChildCallbackContextCorrespondence.refresh_ready inventory.base afterReady.1 afterReady.2.1
+      ChildCallbackContextCorrespondence.refresh_ready inventory.base afterReady.1 afterReady.2.1.1
         parent (ChildFrameModeSemantics.executionRequest mode caller request) initialShared source.bytes ambient (related.linked.retained retained) (related.shared.retained retained)
     let recordValue := StorageCorrespondence.record account (index + 2)
     let recordCode : Code := fun here => .var (here - baseDepth - 1)
@@ -90,10 +92,13 @@ theorem child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catalog}
     have knownRelated : CodeValue (baseDepth + 1) (recordValue :: baseEnvironment)
         (part 6 9 recordCode) (.bool true) := by
       simpa only [StorageCorrespondence.record, known, Option.isSome_some, List.length_cons, List.length_nil] using recordRelated.part (index := 6) rfl
+    have createRead : afterLookup.read? creatorLocation = some (.inRight .unit create.value) := by
+      rw [← createAt]
+      simpa only [prefixRead, create.below, ↓reduceIte] using afterReady.2.2
     have refreshedReferences := ChildFrameCorrespondence.refresh_references
       ((capture.references.prepend extra).prepend [recordValue]) afterLookup
     let refreshedCapture := NestedChildCallbackContextCorrespondence.refreshCapture capture afterLookup
-      (NestedChildCallbackContextCorrespondence.dispatcher_read afterReady.2)
+      (NestedChildCallbackContextCorrespondence.dispatcher_read afterReady.2.1)
     have dispatcherSeparate : ∀ cell ∈ ChildFrameCorrespondence.refresh afterLookup cells,
         cell.location ≠ layout.dispatcher := by
       intro cell member
@@ -106,8 +111,8 @@ theorem child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catalog}
         ((capture.creatorValue.prepend extra).prepend [recordValue]) ⟨creatorValue, creatorRead⟩ creatorSeparate
         ((capture.dispatcherValue.prepend extra).prepend [recordValue]) dispatcherSeparate inventory.creatorDispatcher
         frameRelated gasRelated codeRelated sizeRelated knownRelated
-        (sharedReferences.prepend [recordValue]) (related.linked.retained retained) evaluated responded
-        (dispatcher := capture.dispatcher)
+        (sharedReferences.prepend [recordValue]) (related.linked.retained retained) createRead create.closure
+        evaluated responded (dispatcher := capture.dispatcher)
     have selectedRun := RuntimeCatalogDispatchCorrespondence.runFrame_evaluates first recordRelated invoked
     refine ⟨target, final, ?_, resultRelated, finalRelated, (SharedFrame.ofRetains retained).trans frame⟩
     exact accountRun_child_evaluates sharedReferences
@@ -131,6 +136,7 @@ theorem captured_child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catal
       (closure :: values) cells layout.dispatcher creatorLocation initial)
     (inventory : NestedChildCallbackContextCorrespondence.Inventory layout cells creatorLocation)
     (sharedReferences : SharedReferences capture.depth capture.environment capture.shared (sharedLocations layout))
+    (create : RuntimeCallModeEffectsCorrespondence.CreateHandler layout) (createAt : create.location = creatorLocation)
     (mode : AccountCallSemantics.Mode) (parent : RuntimeCallModeSemantics.State)
     (ambient : ∀ cell ∈ cells, cell.name ∈ Ambient.slots.map Prod.fst →
       ContractEnvironmentCorrespondence.initializedValue parent.runtime.runtime.runtime.runtime.environment cell) :
@@ -138,8 +144,8 @@ theorem captured_child_runs_preserves {sourceCatalog : ChildFrameSemantics.Catal
     ChildRunPreservation mode anchors (sharedLocations layout) dispatcher.shared dispatcher.runFrame
       (ChildFrameModeSemantics.Children sourceCatalog effects parent)
       (RuntimeChildCallEffectsCorrespondence.childReady layout
-        (NestedChildCallbackContextCorrespondence.context inventory capture.closure))
+        (create.context (NestedChildCallbackContextCorrespondence.context inventory capture.closure)))
       dispatcher.depth dispatcher.captured :=
-  child_runs_preserves connection frameExecution compiled closures capture inventory mode parent ambient
+  child_runs_preserves connection frameExecution compiled closures capture inventory create createAt mode parent ambient
 
 end Solcore.Frontend.RustHull.ModeChildCatalogExecutionCorrespondence

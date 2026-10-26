@@ -111,7 +111,9 @@ theorem allocateSharedSlots_separates
             apply evaluated continuation result finalStore
             simpa [List.append_assoc, Nat.add_assoc, Nat.add_comm 1] using completed
 
-theorem allocateFrameSlots_separates
+/-- The created cells, including that every cell for the create-handler slot
+is one of the known cells, since the allocator reuses the installed creator. -/
+theorem allocateFrameSlots_creates
     {depth : Nat} {environment : Core.Environment} {store : Core.Store}
     {slots : List (String × Core.Ty)} {shared : AccountRuntime.References}
     {frame dispatcher creator gas code codeSize codeKnown : Code}
@@ -132,6 +134,7 @@ theorem allocateFrameSlots_separates
       cells.map (fun cell => (cell.name, cell.type)) = slots ∧
       (∀ cell ∈ previousCells.reverse ++ cells, property cell) ∧
       CellLocations (known ++ previousCells.reverse ++ cells) ∧
+      (∀ cell ∈ cells, cell.name = "createHandler" → cell ∈ known) ∧
       ∀ continuation result finalStore,
         Core.Evaluates (extra ++ environment) (store ++ suffix)
           (continuation references (depth + extra.length)) result finalStore →
@@ -140,7 +143,7 @@ theorem allocateFrameSlots_separates
             continuation slots previous depth) result finalStore := by
   induction slots generalizing depth environment store previous previousCells with
   | nil =>
-      refine ⟨[], [], previous.reverse, [], ?_, ?_, rfl, ?_, ?_, ?_⟩
+      refine ⟨[], [], previous.reverse, [], ?_, ?_, rfl, ?_, ?_, (fun _ member => by cases member), ?_⟩
       · simpa only [List.length_nil, Nat.add_zero, List.nil_append, List.append_nil, List.map_reverse]
           using previousRelated.reverse
       · intro cell member
@@ -170,7 +173,7 @@ theorem allocateFrameSlots_separates
             cases member with
             | head => exact stored
             | tail _ member => exact previousStored selected member
-          obtain ⟨extra, suffix, references, cells, related', stored', signature, valid', separate', evaluated⟩ :=
+          obtain ⟨extra, suffix, references, cells, related', stored', signature, valid', separate', creators', evaluated⟩ :=
             ih initializers sharedTail creatorTail (.cons related previousRelated) storedCons
                 (by intro selected member; cases member with
                     | head => exact valid.1
@@ -183,12 +186,16 @@ theorem allocateFrameSlots_separates
                   · exact Or.inl old
                   · exact Or.inl valid.2
                   · exact Or.inr previous)
-          refine ⟨extra, suffix, references, cell :: cells, ?_, ?_, ?_, ?_, ?_, ?_⟩
+          refine ⟨extra, suffix, references, cell :: cells, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
           · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using related'
           · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using stored'
           · simp only [List.map_cons, named, typed, signature]
           · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using valid'
           · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using separate'
+          · intro selected member creatorNamed
+            cases member with
+            | head => exact valid.2
+            | tail _ member => exact creators' selected member creatorNamed
           · intro continuation result finalStore completed
             simpa only [AccountRuntime.allocateFrameSlots, found] using evaluated continuation result finalStore completed
       | none =>
@@ -201,7 +208,7 @@ theorem allocateFrameSlots_separates
               cases member with
               | head => exact stored
               | tail _ member => exact previousStored selected member
-            obtain ⟨extra, suffix, references, cells, related', stored', signature, valid', separate', evaluated⟩ :=
+            obtain ⟨extra, suffix, references, cells, related', stored', signature, valid', separate', creators', evaluated⟩ :=
               ih initializers sharedTail creatorTail (.cons related previousRelated) storedCons
                 (by intro selected member; cases member with
                     | head => exact valid.1
@@ -214,12 +221,16 @@ theorem allocateFrameSlots_separates
                   · exact Or.inl old
                   · exact Or.inl valid.2
                   · exact Or.inr previous)
-            refine ⟨extra, suffix, references, cell :: cells, ?_, ?_, ?_, ?_, ?_, ?_⟩
+            refine ⟨extra, suffix, references, cell :: cells, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
             · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using related'
             · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using stored'
             · simp only [List.map_cons, named, typed, signature]
             · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using valid'
             · simpa only [List.reverse_cons, List.append_assoc, List.singleton_append] using separate'
+            · intro selected member creatorNamed
+              cases member with
+              | head => exact valid.2
+              | tail _ member => exact creators' selected member creatorNamed
             · intro continuation result finalStore completed
               simpa only [AccountRuntime.allocateFrameSlots, found, beq_self_eq_true, ↓reduceIte]
                 using evaluated continuation result finalStore completed
@@ -240,7 +251,7 @@ theorem allocateFrameSlots_separates
             have relatedCons : CodeValues (depth + 1) (reference :: environment)
                 ((fun here => .var (here - depth - 1)) :: previous) ((cell :: previousCells).map InitializedCell.reference) :=
               .cons (CodeValue.bound depth environment reference) (by simpa using previousRelated.prepend [reference])
-            obtain ⟨extra, suffix, references, cells, related', stored', signature, valid', separate', evaluated⟩ :=
+            obtain ⟨extra, suffix, references, cells, related', stored', signature, valid', separate', creators', evaluated⟩ :=
               ih (by simpa using initializers.extend [reference] [value]) sharedTail' creatorTail'
                 relatedCons (previousStored.cons name type value)
                 (by intro selected member; cases member with
@@ -260,16 +271,52 @@ theorem allocateFrameSlots_separates
                   · exact Or.inr (Or.inl old)
                   · exact Or.inl rfl
                   · exact Or.inr (Or.inr previous))
-            refine ⟨extra ++ [reference], [value] ++ suffix, references, cell :: cells, ?_, ?_, ?_, ?_, ?_, ?_⟩
+            refine ⟨extra ++ [reference], [value] ++ suffix, references, cell :: cells, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
             · simpa [List.append_assoc, Nat.add_assoc, Nat.add_comm 1, List.reverse_cons] using related'
             · simpa [List.append_assoc, List.reverse_cons] using stored'
             · exact congrArg ((name, type) :: ·) signature
             · simpa [List.append_assoc, List.reverse_cons] using valid'
             · simpa [List.append_assoc, List.reverse_cons] using separate'
+            · intro selected member creatorNamed
+              cases member with
+              | head => exact False.elim (isCreator (by simpa only [beq_iff_eq] using creatorNamed))
+              | tail _ member => exact creators' selected member creatorNamed
             · intro continuation result finalStore completed
               simp only [AccountRuntime.allocateFrameSlots, found, isCreator]
               apply Core.Evaluates.letE (.newCell initialized')
               apply evaluated continuation result finalStore
               simpa [List.append_assoc, Nat.add_assoc, Nat.add_comm 1] using completed
+
+theorem allocateFrameSlots_separates
+    {depth : Nat} {environment : Core.Environment} {store : Core.Store}
+    {slots : List (String × Core.Ty)} {shared : AccountRuntime.References}
+    {frame dispatcher creator gas code codeSize codeKnown : Code}
+    {property : InitializedCell → Prop} {known : List InitializedCell}
+    (initializers : FrameInitializersValid depth environment store frame dispatcher gas code codeSize codeKnown shared property)
+    (sharedReady : FrameSharedValid depth environment store slots shared (fun cell => property cell ∧ cell ∈ known))
+    (creatorReady : FrameCreatorValid depth environment store slots creator (fun cell => property cell ∧ cell ∈ known))
+    {previous : List Code} {previousCells : List InitializedCell}
+    (previousRelated : CodeValues depth environment previous (previousCells.map InitializedCell.reference))
+    (previousStored : InitializedCells previousCells store)
+    (previousValid : ∀ cell ∈ previousCells, property cell)
+    (knownStored : InitializedCells known store)
+    (separate : CellLocations (known ++ previousCells)) :
+    ∃ extra suffix references cells,
+      CodeValues (depth + extra.length) (extra ++ environment) references
+        ((previousCells.reverse ++ cells).map InitializedCell.reference) ∧
+      InitializedCells (previousCells.reverse ++ cells) (store ++ suffix) ∧
+      cells.map (fun cell => (cell.name, cell.type)) = slots ∧
+      (∀ cell ∈ previousCells.reverse ++ cells, property cell) ∧
+      CellLocations (known ++ previousCells.reverse ++ cells) ∧
+      ∀ continuation result finalStore,
+        Core.Evaluates (extra ++ environment) (store ++ suffix)
+          (continuation references (depth + extra.length)) result finalStore →
+        Core.Evaluates environment store
+          (AccountRuntime.allocateFrameSlots shared frame dispatcher creator gas code codeSize codeKnown
+            continuation slots previous depth) result finalStore := by
+  obtain ⟨extra, suffix, references, cells, related, stored, signature, valid, separate', _, evaluated⟩ :=
+    allocateFrameSlots_creates initializers sharedReady creatorReady previousRelated previousStored previousValid
+      knownStored separate
+  exact ⟨extra, suffix, references, cells, related, stored, signature, valid, separate', evaluated⟩
 
 end Solcore.Frontend.RustHull.Correspondence

@@ -60,6 +60,10 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     {sourceCatalog : ChildFrameSemantics.Catalog} {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
     (capture : ObjectCallbackCapture (RuntimeExtendedInitializedEffects.slots true) (others.length + 1) images catalog
       (closure :: catalogValues) sharedCells dispatcherLocation creatorLocation initial)
+    {createValue : Core.Value} (createRead : initial.read? creatorLocation = some (.inRight .unit createValue))
+    (createCaptured : CapturedClosure ((AccountRuntime.objectHandlers (RuntimeExtendedInitializedEffects.slots true)
+      (others.length + 1) images catalog capture.functions capture.shared capture.dispatcher capture.creator).2
+      (capture.depth + 1)) (.unit :: capture.environment) createValue)
     (catalogCompiled : ContractCatalogCorrespondence.CompiledCatalog (RuntimeExtendedInitializedEffects.slots true) fuel catalog others)
     (catalogCaptured : CapturedClosures captured others catalogValues)
     (connection : RootChildCatalogExecutionCorrespondence.CatalogConnection ⟨program, code, rootBytes⟩ sourceCatalog catalog anchors)
@@ -135,7 +139,7 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     (ContractMemoryCorrespondence.request_related object context contextRelated) rfl
     (contextRelated.part (index := 5) rfl) (CodeValue.mapping (Memory.packBytes ((some rootBytes).getD [])) depth environment)
     (CodeValue.number ((some rootBytes).getD []).length depth environment) (CodeValue.boolean (some rootBytes).isSome depth environment)
-  apply ContractRuntimeEffectsCorrespondence.objectFrame_initializes_extended (fun _ member => RuntimeExtendedInitializedEffects.slots_allowed true member) object context contextRelated references initialized separate
+  apply ContractRuntimeEffectsCorrespondence.objectFrame_initializes_creator (fun _ member => RuntimeExtendedInitializedEffects.slots_allowed true member) object context contextRelated references initialized separate
     description creatorRelated creatorFound creatorAfter
     (fun cell => (ContractEnvironmentCorrespondence.initializedValue (contextEnvironment context (some rootBytes)) cell ∧ ContractCodeCorrespondence.initializedCode (some rootBytes) cell ∧ initializedReturnData cell ∧
       initializedHandler context.address dispatcherLocation cell ∧ initializedDepth Core.Word.zero cell ∧
@@ -172,7 +176,7 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
       · exact ⟨ChildFrameModeCorrespondence.creator_handler_observation .callCode _ _ _ _,
           ChildFrameModeCorrespondence.creator_handler_observation .delegateCall _ _ _ _⟩)
   intro extra suffix frameReferences cells worldLocation balancesLocation referenceValues stored signature observations cellLocations
-    worldReference balancesReference balancesFound
+    creatorCells worldReference balancesReference balancesFound
   have previous := fun cell member => And.intro (observations cell member).1 (observations cell member).2.1
   have callCodeObserved := fun cell member => (observations cell member).2.2.1
   have delegateObserved := fun cell member => (observations cell member).2.2.2
@@ -293,8 +297,25 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     (by simpa only [callReady.baseEqual] using boundary)
     (by simpa only [callReady.baseEqual] using baseMembers)
     (fun cell member => by simpa only [callReady.dispatcherEqual] using delegateObserved cell member)
+  obtain ⟨runInit, installRuntime, createShape⟩ := CreationImplementation.objectHandlers_create
+    (RuntimeExtendedInitializedEffects.slots true) (others.length + 1) images catalog capture.functions capture.shared
+    capture.dispatcher capture.creator
+  let createHandler : RuntimeCallModeEffectsCorrespondence.CreateHandler callReady.layout := {
+    location := creatorLocation
+    below := inventory.creatorBelow
+    outside := inventory.creatorOutside
+    value := createValue
+    closure := {
+      depth := capture.depth + 1
+      captured := .unit :: capture.environment
+      shared := capture.shared
+      runInit := runInit
+      installRuntime := installRuntime
+      closure := by rw [← createShape]; exact createCaptured
+      references := (inventory_references inventory capture.references).prepend [.unit] } }
   let handlers : RuntimeCallModeEffectsCorrespondence.ModeHandlers callReady.layout := {
-    ordinary := ordinaryHandlers, callCode := callCodeReady.handler, delegateCall := delegateReady.handler }
+    ordinary := ordinaryHandlers, callCode := callCodeReady.handler, delegateCall := delegateReady.handler,
+    create := createHandler }
   have initialRelated : StateRel (RuntimeCallEffectsCorrespondence.model callReady.layout
       (prefixRead callReady.layout.boundary (initial ++ suffix)) slots (some rootBytes) ordinaryHandlers) []
       ⟨[], contextInitialState (some rootBytes) object context⟩ (initial ++ suffix) := by
@@ -346,9 +367,12 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
       (by simp only [RuntimeInitializedEffects.expected, named]; rfl)
     simpa only [← location, valued] using stored cell member
   have modeCaptured : (handlers.context callbackContext).valid (prefixRead callReady.layout.boundary (initial ++ suffix)) := by
-    refine ⟨capturedValid, ?_, ?_⟩
+    refine ⟨capturedValid, ?_, ?_, ?_⟩
     · simpa only [handlers, prefixRead, callCodeReady.handler.below, ↓reduceIte] using callCodeReady.read
     · simpa only [handlers, prefixRead, delegateReady.handler.below, ↓reduceIte] using delegateReady.read
+    · have createFinal : (initial ++ suffix).read? creatorLocation = some (.inRight .unit createValue) := by
+        simpa only [Core.Store.read?, List.getElem?_append_left creatorBelow] using createRead
+      simpa only [handlers, createHandler, prefixRead, inventory.creatorBelow, ↓reduceIte] using createFinal
   have childInitial := RuntimeChildCallEffectsCorrespondence.of_base initialRelated linkedInitial modeCaptured
   have callbacks : ∀ {world state current},
       StateRel (RuntimeCallModeEffectsCorrespondence.model callReady.layout
@@ -363,9 +387,9 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     · apply AccountCallModeCorrespondence.ChildRunPreservation.strengthen
         (RootChildCatalogExecutionCorrespondence.captured_child_runs_preserves connection frameExecution catalogCompiled catalogCaptured rootCaptured
         (NestedChildCallbackContextCorrespondence.withDispatcher capture callReady.layout.dispatcher callReady.dispatcherEqual)
-        nestedInventory (inventory_references inventory capture.references) operation.mode state.external ambient)
+        nestedInventory (inventory_references inventory capture.references) createHandler rfl operation.mode state.external ambient)
       intro current ready
-      exact ⟨ready.1, ready.2.1⟩
+      exact ⟨ready.1, ready.2.1, ready.2.2.2.2⟩
   have namedSlot : ∀ name, (name, Core.Ty.word) ∈ RuntimeExtendedInitializedEffects.slots true →
       ∃ location, (⟨name, .word, location⟩ : EffectSlot) ∈ slots := by
     intro name member
@@ -375,6 +399,26 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     exact ⟨cell.location, List.mem_map.mpr ⟨cell, present, by simp only [InitializedCell.effectSlot, named, typed]⟩⟩
   have callerMember := namedSlot "caller" (by simp [RuntimeExtendedInitializedEffects.slots, Effects.slots])
   have valueMember := namedSlot "callvalue" (by simp [RuntimeExtendedInitializedEffects.slots, Effects.slots])
+  have gasMember : ∃ location, (⟨"availableGas", .sum .unit .word, location⟩ : EffectSlot) ∈ slots := by
+    have member : ("availableGas", Core.Ty.sum .unit .word) ∈ RuntimeExtendedInitializedEffects.slots true := by
+      simp [RuntimeExtendedInitializedEffects.slots, Effects.slots]
+    rw [← signature] at member
+    obtain ⟨cell, present, same⟩ := List.mem_map.mp member
+    obtain ⟨named, typed⟩ := Prod.mk.inj same
+    exact ⟨cell.location, List.mem_map.mpr ⟨cell, present, by simp only [InitializedCell.effectSlot, named, typed]⟩⟩
+  have createMember : (⟨"createHandler", Core.OptionalCell.cellType Creation.callbackType, creatorLocation⟩ : EffectSlot) ∈ slots := by
+    have member : ("createHandler", Core.OptionalCell.cellType Creation.callbackType) ∈ RuntimeExtendedInitializedEffects.slots true := by
+      simp [RuntimeExtendedInitializedEffects.slots, Effects.slots]
+    rw [← signature] at member
+    obtain ⟨cell, present, same⟩ := List.mem_map.mp member
+    obtain ⟨named, typed⟩ := Prod.mk.inj same
+    have located : cell.location = creatorLocation := by
+      rcases creatorCells cell present named with shared | located
+      · have names := List.mem_map_of_mem (f := InitializedCell.name) shared
+        rw [capture.names, named] at names
+        simp [sharedSlotTypes, Ambient.slots] at names
+      · exact located
+    exact List.mem_map.mpr ⟨cell, present, by simp only [InitializedCell.effectSlot, named, typed, located]⟩
   obtain ⟨value, final, completed, resultRelated⟩ := frameCall_message_evaluates (withCode := true) (handlers := handlers)
     (by simpa only [slotTypes] using accepted)
     (by simpa only [supported_actual slotTypes] using eligible) closureRelated
@@ -397,7 +441,8 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     (by simpa only [callReady.baseEqual] using codeReady.dataMember)
     (by simpa only [callReady.baseEqual] using codeReady.dataSizeMember)
     callMode
-    callReady.depthMember callReady.handlerMember callCodeReady.member delegateReady.member callerMember valueMember childInitial
+    callReady.depthMember callReady.handlerMember callCodeReady.member delegateReady.member callerMember valueMember
+    ⟨createMember, gasMember⟩ childInitial
     (by simpa only [callReady.baseEqual] using passiveEnvironment) callPassive callbacks evaluated context.address
     (by simpa only [callReady.baseEqual, storageLocations, worldSame] using worldReference.prepend extra) (by simpa only [callReady.baseEqual, balanceSame] using balancesReference.prepend extra)
     ((contextRelated.part (index := 4) rfl).prepend extra)

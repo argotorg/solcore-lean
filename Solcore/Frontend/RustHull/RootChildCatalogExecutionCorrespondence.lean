@@ -118,6 +118,8 @@ def FrameExecution (rootSource : ChildFrameSemantics.Code) (sourceCatalog : Chil
   ∀ {locations : AccountCallCorrespondence.SharedLocations},
     AccountCallCorrespondence.SharedReferences depth environment capture.shared locations →
     RuntimeLinkedWorldCorrespondence.StateRel anchors sharedState.world locations.world initial →
+  ∀ {createValue : Value}, initial.read? creatorLocation = some (.inRight .unit createValue) →
+    CreationCorrespondence.HandlerClosure locations createValue →
   ∀ {status : Semantics.Result Semantics.Value} {finalSource : Semantics.State RuntimeCallModeSemantics.State}
     {response : Semantics.Result AccountCallSemantics.Response},
     Semantics.EvalFunction source.functions (effects (some source.bytes)) source.entry []

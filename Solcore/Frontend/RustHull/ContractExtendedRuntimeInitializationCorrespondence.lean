@@ -65,7 +65,9 @@ theorem creator_initialized_valid_extended {depth : Nat} {environment : Core.Env
   · intro impossible; simp [creatorCell] at impossible
   · intro impossible; simp [creatorCell] at impossible
 
-theorem objectFrame_initializes_extended
+/-- The extended initializer also identifies the create-handler slot: it is a
+shared cell or the installed creator cell. -/
+theorem objectFrame_initializes_creator
     {depth : Nat} {environment : Core.Environment} {initial : Core.Store}
     {contextCode functions dispatcher creator : Code} {shared : AccountRuntime.References}
     {slots : List (String × Core.Ty)} {count : Nat}
@@ -97,6 +99,7 @@ theorem objectFrame_initializes_extended
         (StorageCorrespondence.canonical (object.initialWorld context)) context.address context.completeWorld context.isStatic
         (Core.WordMapping.insertEntries context.address context.balance context.accounts) worldLocation balancesLocation cell ∧ property cell) →
       CellLocations cells →
+      (∀ cell ∈ cells, cell.name = "createHandler" → cell ∈ sharedCells ∨ cell.location = creatorLocation) →
       CodeValue depth environment (AccountRuntime.reference shared "world") (.cellRef AccountState.type worldLocation) →
       CodeValue depth environment (AccountRuntime.reference shared "balances") (.cellRef Core.WordMapping.type balancesLocation) →
       initial.read? balancesLocation = some (Core.WordMapping.encode (Core.WordMapping.insertEntries context.address context.balance context.accounts)) →
@@ -160,16 +163,71 @@ theorem objectFrame_initializes_extended
     refine ⟨cell, named, typed, related, stored, ⟨⟨valid, ?_⟩, included⟩⟩
     rw [cellEqual]
     exact creatorExtra _ (by simpa only [← locationEqual] using stored)
-  obtain ⟨extra, suffix, frameReferences, cells, referenceValues, stored, signature, observed, locations, allocated⟩ :=
-    allocateFrameSlots_separates freshBoth sharedReady creatorReady (previous := []) (previousCells := []) .nil
+  obtain ⟨extra, suffix, frameReferences, cells, referenceValues, stored, signature, observed, locations, creators, allocated⟩ :=
+    allocateFrameSlots_creates freshBoth sharedReady creatorReady (previous := []) (previousCells := []) .nil
       (by intro cell member; cases member) (by intro cell member; cases member)
       (known_initialized initialized creatorStored)
       (by simpa only [List.append_nil] using known_separate separate creatorAfter (value := creatorValue))
   simp only [List.reverse_nil, List.nil_append] at referenceValues stored observed locations allocated
   have cellLocations : CellLocations cells := locations.subset (fun _ member => List.mem_append_right _ member)
+  have creatorCells : ∀ cell ∈ cells, cell.name = "createHandler" → cell ∈ sharedCells ∨ cell.location = creatorLocation := by
+    intro cell member named
+    rcases List.mem_append.mp (creators cell member named) with shared | creatorMember
+    · exact Or.inl shared
+    · have same : cell = creatorCell creatorLocation creatorValue := by simpa using creatorMember
+      exact Or.inr (by rw [same]; rfl)
   obtain ⟨value, final, evaluated, observedResult⟩ := continued extra suffix frameReferences cells worldLocation balancesLocation
-    referenceValues stored signature observed cellLocations worldReference balancesReference balancesFound
+    referenceValues stored signature observed cellLocations creatorCells worldReference balancesReference balancesFound
   exact ⟨value, final, allocated _ _ _ evaluated, observedResult⟩
 
+
+theorem objectFrame_initializes_extended
+    {depth : Nat} {environment : Core.Environment} {initial : Core.Store}
+    {contextCode functions dispatcher creator : Code} {shared : AccountRuntime.References}
+    {slots : List (String × Core.Ty)} {count : Nat}
+    {images : List (Nat × List UInt8)} {codeBytes : Option (List UInt8)}
+    (allowed : ∀ slot ∈ slots, slot ∈ Effects.slots ++ Effects.codeSlots)
+    (object : Contract.CompiledObject) (context : Contract.Context)
+    (contextRelated : CodeValue depth environment contextCode (bundleValues (contextValues object context)))
+    {sharedCells : List InitializedCell} (references : RuntimeReferences depth environment shared sharedCells)
+    (initialized : InitializedCells sharedCells initial) (separate : CellLocations sharedCells)
+    (description : sharedCells.map (fun cell => (cell.name, cell.type, cell.value)) =
+      (((AccountRuntime.sharedInitializers contextCode).zip (ContractMemoryCorrespondence.contextSharedValues object context)).map
+        (fun (entry, value) => (entry.1, entry.2.1, value))).reverse)
+    {creatorLocation : Nat}
+    (creatorRelated : CodeValue depth environment creator (.cellRef (Core.OptionalCell.cellType Creation.callbackType) creatorLocation))
+    (creatorFound : ∃ value, initial.read? creatorLocation = some value)
+    (creatorAfter : ∀ cell ∈ sharedCells, cell.location < creatorLocation)
+    (property : InitializedCell → Prop) (observes : Core.Value → Core.Store → Prop)
+    (freshExtra : FrameInitializersValid depth environment initial
+      (ContractMemoryCorrespondence.requestCode contextCode) dispatcher (part 5 12 contextCode)
+      (constant (Core.WordMapping.literal (Memory.packBytes (codeBytes.getD []))))
+      (number (codeBytes.getD []).length) (CodeBuilder.boolean codeBytes.isSome) shared property)
+    (sharedExtra : ∀ cell ∈ sharedCells, property cell)
+    (creatorExtra : ∀ value, initial.read? creatorLocation = some value → property (creatorCell creatorLocation value))
+    (continued : ∀ extra suffix frameReferences cells worldLocation balancesLocation,
+      CodeValues (depth + extra.length) (extra ++ environment) frameReferences (cells.map InitializedCell.reference) →
+      InitializedCells cells (initial ++ suffix) →
+      cells.map (fun cell => (cell.name, cell.type)) = slots →
+      (∀ cell ∈ cells, initializedObservation
+        (StorageCorrespondence.canonical (object.initialWorld context)) context.address context.completeWorld context.isStatic
+        (Core.WordMapping.insertEntries context.address context.balance context.accounts) worldLocation balancesLocation cell ∧ property cell) →
+      CellLocations cells →
+      CodeValue depth environment (AccountRuntime.reference shared "world") (.cellRef AccountState.type worldLocation) →
+      CodeValue depth environment (AccountRuntime.reference shared "balances") (.cellRef Core.WordMapping.type balancesLocation) →
+      initial.read? balancesLocation = some (Core.WordMapping.encode (Core.WordMapping.insertEntries context.address context.balance context.accounts)) →
+      ∃ value final, Core.Evaluates (extra ++ environment) (initial ++ suffix)
+        (bind (apply (part 0 count functions) (packet frameReferences))
+          (fun framed => AccountRuntime.completeMessage shared images (part 4 12 contextCode) (part 11 12 contextCode) framed)
+          (depth + extra.length)) value final ∧ observes value final) :
+    ∃ value final, Core.Evaluates environment initial
+      (AccountRuntime.objectFrame slots count images codeBytes contextCode functions shared dispatcher creator depth)
+      value final ∧ observes value final := by
+  apply objectFrame_initializes_creator allowed object context contextRelated references initialized separate description
+    creatorRelated creatorFound creatorAfter property observes freshExtra sharedExtra creatorExtra
+  intro extra suffix frameReferences cells worldLocation balancesLocation referenceValues stored signature observed
+    cellLocations _ worldReference balancesReference balancesFound
+  exact continued extra suffix frameReferences cells worldLocation balancesLocation referenceValues stored signature
+    observed cellLocations worldReference balancesReference balancesFound
 
 end Solcore.Frontend.RustHull.ContractRuntimeEffectsCorrespondence

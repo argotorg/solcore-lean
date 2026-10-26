@@ -7,7 +7,7 @@ handler. Their concrete cells remain outside the mutable frame resources. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.ChildFrameModeCorrespondence
 open Core Correspondence ScalarExecution CodeBuilder ChildFrameCorrespondence
-open RuntimeCallModeEffectsCorrespondence (ExtraHandler ModeHandlers)
+open RuntimeCallModeEffectsCorrespondence (ExtraHandler ModeHandlers CreateHandler)
 
 def handlerName : AccountCallSemantics.Mode → String
   | .ordinary => "callHandler"
@@ -135,11 +135,13 @@ def ModeAllocationReady.handlers {sharedCells cells : List InitializedCell} {sto
     {dispatcher creator : Nat} {dispatchValue : Value}
     (ready : ModeAllocationReady sharedCells cells store parent request shared bytes dispatcher creator dispatchValue)
     (dispatch : AccountCallCorrespondence.DispatcherClosure
-      (RuntimeCallEffectsCorrespondence.sharedLocations ready.base.call.layout) dispatchValue) :
+      (RuntimeCallEffectsCorrespondence.sharedLocations ready.base.call.layout) dispatchValue)
+    (create : CreateHandler ready.base.call.layout) :
     ModeHandlers ready.base.call.layout where
   ordinary := ready.base.handlers dispatch
   callCode := ready.callCode.handler
   delegateCall := ready.delegateCall.handler
+  create := create
 
 theorem ModeAllocationReady.captured {sharedCells cells : List InitializedCell} {store : Store}
     {parent : RuntimeCallModeSemantics.State} {request : AccountCallSemantics.Request}
@@ -148,12 +150,15 @@ theorem ModeAllocationReady.captured {sharedCells cells : List InitializedCell} 
     (ready : ModeAllocationReady sharedCells cells store parent request shared bytes dispatcher creator dispatchValue)
     (dispatch : AccountCallCorrespondence.DispatcherClosure
       (RuntimeCallEffectsCorrespondence.sharedLocations ready.base.call.layout) dispatchValue)
+    (create : CreateHandler ready.base.call.layout)
+    (createRead : store.read? create.location = some (.inRight .unit create.value))
     (context : RuntimeChildCallEffectsCorrespondence.Context ready.base.call.layout)
     (valid : context.valid (prefixRead ready.base.call.layout.boundary store)) :
-    ((ready.handlers dispatch).context context).valid (prefixRead ready.base.call.layout.boundary store) := by
-  refine ⟨valid, ?_, ?_⟩
+    ((ready.handlers dispatch create).context context).valid (prefixRead ready.base.call.layout.boundary store) := by
+  refine ⟨valid, ?_, ?_, ?_⟩
   · simpa only [ModeAllocationReady.handlers, prefixRead, ready.callCode.handler.below, ↓reduceIte] using ready.callCode.read
   · simpa only [ModeAllocationReady.handlers, prefixRead, ready.delegateCall.handler.below, ↓reduceIte] using ready.delegateCall.read
+  · simpa only [ModeAllocationReady.handlers, prefixRead, create.below, ↓reduceIte] using createRead
 
 theorem ModeAllocationReady.related {sharedCells cells : List InitializedCell} {store : Store}
     {parent : RuntimeCallModeSemantics.State} {request : AccountCallSemantics.Request}
@@ -162,15 +167,18 @@ theorem ModeAllocationReady.related {sharedCells cells : List InitializedCell} {
     (ready : ModeAllocationReady sharedCells cells store parent request shared bytes dispatcher creator dispatchValue)
     (dispatch : AccountCallCorrespondence.DispatcherClosure
       (RuntimeCallEffectsCorrespondence.sharedLocations ready.base.call.layout) dispatchValue)
+    (create : CreateHandler ready.base.call.layout)
+    (createRead : store.read? create.location = some (.inRight .unit create.value))
     {anchors : RuntimeChildCallEffectsCorrespondence.Anchors}
     (context : RuntimeChildCallEffectsCorrespondence.Context ready.base.call.layout)
     (linked : RuntimeLinkedWorldCorrespondence.StateRel anchors shared.world ready.base.call.layout.storage.world store)
     (valid : context.valid (prefixRead ready.base.call.layout.boundary store)) :
     StateRel (RuntimeCallModeEffectsCorrespondence.model ready.base.call.layout
       (prefixRead ready.base.call.layout.boundary store) (cells.map InitializedCell.effectSlot)
-      (some bytes) (ready.handlers dispatch) anchors context) []
+      (some bytes) (ready.handlers dispatch create) anchors context) []
       ⟨[], ChildFrameSemantics.initial parent request shared bytes⟩ store :=
-  RuntimeChildCallEffectsCorrespondence.of_base (ready.base.related dispatch) linked (ready.captured dispatch context valid)
+  RuntimeChildCallEffectsCorrespondence.of_base (ready.base.related dispatch) linked
+    (ready.captured dispatch create createRead context valid)
 
 /-- The actual allocator installs all three handler closures at the execution
 address carried by its frame request. -/
@@ -208,6 +216,8 @@ theorem allocateModeCallFrame_initializes {depth : Nat} {environment : Environme
       CellLocations (sharedCells ++ [ContractRuntimeEffectsCorrespondence.creatorCell creatorLocation creatorValue] ++ cells) →
       (∀ cell ∈ cells, cell.location < initial.length → cell ∈ sharedCells ∨ cell.name = "createHandler") →
       (∀ cell ∈ cells, cell.name ∈ sharedSlotTypes.map Prod.fst → cell ∈ sharedCells) →
+      (⟨"createHandler", OptionalCell.cellType Creation.callbackType, creatorLocation⟩ : EffectSlot) ∈
+        cells.map InitializedCell.effectSlot →
       ModeAllocationReady sharedCells cells (initial ++ suffix) parent request sharedState bytes
         dispatcherLocation creatorLocation dispatchValue →
       ∃ value final, Core.Evaluates (extra ++ environment) (initial ++ suffix)
@@ -250,10 +260,10 @@ theorem allocateModeCallFrame_initializes {depth : Nat} {environment : Environme
     ⟨⟨ContractCallCorrespondence.creator_depth_observation _ _ _,
       ContractCallCorrespondence.creator_handler_observation _ _ _ _, creatorDispatcher⟩,
       creator_handler_observation .callCode _ _ _ _, creator_handler_observation .delegateCall _ _ _ _⟩
-  apply allocateFrame_initializes_extra parent request sharedState bytes world references signature initialized separate
+  apply allocateFrame_initializes_creator parent request sharedState bytes world references signature initialized separate
     observed creatorRelated creatorFound creatorSeparate frameRelated gasRelated codeRelated sizeRelated knownRelated
     property fresh sharedExtra creatorExtra continuation observes
-  intro extra suffix cells values valuesRelated stored fullSignature locations origins sharedOrigins additional base
+  intro extra suffix cells values valuesRelated stored fullSignature locations origins sharedOrigins additional creatorCells base
   have cellSeparate : CellLocations cells := locations.subset (fun _ member => List.mem_append_right _ member)
   obtain ⟨call⟩ := RuntimeCallInitializedEffects.ready fullSignature stored cellSeparate base.boundary base.members
     (by rw [base.boundary]; exact Nat.lt_of_lt_of_le dispatcherBelow (by simp))
@@ -313,7 +323,16 @@ theorem allocateModeCallFrame_initializes {depth : Nat} {environment : Environme
     (fun cell member => by simpa only [call.dispatcherEqual] using (additional cell member).2.1)
   obtain ⟨delegateReady⟩ := extra_ready .delegateCall fullSignature stored cellSeparate boundary baseMembers
     (fun cell member => by simpa only [call.dispatcherEqual] using (additional cell member).2.2)
-  apply continued extra suffix cells values valuesRelated stored fullSignature locations origins sharedOrigins
+  have creatorMember : (⟨"createHandler", OptionalCell.cellType Creation.callbackType, creatorLocation⟩ : EffectSlot) ∈
+      cells.map InitializedCell.effectSlot := by
+    have present : ("createHandler", OptionalCell.cellType Creation.callbackType) ∈
+        cells.map (fun cell => (cell.name, cell.type)) := by
+      rw [fullSignature]
+      simp [RuntimeExtendedInitializedEffects.slots, Effects.slots]
+    obtain ⟨cell, member, same⟩ := List.mem_map.mp present
+    have equal := creatorCells cell member (Prod.mk.inj same).1
+    exact List.mem_map.mpr ⟨cell, member, by rw [equal]; rfl⟩
+  apply continued extra suffix cells values valuesRelated stored fullSignature locations origins sharedOrigins creatorMember
   exact {base := ready, callCode := callCodeReady, delegateCall := delegateReady}
 
 end Solcore.Frontend.RustHull.ChildFrameModeCorrespondence
