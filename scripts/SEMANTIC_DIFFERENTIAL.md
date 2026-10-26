@@ -1570,6 +1570,78 @@ constructors or from more than one contract, memory-dependent data lengths
 other than whole Words, or ABI event signatures and indexing. Agreement is
 test evidence, not a preservation proof.
 
+## Compare nonzero call value
+
+The `stateful-call-value` profile sends value with each transaction and makes
+the contract's own balance a committed observation. Each transaction calls the
+payable `SynthesizedCallValue.run(uint256 flags, uint256 input)`, selector
+`0x7357f5d2`, with exactly two ABI Words and a call value from a fixed bank:
+0, 1, 7, 2^64 - 1, 2^64 and 2^70. The source reads the value with the pinned
+`std.opcodes` `callvalue` wrapper; original Core reads it with the
+`callValue` host function.
+
+The contract reads `old = sload(0)` and `total = sload(1)`, computes
+`result = step(input + value + old)` with the checked aggregate step, writes
+`result` to slot 0 and `total + value` to slot 1, then reverts with `result`
+as a 32-byte payload if `flags` is odd and returns it otherwise. Slot 1 is the
+committed value the contract has accepted, so after every committed
+transaction the balance must equal the deployment value plus slot 1.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Value observation.** After deployment and after every transaction, all
+  three paths report status, payload, slots 0 and 1, and the contract's
+  committed balance as a decimal Word. The keyed profile's containment rules
+  apply to other slots on the Hull and EVM paths. The sender's balance is
+  never observed: on the EVM path it also pays gas. Original Core reads the
+  contract account's balance in the committed world of
+  `BalancedTopLevelExecution`, which transfers the call value from the caller
+  to the contract before the root runs. The imported-Hull runner performs the
+  same top-level transfer in its checked ledger, as the call runner does for
+  its funded constructor, passes the value and entry balance to the Hull
+  context, and commits the receipt ledger only on return. The EVM path reads
+  `eth_getBalance` at each receipt block.
+- **Funds.** A scenario sends at most 2^72 in total. The local Anvil sender
+  holds its default funds; original Core and imported Hull fund the caller
+  with 2^80. A transfer that original Core or Hull rejects is an execution
+  error, never a revert.
+- **Rollback.** A reverted transaction refunds its value: the contract keeps
+  its prior committed balance and slots on every path. Original Core's
+  balanced root runs on the post-transfer world with the pre-transfer world as
+  its checkpoint; Hull keeps its prior ledger; the EVM reverts the transfer.
+  An out-of-fuel or otherwise incomplete transaction has an unknown balance
+  and ends the sequence.
+- **Deployment.** The contract has an empty payable constructor and is
+  deployed with a value of 0 or 5 recorded in the case. Every path starts with
+  that balance, zero slots, no constructor logs and, on Hull and EVM, no
+  nonzero undeclared slot. Original Core starts from the declared
+  post-deployment world: the contract holds the deployment value and the
+  caller 2^80.
+- **Committed comparison.** After every transaction all three paths must agree
+  on status, payload, slots 0 and 1 and the committed balance. Each path must
+  also follow the fixed protocol: the flags parity selects the completion, the
+  payload is one Word, a revert keeps the prior slots and balance, and every
+  committed balance equals the deployment value plus slot 1.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, replace one
+  input by a storage boundary input or one value by a smaller bank value,
+  reduce one transaction's flags to their parity or clear its revert bit, or
+  lower the deployment value to zero. They are ordered by transaction count,
+  complete program complexity, then the sum of all flags, inputs and values
+  and the deployment value.
+
+Coverage adds three dimensions to the storage step dimensions: the call
+values, the values of reverted transactions, whose refunds rollback must
+perform, and the deployment values.
+
+This profile does not compare the sender's balance, gas, nonces or code, value
+sent by contracts, values above the local sender's funds, or non-payable
+methods, whose dispatcher rejects value with a 4-byte selector payload that
+the Word outcome convention cannot express. Agreement is test evidence, not a
+preservation proof.
+
 
 ## Compare generic selection
 

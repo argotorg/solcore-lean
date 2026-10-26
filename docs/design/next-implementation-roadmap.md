@@ -814,9 +814,38 @@ This scope does not compare gas, balances, nonces or code, constructor logs,
 logs from more than one contract, data lengths other than whole Words, or ABI
 event signatures. Agreement is test evidence, not a preservation proof.
 
+The fourth extension, `stateful-call-value`, adds nonzero call value with the
+contract's own balance as a committed observation. Its definitions were fixed
+before execution:
+
+- Transactions: one to three calls of the payable `run(uint256 flags, uint256
+  input)` with exactly two ABI Words and a call value of 0, 1, 7, 2^64 - 1,
+  2^64 or 2^70. A scenario sends at most 2^72 in total, which the funded local
+  sender can always pay. Malformed calldata is outside the scope.
+- Effects: compute `step(input + callvalue + slot0)` into slot zero and add
+  the call value to slot one. Odd flags revert after both writes.
+- Committed observations: status, payload, slots zero and one, and the
+  contract's committed balance after every transaction on all three paths,
+  with the keyed profile's containment of other slots on the Hull and EVM
+  paths. The sender's balance is never observed, because EVM gas changes it.
+  Every committed balance must equal the deployment value plus slot one.
+- Rollback: a reverted transaction refunds its value. The contract keeps its
+  prior committed balance and slots on every path. Original Core's balanced
+  root runs on the post-transfer world with the pre-transfer world as its
+  checkpoint.
+- Deployment: an empty payable constructor deployed with a recorded value of
+  zero or five. Every path starts with that balance, zero slots and no
+  constructor logs; original Core starts from the declared post-deployment
+  world.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, a bank input, a smaller bank value, flags reduced to their parity or
+  with the revert bit cleared, and a zero deployment value, ordered by
+  transaction count, program complexity and the sum of flags, inputs, values
+  and the deployment value.
+
 Further state/ABI work, such as nested or multi-word ABI elements, `bytes`,
-ABI-encoded return values, multiple callers or nonzero call value, needs
-its own observation, rollback, deployment and reduction definitions first.
+ABI-encoded return values or multiple callers, needs its own observation,
+rollback, deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
