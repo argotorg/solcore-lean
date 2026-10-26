@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph and private-mutation emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage and bounded dynamic-array extensions validated locally; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree; expression closure and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree and a first expression subset for named rows; remaining expression forms and public connection remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -719,10 +719,21 @@ direct lambda initializers, and bare and projected assignments, bit-not updates
 and matches of named-row bodies. At an actual
 prepared named header, checker certification and the cached body's Core typing
 discharge the static premises (`CellAwareInvocationAcceptedNamedHeaders.static_inputs`).
-Accepted-expression meaning is still a premise, contextual-view writes and
-matches are not yet closed, and the public session does not yet use these
-theorems. The design document lists the remaining
-premises.
+
+The first expression closure (`CellAwareInvocationAcceptedExpressions`)
+discharges accepted-expression meaning for named-row bodies whose accepted
+expressions are all literals, ordinary local reads, groups, pairs, primitive
+unary and binary operators or conditionals (`Closed`). It extracts each receipt
+tree from the actual named compiler's acceptance and closes it by structural
+recursion, and its `body_preserves` and `body_reflects` are whole-body theorems
+without the `Expressions` premise. In its place they take `Closed`, the
+read-fault interpretation (`Reads`) and selected-body typing of the staged
+registry. Other
+expression forms, including direct calls, which need the shared size induction
+across bodies, and every expression of a contextual closure still need the
+premise. Contextual-view writes and matches are not yet closed, and the public
+session does not yet use these theorems. The design document lists the
+remaining premises.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile

@@ -1,6 +1,6 @@
 # Core runtime unification and semantic preservation
 
-Updated: 2026-10-26.
+Updated: 2026-10-27.
 
 ## Status and scope
 
@@ -120,8 +120,9 @@ relate `index.body` to independent Source execution in both directions,
 including failures, control transfers and the reached heap.
 
 These theorems keep explicit premises. `Expressions` supplies meaning for
-exactly the expressions the compiler accepted, at every compiler fuel; no
-expression closure exists yet. `Covered` admits returns, final values, discards,
+exactly the expressions the compiler accepted, at every compiler fuel; the
+expression closure below discharges it only for a first subset of named-row
+bodies. `Covered` admits returns, final values, discards,
 `break`/`continue`, blocks, conditionals, `while` and `for` loops, monomorphic
 initialized or uninitialized declarations, and bare and projected assignments
 and bit-not updates when the compiler view is the original Source (as for named
@@ -168,6 +169,39 @@ interpretation of the body's assignment diagnostic words, reached place
 diagnostics and function identity views) remain inputs. These theorems are not
 yet used by the public session.
 
+The first expression closure is
+[CellAwareInvocationAcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressions.lean).
+`Closed` states the covered subset as a predicate on the actual accepted
+expression receipts: every expression the compiler accepts for the body, at any
+fuel and scope, is a site of the subset (`InSubset`). For a named row these
+sites are `Subset` of
+[CellAwareInvocationAcceptedExpressionTrees](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressionTrees.lean):
+literals, ordinary local reads, groups, pairs, primitive unary and binary
+operators and conditionals. Each such site has no coercions, has no
+requirements except at an integer literal, is not a generalized initializer and
+reads no generalized binder, so the compiler's special callback declines it. A
+contextual closure admits no site. Because the compiler accepts only
+expressions it finds in its view, `closed_of_nodes` derives `Closed` from the
+body's expression nodes alone. `of_subset` extracts a receipt tree from the
+compiler's own acceptance at its root fuel
+(`GeneralizedLocalInitializerCompilation.named_contextual`), at the reached
+scope and Source context, using the scope declarations of the physical entry.
+[CellAwareInvocationAcceptedExpressionBounds](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressionBounds.lean)
+closes that tree by structural recursion over the existing invocation-family
+heads for read-product leaves, groups, pairs, operators and conditionals. No
+expression or body execution law is an input. `expressions` turns `Closed` into
+`Expressions` at every budget, and the module's `body_preserves` and
+`body_reflects` compose it with the statement closure: for such bodies they
+are the whole-body theorems above without the `Expressions` premise. In its
+place they take `Closed`, `Reads` (the fault interpretation of the body's
+uninitialized-read diagnostic words) and selected-body typing of the staged
+registry (`SelectedBodies`); the registry extension comes from `Writes`. All
+other premises of the body theorems are unchanged. Direct calls do not fit this
+structural recursion, because their staged trace runs the callee body; they
+need the shared size induction across bodies. Indirect, builtin and method
+calls, indices, longer tuples, constructors, builtin references, generalized
+reads, lambdas and coercions are also outside the subset.
+
 ## Remaining work for the second goal
 
 `StaticProfile` deliberately recognizes a strict subset. Successful compilation
@@ -186,9 +220,14 @@ On the accepted-body route above, the next connected steps are:
   Statements after an always-returning prefix in a non-Unit
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
-- Discharge `Expressions` by an expression closure over the actual accepted
-  expression compiler, with calls, closures, methods and coercions supplied by
-  the shared size induction.
+- Extend the expression closure beyond its first subset over the same actual
+  accepted expression compiler: direct calls through the shared size induction
+  across bodies, then indirect and builtin calls, methods, indices, tuples,
+  constructors, generalized reads, closures and coercions. Expressions of
+  contextual closures need the relation between the compiler view and the
+  Source that their writes and matches also need. Derive `Reads` from the
+  public diagnostic receipt, as `CellAwareNamedReadDiagnostics.uninitialized`
+  does for the older named family.
 - Construct the invocation's physical entry state from the actual named
   parameter entry, as `CellAwareImperativeNamedInvocation` does for the older
   scope family, and connect `body_preserves`/`body_reflects` to the cell-aware
