@@ -2146,6 +2146,7 @@ import Solcore.Test.RustHullLifecycleRuntime
 import Solcore.Test.RustHullRootCallPublic
 import Solcore.Test.RustHullRootCallRuntime
 import Solcore.Frontend.RustHull.Safety
+import Solcore.Test.SourceScalarMeaning
 set_option autoImplicit false
 
 open Solcore
@@ -4086,5 +4087,6 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedFaultingLocal.FailureBridge.selectedRuntime
   Tests.staticSemanticsSpineTests
   Tests.run
+  Tests.SourceScalarMeaning.testSourceScalarMeaning
   IO.println "solcore-lean tests passed"
   return 0
