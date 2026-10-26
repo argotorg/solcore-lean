@@ -717,8 +717,37 @@ inconclusive. With the generalized adapter, the keyed fixed and random suites
 and the two-slot storage and rollback fixed corpora matched again on both
 levels. Hosted CI has not been run.
 
+The third extension, `stateful-logs`, makes event logs committed observations.
+Its definitions were fixed before execution:
+
+- Transactions: one to three zero-value calls of `run(uint256 flags, uint256
+  input)` with exactly two ABI Words; malformed calldata is outside the scope.
+- Effects: write `step(input + slot0)` to slot zero and a counter to slot one.
+  Up to three static log sites follow, each guarded by one flags bit and
+  emitting LOG0 to LOG4 with zero, one or two data Words. Topics and data are
+  derived from a further step application. Odd flags revert after every write
+  and log.
+- Log observation: for each transaction, the ordered list of committed logs,
+  each with its emitter address, topics and data bytes, on all three paths.
+  Core's host offers only the one-topic, one-Word `emitLogWord`, so the Core
+  contract writes each site as a fixed frame of word logs and a versioned
+  observer decodes the committed journal; Core itself is unchanged. Hull uses
+  its receipt logs; the EVM path uses each mined receipt's logs.
+- Rollback: a reverted transaction has no logs and keeps the prior committed
+  slots on every path. Logs committed earlier stay: after the sequence, the EVM
+  chain's complete log list for the contract must equal the concatenation of
+  the committed receipts' logs. Core and Hull histories only append.
+- Deployment: no constructor and no constructor logs. Hull and EVM deployment
+  receipts must contain no logs and leave every slot zero; original Core starts
+  from the declared post-deployment world with no logs.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, log-site removal or simplification (dropping a site's last topic or
+  data Word), and input simplification (a bank input, one of flags bits zero
+  to three cleared, or only those four bits kept), ordered by transaction
+  count, program complexity and the sum of flags and inputs.
+
 Further state/ABI work, such as nested or multi-word ABI elements, `bytes`,
-ABI-encoded return values, multiple callers, nonzero call value or logs, needs
+ABI-encoded return values, multiple callers or nonzero call value, needs
 its own observation, rollback, deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.

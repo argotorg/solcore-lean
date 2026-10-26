@@ -1388,6 +1388,97 @@ multi-word element types, `bytes` and strings, ABI-encoded return values and
 dynamic memory are outside it, as are gas, balances, nonces and logs. Agreement
 is test evidence, not a preservation proof.
 
+## Compare committed event logs
+
+The `stateful-logs` profile makes event logs committed observations. Each
+transaction calls `SynthesizedLogs.run(uint256 flags, uint256 input)`,
+selector `0x7357f5d2`, with exactly two ABI Words. A plan holds the checked
+aggregate step and zero to three log sites. A site has a guard bit `g` (one,
+two or three, strictly increasing across sites), a topic count `n` from zero
+to four and a data length of zero, one or two Words.
+
+The contract reads `old = sload(0)` and `count = sload(1)`, computes
+`result = step(input + old)`, then writes `result` to slot 0 and `count + 1`
+to slot 1. Each site in order whose guard bit is set in `flags` computes
+`value = step(result + g)` and emits one LOGn record:
+
+| Field | Value |
+| --- | --- |
+| Emitter | the contract address |
+| Topics | `value + 1`, ..., `value + n` |
+| Data | `value`, then `result`, as big-endian Words; first `w` of them |
+
+The source emits it with the pinned `std.opcodes` wrapper `log0` to `log4`
+over a buffer reserved from the free-memory pointer. Odd flags then revert
+with `result` as a 32-byte payload; otherwise `run` returns `result`.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Log observation.** For each transaction, the ordered list of committed
+  logs `{address, topics, data}`: the emitter as a decimal address, zero to
+  four decimal topic Words and the data as hexadecimal bytes. The Rust EVM
+  path reads the `logs` of each mined receipt in log-index order. Imported
+  Hull reads the logs of each actual receipt from the declared-slot runner.
+  Original Core's host interface has a single log primitive,
+  `emitLogWord(topic, payload)`, with one topic Word and one data Word. The
+  Core contract therefore writes each site as a frame of `1 + w + n` word
+  logs, and the observer decodes the committed journal of the public
+  top-level runtime under framing `core-word-log-framing-v1`:
+
+  | Record | Topic Word | Payload Word |
+  | --- | --- | --- |
+  | Header | `256 + 16 * w + n` | `0` |
+  | Data `i`, for `i` = 1..`w` | `512 + i` | data Word `i` |
+  | Topic `j`, for `j` = 1..`n` | `768 + j` | topic `j` |
+
+  Every record of a frame must come from the same emitter. A journal that is
+  not a sequence of complete frames is an observer failure, never an empty or
+  partial log list. The framing is a convention of this profile, not a Core
+  LOGn semantics; Core and its host interface are unchanged.
+- **Rollback.** A reverted transaction has no committed logs on any path and
+  keeps the prior committed slots. Original Core's public runtime selects the
+  checkpoint journal and world; Hull receipts of failed calls export no logs;
+  EVM receipts of failed transactions carry none. Logs committed by earlier
+  transactions stay committed: after the sequence, `eth_getLogs` over the
+  whole local chain for the contract must return exactly the concatenation of
+  the deployment and per-transaction receipt logs. The Core and Hull histories
+  report each transaction's committed logs once and never retract them. An
+  out-of-fuel or otherwise incomplete transaction has unknown logs (`null`)
+  and ends the sequence.
+- **Deployment.** The contract has no constructor and emits no constructor
+  logs. The Hull and EVM deployment receipts must contain no logs and leave
+  slots 0 and 1 zero, with no nonzero undeclared slot. Original Core starts
+  from the declared post-deployment world with no logs. A deployment log on
+  any path is a semantic mismatch at the initial stage.
+- **Committed comparison.** After every transaction all three paths must agree
+  on status, payload, slots 0 and 1, and the ordered committed logs. The keyed
+  profile's containment rules apply to slots outside 0 and 1 on the Hull and
+  EVM paths. Each path's logs must also have the static shape that the plan
+  and flags determine: on return, one log per guarded site, in site order,
+  from the contract address, with that site's topic count and 32 times its
+  data length bytes of data; on revert, none.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, remove one log
+  site (the others keep their guards) or drop its last topic or last data
+  Word, replace one transaction's input by a storage boundary input, clear
+  one of bits zero to three of its flags, or keep only those four bits. They
+  are ordered by transaction count, complete program complexity, then the sum
+  of all flags and inputs. A candidate that no longer emits the log of a
+  finding cannot preserve that finding.
+
+Coverage adds four dimensions to the storage step dimensions: committed log
+counts per transaction, committed topic arities, committed data lengths in
+bytes, and the number of guarded sites of each reverted transaction, whose
+logs rollback must discard. Generated coverage derives them from the plan and
+flags; matched coverage uses the actual original-Core histories.
+
+This profile does not compare gas, balances, nonces or code, `LOG` from
+constructors or from more than one contract, memory-dependent data lengths
+other than whole Words, or ABI event signatures and indexing. Agreement is
+test evidence, not a preservation proof.
+
 
 ## Compare generic selection
 
