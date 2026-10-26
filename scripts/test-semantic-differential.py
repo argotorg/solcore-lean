@@ -36,6 +36,38 @@ def observations(value=7):
             for name in ("directCore", "importedHull", "rustEvm")}
 
 
+class ProcessGroupSignalTests(unittest.TestCase):
+    """macOS can reject killpg with EPERM when a group holds only unreaped exits."""
+
+    def test_permission_error_from_an_exited_group_does_not_escape_cleanup(self):
+        process = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+        process.wait(timeout=10)
+        with patch.object(runner.os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')) as killpg:
+            runner.stop_process(process)
+        self.assertEqual(killpg.call_count, 2)
+        self.assertEqual(process.returncode, 0)
+
+    def test_permission_error_still_stops_a_running_leader(self):
+        process = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(30)'], start_new_session=True)
+        try:
+            started = time.monotonic()
+            with patch.object(runner.os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+                runner.stop_process(process)
+            self.assertEqual(process.returncode, -signal.SIGTERM)
+            self.assertLess(time.monotonic() - started, 5)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
+
+    def test_missing_group_is_still_ignored(self):
+        process = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+        process.wait(timeout=10)
+        with patch.object(runner.os, 'killpg', side_effect=ProcessLookupError()) as killpg:
+            runner.stop_process(process)
+        self.assertEqual(killpg.call_count, 2)
+
+
 class CaseProfileTests(unittest.TestCase):
     def input_case(self, value):
         # Envelope validation only; the native tool separately checks the Core program.

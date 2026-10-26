@@ -431,21 +431,27 @@ def core_rows(stdout: str, exit_code: int) -> list[dict]:
     return rows
 
 
+def signal_group(process: subprocess.Popen, signum: int) -> None:
+    # macOS can reject killpg with EPERM once the group holds only exited,
+    # unreaped members; then signal the leader directly if it still runs.
+    try:
+        os.killpg(process.pid, signum)
+    except PermissionError:
+        if process.poll() is None:
+            process.send_signal(signum)
+    except ProcessLookupError:
+        pass
+
+
 def stop_process(process: subprocess.Popen) -> None:
     # Each process owns a new session. Also stop descendants if its leader has
     # already exited; never signal a shared shell or unrelated Lean process.
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
+    signal_group(process, signal.SIGTERM)
     try:
         process.wait(timeout=2)
     except subprocess.TimeoutExpired:
         pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    signal_group(process, signal.SIGKILL)
     process.wait(timeout=2)
 
 

@@ -15,7 +15,6 @@ import copy
 import importlib.util
 import json
 import math
-import os
 from pathlib import Path
 import re
 import signal
@@ -148,18 +147,12 @@ def stop_owned_process(process):
     # The outer runner allows two seconds to stop this exporter. Finish killing
     # the compiler's separate session within that grace period, even if it
     # ignores TERM, rather than leaving it alive when the exporter is killed.
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
+    common.signal_group(process, signal.SIGTERM)
     try:
         process.wait(timeout=.25)
     except subprocess.TimeoutExpired:
         pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    common.signal_group(process, signal.SIGKILL)
     process.wait(timeout=.5)
 
 

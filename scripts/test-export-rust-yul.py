@@ -160,6 +160,22 @@ class YulProtocolTests(unittest.TestCase):
             exporter.run_process([sys.executable, '-c', 'import time;time.sleep(30)'], args)
         self.assertLess(time.monotonic() - started, 5)
 
+    def test_owned_process_cleanup_tolerates_macos_group_permission_error(self):
+        process = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+        process.wait(timeout=10)
+        with patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')) as killpg:
+            exporter.stop_owned_process(process)
+        self.assertEqual(killpg.call_count, 2)
+        running = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(30)'], start_new_session=True)
+        try:
+            with patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+                exporter.stop_owned_process(running)
+            self.assertEqual(running.returncode, -signal.SIGTERM)
+        finally:
+            if running.poll() is None:
+                running.kill()
+                running.wait(timeout=10)
+
     def test_real_process_helper_stops_watched_artifact_growth(self):
         with tempfile.TemporaryDirectory() as directory:
             artifact = Path(directory) / 'large.json'
