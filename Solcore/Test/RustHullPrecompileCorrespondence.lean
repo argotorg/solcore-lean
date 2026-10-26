@@ -1,10 +1,12 @@
 import Solcore.Frontend.RustHull.RuntimeCallEffectsSemantics
 import Solcore.Frontend.RustHull.ContractCallExecutionCorrespondence
+import Solcore.Frontend.RustHull.ContractCallModeExecutionCorrespondence
 
 /-! Calls to the identity precompile reach the actual dispatcher and precompile
-code. The scenarios cover a funded copy, insufficient forwarded gas, a value
-transfer to the precompiled account and a static call, followed by the caller's
-output copy and public resumption. -/
+code. The child-free scenarios cover a funded copy, insufficient forwarded gas,
+a value transfer to the precompiled account and a static call, followed by the
+caller's output copy and public resumption. CALLCODE and DELEGATECALL reach the
+same precompile through the call-mode theorem. -/
 set_option autoImplicit false
 set_option maxRecDepth 8192
 namespace Tests.RustHullPrecompileCorrespondence
@@ -364,8 +366,206 @@ private def check (scenario : Scenario) : IO Unit := do
         throw (IO.userError s!"precompile correspondence: internal snapshot mismatch for {reprStr scenario}")
   | outcome => throw (IO.userError s!"precompile correspondence: Core failed: {reprStr outcome}")
 
+namespace Modes
+
+/-- CALLCODE with value and DELEGATECALL select the precompile by the requested
+target. Neither moves balances; CALLCODE still checks the caller's funds. -/
+inductive Scenario where
+  | callCode | delegated
+  deriving DecidableEq, Repr
+def rootBytes : List UInt8 := [0]
+def context : Contract.Context := {caller := w 55, value := w 7, balance := w 10, completeWorld := true}
+def operation : Scenario → RuntimeCallModeSemantics.Operation
+  | .callCode => .callCode | .delegated => .delegateCall
+def invoked : Scenario → Expr
+  | .callCode => call .word "callcode" [word "100", word "4", word "5", word "1", word "1", word "3", word "2"]
+  | .delegated => call .word "delegatecall" [word "100", word "4", word "1", word "1", word "3", word "2"]
+def stored (scenario : Scenario) : Expr := call .unit "mstore8" [word "2", invoked scenario]
+def code (scenario : Scenario) : CodeBlock := {
+  stmts := [expression seed, expression (stored scenario), expression returned], functions := []}
+def program (scenario : Scenario) : Program :=
+  {entryPoints := [], functions := [], objects := [.object "Precompile" (code scenario) []]}
+def effects : Semantics.ExternalSemantics RuntimeCallModeSemantics.State :=
+  ChildFrameModeSemantics.effectsAt [] 1 (some rootBytes)
+
+def initial (object : Contract.CompiledObject) : SourceState :=
+  ⟨[], ContractCallCorrespondence.contextInitialState (some rootBytes) object (Contract.normalizeContext context)⟩
+def memoryWritten (object : Contract.CompiledObject) : SourceState := withMemory (initial object) seeded
+def value (object : Contract.CompiledObject) : Scenario → Core.Word
+  | .callCode => w 5
+  | .delegated => (RuntimeCallModeSemantics.observations (memoryWritten object).external).direct .callvalue
+def afterCall (object : Contract.CompiledObject) : SourceState :=
+  ⟨[], RuntimeCallEffectsSemantics.withTransport (memoryWritten object).external (nextTransport .identity)
+    (RuntimeCallEffectsSemantics.shared (memoryWritten object).external)⟩
+def afterStore (object : Contract.CompiledObject) : SourceState :=
+  withMemory (afterCall object) (MemorySemantics.mstore8 (copiedMemory .identity) (w 2) (w 1)).2
+def finalState (object : Contract.CompiledObject) : SourceState :=
+  let state := (afterStore object).external
+  ⟨[], {state with runtime := (RuntimeReturnDataEffectsSemantics.withRuntime state.runtime
+    (TerminationSemantics.terminate state.runtime.runtime.runtime.runtime.runtime 1 (w 1) (w 3)).2)}⟩
+
+private theorem seed_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] effects [] seed
+      (initial object) (.value .unit) (memoryWritten object) := by
+  apply Semantics.EvalExpr.call rfl
+  · exact .cons (.word (text := "1") rfl) (.cons (.word (text := "171") rfl) .nil)
+  · exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
+
+private theorem invoked_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    RuntimeCallModeSemantics.Call (ChildFrameModeSemantics.Children [] (ChildFrameModeSemantics.effectsAt [] 0))
+      (operation scenario) (w 100) (w 4) (value object scenario) (w 1) (w 1) (w 3) (w 2)
+      (memoryWritten object).external (.value (.word (w 1))) (afterCall object).external := by
+  apply RuntimeCallModeSemantics.Call.invoked
+  · exact .inl (by cases scenario <;> intro impossible <;> cases impossible)
+  · intro stipend nonzero
+    cases scenario
+    · change ¬w 100 > w (Core.wordModulus - 2301)
+      decide +kernel
+    · cases stipend
+  apply CallTransportSemantics.Execute.ready (inputSize := w 32) (outputSize := w 32)
+  · change MemorySemantics.touchSize? seeded.size (w 1) (w 1) = some (w 32)
+    decide +kernel
+  · change MemorySemantics.touchSize? (w 32) (w 3) (w 2) = some (w 32)
+    decide +kernel
+  apply CallTransportSemantics.Dispatch.returned (input := input) (response := response .identity) (result := .value .unit)
+  · change ¬w 0 > w 1023
+    decide +kernel
+  · exact input_copied
+  · rfl
+  · apply AccountCallSemantics.Dispatch.succeeded
+      (transferred := RuntimeCallEffectsSemantics.shared (memoryWritten object).external)
+    · cases scenario
+      · exact .inr (by change ¬w 5 > w 10; decide +kernel)
+      · exact .inl rfl
+    · cases scenario <;> rfl
+    · apply AccountCallSemantics.Run.precompile
+      apply AccountCallSemantics.Precompile.identity (size := w 32)
+      · exact target_masked
+      · change MemorySemantics.touchSize? Core.Word.zero Core.Word.zero (w 1) = some (w 32)
+        decide +kernel
+      · cases scenario
+        · change AccountCallSemantics.linearCost 15 3 (w 1) ≤ ((w 100).add (w 2300)).val
+          decide +kernel
+        · change AccountCallSemantics.linearCost 15 3 (w 1) ≤ (w 100).val
+          decide
+      · exact identity_copied
+    · rfl
+  · apply MemoryCopySemantics.From.done (size := w 32)
+    · change MemorySemantics.touchSize? (w 32) (w 3) (w 1) = some (w 32)
+      decide +kernel
+    · exact output_copied
+
+private theorem call_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] effects [] (invoked scenario)
+      (memoryWritten object) (.value (.word (w 1))) (afterCall object) := by
+  cases scenario <;> apply Semantics.EvalExpr.call rfl
+  case callCode.argumentsEvaluated =>
+    exact .cons (.word (text := "100") rfl) (.cons (.word (text := "4") rfl) (.cons (.word (text := "5") rfl) (.cons (.word (text := "1") rfl) (.cons (.word (text := "1") rfl) (.cons (.word (text := "3") rfl) (.cons (.word (text := "2") rfl) .nil))))))
+  case callCode.called => exact .external (by rfl) rfl (.callCode (invoked_source object .callCode))
+  case delegated.argumentsEvaluated =>
+    exact .cons (.word (text := "100") rfl) (.cons (.word (text := "4") rfl) (.cons (.word (text := "1") rfl) (.cons (.word (text := "1") rfl) (.cons (.word (text := "3") rfl) (.cons (.word (text := "2") rfl) .nil)))))
+  case delegated.called => exact .external (by rfl) rfl (.delegateCall (invoked_source object .delegated))
+
+private theorem store_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] effects [] (stored scenario)
+      (memoryWritten object) (.value .unit) (afterStore object) := by
+  apply Semantics.EvalExpr.call rfl (.cons (.word (text := "2") rfl) (.cons (call_source object scenario) .nil))
+  exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
+
+private theorem return_source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalExpr [AccountRuntime.frameFunction (code scenario)] effects [] returned
+      (afterStore object) result (finalState object) := by
+  apply Semantics.EvalExpr.call rfl
+  · exact .cons (.word (text := "1") rfl) (.cons (.word (text := "3") rfl) .nil)
+  · exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.termination rfl)))))))
+
+theorem source (object : Contract.CompiledObject) (scenario : Scenario) :
+    Semantics.EvalFunction [AccountRuntime.frameFunction (code scenario)] effects
+      (AccountRuntime.frameFunction (code scenario)) [] (initial object) result (finalState object) := by
+  apply Semantics.EvalFunction.body (control := .fault _) rfl
+  apply Semantics.EvalStatements.next (by intros; intro impossible; cases impossible) (.expression rfl (seed_source object _))
+  apply Semantics.EvalStatements.next (by intros; intro impossible; cases impossible) (.expression rfl (store_source object _))
+  exact .stop (by intros; intro impossible; cases impossible) (.expressionFault rfl (return_source object _))
+    (by intro impossible; cases impossible)
+
+def usedNames : List String := ["mstore8", "callcode", "delegatecall", "return"]
+
+theorem eligible (scenario : Scenario) {supported : String → Prop}
+    (available : ∀ name ∈ usedNames, supported name) :
+    ExecutableProgram supported [AccountRuntime.frameFunction (code scenario)] := by
+  intro function member statement statementMember
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+  subst function
+  simp only [AccountRuntime.frameFunction, code, List.mem_cons, List.not_mem_nil, or_false] at statementMember
+  rcases statementMember with rfl | rfl | rfl
+  all_goals simp only [expression, ExecutableStatement]
+  · exact atoms _ .unit "mstore8" ["1", "171"] (available _ (by simp [usedNames])) (by rfl)
+  · apply ExecutableExpression.external (name := "mstore8") (available _ (by simp [usedNames])) (by rfl)
+    intro argument member
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl
+    · exact .word _ _ _
+    · cases scenario <;> first
+        | exact atoms _ .word "callcode" ["100", "4", "5", "1", "1", "3", "2"] (available _ (by simp [usedNames])) (by rfl)
+        | exact atoms _ .word "delegatecall" ["100", "4", "1", "1", "3", "2"] (available _ (by simp [usedNames])) (by rfl)
+  · exact atoms _ .unit "return" ["1", "3"] (available _ (by simp [usedNames])) (by rfl)
+
+private theorem names_supported : ∀ name ∈ usedNames, ContractCallModeCorrespondence.supported true name := by
+  intro name member
+  simp only [usedNames, List.mem_cons, List.not_mem_nil, or_false] at member
+  rcases member with rfl | rfl | rfl | rfl
+  · exact .inl (.inl (.inl (.inl (.inl (.inl (.inl (.inl (.inl (.inl ⟨.store8, rfl⟩)))))))))
+  · exact .inr (.inr (.inr (.inl rfl)))
+  · exact .inr (.inr (.inr (.inr (.inl rfl))))
+  · exact .inl (.inl (.inl (.inl (.inl (.inl (.inr ⟨.returned, rfl⟩))))))
+
+private theorem empty_connection : ModeChildCatalogExecutionCorrespondence.CatalogConnection [] [] [] := by
+  intro address source selected
+  simp [ChildFrameSemantics.select] at selected
+
+private theorem empty_links (object : Contract.CompiledObject) :
+    ContractCallModeCorrespondence.InitialContextLinks (some rootBytes) [] object context [] := by
+  intro anchor member
+  simp at member
+
+/-- Public consumer of the call-mode theorem: the empty catalog has no
+selected child and no initial code links. -/
+theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
+    (accepted : Contract.compileObject (program scenario) ["Precompile"] 64 (some rootBytes) [] = .ok object) :
+    ∃ value, ContractCallModeCorrespondence.PublicMessageRel context result (finalState object).external value ∧
+      ∃ required, ∀ initialFuel additional limit last,
+        Contract.ReceiptResumes limit (Contract.runWithReceipt (object.instantiate context) initialFuel limit) additional last →
+        (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
+        ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
+  exact ContractCallModeCorrespondence.compileObject_resumes_exact (height := 0) (code := code scenario) (by rfl)
+    accepted rfl (eligible scenario names_supported) empty_connection context rfl (empty_links object)
+    (source object scenario)
+
+private def check (scenario : Scenario) : IO Unit := do
+  let object ← match Contract.compileObject (program scenario) ["Precompile"] 64 (some rootBytes) [] with
+    | .ok object => pure object
+    | .error error => throw (IO.userError s!"precompile mode correspondence: compile failed: {reprStr error}")
+  let prepared := object.instantiate context
+  let checkpoint ← match (Contract.runWithReceipt prepared 0).outcome with
+    | .outOfFuel checkpoint => pure checkpoint
+    | outcome => throw (IO.userError s!"precompile mode correspondence: zero fuel completed: {reprStr outcome}")
+  for receipt in [Contract.runWithReceipt prepared 1000000, Contract.resumeWithReceipt checkpoint 1000000] do
+    match receipt.outcome with
+    | .returned bytes storage =>
+        unless bytes == [171, 1, 171] && storage.isEmpty && receipt.logs.isEmpty &&
+            receipt.balances == [(w 0, w 10)] do
+          throw (IO.userError s!"precompile mode correspondence: wrong result for {reprStr scenario}: {reprStr receipt}")
+    | outcome => throw (IO.userError s!"precompile mode correspondence: expected return for {reprStr scenario}: {reprStr outcome}")
+
+def run : IO Unit := do
+  for scenario in [Scenario.callCode, .delegated] do
+    check scenario
+
+end Modes
+
 def run : IO Unit := do
   for scenario in [Scenario.identity, .underfunded, .transfer, .staticCall] do
     check scenario
+  Modes.run
 
 end Tests.RustHullPrecompileCorrespondence

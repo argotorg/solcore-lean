@@ -576,8 +576,9 @@ so the public theorems for child-free calls, compiled and nested children,
 call modes and root reentry now cover identity calls without statement changes.
 The proof reaches the actual dispatcher, precompile wrapper and copy loop;
 `rfl`-checked restatements expose the builders that the implementation keeps
-private. Four independent source derivations reach the public resumption
-theorem, and runtime checks compare bytes, balances and retained snapshots.
+private. Six independent source derivations reach the child-free and call-mode
+public resumption theorems, including CALLCODE and DELEGATECALL; runtime
+checks compare bytes, balances and retained snapshots.
 ECRECOVER, SHA-256, RIPEMD-160 and P256VERIFY still need independent algorithm
 semantics. Creation/deployment, assembly and source revert, and object linking
 also remain, in that order.

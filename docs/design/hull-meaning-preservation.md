@@ -339,7 +339,9 @@ Their source semantics now includes identity calls.
 `Tests.RustHullPrecompileCorrespondence.public_resumes` supplies four independent
 source derivations: a funded identity call whose output is copied into caller
 memory, an underfunded call, a value transfer to address 4 and a static call.
-Runtime checks compare returned bytes, committed balances, repeated
+`Tests.RustHullPrecompileCorrespondence.Modes.public_resumes` applies the
+call-mode theorem to CALLCODE with value and to DELEGATECALL; neither moves
+balances. Runtime checks compare returned bytes, committed balances, repeated
 resumptions and the retained Core snapshot. ECRECOVER, SHA-256, RIPEMD-160 and
 P256VERIFY have no source rule, so the public theorems state nothing about
 calls to them.
