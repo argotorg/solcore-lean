@@ -1102,11 +1102,18 @@ from a complete world receives a new account and the endowment, and empty
 init code deploys empty code without an init frame. The proof reaches the
 actual address builders, nonce write, checkpoint, collision checks, transfer
 and installation, restated by `rfl`, and four independent source scenarios
-reach the call-mode theorem with runtime checks. Init frames are the next
-unit: nonempty init code in a deployment context, runtime-code validation and
-installation, and rollback with revert bytes; the Hull design document lists
-the remaining source rules and proof obligations. Assembly and source revert,
-and object linking, also remain, in that order.
+reach the call-mode theorem with runtime checks. The two faults after the
+nonce advance are connected as well: an unknown target, absent from an
+incomplete world or recorded with unknown code, is failure 7, and an
+endowment that would overflow the target balance is failure 12. Both restore
+the post-nonce checkpoint through the actual restoration code, and four more
+source scenarios reach the call-mode theorem. Init frames remain: nonempty
+init code in a deployment context, runtime-code validation and installation,
+and rollback with revert bytes. Their source rule needs an init-template
+catalog and a premise connecting it to the compiled init definitions, which
+changes the public theorem statements; the Hull design document lists the
+remaining source rules and proof obligations. Assembly and source revert, and
+object linking, also remain, in that order.
 
 ## Handoff rules
 
