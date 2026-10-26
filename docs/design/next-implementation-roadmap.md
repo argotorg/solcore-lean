@@ -569,10 +569,12 @@ and composes the result with the actual function footer
 (`CellAwareInvocationAcceptedFlow.body_preserves` and `body_reflects`). Covered
 branches are returns, final values, discards, transfers, blocks, conditionals,
 `while` loops, monomorphic declarations, and bare assignments and bit-not
-updates of named-row bodies. Accepted-expression meaning is still a premise,
-projected writes, matches, `for` loops and generalized declarations are not yet
-closed, and the public session does not yet use these theorems. The design
-document lists the remaining premises.
+updates of named-row bodies. At an actual prepared named header, checker
+certification and the cached body's Core typing discharge the static premises
+(`CellAwareInvocationAcceptedNamedHeaders.static_inputs`). Accepted-expression
+meaning is still a premise, projected writes, matches, `for` loops and
+generalized declarations are not yet closed, and the public session does not
+yet use these theorems. The design document lists the remaining premises.
 
 **Hull connections:** preserve the exact existing
 [public theorem boundaries](hull-meaning-preservation.md). Connect precompile
