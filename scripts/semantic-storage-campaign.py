@@ -44,6 +44,29 @@ SHRINKABLE = legacy.SHRINKABLE
 VERSIONS = ("generatorVersion", "profileVersion", "functionVersion", "templateVersion", "stepProfileVersion",
             "stepFunctionVersion", "stepTemplateVersion", "emitterVersion", "wrapperVersion")
 DIMENSIONS = ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templates", "Outcomes", "CompletionPatterns")
+KEYED_DIMENSIONS = DIMENSIONS + ("Keys", "Aliases")
+NUMERIC_DIMENSIONS = ("Inputs", "Keys")
+ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
+TEST_FIELD = re.compile(r"output|storage:(?:0|[1-9][0-9]{0,77})")
+
+
+def dimensions(profile_name):
+    return KEYED_DIMENSIONS if adapter.PROFILES[profile_name]["keyed"] else DIMENSIONS
+
+
+def aliases(case):
+    """Static slot aliasing among keyed transactions, independent of execution."""
+    keys = [int(common.word(tx["key"], "transaction key")) for tx in case["transactions"]]
+    found = set()
+    if int(adapter.COUNTER_SLOT) in keys:
+        found.add("key-counter")
+    if (int(adapter.COUNTER_SLOT) - 1) % 2**256 in keys:
+        found.add("successor-counter")
+    if len(set(keys)) < len(keys):
+        found.add("repeated-key")
+    if any((left + 1) % 2**256 == right for i, left in enumerate(keys) for j, right in enumerate(keys) if i != j):
+        found.add("successor-key")
+    return found
 
 
 def case_hash(case):
@@ -52,7 +75,7 @@ def case_hash(case):
 
 
 def helper_count(case):
-    step = case["storagePlan"]["stepProgram"]
+    step = case[adapter.profile(case)["planKey"]]["stepProgram"]
     if step.get("resultType") != {"tag": "function", "parameter": "word", "result": "word"} or step.get("dataDefinitions") != []:
         raise ValueError("storage step must be a closed Word function graph")
     return legacy.bound_helper_count(step.get("body"))
@@ -112,6 +135,16 @@ def validate_manifest(manifest):
             raise ValueError("invalid rollback completion pattern requirements")
     elif outcomes or patterns:
         raise ValueError("completion requirements belong to the rollback profile")
+    if selected["keyed"]:
+        keys, kinds = manifest.get("requiredKeys"), manifest.get("requiredAliases")
+        if not isinstance(keys, list) or not keys or any(not isinstance(v, str) for v in keys) or len(set(keys)) != len(keys):
+            raise ValueError("keyed coverage requires unique required keys")
+        for value in keys:
+            common.word(value, "required key")
+        if not isinstance(kinds, list) or any(v not in ALIASES for v in kinds) or len(set(kinds)) != len(kinds):
+            raise ValueError("invalid keyed alias requirements")
+    elif "requiredKeys" in manifest or "requiredAliases" in manifest:
+        raise ValueError("key coverage belongs to the keyed storage profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -120,8 +153,10 @@ def validate_manifest(manifest):
             raise ValueError("corpus IDs must be unique bounded identifiers")
         ids.add(entry["id"])
         generated = "generation" in entry
-        if generated == ("storagePlan" in entry) or ("transactions" in entry) == generated:
-            raise ValueError("corpus entry requires generation XOR storagePlan+transactions")
+        if generated == (selected["planKey"] in entry) or ("transactions" in entry) == generated:
+            raise ValueError(f"corpus entry requires generation XOR {selected['planKey']}+transactions")
+        if "expectedHistory" in entry and (not selected["keyed"] or not isinstance(entry["expectedHistory"], list)):
+            raise ValueError("independent expected histories are keyed transaction lists")
         if any(key in entry for key in ("program", "loopPlan", "input")):
             raise ValueError("storage corpus uses a plan and transaction sequence")
         expected = entry.get("expectedFeatures")
@@ -136,7 +171,7 @@ def validate_manifest(manifest):
             if int(seed) >= 2**64 or type(nodes) is not int or not 1 <= nodes <= 512:
                 raise ValueError("storage generation request exceeds bounds")
         else:
-            if not isinstance(entry["storagePlan"], dict) or entry["storagePlan"].get("schema") != selected["planSchema"]:
+            if not isinstance(entry[selected["planKey"]], dict) or entry[selected["planKey"]].get("schema") != selected["planSchema"]:
                 raise ValueError("invalid imported storage plan")
             # Full source/host checking and canonical ABI validation are native.
             if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3:
@@ -150,21 +185,25 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
     synthetic = False
     selected = transaction_id or case["transactions"][0]["id"]
     if path is not None:
-        if path not in PATHS or field not in ("output", "storage:0", "storage:1"):
+        if path not in PATHS or not TEST_FIELD.fullmatch(field) or (
+                not adapter.profile(case)["keyed"] and field not in ("output", "storage:0", "storage:1")):
             raise ValueError("unknown synthetic history adapter")
         if actual.get("category") == "matched":
             if adapter.compare(histories, case).get("category") != "matched":
                 raise ValueError("matched report has inconsistent actual histories")
             rows = histories[path]["transactions"]
             row = next((row for row in rows if row["id"] == selected), None)
-            if row is not None:
+            # Like a removed transaction, a candidate whose keys no longer
+            # declare the selected slot cannot preserve the synthetic finding.
+            declared = field == "output" or field[len("storage:"):] in adapter.observed_slots(case)
+            if row is not None and declared:
                 if field == "output":
                     value = common.hex_bytes(row["output"], "test output")
                     if len(value) != 32:
                         raise ValueError("test adapter requires a returned Word")
                     row["output"] = "0x" + f"{int.from_bytes(value, 'big') ^ 1:064x}"
                 else:
-                    slot = int(field[-1])
+                    slot = next(index for index, entry in enumerate(row["committedStorage"]) if entry["slot"] == field[len("storage:"):])
                     value = row["committedStorage"][slot]["value"]
                     row["committedStorage"][slot]["value"] = str(int(common.word(value)) ^ 1)
                     if rows[-1]["id"] == selected:
@@ -191,21 +230,39 @@ def fingerprint(analysis):
         output = row.get("output")
         shape = "word" if isinstance(output, str) and re.fullmatch(r"0x[0-9a-f]{64}", output) else "bytes" if output is not None else "none"
         shapes[path] = {"status": row.get("status", "not-observed"), "payload": shape}
+    snapshots = []
+    for path in PATHS:
+        history = analysis.get("histories", {}).get(path, {})
+        snapshots.append(history.get("initialStorage", []) if comparison.get("stage") == "initial-storage" and isinstance(history, dict)
+                         else rows[path].get("committedStorage", []))
+    keyed = keyed_analysis(analysis)
     slots = []
-    for index, slot in enumerate(adapter.SLOTS):
-        snapshots = []
-        for path in PATHS:
-            history = analysis.get("histories", {}).get(path, {})
-            snapshots.append(history.get("initialStorage", []) if comparison.get("stage") == "initial-storage" and isinstance(history, dict)
-                             else rows[path].get("committedStorage", []))
+    if keyed:
+        named = [{row.get("slot"): row.get("value") for row in snapshot if isinstance(row, dict) and isinstance(row.get("slot"), str)}
+                 if isinstance(snapshot, list) else {} for snapshot in snapshots]
+        names = sorted({name for values in named for name in values if re.fullmatch(r"0|[1-9][0-9]{0,77}", name)}, key=int)
+        for name in names:
+            values = [values.get(name) if isinstance(values.get(name), str) else None for values in named]
+            if len(set(values)) > 1:
+                slots.append(name)
+    for index, slot in enumerate(() if keyed else adapter.SLOTS):
         values = [snapshot[index].get("value") if isinstance(snapshot, list) and len(snapshot) > index and isinstance(snapshot[index], dict) else None for snapshot in snapshots]
         values = [value if isinstance(value, str) else None for value in values]
         if len(set(values)) > 1:
             slots.append(slot)
-    return {"backend": common.resolve_sonatina_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
+    result = {"backend": common.resolve_sonatina_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "fields": sorted(comparison.get("fields", [])), "storageSlots": slots,
             "pathShapes": shapes, "synthetic": analysis["synthetic"]}
+    if keyed:
+        result["undeclaredPaths"] = sorted(comparison.get("undeclaredPaths", []))
+    return result
+
+
+def keyed_analysis(analysis):
+    histories = analysis.get("histories", {})
+    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") == adapter.KEYED_HISTORY_SCHEMA
+                                               for history in histories.values())
 
 
 def same_failure(expected, analysis):
@@ -216,16 +273,18 @@ def transaction_counts(histories, case):
     """Observed on any path; completed on all paths; equal returned prefixes."""
     result = {"executed": 0, "completed": 0, "matched": 0}
     try:
-        values = {path: adapter.normalize_history(histories[path], case) for path in PATHS if path in histories}
+        values = {path: adapter.normalize_history(histories[path], case, path) for path in PATHS if path in histories}
     except (ValueError, TypeError, KeyError):
         return result
-    prefix = len(values) == 3 and all(value["initialStorage"] == [{"slot": "0", "value": "0"}, {"slot": "1", "value": "0"}] for value in values.values())
+    prefix = len(values) == 3 and all(all(row["value"] == "0" for row in value["initialStorage"]) and
+                                      not value.get("initialUndeclaredStorage") for value in values.values())
     for index, tx in enumerate(case["transactions"]):
         rows = [value["transactions"][index] for value in values.values() if index < len(value["transactions"])]
         result["executed"] += bool(rows)
         complete = len(rows) == 3 and all(row["status"] in ("returned", "reverted") for row in rows)
         result["completed"] += complete
-        prefix = prefix and complete and all(row == rows[0] for row in rows) and all(
+        prefix = prefix and complete and all(adapter.without_containment(row) == adapter.without_containment(rows[0]) for row in rows) and not any(
+            row.get("undeclaredStorage") for row in rows) and all(
             row["status"] == adapter.expected_status(case, tx) and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows)
         prefix = prefix and all(row["status"] != "reverted" or row["committedStorage"] ==
             (value["transactions"][index - 1]["committedStorage"] if index else value["initialStorage"])
@@ -277,7 +336,7 @@ class Campaign:
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "transactionCounts": {"kind": "observed on any path; completed on all three; matched ordered prefixes; shrink executions excluded", "planned": 0, "executed": 0, "completed": 0, "matched": 0, "actualMatched": 0},
             "coverage": {"kind": "step AST features and declared helpers; native-verified generation recipes; inputs and sequence lengths of fully matched scenarios; not opcode traces",
-                         **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in DIMENSIONS}},
+                         **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in dimensions(self.profile)}},
             "cases": [], "materializedIds": [], "findings": [], "secondaryFindings": [],
             "retention": "input cases/compact receipts; complete archives for original/final/secondary findings; matched exports removed (use --case; exact archive replay unavailable)"}
         self.checkpoint()
@@ -287,8 +346,8 @@ class Campaign:
         counts["unexecuted"] = counts["generated"] - counts["executed"]
         tx = self.summary["transactionCounts"]
         tx["unobserved"] = tx["planned"] - tx["executed"]
-        for dimension in DIMENSIONS:
-            coverage["missing" + dimension] = sorted(set(coverage["required" + dimension]) - set(coverage["matched" + dimension]), key=int if dimension == "Inputs" else None)
+        for dimension in dimensions(self.profile):
+            coverage["missing" + dimension] = sorted(set(coverage["required" + dimension]) - set(coverage["matched" + dimension]), key=int if dimension in NUMERIC_DIMENSIONS else None)
         self.summary.update(elapsedSeconds=round(time.monotonic() - self.started, 3), retainedBytes=directory_bytes(self.args.output), shrinkAttempts=self.shrink_attempts)
         save_json(self.args.output / "summary.json", self.summary)
 
@@ -323,9 +382,11 @@ class Campaign:
         else:
             statuses = [adapter.expected_status(case, tx) for tx in case["transactions"]]
         values.update(Outcomes=set(statuses), CompletionPatterns={",".join(statuses)})
+        if self.specification["keyed"]:
+            values.update(Keys={tx["key"] for tx in case["transactions"]}, Aliases=aliases(case))
         for dimension, observed in values.items():
             key = prefix + dimension
-            self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension == "Inputs" else None)
+            self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
 
     def add_case(self, case, identifier):
         adapter.validate_case(case)
@@ -366,6 +427,9 @@ class Campaign:
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
+        if self.specification["keyed"]:
+            for dimension in ("Keys", "Aliases"):
+                self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []
         for entry in manifest["cases"][:self.args.cases]:
@@ -388,7 +452,7 @@ class Campaign:
                     raise ValueError("native generation differs from requested seed/budget")
             else:
                 plan_path, tx_path = self.work / "plan.json", self.work / "transactions.json"
-                save_json(plan_path, entry["storagePlan"])
+                save_json(plan_path, entry[self.specification["planKey"]])
                 save_json(tx_path, entry["transactions"])
                 try:
                     case = self.tool(["emit", plan_path, tx_path, self.args.direct_fuel], "corpus-emission")
@@ -420,7 +484,7 @@ class Campaign:
         args = self.case_args(input_path, folder)
         report = {"schema": adapter.REPORT_SCHEMA, "backend": self.backend, "processes": [], "histories": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-            "scope": "initially empty committed slots0/1; ordered zero-value run(uint256); no gas/balance/nonce equivalence"}
+            "scope": adapter.scope(case) if self.specification["keyed"] else "initially empty committed slots0/1; ordered zero-value run(uint256); no gas/balance/nonce equivalence"}
         interrupted = False
         try:
             adapter.execute(args, report)
@@ -542,6 +606,8 @@ class Campaign:
             self.guard()
             if self.args.test_perturb_path and self.args.test_transaction_id and self.args.test_transaction_id not in {tx["id"] for tx in case["transactions"]}:
                 raise ValueError("selected synthetic transaction ID is absent from the original scenario")
+            if self.args.test_perturb_path and self.args.test_field != "output" and self.args.test_field[len("storage:"):] not in adapter.observed_slots(case):
+                raise ValueError("selected synthetic slot is absent from the original scenario")
             folder, report, analysis = self.execute_case(case)
             category = analysis["comparison"]["category"]
             count_outcome(self.summary["counts"], analysis, case)
@@ -590,13 +656,13 @@ def main():
     parser.add_argument("--core-fuel", type=int, default=10000000)
     parser.add_argument("--gas", type=int, default=10000000)
     parser.add_argument("--case-tool", type=Path)
-    parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-storage-scenario")
+    parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--test-perturb-path", choices=PATHS)
     parser.add_argument("--test-transaction-id")
-    parser.add_argument("--test-field", choices=("output", "storage:0", "storage:1"), default="output")
+    parser.add_argument("--test-field", default="output", help="output or storage:SLOT, an observed decimal slot")
     args = parser.parse_args()
     try:
         selected_profile = args.profile
@@ -615,6 +681,8 @@ def main():
         args.profile = selected_profile or "stateful-storage"
         if args.case_tool is None:
             args.case_tool = ROOT / ".lake/build/bin" / adapter.PROFILES[args.profile]["caseTool"]
+        if args.core_runner is None:
+            args.core_runner = ROOT / ".lake/build/bin" / adapter.PROFILES[args.profile]["coreRunner"]
         if args.cases is None:
             args.cases = 1 if args.case else len(common.read_json(args.corpus)["cases"]) if args.corpus else 10
     except (ValueError, OSError, KeyError, TypeError, common.Finding) as error:
@@ -625,6 +693,8 @@ def main():
         parser.error("test transaction ID requires the explicit adapter and a valid ID")
     if args.test_field != "output" and not args.test_perturb_path:
         parser.error("test field requires the explicit synthetic adapter")
+    if not TEST_FIELD.fullmatch(args.test_field) or (not adapter.PROFILES[args.profile]["keyed"] and args.test_field not in ("output", "storage:0", "storage:1")):
+        parser.error("test field must be output or storage:SLOT for an observed slot")
     limits = {"seed": (0, 2**64 - 1), "nodes": (1, 512), "cases": (1, 1024), "attempts": (0, 10000),
         "seconds": (.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10), "shrink_attempts": (0, 10000),
         "shrink_candidates": (1, 4096), "case_timeout": (.001, 3600), "direct_fuel": (1, 10000000),

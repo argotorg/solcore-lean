@@ -50,6 +50,7 @@ PROFILES = {
     "stateful-storage": ("semantic-storage", "storage", 384),
     "stateful-storage-rollback": ("semantic-storage-rollback", "storage", 384),
     "stateful-calls": ("semantic-call", "call", 384),
+    "stateful-keyed-storage": ("semantic-keyed-storage", "storage", 384),
 }
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
@@ -110,9 +111,11 @@ def command(args, profile, output, seconds, disk_bytes):
     attempts = profile_attempts(args, profile)
     if args.backend == "yul" and family != "pure":
         raise ValueError("Yul is restricted to pure profiles")
-    tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else args.storage_case_tool,
-            "call": args.call_case_tool}[family]
-    runner = {"pure": args.core_runner, "storage": args.storage_core_runner, "call": args.call_core_runner}[family]
+    keyed = profile == "stateful-keyed-storage"
+    tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
+            args.keyed_case_tool if keyed else args.storage_case_tool, "call": args.call_case_tool}[family]
+    runner = {"pure": args.core_runner, "storage": args.keyed_core_runner if keyed else args.storage_core_runner,
+              "call": args.call_core_runner}[family]
     result = [sys.executable, str(ROOT / "scripts" / CAMPAIGNS[family]), "--output", str(output), "--profile", profile,
               "--seconds", str(seconds), "--disk-bytes", str(disk_bytes), "--case-tool", str(tool), "--core-runner", str(runner)]
     for key in ("backend", "anvil", "upstream", "target_dir", "direct_fuel", "core_fuel", "gas", "case_timeout", "shrink_attempts", "shrink_candidates"):
@@ -366,7 +369,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default seventeen for Sonatina, fourteen pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default eighteen for Sonatina, fourteen pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -381,7 +384,8 @@ def parse_args(argv=None):
         parser.add_argument("--" + key.replace("_", "-"), type=float if isinstance(default, float) else int, default=default)
     parser.add_argument("--bin-dir", type=Path, default=ROOT / ".lake/build/bin", help="directory of prebuilt native tools; suite performs no builds")
     binaries = {"case_tool": "semantic-case-tool", "storage_case_tool": "semantic-storage-tool", "rollback_case_tool": "semantic-storage-rollback-tool", "call_case_tool": "semantic-call-tool",
-                "core_runner": "rust-hull-scenario", "storage_core_runner": "rust-hull-storage-scenario", "call_core_runner": "rust-hull-call-scenario"}
+                "core_runner": "rust-hull-scenario", "storage_core_runner": "rust-hull-storage-scenario", "call_core_runner": "rust-hull-call-scenario",
+                "keyed_case_tool": "semantic-keyed-storage-tool", "keyed_core_runner": "rust-hull-keyed-storage-scenario"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))

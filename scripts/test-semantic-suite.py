@@ -43,13 +43,13 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_seventeen_profiles_match_real_manifests_and_campaign_families(self):
+    def test_eighteen_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 17)
+        self.assertEqual(len(args.profile), 18)
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
-                         "runtime-aggregate-call-graphs")), 312)
+                         "runtime-aggregate-call-graphs", "stateful-keyed-storage")), 312)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
         self.assertGreater(suite.requested(args, "runtime-aggregate-call-graphs"), 0)
@@ -63,6 +63,9 @@ class SuiteTests(unittest.TestCase):
             self.assertNotIn("cargo", command)
         self.assertEqual(suite.PROFILES["stateful-storage-rollback"][1], "storage")
         self.assertEqual(suite.PROFILES["stateful-calls"][1], "call")
+        self.assertEqual(suite.PROFILES["stateful-keyed-storage"], ("semantic-keyed-storage", "storage", 384))
+        self.assertEqual(suite.requested(args, "stateful-keyed-storage"),
+                         len(json.loads(suite.manifest("stateful-keyed-storage").read_text())["cases"]))
 
     def test_primitive_profile_routes_its_manifest_and_random_defaults_under_all_backends(self):
         self.assertEqual(suite.PROFILES['runtime-primitives'], ('semantic-primitive', 'pure', 96))
@@ -95,14 +98,15 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 393, 17), ('sonatina-o2', 393, 17), ('yul', 357, 14)):
+        for backend, old_count, profile_count in (('sonatina-o0', 393, 18), ('sonatina-o2', 393, 18), ('yul', 357, 14)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
             self.assertEqual(len(args.profile), profile_count)
+            keyed = suite.requested(args, 'stateful-keyed-storage') if backend != 'yul' else 0
             self.assertEqual(sum(suite.requested(args, p) for p in args.profile),
                 old_count + count + suite.requested(args, 'runtime-call-graph-loops')
-                + suite.requested(args, 'runtime-aggregate-call-graphs'))
+                + suite.requested(args, 'runtime-aggregate-call-graphs') + keyed)
             command = suite.command(args, 'runtime-call-graphs', self.directory/backend, 30, 64*1024**2)
             self.assertEqual(command[command.index('--corpus')+1], str(suite.manifest('runtime-call-graphs')))
             self.assertEqual(command[command.index('--backend')+1], backend)
@@ -373,12 +377,12 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 17)
+            self.assertEqual(len(sonatina.profile), 18)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
     def test_explicit_yul_stateful_profiles_are_errors_instead_of_silent_omissions(self):
-        for profile in ('stateful-storage', 'stateful-storage-rollback', 'stateful-calls'):
+        for profile in ('stateful-storage', 'stateful-storage-rollback', 'stateful-calls', 'stateful-keyed-storage'):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.args('--backend', 'yul', '--profile', 'closed-g0', '--profile', profile)
             with self.assertRaises(ValueError):
@@ -419,7 +423,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 17)
+        self.assertEqual(len(set(seeds.values())), 18)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for profile, seed in seeds.items():
             self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)
@@ -435,7 +439,8 @@ class SuiteTests(unittest.TestCase):
                     "runtime-aggregate-call-graphs": ("semantic-case-tool", "rust-hull-scenario"),
                     "stateful-storage": ("semantic-storage-tool", "rust-hull-storage-scenario"),
                     "stateful-storage-rollback": ("semantic-storage-rollback-tool", "rust-hull-storage-scenario"),
-                    "stateful-calls": ("semantic-call-tool", "rust-hull-call-scenario")}
+                    "stateful-calls": ("semantic-call-tool", "rust-hull-call-scenario"),
+                    "stateful-keyed-storage": ("semantic-keyed-storage-tool", "rust-hull-keyed-storage-scenario")}
         for profile, (tool, runner) in expected.items():
             command = suite.command(args, profile, self.directory / profile, 10, 64 * 1024**2)
             self.assertEqual(Path(command[command.index("--case-tool") + 1]).name, tool)

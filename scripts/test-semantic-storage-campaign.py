@@ -514,5 +514,138 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(campaign.common.read_json(output / "summary.json")["backend"], "sonatina-o2")
 
 
+def keyed_case(pairs=((5, 2), (0, 4), (fixtures.MAX_WORD, 3))):
+    value = fixtures.keyed_case(pairs)
+    value["keyedStoragePlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def keyed_report(value):
+    histories = fixtures.keyed_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class KeyedCampaignTests(unittest.TestCase):
+    def test_static_alias_kinds_follow_counter_successor_and_repetition(self):
+        maximum = fixtures.MAX_WORD
+        for pairs, expected in ((((5, 2),), set()), (((0, 2),), {"key-counter"}), (((maximum, 2),), {"successor-counter"}),
+                                (((7, 0), (7, 2)), {"repeated-key"}), (((8, 0), (7, 2)), {"successor-key"}),
+                                (((5, 2), (0, 4), (maximum, 3)), {"key-counter", "successor-counter", "successor-key"})):
+            with self.subTest(pairs=pairs):
+                self.assertEqual(campaign.aliases(keyed_case(pairs)), expected)
+
+    def test_keyed_manifest_requires_keys_and_aliases_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-keyed-storage-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(manifest["requiredAliases"], list(campaign.ALIASES))
+        changes = [lambda m: m.pop("requiredKeys"), lambda m: m.update(requiredKeys=["00"]),
+            lambda m: m.update(requiredAliases=["key-counter", "key-counter"]),
+            lambda m: m.update(requiredAliases=["unknown"]),
+            lambda m: m["cases"][0].update(expectedHistory={}),
+            lambda m: m["cases"][0].update(storagePlan=m["cases"][0].pop("keyedStoragePlan")),
+            lambda m: m.update(requiredOutcomes=["returned"])]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        storage = json.loads((ROOT / "scripts/semantic-storage-corpus.json").read_text())
+        for change in (lambda m: m.update(requiredKeys=["0"]), lambda m: m.update(requiredAliases=[]),
+                       lambda m: m["cases"][0].update(expectedHistory=[])):
+            invalid = copy.deepcopy(storage)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_synthetic_slot_injection_is_by_declared_slot_name(self):
+        value = keyed_case()
+        raw = keyed_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        original = copy.deepcopy(raw)
+        changed = campaign.analyze(raw, value, "rustEvm", "tx-1", "storage:5")
+        self.assertEqual(raw, original)
+        self.assertEqual((changed["comparison"]["category"], changed["comparison"]["transactionId"]), ("semantic-mismatch", "tx-1"))
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["fields"], fingerprint["undeclaredPaths"]),
+                         (["5"], ["committedStorage"], []))
+        self.assertFalse(campaign.same_failure(fingerprint, campaign.analyze(raw, value, "rustEvm", "tx-1", "storage:6")))
+        self.assertTrue(campaign.same_failure(fingerprint, campaign.analyze(keyed_report(value), value, "rustEvm", "tx-1", "storage:5")))
+        for field in ("storage:05", "slot:5"):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                campaign.analyze(raw, value, "rustEvm", "tx-1", field)
+        with self.assertRaises(ValueError):
+            campaign.analyze(report(), case(), "rustEvm", "tx-1", "storage:5")
+        # A reduced key sequence that no longer declares the slot cannot keep
+        # the synthetic finding; it is an ordinary actual analysis.
+        reduced = keyed_case(((7, 2), (0, 4), (fixtures.MAX_WORD, 3)))
+        dropped = campaign.analyze(keyed_report(reduced), reduced, "rustEvm", "tx-1", "storage:5")
+        self.assertFalse(dropped["synthetic"])
+        self.assertEqual(dropped["comparison"]["category"], "matched")
+        self.assertFalse(campaign.same_failure(fingerprint, dropped))
+
+    def test_original_scenario_must_declare_the_selected_synthetic_slot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-keyed-storage", test_perturb_path="rustEvm",
+                                                 test_transaction_id="tx-1", test_field="storage:2"))
+            with patch.object(instance, "prepare_cases", side_effect=lambda: instance.add_case(keyed_case(), "policy")), \
+                 patch.object(instance, "execute_case") as execute, self.assertRaises(ValueError):
+                instance.run()
+            execute.assert_not_called()
+
+    def test_undeclared_paths_join_only_the_keyed_failure_identity(self):
+        value = keyed_case()
+        raw = keyed_report(value)
+        raw["histories"]["importedHull"]["transactions"][0]["undeclaredStorage"] = [{"slot": "9", "value": "1"}]
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], value)
+        fingerprint = campaign.fingerprint(campaign.analyze(raw, value))
+        self.assertEqual((fingerprint["category"], fingerprint["fields"], fingerprint["undeclaredPaths"], fingerprint["storageSlots"]),
+                         ("semantic-mismatch", ["undeclaredStorage"], ["importedHull"], []))
+        legacy = campaign.fingerprint(campaign.analyze(report(), case(), "rustEvm", "tx-1", "storage:0"))
+        self.assertNotIn("undeclaredPaths", legacy)
+        self.assertEqual(legacy["storageSlots"], ["0"])
+
+    def test_keyed_prefix_counts_exclude_undeclared_storage(self):
+        value = keyed_case()
+        raw = keyed_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+        raw["histories"]["rustEvm"]["transactions"][1]["undeclaredStorage"] = [{"slot": "9", "value": "1"}]
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 1})
+        raw = keyed_report(value)
+        raw["histories"]["importedHull"]["initialUndeclaredStorage"] = [{"slot": "9", "value": "1"}]
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value)["matched"], 0)
+
+    def test_keyed_coverage_records_keys_and_aliases_from_matched_scenarios(self):
+        value = keyed_case()
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-keyed-storage"))
+            self.assertIn("requiredAliases", instance.summary["coverage"])
+            instance.summary["coverage"].update(requiredKeys=["0", "5", str(fixtures.MAX_WORD)], requiredAliases=list(campaign.ALIASES))
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", keyed_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedKeys"], ["0", "5", str(fixtures.MAX_WORD)])
+            self.assertEqual(coverage["matchedAliases"], ["key-counter", "successor-counter", "successor-key"])
+            self.assertEqual(coverage["missingAliases"], ["repeated-key"])
+        with tempfile.TemporaryDirectory() as directory:
+            legacy = campaign.Campaign(options(directory))
+            self.assertNotIn("requiredKeys", legacy.summary["coverage"])
+
+    def test_keyed_cli_accepts_named_slots_but_two_slot_profiles_keep_their_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "case.json"
+            path.write_text(json.dumps(case()))
+            for field in ("storage:5", "storage:", "slot:0"):
+                with self.subTest(field=field), patch.object(sys, "argv", ["campaign", "--output", str(Path(directory) / field.replace(":", "-")),
+                        "--case", str(path), "--test-perturb-path", "rustEvm", "--test-field", field]), \
+                        redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+                    campaign.main()
+                self.assertEqual(stopped.exception.code, 2)
+        self.assertTrue(campaign.TEST_FIELD.fullmatch("storage:" + str(fixtures.MAX_WORD)))
+
+
 if __name__ == "__main__":
     unittest.main()

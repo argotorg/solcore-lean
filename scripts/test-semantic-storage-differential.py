@@ -810,5 +810,201 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(report["backend"], "sonatina-o2")
 
 
+MAX_WORD = 2**256 - 1
+
+
+def keyed_case(pairs=((5, 2), (0, 4), (MAX_WORD, 3))):
+    """Envelope fixture only: native replay checks the actual keyed program."""
+    transactions = [{"id": f"tx-{index}", "key": str(key), "input": str(value), "value": "0",
+        "calldata": "0x7357f5d2" + f"{key:064x}" + f"{value:064x}"} for index, (key, value) in enumerate(pairs)]
+    return {"schema": runner.KEYED_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "keyedStoragePlan": {"schema": "solcore-lean.keyed-storage-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": runner.keyed_slots(transactions),
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedKeyedStorage", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": "0x7357f5d2", "deployPath": ["SynthesizedKeyedStorageDeploy"],
+            "runtimePath": ["SynthesizedKeyedStorageDeploy", "SynthesizedKeyedStorage"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def keyed_slots(value, counter=0):
+    return [{"slot": slot, "value": str(counter if slot == "0" else 0)} for slot in value["observedSlots"]]
+
+
+def keyed_history(value, path):
+    """Committed counter rows; odd inputs revert and keep the prior snapshot."""
+    rows, counter = [], 0
+    for index, tx in enumerate(value["transactions"]):
+        reverted = int(tx["input"]) % 2 == 1
+        counter += 0 if reverted else 1
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{index + 3:064x}", "committedStorage": keyed_slots(value, counter)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.KEYED_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": keyed_slots(value), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def keyed_histories(value=None):
+    value = keyed_case() if value is None else value
+    return {path: keyed_history(value, path) for path in runner.PATHS}
+
+
+class KeyedStorageTests(unittest.TestCase):
+    def test_keyed_case_declares_derived_slots_and_two_word_calldata(self):
+        value = keyed_case()
+        runner.validate_case(value)
+        self.assertEqual(value["observedSlots"], ["0", "1", "5", "6", str(MAX_WORD)])
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "5", "6", str(MAX_WORD)))
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["rollback"]),
+                         ("semantic-keyed-storage-tool", "rust-hull-keyed-storage-scenario", True))
+        self.assertEqual(runner.keyed_slots([{"key": "7"}, {"key": "7"}]), ["0", "7", "8"])
+        for slots in (["0", "5", "6", str(MAX_WORD)], ["1", "0", "5", "6", str(MAX_WORD)],
+                      ["0", "1", "2", "5", "6", str(MAX_WORD)], ["0", "1"]):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        for key, changed in (("key", "05"), ("key", str(2**256)), ("input", "01"),
+                             ("calldata", "0xa444f5e9" + "00" * 32), ("calldata", value["transactions"][0]["calldata"][:-2])):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for key in ("schema", "keyedStoragePlan", "contract"):
+            mixed = copy.deepcopy(value)
+            mixed[key] = case()[key] if key != "keyedStoragePlan" else {"schema": "solcore-lean.storage-plan.v1", "stepProgram": {}}
+            with self.subTest(key=key), self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(mixed)
+        self.assertIn("run(uint256,uint256)", runner.scope(value))
+
+    def test_keyed_histories_match_and_containment_belongs_to_hull_and_evm(self):
+        value = keyed_case()
+        self.assertEqual(runner.compare(keyed_histories(value), value)["category"], "matched")
+        claimed = keyed_histories(value)
+        claimed["directCore"]["transactions"][0]["undeclaredStorage"] = []
+        self.assertEqual(runner.compare(claimed, value)["category"], "adapter-error")
+        for path in runner.CONTAINMENT_PATHS:
+            for key in ("initialUndeclaredStorage", None):
+                missing = keyed_histories(value)
+                if key:
+                    del missing[path][key]
+                else:
+                    del missing[path]["transactions"][1]["undeclaredStorage"]
+                with self.subTest(path=path, key=key):
+                    self.assertEqual(runner.compare(missing, value)["category"], "adapter-error")
+        undeclared = keyed_histories(value)
+        undeclared["rustEvm"]["observedSlots"] = ["0", "1"]
+        self.assertEqual(runner.compare(undeclared, value)["category"], "adapter-error")
+
+    def test_undeclared_nonzero_storage_is_a_semantic_mismatch_on_its_own_path(self):
+        value = keyed_case()
+        for path in runner.CONTAINMENT_PATHS:
+            observed = keyed_histories(value)
+            observed[path]["transactions"][1]["undeclaredStorage"] = [{"slot": "9", "value": "1"}]
+            result = runner.compare(observed, value)
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertEqual((result["fields"], result["undeclaredPaths"]), (["undeclaredStorage"], [path]))
+            initial = keyed_histories(value)
+            initial[path]["initialUndeclaredStorage"] = [{"slot": "2", "value": "3"}]
+            result = runner.compare(initial, value)
+            with self.subTest(path=path, stage="initial"):
+                self.assertEqual((result["category"], result["stage"], result["fields"], result["undeclaredPaths"]),
+                                 ("semantic-mismatch", "initial-storage", ["undeclaredStorage"], [path]))
+            for history in initial.values():
+                history["initialStorage"][0]["value"] = "1"
+            result = runner.compare(initial, value)
+            with self.subTest(path=path, stage="initial-declared"):
+                self.assertEqual((result["fields"], result["undeclaredPaths"]), (["committedStorage", "undeclaredStorage"], [path]))
+
+    def test_undeclared_rows_are_canonical_and_never_declared_or_zero(self):
+        value = keyed_case()
+        widespread = [{"slot": str(100 + index), "value": "1"} for index in range(runner.MAX_UNDECLARED_SLOTS)]
+        observed = keyed_histories(value)
+        observed["rustEvm"]["transactions"][0]["undeclaredStorage"] = widespread
+        self.assertEqual(runner.compare(observed, value)["category"], "semantic-mismatch")
+        for rows in ([{"slot": "5", "value": "1"}], [{"slot": "9", "value": "0"}], widespread + [{"slot": "999", "value": "1"}],
+                     [{"slot": "10", "value": "1"}, {"slot": "9", "value": "1"}], [{"slot": "09", "value": "1"}],
+                     [{"slot": "9", "value": "1", "extra": True}], {"slot": "9"}):
+            observed = keyed_histories(value)
+            observed["importedHull"]["transactions"][0]["undeclaredStorage"] = rows
+            with self.subTest(rows=rows):
+                self.assertEqual(runner.compare(observed, value)["category"], "adapter-error")
+
+    def test_declared_slot_difference_and_keyed_rollback_are_compared(self):
+        value = keyed_case()
+        observed = keyed_histories(value)
+        observed["rustEvm"]["transactions"][0]["committedStorage"][2]["value"] = "4"
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                         ("semantic-mismatch", "tx-0", ["committedStorage"]))
+        self.assertNotIn("undeclaredPaths", result)
+        tentative = keyed_histories(value)
+        for history in tentative.values():
+            history["transactions"][2]["committedStorage"] = keyed_slots(value, 3)
+            history["finalStorage"] = keyed_slots(value, 3)
+        result = runner.compare(tentative, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-2"))
+        self.assertIn("committedStorage", result["fields"])
+
+    def test_prestate_diff_names_only_contract_storage_changes(self):
+        address = "0x" + "ab" * 20
+        diff = {"pre": {address: {"storage": {"0x" + "00" * 31 + "09": "0x" + "00" * 32}},
+                        "0x" + "cd" * 20: {"balance": "0x1", "nonce": 1}},
+                "post": {address.upper().replace("0X", "0x"): {"storage": {"0x01": "0x" + "00" * 31 + "02"}},
+                         "0x" + "cd" * 20: {"balance": "0x0", "nonce": 2}}}
+        self.assertEqual(runner.changed_slots(diff, address), {"1", "9"})
+        self.assertEqual(runner.changed_slots({"pre": {}, "post": {}}, address), set())
+        other = copy.deepcopy(diff)
+        other["post"]["0x" + "cd" * 20]["storage"] = {"0x01": "0x01"}
+        for invalid in (other, {"post": {}}, {"pre": [], "post": {}}, {"pre": {"bad": {}}, "post": {}},
+                        {"pre": {address: {"storage": {"0xzz": "0x0"}}}, "post": {}},
+                        {"pre": {address: {"storage": []}}, "post": {}}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                runner.changed_slots(invalid, address)
+
+    def test_evm_containment_rereads_outside_slots_at_the_receipt_block(self):
+        calls = []
+        class Rpc:
+            def call(self, method, params):
+                calls.append((method, params))
+                return "0x" + f"{7 if params[1] == hex(10) else 0:064x}"
+        rows = runner.evm_undeclared(Rpc(), "0x" + "ab" * 20, "0x5", {"0", "9", "10", "1"}, ("0", "1"))
+        self.assertEqual(rows, [{"slot": "10", "value": "7"}])
+        self.assertEqual([params[1:] for _, params in calls], [[hex(9), "0x5"], [hex(10), "0x5"]])
+        self.assertEqual(runner.evm_undeclared(Rpc(), "0x" + "ab" * 20, "0x5", {"0"}, ("0",)), [])
+
+    def test_keyed_hull_history_carries_declared_and_undeclared_rows(self):
+        value = keyed_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": keyed_slots(value), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in keyed_history(value, "importedHull")["transactions"]]
+        stdout = "\n".join(json.dumps(row) for row in [deployment, *calls])
+        history = runner.hull_history(stdout, 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"], history["initialUndeclaredStorage"]),
+                         (runner.KEYED_HISTORY_SCHEMA, value["observedSlots"], []))
+        deployment["undeclaredStorage"] = [{"slot": "9", "value": "1"}]
+        stdout = "\n".join(json.dumps(row) for row in [deployment, *calls])
+        self.assertEqual(runner.hull_history(stdout, 0, value)["initialUndeclaredStorage"], [{"slot": "9", "value": "1"}])
+        del deployment["undeclaredStorage"]
+        with self.assertRaises(ValueError):
+            runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+
+    def test_two_slot_profiles_keep_their_fixed_observation(self):
+        value = case()
+        self.assertEqual(runner.observed_slots(value), runner.SLOTS)
+        self.assertEqual(runner.profile(value)["coreRunner"], "rust-hull-storage-scenario")
+        observed = histories(value)
+        observed["importedHull"]["transactions"][0]["undeclaredStorage"] = []
+        self.assertEqual(runner.compare(observed, value)["category"], "matched")
+        self.assertEqual(runner.scope(value),
+                         "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence")
+
+
 if __name__ == "__main__":
     unittest.main()

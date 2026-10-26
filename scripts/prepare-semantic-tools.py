@@ -38,6 +38,8 @@ TARGETS = {
     "rustHullContract": "rust-hull-contract",
     "rustHullStorageScenario": "rust-hull-storage-scenario",
     "rustHullCallScenario": "rust-hull-call-scenario",
+    "semanticKeyedStorageTool": "semantic-keyed-storage-tool",
+    "rustHullKeyedStorageScenario": "rust-hull-keyed-storage-scenario",
 }
 PATCHES = {
     "crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
