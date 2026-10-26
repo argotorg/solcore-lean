@@ -2159,6 +2159,7 @@ import Solcore.Test.SourceAggregateMeaning
 import Solcore.Test.SourceEventLogEmitter
 import Solcore.Test.SourceEventLogCases
 import Solcore.Test.SourceEventLogCorpus
+import Solcore.Test.RustHullCreationCorrespondence
 set_option autoImplicit false
 
 open Solcore
@@ -4112,5 +4113,6 @@ def main : IO UInt32 := do
   Tests.SourceEventLogEmitter.testSourceEventLogEmitter
   Tests.SourceEventLogCases.testSourceEventLogCases
   Tests.SourceEventLogCorpus.testSourceEventLogCorpus
+  Tests.RustHullCreationCorrespondence.run
   IO.println "solcore-lean tests passed"
   return 0
