@@ -150,6 +150,13 @@ run, and SIGTERM or SIGINT stops the running suite, which records its
 unfinished work. An interrupted run moves to `interrupted/` and reruns from its
 seed on the next start; its partial findings are not counted.
 
+`--jobs N` runs N suites at once, each on its own iteration and backend. Seeds
+still follow the iteration, so results do not depend on N. Runs finish out of
+order: the ledger records them as they complete, and a resumed driver fills
+gaps before starting new iterations. Each suite runs one compiler, one Anvil
+and the Lean tools at a time. Choose N by the host's cores and memory; an
+overloaded host turns case timeouts into inconclusive results.
+
 Before every run the driver verifies the prepared tools offline. The digests
 of the readiness receipt and of the harness scripts form an epoch. When the
 tools or scripts change, the driver stops until it is restarted with

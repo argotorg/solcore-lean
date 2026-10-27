@@ -270,6 +270,39 @@ class FuzzTests(unittest.TestCase):
         log = [json.loads(line) for line in (self.state / "notify.log").read_text().splitlines()]
         self.assertEqual([entry["new"] for entry in log], [[sid]])
 
+    def test_parallel_workers_run_distinct_units_concurrently(self):
+        import threading, time
+        active, peak, guard = [0], [0], threading.Lock()
+
+        def scenario(seed, backend):
+            with guard:
+                active[0] += 1
+                peak[0] = max(peak[0], active[0])
+            time.sleep(.3)
+            with guard:
+                active[0] -= 1
+            return [("runtime-primitives", [crash()] if backend == "sonatina-o2" else [])]
+        code, fake = self.start("--iterations", "2", "--jobs", "3", scenario=scenario)
+        self.assertEqual(code, 0)
+        self.assertGreater(peak[0], 1)
+        units = sorted((row["iteration"], row["backend"], row["rootSeed"]) for row in self.ledger())
+        self.assertEqual(units, [(0, "sonatina-o0", "100"), (0, "sonatina-o2", "100"),
+                                 (1, "sonatina-o0", "101"), (1, "sonatina-o2", "101")])
+        entry, = self.registry()["signatures"].values()
+        self.assertEqual((entry["count"], len(entry["examples"])), (2, 2))
+        self.assertEqual(sum(occurrence["new"] for row in self.ledger() for occurrence in row["occurrences"]), 1)
+
+    def test_next_run_fills_gaps_before_new_iterations(self):
+        config = {"backend": ["sonatina-o0", "sonatina-o2"]}
+        ledger = [{"iteration": 1, "backend": "sonatina-o0"}, {"iteration": 1, "backend": "sonatina-o2"},
+                  {"iteration": 0, "backend": "sonatina-o0"}]
+        self.assertEqual(fuzz.next_run(config, ledger), (0, "sonatina-o2"))
+        self.assertEqual(fuzz.next_run(config, ledger, {(0, "sonatina-o2")}), (2, "sonatina-o0"))
+        self.assertEqual(fuzz.next_run(config, []), (0, "sonatina-o0"))
+        self.assertEqual(fuzz.parse_args(["run"]).jobs, 1)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            fuzz.parse_args(["run", "--jobs", "0"])
+
     def test_configuration_is_checked_with_the_suite_and_yul_runs_pure_profiles(self):
         code, fake = self.main("run", "--state", str(self.state), "--cases", "0")
         self.assertEqual((code, fake.calls, (self.state / "config.json").exists()), (2, [], False))

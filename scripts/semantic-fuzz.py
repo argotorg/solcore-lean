@@ -29,7 +29,9 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
+import traceback
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
@@ -245,12 +247,13 @@ def configure(state, args):
     return config
 
 
-def next_run(config, ledger):
-    done = {(row["iteration"], row["backend"]) for row in ledger}
-    iteration = max((row["iteration"] for row in ledger), default=0)
+def next_run(config, ledger, claimed=frozenset()):
+    """The earliest run neither recorded nor in progress; gaps left by parallel workers come first."""
+    taken = {(row["iteration"], row["backend"]) for row in ledger} | set(claimed)
+    iteration = 0
     while True:
         for backend in config["backend"]:
-            if (iteration, backend) not in done:
+            if (iteration, backend) not in taken:
                 return iteration, backend
         iteration += 1
 
@@ -502,7 +505,7 @@ def report(state):
     for totals in runs.values():
         totals["iterations"] = len(totals["iterations"])
         totals["elapsedSeconds"] = round(totals["elapsedSeconds"], 3)
-    latest = ledger[-1]["iteration"] if ledger else None
+    latest = max((row["iteration"] for row in ledger), default=None)
     newest = {occurrence["signature"] for row in ledger if row["iteration"] == latest
               for occurrence in row.get("occurrences", []) if occurrence.get("new")}
     signatures = []
@@ -596,51 +599,91 @@ def finish(state, reason, code=0, kept=None):
     return code
 
 
-def loop(state, config, args, stop):
-    for iteration, backend, run_dir, summary in unrecorded_runs(state, state.ledger()):
-        record_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None, None, None, args.keep_runs)
-    first, missing = None, 0
-    while True:
-        iteration, backend = next_run(config, state.ledger())
-        first = iteration if first is None else first
-        if args.iterations and iteration >= first + args.iterations:
-            return finish(state, "iteration limit")
-        if stop.reason:
-            return finish(state, "signal " + stop.reason)
-        if state.stop_path.exists():
-            return finish(state, "stop file")
-        if args.max_state_bytes and suite.directory_bytes(state.directory) >= args.max_state_bytes:
-            return finish(state, "state disk limit", 4)
-        try:
-            epoch = current_epoch(config)
-        except NotReady:
-            if stop.reason:  # A terminal interrupt also reaches the readiness check.
-                return finish(state, "signal " + stop.reason)
-            raise
-        check_epoch(state, epoch, iteration, args.accept_new_epoch)
-        args.accept_new_epoch = False  # One acceptance covers only the epoch it was given for.
+class Driver:
+    """Parallel workers claim (iteration, backend) runs; results are recorded one at a time."""
+
+    def __init__(self, state, config, args, stop):
+        self.state, self.config, self.args, self.stop = state, config, args, stop
+        self.lock = threading.Lock()
+        self.claimed = set()
+        self.first = None
+        self.missing = 0
+        self.ending = None
+
+    def end(self, reason, code=0, kept=None):
+        """The first reason to stop wins; runs in progress still finish and are recorded."""
+        if self.ending is None:
+            self.ending = (reason, code, kept)
+
+    def claim(self):
+        with self.lock:
+            if self.ending is None and self.stop.reason:
+                self.end("signal " + self.stop.reason)
+            elif self.ending is None and self.state.stop_path.exists():
+                self.end("stop file")
+            elif self.ending is None and self.args.max_state_bytes and \
+                    suite.directory_bytes(self.state.directory) >= self.args.max_state_bytes:
+                self.end("state disk limit", 4)
+            if self.ending is not None:
+                return None
+            unit = next_run(self.config, self.state.ledger(), self.claimed)
+            self.first = unit[0] if self.first is None else self.first
+            if self.args.iterations and unit[0] >= self.first + self.args.iterations:
+                self.end("iteration limit")
+                return None
+            self.claimed.add(unit)
+            return unit
+
+    def work(self):
+        while (unit := self.claim()) is not None:
+            try:
+                self.run(*unit)
+            except EpochChanged as error:
+                with self.lock:
+                    self.end("epoch changed: " + str(error), 3)
+            except NotReady as error:
+                with self.lock:
+                    self.end(("signal " + self.stop.reason) if self.stop.reason else "not ready: " + str(error),
+                             0 if self.stop.reason else 2)
+            except Exception as error:  # noqa: BLE001 - stop every worker and keep the traceback visible.
+                traceback.print_exc()
+                with self.lock:
+                    self.end(f"driver error in iteration {unit[0]} ({unit[1]}): {error!r}", 6)
+            finally:
+                with self.lock:
+                    self.claimed.discard(unit)
+
+    def run(self, iteration, backend):
+        state, config, args = self.state, self.config, self.args
+        epoch = current_epoch(config)
+        with self.lock:
+            check_epoch(state, epoch, iteration, args.accept_new_epoch)
+            args.accept_new_epoch = False  # One acceptance covers only the epoch it was given for.
         run_dir = state.run_directory(iteration, backend)
         run_dir.parent.mkdir(parents=True, exist_ok=True)
         started, began = now(), time.monotonic()
         exit_code, interrupted = run_suite(suite_command(config, iteration, backend, run_dir),
                                            run_dir.with_name(backend + ".stdout.log"),
-                                           run_dir.with_name(backend + ".stderr.log"), stop)
+                                           run_dir.with_name(backend + ".stderr.log"), self.stop)
         summary = load(run_dir / "summary.json")
         if interrupted or isinstance(summary, dict) and summary.get("stop") == "interrupted":
-            kept = retain_interrupted(state, run_dir)
-            return finish(state, f"interrupted in iteration {iteration} ({backend}); it reruns on resume", kept=kept)
-        missing = missing + 1 if not isinstance(summary, dict) else 0
-        summary = summary if isinstance(summary, dict) else {"status": "missing-summary", "profiles": []}
-        row = record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started,
-                         round(time.monotonic() - began, 3), args.keep_runs)
-        report(state)
+            with self.lock:
+                kept = retain_interrupted(state, run_dir)
+                self.end(f"interrupted in iteration {iteration} ({backend}); it reruns on resume", kept=kept)
+            return
+        with self.lock:
+            self.missing = self.missing + 1 if not isinstance(summary, dict) else 0
+            summary = summary if isinstance(summary, dict) else {"status": "missing-summary", "profiles": []}
+            row = record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started,
+                             round(time.monotonic() - began, 3), args.keep_runs)
+            report(state)
+            if self.missing >= MISSING_SUMMARY_LIMIT:
+                self.end(f"{self.missing} consecutive runs produced no suite summary; see their logs", 5)
         new = [occurrence["signature"] for occurrence in row["occurrences"] if occurrence["new"]]
         print(json.dumps({"iteration": iteration, "backend": backend, "rootSeed": row["rootSeed"], "status": row["suiteStatus"],
                           "occurrences": len(row["occurrences"]), "new": new, "problems": len(row["problems"])}), flush=True)
         if new or any(problem.get("status") in ("adapter-error", "missing-summary") for problem in row["problems"]):
             notify(args.notify_command, state, row, new)
-        if missing >= MISSING_SUMMARY_LIMIT:
-            return finish(state, f"{missing} consecutive runs produced no suite summary; see their logs", 5)
 
 
 def run(args):
@@ -650,7 +693,19 @@ def run(args):
         stop = StopFlag()
         previous = {signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)}
         try:
-            return loop(state, config, args, stop)
+            for iteration, backend, run_dir, summary in unrecorded_runs(state, state.ledger()):
+                record_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None, None, None,
+                           args.keep_runs)
+            driver = Driver(state, config, args, stop)
+            workers = [threading.Thread(target=driver.work, name=f"fuzz-worker-{index}", daemon=True)
+                       for index in range(args.jobs)]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                while worker.is_alive():
+                    worker.join(.5)  # Short joins keep signal handling in the main thread prompt.
+            reason, code, kept = driver.ending or ("workers finished", 0, None)
+            return finish(state, reason, code, kept)
         finally:
             for signum, handler in previous.items():
                 signal.signal(signum, handler)
@@ -691,6 +746,7 @@ def parse_args(argv=None):
     for name in ("bin-dir", "upstream", "target-dir", "anvil", "solc"):
         runner.add_argument("--" + name, type=Path)
     runner.add_argument("--iterations", type=int, default=0, help="stop after this many iterations (default: until stopped)")
+    runner.add_argument("--jobs", type=int, default=1, help="runs in parallel; each run is one suite on one backend")
     runner.add_argument("--max-state-bytes", type=int, default=50 * 1024**3, help="stop before a run once the state uses this much disk")
     runner.add_argument("--accept-new-epoch", action="store_true", help="continue after the tools or harness scripts changed")
     runner.add_argument("--keep-runs", action="store_true", help="keep complete run directories instead of pruning them")
@@ -701,6 +757,8 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     if args.command == "run" and args.iterations < 0:
         parser.error("--iterations must not be negative")
+    if args.command == "run" and not 1 <= args.jobs <= 256:
+        parser.error("--jobs must be between 1 and 256")
     return args
 
 
