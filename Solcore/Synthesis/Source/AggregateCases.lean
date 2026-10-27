@@ -188,14 +188,16 @@ def boundaryResults (function : Aggregates.CheckedDAG) (fuel : Nat) : Except Str
     | .outOfFuel _ => .error "boundary observation exhausted Core fuel"
     | .fault _ _ => .error "boundary observation produced a Core fault"
 
-def inputSensitive (function : Aggregates.CheckedDAG) (fuel : Nat) : Except String Unit := do
+def inputSensitive (function : Aggregates.CheckedDAG) (fuel : Nat)
+    (acceptance : Acceptance := .profile) : Except String Unit := do
   let results ← boundaryResults function fuel
   unless results.any (fun value => results.any (fun other => value != other)) do
     throw "all four boundary inputs returned the same Word"
+  acceptance.check Input.boundaryInputs results
 
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
-    (revision : GeneratorRevision := .v1) (inputSelection : InputSelection := .boundary) :
-    Json := Id.run do
+    (revision : GeneratorRevision := .v1) (inputSelection : InputSelection := .boundary)
+    (acceptance : Acceptance := .profile) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -206,7 +208,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
       let result := do
         let (function, origin) ← generatedFunction seed nodes revision
         let emitted ← (emit function).mapError reprStr
-        inputSensitive function fuel
+        inputSensitive function fuel acceptance
         return (function, origin, emitted)
       match result with
       | .error error =>
@@ -214,7 +216,8 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
           excluded := excluded.push (Json.mkObj [
             ("seed", toJson (toString seed.toNat)), ("stage", toJson "aggregate-profile"),
             ("reason", toJson error),
-            ("code", toJson (if resource then "boundary-out-of-fuel" else "profile-excluded")),
+            ("code", toJson (if resource then "boundary-out-of-fuel"
+              else if error == Acceptance.identityReason then "boundary-identity" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (function, origin, emitted) =>
           for (input, inputIndex) in (inputSelection.inputs Input.boundaryInputs seed).zipIdx do
@@ -222,7 +225,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
               let origin := (origin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
                 "validationFuel" (toJson fuel)
               cases := cases.push
-                (makeCase function input emitted (inputSelection.record origin) fuel revision
+                (makeCase function input emitted (acceptance.record (inputSelection.record origin)) fuel revision
                   (revision.caseMask seed featureSupport))
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
@@ -269,7 +272,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
       throw "saved input differs from its boundary index"
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
-    inputSensitive function validationFuel
+    inputSensitive function validationFuel (← Acceptance.ofOrigin origin)
   return makeCase admitted.function admitted.input emitted origin fuel revision mask
 
 /-- Case payload markers are distinct from ordinary Word let binders. This

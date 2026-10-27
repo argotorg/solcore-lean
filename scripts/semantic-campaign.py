@@ -98,6 +98,16 @@ RUNTIME_INPUT_PROFILES = tuple(profile for profile in PROFILES if profile != "cl
 INPUT_SELECTIONS = ("boundary", "seeded-inputs-v1/splitmix64")
 RANDOM_INPUT_SELECTION = "seeded-inputs-v1/splitmix64"
 SEEDED_INPUTS = 4
+# Random generation also excludes a function that returns each of its boundary
+# inputs unchanged, in the runtime-input profiles whose functions can be
+# identities. The loop profiles already require a changed positive-trip input,
+# and a generic selection returns equal or adjacent Words for inputs 0 and 1.
+# A fixed corpus applies each profile's own filters; a saved case keeps its own.
+ACCEPTANCES = ("profile", "exclude-boundary-identity-v1")
+RANDOM_ACCEPTANCE = "exclude-boundary-identity-v1"
+IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
+                            "runtime-aggregates", "runtime-closures", "runtime-comptime", "runtime-modules",
+                            "runtime-call-graphs", "runtime-aggregate-call-graphs")
 # The case tool returns at most this many cases per generation request.
 MAX_CASES = 1024
 RESOURCE = "inconclusive-resource"
@@ -124,6 +134,14 @@ def input_selection(profile: str, case: dict) -> str | None:
         return None
     origin = case.get("provenance", {}).get("origin")
     return origin.get("inputSelection", "boundary") if isinstance(origin, dict) else "boundary"
+
+
+def acceptance(profile: str, case: dict) -> str | None:
+    """A case's acceptance filter; the profile's own unless its generated origin names one."""
+    if profile not in IDENTITY_FILTER_PROFILES:
+        return None
+    origin = case.get("provenance", {}).get("origin")
+    return origin.get("acceptance", "profile") if isinstance(origin, dict) else "profile"
 
 
 def directory_bytes(path: Path) -> int:
@@ -669,6 +687,9 @@ class Campaign:
         self.input_selection = getattr(args, "input_selection", None)
         if self.input_selection is None and args.profile in RUNTIME_INPUT_PROFILES and random:
             self.input_selection = RANDOM_INPUT_SELECTION
+        self.acceptance = getattr(args, "acceptance", None)
+        if self.acceptance is None and args.profile in IDENTITY_FILTER_PROFILES and random:
+            self.acceptance = RANDOM_ACCEPTANCE
         self.summary = {
             "schema": SCHEMA, "status": "running", "backend": args.backend, "synthetic": args.test_perturb_path is not None,
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path} if args.test_perturb_path else None,
@@ -707,6 +728,7 @@ class Campaign:
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
         self.summary["configuration"]["g0Version"] = self.g0_version
         self.summary["configuration"]["inputSelection"] = self.input_selection
+        self.summary["configuration"]["acceptance"] = self.acceptance
         self.summary["configuration"]["functions"] = getattr(args, "functions", None)
         if args.profile in CALL_GRAPH_PROFILES:
             self.summary["callShapeCoverage"] = {
@@ -1003,12 +1025,20 @@ class Campaign:
         self.input_selection = recorded
         self.summary["configuration"]["inputSelection"] = recorded
 
+    def recorded_acceptance(self, recorded: str | None) -> None:
+        """Adopt the acceptance filter of a corpus (each profile's own) or a saved case."""
+        if self.acceptance is not None and self.acceptance != recorded:
+            raise ValueError("acceptance filter disagrees with the supplied case or corpus")
+        self.acceptance = recorded
+        self.summary["configuration"]["acceptance"] = recorded
+
     def prepare_cases(self) -> dict:
         if self.args.case is not None:
             case = m2.read_json(self.args.case)
             m2.validate_case(case)
             self.recorded_g0_version(m2.CASE_PROFILES[case["schema"]], case["provenance"])
             self.recorded_input_selection(input_selection(m2.CASE_PROFILES[case["schema"]], case))
+            self.recorded_acceptance(acceptance(m2.CASE_PROFILES[case["schema"]], case))
             self.summary["caseInput"] = {"path": str(self.args.case), "sha256": m2.file_digest(self.args.case)}
             return {"schema": "solcore-lean.semantic-corpus.v1", "requested": 1,
                 "attempted": 0, "excluded": [], "cases": [case], "status": "complete"}
@@ -1017,6 +1047,8 @@ class Campaign:
             options = [self.g0_version] if self.args.profile in G0_PROFILES else []
             if self.args.profile in RUNTIME_INPUT_PROFILES and self.input_selection != "boundary":
                 options.append(self.input_selection)
+            if self.args.profile in IDENTITY_FILTER_PROFILES and self.acceptance != "profile":
+                options.append(self.acceptance)
             return self.tool([command, str(self.args.seed), str(self.args.nodes), str(self.args.cases),
                               str(self.args.attempts), str(self.args.direct_fuel), *options], "generation")
         manifest = validate_manifest(m2.read_json(self.args.corpus))
@@ -1025,6 +1057,7 @@ class Campaign:
         generate_command, emit_command, origin_kind = PROFILE_COMMANDS[profile]
         version = self.recorded_g0_version(profile, manifest)
         self.recorded_input_selection("boundary" if profile in RUNTIME_INPUT_PROFILES else None)
+        self.recorded_acceptance("profile" if profile in IDENTITY_FILTER_PROFILES else None)
         save_json(self.args.output / "corpus.json", manifest)
         self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": m2.digest(m2.json_bytes(manifest))}
         coverage = self.summary["coverage"]
@@ -1153,6 +1186,8 @@ class Campaign:
         self.summary["generation"]["generatorVersions"] = sorted({case["provenance"]["generatorVersion"] for case in cases})
         self.summary["generation"]["inputSelections"] = sorted(
             {selection for case in cases if (selection := input_selection(self.args.profile, case)) is not None})
+        self.summary["generation"]["acceptances"] = sorted(
+            {value for case in cases if (value := acceptance(self.args.profile, case)) is not None})
         functions = getattr(self.args, "functions", None)
         self.summary["generation"]["requestedFunctions"] = functions
         self.summary["generation"]["inputsPerFunction"] = (
@@ -1239,6 +1274,10 @@ def main() -> int:
     parser.add_argument("--input-selection", choices=INPUT_SELECTIONS,
                         help=f"inputs of random runtime-input profiles; default {RANDOM_INPUT_SELECTION}. "
                              "A corpus uses boundary inputs and a saved case keeps its own")
+    parser.add_argument("--acceptance", choices=ACCEPTANCES,
+                        help="acceptance filter of random runtime-input profiles whose functions can be identities; "
+                             f"default {RANDOM_ACCEPTANCE}. A corpus uses each profile's own filters and a saved "
+                             "case keeps its own")
     parser.add_argument("--seconds", type=float, default=300)
     parser.add_argument("--disk-bytes", type=int, default=128 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32, help="total candidate executions across all findings")
@@ -1256,18 +1295,20 @@ def main() -> int:
                         help="SYNTHETIC TEST ONLY: change a copied observation after real three-way agreement")
     args = parser.parse_args()
     try:
-        selected_profile, recorded, recorded_inputs = None, None, None
+        selected_profile, recorded, recorded_inputs, recorded_acceptance = None, None, None, None
         if args.corpus:
             manifest = validate_manifest(m2.read_json(args.corpus))
             selected_profile = manifest.get("profile", "closed-g0")
             recorded = g0_version(selected_profile, manifest)
             recorded_inputs = "boundary" if selected_profile in RUNTIME_INPUT_PROFILES else None
+            recorded_acceptance = "profile" if selected_profile in IDENTITY_FILTER_PROFILES else None
         elif args.case:
             case = m2.read_json(args.case)
             m2.validate_case(case)
             selected_profile = m2.CASE_PROFILES[case["schema"]]
             recorded = g0_version(selected_profile, case["provenance"])
             recorded_inputs = input_selection(selected_profile, case)
+            recorded_acceptance = acceptance(selected_profile, case)
         if args.profile and selected_profile and args.profile != selected_profile:
             parser.error("--profile disagrees with the supplied case or corpus")
         args.profile = args.profile or selected_profile or "closed-g0"
@@ -1283,6 +1324,11 @@ def main() -> int:
             parser.error("--input-selection applies only to runtime-input profiles")
         if (args.corpus or args.case) and args.input_selection != recorded_inputs:
             parser.error("--input-selection disagrees with the supplied case or corpus")
+    if args.acceptance is not None:
+        if args.profile not in IDENTITY_FILTER_PROFILES:
+            parser.error("--acceptance applies only to runtime-input profiles whose functions can be identities")
+        if (args.corpus or args.case) and args.acceptance != recorded_acceptance:
+            parser.error("--acceptance disagrees with the supplied case or corpus")
     if args.functions is not None:
         if args.corpus or args.case:
             parser.error("--functions applies only to random generation, not to a corpus or a saved case")

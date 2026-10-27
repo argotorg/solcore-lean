@@ -150,16 +150,18 @@ def constantUsesOperation (constant : CheckedWordProgram) : Bool :=
 
 /-- Generation retains a nonliteral constant computation and an input-sensitive
 runtime step. Imported and reduced literals and constant steps remain valid. -/
-def inputSensitive (plan : CheckedPlan) (fuel : Nat) : Except String Unit := do
+def inputSensitive (plan : CheckedPlan) (fuel : Nat)
+    (acceptance : Acceptance := .profile) : Except String Unit := do
   unless constantUsesOperation plan.constant do throw "constant AST contains no operation"
   Aggregate.inputSensitive plan.step fuel
   let results ← boundaryResults plan fuel
   unless results.any (fun result => some result != results.head?) do
     throw "all module boundary inputs returned the same result"
+  acceptance.check boundaryInputs results
 
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
-    (revision : GeneratorRevision := .v1) (inputSelection : InputSelection := .boundary) :
-    Json := Id.run do
+    (revision : GeneratorRevision := .v1) (inputSelection : InputSelection := .boundary)
+    (acceptance : Acceptance := .profile) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -170,7 +172,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
       let result := do
         let (plan, origin) ← generatedPlan seed nodes revision
         let emitted ← (emit plan).mapError reprStr
-        inputSensitive plan fuel
+        inputSensitive plan fuel acceptance
         return (plan, origin, emitted)
       match result with
       | .error error =>
@@ -178,7 +180,8 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
           excluded := excluded.push (Json.mkObj [
             ("seed", toJson (toString seed.toNat)), ("stage", toJson "module-profile"),
             ("reason", toJson error),
-            ("code", toJson (if resource then "boundary-out-of-fuel" else "profile-excluded")),
+            ("code", toJson (if resource then "boundary-out-of-fuel"
+              else if error == Acceptance.identityReason then "boundary-identity" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (plan, origin, emitted) =>
           for (input, inputIndex) in (inputSelection.inputs boundaryInputs seed).zipIdx do
@@ -186,7 +189,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
               let origin := (origin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
                 "validationFuel" (toJson fuel)
               cases := cases.push
-                (makeCase plan input emitted (inputSelection.record origin) fuel revision
+                (makeCase plan input emitted (acceptance.record (inputSelection.record origin)) fuel revision
                   (revision.caseMask seed featureSupport))
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
@@ -280,8 +283,9 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
     let canonicalOrigin := (expectedOrigin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
       "validationFuel" (toJson validationFuel)
-    unless origin == inputSelection.record canonicalOrigin do throw "saved origin differs from generated module provenance"
-    inputSensitive plan validationFuel
+    let acceptance ← Acceptance.ofOrigin origin
+    unless origin == acceptance.record (inputSelection.record canonicalOrigin) do throw "saved origin differs from generated module provenance"
+    inputSensitive plan validationFuel acceptance
   else if kind = "imported" then
     unless origin == Json.mkObj [("kind", toJson "imported")] do throw "noncanonical imported origin"
   else if kind = "reduced" then

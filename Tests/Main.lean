@@ -1875,6 +1875,7 @@ import Solcore.Test.SourceSeededInputCases
 import Solcore.Test.SourceSwarmMaskCases
 import Solcore.Test.SourceEmitterSupportCases
 import Solcore.Test.SourceRevisionFourCases
+import Solcore.Test.SourceAcceptanceCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -4028,6 +4029,7 @@ def run : IO Unit := do
   SourceSwarmMaskCases.testSourceSwarmMaskCases
   SourceEmitterSupportCases.testSourceEmitterSupportCases
   SourceRevisionFourCases.testSourceRevisionFourCases
+  SourceAcceptanceCases.testSourceAcceptanceCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter
