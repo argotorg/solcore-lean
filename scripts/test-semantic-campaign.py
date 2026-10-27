@@ -119,6 +119,27 @@ def recursion_policy_case(mask=7, form="mutual", value=7, helpers=2):
     return case
 
 
+def assembly_policy_case(form="switch", value="255"):
+    """Inline Yul envelope/coverage fixture; no compiler or runtime is simulated."""
+    number = int(value)
+    body = {'tag': 'binary', 'op': 'wordDiv', 'left': {'tag': 'var', 'index': 0},
+            'right': {'tag': 'word', 'value': '0x' + f'{2:064x}'}}
+    function = {'tag': 'lambda', 'parameterType': 'word', 'resultType': 'word', 'body': body}
+    program = {'schema': 'solcore-semantic-core', 'resultType': {'tag': 'function', 'parameter': 'word', 'result': 'word'},
+               'dataDefinitions': [], 'body': function}
+    return {'schema': campaign.m2.ASSEMBLY_CASE_SCHEMA, 'input': value, 'source': '// inline Yul policy fixture',
+        'assemblyPlan': {'schema': 'solcore-lean.assembly-plan.v1', 'functionProgram': program, 'form': form},
+        'program': {'schema': 'solcore-semantic-core', 'resultType': 'word', 'dataDefinitions': [],
+            'body': {'tag': 'apply', 'function': function, 'argument': {'tag': 'word', 'value': '0x' + f'{number:064x}'}}},
+        'provenance': {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                   *campaign.PROFILE_VERSION_FIELDS['runtime-assembly'])},
+            'origin': {'kind': 'assembly-generated', 'seed': '1', 'maxProgramNodes': 96, 'form': form},
+            'features': ['binary:Solcore.Core.Wire.BinaryOp.wordDiv', 'local', 'wordLiteral']},
+        'contract': {'name': 'SynthesizedAssembly', 'method': 'run', 'signature': 'run(uint256)',
+            'deployPath': ['SynthesizedAssemblyDeploy'], 'runtimePath': ['SynthesizedAssemblyDeploy', 'SynthesizedAssembly'],
+            'calldata': '0xa444f5e9' + f'{number:064x}', 'constructorCalldata': '0x'}}
+
+
 def generic_policy_case(variant="word", value=1, helpers=2):
     """Generic transport/coverage fixture; not a simulated compiler result."""
     case = loop_policy_case(7, value, helpers)
@@ -1124,6 +1145,129 @@ class RecursionCoverageTests(unittest.TestCase):
         self.assertEqual(len(manifest['cases']), 63)
         loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
         self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
+
+
+class AssemblyCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-assembly'
+
+    def manifest(self):
+        case = assembly_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'assemblyRequirements': {'forms': ['switch'], 'formFeatures': ['switch:local']},
+            'cases': [{'id': 'assembly', 'input': '255', 'assemblyPlan': case['assemblyPlan'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE], ('assembly-generate', 'assembly-emit', 'assembly-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.ASSEMBLY_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], (*campaign.PRIMITIVE_VERSIONS, 'functionProfileVersion'))
+        self.assertIn(self.PROFILE, campaign.G0_PROFILES)
+        self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertNotIn(self.PROFILE, campaign.HELPER_PROFILES)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual(campaign.m2.ASSEMBLY_FORMS, ('switch', 'if', 'operations'))
+        self.assertEqual(len(campaign.ASSEMBLY_FORM_FEATURES), 87)
+        self.assertEqual(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-primitives-v1/v', 'baseGeneratorVersion': 'v'}), 'v')
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['assembly-generate', '1', '96', '1', '256', '1000000', campaign.RANDOM_G0_VERSION,
+                                 campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+        self.assertEqual(summary['configuration']['acceptance'], campaign.RANDOM_ACCEPTANCE)
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        entry = value['cases'][0]
+        base = value['assemblyRequirements']
+        for invalid in (None, {}, {**base, 'forms': ['loop']}, {**base, 'forms': ['switch', 'switch']},
+                        {**base, 'formFeatures': ['loop:local']}, {**base, 'formFeatures': ['switch:pair']},
+                        {**base, 'formFeatures': [True]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'assemblyRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'recursionPlan': entry['assemblyPlan']},
+                        {'id': 'assembly', 'input': '255', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        for plan in ({**entry['assemblyPlan'], 'form': 'loop'}, {**entry['assemblyPlan'], 'functionProgram': None},
+                     {**entry['assemblyPlan'], 'schema': 'solcore-lean.recursion-plan.v1'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'assemblyPlan': plan}]})
+        with self.assertRaises(ValueError):
+            campaign.assembly_requirements({'profile': 'runtime-primitives', 'assemblyRequirements': base})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.PRIMITIVE_INPUTS[1:])})
+        for input_value in campaign.PRIMITIVE_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 96}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_plan_form_and_the_original_features(self):
+        case = assembly_policy_case('operations')
+        self.assertEqual(campaign.specified_assembly(case), {'Forms': {'operations'}, 'FormFeatures': {
+            'operations:binary:Solcore.Core.Wire.BinaryOp.wordDiv', 'operations:local', 'operations:wordLiteral'}})
+        self.assertEqual(campaign.helper_counts(case), set())
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': set(), 'Updates': set()})
+        self.assertEqual(campaign.specified_assembly(loop_policy_case()), {'Forms': set(), 'FormFeatures': set()})
+
+    def test_imported_plan_routes_to_assembly_emit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile, config.cases = self.PROFILE, 1
+            value = self.manifest(); value['cases'][0]['expectedCore'] = 'untrusted-golden-is-ignored'
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return assembly_policy_case()
+            instance.tool = tool
+            self.assertEqual(instance.prepare_cases()['cases'], [assembly_policy_case()])
+            self.assertEqual(calls, [('assembly-emit', value['cases'][0]['assemblyPlan'], ['255', '1000'], 'corpus-emission')])
+            coverage = instance.summary['assemblyCoverage']
+            self.assertEqual((coverage['requiredForms'], coverage['generatedForms'], coverage['matchedForms']),
+                             (['switch'], ['switch'], []))
+
+    def test_nonmatching_outcomes_cannot_satisfy_assembly_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [assembly_policy_case('switch'), assembly_policy_case('operations')]
+            instance.summary['assemblyCoverage'].update(requiredForms=['operations', 'switch'],
+                requiredFormFeatures=['operations:local', 'switch:local'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['assemblyPlan']['form']
+                folder.mkdir()
+                report = matched()
+                if case['assemblyPlan']['form'] == 'operations':
+                    report['comparison'] = {'category': 'compiler-crash', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['assemblyCoverage']
+            self.assertEqual((coverage['generatedForms'], coverage['matchedForms']), (['operations', 'switch'], ['switch']))
+            self.assertEqual((coverage['missingForms'], coverage['missingFormFeatures']), (['operations'], ['operations:local']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_every_feature_in_every_form(self):
+        manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts/semantic-assembly-corpus.json').read_text()))
+        primitive = json.loads((ROOT / 'scripts/semantic-primitive-corpus.json').read_text())
+        self.assertEqual(manifest['assemblyRequirements']['forms'], list(campaign.m2.ASSEMBLY_FORMS))
+        self.assertEqual(manifest['assemblyRequirements']['formFeatures'], list(campaign.ASSEMBLY_FORM_FEATURES))
+        self.assertEqual(set(campaign.ASSEMBLY_FORM_FEATURES), {f'{form}:{feature}' for form in campaign.m2.ASSEMBLY_FORMS
+                                                               for feature in primitive['requiredFeatures']})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertEqual(len(manifest['cases']), 72)
+        plans = {}
+        for entry in manifest['cases']:
+            key = json.dumps(entry['assemblyPlan'], sort_keys=True)
+            plans.setdefault(key, (entry['assemblyPlan']['form'], []))[1].append(entry['input'])
+        self.assertEqual(len(plans), 9)
+        self.assertEqual(sorted(form for form, _ in plans.values()), sorted(3 * list(campaign.m2.ASSEMBLY_FORMS)))
+        self.assertTrue(all(inputs == list(campaign.PRIMITIVE_INPUTS) for _, inputs in plans.values()))
 
 
 class GenericCoverageTests(unittest.TestCase):
@@ -2506,7 +2650,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 16)
+        self.assertEqual(len(campaign.PROFILES), 17)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -3283,7 +3427,7 @@ class G0VersionTests(CommandLine, unittest.TestCase):
 
 class FunctionCountTests(CommandLine, unittest.TestCase):
     """--functions asks random runtime-input campaigns for whole functions; counts stay per case."""
-    SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
+    SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-assembly': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
               'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8}

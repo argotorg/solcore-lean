@@ -34,6 +34,7 @@ PROFILE_SCHEMAS = {profile: schema for schema, profile in m2.CASE_PROFILES.items
 PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-word": ("input-generate", "input-emit", "input-generated"),
                     "runtime-primitives": ("primitive-generate", "primitive-emit", "primitive-generated"),
+                    "runtime-assembly": ("assembly-generate", "assembly-emit", "assembly-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
                     "runtime-aggregate-call-graphs": ("aggregate-call-graph-generate", "aggregate-call-graph-emit", "aggregate-call-graph-generated"),
@@ -69,8 +70,15 @@ PRIMITIVE_FEATURES = frozenset(
     + ["ternary:Solcore.Core.Wire.TernaryOp.wordAddMod", "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod"])
 INPUT_VERSIONS = ("profileVersion", "functionVersion", "abstractionVersion")
 PRIMITIVE_VERSIONS = (*INPUT_VERSIONS, "baseGeneratorVersion", "boundaryVersion")
+# Every form of the inline Yul profile renders every G0 feature of the primitive corpus.
+ASSEMBLY_FORM_FEATURES = tuple(f"{form}:{feature}" for form in m2.ASSEMBLY_FORMS for feature in sorted(
+    PRIMITIVE_FEATURES | {"binary:Solcore.Core.Wire.BinaryOp." + operation for operation in (
+        "wordAdd", "wordSub", "wordMul", "wordAnd", "wordOr", "wordXor", "wordEq", "wordGt")}
+    | {"unary:Solcore.Core.Wire.UnaryOp.boolNot", "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+       "wordLiteral", "boolLiteral", "local", "let", "if"}))
 PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-primitives": PRIMITIVE_VERSIONS,
+                          "runtime-assembly": (*PRIMITIVE_VERSIONS, "functionProfileVersion"),
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
                           "runtime-aggregate-call-graphs": m2.AGGREGATE_CALL_GRAPH_VERSIONS,
@@ -92,7 +100,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-modules": ("profileVersion", "functionVersion", "templateVersion",
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion")}
 # Profiles whose programs come from the G0 generator; call-graph profiles use their own grammars.
-G0_PROFILES = ("closed-g0", "runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
+G0_PROFILES = ("closed-g0", "runtime-word", "runtime-primitives", "runtime-assembly", "runtime-functions", "runtime-mutation",
                "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-generics",
                "runtime-closures", "runtime-comptime", "runtime-modules")
 G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1", "core-g0-v3/lcg64-v1", "core-g0-v4/lcg64-v1")
@@ -118,7 +126,7 @@ SEEDED_INPUTS = 4
 # A fixed corpus applies each profile's own filters; a saved case keeps its own.
 ACCEPTANCES = ("profile", "exclude-boundary-identity-v1")
 RANDOM_ACCEPTANCE = "exclude-boundary-identity-v1"
-IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
+IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-assembly", "runtime-functions", "runtime-mutation",
                             "runtime-aggregates", "runtime-closures", "runtime-comptime", "runtime-modules",
                             "runtime-call-graphs", "runtime-aggregate-call-graphs")
 # The case tool returns at most this many cases per generation request.
@@ -144,7 +152,7 @@ def g0_version(profile: str, versions: dict) -> str | None:
     """The G0 version a manifest or case provenance records; primitives prefix their own."""
     if profile not in G0_PROFILES:
         return None
-    return versions.get("baseGeneratorVersion" if profile == "runtime-primitives" else "generatorVersion")
+    return versions.get("baseGeneratorVersion" if profile in ("runtime-primitives", "runtime-assembly") else "generatorVersion")
 
 
 def input_selection(profile: str, case: dict) -> str | None:
@@ -421,6 +429,28 @@ def specified_recursion(case: dict) -> dict[str, set]:
             "Depths": {int(m2.word(case.get("input"))) & plan["depthMask"]}}
 
 
+def assembly_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("assemblyRequirements", {"forms": [], "formFeatures": []})
+    if not isinstance(requirements, dict) or set(requirements) != {"forms", "formFeatures"}:
+        raise ValueError("assemblyRequirements requires forms and formFeatures arrays")
+    for key, allowed in (("forms", m2.ASSEMBLY_FORMS), ("formFeatures", ASSEMBLY_FORM_FEATURES)):
+        values = requirements[key]
+        if (not isinstance(values, list) or any(not isinstance(v, str) or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid assembly {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-assembly" and any(requirements.values()):
+        raise ValueError("only inline Yul corpora can require forms")
+    return requirements
+
+
+def specified_assembly(case: dict) -> dict[str, set]:
+    """The plan's form and the original Core function's AST features in it."""
+    if case.get("schema") != m2.ASSEMBLY_CASE_SCHEMA:
+        return {"Forms": set(), "FormFeatures": set()}
+    form = m2.validate_assembly_plan(case.get("assemblyPlan"))["form"]
+    return {"Forms": {form}, "FormFeatures": {f"{form}:{feature}" for feature in case["provenance"]["features"]}}
+
+
 def generic_requirements(manifest: dict) -> dict:
     requirements = manifest.get("genericRequirements", {"instantiations": []})
     if not isinstance(requirements, dict) or set(requirements) != {"instantiations"}:
@@ -582,6 +612,7 @@ def generation_recipes(case: dict) -> dict[str, set[int]]:
 
 NESTED_LOOP_DIMENSIONS = ("Shapes", "OuterIterations", "InnerIterations", "TotalIterations")
 RECURSION_DIMENSIONS = ("Shapes", "Depths")
+ASSEMBLY_DIMENSIONS = ("Forms", "FormFeatures")
 
 
 def missing_coverage(summary: dict) -> bool:
@@ -590,6 +621,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["loopCoverage"]["missing" + dimension] for dimension in ("Masks", "Iterations"))
         or any(summary["nestedLoopCoverage"]["missing" + dimension] for dimension in NESTED_LOOP_DIMENSIONS)
         or any(summary["recursionCoverage"]["missing" + dimension] for dimension in RECURSION_DIMENSIONS)
+        or any(summary["assemblyCoverage"]["missing" + dimension] for dimension in ASSEMBLY_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -626,6 +658,8 @@ def validate_manifest(manifest) -> dict:
             raise ValueError("primitive corpus must require all fourteen added AST operators")
         if not set(PRIMITIVE_INPUTS) <= set(required_inputs):
             raise ValueError("primitive corpus must require all eight boundary inputs")
+    if profile == "runtime-assembly" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+        raise ValueError("inline Yul corpus must require all eight boundary inputs")
     if profile == "runtime-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
@@ -643,6 +677,7 @@ def validate_manifest(manifest) -> dict:
     loop_requirements(manifest)
     nested_loop_requirements(manifest)
     recursion_requirements(manifest)
+    assembly_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -655,9 +690,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "assemblyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-assembly": "assemblyPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -698,6 +733,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_nested_loop_plan(entry["nestedLoopPlan"])
         elif "recursionPlan" in entry:
             m2.validate_recursion_plan(entry["recursionPlan"])
+        elif "assemblyPlan" in entry:
+            m2.validate_assembly_plan(entry["assemblyPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -718,7 +755,7 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
         return NESTED_LOOP_INPUTS
     if profile == "runtime-recursion":
         return RECURSION_INPUTS
-    if profile in ("runtime-primitives", "runtime-call-graphs", "runtime-aggregate-call-graphs"):
+    if profile in ("runtime-primitives", "runtime-assembly", "runtime-call-graphs", "runtime-aggregate-call-graphs"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
 
@@ -871,6 +908,8 @@ class Campaign:
                 **{prefix + dimension: [] for dimension in NESTED_LOOP_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "recursionCoverage": {"classification": "recursion plan shapes and depths prescribed by the plan and the input; matched plans verified by native replay; not measured traces or opcode coverage",
                 **{prefix + dimension: [] for dimension in RECURSION_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "assemblyCoverage": {"classification": "inline Yul plan forms and the original Core function's AST features in each form; matched plans verified by native replay; not measured Yul builtins or opcode coverage",
+                **{prefix + dimension: [] for dimension in ASSEMBLY_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -918,6 +957,9 @@ class Campaign:
         recursion = self.summary["recursionCoverage"]
         for dimension in RECURSION_DIMENSIONS:
             recursion["missing" + dimension] = sorted(set(recursion["required" + dimension]) - set(recursion["matched" + dimension]))
+        assembly = self.summary["assemblyCoverage"]
+        for dimension in ASSEMBLY_DIMENSIONS:
+            assembly["missing" + dimension] = sorted(set(assembly["required" + dimension]) - set(assembly["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -957,6 +999,11 @@ class Campaign:
         for dimension, values in specified_recursion(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["recursionCoverage"][key] = sorted(set(self.summary["recursionCoverage"][key]) | values)
+
+    def record_assembly(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_assembly(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["assemblyCoverage"][key] = sorted(set(self.summary["assemblyCoverage"][key]) | values)
 
     def record_generics(self, case: dict, *, matched: bool = False) -> None:
         key = ("matched" if matched else "generated") + "Instantiations"
@@ -1257,6 +1304,9 @@ class Campaign:
         recursion = recursion_requirements(manifest)
         self.summary["recursionCoverage"]["requiredShapes"] = sorted(recursion["shapes"])
         self.summary["recursionCoverage"]["requiredDepths"] = sorted(recursion["depths"])
+        assembly = assembly_requirements(manifest)
+        self.summary["assemblyCoverage"]["requiredForms"] = sorted(assembly["forms"])
+        self.summary["assemblyCoverage"]["requiredFormFeatures"] = sorted(assembly["formFeatures"])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1294,9 +1344,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "assemblyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-assembly": "assemblyPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -1340,6 +1390,7 @@ class Campaign:
             self.record_loops(case)
             self.record_nested_loops(case)
             self.record_recursion(case)
+            self.record_assembly(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1393,6 +1444,7 @@ class Campaign:
             self.record_loops(case)
             self.record_nested_loops(case)
             self.record_recursion(case)
+            self.record_assembly(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1420,6 +1472,7 @@ class Campaign:
                 self.record_loops(case, matched=True)
                 self.record_nested_loops(case, matched=True)
                 self.record_recursion(case, matched=True)
+                self.record_assembly(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -1541,7 +1594,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

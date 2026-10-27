@@ -48,6 +48,8 @@ AGGREGATE_SHAPES = ("pair-component-call", "sum-payload-call", "projected-call-a
                     "case-branch-call", "payload-call-argument", "aggregate-let", "aggregate-branch", "nested-case")
 AGGREGATE_CALL_GRAPH_VERSIONS = ("profileVersion", "functionVersion", "boundaryVersion", "shapeVersion")
 PRIMITIVE_CASE_SCHEMA = "solcore-lean.semantic-primitive-case.v1"
+ASSEMBLY_CASE_SCHEMA = "solcore-lean.semantic-assembly-case.v1"
+ASSEMBLY_FORMS = ("switch", "if", "operations")
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
@@ -61,7 +63,8 @@ CLOSURE_CASE_SCHEMA = "solcore-lean.semantic-closure-case.v1"
 COMPTIME_CASE_SCHEMA = "solcore-lean.semantic-comptime-case.v1"
 MODULE_CASE_SCHEMA = "solcore-lean.semantic-module-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
-                 PRIMITIVE_CASE_SCHEMA: "runtime-primitives", CALL_GRAPH_CASE_SCHEMA: "runtime-call-graphs",
+                 PRIMITIVE_CASE_SCHEMA: "runtime-primitives", ASSEMBLY_CASE_SCHEMA: "runtime-assembly",
+                 CALL_GRAPH_CASE_SCHEMA: "runtime-call-graphs",
                  CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime-call-graph-loops",
                  AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime-aggregate-call-graphs",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
@@ -69,7 +72,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  NESTED_LOOP_CASE_SCHEMA: "runtime-nested-loops", RECURSION_CASE_SCHEMA: "runtime-recursion",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
-                  PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
+                  PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
+                  CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
                   CALL_GRAPH_LOOP_CASE_SCHEMA: "SynthesizedCallGraphLoops",
                   AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "SynthesizedAggregateCallGraphs",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
@@ -280,6 +284,17 @@ def validate_recursion_plan(plan) -> dict:
     return plan
 
 
+def validate_assembly_plan(plan) -> dict:
+    """Validate the envelope; native replay checks the function and its emission."""
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.assembly-plan.v1":
+        raise ValueError("unsupported assembly plan schema")
+    if plan.get("form") not in ASSEMBLY_FORMS:
+        raise ValueError("assembly form must be switch, if or operations")
+    if not isinstance(plan.get("functionProgram"), dict):
+        raise ValueError("assembly plan requires its original Word function")
+    return plan
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -359,6 +374,8 @@ def validate_case(case: dict) -> None:
         validate_nested_loop_plan(case.get("nestedLoopPlan"))
     if case["schema"] == RECURSION_CASE_SCHEMA:
         validate_recursion_plan(case.get("recursionPlan"))
+    if case["schema"] == ASSEMBLY_CASE_SCHEMA:
+        validate_assembly_plan(case.get("assemblyPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == GENERIC_CASE_SCHEMA:
@@ -378,9 +395,10 @@ def validate_case(case: dict) -> None:
     for key in ("generatorVersion", "emitterVersion", "wrapperVersion"):
         if not isinstance(provenance.get(key), str) or not provenance[key]:
             raise ValueError(f"missing provenance {key}")
-    if case["schema"] == PRIMITIVE_CASE_SCHEMA:
+    if case["schema"] in (PRIMITIVE_CASE_SCHEMA, ASSEMBLY_CASE_SCHEMA):
         for key in ("profileVersion", "functionVersion", "abstractionVersion",
-                    "baseGeneratorVersion", "boundaryVersion"):
+                    "baseGeneratorVersion", "boundaryVersion",
+                    *(("functionProfileVersion",) if case["schema"] == ASSEMBLY_CASE_SCHEMA else ())):
             if not isinstance(provenance.get(key), str) or not provenance[key]:
                 raise ValueError(f"missing primitive provenance {key}")
     if case["schema"] in (CALL_GRAPH_CASE_SCHEMA, CALL_GRAPH_LOOP_CASE_SCHEMA):
@@ -421,7 +439,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "assemblyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -873,6 +891,7 @@ def execute(args, report: dict) -> None:
         CASE_SCHEMA: "closed G0 Word/Bool, gas-independent, Sonatina O0, pure run() ABI Word",
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
         PRIMITIVE_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations, Sonatina O0, run(uint256) ABI Word",
+        ASSEMBLY_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations as inline Yul in whole-body or per-operation assembly blocks, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated acyclic Word helper graphs, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, directly generated acyclic Word helper step graph, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated internal Word pairs/sums, projections and case payload scopes with acyclic Word helper calls, Sonatina O0, run(uint256) ABI Word",

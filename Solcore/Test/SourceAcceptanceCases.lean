@@ -5,8 +5,9 @@ import Solcore.Synthesis.Source.ModuleCases
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.CallGraphLoopCases
 import Solcore.Synthesis.Source.AggregateCallGraphCases
+import Solcore.Synthesis.Source.AssemblyCases
 
-/-! The identity filter `exclude-boundary-identity-v1` of the ten runtime-input
+/-! The identity filter `exclude-boundary-identity-v1` of the eleven runtime-input
 profiles whose generated functions can be identities. Over a window of
 attempts it excludes exactly the functions that return every boundary input
 unchanged, under its own reason and code, and keeps every other function with
@@ -53,6 +54,10 @@ private def profiles : List Profile := [
   {name := "runtime-primitives", generate := fun seed nodes count attempts fuel inputs acceptance =>
       Primitive.generateCases seed nodes count attempts fuel .v4 inputs acceptance,
     replay := Primitive.replayCase, shrink := Primitive.shrinkCases, nodes := 96, inputs := 8,
+    identity := some 8},
+  {name := "runtime-assembly", generate := fun seed nodes count attempts fuel inputs acceptance =>
+      Assembly.generateCases seed nodes count attempts fuel .v4 inputs acceptance,
+    replay := Assembly.replayCase, shrink := Assembly.shrinkCases, nodes := 96, inputs := 8,
     identity := some 8},
   {name := "runtime-functions", generate := fun seed nodes count attempts fuel inputs acceptance =>
       Solcore.Synthesis.Source.Function.generateCases seed nodes count attempts fuel .v4 inputs acceptance,
@@ -234,7 +239,7 @@ private def acceptanceChecks : IO Unit := do
 
 def testSourceAcceptanceCases : IO Unit := do
   acceptanceChecks
-  ensure (profiles.length == 10) "a profile whose functions can be identities is missing"
+  ensure (profiles.length == 11) "a profile whose functions can be identities is missing"
   for profile in profiles do
     checkWindow profile
     if let some seed := profile.identity then checkIdentity profile seed

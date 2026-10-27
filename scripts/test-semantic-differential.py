@@ -175,6 +175,17 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.RECURSION_CASE_SCHEMA], "runtime-recursion")
         self.assertEqual(runner.CASE_CONTRACTS[runner.RECURSION_CASE_SCHEMA], "SynthesizedRecursion")
 
+    def test_assembly_plan_requires_a_form_and_the_original_function(self):
+        plan = {"schema": "solcore-lean.assembly-plan.v1", "functionProgram": {}, "form": "switch"}
+        for form in ("switch", "if", "operations"):
+            runner.validate_assembly_plan({**plan, "form": form})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.recursion-plan.v1"}, {**plan, "functionProgram": None},
+                        {**plan, "form": "branches"}, {**plan, "form": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_assembly_plan(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.ASSEMBLY_CASE_SCHEMA], "runtime-assembly")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.ASSEMBLY_CASE_SCHEMA], "SynthesizedAssembly")
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -530,7 +541,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 16)
+        self.assertEqual(len(runner.CASE_PROFILES), 17)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

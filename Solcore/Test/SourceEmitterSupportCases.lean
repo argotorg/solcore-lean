@@ -9,6 +9,7 @@ import Solcore.Synthesis.Source.ClosureCases
 import Solcore.Synthesis.Source.ComptimeCases
 import Solcore.Synthesis.Source.ModuleCases
 import Solcore.Synthesis.Source.PrimitiveCases
+import Solcore.Synthesis.Source.AssemblyCases
 
 /-! The G0 features each pure profile declares are exactly those its emitter
 renders: a probe program for each catalog feature emits if and only if the
@@ -71,6 +72,12 @@ private def profiles : List Profile := [
     (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Input.emit)⟩,
   ⟨"runtime-primitives", Primitive.featureSupport, fun feature =>
     (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Primitive.emit)⟩,
+  ⟨"runtime-assembly switch", Assembly.featureSupport, fun feature =>
+    (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Assembly.emit .switch)⟩,
+  ⟨"runtime-assembly if", Assembly.featureSupport, fun feature =>
+    (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Assembly.emit .branches)⟩,
+  ⟨"runtime-assembly operations", Assembly.featureSupport, fun feature =>
+    (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Assembly.emit .operations)⟩,
   ⟨"runtime-functions", Solcore.Synthesis.Source.Function.featureSupport, fun feature =>
     (CheckedWordFunctionDAG.ofParts? [probe (.var 0) feature] entry).map
       (emits ∘ Solcore.Synthesis.Source.Function.emit)⟩,
@@ -116,7 +123,8 @@ private def indices (mask : FeatureMask) : List Nat :=
 
 def testSourceEmitterSupportCases : IO Unit := do
   ensure (indices scalarSupport == [0, 1, 3, 4, 5, 8, 9, 10, 19, 20, 24, 25] &&
-      PrimitiveRenderer.support == FeatureMask.all && AggregateRenderer.support == FeatureMask.all &&
+      PrimitiveRenderer.support == FeatureMask.all && AssemblyRenderer.support == FeatureMask.all &&
+      AggregateRenderer.support == FeatureMask.all &&
       MutationRenderer.support == scalarSupport)
     "a renderer's declared G0 features changed"
   for profile in profiles do
