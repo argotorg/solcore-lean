@@ -271,6 +271,21 @@ gives `Expressions` for every family body, and its `preserves` and `reflects`
 give the application of every admitted header at every grade. A call nested
 inside another expression is not yet covered.
 
+[CellAwareInvocationAcceptedCallAuthority](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallAuthority.lean)
+derives `Ports` from a complete inventory. A call receipt's global slot names
+an indexed function, because the indexed globals are the functions'
+signatures, and the inventory's header for that index gives the `Port`.
+[CellAwareInvocationAcceptedCallEntry](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallEntry.lean)
+is the body-trace counterpart of the row lemma, packaged as the root's
+`NamedResultAt` with the restored caller's post-admission.
+[CellAwarePublicAcceptedCallRoot](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedCallRoot.lean)
+gives the preservation theorem of the unchanged public root for a
+call-containing row. The root call runs as before, and the body runs on the
+slot-retaining protocol from the root's physical cache and capture, with the
+body's expression meaning from the family induction. The reflection direction
+at the root, the lifting of original traces of call-containing bodies and a
+one-call instance remain.
+
 The public connection of this subset starts at
 [CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
 Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
@@ -392,11 +407,11 @@ On the accepted-body route above, the next connected steps are:
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Extend the expression closure beyond its first subset over the same actual
   accepted expression compiler. Direct calls at expression roots are closed
-  over families of rows. Allow them inside other expressions and as arguments,
-  and derive their call authority (`Ports`) from the compiler receipt. To
-  connect family rows to the public root, its entry must start the body on the
-  slot-retaining protocol, and the statement lifting must lift original traces
-  of call-containing bodies by the same induction on the original semantics.
+  over families of rows, with call authority from a complete inventory. Allow
+  them inside other expressions and as arguments. At the public root the
+  preservation direction is connected. The reflection direction remains, as
+  does the lifting of original traces of call-containing bodies, by the same
+  induction on the original semantics, and a one-call instance.
   After direct calls come indirect and builtin calls,
   methods, indices, tuples, constructors, generalized reads, closures and
   coercions. Expressions of contextual closures need the relation between the

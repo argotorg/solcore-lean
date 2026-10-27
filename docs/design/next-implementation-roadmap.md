@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback and keyed-storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, and direct calls at expression roots closed by one size induction over a family of rows; nested calls, the public connection of call-containing bodies, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch`, nested memory and termination calls and the word operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero` connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -1562,9 +1562,13 @@ calls at expression roots, with first-subset arguments, extend the subset
 (`CellAwareInvocationAcceptedCallTrees`,
 `CellAwareInvocationAcceptedCallExpressions`). One strong induction on the
 grade closes every family of rows whose bodies call only admitted
-instantiations (`CellAwareInvocationAcceptedCallFamily`). Nested calls and the
-public connection of call-containing bodies remain. Contextual-view writes and
-matches are not yet closed.
+instantiations (`CellAwareInvocationAcceptedCallFamily`). A complete inventory
+supplies the call authority (`CellAwareInvocationAcceptedCallAuthority`). In the
+preservation direction, the unchanged public root runs a call-containing row on
+the slot-retaining protocol (`CellAwarePublicAcceptedCallRoot`). Root
+reflection, the lifting of original traces of call-containing bodies, a
+one-call instance and nested calls remain. Contextual-view writes and matches
+are not yet closed.
 
 For these named rows the subset is connected to the unchanged public root
 (`CellAwarePublicAcceptedNamedRoot` and `CellAwarePublicAcceptedNamedForward`).
