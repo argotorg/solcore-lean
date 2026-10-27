@@ -87,3 +87,11 @@ lean_exe rustHullForwardScenario where
 lean_exe semanticMappingTool where
   root := `Tests.SemanticMappingTool
   exeName := "semantic-mapping-tool"
+
+lean_exe semanticLedgerTool where
+  root := `Tests.SemanticLedgerTool
+  exeName := "semantic-ledger-tool"
+
+lean_exe rustHullLedgerScenario where
+  root := `Tests.RustHullLedgerScenarioRun
+  exeName := "rust-hull-ledger-scenario"

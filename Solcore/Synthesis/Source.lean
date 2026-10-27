@@ -44,6 +44,8 @@ import Solcore.Synthesis.Source.ForwardedCallEmitter
 import Solcore.Synthesis.Source.ForwardedCallCases
 import Solcore.Synthesis.Source.StorageMappingEmitter
 import Solcore.Synthesis.Source.StorageMappingCases
+import Solcore.Synthesis.Source.StorageLedgerEmitter
+import Solcore.Synthesis.Source.StorageLedgerCases
 import Solcore.Synthesis.Source.NestedCallEmitter
 import Solcore.Synthesis.Source.NestedCallCases
 

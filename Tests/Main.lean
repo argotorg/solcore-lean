@@ -2184,6 +2184,9 @@ import Solcore.Test.SourceStorageMappingCorpus
 import Solcore.Test.RustHullAssemblyCorrespondence
 import Solcore.Test.SourceStorageMeaning
 import Solcore.Test.RustHullYulBlockCorrespondence
+import Solcore.Test.SourceStorageLedgerEmitter
+import Solcore.Test.SourceStorageLedgerCases
+import Solcore.Test.SourceStorageLedgerCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4161,5 +4164,8 @@ def main : IO UInt32 := do
   Tests.RustHullAssemblyCorrespondence.run
   Tests.SourceStorageMeaning.testSourceStorageMeaning
   Tests.RustHullYulBlockCorrespondence.run
+  Tests.SourceStorageLedgerEmitter.testSourceStorageLedgerEmitter
+  Tests.SourceStorageLedgerCases.testSourceStorageLedgerCases
+  Tests.SourceStorageLedgerCorpus.testSourceStorageLedgerCorpus
   IO.println "solcore-lean tests passed"
   return 0
