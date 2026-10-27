@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop and generic emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic and two-slot storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance and a direct-call head given the callee's application meaning; discharging that input across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and one-call inline Yul blocks connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -655,10 +655,36 @@ entry from private definitions for each variant. A call resolves to the
 selector only because no helper is named `sc_select`, which a named copy of the
 aggregate helper-loop lemma states; the original lemma is unchanged. The step
 may allocate private cells, so the final store holds the cells of both step
-calls. The other emitters that render with the aggregate renderer (closures,
-comptime, modules, storage, storage rollback, keyed storage, dynamic arrays,
-dynamic bytes, event logs, call value, calls and forwarded value) are not
-covered; their texts use forms outside the source fragments.
+calls.
+
+`Storage.emit_source_meaning` covers the `stateful-storage` emitter, whose
+method reads two storage slots, stores the step's result for the input plus
+slot 0 in slot 0 and slot 1 plus one in slot 1, and returns the sum of both
+slots read back. It is the first theorem with a stateful source semantics. The
+storage grammar and meaning are separate from the others: `parseStorageSource`
+also reads the `sload, sstore` import line, `sstore(slot, value);`, a `let`
+whose call argument is one infix operation and an infix operation in the
+returned `uint256(...)`. `storageSourceCall` runs the method from a storage
+and returns its word with the final storage; `sload` reads the current storage
+and free functions see none. The Core reference is a host-runtime contract.
+The theorem therefore observes one top-level transaction, the runner of the
+storage differential oracle, on any world in which the contract is installed,
+with calldata whose word at offset 4 is the input. The source call starts from
+the installed account's storage. With enough fuel the transaction completes,
+and every completed run returns the ABI encoding of the source's word and
+commits an account whose storage equals the source's final storage at every
+slot. Because the starting storage is arbitrary, the statement applies to each
+transaction of a history. The proof builds the host-machine path through the
+wrapper's seven requests with the existing handled-path, big-step and
+read-after-write lemmas; no existing statement changed. The new assumptions
+are the parsing of the import selection, call statements and infix call
+arguments, the resolution of `sload` and `sstore` to the `std.opcodes`
+wrappers, their `SLOAD` and `SSTORE` meaning, and storage lowering and ABI
+dispatch. The other emitters that render with the aggregate renderer
+(closures, comptime, modules, storage rollback, keyed storage, storage
+mappings, dynamic arrays, dynamic bytes, event logs, call value, calls and
+forwarded value) are not covered; their texts use forms outside the source
+fragments.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -697,8 +723,15 @@ generated plans at eight or more inputs. All agree with Core, the regression
 plans also match hand-known Words and cell counts, and every Core run ends with
 Word cells only. Loop-free texts keep their `sourceCall` meaning, altered
 selectors lose or change their meaning, and two infix operations without
-parentheses are rejected. The full Lean build (10,064 jobs), registered
-tests and the semantic-kernel policy passed.
+parentheses are rejected. The registered `SourceStorageMeaning` test runs six
+regression plans, fourteen raw primitive steps and 23 generated scenarios
+through histories from empty and from two nonempty storages. Each of the 627
+transactions starts from the committed account's storage and agrees with the
+Core transaction on its word, its ABI bytes and the committed slots, and the
+regression plans also follow the two-slot recurrence. Altered stores and loads
+change the result, and a free function that reads storage has no meaning. The
+full Lean build (10,081 jobs), registered tests and the semantic-kernel
+policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

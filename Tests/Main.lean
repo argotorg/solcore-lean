@@ -2182,6 +2182,7 @@ import Solcore.Test.SourceStorageMappingEmitter
 import Solcore.Test.SourceStorageMappingCases
 import Solcore.Test.SourceStorageMappingCorpus
 import Solcore.Test.RustHullAssemblyCorrespondence
+import Solcore.Test.SourceStorageMeaning
 set_option autoImplicit false
 
 open Solcore
@@ -4157,5 +4158,6 @@ def main : IO UInt32 := do
   Tests.SourceStorageMappingCases.testSourceStorageMappingCases
   Tests.SourceStorageMappingCorpus.testSourceStorageMappingCorpus
   Tests.RustHullAssemblyCorrespondence.run
+  Tests.SourceStorageMeaning.testSourceStorageMeaning
   IO.println "solcore-lean tests passed"
   return 0

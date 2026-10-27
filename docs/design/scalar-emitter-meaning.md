@@ -24,13 +24,16 @@ semantic-kernel policy check now covers.
 | `CallGraphLoop.emit_source_meaning` | If `CallGraphLoop.emit plan = .ok emitted` (profile `runtime-call-graph-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `Loop.emit_source_meaning` | If `Loop.emit plan = .ok emitted` (profile `runtime-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `Generic.emit_source_meaning` | If `Generic.emit plan = .ok emitted` (profile `runtime-generics`), then for every Word input `x` there is `w` with `genericSourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
+| `Storage.emit_source_meaning` | If `Storage.emit plan = .ok emitted` (profile `stateful-storage`), then for every world in which `plan.contract` is installed at the invocation's target account `a` (`installed`) and every invocation whose calldata holds the Word `x` at offset 4, there are a Word `w` and a storage `s` with `storageSourceCall emitted.source (accountStorage a) "run" [x.val] = some (w.val, s)` and `CoreCommits plan.contract invocation installed w s`. |
 | `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
 | `CallGraphLoop.emit_preserves_meaning`, `Loop.emit_preserves_meaning` | The same results, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
 | `Generic.emit_preserves_meaning` | The same result, exposing the generic file `file` with `emitted.source = file.print`, `parseGenericSource emitted.source = some file` and `file.call "run" [x.val] = some w.val`. |
+| `Storage.emit_preserves_meaning` | The same result, exposing the storage file `file` with `emitted.source = file.print`, `parseStorageSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some (w.val, s)`. |
 | `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 | `parseLoopSource_print` | The same for loop files under the loop grammar. |
 | `parseGenericSource_print` | The same for generic files under the generic grammar, when every generic function has a type parameter and every method-body `match` is in the generic form that the parser produces. |
+| `parseStorageSource_print` | The same for storage files under the storage grammar. |
 | `loopSourceCall_of_parseSource` | On every text that `parseSource` accepts, `loopSourceCall fuel` is `sourceCall`, for every fuel. |
 | `genericSourceCall_print_loopFree` | On the printing of every loop-free file whose names are lexically valid and not reserved, `genericSourceCall` is `sourceCall`. |
 | `loopSourceCall_mono`, `loopSourceCall_unique` | More fuel keeps the result of a completed loop call, so all completed calls of a text return the same word. |
@@ -71,6 +74,27 @@ call.
 method under the generic meaning. The generic fragment has no loops or
 recursion, so it needs no fuel.
 
+`storageSourceCall source s` reads a text with the storage grammar below and
+calls the method from the storage `s`, which maps each slot to a word. It
+returns the method's word and its final storage. The storage reference is not
+a closed program. `StorageContract.canonicalProgram` is a host-runtime contract
+that reads its input word from calldata at offset 4 and reads and writes
+storage through host requests. Its theorem therefore observes one top-level
+transaction: `TopLevelExecution.run`, the runner of the storage differential
+oracle (`StorageExecution.observe`), on a world in which the contract is
+installed. `CoreCommits contract invocation installed w s` states two things.
+With enough fuel, the transaction completes. Every completed run returns the
+ABI encoding of `w`, with Core result `w`, and commits a world whose target
+account holds `s` at every slot (`StorageAgrees`). The source call starts from
+the installed account's storage, read slot by slot (`accountStorage`). The
+theorem holds for every world in which the contract is installed, whatever the
+account's storage, so it applies to each transaction of a history in turn. The
+next transaction starts from the committed account, whose storage agrees with
+the source storage at every slot. It assumes calldata whose word at offset 4 is
+the input. The canonical calldata, the `run(uint256)` selector followed by the
+ABI word, has this property, as the executable checks confirm; the theorem says
+nothing about other calldata.
+
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -86,7 +110,10 @@ The source side ([Syntax](../../Solcore/Synthesis/Source/ScalarMeaning/Syntax.le
 and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean), and,
 for generic programs,
 [GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/GenericSemantics.lean)
-and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean))
+and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean),
+and, for storage programs,
+[StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/StorageSemantics.lean)
+and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean))
 does not import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
@@ -229,6 +256,35 @@ every ordinary function and the method may call them. A loop-free file is a
 generic file without generic functions and with the same printing; when its
 names are valid and not reserved, its generic meaning is its `sourceCall`
 meaning.
+
+Storage. [StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/StorageSemantics.lean)
+and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean)
+extend the loop-free fragment for the two-slot storage wrapper, again as a
+separate grammar and meaning. A storage file imports `std` and `std.dispatch`
+and then `import {sload, sstore, opcode as alias, ...} from std.opcodes;`, in
+which the aliases are optional. Its method body may also contain
+`sstore(slot, value);` and `let x: T = f(a op b);`, and the method returns
+`uint256(e)` or `uint256(a op b)`. Here `a op b` is one infix operation without
+parentheses, and a store's slot and value may each be an expression or such an
+operation. As in the pinned frontend, an import selects names in braces, each
+with an optional alias (`crates/parser/src/parse/imports.rs`), a call followed
+by `;` is an expression statement (`crates/parser/src/parse/stmt.rs`), and an
+infix operation needs no parentheses (`crates/parser/src/parse/expr_pat.rs`).
+`parseStorageSource` lexes as `parseSource` does and recognizes the extensions
+by their first tokens. A store starts with `sstore (`, which no loop-free
+statement starts with. A call `let` goes on with an infix operator where the
+argument of a loop-free call ends with `)` or `,`. Storage maps each slot to a
+word, and a method runs from a storage and returns its word with the final
+storage. Loop-free statements, call `let`s and the returned value evaluate in
+the file's call context extended by `sload`, which returns the current
+storage's word at the slot its one word argument names. A call `let` and an
+infix operand mean their parenthesized forms. `sstore` evaluates its slot and
+then its value, both of which must be words, and replaces that slot's word;
+later loads see the new word. Free functions see no storage. They are declared
+in the file's context without `sload`, so a free function that calls `sload`
+has no meaning in this fragment, and no expression can call `sstore`. The
+pinned `std.opcodes` wrappers pass their `word` arguments to the EVM `SLOAD`
+and `SSTORE` instructions (`std/opcodes.sol`).
 
 ## Connection to the actual emitter
 
@@ -428,13 +484,42 @@ the store the first left, so the final store holds the cells of both calls. As
 for the aggregate emitter, the file imports the fourteen aliases exactly when
 a helper or the entry uses one.
 
+[StorageEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/StorageEmitter.lean)
+connects the actual `Storage.emit` (profile `stateful-storage`). Its helpers
+come from the aggregate emitter's helper loop, and its entry is printed by
+`AggregateRenderer.render` as `sc_step`. The import line is the printing of
+`sload`, `sstore` and, when a rendered body uses one, the fourteen aliases. The
+method reads slots 0 and 1, stores `sc_step(input + slot 0)` in slot 0 and slot
+1 plus one in slot 1, reads both slots back and returns their sum
+(`storageMethod_run`). The Core wrapper of `StorageContract.canonicalProgram`
+is private to its module, so the proof restates it (`storageExpression`) and
+shows that the program body reduces to the restatement. The restated wrapper
+runs on the host-aware Core machine, which suspends at every host request.
+`storage_handled` builds the run through its seven requests as a
+`HostDriver.HandledSteps` path of the transaction storage handler: the input
+word at offset 4, two reads, two writes and two reads back. The pure parts of
+the path come from Core's big-step evaluation
+(`Evaluates.toStepsWithContinuation`). The step closure is built in the host
+environment. The helper loop and the aggregate render lemmas admit that
+environment as the tail of the helper closures (`dag_evaluates`,
+`aggregateLoop_spec`), so no renaming is needed. `HostDriver.run_done_complete`
+turns the path into the raw run of every fuel at least its length.
+`topLevel_run_completed` shows that a raw run that returns a word completes the
+top-level transaction with the `returnWord` decoding and commits the working
+world. The handler's read-after-write laws give the returned word and the
+committed account, whose storage agrees with the source storage at every slot
+(`storageAgrees_writes`). By `TopLevelExecution.resumeWithFuel_run`, every
+completed run has the same result.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
 [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean) proves
 the same for loop files (`parseLoopSource_print`), and
 [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean)
-for generic files (`parseGenericSource_print`). The meaning is therefore a
+for generic files (`parseGenericSource_print`), and
+[StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean)
+for storage files (`parseStorageSource_print`). The meaning is therefore a
 function of the emitted `String`, not of an internal printer argument.
 
 ## Assumptions outside the theorem
@@ -502,6 +587,25 @@ above. Under assumption 4, the specialization of `sc_select` at each
 instantiation, its lowering and its execution keep that dynamic meaning, so
 each call returns `left` when `flag` holds and `right` otherwise.
 
+The storage emitter adds storage to these assumptions. Under assumption 1, the
+pinned parser reads `import {sload, sstore, ...} from std.opcodes;` as the
+selection of those names (`crates/parser/src/parse/imports.rs`), and
+`sstore(0, sc_computed);` as an expression statement
+(`crates/parser/src/parse/stmt.rs`). It reads the infix operations in
+`sc_step(sc_input + sc_old0)`, `sstore(1, sc_old1 + 1)` and
+`uint256(sc_final0 + sc_final1)` as their parenthesized forms
+(`crates/parser/src/parse/expr_pat.rs`). Under assumption 2, `sload` and
+`sstore` resolve to the `std.opcodes` wrappers, and the frontend accepts the
+call statement and discards its `()` result. Under assumption 3, the wrappers
+mean the EVM `SLOAD` and `SSTORE` of the contract's own storage, as described
+above. Under assumption 4, the lowering of the wrappers' assembly blocks, code
+generation and EVM execution keep that meaning. At the start of a call, the
+deployed contract's storage is the committed storage that the Core reference
+reads, and a returning transaction commits its writes. `std.dispatch` decodes
+the word at offset 4 of the calldata as the `uint256` argument, which is the
+theorem's calldata hypothesis. Gas, including the costs and refunds of
+`SSTORE`, is not modeled.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -509,23 +613,30 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and eleven
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and twelve
 actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
 named helpers (`runtime-functions`), raw primitive aliases
 (`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
 locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`), aggregate
 call graphs (`runtime-aggregate-call-graphs`), call-graph loops
-(`runtime-call-graph-loops`), aggregate loops (`runtime-loops`) and generic
-selection (`runtime-generics`). They do not yet cover the other emitters that
-render with `AggregateRenderer` (closures, comptime, modules, storage, storage
-rollback, keyed storage, dynamic arrays, dynamic bytes, event logs, call
-value, contract calls and forwarded value). Their texts use forms outside
-these fragments, such as storage access, external calls, lambdas and
+(`runtime-call-graph-loops`), aggregate loops (`runtime-loops`), generic
+selection (`runtime-generics`) and two-slot storage (`stateful-storage`). They
+do not yet cover the other emitters that render with `AggregateRenderer`
+(closures, comptime, modules, storage rollback, keyed storage, storage
+mappings, dynamic arrays, dynamic bytes, event logs, call value, contract calls
+and forwarded value). Their texts use forms outside these fragments, such as
+reverts, keyed or hashed storage access, external calls, lambdas and
 multi-file module bundles. The loop grammar admits loops only at the top level
 of a method body, with a loop-free body and an infix condition. The generic
 grammar has no loops, admits early returns only as guards on a local in
 generic function bodies, and admits unparenthesized infix operations only as
-the whole value of a method-body `let` or assignment.
+the whole value of a method-body `let` or assignment. The storage grammar
+admits `sload` only in the method and `sstore` only as a statement of the
+method body. It admits unparenthesized infix operations only as the argument of
+a call `let`, as a store operand and in the returned `uint256(...)`. Its
+theorem covers one transaction of an installed contract with calldata whose
+word at offset 4 is the input. Deployment, other accounts, balances, logs,
+reverts and gas are outside it.
 
 ## Executable checks
 
@@ -654,3 +765,28 @@ returning the other candidate and a selector without its guard change the
 result, a `word` flag parameter and a guard on a `word` have no meaning, two
 infix operations without parentheses are rejected, and applying the step to
 the input plus two in place of one changes the result.
+
+[SourceStorageMeaning](../../Solcore/Test/SourceStorageMeaning.lean) is
+registered as well. It runs actual `Storage.emit` output through
+`storageSourceCall` transaction by transaction. Each call starts from the
+storage of the account that the committed world holds and is compared with the
+original Core contract's `TopLevelExecution.run`: the returned word, its ABI
+bytes and the committed slots 0, 1, 2, 3, `2^255` and `2^256 - 1`. Every history
+runs from empty storage and from two nonempty storages, one of which makes slot
+1 wrap to zero. Each transaction must also be out of fuel at fuel 0, and the
+canonical calldata must carry its input word at offset 4. The six regression
+plans of the storage emitter's test (increment, a step that allocates a private
+cell, a mixed step, identity, constant and a raw division) run seven inputs or
+three. Their words and slots must also follow the two-slot recurrence with the
+step's hand-known function. The fourteen opcodes applied to a helper result
+run four inputs. Twenty-three generated scenarios from 24 seeds at the 256 and
+512-node budgets run their generated inputs and two more. In all, 627
+transactions agree with Core. Each text must reparse under the storage
+grammar, print back to itself, import the aliases exactly when a step body uses
+one and declare `sc_step` after one function per helper, and `parseSource`
+must reject it. An argument of `2^256` has no meaning, and two loop-free
+aggregate texts are outside the storage grammar. Storing to another slot,
+loading another slot and dropping the second store change the result. A
+parenthesized step argument keeps it. Two infix operations without parentheses
+and an import line without `sstore` are rejected. A free function that reads
+storage and a stored Boolean have no meaning.
