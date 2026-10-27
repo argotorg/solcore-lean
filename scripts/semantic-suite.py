@@ -162,8 +162,8 @@ def node_budget(args, profile):
 def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
     attempts = profile_attempts(args, profile)
-    if args.backend == "yul" and family != "pure":
-        raise ValueError("Yul is restricted to pure profiles")
+    if args.backend == "yul" and family == "call":
+        raise ValueError("Yul is restricted to the pure and storage-family profiles")
     storage_tools = {"stateful-keyed-storage": args.keyed_case_tool, "stateful-dynamic-array": args.array_case_tool,
                      "stateful-logs": args.log_case_tool, "stateful-call-value": args.value_case_tool,
                      "stateful-bytes": args.bytes_case_tool, "stateful-mapping": args.mapping_case_tool,
@@ -436,7 +436,8 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirty-three for Sonatina, the sixteen pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirty-three for Sonatina, the sixteen pure profiles for Yul, "
+                             "which also runs the fifteen storage-family profiles when they are selected")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -471,7 +472,7 @@ def parse_args(argv=None):
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; forwarded only to pure Yul campaigns")
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; forwarded only to Yul campaigns")
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     args = parser.parse_args(argv)
@@ -481,8 +482,8 @@ def parse_args(argv=None):
         parser.error("--cases, --functions, --nodes and --nodes-scale apply only to random mode; fixed corpora must remain complete")
     args.cases = args.cases if args.cases is not None else 4
     if args.backend == "yul":
-        if args.profile and any(PROFILES[profile][1] != "pure" for profile in args.profile):
-            parser.error("--backend yul supports only pure profiles; stateful profiles must use Sonatina")
+        if args.profile and any(PROFILES[profile][1] == "call" for profile in args.profile):
+            parser.error("--backend yul supports the pure and storage-family profiles; call profiles must use Sonatina")
         args.profile = args.profile or [profile for profile, (_, family, _) in PROFILES.items() if family == "pure"]
     else:
         args.profile = args.profile or list(PROFILES)

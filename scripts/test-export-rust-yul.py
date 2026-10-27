@@ -38,20 +38,31 @@ def hull_output(contract=CONTRACT):
 
 
 class YulProtocolTests(unittest.TestCase):
-    def test_all_sixteen_pure_contracts_are_admitted_but_stateful_wrappers_are_not(self):
-        self.assertEqual(len(exporter.CONTRACTS), 16)
-        self.assertEqual(len(set(exporter.CONTRACTS)), 16)
+    def test_pure_and_storage_family_wrappers_are_admitted_but_call_wrappers_are_not(self):
+        self.assertEqual(len(exporter.PURE_CONTRACTS), 16)
+        self.assertEqual(len(exporter.STORAGE_CONTRACTS), 12)
+        self.assertEqual(len(set(exporter.CONTRACTS)), 28)
+        self.assertEqual(exporter.CONTRACTS, exporter.PURE_CONTRACTS + exporter.STORAGE_CONTRACTS)
         self.assertIn("SynthesizedRecursion", exporter.CONTRACTS)
         self.assertIn("SynthesizedNestedLoops", exporter.CONTRACTS)
         self.assertIn("SynthesizedPrimitives", exporter.CONTRACTS)
         self.assertIn("SynthesizedCallGraphs", exporter.CONTRACTS)
         self.assertIn("SynthesizedCallGraphLoops", exporter.CONTRACTS)
         self.assertIn("SynthesizedAggregateCallGraphs", exporter.CONTRACTS)
-        # The allow-list is derived from the case profiles, not maintained separately.
-        self.assertEqual(exporter.CONTRACTS, tuple(exporter.common.CASE_CONTRACTS.values()))
+        # Both allow-lists are derived from the case profiles, not maintained separately.
+        self.assertEqual(exporter.PURE_CONTRACTS, tuple(exporter.common.CASE_CONTRACTS.values()))
+        self.assertEqual(len(exporter.storage.PROFILES), 15)
+        self.assertEqual(set(exporter.STORAGE_CONTRACTS), {value["contract"] for value in exporter.storage.PROFILES.values()})
+        # The three malformed-calldata profiles reuse the dynamic-array, nested-array and long-bytes wrappers.
+        self.assertEqual({value["contract"] for name, value in exporter.storage.PROFILES.items() if "malformed" in name},
+                         {"SynthesizedDynamicArray", "SynthesizedNestedArray", "SynthesizedLongBytes"})
+        for contract in ("SynthesizedStorage", "SynthesizedRollback", "SynthesizedLedger", "SynthesizedMethods"):
+            self.assertIn(contract, exporter.STORAGE_CONTRACTS)
         for contract in exporter.CONTRACTS:
             exporter.validate_contract(contract)
-        for contract in ("Root", "SynthesizedStorage", "SynthesizedRollback", "SynthesizedCaller", "SynthesizedCallee", None):
+        # The call profiles' parent and child contracts are not admitted.
+        for contract in ("Root", "SynthesizedCaller", "SynthesizedCallee", "SynthesizedForwarder", "SynthesizedRecipient",
+                         "SynthesizedStorageDeploy", "synthesizedstorage", None):
             with self.assertRaises(ValueError):
                 exporter.validate_contract(contract)
         # Near misses of the new wrapper name are not admitted either.
@@ -83,9 +94,45 @@ class YulProtocolTests(unittest.TestCase):
                     exporter.validate_hull(hull_output(contract), other)
         arguments = ["policy.sol", "--output", "policy.json", "--solc", "/policy/solc"]
         self.assertEqual(exporter.parse_args([*arguments, "--contract", contract]).contract, contract)
-        for rejected in ("SynthesizedStorage", "SynthesizedAggregateCallGraph"):
+        for rejected in ("SynthesizedCaller", "SynthesizedAggregateCallGraph"):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 exporter.parse_args([*arguments, "--contract", rejected])
+
+    def test_storage_family_wrappers_keep_one_creation_runtime_pair_and_record_their_scope(self):
+        arguments = ["policy.sol", "--output", "policy.json", "--solc", "/policy/solc"]
+        for contract in exporter.STORAGE_CONTRACTS:
+            with self.subTest(contract=contract):
+                artifact = exporter.artifact_from_output(solc_output(contract), contract)
+                self.assertEqual((artifact["selectedObject"], artifact["runtimeObject"]), (contract + "Deploy", contract))
+                exporter.validate_artifact(artifact, contract)
+                exporter.validate_hull(hull_output(contract), contract)
+                self.assertEqual(exporter.parse_args([*arguments, "--contract", contract]).contract, contract)
+                self.assertEqual(exporter.scope(contract), "generated two-object wrapper shape; caller validates canonical "
+                                 "storage-family case; EVM bytes only; no Hull linker map")
+                # A nested child object, a second runtime object or a second deployment object is still refused.
+                nested = solc_output(contract)
+                nested["sources"]["checked.yul"]["ast"]["subObjects"][0]["subObjects"] = [
+                    {"nodeType": "YulObject", "name": "Child", "subObjects": []}]
+                second = solc_output(contract)
+                second["sources"]["checked.yul"]["ast"]["subObjects"].append({"nodeType": "YulObject", "name": "Other", "subObjects": []})
+                for output in (nested, second):
+                    with self.assertRaises(ValueError):
+                        exporter.artifact_from_output(output, contract)
+                two = hull_output(contract)
+                two["program"]["objects"].append({"name": "SynthesizedCalleeDeploy", "inners": [{"name": "SynthesizedCallee", "inners": []}]})
+                inner = hull_output(contract)
+                inner["program"]["objects"][0]["inners"][0]["inners"] = [{"name": "Child", "inners": []}]
+                for document in (two, inner):
+                    with self.assertRaises(ValueError):
+                        exporter.validate_hull(document, contract)
+                linked = solc_output(contract)
+                linked["contracts"]["checked.yul"][contract + "Deploy"]["evm"]["deployedBytecode"]["immutableReferences"] = {"1": []}
+                with self.assertRaises(ValueError):
+                    exporter.artifact_from_output(linked, contract)
+        self.assertEqual(exporter.scope(CONTRACT), "generated two-object wrapper shape; caller validates canonical pure case; "
+                         "EVM bytes only; no Hull linker map")
+        with self.assertRaises(ValueError):
+            exporter.scope("SynthesizedCaller")
 
     def test_only_pinned_release_accepts_linux_and_macos_suffixes(self):
         for suffix in ('', '.Linux.g++', '.Darwin.appleclang'):

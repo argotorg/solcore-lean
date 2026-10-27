@@ -452,55 +452,72 @@ class BackendTests(unittest.TestCase):
         del expected["backend"]
         self.assertTrue(campaign.same_failure(expected, legacy))
         self.assertFalse(campaign.same_failure(expected, optimized))
-        for invalid in (None, "yul"):
+        for invalid in (None, "solc-yul"):
             with self.subTest(backend=invalid), self.assertRaises(ValueError):
                 campaign.analyze({**report(value), "backend": invalid}, value)
 
     def test_each_candidate_uses_selected_backend_and_retains_it_in_report(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            instance = campaign.Campaign(options(temporary, backend="sonatina-o2"))
-            seen = []
-            def execute(args, raw):
-                seen.append((args.backend, raw["backend"]))
-                value = json.loads(args.case.read_text())
-                raw.update(report(value))
-            with patch.object(campaign.adapter, "execute", side_effect=execute):
-                for value in (case(3), case(1)):
-                    folder, raw, analysis = instance.execute_case(value)
-                    self.assertEqual(raw["backend"], "sonatina-o2")
-                    self.assertEqual(analysis["backend"], "sonatina-o2")
-                    self.assertEqual(campaign.common.read_json(folder / "report.json")["backend"], "sonatina-o2")
-            self.assertEqual(seen, [("sonatina-o2", "sonatina-o2")] * 2)
-            self.assertEqual(instance.summary["backend"], "sonatina-o2")
-            self.assertEqual(instance.summary["configuration"]["backend"], "sonatina-o2")
+        for backend in ("sonatina-o2", "yul"):
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as temporary:
+                instance = campaign.Campaign(options(temporary, backend=backend, solc=Path(temporary) / "solc"))
+                seen = []
+                def execute(args, raw):
+                    seen.append((args.backend, raw["backend"], args.solc))
+                    value = json.loads(args.case.read_text())
+                    raw.update(report(value))
+                with patch.object(campaign.adapter, "execute", side_effect=execute):
+                    for value in (case(3), case(1)):
+                        folder, raw, analysis = instance.execute_case(value)
+                        self.assertEqual(raw["backend"], backend)
+                        self.assertEqual(analysis["backend"], backend)
+                        self.assertEqual(campaign.common.read_json(folder / "report.json")["backend"], backend)
+                # Every candidate receives the same compiler; only Yul uses it.
+                self.assertEqual(seen, [(backend, backend, (Path(temporary) / "solc").resolve())] * 2)
+                self.assertEqual(instance.summary["backend"], backend)
+                self.assertEqual(instance.summary["configuration"]["backend"], backend)
+                self.assertEqual(instance.summary["tools"].get("solc"), str((Path(temporary) / "solc").resolve()) if backend == "yul" else None)
 
-    def test_yul_campaign_cli_is_rejected_before_output(self):
+    def test_yul_campaign_cli_forwards_its_compiler(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "campaign"
-            arguments = ["campaign", "--output", str(output), "--backend", "yul", "--cases", "1"]
+            def run(instance):
+                self.assertEqual((instance.backend, instance.args.solc, instance.solc), ("yul", (Path(temporary) / "solc").resolve(),
+                                                                                         (Path(temporary) / "solc").resolve()))
+                instance.summary["status"] = "complete"
+                instance.summary["counts"].update(generated=1, executed=1, completed=1, matched=1)
+            arguments = ["campaign", "--output", str(output), "--backend", "yul", "--solc", str(Path(temporary) / "solc"), "--cases", "1"]
+            with patch.object(sys, "argv", arguments), patch.object(campaign.Campaign, "run", run), redirect_stdout(io.StringIO()):
+                self.assertEqual(campaign.main(), 0)
+            summary = campaign.common.read_json(output / "summary.json")
+            self.assertEqual((summary["backend"], summary["configuration"]["backend"]), ("yul", "yul"))
+            self.assertEqual(summary["tools"]["solc"], str((Path(temporary) / "solc").resolve()))
+
+    def test_unknown_backend_campaign_is_rejected_before_output_or_work_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "campaign"
+            arguments = ["campaign", "--output", str(output), "--backend", "solc-yul", "--cases", "1"]
             with patch.object(sys, "argv", arguments), patch.object(campaign.Campaign, "run") as run, \
                     redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
                 campaign.main()
             self.assertEqual(caught.exception.code, 2)
             run.assert_not_called()
             self.assertFalse(output.exists())
-
-    def test_yul_programmatic_campaign_is_rejected_before_work_directory(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
-                campaign.Campaign(options(temporary, backend="yul"))
+            with self.assertRaisesRegex(ValueError, "unsupported backend"):
+                campaign.Campaign(options(temporary, backend="solc-yul"))
             self.assertFalse((Path(temporary) / ".work").exists())
 
-    def test_yul_cannot_become_a_stateful_reduction_identity(self):
+    def test_yul_is_part_of_a_stateful_reduction_identity(self):
         value = case()
         ordinary = campaign.analyze(report(value), value, "rustEvm", "tx-1")
-        expected = campaign.fingerprint(ordinary)
-        with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
-            campaign.fingerprint({**ordinary, "backend": "yul"})
-        with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
-            campaign.same_failure({**expected, "backend": "yul"}, ordinary)
-        with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
-            campaign.same_failure(expected, {**ordinary, "backend": "yul"})
+        yul = campaign.analyze({**report(value), "backend": "yul"}, value, "rustEvm", "tx-1")
+        self.assertEqual(campaign.fingerprint(yul)["backend"], "yul")
+        expected = campaign.fingerprint(yul)
+        self.assertTrue(campaign.same_failure(expected, yul))
+        # A Yul finding is not reproduced by the same difference on Sonatina, nor the reverse.
+        self.assertFalse(campaign.same_failure(expected, ordinary))
+        self.assertFalse(campaign.same_failure(campaign.fingerprint(ordinary), yul))
+        with self.assertRaisesRegex(ValueError, "unsupported saved backend"):
+            campaign.fingerprint({**ordinary, "backend": "solc-yul"})
 
     def test_campaign_cli_selects_backend(self):
         with tempfile.TemporaryDirectory() as temporary:

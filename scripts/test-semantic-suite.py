@@ -463,18 +463,44 @@ class SuiteTests(unittest.TestCase):
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
-    def test_explicit_yul_stateful_profiles_are_errors_instead_of_silent_omissions(self):
-        for profile in ('stateful-storage', 'stateful-storage-rollback', 'stateful-calls', 'stateful-keyed-storage',
-                        'stateful-dynamic-array', 'stateful-logs', 'stateful-call-value', 'stateful-bytes',
-                        'stateful-forwarded-value', 'stateful-mapping', 'stateful-ledger', 'stateful-long-bytes',
-                        'stateful-nested-array', 'stateful-malformed-calldata', 'stateful-malformed-nested-array',
-                        'stateful-malformed-bytes', 'stateful-methods'):
+    def test_explicit_yul_call_profiles_are_errors_instead_of_silent_omissions(self):
+        for profile in ('stateful-calls', 'stateful-forwarded-value'):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.args('--backend', 'yul', '--profile', 'closed-g0', '--profile', profile)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.args('--backend', 'yul', '--profile', 'stateful-storage', '--profile', profile)
             with self.assertRaises(ValueError):
                 suite.command(self.args('--backend', 'yul'), profile, self.directory / profile, 30, 64 * 1024**2)
+        self.assertEqual([profile for profile, (_, family, _) in suite.PROFILES.items() if family == 'call'],
+                         ['stateful-calls', 'stateful-forwarded-value'])
         selected = self.args('--backend', 'yul', '--profile', 'runtime-modules')
         self.assertEqual(selected.profile, ['runtime-modules'])
+
+    def test_yul_runs_the_selected_storage_family_profiles_with_its_compiler(self):
+        storage = [profile for profile, (_, family, _) in suite.PROFILES.items() if family == 'storage']
+        self.assertEqual(len(storage), 15)
+        # The default Yul selection stays the pure profiles; storage-family profiles run when selected.
+        self.assertTrue(set(storage).isdisjoint(self.args('--backend', 'yul').profile))
+        arguments = [argument for profile in storage for argument in ('--profile', profile)]
+        for mode in ('fixed', 'random'):
+            args = self.args('--mode', mode, '--backend', 'yul', '--solc', '/chosen/pinned-solc', *arguments)
+            self.assertEqual(args.profile, storage)
+            sonatina = self.args('--mode', mode, *arguments)
+            for profile in storage:
+                command = suite.command(args, profile, self.directory / mode / profile, 30, 64 * 1024**2)
+                self.assertEqual(Path(command[1]).name, 'semantic-storage-campaign.py')
+                self.assertEqual(command[command.index('--backend') + 1], 'yul')
+                self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
+                # Apart from the backend and its compiler, the Sonatina command is unchanged.
+                other = suite.command(sonatina, profile, self.directory / mode / profile, 30, 64 * 1024**2)
+                position = command.index('--solc')
+                self.assertEqual(command[:position] + command[position + 2:],
+                                 [value if value != 'sonatina-o0' else 'yul' for value in other])
+        summary = completed('stateful-methods', 2)
+        summary.update(backend='yul')
+        summary['configuration']['backend'] = 'yul'
+        self.assertEqual(suite.classify(summary, 'stateful-methods', 2, 0, backend='yul'), 'passed')
+        self.assertEqual(suite.classify(summary, 'stateful-methods', 2, 0), 'adapter-error')
 
     def test_backend_completion_cannot_switch_or_relabel_a_legacy_run(self):
         legacy = completed()

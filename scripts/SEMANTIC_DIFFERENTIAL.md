@@ -4136,6 +4136,69 @@ This observation does not cover accounts other than the deployed contracts,
 transient storage, gas, nonces or code. Agreement is test evidence, not a
 preservation proof.
 
+## Compare storage-family contracts on Yul
+
+The fifteen storage-family profiles also run with `--backend yul --solc PATH`.
+They compile as the pure profiles do: the checked Rust driver's Yul goes
+through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The two
+call profiles stay on Sonatina, because each of their sources compiles a parent
+and a child contract. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the observation
+boundary; this section describes how to run it.
+
+### Definitions
+
+- **Paths:** original Core, the Yul EVM, and imported Hull linked with
+  Sonatina O0 images. `pathBackends` records them as `original-core`, `yul` and
+  `sonatina-o0`. Hull is an additional reference, not Yul-linked execution.
+- **Compilation:** each scenario compiles its own Yul after native replay and
+  the O0 Hull and image exports. The EVM deploys the creation bytes, checks the
+  installed runtime against the same compilation's deployed bytes, and mines
+  every transaction.
+- **Observations:** the same as on Sonatina:
+  - completion and the returned or reverted bytes, with std's error selectors
+    under the selector rule;
+  - the declared slots and their containment;
+  - the whole committed storage;
+  - ordered logs;
+  - call value and the contract's balance;
+  - the ledger's senders.
+- **No layout dependence:** the wrappers' runtime code reads no code, and
+  their creation code reads only its own runtime object. Gas, layout, code
+  size and optimizer internals are not compared.
+- **Admission:** `export-rust-yul.py` admits the sixteen pure and the twelve
+  storage-family wrappers, taken from the adapters' profile tables; the three
+  malformed profiles reuse wrappers. Each must compile to one creation object
+  with one runtime sub-object and no link or immutable references.
+
+### Running and validation
+
+```sh
+python3 scripts/semantic-storage-campaign.py --backend yul \
+  --corpus scripts/semantic-ledger-corpus.json \
+  --output .upstream/semantic-ledger-yul --seconds 900
+python3 scripts/semantic-suite.py --mode fixed --backend yul \
+  --profile stateful-storage --profile stateful-methods \
+  --output .upstream/semantic-storage-yul-fixed
+```
+
+Reports keep `backend` `yul` and the same Yul evidence as the pure profiles:
+- the checked Yul;
+- the exact solc request and response;
+- the compiler's digest and full version;
+- the main and the Yul Hull artifacts.
+
+Exact replay inherits the backend and rejects a conflicting `--backend`. It
+fails if the exporter, the transport or solc's digest or version changed.
+`--solc` may name the same executable at another path. Reductions and their
+archives keep the backend; a Yul finding is a different identity from the same
+difference on Sonatina.
+
+The suite runs a storage-family profile on Yul when `--profile` selects it.
+Its default Yul selection stays the sixteen pure profiles. `--backend yul`
+with `stateful-calls` or `stateful-forwarded-value` is refused before
+execution.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

@@ -734,7 +734,7 @@ class CancellationTests(unittest.TestCase):
 class BackendTests(unittest.TestCase):
     """Backend selection policy only; mocked execution is not an EVM result."""
 
-    def invoke(self, directory, *, backend=None, saved=...):
+    def invoke(self, directory, *, backend=None, saved=..., solc=None):
         source = directory / "case.json"
         source.write_text(json.dumps(case()))
         output = directory / "run"
@@ -746,24 +746,28 @@ class BackendTests(unittest.TestCase):
             arguments += ["--case", str(source)]
         if backend is not None:
             arguments += ["--backend", backend]
+        if solc is not None:
+            arguments += ["--solc", str(solc)]
         captured = []
         def executed(args, report):
             captured.append((args.backend, report["backend"]))
+            self.solc = args.solc
             report["comparison"] = {"category": "matched", "pairs": {}}
         with patch.object(sys, "argv", arguments), patch.object(runner, "execute", side_effect=executed), redirect_stdout(io.StringIO()):
             code = runner.main()
         return code, captured, json.loads((output / "report.json").read_text())
 
     def test_default_and_explicit_backends_are_recorded(self):
-        for explicit, expected in ((None, "sonatina-o0"), ("sonatina-o2", "sonatina-o2")):
+        for explicit, expected in ((None, "sonatina-o0"), ("sonatina-o2", "sonatina-o2"), ("yul", "yul")):
             with self.subTest(backend=explicit), tempfile.TemporaryDirectory() as temporary:
                 code, captured, report = self.invoke(Path(temporary), backend=explicit)
                 self.assertEqual(code, 0)
                 self.assertEqual(captured, [(expected, expected)])
                 self.assertEqual(report["backend"], expected)
+                self.assertEqual(report["pathBackends"], runner.common.path_backends(expected))
 
-    def test_exact_replay_inherits_o2_and_legacy_o0(self):
-        for saved, expected in (({}, "sonatina-o0"), ({"backend": "sonatina-o2"}, "sonatina-o2")):
+    def test_exact_replay_inherits_o2_yul_and_legacy_o0(self):
+        for saved, expected in (({}, "sonatina-o0"), ({"backend": "sonatina-o2"}, "sonatina-o2"), ({"backend": "yul"}, "yul")):
             with self.subTest(saved=saved), tempfile.TemporaryDirectory() as temporary:
                 _, captured, report = self.invoke(Path(temporary), saved=saved)
                 self.assertEqual(captured, [(expected, expected)])
@@ -771,7 +775,8 @@ class BackendTests(unittest.TestCase):
 
     def test_exact_replay_backend_change_or_null_is_rejected_before_execution(self):
         for saved, explicit in (({}, "sonatina-o2"), ({"backend": "sonatina-o2"}, "sonatina-o0"),
-                                ({"backend": None}, None), ({"backend": "yul"}, None)):
+                                ({"backend": None}, None), ({"backend": "yul"}, "sonatina-o0"), ({}, "yul"),
+                                ({"backend": "sonatina-o2"}, "yul"), ({"backend": "solc-yul"}, None)):
             with self.subTest(saved=saved, explicit=explicit), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
                 with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
@@ -779,24 +784,28 @@ class BackendTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, 2)
                 self.assertFalse((directory / "run").exists())
 
-    def test_yul_cli_is_rejected_before_output_or_execution(self):
+    def test_yul_cli_records_its_compiler_path_and_separated_path_backends(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
-                self.invoke(directory, backend="yul")
-            self.assertEqual(caught.exception.code, 2)
-            self.assertFalse((directory / "run").exists())
+            code, captured, report = self.invoke(directory, backend="yul", solc=directory / "pinned" / ".." / "solc")
+            self.assertEqual((code, captured), (0, [("yul", "yul")]))
+            self.assertEqual(self.solc, (directory / "solc").resolve())
+            self.assertEqual(report["pathBackends"], {"directCore": "original-core", "importedHull": "sonatina-o0", "rustEvm": "yul"})
 
-    def test_yul_programmatic_execution_and_saved_archive_have_no_fallback(self):
-        args = SimpleNamespace(replay=None, backend="yul")
+    def test_unknown_backends_have_no_fallback_and_yul_archives_use_the_shared_check(self):
+        args = SimpleNamespace(replay=None, backend="solc-yul")
         with patch.object(runner.common, "Runner") as execution:
-            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+            with self.assertRaisesRegex(ValueError, "unsupported backend"):
                 runner.execute(args, {})
             execution.assert_not_called()
         with patch.object(runner.common, "verify_archive") as archive:
-            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
-                runner.verify_archive(Path("unused"), {"schema": runner.REPORT_SCHEMA, "backend": "yul"})
+            with self.assertRaisesRegex(ValueError, "unsupported saved backend"):
+                runner.verify_archive(Path("unused"), {"schema": runner.REPORT_SCHEMA, "backend": "solc-yul"})
             archive.assert_not_called()
+            saved = {"schema": runner.REPORT_SCHEMA, "backend": "yul", "pathBackends": runner.common.path_backends("yul")}
+            runner.verify_archive(Path("unused"), saved)
+            # The shared check validates images, provenance and the Yul evidence of the pure report form.
+            archive.assert_called_once_with(Path("unused"), {**saved, "schema": runner.common.REPORT_SCHEMA})
 
     def test_invalid_replay_report_and_budgets_fail_before_output(self):
         for saved in (None, [], ["report"], True, "report", {"budgets": None}, {"budgets": []}):
@@ -835,6 +844,97 @@ class BackendTests(unittest.TestCase):
             self.assertNotIn("--optimization", hull_command)
             self.assertEqual(validate.call_args.kwargs["backend"], "sonatina-o2")
             self.assertEqual(report["backend"], "sonatina-o2")
+            self.assertEqual(report["pathBackends"], runner.common.path_backends("sonatina-o2"))
+            self.assertNotIn("solc", report["tools"])
+
+    def test_yul_links_hull_to_o0_images_and_deploys_the_transported_yul_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source, output = directory / "case.json", directory / "run"
+            source.write_text(json.dumps(case())); output.mkdir()
+            (output / "images.json").write_text("{}")
+            args = SimpleNamespace(case=source, replay=None, backend="yul", solc=directory / "solc", output=output,
+                artifact_limit=1 << 20, case_tool=Path("unused-case"), core_runner=Path("unused-core"),
+                anvil=Path("unused-anvil"), direct_fuel=1000, timeout=1, gas=1000,
+                upstream=directory / "upstream", target_dir=directory / "target")
+            fake = Mock()
+            fake.identity.return_value = {"sha256": "0" * 64, "version": "Version: policy"}
+            fake.process.return_value = {"returncode": 0, "stdout": "revision"}
+            commands, sent = [], []
+            def checked(_runner, stage, command, *_limits):
+                commands.append((stage, command))
+                return {"stdout": json.dumps(case()) if stage == "direct-core-replay" else ""}
+            class Rpc:
+                def call(self, method, params):
+                    if method == "eth_accounts":
+                        return ["0x" + "11" * 20]
+                    sent.append((method, params[0]))
+                    raise ValueError("test stops at deployment")
+            @contextmanager
+            def anvil(*_arguments, **_options):
+                yield Rpc()
+            report = {"processes": [], "histories": {}}
+            images = {"sonatina": True}
+            with patch.object(runner.common, "Runner", return_value=fake), \
+                 patch.object(runner.common, "checked_process", side_effect=checked), \
+                 patch.object(runner.common, "validate_export", return_value={"hull": {}, "images": {}}) as validate, \
+                 patch.object(runner.common, "read_json", side_effect=lambda path, *_: images if path.name == "images.json" else json.loads(path.read_text())), \
+                 patch.object(runner.common, "image_bytes", side_effect=lambda _images, path: b"sonatina-" + path[-1].encode()), \
+                 patch.object(runner.common, "yul_transport", return_value=(b"yul-init", b"yul-runtime")) as transport, \
+                 patch.object(runner.common, "anvil", anvil):
+                with self.assertRaisesRegex(ValueError, "test stops at deployment"):
+                    runner.execute(args, report)
+            image_command = next(command for stage, command in commands if stage == "rust-code-images")
+            self.assertEqual(image_command[image_command.index("--optimization") + 1], "O0")
+            self.assertEqual(validate.call_args.kwargs["backend"], "sonatina-o0")
+            self.assertEqual(report["pathBackends"], {"directCore": "original-core", "importedHull": "sonatina-o0", "rustEvm": "yul"})
+            self.assertEqual(report["tools"]["solc"], fake.identity.return_value)
+            self.assertEqual(report["tools"]["yulExporterSha256"], runner.common.file_digest(ROOT / "scripts/export-rust-yul.py"))
+            self.assertEqual(report["tools"]["yulTransportSha256"], runner.common.file_digest(ROOT / "scripts/semantic-yul.py"))
+            self.assertEqual(transport.call_args.args, ("execute", args, fake, case(), output / "case.sol", output / "hull.json", report, None))
+            # The EVM deploys the creation bytes of the Yul compilation, never the Sonatina image.
+            self.assertEqual(sent, [("eth_sendTransaction", {"from": "0x" + "11" * 20, "data": "0x" + b"yul-init".hex(),
+                                                              "value": "0x0", "gas": hex(1000)})])
+
+    def test_yul_replay_rejects_compiler_or_transport_drift_before_export(self):
+        tools = {"runnerSha256": runner.common.file_digest(ROOT / "scripts/semantic-storage-differential.py"),
+                 "sharedRunnerSha256": runner.common.file_digest(ROOT / "scripts/semantic-differential.py"),
+                 "leanToolchain": (ROOT / "lean-toolchain").read_text().strip(),
+                 "exporters": {name: runner.common.file_digest(ROOT / "scripts" / name) for name in
+                     ("export-rust-hull.py", "export-rust-code-image.py", "rust-hull-export.rs", "rust-code-image-export.rs")},
+                 "yulExporterSha256": runner.common.file_digest(ROOT / "scripts/export-rust-yul.py"),
+                 "yulTransportSha256": runner.common.file_digest(ROOT / "scripts/semantic-yul.py"),
+                 "solc": {"sha256": "0" * 64, "version": "Version: policy"},
+                 **{key: {"sha256": "0" * 64} for key in ("caseTool", "coreRunner", "anvil")}}
+        for change, detail in ((("yulExporterSha256", "1" * 64), "yulExporterSha256"), (("yulTransportSha256", "1" * 64), "yulTransportSha256"),
+                               (("solc", {"sha256": "1" * 64, "version": "Version: policy"}), "solc sha256"),
+                               (("solc", {"sha256": "0" * 64, "version": "Version: other"}), "solc version"), (None, None)):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                replay, output = directory / "saved", directory / "run"
+                replay.mkdir(); output.mkdir()
+                (replay / "case.json").write_text(json.dumps(case()))
+                saved = {"schema": runner.REPORT_SCHEMA, "backend": "yul", "tools": copy.deepcopy(tools)}
+                if change is not None:
+                    saved["tools"][change[0]] = change[1]
+                (replay / "report.json").write_text(json.dumps(saved))
+                args = SimpleNamespace(case=None, replay=replay, backend=None, solc=directory / "solc", output=output,
+                    artifact_limit=1 << 20, case_tool=Path("unused-case"), core_runner=Path("unused-core"),
+                    anvil=Path("unused-anvil"), direct_fuel=1000, timeout=1)
+                fake = Mock()
+                fake.identity.side_effect = lambda path, version=False: (
+                    {"sha256": "0" * 64, **({"version": "Version: policy"} if version else {})})
+                fake.process.return_value = {"returncode": 0, "stdout": "revision"}
+                with patch.object(runner, "verify_archive"), patch.object(runner.common, "Runner", return_value=fake), \
+                     patch.object(runner.common, "checked_process", side_effect=ValueError("replay reached the native tools")):
+                    if detail is None:
+                        with self.assertRaisesRegex(ValueError, "replay reached the native tools"):
+                            runner.execute(args, {"processes": [], "histories": {}})
+                    else:
+                        with self.assertRaises(runner.Finding) as caught:
+                            runner.execute(args, {"processes": [], "histories": {}})
+                        self.assertEqual((caught.exception.category, caught.exception.stage), ("adapter-error", "replay"))
+                        self.assertIn(detail, caught.exception.detail)
 
 
 MAX_WORD = 2**256 - 1

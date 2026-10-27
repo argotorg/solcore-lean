@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Validate and execute the separate Yul EVM export boundary.
 
-The caller first validates a canonical pure case with the native replay tool.
+The caller first validates a canonical pure or storage-family case with the
+native replay tool; this module validates the case again with its adapter.
 Imported Hull continues to use its independently exported Sonatina O0 images.
 This module provides no execution oracle, source purity proof or Yul linker map.
 Its dynamically loaded common.Finding class is local to this module. The calling
@@ -37,11 +38,24 @@ EVIDENCE = {"hull": "yul.hull.json", "hullProvenance": "yul.hull.json.provenance
 FILES = (ARTIFACT, PROVENANCE, *EVIDENCE.values())
 MAIN_FILES = ("hull.json", "hull.json.provenance.json")
 PATH_BACKENDS = {"directCore": "original-core", "importedHull": "sonatina-o0", "rustEvm": "yul"}
+STORAGE_SCHEMAS = frozenset(value["caseSchema"] for value in exporter.storage.PROFILES.values())
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def validate_case(case):
+    """A storage-family case is validated by the storage adapter, keeping its
+    structured failures; every other case by the pure adapter."""
+    if isinstance(case, dict) and case.get("schema") in STORAGE_SCHEMAS:
+        try:
+            exporter.storage.validate_case(case)
+        except exporter.storage.common.Finding as error:
+            raise common.Finding(error.category, error.stage, error.detail) from error
+    else:
+        common.validate_case(case)
 
 
 def valid_hash(value):
@@ -132,10 +146,10 @@ def validate_tool_record(record, tools):
 
 
 def used_yul_execution(report):
-    require(isinstance(report.get("rawObservations", {}), dict) and isinstance(report.get("observations", {}), dict),
-            "malformed saved execution observations")
+    require(isinstance(report.get("rawObservations", {}), dict) and isinstance(report.get("observations", {}), dict) and
+            isinstance(report.get("histories", {}), dict), "malformed saved execution observations")
     return ("rustEvm" in report.get("rawObservations", {}) or "rustEvm" in report.get("observations", {}) or
-            "evmDeployment" in report or "executionContext" in report)
+            "rustEvm" in report.get("histories", {}) or "evmDeployment" in report or "executionContext" in report)
 
 
 def validate_archive(directory, report, limit):
@@ -154,7 +168,7 @@ def validate_archive(directory, report, limit):
         require(valid_hash(inventory.get(name)) and inventory[name] == common.file_digest(path),
                 "archive omits or changes Yul evidence: " + name)
     case = common.read_json(directory / "case.json", limit)
-    common.validate_case(case)
+    validate_case(case)
     provenance = report.get("exportProvenance", {})
     require(isinstance(provenance, dict), "missing main Hull export provenance")
     record = validate_export(directory, case["contract"]["name"], provenance.get("hull"), limit)
@@ -164,8 +178,8 @@ def validate_archive(directory, report, limit):
 
 
 def execute(args, runner, case, source, hull_path, report, previous=None):
-    """Export the replay-checked pure case; the caller executes the returned bytes."""
-    common.validate_case(case)
+    """Export the replay-checked case; the caller executes the returned bytes."""
+    validate_case(case)
     require(report.get("backend") == "yul" and report.get("pathBackends") == PATH_BACKENDS,
             "Yul EVM export requires explicitly separated execution paths")
     contract = case["contract"]["name"]
