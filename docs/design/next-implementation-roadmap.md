@@ -221,10 +221,12 @@ Yul-linked Hull execution. Do not infer a linker map by searching byte strings,
 mislabel Sonatina images as Yul, or weaken the code-image invariant.
 
 Admit only the generated creation/runtime wrapper pair with actual runtime
-output and no unresolved libraries or immutable references. Stateful Yul,
-code-observing programs and arbitrary nested objects remain excluded until
-their layout and observation boundary are connected explicitly. This scope
-does not require bytecode-layout or gas equality between the three paths.
+output and no unresolved libraries or immutable references. The fifteen
+storage-family profiles are admitted under the stateful Yul boundary below.
+The two call profiles, other code-observing programs and arbitrary nested
+objects remain excluded until their layout and observation boundary are
+connected explicitly. This scope does not require bytecode-layout or gas
+equality between the three paths.
 
 Before adapter integration, eight real Yul EVM probes matched freshly replayed
 original Core: addition, an input-dependent high-bit branch, ordered local
@@ -260,6 +262,90 @@ all 276 cases across the same ten profiles, with zero mismatches, errors,
 rejections, inconclusive results, missing coverage or unexecuted cases. It took
 2,248.763 seconds and retained 20,489,590 bytes locally. This completes the
 initial local Yul gate; no hosted-run result is claimed.
+
+### Stateful Yul boundary
+
+These definitions were fixed before execution. The fifteen storage-family
+profiles also run on Yul:
+- `stateful-storage` and `stateful-storage-rollback`;
+- `stateful-keyed-storage`, `stateful-dynamic-array` and `stateful-logs`;
+- `stateful-call-value`, `stateful-bytes` and `stateful-long-bytes`;
+- `stateful-mapping`, `stateful-ledger` and `stateful-nested-array`;
+- `stateful-malformed-calldata`, `stateful-malformed-nested-array` and
+  `stateful-malformed-bytes`;
+- `stateful-methods`.
+
+The call profiles `stateful-calls` and `stateful-forwarded-value` stay on
+Sonatina. Each of their sources compiles two contracts, a parent and the child
+it calls, so it needs two creation/runtime pairs; the Yul export admits one.
+
+A feasibility probe preceded these definitions. For the first four scenarios
+of each fixed corpus, it compiled the checked Rust driver's Yul with the
+pinned solc. That is 60 scenarios over twelve wrappers; the three malformed
+profiles reuse the dynamic-array, nested-array and 256-byte `bytes` wrappers.
+The probe then ran the unchanged storage adapter with the EVM deploying those
+bytes:
+- Every compilation was one creation object with one runtime sub-object. It
+  had no data sections, other objects, or link or immutable references, and at
+  most 1,489 creation and 1,443 runtime bytes. The checked Hull had one
+  deployment object with one leaf runtime object.
+- The runtime code reads no code. `codecopy`, `codesize`, `dataoffset` and
+  `datasize` occur only in the creation code, which copies its own runtime
+  object. Neither part uses `create`, a call, `extcode*`, `selfdestruct`, a
+  balance read, `gas` or transient storage.
+- Every deployment's prestate diff reported no storage, so the EVM contract
+  starts empty as on the other paths.
+- All 60 scenarios and their 173 transactions matched on all three paths. They
+  include 23 rows compared by std's error selector, 9 logs and two nonzero
+  deployment values.
+
+Nothing shared changed: not the runtime, the Hull importer, the declared-slot
+runners or a proof.
+
+**Paths:**
+- Original generated Core.
+- The Yul EVM. It deploys the creation bytes of one solc compilation, checks the
+  installed runtime against that compilation's deployed bytes, and mines every
+  transaction.
+- Imported Hull linked with separately validated Sonatina O0 images. As for pure
+  Yul, it is an additional reference, not Yul-linked Hull execution.
+
+Reports record `backend` `yul` and the `pathBackends` of pure Yul:
+`original-core`, `sonatina-o0` and `yul`.
+
+**Observation boundary.** The Yul EVM path supplies the same observations as
+Sonatina, from actual mined transactions and receipt-block state:
+- each transaction's completion and its returned or reverted bytes, with std's
+  error selectors under the unchanged selector rule;
+- the declared committed slots and, where declared, the absence of nonzero
+  undeclared slots;
+- the contract's whole committed storage after deployment and after every
+  transaction, from prestate diffs and receipt-block rereads;
+- ordered committed logs, from receipts and the chain's log list;
+- for `stateful-call-value`, the call value and the contract's committed
+  balance;
+- for `stateful-ledger`, the fixed senders.
+
+None of these depends on code layout: the runtime reads no code, and the
+creation code reads only its own runtime object. Gas, bytecode layout, code
+size and optimizer internals are not compared.
+
+**Admission.** `export-rust-yul.py` admits the sixteen pure wrappers and the
+twelve storage-family wrappers, each list taken from its adapter's profile
+table. The shape checks above are unchanged. Wrapper names and shape do not
+establish scope: the storage adapter validates and natively replays the case
+before the export, as the pure adapter does.
+
+**Selection.** The storage adapter and campaign accept `--backend yul --solc
+PATH`. Exact replay inherits the backend and checks the Yul evidence as for pure
+Yul. The suite runs the storage-family profiles on Yul when they are selected;
+its default Yul selection stays the sixteen pure profiles. A call profile with
+`--backend yul` is refused before execution.
+
+**Validation before results:**
+- fixed Yul matrices of the fifteen storage-family corpora;
+- random Yul runs of each profile with sixteen scenarios of eight transactions,
+  G0 revision three with swarm masks, at the suite's default node budgets.
 
 ## 3. Missing runtime operation mappings
 
