@@ -142,6 +142,24 @@ class CaseProfileTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.validate_loop_plan(invalid)
 
+    def test_nested_loop_plan_requires_bounded_masks_a_bound_form_and_original_step_program(self):
+        plan = {"schema": "solcore-lean.nested-loop-plan.v1", "outerMask": 3, "innerMask": 3,
+                "innerBound": "accumulator", "stepProgram": {}}
+        for outer in (0, 1, 3):
+            for inner in (0, 1, 3):
+                for bound in ("input", "counter", "accumulator"):
+                    runner.validate_nested_loop_plan({**plan, "outerMask": outer, "innerMask": inner, "innerBound": bound})
+        for key in ("outerMask", "innerMask"):
+            for mask in (True, -1, 2, 7, '3', 3.0):
+                with self.assertRaises(ValueError):
+                    runner.validate_nested_loop_plan({**plan, key: mask})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.loop-plan.v1"}, {**plan, "stepProgram": None},
+                        {**plan, "innerBound": "step"}, {**plan, "innerBound": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_nested_loop_plan(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.NESTED_LOOP_CASE_SCHEMA], "runtime-nested-loops")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.NESTED_LOOP_CASE_SCHEMA], "SynthesizedNestedLoops")
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -497,7 +515,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 14)
+        self.assertEqual(len(runner.CASE_PROFILES), 15)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

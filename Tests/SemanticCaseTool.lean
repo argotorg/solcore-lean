@@ -2,6 +2,7 @@ import Solcore.Synthesis.Source.FunctionCases
 import Solcore.Synthesis.Source.MutationCases
 import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopCases
+import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureCases
 import Solcore.Synthesis.Source.ComptimeCases
@@ -81,6 +82,9 @@ private def generator (command : String) : Option Generator :=
   | "loop-generate" => some ⟨true, true, false,
       fun seed nodes count attempts fuel revision inputs _ =>
         Loop.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "nested-loop-generate" => some ⟨true, true, false,
+      fun seed nodes count attempts fuel revision inputs _ =>
+        NestedLoop.generateCases seed nodes count attempts fuel revision inputs⟩
   | "generic-generate" => some ⟨true, true, false,
       fun seed nodes count attempts fuel revision inputs _ =>
         Generic.generateCases seed nodes count attempts fuel revision inputs⟩
@@ -188,6 +192,11 @@ private def execute (args : List String) : IO Json := do
       let input ← get (Input.inputWord input)
       get (Generic.emitCase function input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
+  | "nested-loop-emit" :: file :: input :: rest =>
+      let plan ← get (NestedLoop.checkedPlan (← readJson file))
+      let input ← get (Input.inputWord input)
+      get (NestedLoop.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
   | "loop-emit" :: file :: input :: rest =>
       let function ← get (Loop.checkedPlan (← readJson file))
       let input ← get (Input.inputWord input)
@@ -218,6 +227,9 @@ private def execute (args : List String) : IO Json := do
       else if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
         let checked ← get (Generic.caseProgram json)
         return Generic.observe checked.plan checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some NestedLoop.caseSchema then
+        let checked ← get (NestedLoop.caseProgram json)
+        return NestedLoop.observe checked.plan checked.input fuel
       else if (json.getObjValAs? String "schema").toOption == some Loop.caseSchema then
         let checked ← get (Loop.caseProgram json)
         return Loop.observe checked.plan checked.input fuel
@@ -259,6 +271,8 @@ private def execute (args : List String) : IO Json := do
         Closure.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
         Generic.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some NestedLoop.caseSchema then
+        NestedLoop.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Loop.caseSchema then
         Loop.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Aggregate.caseSchema then
@@ -289,6 +303,8 @@ private def execute (args : List String) : IO Json := do
         Closure.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Generic.caseSchema then
         Generic.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some NestedLoop.caseSchema then
+        NestedLoop.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Loop.caseSchema then
         Loop.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Aggregate.caseSchema then
@@ -307,7 +323,7 @@ private def execute (args : List String) : IO Json := do
           AggregateCallGraph.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, call-graph-loop-generate or generic-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, call-graph-loop-generate or generic-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

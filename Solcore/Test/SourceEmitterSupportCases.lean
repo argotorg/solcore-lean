@@ -2,6 +2,7 @@ import Solcore.Synthesis.Source.FunctionCases
 import Solcore.Synthesis.Source.MutationCases
 import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopCases
+import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureCases
 import Solcore.Synthesis.Source.ComptimeCases
@@ -79,6 +80,10 @@ private def profiles : List Profile := [
   ⟨"runtime-loops", Loop.featureSupport, fun feature => do
     let plan ← BoundedLoop.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) 3
     return emits (Loop.emit plan)⟩,
+  ⟨"runtime-nested-loops", NestedLoop.featureSupport, fun feature => do
+    let plan ← Solcore.Synthesis.Core.NestedLoop.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) 3 3
+      .accumulator
+    return emits (NestedLoop.emit plan)⟩,
   ⟨"runtime-generics", Generic.featureSupport, fun feature => do
     let plan ← Solcore.Synthesis.Core.Generic.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) .word
     return emits (Generic.emit plan)⟩,

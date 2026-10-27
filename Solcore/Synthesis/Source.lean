@@ -20,6 +20,8 @@ import Solcore.Synthesis.Source.AggregateEmitter
 import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopEmitter
 import Solcore.Synthesis.Source.LoopCases
+import Solcore.Synthesis.Source.NestedLoopEmitter
+import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.GenericEmitter
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureEmitter

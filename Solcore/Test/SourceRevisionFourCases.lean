@@ -2,6 +2,7 @@ import Solcore.Synthesis.Source.FunctionCases
 import Solcore.Synthesis.Source.MutationCases
 import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopCases
+import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureCases
 import Solcore.Synthesis.Source.ComptimeCases
@@ -79,6 +80,10 @@ private def profiles : List Profile := [
       Loop.generateCases seed nodes count attempts fuel revision,
     replay := Loop.replayCase, shrink := Loop.shrinkCases, nodes := 384, count := 6,
     versions := g0Version, support := Loop.featureSupport},
+  {name := "runtime-nested-loops", generate := fun seed nodes count attempts fuel revision =>
+      NestedLoop.generateCases seed nodes count attempts fuel revision,
+    replay := NestedLoop.replayCase, shrink := NestedLoop.shrinkCases, nodes := 384, count := 6,
+    versions := g0Version, support := NestedLoop.featureSupport},
   {name := "runtime-generics", generate := fun seed nodes count attempts fuel revision =>
       Generic.generateCases seed nodes count attempts fuel revision,
     replay := Generic.replayCase, shrink := Generic.shrinkCases, nodes := 384, count := 4,
@@ -204,7 +209,7 @@ private def statisticsChecks : IO Unit := do
     s!"runtime-word: revision four has {← distinctSources four} sources against {← distinctSources three}"
 
 def testSourceRevisionFourCases : IO Unit := do
-  ensure (profiles.length == 11) "a G0-based profile is missing from the revision-four checks"
+  ensure (profiles.length == 12) "a G0-based profile is missing from the revision-four checks"
   for profile in profiles do
     checkProfile profile
   statisticsChecks

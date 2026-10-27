@@ -84,6 +84,21 @@ def loop_policy_case(mask=7, value=7, helpers=2):
     return case
 
 
+def nested_loop_policy_case(outer=3, inner=3, bound="accumulator", value=3, iterations=(3, 1, 2), helpers=2):
+    """Nested-loop envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = loop_policy_case(7, value, helpers)
+    step = case.pop('loopPlan')['stepProgram']
+    case.update(schema=campaign.m2.NESTED_LOOP_CASE_SCHEMA,
+        nestedLoopPlan={'schema': 'solcore-lean.nested-loop-plan.v1', 'outerMask': outer, 'innerMask': inner,
+                        'innerBound': bound, 'stepProgram': step})
+    case['contract'].update(name='SynthesizedNestedLoops', deployPath=['SynthesizedNestedLoopsDeploy'],
+        runtimePath=['SynthesizedNestedLoopsDeploy', 'SynthesizedNestedLoops'])
+    case['provenance']['origin'].update(kind='nested-loop-generated', outerMask=outer, innerMask=inner, innerBound=bound)
+    del case['provenance']['origin']['mask']
+    case['provenance']['iterations'] = None if iterations is None else list(iterations)
+    return case
+
+
 def generic_policy_case(variant="word", value=1, helpers=2):
     """Generic transport/coverage fixture; not a simulated compiler result."""
     case = loop_policy_case(7, value, helpers)
@@ -884,6 +899,120 @@ class LoopCoverageTests(unittest.TestCase):
             summary = json.loads((output / 'summary.json').read_text())
             self.assertEqual(summary['status'], 'coverage-incomplete')
             self.assertEqual(summary['loopCoverage']['missingIterations'], [0, 3])
+
+
+class NestedLoopCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-nested-loops'
+
+    def manifest(self):
+        case = nested_loop_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.NESTED_LOOP_INPUTS),
+            'requiredHelperCounts': [1, 2, 3],
+            'nestedLoopRequirements': {'shapes': ['3x3:accumulator'], 'outerIterations': [3],
+                                       'innerIterations': [1, 2, 3], 'totalIterations': [6]},
+            'cases': [{'id': 'nested', 'input': '3', 'nestedLoopPlan': case['nestedLoopPlan'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('nested-loop-generate', 'nested-loop-emit', 'nested-loop-generated'))
+        self.assertIn(self.PROFILE, campaign.G0_PROFILES)
+        self.assertIn(self.PROFILE, campaign.HELPER_PROFILES)
+        self.assertNotIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), ('0', '1', '2', '3', str(2**256 - 1), str(2**255)))
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 10)
+        self.assertEqual(len(campaign.NESTED_LOOP_SHAPES), 12)
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.NESTED_LOOP_CASE_SCHEMA)
+
+    def test_random_campaign_requests_the_native_generator(self):
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['nested-loop-generate', '1', '384', '1', '256', '1000000', campaign.RANDOM_G0_VERSION,
+                                 campaign.RANDOM_INPUT_SELECTION]])
+        self.assertIsNone(summary['configuration']['acceptance'])
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        entry = value['cases'][0]
+        base = value['nestedLoopRequirements']
+        for invalid in (None, {}, {**base, 'shapes': ['2x3:input']}, {**base, 'shapes': ['3x3:other']},
+                        {**base, 'outerIterations': [4]}, {**base, 'innerIterations': [True]},
+                        {**base, 'totalIterations': [10]}, {**base, 'totalIterations': [1, 1]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'nestedLoopRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'loopPlan': entry['nestedLoopPlan']},
+                        {'id': 'nested', 'input': '3', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        for plan in ({**entry['nestedLoopPlan'], 'outerMask': 2}, {**entry['nestedLoopPlan'], 'innerBound': 'step'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'nestedLoopPlan': plan}]})
+        with self.assertRaises(ValueError):
+            campaign.nested_loop_requirements({'profile': 'runtime-loops', 'nestedLoopRequirements': base})
+        for input_value in campaign.NESTED_LOOP_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 384}, 'expectedFeatures': []}]})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '7',
+                'generation': {'seed': '0', 'maxProgramNodes': 384}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_plan_and_recorded_iterations(self):
+        case = nested_loop_policy_case()
+        self.assertEqual(campaign.specified_nested_loops(case), {'Shapes': {'3x3:accumulator'},
+            'OuterIterations': {3}, 'InnerIterations': {1, 2, 3}, 'TotalIterations': {6}})
+        self.assertEqual(campaign.helper_counts(case), {2})
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+        counter = nested_loop_policy_case(3, 1, 'counter', 3, (1, 0, 1))
+        self.assertEqual(campaign.specified_nested_loops(counter)['TotalIterations'], {2})
+        unknown = nested_loop_policy_case(iterations=None)
+        self.assertEqual(campaign.specified_nested_loops(unknown)['OuterIterations'], set())
+        for wrong in (nested_loop_policy_case(iterations=(3, 1)), nested_loop_policy_case(iterations=(4, 0, 0)),
+                      nested_loop_policy_case(3, 1, 'counter', 3, (1, 1, 1)),
+                      nested_loop_policy_case(3, 3, 'input', 3, (3, 3, 2))):
+            with self.assertRaises(ValueError):
+                campaign.specified_nested_loops(wrong)
+        self.assertEqual(campaign.specified_nested_loops(loop_policy_case())['Shapes'], set())
+
+    def test_nonmatching_outcomes_cannot_satisfy_nested_loop_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [nested_loop_policy_case(), nested_loop_policy_case(1, 3, 'input', 1, (1,))]
+            instance.summary['nestedLoopCoverage'].update(requiredShapes=['1x3:input', '3x3:accumulator'],
+                                                          requiredTotalIterations=[1, 6])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['nestedLoopPlan']['innerBound']
+                folder.mkdir()
+                report = matched()
+                if case['nestedLoopPlan']['innerBound'] == 'input':
+                    report['comparison'] = {'category': 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['nestedLoopCoverage']
+            self.assertEqual(coverage['generatedShapes'], ['1x3:input', '3x3:accumulator'])
+            self.assertEqual(coverage['matchedShapes'], ['3x3:accumulator'])
+            self.assertEqual(coverage['missingShapes'], ['1x3:input'])
+            self.assertEqual(coverage['missingTotalIterations'], [1])
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts/semantic-nested-loop-corpus.json').read_text()))
+        requirements = manifest['nestedLoopRequirements']
+        self.assertEqual(sorted(requirements['shapes']), sorted(campaign.NESTED_LOOP_SHAPES))
+        self.assertEqual((requirements['outerIterations'], requirements['innerIterations'], requirements['totalIterations']),
+                         ([0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3, 4, 6, 9]))
+        self.assertEqual(manifest['requiredInputs'], list(campaign.NESTED_LOOP_INPUTS))
+        self.assertEqual(len(manifest['cases']), 72)
+        loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
+        self.assertTrue(set(loops['requiredFeatures']) < set(manifest['requiredFeatures']))
 
 
 class GenericCoverageTests(unittest.TestCase):
@@ -2266,7 +2395,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 14)
+        self.assertEqual(len(campaign.PROFILES), 15)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -3045,7 +3174,7 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
     """--functions asks random runtime-input campaigns for whole functions; counts stay per case."""
     SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
               'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
-              'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-generics': 8, 'runtime-closures': 8,
+              'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
@@ -3199,7 +3328,7 @@ class AcceptanceTests(CommandLine, unittest.TestCase):
     def test_identity_filter_profiles(self):
         self.assertEqual(campaign.RANDOM_ACCEPTANCE, self.FILTER)
         self.assertEqual(set(campaign.RUNTIME_INPUT_PROFILES) - set(campaign.IDENTITY_FILTER_PROFILES),
-                         {'runtime-loops', 'runtime-call-graph-loops', 'runtime-generics'})
+                         {'runtime-loops', 'runtime-call-graph-loops', 'runtime-nested-loops', 'runtime-generics'})
         self.assertTrue(set(campaign.IDENTITY_FILTER_PROFILES) <= set(campaign.RUNTIME_INPUT_PROFILES))
         case = function_case(1)
         self.assertEqual(campaign.acceptance('runtime-functions', case), self.PROFILE)
