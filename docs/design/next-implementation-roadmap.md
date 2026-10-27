@@ -780,6 +780,63 @@ replays, refuses a saved identity, composes with seeded inputs and leaves
 reductions unfiltered; 666 generation runs and 3,996 replays, observations and
 reductions without the filter matched the previous build byte for byte.
 
+**Nested bounded loops.** The first new program shape is
+`runtime-nested-loops`: a bounded source `while` loop whose body runs a second
+bounded `while` loop around the step. The existing profiles, their corpora,
+emitters and emitter proofs stay unchanged; this emitter has no proof yet. The
+definitions were fixed before execution:
+
+- Step: an aggregate step DAG of one to three helpers, generated with the
+  current G0 revision exactly as for `runtime-loops`, so every G0 feature
+  renders and revision four equals revision three.
+- Source loop forms. With input `x`, outer mask `O` and inner mask `I`, the
+  wrapper sets `acc = x` and runs `x & O` outer iterations. Each outer
+  iteration `i` (counting from zero) first sets the inner bound and resets
+  the inner counter, then runs `acc = sc_step(acc)` once per inner iteration.
+  The inner bound reads one of three things, fixed per plan:
+  - `input`: `x & I`, the same in every outer iteration;
+  - `counter`: `(i + 1) & I`, which varies with the outer counter;
+  - `accumulator`: `acc & I`, read from the value the previous outer
+    iterations computed.
+  Both counters, the inner bound and the accumulator are declared before the
+  outer loop and assigned inside it. The function returns `acc`.
+- Bounds: plans admit masks 0, 1 and 3 for both loops; generation draws both
+  from 1 and 3. A call therefore runs at most three outer iterations, at most
+  three inner iterations in each and at most nine step calls in total. The
+  original Core reference is finite: it unrolls three or fewer outer ordinal
+  guards, each containing its inner bound and three or fewer inner ordinal
+  guards, over one Word cell, and has no counter cell. It is checked by the
+  full Core checker and the 512-node case limit.
+- Shapes: the twelve combinations of outer mask, inner mask and inner-bound
+  form, drawn from a SplitMix64 hash of the case seed so that consecutive
+  seeds vary in shape independently of the step's helper count and template.
+- Boundary inputs: 0, 1, 2, 3, `2^256 - 1` and `2^255`, which give zero to
+  three outer iterations; random campaigns add the four seeded inputs.
+- Exclusions, in order: a node budget too small for the shape or above 512, the
+  step's own generation exclusions, a step whose four boundary inputs return
+  the same Word, fuel exhaustion on a boundary input (an inconclusive resource
+  exclusion), and a function that returns every boundary input unchanged
+  (`every boundary input returned itself`, code `boundary-identity`). A
+  boundary input without a step call returns itself, so the last rule asks
+  some input that calls the step to change; the profile needs no acceptance
+  filter.
+- Specified iterations: each case records the inner trip count of every
+  outer iteration it runs. For the `accumulator` form they follow from the
+  step's original Core results, evaluated call by call; the record is a
+  specification from the plan, the input and Core, not a measured trace.
+  Replay recomputes it.
+- Reductions may remove step syntax through the aggregate step reductions,
+  which keep the helper count and binding inventory; lower either mask to a
+  smaller admitted mask, removing whole canonical guards; replace the
+  `counter` or `accumulator` inner bound by the `input` bound; and move the
+  input to a boundary input. Every candidate is sealed by the full checker and
+  must be strictly smaller than its parent in nodes, then literal weight.
+- Fixed corpus coverage: every aggregate step AST feature that the
+  `runtime-loops` corpus requires, one to three helpers, all four aggregate
+  templates, all six boundary inputs, all twelve generation shapes, outer
+  iteration counts 0 to 3, inner trip counts 0 to 3 within a run outer
+  iteration, and total step calls 0, 1, 2, 3, 4, 6 and 9.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
