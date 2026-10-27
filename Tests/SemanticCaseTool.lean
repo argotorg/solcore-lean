@@ -14,6 +14,7 @@ import Solcore.Synthesis.Source.AggregateCallGraphCases
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false
 open Lean Solcore.Synthesis.Source
+open Solcore.Synthesis.Core (Seed GeneratorRevision)
 
 private def get {α : Type} (result : Except String α) : IO α :=
   match result with
@@ -40,7 +41,55 @@ private def fuelValue (rest : List String) : IO Nat := do
   | [fuel] => natural "execution fuel" fuel 10000000
   | _ => throw (IO.userError "too many arguments")
 
+/-- The G0-based generation commands. -/
+private def g0Generator (command : String) :
+    Option (Seed → Nat → Nat → Nat → Nat → GeneratorRevision → Json) :=
+  match command with
+  | "generate" => some fun seed nodes count attempts fuel revision =>
+      generateCases seed nodes count attempts fuel revision
+  | "input-generate" => some fun seed nodes count attempts fuel revision =>
+      Input.generateCases seed nodes count attempts fuel revision
+  | "primitive-generate" => some fun seed nodes count attempts fuel revision =>
+      Primitive.generateCases seed nodes count attempts fuel revision
+  | "function-generate" => some fun seed nodes count attempts fuel revision =>
+      Function.generateCases seed nodes count attempts fuel revision
+  | "mutation-generate" => some fun seed nodes count attempts fuel revision =>
+      Mutation.generateCases seed nodes count attempts fuel revision
+  | "aggregate-generate" => some fun seed nodes count attempts fuel revision =>
+      Aggregate.generateCases seed nodes count attempts fuel revision
+  | "loop-generate" => some fun seed nodes count attempts fuel revision =>
+      Loop.generateCases seed nodes count attempts fuel revision
+  | "generic-generate" => some fun seed nodes count attempts fuel revision =>
+      Generic.generateCases seed nodes count attempts fuel revision
+  | "closure-generate" => some fun seed nodes count attempts fuel revision =>
+      Closure.generateCases seed nodes count attempts fuel revision
+  | "comptime-generate" => some fun seed nodes count attempts fuel revision =>
+      Comptime.generateCases seed nodes count attempts fuel revision
+  | "module-generate" => some fun seed nodes count attempts fuel revision =>
+      Modules.generateCases seed nodes count attempts fuel revision
+  | _ => none
+
+/-- A trailing generator version selects the G0 revision; without one, the
+commands keep `v1`, which the fixed corpora pin. -/
+private def g0Revision : List String → IO GeneratorRevision
+  | [] => pure .v1
+  | [version] => match GeneratorRevision.ofVersion? version with
+      | some revision => pure revision
+      | none => throw (IO.userError "unknown G0 generator version")
+  | _ => throw (IO.userError "too many arguments")
+
 private def execute (args : List String) : IO Json := do
+  if let command :: seed :: nodes :: count :: attempts :: fuel :: version := args then
+    if let some generator := g0Generator command then
+      if version.length ≤ 1 then
+        let count ← natural "case count" count 1024
+        unless count > 0 do throw (IO.userError "case count must be positive")
+        return generator (Seed.ofNat (← natural "seed" seed (2 ^ 64 - 1)))
+          (← natural "node budget" nodes 512)
+          count
+          (← natural "attempt limit" attempts 10000)
+          (← natural "execution fuel" fuel 10000000)
+          (← g0Revision version)
   match args with
   | ["aggregate-call-graph-generate", seed, nodes, count, attempts, fuel] =>
       let count ← natural "case count" count 1024
@@ -64,105 +113,6 @@ private def execute (args : List String) : IO Json := do
       let count ← natural "case count" count 1024
       unless count > 0 do throw (IO.userError "case count must be positive")
       return CallGraph.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["primitive-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Primitive.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["module-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Modules.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["comptime-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Comptime.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["closure-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Closure.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["generic-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Generic.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["loop-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Loop.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["aggregate-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Aggregate.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["mutation-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Mutation.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["function-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Function.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["input-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return Input.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return generateCases (Solcore.Synthesis.Core.Seed.ofNat
         (← natural "seed" seed (2 ^ 64 - 1)))
         (← natural "node budget" nodes 512)
         count
@@ -341,7 +291,7 @@ private def execute (args : List String) : IO Json := do
           AggregateCallGraph.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

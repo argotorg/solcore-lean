@@ -78,6 +78,13 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
                           "runtime-modules": ("profileVersion", "functionVersion", "templateVersion",
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion")}
+# Profiles whose programs come from the G0 generator; call-graph profiles use their own grammars.
+G0_PROFILES = ("closed-g0", "runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
+               "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime",
+               "runtime-modules")
+G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1")
+# Random generation uses v2; a fixed corpus or a saved case keeps the version it records.
+RANDOM_G0_VERSION = "core-g0-v2/lcg64-v1"
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
@@ -87,6 +94,13 @@ def save_json(path: Path, value) -> None:
     temporary = path.with_suffix(path.suffix + ".writing")
     temporary.write_bytes(m2.json_bytes(value))
     temporary.replace(path)
+
+
+def g0_version(profile: str, versions: dict) -> str | None:
+    """The G0 version a manifest or case provenance records; primitives prefix their own."""
+    if profile not in G0_PROFILES:
+        return None
+    return versions.get("baseGeneratorVersion" if profile == "runtime-primitives" else "generatorVersion")
 
 
 def directory_bytes(path: Path) -> int:
@@ -614,6 +628,10 @@ class Campaign:
         self.work.mkdir()
         self.counter = 0
         self.shrink_attempts = 0
+        self.g0_version = getattr(args, "g0_version", None)
+        if (self.g0_version is None and args.profile in G0_PROFILES
+                and getattr(args, "corpus", None) is None and getattr(args, "case", None) is None):
+            self.g0_version = RANDOM_G0_VERSION
         self.summary = {
             "schema": SCHEMA, "status": "running", "backend": args.backend, "synthetic": args.test_perturb_path is not None,
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path} if args.test_perturb_path else None,
@@ -647,6 +665,7 @@ class Campaign:
             "moduleCoverage": {"classification": "prescribed mixed-module selection branches; canonical bundles verified by native replay; not measured import or opcode coverage",
                 "generatedBranches": [], "matchedBranches": [], "requiredBranches": []},
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
+        self.summary["configuration"]["g0Version"] = self.g0_version
         if args.profile in CALL_GRAPH_PROFILES:
             self.summary["callShapeCoverage"] = {
                 "classification": "original Core syntactic call shapes; matched cases authenticated by native replay; not measured calls or opcode coverage",
@@ -913,21 +932,33 @@ class Campaign:
             save_json(history_path, history)
             self.checkpoint()
 
+    def recorded_g0_version(self, profile: str, versions: dict) -> list[str]:
+        """Adopt the recorded G0 version; G0 generation commands receive it explicitly."""
+        recorded = g0_version(profile, versions)
+        if self.g0_version is not None and self.g0_version != recorded:
+            raise ValueError("G0 generator version disagrees with the supplied case or corpus")
+        self.g0_version = recorded
+        self.summary["configuration"]["g0Version"] = recorded
+        return [] if recorded is None else [recorded]
+
     def prepare_cases(self) -> dict:
         if self.args.case is not None:
             case = m2.read_json(self.args.case)
             m2.validate_case(case)
+            self.recorded_g0_version(m2.CASE_PROFILES[case["schema"]], case["provenance"])
             self.summary["caseInput"] = {"path": str(self.args.case), "sha256": m2.file_digest(self.args.case)}
             return {"schema": "solcore-lean.semantic-corpus.v1", "requested": 1,
                 "attempted": 0, "excluded": [], "cases": [case], "status": "complete"}
         if self.args.corpus is None:
             command = PROFILE_COMMANDS[self.args.profile][0]
+            version = [self.g0_version] if self.args.profile in G0_PROFILES else []
             return self.tool([command, str(self.args.seed), str(self.args.nodes), str(self.args.cases),
-                              str(self.args.attempts), str(self.args.direct_fuel)], "generation")
+                              str(self.args.attempts), str(self.args.direct_fuel), *version], "generation")
         manifest = validate_manifest(m2.read_json(self.args.corpus))
         profile = manifest.get("profile", "closed-g0")
         runtime_input = profile != "closed-g0"
         generate_command, emit_command, origin_kind = PROFILE_COMMANDS[profile]
+        version = self.recorded_g0_version(profile, manifest)
         save_json(self.args.output / "corpus.json", manifest)
         self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": m2.digest(m2.json_bytes(manifest))}
         coverage = self.summary["coverage"]
@@ -965,7 +996,7 @@ class Campaign:
                 response = self.tool([generate_command,
                     str(request["seed"]), str(request["maxProgramNodes"]),
                     str(len(profile_inputs(profile))) if runtime_input else "1",
-                    "1", str(self.args.direct_fuel)], "corpus-generation")
+                    "1", str(self.args.direct_fuel), *version], "corpus-generation")
                 generated = response.get("cases", [])
                 if runtime_input:
                     generated = [case for case in generated if case.get("input") == entry["input"]]
@@ -1053,6 +1084,7 @@ class Campaign:
             "manifest entries" if self.args.corpus else
             "function graph candidates" if self.args.profile in HELPER_PROFILES else
             "function candidates" if self.args.profile != "closed-g0" else "program candidates")
+        self.summary["generation"]["generatorVersions"] = sorted({case["provenance"]["generatorVersion"] for case in cases})
         save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
         coverage = self.summary["coverage"]
         coverage["generatedFeatures"] = sorted({feature for case in cases for feature in case["provenance"]["features"]})
@@ -1126,6 +1158,9 @@ def main() -> int:
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
     selection.add_argument("--case", type=Path, help="re-execute one saved case, including a reduced finding")
     parser.add_argument("--attempts", type=int, help="generation attempt limit; default 1024 for call graphs, 512 for primitives/comptime/modules, otherwise 256")
+    parser.add_argument("--g0-version", choices=G0_VERSIONS,
+                        help=f"G0 generator for random G0-based profiles; default {RANDOM_G0_VERSION}. "
+                             "A corpus or saved case uses the version it records")
     parser.add_argument("--seconds", type=float, default=300)
     parser.add_argument("--disk-bytes", type=int, default=128 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32, help="total candidate executions across all findings")
@@ -1143,18 +1178,26 @@ def main() -> int:
                         help="SYNTHETIC TEST ONLY: change a copied observation after real three-way agreement")
     args = parser.parse_args()
     try:
-        selected_profile = None
+        selected_profile, recorded = None, None
         if args.corpus:
-            selected_profile = validate_manifest(m2.read_json(args.corpus)).get("profile", "closed-g0")
+            manifest = validate_manifest(m2.read_json(args.corpus))
+            selected_profile = manifest.get("profile", "closed-g0")
+            recorded = g0_version(selected_profile, manifest)
         elif args.case:
             case = m2.read_json(args.case)
             m2.validate_case(case)
             selected_profile = m2.CASE_PROFILES[case["schema"]]
+            recorded = g0_version(selected_profile, case["provenance"])
         if args.profile and selected_profile and args.profile != selected_profile:
             parser.error("--profile disagrees with the supplied case or corpus")
         args.profile = args.profile or selected_profile or "closed-g0"
     except (OSError, ValueError, KeyError, TypeError, m2.Finding) as error:
         parser.error(str(error))
+    if args.g0_version is not None:
+        if args.profile not in G0_PROFILES:
+            parser.error("--g0-version applies only to G0-based profiles")
+        if (args.corpus or args.case) and args.g0_version != recorded:
+            parser.error("--g0-version disagrees with the supplied case or corpus")
     if args.attempts is None:
         args.attempts = 1024 if args.profile == "runtime-call-graphs" else 512 if args.profile in ("runtime-primitives", "runtime-comptime", "runtime-modules") else 256
     if args.nodes is None:

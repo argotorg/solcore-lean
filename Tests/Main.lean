@@ -1830,6 +1830,7 @@ import Solcore.Test.CoreWireHost
 import Solcore.Test.CoreWirePublic
 import Solcore.Test.CoreSynthesisFragment
 import Solcore.Test.CoreSynthesisGenerator
+import Solcore.Test.CoreSynthesisGeneratorV2
 import Solcore.Test.CoreSynthesisSeed
 import Solcore.Test.CoreSynthesisShrink
 import Solcore.Test.SourceSynthesisEmitter
@@ -1865,6 +1866,7 @@ import Solcore.Test.SourceComptimeEmitter
 import Solcore.Test.SourceComptimeCases
 import Solcore.Test.SourceModuleEmitter
 import Solcore.Test.SourceModuleCases
+import Solcore.Test.SourceGeneratorRevisionCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -3965,6 +3967,7 @@ def run : IO Unit := do
   CoreSynthesisSeed.testCoreSynthesisSeed
   testCoreSynthesisFragment
   CoreSynthesisGenerator.testCoreSynthesisGenerator
+  CoreSynthesisGeneratorV2.testCoreSynthesisGeneratorV2
   CoreSynthesisShrink.testCoreSynthesisShrink
   SourceSynthesisEmitter.testSourceSynthesisEmitter
   SourceSynthesisCases.testSourceSynthesisCases
@@ -3999,6 +4002,7 @@ def run : IO Unit := do
   SourceComptimeCases.testSourceComptimeCases
   SourceModuleEmitter.testSourceModuleEmitter
   SourceModuleCases.testSourceModuleCases
+  SourceGeneratorRevisionCases.testSourceGeneratorRevisionCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter

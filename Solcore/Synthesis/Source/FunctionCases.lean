@@ -36,25 +36,25 @@ def contractJson (emitted : EmittedProgram) (input : Word) : Json := Json.mkObj 
   ("calldata", toJson (Input.calldata input)), ("constructorCalldata", toJson "0x")]
 
 def makeCase (function : CheckedWordFunctionDAG) (input : Word) (emitted : EmittedProgram)
-    (origin : Json) (fuel : Nat) : Json := Json.mkObj [
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Json := Json.mkObj [
   ("schema", toJson caseSchema), ("program", Wire.encodeProgram (function.instantiate input)),
   ("input", toJson (toString input.val)), ("source", toJson emitted.source),
   ("provenance", Json.mkObj [
     ("origin", origin), ("profileVersion", toJson profileVersion),
     ("functionVersion", toJson wordFunctionDAGVersion),
     ("abstractionVersion", toJson abstractionVersion),
-    ("generatorVersion", toJson generatorVersion),
+    ("generatorVersion", toJson revision.version),
     ("emitterVersion", toJson emitterVersion), ("wrapperVersion", toJson wrapperVersion),
     ("features", toJson function.features)]),
   ("contract", contractJson emitted input), ("executionFuel", toJson fuel),
   ("directCore", observe function input fuel)]
 
 def emitCase (function : CheckedWordFunctionDAG) (input : Word)
-    (origin : Json) (fuel : Nat) : Except String Json := do
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Except String Json := do
   unless Wire.programNodes (function.instantiate input) ≤ 512 do
     throw "applied function DAG exceeds the 512-node case limit"
   let emitted ← (emit function).mapError reprStr
-  return makeCase function input emitted origin fuel
+  return makeCase function input emitted origin fuel revision
 
 private def decodeProgram (json : Json) : Except String Wire.Program := do
   let program ← (Wire.decodeProgramWithBudget
@@ -85,7 +85,7 @@ def caseProgram (json : Json) : Except String CheckedInput := do
 
 /-- Scalar budgets account for every helper lambda, binding, call, input and
 program node. The final measured applied program remains the admission rule. -/
-def generatedFunction (seed : Seed) (nodes : Nat) :
+def generatedFunction (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1) :
     Except String (CheckedWordFunctionDAG × Json) := do
   let count := 1 + seed.toNat % 3
   unless nodes ≤ 512 && 9 * count + 6 ≤ nodes do
@@ -96,7 +96,8 @@ def generatedFunction (seed : Seed) (nodes : Nat) :
   let mut finalSeed := seed
   for index in List.range count do
     let helperSeed := Seed.ofNat (seed.toNat + index)
-    let generated ← (generate {seed := helperSeed, maxProgramNodes := scalarBudget}).mapError reprStr
+    let generated ←
+      (generate {seed := helperSeed, maxProgramNodes := scalarBudget, revision}).mapError reprStr
     let literals := literalCount generated.program.body
     unless literals > 0 do throw "generated helper has no Word literal to abstract"
     let selected := helperSeed.toNat % literals
@@ -133,7 +134,8 @@ def inputSensitive (function : CheckedWordFunctionDAG) (fuel : Nat) : Except Str
   unless results.any (fun value => results.any (fun other => value != other)) do
     throw "all four boundary inputs returned the same Word"
 
-def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json := Id.run do
+def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -142,7 +144,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
       attempted := attempted + 1
       let seed := Seed.ofNat (firstSeed.toNat + index)
       let result := do
-        let (function, origin) ← generatedFunction seed nodes
+        let (function, origin) ← generatedFunction seed nodes revision
         let emitted ← (emit function).mapError reprStr
         inputSensitive function fuel
         return (function, origin, emitted)
@@ -159,7 +161,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
             if cases.size < count then
               let origin := (origin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
                 "validationFuel" (toJson fuel)
-              cases := cases.push (makeCase function input emitted origin fuel)
+              cases := cases.push (makeCase function input emitted origin fuel revision)
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -168,8 +170,9 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
 def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   let admitted ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
+  let revision := savedRevision provenance
   for (name, expected) in [
-      ("generatorVersion", generatorVersion), ("profileVersion", profileVersion),
+      ("generatorVersion", revision.version), ("profileVersion", profileVersion),
       ("functionVersion", wordFunctionDAGVersion), ("abstractionVersion", abstractionVersion),
       ("emitterVersion", emitterVersion), ("wrapperVersion", wrapperVersion)] do
     unless (← provenance.getObjValAs? String name) = expected do throw (name ++ " changed")
@@ -189,7 +192,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
-    let (function, expectedOrigin) ← generatedFunction (Seed.ofNat seed) nodes
+    let (function, expectedOrigin) ← generatedFunction (Seed.ofNat seed) nodes revision
     for name in ["kind", "seed", "finalSeed", "maxProgramNodes", "helperCount", "helpers"] do
       unless (← origin.getObjVal? name) == (← expectedOrigin.getObjVal? name) do
         throw ("saved " ++ name ++ " differs from generated helper provenance")
@@ -201,7 +204,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
     inputSensitive function validationFuel
-  return makeCase admitted.function admitted.input emitted origin fuel
+  return makeCase admitted.function admitted.input emitted origin fuel revision
 
 structure Reduction (source : CheckedInput) where private mk ::
   candidate : CheckedInput
@@ -270,12 +273,14 @@ def reductions (source : CheckedInput) : List (Reduction source) := Id.run do
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
+  let revision := savedRevision (← json.getObjVal? "provenance")
   let mut cases : Array Json := #[]
   for reduced in (reductions source).take limit do
     let origin := Json.mkObj [
       ("kind", toJson "reduced"), ("parentProgram", Wire.encodeProgram source.program),
       ("parentInput", toJson (toString source.input.val))]
-    cases := cases.push (← emitCase reduced.candidate.function reduced.candidate.input origin fuel)
+    cases := cases.push
+      (← emitCase reduced.candidate.function reduced.candidate.input origin fuel revision)
   return Json.mkObj [("schema", toJson corpusSchema), ("cases", .arr cases)]
 
 end Solcore.Synthesis.Source.Function

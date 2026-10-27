@@ -48,13 +48,13 @@ def contractJson (emitted : EmittedProgram) : Json := Json.mkObj [
   ("constructorCalldata", toJson "0x")]
 
 def makeCase (checked : CheckedWordProgram) (emitted : EmittedProgram)
-    (origin : Json) (fuel : Nat) : Json := Json.mkObj [
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Json := Json.mkObj [
   ("schema", toJson caseSchema),
   ("program", Solcore.Core.Wire.encodeProgram checked.program),
   ("source", toJson emitted.source),
   ("provenance", Json.mkObj [
     ("origin", origin),
-    ("generatorVersion", toJson generatorVersion),
+    ("generatorVersion", toJson revision.version),
     ("emitterVersion", toJson emitterVersion),
     ("wrapperVersion", toJson wrapperVersion),
     ("features", toJson ((features checked.program.body).map featureName))]),
@@ -62,13 +62,23 @@ def makeCase (checked : CheckedWordProgram) (emitted : EmittedProgram)
   ("executionFuel", toJson fuel),
   ("directCore", observe checked fuel)]
 
-def emitCase (checked : CheckedWordProgram) (origin : Json) (fuel : Nat) :
-    Except EmitError Json := do
+def emitCase (checked : CheckedWordProgram) (origin : Json) (fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Except EmitError Json := do
   let emitted ← emit checked
-  return makeCase checked emitted origin fuel
+  return makeCase checked emitted origin fuel revision
 
-/-- Bounded seed search leaves the original G0 generator and its version intact. -/
-def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json := Id.run do
+/--
+The G0 revision named by saved provenance. An unknown version yields `v1`,
+whose exact version check then rejects the case as before.
+-/
+def savedRevision (provenance : Json) (field : String := "generatorVersion") : GeneratorRevision :=
+  match provenance.getObjValAs? String field with
+  | .ok version => (GeneratorRevision.ofVersion? version).getD .v1
+  | .error _ => .v1
+
+/-- Bounded seed search with one G0 revision; `v1` stays the default. -/
+def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -76,7 +86,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
     if cases.size < count then
       attempted := attempted + 1
       let seed := Seed.ofNat (firstSeed.toNat + index)
-      match generate {seed, maxProgramNodes := nodes} with
+      match generate {seed, maxProgramNodes := nodes, revision} with
       | .error error =>
           excluded := excluded.push (Json.mkObj [
             ("seed", toJson (toString seed.toNat)),
@@ -87,7 +97,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
             ("seed", toJson (toString generated.initialSeed.toNat)),
             ("finalSeed", toJson (toString generated.finalSeed.toNat)),
             ("maxProgramNodes", toJson generated.maxProgramNodes)]
-          match emitCase generated.checkedProgram origin fuel with
+          match emitCase generated.checkedProgram origin fuel revision with
           | .error error =>
               excluded := excluded.push (Json.mkObj [
                 ("seed", toJson (toString seed.toNat)),
@@ -119,7 +129,8 @@ def caseProgram (json : Json) : Except String CheckedWordProgram := do
 def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   let checked ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  unless (← provenance.getObjValAs? String "generatorVersion") = generatorVersion do
+  let revision := savedRevision provenance
+  unless (← provenance.getObjValAs? String "generatorVersion") = revision.version do
     throw "generator version changed"
   unless (← provenance.getObjValAs? String "emitterVersion") = emitterVersion do
     throw "emitter version changed"
@@ -143,23 +154,26 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     unless nodes ≤ 512 do throw "saved generation budget exceeds limit"
-    let generated ← (generate {seed := Seed.ofNat seed, maxProgramNodes := nodes}).mapError reprStr
+    let generated ←
+      (generate {seed := Seed.ofNat seed, maxProgramNodes := nodes, revision}).mapError reprStr
     unless Solcore.Core.Wire.encodeProgram generated.program ==
         Solcore.Core.Wire.encodeProgram checked.program do
       throw "saved program differs from its generation seed"
     unless (← origin.getObjValAs? String "finalSeed") = toString generated.finalSeed.toNat do
       throw "saved final seed differs from generation"
-  return makeCase checked emitted origin fuel
+  return makeCase checked emitted origin fuel revision
 
+/-- Reduced candidates keep the parent's G0 revision. -/
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let checked ← caseProgram json
+  let revision := savedRevision (← json.getObjVal? "provenance")
   let mut results : Array Json := #[]
   for candidate in (shrink checked).take limit do
     let origin := Json.mkObj [
       ("kind", toJson "reduced"),
       ("parentProgram", Solcore.Core.Wire.encodeProgram checked.program)]
-    let result ← (emitCase candidate.checkedProgram origin fuel).mapError reprStr
+    let result ← (emitCase candidate.checkedProgram origin fuel revision).mapError reprStr
     results := results.push result
   return Json.mkObj [("schema", toJson corpusSchema), ("cases", .arr results)]
 

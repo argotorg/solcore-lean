@@ -603,7 +603,7 @@ class ManifestTests(unittest.TestCase):
 
                 instance.tool = tool
                 instance.prepare_cases()
-                self.assertEqual(calls, [([command, '1', '16', '2', '16', '1000'], 'generation')])
+                self.assertEqual(calls, [([command, '1', '16', '2', '16', '1000', campaign.RANDOM_G0_VERSION], 'generation')])
 
     def test_secondary_finding_archive_survives_work_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -838,7 +838,7 @@ class LoopCoverageTests(unittest.TestCase):
                 return {'cases': [loop_policy_case()]}
             instance.tool = tool
             self.assertEqual(len(instance.prepare_cases()['cases']), 1)
-            self.assertEqual(calls, [(['loop-generate', '0', '384', '6', '1', '1000'], 'corpus-generation')])
+            self.assertEqual(calls, [(['loop-generate', '0', '384', '6', '1', '1000', 'test'], 'corpus-generation')])
             self.assertEqual(instance.summary['loopCoverage']['generatedIterations'], [7])
             self.assertEqual(instance.summary['loopCoverage']['matchedIterations'], [])
 
@@ -951,7 +951,7 @@ class GenericCoverageTests(unittest.TestCase):
                 return {'cases': [generic_policy_case()]}
             instance.tool = tool
             self.assertEqual(len(instance.prepare_cases()['cases']), 1)
-            self.assertEqual(calls, [(['generic-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+            self.assertEqual(calls, [(['generic-generate', '0', '384', '4', '1', '1000', 'test'], 'corpus-generation')])
             self.assertEqual(instance.summary['genericCoverage']['generatedInstantiations'], ['word:odd'])
             self.assertEqual(instance.summary['genericCoverage']['matchedInstantiations'], [])
 
@@ -1061,7 +1061,7 @@ class ClosureCoverageTests(unittest.TestCase):
                 return {'cases': [closure_policy_case()]}
             instance.tool = tool
             self.assertEqual(len(instance.prepare_cases()['cases']), 1)
-            self.assertEqual(calls, [(['closure-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+            self.assertEqual(calls, [(['closure-generate', '0', '384', '4', '1', '1000', 'test'], 'corpus-generation')])
             self.assertEqual(instance.summary['closureCoverage']['generatedVariants'], ['snapshot'])
             self.assertEqual(instance.summary['closureCoverage']['matchedVariants'], [])
 
@@ -1192,7 +1192,7 @@ class ComptimeCoverageTests(unittest.TestCase):
                     self.assertEqual(instance.summary['comptimeCoverage']['generatedVariants'], ['offset'])
                     self.assertEqual(instance.summary['constantCoverage']['generatedFeatures'], sorted(value['requiredConstantFeatures']))
                     self.assertEqual(instance.summary['constantCoverage']['matchedFeatures'], [])
-                self.assertEqual(calls, [(['comptime-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+                self.assertEqual(calls, [(['comptime-generate', '0', '384', '4', '1', '1000', 'test'], 'corpus-generation')])
 
     def test_nonmatching_cases_cannot_satisfy_constant_or_variant_coverage(self):
         for failure in ('inconclusive-resource', 'source-rejected', 'compilation-rejected'):
@@ -1315,7 +1315,7 @@ class ModuleCoverageTests(unittest.TestCase):
                     self.assertEqual(instance.summary['moduleCoverage']['generatedBranches'], ['odd'])
                     self.assertEqual(instance.summary['constantCoverage']['generatedFeatures'], sorted(value['requiredConstantFeatures']))
                     self.assertEqual(instance.summary['constantCoverage']['matchedFeatures'], [])
-                self.assertEqual(calls, [(['module-generate', '0', '384', '4', '1', '1000'], 'corpus-generation')])
+                self.assertEqual(calls, [(['module-generate', '0', '384', '4', '1', '1000', 'test'], 'corpus-generation')])
 
     def test_resource_and_rejection_cannot_satisfy_module_branch_or_constant_coverage(self):
         for failure in ('inconclusive-resource', 'source-rejected', 'compilation-rejected'):
@@ -1444,7 +1444,7 @@ class PrimitiveCoverageTests(unittest.TestCase):
                     self.assertEqual(instance.prepare_cases()['cases'], [case])
                     self.assertEqual(instance.summary['coverage']['generatedInputs'], ['255'])
                     self.assertEqual(instance.summary['coverage']['matchedInputs'], [])
-                self.assertEqual(calls, [(['primitive-generate', '1', '96', '8', '1', '1000'], 'corpus-generation')])
+                self.assertEqual(calls, [(['primitive-generate', '1', '96', '8', '1', '1000', 'test'], 'corpus-generation')])
 
     def test_imported_function_routes_to_primitive_emit_without_using_saved_golden(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1493,7 +1493,7 @@ class PrimitiveCoverageTests(unittest.TestCase):
             with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-primitives', '--cases', '1']), \
                     patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
                 campaign.main()
-            self.assertEqual(seen, [(['primitive-generate', '1', '96', '1', '512', '1000000'], 'generation')])
+            self.assertEqual(seen, [(['primitive-generate', '1', '96', '1', '512', '1000000', campaign.RANDOM_G0_VERSION], 'generation')])
 
     def test_primitive_execution_and_shrink_keep_every_backend(self):
         for backend in campaign.m2.BACKENDS:
@@ -2188,13 +2188,14 @@ class CallGraphLoopCoverageTests(unittest.TestCase):
                 ('runtime-aggregates', 'aggregate-generate', '256', '256'),
                 ('runtime-primitives', 'primitive-generate', '96', '512')):
             _, seen = self.run_main('--profile', profile, '--cases', '1')
-            self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000']])
+            version = [campaign.RANDOM_G0_VERSION] if profile in campaign.G0_PROFILES else []
+            self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000', *version]])
         for nodes in ('38', '3', '513'):
             with self.subTest(nodes=nodes), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.run_main('--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
         # The lower bound is specific to this profile: the ordinary loop profile still accepts 38.
         _, seen = self.run_main('--profile', 'runtime-loops', '--cases', '1', '--nodes', '38')
-        self.assertEqual(seen, [['loop-generate', '1', '38', '1', '256', '1000000']])
+        self.assertEqual(seen, [['loop-generate', '1', '38', '1', '256', '1000000', campaign.RANDOM_G0_VERSION]])
 
     def test_call_graph_loop_shrink_keeps_schema_backend_and_explicit_synthetic_separation(self):
         for backend in campaign.m2.BACKENDS:
@@ -2872,13 +2873,14 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
                 ('runtime-mutation', 'mutation-generate', '192', '256'),
                 ('runtime-primitives', 'primitive-generate', '96', '512')):
             _, seen = self.run_main('--profile', profile, '--cases', '1')
-            self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000']])
+            version = [campaign.RANDOM_G0_VERSION] if profile in campaign.G0_PROFILES else []
+            self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000', *version]])
         for nodes in ('12', '3', '513'):
             with self.subTest(nodes=nodes), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.run_main('--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
         # The lower bound is specific to the call-graph profiles: the template aggregate profile still accepts 12.
         _, seen = self.run_main('--profile', 'runtime-aggregates', '--cases', '1', '--nodes', '12')
-        self.assertEqual(seen, [['aggregate-generate', '1', '12', '1', '256', '1000000']])
+        self.assertEqual(seen, [['aggregate-generate', '1', '12', '1', '256', '1000000', campaign.RANDOM_G0_VERSION]])
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.run_main('--profile', 'runtime-call-graphs', '--cases', '1', '--nodes', '12')
 
@@ -2903,6 +2905,119 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
                 self.assertEqual(history['steps'][0]['actualComparison']['category'], 'matched')
                 self.assertEqual(history['steps'][0]['fingerprint']['backend'], backend)
                 self.assertTrue(finding['synthetic'])
+
+
+class G0VersionTests(unittest.TestCase):
+    """Random G0-based generation uses v2; a corpus or saved case keeps its recorded version."""
+    V1, V2 = campaign.G0_VERSIONS
+
+    def run_main(self, *argv, prepare=True):
+        """Parse the real command line; capture the configuration and native commands only."""
+        with tempfile.TemporaryDirectory() as directory:
+            summaries, seen = [], []
+            def run(instance):
+                instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                if prepare: instance.prepare_cases()
+                summaries.append(copy.deepcopy(instance.summary))
+                instance.summary['status'] = 'generation-exhausted'
+            with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory) / 'run'), *argv]), \
+                    patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
+                campaign.main()
+            return summaries[0], seen
+
+    def refused(self, *argv):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.run_main(*argv, prepare=False)
+
+    def manifest(self, version):
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'closed-g0',
+            'generatorVersion': version, 'emitterVersion': 'test', 'wrapperVersion': 'test',
+            'requiredFeatures': [], 'requiredWordLiterals': [],
+            'cases': [{'id': 'seeded', 'generation': {'seed': '5', 'maxProgramNodes': 24}, 'expectedFeatures': []}]}
+
+    def test_only_call_graph_profiles_use_their_own_grammar(self):
+        self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
+            {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregate-call-graphs'})
+        self.assertEqual(campaign.RANDOM_G0_VERSION, self.V2)
+        self.assertEqual(campaign.g0_version('runtime-primitives',
+            {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
+        self.assertEqual(campaign.g0_version('runtime-word', {'generatorVersion': self.V2}), self.V2)
+        self.assertIsNone(campaign.g0_version('runtime-call-graphs', {'generatorVersion': 'other'}))
+
+    def test_random_g0_profiles_request_v2_and_record_it(self):
+        for profile in campaign.PROFILES:
+            with self.subTest(profile=profile):
+                summary, seen = self.run_main('--profile', profile, '--cases', '1')
+                expected = [self.V2] if profile in campaign.G0_PROFILES else []
+                self.assertEqual(len(seen), 1)
+                self.assertEqual(seen[0][0], campaign.PROFILE_COMMANDS[profile][0])
+                self.assertEqual(seen[0][6:], expected)
+                self.assertEqual(summary['configuration']['g0Version'], expected[0] if expected else None)
+
+    def test_explicit_v1_reaches_the_native_generator(self):
+        summary, seen = self.run_main('--profile', 'runtime-aggregates', '--cases', '1', '--g0-version', self.V1)
+        self.assertEqual(seen, [['aggregate-generate', '1', '256', '1', '256', '1000000', self.V1]])
+        self.assertEqual(summary['configuration']['g0Version'], self.V1)
+        self.refused('--profile', 'runtime-call-graphs', '--g0-version', self.V2)
+        self.refused('--g0-version', 'core-g0-v3/lcg64-v1')
+
+    def test_committed_g0_corpora_pin_v1(self):
+        pinned = 0
+        for path in sorted((ROOT / 'scripts').glob('semantic*-corpus.json')):
+            manifest = json.loads(path.read_text())
+            profile = manifest.get('profile', 'closed-g0')
+            if profile in campaign.G0_PROFILES:
+                self.assertEqual(campaign.g0_version(profile, manifest), self.V1, path.name)
+                pinned += 1
+        self.assertEqual(pinned, len(campaign.G0_PROFILES))
+
+    def test_corpus_generation_passes_the_manifest_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for version in (self.V1, self.V2):
+                with self.subTest(version=version):
+                    path = Path(directory) / 'manifest.json'
+                    path.write_text(json.dumps(self.manifest(version)))
+                    summary, seen = self.run_main('--corpus', str(path))
+                    self.assertEqual(seen, [['generate', '5', '24', '1', '1', '1000000', version]])
+                    self.assertEqual(summary['configuration']['g0Version'], version)
+                    self.assertEqual(self.run_main('--corpus', str(path), '--g0-version', version)[1], seen)
+                    other = self.V2 if version == self.V1 else self.V1
+                    self.refused('--corpus', str(path), '--g0-version', other)
+            config = options(directory)
+            config.output, config.corpus, config.g0_version = Path(directory) / 'direct', path, self.V1
+            config.output.mkdir()
+            with self.assertRaises(ValueError):
+                campaign.Campaign(config).prepare_cases()
+
+    def test_saved_case_keeps_its_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            saved = Path(directory) / 'case.json'
+            case = function_case(1)
+            case['provenance']['generatorVersion'] = self.V1
+            saved.write_text(json.dumps(case))
+            summary, seen = self.run_main('--case', str(saved))
+            self.assertEqual((summary['configuration']['g0Version'], seen), (self.V1, []))
+            self.run_main('--case', str(saved), '--g0-version', self.V1)
+            self.refused('--case', str(saved), '--g0-version', self.V2)
+
+    def test_summary_lists_the_generated_versions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-functions', 1, 0
+            config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+            instance = campaign.Campaign(config)
+            case = function_case(1)
+            case['provenance']['generatorVersion'] = self.V2
+            instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': 1, 'attempted': 1,
+                                        'status': 'complete', 'excluded': [], 'cases': [case]}
+
+            def execute(adapter_args, report):
+                report.update(matched(), backend=adapter_args.backend)
+
+            with patch.object(campaign.m2, 'execute', side_effect=execute), redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(instance.summary['configuration']['g0Version'], self.V2)
+            self.assertEqual(instance.summary['generation']['generatorVersions'], [self.V2])
 
 
 class CancellationTests(unittest.TestCase):

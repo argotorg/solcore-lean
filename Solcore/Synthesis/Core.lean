@@ -22,6 +22,7 @@ import Solcore.Synthesis.Core.StorageLedger
 import Solcore.Synthesis.Core.LongBytes
 import Solcore.Synthesis.Core.NestedArray
 import Solcore.Synthesis.Core.NestedCall
+import Solcore.Synthesis.Core.GeneratorV2
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink
 

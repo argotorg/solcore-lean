@@ -15,6 +15,10 @@ open Solcore.Synthesis.Core
 def caseSchema : String := "solcore-lean.semantic-primitive-case.v1"
 def profileVersion : String := "runtime-primitives-v1/literal-seed-v1"
 def generatorVersion : String := "core-primitives-v1/" ++ Solcore.Synthesis.Core.generatorVersion
+
+/-- The profile layer over one G0 revision; `generatorVersion` is its `v1` value. -/
+def generatorVersionFor (revision : GeneratorRevision) : String :=
+  "core-primitives-v1/" ++ revision.version
 def boundaryVersion : String := "word-primitive-boundary-bank-v1"
 
 /-- Difference measured from the existing Wire node-count definitions, including
@@ -70,7 +74,7 @@ def contractJson (emitted : EmittedProgram) (input : Word) : Json := Json.mkObj 
   ("calldata", toJson (calldata input)), ("constructorCalldata", toJson "0x")]
 
 def makeCase (function : CheckedWordFunction) (input : Word) (emitted : EmittedProgram)
-    (origin : Json) (fuel : Nat) : Json := Json.mkObj [
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Json := Json.mkObj [
   ("schema", toJson caseSchema),
   ("program", Wire.encodeProgram (function.instantiate input)),
   ("input", toJson (toString input.val)), ("source", toJson emitted.source),
@@ -78,8 +82,8 @@ def makeCase (function : CheckedWordFunction) (input : Word) (emitted : EmittedP
     ("origin", origin), ("profileVersion", toJson profileVersion),
     ("functionVersion", toJson wordFunctionVersion),
     ("abstractionVersion", toJson abstractionVersion),
-    ("generatorVersion", toJson generatorVersion),
-    ("baseGeneratorVersion", toJson Solcore.Synthesis.Core.generatorVersion),
+    ("generatorVersion", toJson (generatorVersionFor revision)),
+    ("baseGeneratorVersion", toJson revision.version),
     ("boundaryVersion", toJson boundaryVersion),
     ("emitterVersion", toJson emitterVersion), ("wrapperVersion", toJson wrapperVersion),
     ("features", toJson ((features function.body).map featureName))]),
@@ -87,11 +91,11 @@ def makeCase (function : CheckedWordFunction) (input : Word) (emitted : EmittedP
   ("directCore", observe function input fuel)]
 
 def emitCase (function : CheckedWordFunction) (input : Word)
-    (origin : Json) (fuel : Nat) : Except String Json := do
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Except String Json := do
   unless Wire.programNodes (function.instantiate input) ≤ 512 do
     throw "applied primitive function exceeds the 512-node case limit"
   let emitted ← (emit function).mapError reprStr
-  return makeCase function input emitted origin fuel
+  return makeCase function input emitted origin fuel revision
 
 private def decodeProgram (json : Json) : Except String Wire.Program := do
   let program ← (Wire.decodeProgramWithBudget
@@ -127,11 +131,12 @@ def caseProgram (json : Json) : Except String CheckedInput := do
       return admitted
   | _ => throw "input case program is not a closed Word function application"
 
-private def candidate (seed : Seed) (nodes : Nat) :
+private def candidate (seed : Seed) (nodes : Nat) (revision : GeneratorRevision) :
     Except String (GeneratedProgram × Nat × CheckedWordFunction) := do
   unless minimumProgramNodes ≤ nodes && nodes ≤ 512 do
     throw "complete primitive program budget must be between the profile minimum and 512"
-  let generated ← (generate {seed, maxProgramNodes := nodes - appliedOverhead}).mapError reprStr
+  let generated ←
+    (generate {seed, maxProgramNodes := nodes - appliedOverhead, revision}).mapError reprStr
   let count := literalCount generated.program.body
   unless count > 0 do throw "generated body has no Word literal to abstract"
   let literalIndex := seed.toNat % count
@@ -157,7 +162,8 @@ def inputSensitive (function : CheckedWordFunction) (fuel : Nat) : Except String
 
 /-- Attempt limits count functions; case limits count individual runtime inputs.
 One accepted function emits the fixed eight inputs in order, truncated by count. -/
-def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json := Id.run do
+def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -166,7 +172,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
       attempted := attempted + 1
       let seed := Seed.ofNat (firstSeed.toNat + index)
       let result := do
-        let (generated, literalIndex, function) ← candidate seed nodes
+        let (generated, literalIndex, function) ← candidate seed nodes revision
         let emitted ← (emit function).mapError (fun error => "unsupported source primitive: " ++ reprStr error)
         inputSensitive function fuel
         return (generated, literalIndex, function, emitted)
@@ -190,7 +196,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
                 ("baseProgramNodes", toJson generated.maxProgramNodes),
                 ("literalIndex", toJson literalIndex), ("inputIndex", toJson inputIndex),
                 ("validationFuel", toJson fuel)]
-              cases := cases.push (makeCase function input emitted origin fuel)
+              cases := cases.push (makeCase function input emitted origin fuel revision)
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -199,9 +205,10 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
 def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   let admitted ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
+  let revision := savedRevision provenance "baseGeneratorVersion"
   for (name, expected) in [
-      ("generatorVersion", generatorVersion), ("profileVersion", profileVersion),
-      ("baseGeneratorVersion", Solcore.Synthesis.Core.generatorVersion), ("boundaryVersion", boundaryVersion),
+      ("generatorVersion", generatorVersionFor revision), ("profileVersion", profileVersion),
+      ("baseGeneratorVersion", revision.version), ("boundaryVersion", boundaryVersion),
       ("functionVersion", wordFunctionVersion), ("abstractionVersion", abstractionVersion),
       ("emitterVersion", emitterVersion), ("wrapperVersion", wrapperVersion)] do
     unless (← provenance.getObjValAs? String name) = expected do
@@ -224,7 +231,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     unless minimumProgramNodes ≤ nodes && nodes ≤ 512 do throw "saved generation budget exceeds profile limits"
-    let (generated, literalIndex, function) ← candidate (Seed.ofNat seed) nodes
+    let (generated, literalIndex, function) ← candidate (Seed.ofNat seed) nodes revision
     unless (← origin.getObjValAs? Nat "literalIndex") = literalIndex do
       throw "saved literal index differs from the input profile"
     unless Wire.encodeProgram function.program == Wire.encodeProgram admitted.function.program do
@@ -258,7 +265,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless origin == Json.mkObj [("kind", toJson "reduced"), ("parentProgram", parentProgram),
         ("parentInput", toJson parentText)] do
       throw "reduced primitive provenance is not canonical"
-  let fresh := makeCase admitted.function admitted.input emitted origin fuel
+  let fresh := makeCase admitted.function admitted.input emitted origin fuel revision
   unless (← fresh.getObjVal? "provenance") == provenance do
     throw "primitive provenance contains unexpected fields"
   return fresh
@@ -304,12 +311,14 @@ def reductions (source : CheckedInput) : List (Reduction source) := Id.run do
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
+  let revision := savedRevision (← json.getObjVal? "provenance") "baseGeneratorVersion"
   let mut cases : Array Json := #[]
   for reduced in (reductions source).take limit do
     let origin := Json.mkObj [
       ("kind", toJson "reduced"), ("parentProgram", Wire.encodeProgram source.program),
       ("parentInput", toJson (toString source.input.val))]
-    cases := cases.push (← emitCase reduced.candidate.function reduced.candidate.input origin fuel)
+    cases := cases.push
+      (← emitCase reduced.candidate.function reduced.candidate.input origin fuel revision)
   return Json.mkObj [("schema", toJson corpusSchema), ("cases", .arr cases)]
 
 end Solcore.Synthesis.Source.Primitive

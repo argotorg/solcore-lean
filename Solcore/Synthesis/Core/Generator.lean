@@ -2,6 +2,7 @@ import Solcore.Core.Primitive
 import Solcore.Core.Wire.Codec.Program
 import Solcore.Core.Wire.Host
 import Solcore.Synthesis.Core.Fragment
+import Solcore.Synthesis.Core.GeneratorV2
 import Solcore.Synthesis.Core.Seed
 
 /-! Deterministic, checker-sealed generation for the pure G0 Core fragment. -/
@@ -12,10 +13,20 @@ namespace Solcore.Synthesis.Core
 
 open Solcore.Core.Wire
 
+/--
+The replay-visible G0 choice semantics. Fixed corpora pin `v1`; `v2` mixes
+each draw, takes choices from its upper bits and widens the literal bank.
+-/
+inductive GeneratorRevision where
+  | v1
+  | v2
+  deriving Repr, BEq, DecidableEq, Inhabited
+
 /-- The complete replay input for one generated Program. -/
 structure GenerationRequest where
   seed : Seed
   maxProgramNodes : Nat
+  revision : GeneratorRevision := .v1
   deriving Repr, BEq, DecidableEq
 
 /-- Configuration failure and the one impossible-by-design invariant failure. -/
@@ -30,12 +41,27 @@ def minimumProgramNodes : Nat := 3
 /-- Version of the generation choices layered on the versioned seed algorithm. -/
 def generatorVersion : String := "core-g0-v1/" ++ Seed.algorithmId
 
+namespace GeneratorRevision
+
+def all : List GeneratorRevision := [.v1, .v2]
+
+/-- Both revisions layer their choices on the unchanged lcg64-v1 draws. -/
+def version : GeneratorRevision → String
+  | .v1 => generatorVersion
+  | .v2 => "core-g0-v2/" ++ Seed.algorithmId
+
+def ofVersion? (version : String) : Option GeneratorRevision :=
+  all.find? (·.version = version)
+
+end GeneratorRevision
+
 /-- A checked Program together with the exact replay provenance that produced it. -/
 structure GeneratedProgram where
   private mk ::
   initialSeed : Seed
   finalSeed : Seed
   maxProgramNodes : Nat
+  revision : GeneratorRevision
   checkedProgram : CheckedWordProgram
 
 namespace GeneratedProgram
@@ -268,7 +294,9 @@ def generate (request : GenerationRequest) : Except GenerationError GeneratedPro
     .error .budgetTooSmall
   else
     let bodyBudget := request.maxProgramNodes - 2
-    let (body, finalSeed) := generateExpr .word 0 bodyBudget request.seed
+    let (body, finalSeed) := match request.revision with
+      | .v1 => generateExpr .word 0 bodyBudget request.seed
+      | .v2 => GeneratorV2.generateExpr .word 0 bodyBudget request.seed
     let program : Program := {
       resultType := .word
       dataDefinitions := []
@@ -280,6 +308,7 @@ def generate (request : GenerationRequest) : Except GenerationError GeneratedPro
         initialSeed := request.seed
         finalSeed
         maxProgramNodes := request.maxProgramNodes
+        revision := request.revision
         checkedProgram
       }
 
