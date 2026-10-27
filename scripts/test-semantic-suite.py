@@ -501,6 +501,21 @@ class SuiteTests(unittest.TestCase):
             for key in ("anvil", "upstream", "target_dir"):
                 self.assertEqual(command[command.index("--" + key.replace("_", "-")) + 1], str(getattr(args, key)))
 
+    def test_random_node_scale_multiplies_profile_defaults_up_to_the_cap(self):
+        args = self.args("--mode", "random", "--nodes-scale", "2")
+        budgets = {profile: suite.command(args, profile, self.directory / profile, 10, 64 * 1024**2)
+                   for profile in ("closed-g0", "runtime-primitives", "runtime-loops", "stateful-storage", "stateful-calls")}
+        self.assertEqual({profile: command[command.index("--nodes") + 1] for profile, command in budgets.items()},
+                         {"closed-g0": "48", "runtime-primitives": "192", "runtime-loops": "512",
+                          "stateful-storage": "512", "stateful-calls": "512"})
+        self.assertEqual(suite.node_budget(self.args("--mode", "random"), "closed-g0"), 24)
+        self.assertEqual(suite.node_budget(self.args("--mode", "random", "--nodes-scale", "1.5"), "runtime-word"), 48)
+        self.assertEqual(suite.node_budget(self.args("--mode", "random", "--nodes-scale", "3", "--nodes", "100"), "closed-g0"), 100)
+        for arguments in (("--nodes-scale", "2"), ("--mode", "random", "--nodes-scale", "0.5"),
+                          ("--mode", "random", "--nodes-scale", "4.5"), ("--mode", "random", "--nodes-scale", "nan")):
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.args(*arguments)
+
     def test_invalid_bounds_duplicate_profiles_and_fixed_truncation_rejected(self):
         for arguments in (("--cases", "1"), ("--nodes", "32"), ("--seconds", "nan"), ("--seconds", "0"),
                           ("--disk-bytes", "1"), ("--seed", str(1 << 64)), ("--shard-count", "0"),

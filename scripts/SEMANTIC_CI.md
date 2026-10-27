@@ -46,6 +46,9 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
   --output .upstream/semantic-random
 ```
 
+Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
+profile's default node budget, capped at 512; an explicit `--nodes` wins.
+
 Use `--backend sonatina-o2` with either suite command to compare the same cases
 after O2 compilation. O0 remains the default. The CI matrix runs each backend
 in a separate job with separate reports and artifacts; failure in one does not

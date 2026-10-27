@@ -118,6 +118,11 @@ def profile_attempts(args, profile):
     return args.attempts
 
 
+def node_budget(args, profile):
+    """An explicit budget wins; otherwise the profile default, scaled and capped like the campaigns."""
+    return args.nodes or min(512, round(PROFILES[profile][2] * args.nodes_scale))
+
+
 def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
     attempts = profile_attempts(args, profile)
@@ -146,7 +151,7 @@ def command(args, profile, output, seconds, disk_bytes):
         result += ["--corpus", str(manifest(profile)), "--attempts", str(max(attempts, requested(args, profile)))]
     else:
         seed = derived_seed(args.seed, profile, args.shard_index, args.shard_count, profile_attempts(args, profile))
-        result += ["--seed", str(seed), "--nodes", str(args.nodes or nodes), "--cases", str(args.cases), "--attempts", str(attempts)]
+        result += ["--seed", str(seed), "--nodes", str(node_budget(args, profile)), "--cases", str(args.cases), "--attempts", str(attempts)]
     return result
 
 
@@ -307,7 +312,7 @@ class Suite:
         self.started = time.monotonic()
         self.deadline = self.started + args.seconds
         self.report = {"schema": SCHEMA, "status": "running", "backend": args.backend, "mode": args.mode, "seedVersion": SEED_VERSION,
-            "rootSeed": str(args.seed), "shardIndex": args.shard_index, "shardCount": args.shard_count,
+            "rootSeed": str(args.seed), "shardIndex": args.shard_index, "shardCount": args.shard_count, "nodesScale": args.nodes_scale,
             "selectedProfiles": args.profile, "profiles": [], "unexecutedProfiles": args.profile[:],
             "limits": {key: getattr(args, key) for key in ("seconds", "profile_seconds", "disk_bytes", "profile_disk_bytes", "output_limit", "cleanup_seconds")},
             "suiteSha256": digest(Path(__file__)), "executionOrder": "sequential",
@@ -336,7 +341,7 @@ class Suite:
             if args.mode == "fixed":
                 row.update(manifest=str(manifest(profile).relative_to(ROOT)), manifestSha256=digest(manifest(profile)))
             else:
-                row.update(seed=str(derived_seed(args.seed, profile, args.shard_index, args.shard_count, profile_attempts(args, profile))), attempts=profile_attempts(args, profile))
+                row.update(seed=str(derived_seed(args.seed, profile, args.shard_index, args.shard_count, profile_attempts(args, profile))), attempts=profile_attempts(args, profile), nodes=node_budget(args, profile))
             self.report["profiles"].append(row)
             self.report["unexecutedProfiles"] = args.profile[index + 1:]
             self.checkpoint()
@@ -394,6 +399,7 @@ def parse_args(argv=None):
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
     parser.add_argument("--cases", type=int, help="random cases per profile (default 4); fixed mode always uses the entire manifest")
     parser.add_argument("--nodes", type=int, help="override random node budget; otherwise profile-specific defaults")
+    parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512")
     parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles")
     defaults = {"seconds": 7200., "profile_seconds": 900., "disk_bytes": 1024**3,
                 "profile_disk_bytes": 256 * 1024**2, "output_limit": 8 * 1024**2, "cleanup_seconds": 10.,
@@ -420,8 +426,8 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     args.attempts_explicit = args.attempts is not None
     args.attempts = 512 if args.attempts is None else args.attempts
-    if args.mode == "fixed" and (args.cases is not None or args.nodes is not None):
-        parser.error("--cases and --nodes apply only to random mode; fixed corpora must remain complete")
+    if args.mode == "fixed" and (args.cases is not None or args.nodes is not None or args.nodes_scale != 1):
+        parser.error("--cases, --nodes and --nodes-scale apply only to random mode; fixed corpora must remain complete")
     args.cases = args.cases if args.cases is not None else 4
     if args.backend == "yul":
         if args.profile and any(PROFILES[profile][1] != "pure" for profile in args.profile):
@@ -436,7 +442,7 @@ def parse_args(argv=None):
               "disk_bytes": (MIN_CAMPAIGN_BYTES * 2, 10**10), "profile_disk_bytes": (MIN_CAMPAIGN_BYTES, 10**10),
               "output_limit": (1024, 64 * 1024**2), "cleanup_seconds": (.1, 30), "case_timeout": (.001, 3600),
               "direct_fuel": (1, 10000000), "core_fuel": (1, 1000000000), "gas": (1, 1000000000),
-              "shrink_attempts": (0, 10000), "shrink_candidates": (1, 4096)}
+              "shrink_attempts": (0, 10000), "shrink_candidates": (1, 4096), "nodes_scale": (1, 4)}
     if args.nodes is not None:
         limits["nodes"] = (3, 512)
     for key, (low, high) in limits.items():
