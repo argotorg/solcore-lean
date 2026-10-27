@@ -2096,6 +2096,35 @@ dispatcher and decoder. The definitions were fixed before execution:
   Every length is checked against the calldata size before any loop or copy,
   so a huge length reverts instead of running out of gas.
 
+What std does with each malformation, from that reading:
+- Short calldata and a wrong selector revert with `0x4924aef0`.
+- A truncated head, a truncated tail, every out-of-range or wrapping offset, a
+  length one too long, `2^251`, `2^251 + 1` and the maximum revert with
+  `0x08638556`.
+- Trailing bytes are ignored.
+- Offset 0 decodes the flags word as the length and runs.
+- Offset 32 makes the offset word its own length of 32 and reverts.
+- A shorter or zero length decodes a prefix and runs.
+
+Before any random run, the golden cases passed on both models. Once the
+compiled contract ran, the Hull and EVM paths of every fixed and random
+rejection reverted with exactly the selector the reading predicts.
+
+With scripts and native tools frozen on `20ba7418c`:
+- Fixed corpora on O0 and O2: the thirteen existing ones still pass with 167
+  scenarios and 460 prefixes per level. The new one matched its 13 scenarios
+  and 36 prefixes with complete coverage, 22 of its rows compared by
+  selector.
+- Random suites of sixteen eight-transaction cases (seed 20261030) at 448 and
+  512 nodes matched 16 scenarios and 128 prefixes on each level, every case
+  on revision three:
+  - at 448 nodes, 81 rows were compared by selector (31 `0x4924aef0`, 50
+    `0x08638556`) and 47 transactions were accepted;
+  - at 512 nodes, 82 rows were compared by selector and 46 accepted.
+- A case took about 7 seconds, so sixteen cases used under two minutes of the
+  900-second budget. Four seeds at 448 nodes left too few nodes for their
+  step template. There was no finding.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

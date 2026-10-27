@@ -3032,6 +3032,19 @@ the words std decodes. Required coverage is every malformation kind, both std
 selectors and acceptance, lengths 0 to 3, one to three helpers and
 transactions, all four templates, both outcomes and eight completion patterns.
 
+Local validation used committed code with frozen scripts and native tools. The
+fixed suite matched all thirteen scenarios and 36 prefixes on Sonatina O0 and
+O2 with complete coverage. Its 22 std rejections reverted on Hull and EVM with
+exactly the selector std prescribes, while the thirteen existing stateful
+corpora kept their 167 scenarios and 460 prefixes. Random suites of sixteen
+eight-transaction cases (seed `20261030`) matched all 16 scenarios and 128
+prefixes on both levels, at 448 nodes and at 512:
+- 448 nodes: 81 rows were compared by selector and 47 transactions were
+  accepted;
+- 512 nodes: 82 rows were compared by selector and 46 transactions were
+  accepted.
+A case took about 7 seconds. Neither run produced a finding.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The nine
