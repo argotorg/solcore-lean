@@ -63,7 +63,7 @@ an unsupported expression with a different computation.
 
 ## G0 generator revisions
 
-The G0 generator has three replay revisions, all layered on the unchanged
+The G0 generator has four replay revisions, all layered on the unchanged
 `lcg64-v1` draws. A case records its revision in `generatorVersion`. The
 primitive profile records `core-primitives-v1/` followed by the revision there,
 and the plain revision in `baseGeneratorVersion`.
@@ -72,7 +72,8 @@ and the plain revision in `baseGeneratorVersion`.
 | --- | --- | --- |
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
 | v2 | `core-g0-v2/lcg64-v1` | `--g0-version` for the pure and stateful profiles |
-| v3 | `core-g0-v3/lcg64-v1` | random generation of the eleven G0-based pure profiles and of every stateful step |
+| v3 | `core-g0-v3/lcg64-v1` | random generation of every stateful step; `--g0-version` for the pure profiles |
+| v4 | `core-g0-v4/lcg64-v1` | random generation of the eleven G0-based pure profiles |
 
 The eleven are `closed-g0`, `runtime-word`, `runtime-primitives`,
 `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-loops`,
@@ -133,16 +134,16 @@ regenerate unchanged; an unknown version is rejected. `replay` regenerates a
 seeded case with its recorded revision, and `shrink` gives each reduction its
 parent's revision. The call-graph commands take no version.
 
-`scripts/semantic-campaign.py` passes `core-g0-v3/lcg64-v1` in random mode for
+`scripts/semantic-campaign.py` passes `core-g0-v4/lcg64-v1` in random mode for
 the eleven profiles; `--g0-version` selects a revision explicitly. With
 `--corpus` it passes the manifest's version, and with `--case` it keeps the
 saved case's; a disagreeing `--g0-version` is refused. The campaign summary
 records `configuration.g0Version` and the generated cases' versions in
 `generation.generatorVersions`. `semantic-suite.py --mode random` therefore
-generates v3 for these profiles, and fixed mode stays on v1. The stateful
+generates v4 for these profiles, and fixed mode stays on v1. The stateful
 profiles build their random aggregate steps with v3 under their own tools,
-which record, replay and pass on each case's mask, and their fixed corpora
-stay on v1 (see
+which record, replay and pass on each case's mask but reject v4, and their
+fixed corpora stay on v1 (see
 [storage campaigns](#run-and-reduce-storage-campaigns)).
 
 ### Revision three: swarm masks
@@ -187,6 +188,87 @@ enabled in 900 to 1,148 of 2,048 masks. Both revisions use all 26 features over
 the sample. Before the second draw, a disabled form fell to a leaf instead;
 those programs had 5,561 operators at 32 nodes, a quarter fewer than v2.
 
+### Revision four: masks within the emitter
+
+v4 is v3 with each case's swarm mask restricted to the G0 features the
+profile's emitter renders. Each emitter declares them from its renderer's own
+operator predicates (`featureSupport` in the emitter modules), and a registered
+Lean test probes every catalog feature through every pure emitter: a feature
+emits exactly when it is declared.
+
+| Renderer | Features | Programs |
+| --- | --- | --- |
+| Scalar | Bool and Word negation; add, sub, mul, and, or, xor, `==` and `>`; `let` and `if` (12 of 26) | `closed-g0`, `runtime-word`, `runtime-functions` and `runtime-mutation`; comptime and module constants |
+| Primitive, call-graph and aggregate | all 26 | `runtime-primitives`, `runtime-aggregates`, `runtime-loops`, `runtime-generics` and `runtime-closures`; comptime and module steps |
+
+Where the emitter renders every feature, v4 is v3 apart from its version:
+`runtime-primitives`, `runtime-aggregates`, `runtime-loops`,
+`runtime-generics` and `runtime-closures`. The four scalar profiles restrict
+the mask of every G0 program of the case. A comptime or module case records
+its step's mask, which is the unrestricted v3 mask, and its constant uses that
+mask restricted to the scalar renderer's features.
+
+When the restriction removes every operator the mask enabled, the case uses the
+emitter's whole feature set instead, so it never draws programs of leaves,
+`let` and `if` alone where v3 had operators. Under the scalar renderer that
+happens for about one seed in a thousand (18 of the first 20,000; seed 323 is
+the first). A v3 mask that enables no operator, of which the first 200,000
+seeds have none, restricts plainly.
+
+A v4 case records its effective mask in `provenance.swarmMask`. Replay
+requires it, rejects a mask outside the profile's features and checks a seeded
+case's mask against its seed; a reduction copies its parent's mask. The
+stateful tools parse versions only up to v3, so they reject v4 as an unknown
+version. The pure case tool accepts all four.
+
+Over the first 256 functions accepted from seed 1 at the campaign's default
+budgets, with seeded inputs, v4 left no exclusion for an unsupported operator.
+An identity function returned each of its eight to twelve recorded inputs
+under direct Core evaluation; for `closed-g0` the column counts programs that
+are one literal. No accepted function was constant, since every runtime
+profile rejects functions whose boundary outputs agree.
+
+| Profile | Distinct sources | Identity | Attempts per function | Unsupported-operator exclusions | Other v4 exclusions |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `closed-g0` | 193 → 245 | 174 → 41 | 4.08 → 1.00 | 788 → 0 | none |
+| `runtime-word` | 39 → 188 | 210 → 82 | 4.52 → 1.54 | 873 → 0 | 137 equal boundary outputs |
+| `runtime-functions` | 133 → 220 | 110 → 36 | 6.25 → 1.89 | 771 → 0 | 161 template budget, 67 equal boundary outputs |
+| `runtime-mutation` | 253 → 256 | 4 → 3 | 9.79 → 1.04 | 2,147 → 0 | 10 template budget |
+| `runtime-comptime` | 256 → 256 | 0 → 4 | 6.09 → 1.48 | 930 → 0 | 120 constants without an operation, 2 equal boundary outputs |
+| `runtime-modules` | 256 → 256 | 0 → 0 | 6.98 → 1.57 | 995 → 0 | 113 constants without an operation, 33 template budget |
+| `runtime-primitives` | 150 | 103 | 2.29 | 0 | 331 equal boundary outputs |
+| `runtime-aggregates` | 256 | 24 | 1.00 | 0 | none |
+| `runtime-loops` | 256 | 0 | 1.13 | 0 | 34 loops that returned every positive-trip input unchanged |
+| `runtime-generics` | 256 | 0 | 1.00 | 0 | none |
+| `runtime-closures` | 256 | 0 | 1.00 | 0 | none |
+
+Single values are the same under both revisions. Duplicates no longer form
+the majority of any profile, but the identity stays common where a one-leaf
+program always passes and many larger ones give equal boundary outputs: 82 of
+256 `runtime-word` functions under v4 and 103 of 256 `runtime-primitives`
+functions under both revisions. v4 does not deduplicate sources.
+
+Frozen sixteen-case random matrices of the eleven profiles, from root seed 1
+with shared compilation, matched all 176 v4 cases on O0 in 279 seconds and on
+O2 in 303 seconds, against 268 and 363 seconds for v3. Both revisions compiled
+35 distinct sources, since sixteen cases hold one or two functions of each
+runtime profile. v4 needed 16 `closed-g0` generation attempts instead of 70, 3
+for `runtime-functions` instead of 50, 2 for `runtime-mutation` instead of 21
+and 2 for `runtime-modules` instead of 18. v3's O2 matrix again crashed the
+compiler on all eight inputs of the recorded `runtime-comptime` plan seed
+`13439332813997308049`. v4 accepts the preceding seed, which v3 excluded for an
+unsupported operator, so its sixteen cases end before that plan; generated
+under v4, the plan still crashes.
+
+With whole functions, sixteen per profile on O0 and both revisions from the
+same root, v4 found 14 distinct `runtime-word` sources against 3 (4.2 against
+1.5 per minute) in 23 attempts against 81, 15 `runtime-functions` sources
+against 13, and 11 `runtime-primitives` sources under both. Sixty-four
+`closed-g0` cases had 63 distinct sources in 64 attempts, while v3 exhausted
+its 256 default attempts after 58 programs with 47 sources. Other work loaded
+the machine heavily during these runs, with load averages up to 60, so their
+times are approximate; source and attempt counts do not depend on load.
+
 ## Seeded runtime inputs
 
 Random campaigns of the thirteen runtime-input pure profiles, every pure
@@ -214,6 +296,23 @@ the two loop profiles and twelve in `runtime-primitives`,
 counts inputs, so a sixteen-case run of a four-input profile covers two
 functions rather than four. The admission filters still use the boundary
 inputs only.
+
+A random runtime-input campaign can instead ask for whole functions:
+`--functions N` generates N accepted functions with all of their inputs. It
+replaces `--cases` with N times the profile's inputs per function, and every
+count stays per case. The case tool returns at most 1,024 cases, which bounds
+N:
+
+| Profiles | Inputs per function, seeded (boundary) | Largest N, seeded (boundary) |
+| --- | ---: | ---: |
+| `runtime-word`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-generics`, `runtime-closures`, `runtime-comptime`, `runtime-modules` | 8 (4) | 128 (256) |
+| `runtime-loops`, `runtime-call-graph-loops` | 10 (6) | 102 (170) |
+| `runtime-primitives`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | 12 (8) | 85 (128) |
+
+The summary records `configuration.functions`,
+`generation.requestedFunctions` and `generation.inputsPerFunction`, all null
+without the option. The campaign refuses `--functions` with `--cases`, with a
+corpus or a saved case, for `closed-g0` and outside the bounds above.
 
 These profiles' generation commands take the selection after `FUEL`, in either
 order with a G0 version:
@@ -522,7 +621,9 @@ always becomes the identity and passes; the mutation templates keep that
 profile's sources distinct. The primitive profile's exclusions were all
 functions whose eight boundary outputs agreed. Sharing compiles each repeat
 once, but every repeat still runs all its inputs: a 64-case random
-`runtime-word` run had eight functions and two distinct sources.
+`runtime-word` run had eight functions and two distinct sources. [Revision
+four](#revision-four-masks-within-the-emitter) keeps masks within each
+emitter's features and removes most of these repeats.
 
 ## Check the reducer
 

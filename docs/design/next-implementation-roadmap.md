@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision three, revision two under per-case swarm masks, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs and can request whole functions; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]` and malformed-calldata extensions validated locally, the last comparing std error reverts by selector; all fourteen stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions; multi-word return values need a contract runtime change; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -702,6 +702,48 @@ The aggregate emitter supports every G0 operator, so 936 attempts had no
 operator exclusion. The only exclusions were 40 template-budget refusals, 0 to
 12 per profile, the most in malformed calldata, whose wrapper leaves its step
 175 nodes.
+
+**G0 generator revision four.** Random mode now generates the eleven G0-based
+pure profiles with `core-g0-v4/lcg64-v1`: revision three with each case's swarm
+mask restricted to the features the profile's emitter renders. Every emitter
+declares them from its renderer's operator predicates, and a registered test
+probes all 26 catalog features through each pure emitter and requires a
+feature to emit exactly when it is declared. The scalar renderer, used by
+`closed-g0`, `runtime-word`, `runtime-functions`, `runtime-mutation` and the
+comptime and module constants, renders twelve features; the primitive,
+call-graph and aggregate renderers render all 26, so the primitive, aggregate,
+loop, generic and closure profiles generate exactly as under revision three. A
+comptime or module case records its step's unrestricted mask, and its constant
+uses that mask restricted to the scalar renderer. A restriction that would
+remove every operator the mask enabled uses the emitter's whole feature set
+instead, about one seed in a thousand under the scalar renderer. A case records
+its effective mask, replay rejects a mask outside the profile's features, and
+reductions copy it. The stateful tools parse versions only up to revision three
+and stay on it; fixed corpora stay on revision one.
+
+Over the first 256 functions accepted from seed 1, revision four removed every
+exclusion for an unsupported operator, and in the six restricted profiles
+attempts per accepted function fell from 4.1–9.8 to 1.0–1.9. Distinct `runtime-word` sources rose from 39 to 188 and
+identities fell from 210 to 82; `runtime-functions` rose from 133 to 220
+sources with 110 against 36 identities, and one-literal `closed-g0` programs
+fell from 174 to 41. The identity remains frequent in `runtime-primitives`
+(103 of 256 under both revisions), whose emitter renders every feature, and in
+`runtime-word` (82); sources are not deduplicated. Random runtime-input
+campaigns also accept `--functions N`, which asks for N accepted functions
+with all of their inputs instead of a case count; summaries record
+`generation.requestedFunctions` and every count stays per case.
+
+The registered tests probe every catalog feature through every pure emitter
+and check revision-four generation, replay, tampering and reduction in all
+eleven profiles. The case tool reproduced revisions one to three byte for byte
+in 492 generation runs and 4,320 replays, observations and reductions against
+the previous build, and the stateful tools reject revision four. Frozen
+sixteen-case random matrices of the eleven profiles from root seed 1 matched
+all 176 revision-four cases on O0 and on O2. Revision three's O2 matrix again
+crashed on the recorded comptime plan; revision four's sixteen cases end before
+that plan, which still crashes when generated under revision four. With
+sixteen whole functions per profile, revision four found 14 distinct
+`runtime-word` sources against 3.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
