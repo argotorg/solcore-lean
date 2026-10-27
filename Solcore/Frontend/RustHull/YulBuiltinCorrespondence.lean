@@ -152,8 +152,8 @@ theorem step (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayo
     (offsetMember : ⟨"returnOffset", .word, layout.storage.returnOffset⟩ ∈ slots)
     (sizeMember : ⟨"returnSize", .word, layout.storage.returnSize⟩ ∈ slots) :
     YulBlockCorrespondence.BuiltinStep (model layout baseline slots image handlers anchors context) slots := by
-  intro name words state result next scope effect mapping environment world store computed compiled runtime fixed
-    stateRelated
+  intro name words state result next scope effect mapping environment world store effectNamed computed compiled runtime
+    fixed stateRelated
   have base := base_related stateRelated
   have beforeRuntime := RuntimeEnvironmentEffectsCorrespondence.runtime_related
     (RuntimeLogEffectsCorrespondence.runtime_related (RuntimeAccountEffectsCorrespondence.runtime_related (account_related base)))
@@ -251,6 +251,12 @@ theorem step (passive : RuntimeLogEffectsCorrespondence.Passive layout.toLogLayo
         TerminationBuiltinCorrespondence.terminate_state memoryBefore storageBefore 2 offset length
       exact ⟨_, _, haltResult, haltEvaluated, terminated_related passive stateRelated 2 offset length,
         TerminationBuiltinCorrespondence.terminate_closures memoryBefore storageBefore 2 offset length⟩
+  | add => exact absurd effectNamed (by decide)
+  | sub => exact absurd effectNamed (by decide)
+  | lt => exact absurd effectNamed (by decide)
+  | gt => exact absurd effectNamed (by decide)
+  | eq => exact absurd effectNamed (by decide)
+  | iszero => exact absurd effectNamed (by decide)
 
 end
 

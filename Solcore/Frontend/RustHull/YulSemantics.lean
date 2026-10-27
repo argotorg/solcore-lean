@@ -1,11 +1,14 @@
 import Solcore.Frontend.RustHull.RuntimeCallEffectsSemantics
+import Solcore.Frontend.RustHull.YulFragment
 
 /-! The connected fragment of inline Yul, independently of its lowering. An
 assembly block is a list of statements: `let` with one name and an optional
 value, assignment to one name, expression statements, nested blocks, `if` and
 `switch`. Expressions are literals, variables and calls of `mload`, `msize`,
-`mstore`, `mstore8`, `return` and `revert`. A call evaluates its arguments from
-right to left, so nested calls with effects observe the order. Yul locals live
+`mstore`, `mstore8`, `return` and `revert`, and of the word operations `add`
+and `sub` modulo 2^256, the unsigned comparisons `lt` and `gt`, `eq` and
+`iszero`, which give one or zero. A call evaluates its arguments from right to
+left, so nested calls with effects observe the order. Yul locals live
 in the Hull heap like Hull locals and are visible until the end of their block;
 a variable may also name a Hull word local, which the block reads and assigns in
 place. An `if` runs its body when the condition word is nonzero, and a `switch`
@@ -31,11 +34,15 @@ def withFrame (state : State) (next : RuntimeEffectsSemantics.State) : State :=
   {state with external := {state.external with
     runtime := (RuntimeReturnDataEffectsSemantics.withRuntime state.external.runtime next)}}
 
+/-- The builtins of the fragment with effects on the frame. -/
+def effectBuiltins : List String := ["mload", "msize", "mstore", "mstore8", "return", "revert"]
+
 /-- The builtins of the fragment. -/
-def builtins : List String := ["mload", "msize", "mstore", "mstore8", "return", "revert"]
+def builtins : List String := effectBuiltins ++ YulFragment.primitives
 
 /-- A builtin of the fragment on its argument words, in Yul order: a memory read
-or size, a memory write, or the return or revert termination. -/
+or size, a memory write, the return or revert termination, or a word operation
+that leaves the frame unchanged. -/
 inductive Builtin : String → List Word → RuntimeEffectsSemantics.State →
     Semantics.Result Semantics.Value → RuntimeEffectsSemantics.State → Prop where
   | mload {frame : RuntimeEffectsSemantics.State} {offset : Word} :
@@ -55,6 +62,22 @@ inductive Builtin : String → List Word → RuntimeEffectsSemantics.State →
   | reverted {frame : RuntimeEffectsSemantics.State} {offset length : Word} :
       Builtin "revert" [offset, length] frame (TerminationSemantics.terminate frame 2 offset length).1
         (TerminationSemantics.terminate frame 2 offset length).2
+  | add {frame : RuntimeEffectsSemantics.State} {left right : Word} :
+      Builtin "add" [left, right] frame (.value (.word (left + right))) frame
+  | sub {frame : RuntimeEffectsSemantics.State} {left right : Word} :
+      Builtin "sub" [left, right] frame (.value (.word (left - right))) frame
+  | lt {frame : RuntimeEffectsSemantics.State} {left right : Word} :
+      Builtin "lt" [left, right] frame
+        (.value (.word (if left < right then Word.ofNatModulo 1 else Word.zero))) frame
+  | gt {frame : RuntimeEffectsSemantics.State} {left right : Word} :
+      Builtin "gt" [left, right] frame
+        (.value (.word (if left > right then Word.ofNatModulo 1 else Word.zero))) frame
+  | eq {frame : RuntimeEffectsSemantics.State} {left right : Word} :
+      Builtin "eq" [left, right] frame
+        (.value (.word (if left = right then Word.ofNatModulo 1 else Word.zero))) frame
+  | iszero {frame : RuntimeEffectsSemantics.State} {value : Word} :
+      Builtin "iszero" [value] frame
+        (.value (.word (if value = Word.zero then Word.ofNatModulo 1 else Word.zero))) frame
 
 mutual
   /-- An expression's value. A call evaluates the reversed argument list from

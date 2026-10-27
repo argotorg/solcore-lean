@@ -3,16 +3,20 @@ import Solcore.Frontend.RustHull.Syntax
 /-! The inline Yul the common recursive proof accepts: statement lists of `let`
 with one name, assignment to one name, expression statements, nested blocks,
 `if` and `switch` without string case literals, over literals, variables and
-calls of supported names. Effect layers that support no name accept no block. -/
+calls of supported names or of the connected word primitives. Effect layers
+that support no name accept no block. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.YulFragment
+
+/-- The connected word primitives, lowered as pure Core operations. -/
+def primitives : List String := ["add", "sub", "lt", "gt", "eq", "iszero"]
 
 mutual
   inductive ExpressionEligible (supported : String → Prop) : YulExpr → Prop where
     | literal {value : YulLit} {span : Option Span} : ExpressionEligible supported ⟨.literal value, span⟩
     | ident {name : YulName} {span : Option Span} : ExpressionEligible supported ⟨.ident name, span⟩
-    | call {name : YulName} {arguments : List YulExpr} {span : Option Span} (named : supported name.name)
-        (eligible : ArgumentsEligible supported arguments) :
+    | call {name : YulName} {arguments : List YulExpr} {span : Option Span}
+        (named : supported name.name ∨ name.name ∈ primitives) (eligible : ArgumentsEligible supported arguments) :
         ExpressionEligible supported ⟨.call name arguments, span⟩
 
   inductive ArgumentsEligible (supported : String → Prop) : List YulExpr → Prop where

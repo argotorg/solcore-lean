@@ -12,8 +12,9 @@ variable reads it, and a call binds its argument words from right to left
 before the builtin code runs. A nested block, `if` or `switch` is joined to the
 rest of its list by `LocalLoop.sequence`; its bodies are lowered in the
 enclosing context, so their locals end with them, and any control other than
-fallthrough stops the list. The builtin code is a separate obligation,
-`BuiltinStep`, which the frame model meets. -/
+fallthrough stops the list. The code of an effect builtin is a separate
+obligation, `BuiltinStep`, which the frame model meets; the word primitives
+compile to pure Core code, which `primitive_step` proves for every model. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.YulBlockCorrespondence
 open Core Correspondence StatementCorrespondence
@@ -67,6 +68,38 @@ theorem expr_call {fuel : Nat} {context : YulLowering.Context} {name : YulName} 
     obtain ⟨effect, effectCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
     cases compiled
     exact ⟨loweredArguments, effect, argumentsCompiled, words_checked checked, effectCompiled, rfl⟩
+
+/-- The accepted lowering of a call of a word primitive: the argument
+lowerings, the actual `RustYulPrimitives` code over word temporaries, and the
+right-to-left argument binds. -/
+theorem expr_primitive {fuel : Nat} {context : YulLowering.Context} {name : YulName} {arguments : List YulExpr}
+    {span : Option Span} {lowered : Lowered}
+    (compiled : YulLowering.lowerExpr (fuel + 1) context ⟨.call name arguments, span⟩ = .ok lowered)
+    (noFunctions : context.functions = []) (notUser : name.name.startsWith "usr$" = false)
+    (notEffect : Effects.supports name.name = false) :
+    ∃ loweredArguments primitive, arguments.mapM (YulLowering.lowerExpr fuel context) = .ok loweredArguments ∧
+      (∀ argument ∈ loweredArguments, argument.type = .word) ∧
+      RustYulPrimitives.compile name.name ((List.range loweredArguments.length).map Core.Expr.var) =
+        .ok primitive ∧
+      lowered = ⟨primitive.type, YulLowering.bindArguments primitive.type
+        (LanguageResult.success primitive.expression) 0 loweredArguments.reverse⟩ := by
+  by_cases reserved : name.name.startsWith Effects.reservedPrefix
+  · simp only [YulLowering.lowerExpr, reserved, ↓reduceIte] at compiled
+    simp [fail, Bind.bind, Except.bind] at compiled
+  · simp only [YulLowering.lowerExpr, reserved, Bool.false_eq_true, ↓reduceIte, noFunctions, List.find?_nil,
+      notUser, notEffect] at compiled
+    obtain ⟨loweredArguments, argumentsCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
+    obtain ⟨_, checked, compiled⟩ := lower_bind_eq_ok.mp compiled
+    split at compiled
+    · cases compiled
+    split at compiled
+    · rename_i value primitiveCompiled
+      obtain ⟨primitive, chosen, compiled⟩ := lower_bind_eq_ok.mp compiled
+      cases chosen
+      cases compiled
+      exact ⟨loweredArguments, value, argumentsCompiled, words_checked checked, primitiveCompiled, rfl⟩
+    · obtain ⟨_, failed, _⟩ := lower_bind_eq_ok.mp compiled
+      cases failed
 
 theorem expr_literal {fuel : Nat} {context : YulLowering.Context} {literal : YulLit} {span : Option Span}
     {lowered : Lowered}
@@ -617,24 +650,139 @@ theorem Compound.isCompound {environment : Semantics.Environment} {statement : Y
     (compound : YulSemantics.Compound environment statement initial control final) : IsCompound statement := by
   cases compound <;> trivial
 
+/-- A builtin of the fragment is lowered either by `Effects.lowerBuiltin` or as a
+pure `RustYulPrimitives` operation. -/
 theorem builtin_named {name : String} (named : name ∈ YulSemantics.builtins) :
     name.startsWith Effects.reservedPrefix = false ∧ name.startsWith "usr$" = false ∧
-      Effects.supports name = true := by
-  simp only [YulSemantics.builtins, List.mem_cons, List.not_mem_nil, or_false] at named
-  rcases named with rfl | rfl | rfl | rfl | rfl | rfl <;> decide +kernel
+      ((name ∈ YulSemantics.effectBuiltins ∧ Effects.supports name = true) ∨
+        (name ∈ YulFragment.primitives ∧ Effects.supports name = false)) := by
+  simp only [YulSemantics.builtins, YulSemantics.effectBuiltins, YulFragment.primitives, List.mem_append,
+    List.mem_cons, List.not_mem_nil, or_false] at named
+  rcases named with (rfl | rfl | rfl | rfl | rfl | rfl) | (rfl | rfl | rfl | rfl | rfl | rfl) <;> decide +kernel
 
 theorem Builtin.named {name : String} {words : List Word} {frame next : RuntimeEffectsSemantics.State}
     {result : Semantics.Result Semantics.Value} (computed : YulSemantics.Builtin name words frame result next) :
     name ∈ YulSemantics.builtins := by
-  cases computed <;> simp [YulSemantics.builtins]
+  cases computed <;> decide
 
-/-- The builtin obligation of an effect model: the actual code of a builtin
-over its argument words, bound as the innermost Core values, simulates
+/-- The Core code of a two-argument word primitive, over the innermost values in
+source order. -/
+def binaryCode (body : Core.Expr) : Core.Expr :=
+  .apply (.lambda .word .word (.apply (.lambda .word .word body) (.var 1))) (.var 1)
+
+/-- The Core code of a one-argument word primitive. -/
+def unaryCode (body : Core.Expr) : Core.Expr :=
+  .apply (.lambda .word .word body) (.var 0)
+
+theorem binaryCode_evaluates {body : Core.Expr} {mapping : Renaming} {environment : Environment}
+    {store : Store} {left right : Word} {result : Value} (first : mapping 0 = 0) (second : mapping 1 = 1)
+    (evaluated : Evaluates (.word left :: .word right :: .word left :: .word right :: environment) store
+      (body.rename mapping.lift.lift) result store) :
+    Evaluates (.word left :: .word right :: environment) store ((binaryCode body).rename mapping) result store := by
+  apply Evaluates.apply .lambda (.var (by show (_ :: _ :: environment)[mapping 1]? = _; rw [second]; rfl))
+  apply Evaluates.apply .lambda
+    (.var (by show (_ :: _ :: _ :: environment)[mapping 0 + 1]? = _; rw [first]; rfl))
+  exact evaluated
+
+theorem unaryCode_evaluates {body : Core.Expr} {mapping : Renaming} {environment : Environment}
+    {store : Store} {value : Word} {result : Value} (first : mapping 0 = 0)
+    (evaluated : Evaluates (.word value :: .word value :: environment) store (body.rename mapping.lift) result store) :
+    Evaluates (.word value :: environment) store ((unaryCode body).rename mapping) result store := by
+  apply Evaluates.apply .lambda (.var (by show (_ :: environment)[mapping 0]? = _; rw [first]; rfl))
+  exact evaluated
+
+/-- The word primitives run their actual `RustYulPrimitives` code over the
+argument words and leave the frame unchanged, in every effect model. -/
+theorem primitive_step {name : String} {words : List Word} {frame next : RuntimeEffectsSemantics.State}
+    {result : Semantics.Result Semantics.Value} (computed : YulSemantics.Builtin name words frame result next)
+    (primitive : name ∈ YulFragment.primitives) {lowered : RustYulPrimitives.Lowered}
+    (compiled : RustYulPrimitives.compile name ((List.range words.length).map Core.Expr.var) = .ok lowered)
+    {mapping : Renaming} {environment : Environment} {store : Store}
+    (fixed : ∀ index < words.length, mapping index = index) :
+    next = frame ∧ ∃ target, ResultRel lowered.type result target ∧
+      Evaluates (words.map Value.word ++ environment) store
+        ((LanguageResult.success lowered.expression).rename mapping) target store := by
+  cases computed with
+  | mload => exact absurd primitive (by decide)
+  | msize => exact absurd primitive (by decide)
+  | mstore => exact absurd primitive (by decide)
+  | mstore8 => exact absurd primitive (by decide)
+  | returned => exact absurd primitive (by decide)
+  | reverted => exact absurd primitive (by decide)
+  | @add _ left right =>
+      have code : RustYulPrimitives.compile "add" [.var 0, .var 1] =
+          .ok ⟨.word, binaryCode (.binary .wordAdd (.var 0) (.var 1))⟩ := rfl
+      rw [show (List.range [left, right].length).map Core.Expr.var = [.var 0, .var 1] from rfl, code] at compiled
+      cases compiled
+      exact ⟨rfl, _, .value (.word _), LanguageResult.success_evaluates
+        (binaryCode_evaluates (fixed 0 (by simp)) (fixed 1 (by simp)) (.binary (.var rfl) (.var rfl) rfl))⟩
+  | @sub _ left right =>
+      have code : RustYulPrimitives.compile "sub" [.var 0, .var 1] =
+          .ok ⟨.word, binaryCode (.binary .wordSub (.var 0) (.var 1))⟩ := rfl
+      rw [show (List.range [left, right].length).map Core.Expr.var = [.var 0, .var 1] from rfl, code] at compiled
+      cases compiled
+      exact ⟨rfl, _, .value (.word _), LanguageResult.success_evaluates
+        (binaryCode_evaluates (fixed 0 (by simp)) (fixed 1 (by simp)) (.binary (.var rfl) (.var rfl) rfl))⟩
+  | @lt _ left right =>
+      have code : RustYulPrimitives.compile "lt" [.var 0, .var 1] =
+          .ok ⟨.word, binaryCode (.ifE (.binary .wordGt (.var 1) (.var 0)) (.word (Word.ofNatModulo 1))
+            (.word Word.zero))⟩ := rfl
+      rw [show (List.range [left, right].length).map Core.Expr.var = [.var 0, .var 1] from rfl, code] at compiled
+      cases compiled
+      refine ⟨rfl, _, .value (.word _), LanguageResult.success_evaluates
+        (binaryCode_evaluates (fixed 0 (by simp)) (fixed 1 (by simp)) ?_)⟩
+      by_cases below : left < right
+      · rw [if_pos below]
+        exact .ifTrue (.binary (.var rfl) (.var rfl) (by simp [BinaryOp.apply, below])) .word
+      · rw [if_neg below]
+        exact .ifFalse (.binary (.var rfl) (.var rfl) (by simp [BinaryOp.apply, below])) .word
+  | @gt _ left right =>
+      have code : RustYulPrimitives.compile "gt" [.var 0, .var 1] =
+          .ok ⟨.word, binaryCode (.ifE (.binary .wordGt (.var 0) (.var 1)) (.word (Word.ofNatModulo 1))
+            (.word Word.zero))⟩ := rfl
+      rw [show (List.range [left, right].length).map Core.Expr.var = [.var 0, .var 1] from rfl, code] at compiled
+      cases compiled
+      refine ⟨rfl, _, .value (.word _), LanguageResult.success_evaluates
+        (binaryCode_evaluates (fixed 0 (by simp)) (fixed 1 (by simp)) ?_)⟩
+      by_cases above : left > right
+      · rw [if_pos above]
+        exact .ifTrue (.binary (.var rfl) (.var rfl) (by simp [BinaryOp.apply, above])) .word
+      · rw [if_neg above]
+        exact .ifFalse (.binary (.var rfl) (.var rfl) (by simp [BinaryOp.apply, above])) .word
+  | @eq _ left right =>
+      have code : RustYulPrimitives.compile "eq" [.var 0, .var 1] =
+          .ok ⟨.word, binaryCode (.ifE (.binary .wordEq (.var 0) (.var 1)) (.word (Word.ofNatModulo 1))
+            (.word Word.zero))⟩ := rfl
+      rw [show (List.range [left, right].length).map Core.Expr.var = [.var 0, .var 1] from rfl, code] at compiled
+      cases compiled
+      refine ⟨rfl, _, .value (.word _), LanguageResult.success_evaluates
+        (binaryCode_evaluates (fixed 0 (by simp)) (fixed 1 (by simp)) ?_)⟩
+      by_cases same : left = right
+      · rw [if_pos same]
+        exact .ifTrue (.binary (.var rfl) (.var rfl) (by simp [BinaryOp.apply, same])) .word
+      · rw [if_neg same]
+        exact .ifFalse (.binary (.var rfl) (.var rfl) (by simp [BinaryOp.apply, same])) .word
+  | @iszero _ value =>
+      have code : RustYulPrimitives.compile "iszero" [.var 0] =
+          .ok ⟨.word, unaryCode (.ifE (.binary .wordEq (.var 0) (.word Word.zero)) (.word (Word.ofNatModulo 1))
+            (.word Word.zero))⟩ := rfl
+      rw [show (List.range [value].length).map Core.Expr.var = [.var 0] from rfl, code] at compiled
+      cases compiled
+      refine ⟨rfl, _, .value (.word _), LanguageResult.success_evaluates (unaryCode_evaluates (fixed 0 (by simp)) ?_)⟩
+      by_cases zero : value = Word.zero
+      · rw [if_pos zero]
+        exact .ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply, zero])) .word
+      · rw [if_neg zero]
+        exact .ifFalse (.binary (.var rfl) .word (by simp [BinaryOp.apply, zero])) .word
+
+/-- The builtin obligation of an effect model: the actual code of an effect
+builtin over its argument words, bound as the innermost Core values, simulates
 `YulSemantics.Builtin`. -/
 def BuiltinStep (model : StateModel RuntimeCallEffectsSemantics.State) (slots : List EffectSlot) : Prop :=
   ∀ {name : String} {words : List Word} {state : YulSemantics.State} {result : Semantics.Result Semantics.Value}
     {next : RuntimeEffectsSemantics.State} {scope : Scope} {effect : Lowered} {mapping : Renaming}
     {environment : Environment} {world : World} {store : Store},
+    name ∈ YulSemantics.effectBuiltins →
     YulSemantics.Builtin name words (YulSemantics.frame state) result next →
     Effects.lowerBuiltin scope name ((List.range words.length).map Core.Expr.var) = .ok effect →
     EffectEnvironmentRel slots scope mapping (words.map Value.word ++ environment) →
@@ -735,35 +883,57 @@ theorem expression_simulation (step : BuiltinStep model slots) {sourceEnvironmen
     cases fuel with
     | zero => cases compiled
     | succ fuel =>
-        obtain ⟨_, notUser, builtin⟩ := builtin_named (Builtin.named computed)
-        obtain ⟨loweredArguments, effect, argumentsCompiled, typed, effectCompiled, rfl⟩ :=
-          expr_call compiled noFunctions notUser builtin
-        obtain ⟨middleStore, lengthEq, middleState, firstFrame, continued⟩ :=
-          argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
-            stateRelated [] effect.type effect.expression
-        have count : words.reverse.length = loweredArguments.length := by simpa using lengthEq
-        obtain ⟨target, finalStore, related, effectEvaluated, finalState, lastFrame⟩ :=
-          step computed (by rw [count]; exact effectCompiled)
-            (temporaries_related runtime loweredArguments (words.reverse.map Value.word) (by simpa using count))
-            (fun index below => liftN_below mapping (count ▸ below)) middleState
-        refine ⟨target, finalStore, related, continued ?_, finalState, firstFrame.trans lastFrame⟩
-        have sameLength : ([] : Environment).length + words.length = loweredArguments.length := by
-          simpa using count
-        rw [sameLength, List.append_nil, ← List.map_reverse]
-        exact effectEvaluated
+        obtain ⟨_, notUser, kind⟩ := builtin_named (Builtin.named computed)
+        rcases kind with ⟨effectNamed, builtin⟩ | ⟨primitiveNamed, notEffect⟩
+        · obtain ⟨loweredArguments, effect, argumentsCompiled, typed, effectCompiled, rfl⟩ :=
+            expr_call compiled noFunctions notUser builtin
+          obtain ⟨middleStore, lengthEq, middleState, firstFrame, continued⟩ :=
+            argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
+              stateRelated [] effect.type effect.expression
+          have count : words.reverse.length = loweredArguments.length := by simpa using lengthEq
+          obtain ⟨target, finalStore, related, effectEvaluated, finalState, lastFrame⟩ :=
+            step effectNamed computed (by rw [count]; exact effectCompiled)
+              (temporaries_related runtime loweredArguments (words.reverse.map Value.word) (by simpa using count))
+              (fun index below => liftN_below mapping (count ▸ below)) middleState
+          refine ⟨target, finalStore, related, continued ?_, finalState, firstFrame.trans lastFrame⟩
+          have sameLength : ([] : Environment).length + words.length = loweredArguments.length := by
+            simpa using count
+          rw [sameLength, List.append_nil, ← List.map_reverse]
+          exact effectEvaluated
+        · obtain ⟨loweredArguments, primitive, argumentsCompiled, typed, primitiveCompiled, rfl⟩ :=
+            expr_primitive compiled noFunctions notUser notEffect
+          obtain ⟨middleStore, lengthEq, middleState, firstFrame, continued⟩ :=
+            argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
+              stateRelated [] primitive.type (LanguageResult.success primitive.expression)
+          have count : words.reverse.length = loweredArguments.length := by simpa using lengthEq
+          obtain ⟨rfl, target, related, primitiveEvaluated⟩ :=
+            primitive_step (environment := environment) (store := middleStore) computed primitiveNamed
+              (by rw [count]; exact primitiveCompiled) (fun index below => liftN_below mapping (count ▸ below))
+          refine ⟨target, middleStore, related, continued ?_, middleState, firstFrame⟩
+          have sameLength : ([] : Environment).length + words.length = loweredArguments.length := by
+            simpa using count
+          rw [sameLength, List.append_nil, ← List.map_reverse]
+          exact primitiveEvaluated
   case callFault =>
     intro name arguments span initial final reason named _ argumentsSimulated
       fuel context lowered noFunctions compiled world mapping environment store environmentRelated runtime stateRelated
     cases fuel with
     | zero => cases compiled
     | succ fuel =>
-        obtain ⟨_, notUser, builtin⟩ := builtin_named named
-        obtain ⟨loweredArguments, effect, argumentsCompiled, typed, _, rfl⟩ :=
-          expr_call compiled noFunctions notUser builtin
-        obtain ⟨reasonWord, finalStore, rfl, finalState, frame, faulted⟩ :=
-          argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
-            stateRelated [] effect.type effect.expression
-        exact ⟨_, finalStore, .language reasonWord, faulted, finalState, frame⟩
+        obtain ⟨_, notUser, kind⟩ := builtin_named named
+        rcases kind with ⟨_, builtin⟩ | ⟨_, notEffect⟩
+        · obtain ⟨loweredArguments, effect, argumentsCompiled, typed, _, rfl⟩ :=
+            expr_call compiled noFunctions notUser builtin
+          obtain ⟨reasonWord, finalStore, rfl, finalState, frame, faulted⟩ :=
+            argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
+              stateRelated [] effect.type effect.expression
+          exact ⟨_, finalStore, .language reasonWord, faulted, finalState, frame⟩
+        · obtain ⟨loweredArguments, primitive, argumentsCompiled, typed, _, rfl⟩ :=
+            expr_primitive compiled noFunctions notUser notEffect
+          obtain ⟨reasonWord, finalStore, rfl, finalState, frame, faulted⟩ :=
+            argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
+              stateRelated [] primitive.type (LanguageResult.success primitive.expression)
+          exact ⟨_, finalStore, .language reasonWord, faulted, finalState, frame⟩
   case nil =>
     intro state fuel context loweredArguments _ lowers world mapping environment store _ _ stateRelated bound type body
     cases lowers

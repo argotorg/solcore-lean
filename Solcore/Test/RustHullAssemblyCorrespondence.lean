@@ -125,7 +125,7 @@ theorem eligible (scenario : Scenario) {supported : String → Prop}
       intro statement member
       simp only [List.mem_singleton] at member
       subst member
-      exact .expression (.call (available _ (by simp [usedNames])) (.cons .literal (.cons .literal .nil)))
+      exact .expression (.call (.inl (available _ (by simp [usedNames]))) (.cons .literal (.cons .literal .nil)))
 
 private theorem names_supported : ∀ name ∈ usedNames, ContractCallModeCorrespondence.supported true name := by
   intro name member
