@@ -243,6 +243,34 @@ expression of the callee lies in the closed subset, so `preserves_closed` and
 `reflects_closed` give the input for such a callee at every grade without the
 induction.
 
+Direct calls enter the expression closure at expression roots.
+[CellAwareInvocationAcceptedCallTrees](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallTrees.lean)
+adds them to the first subset (`CallSubset`) when four conditions hold:
+- the call's arguments are first-subset sites;
+- its node has no coercions or requirements;
+- its declaration is monomorphic and the calling row has no evidence
+  assumptions (`DirectSite`, whose policy lemmas are in
+  [CellAwareInvocationAcceptedDirectSites](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedDirectSites.lean));
+- the family admits its instantiation.
+
+At such a call the receipt tree (`CallTree`) keeps the compiler's direct-call
+receipt, the authority (`Port`) of the selected header and the subset receipt
+trees of the arguments. `of_call_subset` extracts it from the compiler's
+acceptance; the call authority of the body's receipts is an input (`Ports`),
+as in the older direct families.
+[CellAwareInvocationAcceptedCallBounds](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallBounds.lean)
+closes the tree: subset roots use the existing bounds, and calls use the
+direct-call head, with evidence from the call's empty requirements.
+[CellAwareInvocationAcceptedCallExpressions](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallExpressions.lean)
+turns `ClosedCalls` into `Expressions` on the slot-retaining protocol, given
+the application of every admitted callee below the budget.
+[CellAwareInvocationAcceptedCallFamily](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallFamily.lean)
+closes a family. Suppose every catalog header with an admitted instantiation
+has the receipts of such a row (`Row`). Then one strong induction on the grade
+gives `Expressions` for every family body, and its `preserves` and `reflects`
+give the application of every admitted header at every grade. A call nested
+inside another expression is not yet covered.
+
 The public connection of this subset starts at
 [CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
 Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
@@ -363,12 +391,13 @@ On the accepted-body route above, the next connected steps are:
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Extend the expression closure beyond its first subset over the same actual
-  accepted expression compiler. For direct calls, add call sites to the subset
-  and its receipt tree, and close them by one size induction over a family of
-  rows whose bodies each meet the accepted-body premises. At a call of a given
-  grade the head needs the callee's application below that grade, which the
-  row lemma derives from the callee body's expressions below it. After direct
-  calls come indirect and builtin calls,
+  accepted expression compiler. Direct calls at expression roots are closed
+  over families of rows. Allow them inside other expressions and as arguments,
+  and derive their call authority (`Ports`) from the compiler receipt. To
+  connect family rows to the public root, its entry must start the body on the
+  slot-retaining protocol, and the statement lifting must lift original traces
+  of call-containing bodies by the same induction on the original semantics.
+  After direct calls come indirect and builtin calls,
   methods, indices, tuples, constructors, generalized reads, closures and
   coercions. Expressions of contextual closures need the relation between the
   compiler view and the Source that their writes and matches also need.
