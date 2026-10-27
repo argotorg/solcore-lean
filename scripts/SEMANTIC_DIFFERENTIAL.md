@@ -2389,6 +2389,80 @@ senders, value-bearing transfers, contract callers, other key or value types
 or Solidity's slot order. Agreement is test evidence, not a preservation
 proof.
 
+## Compare `bytes` payloads beyond 64 bytes
+
+The `stateful-long-bytes` profile extends the bytes profile to payloads of up
+to 256 bytes. It was built as the fallback for ABI-encoded multi-word return
+values: original Core's contract entry conventions return exactly one Word,
+and no host request writes return data, so a tuple or `bytes` return would
+need a new entry convention in the shared contract runtime. Each transaction
+calls `SynthesizedLongBytes.run(uint256 flags, bytes payload)`, selector
+`0x220eb9b6`, with the bytes profile's canonical head/tail encoding and a
+payload of 0 to 256 bytes. The calldata is therefore 100 to 356 bytes long.
+The source parameter is again `payload: memory<bytes>`, so the pinned decoder
+copies the length Word and up to eight payload Words into fresh memory and
+zeroes the padding.
+
+The contract reads `acc = sload(0)`. For each present 32-byte chunk `k` from 0
+to 7 (present when the length exceeds `32k`) it computes `acc = step(acc +
+chunk_k)` with the checked aggregate step and writes slot `1 + k`; in a chunk,
+payload bytes at or past the length read as zero. It then writes `acc` to slot
+0, adds the payload length to a running byte count in slot 9 and writes the
+last payload byte, or zero for an empty payload, to slot 10. The result is
+`sload(0) + sload(9) + sload(10) + calldatasize()`. Odd flags revert with it
+as a 32-byte payload after the writes; other flags return it. With two chunks
+and slots 3 and 4 for the count and the last byte, this is exactly the bytes
+profile.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Payload scope.** A payload has 0 to 256 bytes, including lengths that are
+  not multiples of 32, and its calldata is exactly the canonical encoding.
+  Non-canonical offsets, truncated or longer payloads and nonzero padding are
+  outside the profile, as for the bytes profile.
+- **Reading.** As for the bytes profile. Original Core follows the head offset
+  to the length and reads each chunk Word with `inputDataWordBE?`, masked to
+  the payload length, the last payload byte with `inputDataByte?` and the
+  calldata size with `inputDataSize`. Core and its host interface are
+  unchanged. The source reads chunk `k` of the decoded copy as `mload(data +
+  32 + 32k)` and the last byte as `mload(data + length) & 255`.
+- **Committed observation.** After every transaction all three paths report
+  status, payload and slots 0 through 10. The keyed profile's containment
+  rules apply: the Hull and EVM paths must show no nonzero committed slot
+  outside them. Memory is per call and not observed.
+- **Committed comparison.** All three paths must agree on every observed field
+  after every transaction. Each path must also follow the fixed protocol: the
+  flags parity selects the completion and the payload is one Word. A revert
+  keeps the prior slots. A returned transaction adds its payload length to
+  slot 9, leaves its last payload byte (zero when empty) in slot 10 and
+  returns the sum of the committed slots 0, 9 and 10 plus its calldata size.
+- **Rollback.** A revert keeps the prior committed slots on every path, chosen
+  by `ContractRuntime` for original Core. An incomplete transaction ends the
+  sequence.
+- **Deployment.** The constructor is empty and receives zero value. Every
+  declared slot is zero afterwards, and no undeclared slot is nonzero on the
+  Hull and EVM paths. Original Core starts from the declared post-deployment
+  world.
+- **Sequence reduction.** As for the bytes profile: candidates simplify the
+  checked step (keeping every helper and binder), remove one transaction with
+  stable IDs, truncate one payload to a shorter length from the generation
+  bank, set every byte of one payload to zero, or reduce one transaction's
+  flags to their parity or clear its revert bit. They are ordered by
+  transaction count, complete program complexity, total payload length, then
+  the sum of all flags and payload bytes.
+- **Node budget.** The eight chunk guards are a fixed part of the wrapper and
+  lie outside the step's node budget, as the mapping's Keccak closure does;
+  the complete contract may exceed the requested budget by exactly their size.
+
+Generation draws three payload lengths from the bank 0, 1, 64, 65, 96, 97,
+128, 129, 192, 223, 255 and 256, a byte pattern for each (zeros, `0xff`, the
+ramp 1, 2, 3, ... or seeded bytes) and one of four completion patterns from a
+separate high-bit stream; flags are just the parity. Coverage adds the payload
+lengths and the payload lengths of reverted transactions, as for the bytes
+profile. The chunk Words are the runtime inputs.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

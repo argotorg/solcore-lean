@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage and two-slot rollback emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping and sender-keyed ledger extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping and sender-keyed ledger extensions validated locally; `bytes` payloads of up to 256 bytes defined; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, a direct-call head and the row lemma that derives its input from the callee's own accepted body; call sites in the subset and the size induction across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch` and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1403,6 +1403,48 @@ This scope does not compare gas, balances, nonces, code or memory, other
 senders, value-bearing transfers, contract callers, other key or value types
 or Solidity's slot order. Agreement is test evidence, not a preservation
 proof.
+
+The ninth extension was to compare ABI-encoded multi-word return values on all
+three paths. Original Core cannot produce them without a change. Its two
+contract entry conventions, `returnWord` and `wordOutcomeV1` in
+`CoreContractEntryProfile`, decode the result into exactly one Word of return
+data, and no host request writes return data. A static tuple or a `bytes`
+return would need a new entry convention, with its decoding lemmas, in the
+shared contract runtime. That lies outside this work's files and would change
+Core's runtime interface, so the fallback was built instead.
+
+The fallback, `stateful-long-bytes`, takes the bytes profile's protocol from
+two 32-byte chunks to eight, so payloads reach 256 bytes. The pinned decoder
+then copies up to eight Words into memory, and both Core and the source read
+every chunk. Its definitions were fixed before execution:
+
+- Transactions: one to three zero-value calls of `run(uint256 flags, bytes
+  payload)` with the canonical ABI encoding: the head, the tail offset 64, the
+  length and the payload zero-padded to whole Words, with at most 256 payload
+  bytes. Other encodings are outside the scope.
+- Effects: chunk `k`, for `k` from 0 to 7, is present when the length exceeds
+  `32k`. It is the payload's Word at that position, with bytes at or past the
+  length read as zero. Starting from slot zero, the accumulator becomes
+  `step(accumulator + chunk)` and is written to slot `1 + k`. Then the
+  accumulator goes to slot zero, the running byte count plus the length to
+  slot nine and the last payload byte, or zero when the payload is empty, to
+  slot ten. The result rereads slots zero, nine and ten and adds the calldata
+  size. Odd flags revert with it after the writes.
+- Committed observations: status, payload and slots zero through ten after
+  every transaction on all three paths. The Hull and EVM paths must show no
+  nonzero committed slot outside them.
+- Protocol: odd flags revert and a revert keeps the eleven slots. A returned
+  transaction adds its length to slot nine, leaves its last byte in slot ten
+  and returns the committed slots zero, nine and ten plus its calldata size,
+  `100` plus the payload length rounded up to a whole Word.
+- Rollback and deployment: as for the bytes profile.
+- Sequence reduction: as for the bytes profile, truncating to the new length
+  bank: checked step reduction, transaction removal with stable IDs, a shorter
+  bank length, zeroed payload bytes, and flags reduced to their parity or with
+  the revert bit cleared. Candidates are ordered by transaction count, program
+  complexity, total payload length, then flags and payload bytes.
+- Node budget: the eight chunk guards are a fixed part of the wrapper. Like
+  the mapping's Keccak closure, they lie outside the step's node budget.
 
 Further state/ABI work, such as nested or multi-word ABI elements, longer
 `bytes` or strings, ABI-encoded return values or callers beyond the three
