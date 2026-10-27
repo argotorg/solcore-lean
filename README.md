@@ -165,7 +165,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same twenty-six-profile suite runs locally with shared time and disk limits.
+The same twenty-seven-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -347,6 +347,16 @@ one Word, so they need a new entry convention in the shared contract runtime.
 Its twelve fixed scenarios and sixteen recorded random scenarios match on both
 Sonatina levels, with reduction and exact archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bytes-payloads-beyond-64-bytes).
+
+The nested-array profile passes one bounded `uint256[][]` parameter, at most
+three rows of at most two elements, in the canonical nested head/tail
+encoding. The pinned std follows each row's offset relative to the offset
+table; original Core reads the calldata directly. The contract folds each
+present element through the checked step into its own slot, then records the
+outer length and the element count; odd flags revert. Its twelve fixed
+scenarios and sixteen recorded random scenarios match on both Sonatina levels,
+with reduction and exact archive replay. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nested-dynamic-arrays).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases
