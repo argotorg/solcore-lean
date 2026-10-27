@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision three, revision two under per-case swarm masks, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision three, revision two under per-case swarm masks, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; all thirteen stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision two and sequences of up to eight transactions; multi-word return values need a contract runtime change; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -653,6 +653,40 @@ export with `arithmetic operation overflow` in `primitive-types`, the panic
 recorded earlier for the event-log profile; checked Hull export succeeded.
 Automatic reduction kept the fingerprint. That O2 random gate failed. Per the
 user's instruction, the symptom is recorded without upstream investigation.
+
+**Shared compilation.** Checked Hull and code-image export took 3.9 of 4.5
+seconds per random `runtime-word` case on O0, yet depend only on the source. A
+pure campaign now compiles each distinct source once per backend and reuses
+the result for every case whose source files, backend, library, exporters and
+compiler builds are identical by digest, never by position. The compilation
+runs in a directory named by that digest; each case copies all outputs into
+its own archive, checks their digests and records the shared compilation and
+processes in `report.compilation`. A shared rejection or crash keeps its
+category, stage, detail and fingerprint on every case it affects and counts as
+an error each time; resource and adapter failures are not shared. Every case
+still executes all three paths at its own input. Yul shares its Yul export
+with the two Sonatina exports; reductions and exact replay compile on their
+own. With root seed 1 and sixteen cases each of `runtime-word`,
+`runtime-primitives`, `runtime-loops` and `runtime-call-graphs`, the 64 random
+cases took 71 seconds on O0 and O2 instead of 303 and 306, with seven
+compilations; the profiles' fixed corpora, 213 cases with 74 distinct sources,
+took 455 seconds on each backend instead of 1,032 and 1,020. A reusing case
+takes 0.6 to 0.8 seconds. All fourteen pure fixed corpora, 595 cases, kept
+their cases, categories, fingerprints and coverage on O0 and O2, as did 176
+cases of four corpora on Yul; 44 archives, 39 of them from reused
+compilations, replayed exactly on O0, O2 and Yul; and the recorded O2
+comptime crash recurred on all eight inputs of its function after one
+compilation, with unchanged fingerprints. The Python policy suite (617 tests),
+the Lean build and test driver, the tool receipt and the ten fixed-corpus
+validators passed.
+
+The measurement also showed that random sources repeat in the scalar G0
+profiles: the first 64 functions accepted from seed 1 gave 12 distinct
+`runtime-word` sources, 24 for `runtime-functions` and 39 for
+`runtime-primitives`, and 51 of the 64 `runtime-word` functions were the
+identity. The emitter of the first two rejects the extended operators, which
+caused nearly all of their exclusions, while a one-leaf program always passes
+as the identity.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

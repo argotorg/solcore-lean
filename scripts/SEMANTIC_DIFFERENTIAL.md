@@ -415,6 +415,114 @@ return value cannot shrink into a revert or a resource failure. Other genuine
 findings encountered during reduction are retained separately, without recursive
 reduction. Exact replay uses the single-case runner's `--replay ARCHIVE` option.
 
+## Shared compilation in campaigns
+
+Checked Hull export and code-image export read a case's source files, not its
+runtime input, and they took most of each case's time: 3.9 of 4.5 seconds per
+case in a random `runtime-word` run on O0. With seeded inputs one function has
+eight to twelve cases. A pure campaign therefore compiles each distinct source
+once per backend and shares the result.
+
+Before compiling, the runner computes the case's compilation identity: the
+SHA-256 digests of its own source files (all four bundle files for modules),
+the backend and the optimization of the linked images, every standard-library
+source, both compiler binaries and their build receipts, the four exporter
+files, the runner itself and the Python interpreter; Yul adds solc's digest
+and full version and the Yul exporter and transport. Cases whose identities
+are equal share one compilation. No case is matched by its position: cases of
+two seeds that emit byte-identical sources share too.
+
+The compilation runs once in `.work/compilations/DIGEST/`, named by the
+identity's digest, so every case using it was compiled from the same paths.
+Each case copies all of its outputs into its own run directory and checks
+their digests, so its archive stays self-contained. Hull provenance names the
+shared directory's `case.sol`; validation checks that the case's own
+`case.sol` has exactly the digest compiled there, and a module case's bundle
+receipt names the shared files the same way. `report.json` records
+`compilation` (`solcore-lean.semantic-compilation.v1`): the identity and its
+digest, the shared directory, the output digests and whether this case
+compiled or reused it. A reusing case lists the shared compiler processes in
+`processes` with `reused: true` and their original times. Every case still
+runs its own direct Core replay, deployment, EVM call and imported Hull
+execution, so a matched case executed all three paths at its own input.
+
+A rejection or crash of a shared source stays with its compilation. Every case
+with that source reports the first case's category, stage, detail and
+fingerprint, keeps the partial outputs in its own archive and counts as an
+error and a finding, without compiling again. The failure is raised where its
+stage would have run, so a Yul export failure follows the check of the copied
+Sonatina exports. A timeout, output limit, interruption or adapter failure is
+not kept, and the next case with that source compiles again. At most eight
+compilations are kept, the least recently used being deleted first; the rest
+are deleted with the work directory.
+
+Reduction candidates compile in their own run directories, as before. Exact
+replay of any archive, including one whose case reused a compilation, compiles
+from that archive's own case. `summary.json` records `compilation` with the
+counts `distinctSources`, `compiled` and `reused`, and each case row records
+`compilation` as `compiled`, `reused` or null when the case reached no
+compiler, for example after a direct Core resource limit. Fixed corpora share
+compilations the same way; their cases, categories, fingerprints and coverage
+are unchanged.
+
+With root seed 1, sixteen random cases each of `runtime-word`,
+`runtime-primitives`, `runtime-loops` and `runtime-call-graphs` took 71 seconds
+on O0 and on O2 instead of 303 and 306; their 64 cases needed seven
+compilations. The fixed corpora of the same profiles, 213 cases with 74
+distinct sources, took 455 seconds on each backend instead of 1,032 and 1,020.
+Every case, category, fingerprint and coverage set equaled the run without
+sharing. Per profile on O0 (O2 was within 4%):
+
+| Profile | Cases | Distinct sources | Cases per minute | Distinct sources per minute |
+| --- | ---: | ---: | ---: | ---: |
+| `runtime-word`, random | 16 | 2 | 13.3 → 52.6 | 1.66 → 6.58 |
+| `runtime-primitives`, random | 16 | 1 | 13.1 → 66.8 | 0.82 → 4.17 |
+| `runtime-loops`, random | 16 | 2 | 11.9 → 48.6 | 1.49 → 6.08 |
+| `runtime-call-graphs`, random | 16 | 2 | 12.4 → 51.1 | 1.55 → 6.39 |
+| `runtime-word`, fixed | 16 | 4 | 12.7 → 35.1 | 3.17 → 8.77 |
+| `runtime-primitives`, fixed | 81 | 34 | 12.7 → 25.2 | 5.34 → 10.58 |
+| `runtime-loops`, fixed | 60 | 10 | 11.6 → 39.1 | 1.93 → 6.51 |
+| `runtime-call-graphs`, fixed | 56 | 26 | 12.7 → 23.5 | 5.91 → 10.89 |
+
+A compilation still takes about four seconds. A case that reuses one takes
+0.6 to 0.8 seconds: tool identity checks, four short processes and the
+imported Hull run. Other work on the machine was heavier during the runs
+without sharing (load average 5 to 8 against 3 to 4), so the compilation
+counts are the load-independent comparison.
+
+All fourteen pure fixed corpora, 595 cases, gave the same cases, categories,
+fingerprints, counts and coverage with and without sharing on O0 and on O2.
+So did the `runtime-word`, `runtime-loops`, `runtime-modules` and
+`runtime-call-graphs` corpora on Yul: 176 cases with 51 distinct sources, in
+546 instead of 1,433 seconds under the same parallel load. Synthetic-adapter
+campaigns, which keep every case's archive, replayed all 44 of their archives
+exactly, 39 of them reused: eight `runtime-word` and eight `runtime-modules`
+cases on O0 and on Yul, and twelve `runtime-primitives` cases on O2. The
+recorded O2 `runtime-comptime` crash (derived seed `13439332813997308047`)
+crashed all eight inputs of its function again, with the same categories and
+fingerprints, after one compilation instead of eight, in 19 instead of 84
+seconds. `semantic-fuzz.py`'s crash-site replay named the same call site for
+the compiling archive and each reusing one. `check-semantic-findings.py`
+passed with the fixed closed case `cases/0006.json`.
+
+Random sources repeat across seeds in three scalar profiles. Of the first 64
+functions accepted from seed 1 under revision three with seeded inputs,
+`runtime-word` had 12 distinct sources, `runtime-functions` 24 and
+`runtime-primitives` 39; every other runtime-input profile had 64. Most repeats
+are the identity `f(x) = x`: 51 of the 64 `runtime-word` functions and 26 of
+the 64 primitive functions. Over 256 functions per revision, the identity was
+71 to 82% of accepted `runtime-word` functions at 32 nodes and 41 to 44% of
+`runtime-primitives` functions at 96 nodes under each of the three revisions.
+The emitter of `runtime-word`, `runtime-functions` and `runtime-mutation`
+rejects the extended operators, which most generated programs contain: they
+caused 255 of 262 exclusions for `runtime-word`, 548 of 554 for
+`runtime-functions` and 578 of 606 for `runtime-mutation`. A one-leaf program
+always becomes the identity and passes; the mutation templates keep that
+profile's sources distinct. The primitive profile's exclusions were all
+functions whose eight boundary outputs agreed. Sharing compiles each repeat
+once, but every repeat still runs all its inputs: a 64-case random
+`runtime-word` run had eight functions and two distinct sources.
+
 ## Check the reducer
 
 The explicit test adapter below perturbs a copied observation only after all
