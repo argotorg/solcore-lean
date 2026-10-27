@@ -3034,6 +3034,71 @@ class G0VersionTests(CommandLine, unittest.TestCase):
             self.assertEqual(instance.summary['generation']['generatorVersions'], [self.V4])
 
 
+class FunctionCountTests(CommandLine, unittest.TestCase):
+    """--functions asks random runtime-input campaigns for whole functions; counts stay per case."""
+    SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
+              'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
+              'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-generics': 8, 'runtime-closures': 8,
+              'runtime-comptime': 8, 'runtime-modules': 8}
+
+    def test_inputs_per_function_of_every_runtime_input_profile(self):
+        self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))
+        for profile, seeded in self.SEEDED.items():
+            self.assertEqual(campaign.inputs_per_function(profile, campaign.RANDOM_INPUT_SELECTION), seeded)
+            self.assertEqual(campaign.inputs_per_function(profile, 'boundary'), len(campaign.profile_inputs(profile)))
+            self.assertEqual(seeded, len(campaign.profile_inputs(profile)) + campaign.SEEDED_INPUTS)
+
+    def test_functions_request_every_input_of_each_function(self):
+        for profile, seeded in self.SEEDED.items():
+            with self.subTest(profile=profile):
+                summary, seen = self.run_main('--profile', profile, '--functions', '3')
+                self.assertEqual(seen[0][3], str(3 * seeded))
+                self.assertEqual((summary['configuration']['cases'], summary['configuration']['functions']),
+                                 (3 * seeded, 3))
+        summary, seen = self.run_main('--profile', 'runtime-loops', '--functions', '5', '--input-selection', 'boundary')
+        self.assertEqual((seen[0][3], summary['configuration']['cases']), ('30', 30))
+        summary, _ = self.run_main('--profile', 'runtime-word', '--functions', '128')
+        self.assertEqual(summary['configuration']['cases'], 1024)
+        self.assertIsNone(self.run_main('--profile', 'runtime-word', '--cases', '4')[0]['configuration']['functions'])
+
+    def test_functions_are_refused_outside_random_runtime_input_campaigns(self):
+        self.assertIn('only to runtime-input profiles', self.refused('--profile', 'closed-g0', '--functions', '2'))
+        self.assertIn('exclusive', self.refused('--profile', 'runtime-word', '--functions', '2', '--cases', '16'))
+        for profile, count in (('runtime-word', '0'), ('runtime-word', '129'), ('runtime-primitives', '86'),
+                               ('runtime-loops', '103')):
+            with self.subTest(profile=profile, count=count):
+                self.assertIn('--functions must be between 1 and', self.refused('--profile', profile, '--functions', count))
+        with tempfile.TemporaryDirectory() as directory:
+            saved = Path(directory) / 'case.json'
+            saved.write_text(json.dumps(function_case(1)))
+            self.assertIn('not to a corpus or a saved case', self.refused('--case', str(saved), '--functions', '1'))
+            manifest = Path(directory) / 'manifest.json'
+            manifest.write_text(json.dumps(G0VersionTests().manifest(campaign.G0_VERSIONS[0])))
+            self.assertIn('not to a corpus or a saved case', self.refused('--corpus', str(manifest), '--functions', '1'))
+
+    def test_summary_records_the_requested_functions(self):
+        for functions in (2, None):
+            with self.subTest(functions=functions), tempfile.TemporaryDirectory() as directory:
+                config = options(directory)
+                config.profile, config.shrink_attempts, config.functions = 'runtime-functions', 0, functions
+                config.cases = 16 if functions else 4
+                config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+                instance = campaign.Campaign(config)
+                instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': config.cases,
+                    'attempted': 2, 'status': 'complete', 'excluded': [], 'cases': [function_case(1)] * config.cases}
+
+                def execute(adapter_args, report):
+                    report.update(matched(), backend=adapter_args.backend)
+
+                with patch.object(campaign.m2, 'execute', side_effect=execute), redirect_stdout(io.StringIO()):
+                    instance.run()
+                generation = instance.summary['generation']
+                self.assertEqual((generation['requestedFunctions'], generation['inputsPerFunction']),
+                                 (2, 8) if functions else (None, None))
+                self.assertEqual(instance.summary['configuration']['functions'], functions)
+                self.assertEqual(instance.summary['counts']['matched'], config.cases)
+
+
 class InputSelectionTests(unittest.TestCase):
     """Random runtime-input generation appends seeded inputs; corpora keep boundary inputs."""
     BOUNDARY, SEEDED = campaign.INPUT_SELECTIONS

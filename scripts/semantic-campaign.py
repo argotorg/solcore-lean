@@ -97,6 +97,9 @@ STATEFUL_RANDOM_G0_VERSION = "core-g0-v3/lcg64-v1"
 RUNTIME_INPUT_PROFILES = tuple(profile for profile in PROFILES if profile != "closed-g0")
 INPUT_SELECTIONS = ("boundary", "seeded-inputs-v1/splitmix64")
 RANDOM_INPUT_SELECTION = "seeded-inputs-v1/splitmix64"
+SEEDED_INPUTS = 4
+# The case tool returns at most this many cases per generation request.
+MAX_CASES = 1024
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
@@ -552,6 +555,13 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
     return INPUT_BOUNDARIES
 
 
+def inputs_per_function(profile: str, selection: str) -> int:
+    """The cases one accepted function of a runtime-input profile yields: its
+    boundary inputs, then the seeded ones. Only the last function of a
+    generation request can be cut short by its case count."""
+    return len(profile_inputs(profile)) + (SEEDED_INPUTS if selection == RANDOM_INPUT_SELECTION else 0)
+
+
 def generation_resource_exclusions(excluded: list) -> int:
     """Generation resource failures count separately from executed cases."""
     count = 0
@@ -697,6 +707,7 @@ class Campaign:
             "retention": "all generated cases and compact reports; complete archives for findings and final reductions; no intermediate exports"}
         self.summary["configuration"]["g0Version"] = self.g0_version
         self.summary["configuration"]["inputSelection"] = self.input_selection
+        self.summary["configuration"]["functions"] = getattr(args, "functions", None)
         if args.profile in CALL_GRAPH_PROFILES:
             self.summary["callShapeCoverage"] = {
                 "classification": "original Core syntactic call shapes; matched cases authenticated by native replay; not measured calls or opcode coverage",
@@ -1142,6 +1153,10 @@ class Campaign:
         self.summary["generation"]["generatorVersions"] = sorted({case["provenance"]["generatorVersion"] for case in cases})
         self.summary["generation"]["inputSelections"] = sorted(
             {selection for case in cases if (selection := input_selection(self.args.profile, case)) is not None})
+        functions = getattr(self.args, "functions", None)
+        self.summary["generation"]["requestedFunctions"] = functions
+        self.summary["generation"]["inputsPerFunction"] = (
+            None if functions is None else inputs_per_function(self.args.profile, self.input_selection))
         save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
         coverage = self.summary["coverage"]
         coverage["generatedFeatures"] = sorted({feature for case in cases for feature in case["provenance"]["features"]})
@@ -1211,6 +1226,9 @@ def main() -> int:
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
     parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
+    parser.add_argument("--functions", type=int,
+                        help="random runtime-input profiles only: generate this many accepted functions, each "
+                             "with all of its inputs, instead of a case count; counts stay per case")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
     selection.add_argument("--case", type=Path, help="re-execute one saved case, including a reduced finding")
@@ -1265,6 +1283,18 @@ def main() -> int:
             parser.error("--input-selection applies only to runtime-input profiles")
         if (args.corpus or args.case) and args.input_selection != recorded_inputs:
             parser.error("--input-selection disagrees with the supplied case or corpus")
+    if args.functions is not None:
+        if args.corpus or args.case:
+            parser.error("--functions applies only to random generation, not to a corpus or a saved case")
+        if args.profile not in RUNTIME_INPUT_PROFILES:
+            parser.error("--functions applies only to runtime-input profiles")
+        if args.cases is not None:
+            parser.error("--functions and --cases are exclusive")
+        per_function = inputs_per_function(args.profile, args.input_selection or RANDOM_INPUT_SELECTION)
+        if not 1 <= args.functions <= MAX_CASES // per_function:
+            parser.error(f"--functions must be between 1 and {MAX_CASES // per_function} for {args.profile}, "
+                         f"whose functions have {per_function} inputs each")
+        args.cases = args.functions * per_function
     if args.attempts is None:
         args.attempts = 1024 if args.profile == "runtime-call-graphs" else 512 if args.profile in ("runtime-primitives", "runtime-comptime", "runtime-modules") else 256
     if args.nodes is None:
@@ -1276,7 +1306,7 @@ def main() -> int:
             parser.error(str(error))
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
-    limits = {"seed": (0, 2**64 - 1), "nodes": (minimum_nodes(args.profile), 512), "cases": (1, 1024), "attempts": (0, 10000),
+    limits = {"seed": (0, 2**64 - 1), "nodes": (minimum_nodes(args.profile), 512), "cases": (1, MAX_CASES), "attempts": (0, 10000),
               "seconds": (0.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10),
               "shrink_attempts": (0, 10000), "shrink_candidates": (1, 4096), "case_timeout": (0.001, 3600),
               "direct_fuel": (1, 10000000), "core_fuel": (1, 1000000000), "gas": (1, 1000000000)}
