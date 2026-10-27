@@ -2271,6 +2271,124 @@ three distinct senders, both revert causes (odd flags and an even-flag
 insufficient balance) and three static alias kinds: a self-transfer, a sender
 that an earlier transaction paid, and a repeated sender.
 
+### Running and validation
+
+```sh
+lake build semanticLedgerTool rustHullLedgerScenario
+mkdir -p .upstream/semantic-ledger-cases
+.lake/build/bin/semantic-ledger-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-ledger-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-ledger-corpus.json \
+  --output .upstream/semantic-ledger-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-ledger \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-ledger-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the other storage tools; `observe` also rejects bindings whose
+contract address is a sender. Plans use `solcore-lean.ledger-plan.v1` under
+the case field `ledgerPlan`; cases use `solcore-lean.semantic-ledger-case.v1`.
+Transactions are `{id, sender, flags, recipient, amount, input, calldata,
+value}`. `sender` is the decimal address of one of the three senders, the
+calldata holds the selector and the other four fields as Words, and `value`
+is always zero. The tool and the adapter both reject any other sender and
+calldata that does not hold the saved Words. A case's `observedSlots` must
+equal the slots derived from its senders and recipients. The calldata of all
+32 fixed and 48 random transactions matched `cast calldata
+"run(uint256,uint256,uint256,uint256)"` from the pinned Foundry release byte
+for byte; the Lean tests retain one such vector. Histories use
+`solcore-lean.ledger-history.v1` with the keyed history fields.
+
+The new Hull runner `rust-hull-ledger-scenario` takes
+`solcore-lean.ledger-contract-scenario.v1` scenarios: the keyed scenario
+fields plus `senders`, one to eight distinct addresses other than the
+contract, which must include the constructor's caller. Each call's context
+names its own caller, which must be a declared sender. The adapter declares
+the three senders and uses each transaction's sender as its call's caller. On
+the EVM path it first checks that Anvil's first account is the first sender
+and that `eth_accounts` unlocks all three, then sends each transaction from
+its own sender.
+
+The adapter cannot evaluate the step, so it checks the ledger protocol from
+each row and the prior committed slots. Odd flags revert, and a revert keeps
+the slots. An even-flag revert reports a credited balance below the amount. A
+returned row increments the counter, changes only the counter and the two
+entries, and returns their sum. It credits another recipient with exactly the
+amount without wrapping the sender's entry; a self-transfer keeps at least the
+amount. All three paths agreeing on a row that breaks the protocol is still a
+mismatch. Before execution, the campaign plans even flags as returns, so only
+matched histories can cover an insufficient balance.
+
+Generation reserves the measured 115-node wrapper, so the 384-node default
+leaves 269 nodes for the step; the 2,654-node Keccak closure lies outside the
+budget. All 300 of the first 300 seeds were accepted. Their 900 transactions
+returned 612 times, reverted on odd flags 217 times and reverted for an
+insufficient balance 71 times. Generated scenarios must complete and follow
+the ledger protocol under original Core. As for the mapping, a native shrink
+response carries at most 16 candidates.
+
+The fixed corpus has twelve scenarios and 32 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with new senders,
+recipients, amounts, inputs and flags, and four generated seeds. Its expected
+slots and histories were computed outside Lean, with slots from `cast
+keccak`, by a separate evaluator of the step programs and a direct model of
+the protocol. `Tests/Main.lean` registers a validator that compares every
+status, payload and declared slot with original Core and every declared slot
+list with the independent one. It rejects tampered outputs, counters and
+entries, a sender slot in Solidity's order, a missing or extra declared slot,
+another sender and a consistently re-encoded recipient change. Required
+coverage is all 33 step AST features in the corpus, the six storage boundary
+inputs, all three senders, the whole recipient and amount banks, one to three
+distinct senders, both revert causes, the three alias kinds, one to three
+helpers and transactions, all four templates, both outcomes and seven
+completion patterns.
+
+Local validation used committed code with frozen scripts and native tools; the
+eighteen existing native tools are byte-identical to main's. The fixed suite
+matched all twelve scenarios and 32 prefixes on Sonatina O0 and O2, with
+complete coverage, in 76.2 and 75.6 seconds. The recorded random suite (root
+seed `20261026`, sixteen cases, 2,048 attempts) accepted sixteen scenarios
+from sixteen attempts with no exclusions. All sixteen scenarios and 48
+prefixes matched on both levels in 109.8 and 128.5 seconds. They covered all
+senders, recipients and amounts, one to three distinct senders, both revert
+causes and all three alias kinds. Neither run produced a finding.
+
+A copied `importedHull` counter difference at `tx-2` of the
+`identity-three-senders` scenario, an insufficient-balance revert after two
+transfers from the two other senders, was reduced on each level to that
+transaction from the first sender with recipient zero, amount one, input zero
+and a reduced step: nine accepted reductions in eleven candidate executions,
+all of whose actual comparisons matched. The two rejected candidates lowered
+the amount to zero, which would have let the transfer through and changed the
+completion. A copied difference in the third sender's entry slot at the same
+transaction was reduced on each level to that transaction from the first
+sender, paying amount one to the third sender, with input zero and a reduced
+step: eight accepted reductions in seventeen candidate executions, all of
+whose actual comparisons matched. An earlier sender was rejected while it
+removed the third sender's slot from the declaration, and accepted once the
+transaction paid the third sender, which keeps the slot declared. Recipients
+that dropped the slot and an amount of zero were rejected.
+
+On the `generated-8` scenario, whose three-helper step has many reductions, a
+difference in its third sender's slot reached the 64-attempt limit on each
+level with eleven accepted step reductions in 64 candidate executions. Every
+sixteen-candidate batch began with step candidates, and most of them made the
+last transfer insufficient, so the transaction candidates were not reached.
+The original and reduced archives of all three reductions replayed exactly
+with three-way agreement (twelve replays), and synthetic replays reproduced
+the fingerprints. Core or Hull fuel one was classified as inconclusive.
+
+With the extended adapter, campaign and suite, the two-slot storage, rollback,
+call, keyed, dynamic-array, log, call-value, bytes, forwarded-value and
+mapping fixed corpora still matched all 131 scenarios and 362 prefixes on each
+level.
+
+This profile does not compare gas, balances, nonces, code or memory, other
+senders, value-bearing transfers, contract callers, other key or value types
+or Solidity's slot order. Agreement is test evidence, not a preservation
+proof.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

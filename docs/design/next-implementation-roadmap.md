@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic and two-slot storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; a sender-keyed mapping ledger defined; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping and sender-keyed ledger extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance and a direct-call head given the callee's application meaning; discharging that input across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1317,9 +1317,72 @@ before execution:
   complexity, then the sum of sender positions, flags, recipients, amounts and
   inputs. They rederive their declared slots.
 
+Original Core invokes each transaction with its sender as caller, over a world
+with an empty account per sender, and its observer derives the declared slots
+with `Solcore.Abi.V1.Keccak256`. A new Hull runner,
+`rust-hull-ledger-scenario`, accepts the declared senders; the keyed runner is
+unchanged. The adapter sends each EVM transaction from its sender after
+checking that Anvil unlocks all three. It checks the ledger protocol from each
+row and the prior slots without evaluating the step. The profile is a
+twenty-fifth suite profile with two new native tools; the eighteen other
+native tools are byte-identical to main's. Generation reserves the measured
+115-node wrapper. Three senders, recipients, amounts and inputs and one of
+four flags patterns come from a separate high-bit stream. All 300 of the first
+300 seeds at 384 nodes were accepted. Their 900 transactions returned 612
+times, reverted on odd flags 217 times and reverted for an insufficient
+balance 71 times.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 32
+transactions. Its slots, from `cast keccak`, and its histories were computed
+outside Lean by a separate evaluator of the step programs and a direct model
+of the protocol. A registered Lean validator confirmed every declared slot
+list, status, payload and slot against original Core. It rejected tampered
+entries, including a sender slot in Solidity's order and another sender.
+Coverage includes all 33 step features of the corpus, the six storage boundary
+inputs, all three senders, the whole recipient bank (the three senders, 0,
+2^160 - 1 and 2^256 - 1) and amount bank (0, 1, 7, 2^64 - 1, 2^64 and 2^70),
+and one to three distinct senders. It also includes both revert causes, the
+three alias kinds (a self-transfer, a sender that an earlier transaction paid,
+and a repeated sender), one to three helpers and transactions, four templates,
+both outcomes and seven completion patterns. The calldata of all 32 fixed and
+48 random transactions matched `cast calldata`.
+
+The full Lean build (10,084 jobs), registered tests, kernel policy and 526
+Python policy tests passed. The fixed suite matched all 12 scenarios and 32
+prefixes on Sonatina O0 and O2 (76.2 and 75.6 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+sixteen attempts with no exclusions. Both levels matched all sixteen and 48
+prefixes (109.8 and 128.5 seconds), covering every sender, recipient and
+amount, one to three distinct senders and both revert causes. Neither random
+run produced a finding.
+
+A copied Hull counter difference at an insufficient-balance revert, after
+transfers from the two other senders, was reduced on each level to that
+transaction from the first sender, with recipient zero, amount one and input
+zero: nine accepted reductions in eleven actual candidate executions. A copied
+difference in that transaction's sender slot was reduced to the same
+transaction from the first sender, paying the third sender, which keeps the
+slot declared: eight accepted reductions in seventeen. Earlier senders were
+rejected while they dropped the slot. On a generated three-helper step, a
+sender-slot difference reached the 64-attempt limit with eleven accepted step
+reductions, because every sixteen-candidate batch began with step candidates.
+Original and reduced archives replayed exactly with agreement (twelve
+replays), and synthetic fingerprints reproduced. Core or Hull fuel one was
+inconclusive. With the extended storage and suite scripts, the storage,
+rollback, call, keyed, dynamic-array, log, call-value, bytes, forwarded-value
+and mapping fixed corpora still matched all 131 scenarios and 362 prefixes on
+both levels. An offline preparation of the worktree's cloned cache verified
+all twenty native tools as ready. Hosted CI has not been run.
+
+This scope does not compare gas, balances, nonces, code or memory, other
+senders, value-bearing transfers, contract callers, other key or value types
+or Solidity's slot order. Agreement is test evidence, not a preservation
+proof.
+
 Further state/ABI work, such as nested or multi-word ABI elements, longer
-`bytes` or strings, ABI-encoded return values or multiple callers, needs its
-own observation, rollback, deployment and reduction definitions first.
+`bytes` or strings, ABI-encoded return values or callers beyond the three
+fixed senders, needs its own observation, rollback, deployment and reduction
+definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
