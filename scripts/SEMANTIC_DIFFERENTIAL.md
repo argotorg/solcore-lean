@@ -1122,8 +1122,11 @@ repeat observations; it does not execute an EVM.
 Random generation draws the checked step with
 [G0 revision two](#g0-generator-revisions) and passes `core-g0-v2/lcg64-v1`
 after `FUEL` to the native `generate` command; `--g0-version` selects revision
-one instead. A fixed corpus or a saved `--case` uses the version it records in
-`generatorVersion`, and a disagreeing `--g0-version` is refused. Reductions
+one instead. Revision three is refused, as a version option and in a saved case
+or corpus, because the stateful case tools record no swarm mask; the pure
+campaign's random default does not apply here. A fixed corpus or a saved
+`--case` uses the version it records in `generatorVersion`, and a disagreeing
+`--g0-version` is refused. Reductions
 inherit their parent's version. The summary records `configuration.g0Version`
 and `generation.generatorVersions`. The call campaign handles the version the
 same way. A suite sample of four random cases for each of the thirteen

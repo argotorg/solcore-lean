@@ -1523,10 +1523,11 @@ class G0VersionTests(unittest.TestCase):
             with patch.object(instance, "tool", return_value=self.generated("core-g0-v2/lcg64-v1")):
                 instance.prepare_cases()
             self.assertEqual(instance.summary["configuration"]["g0Version"], "core-g0-v2/lcg64-v1")
-            unknown = campaign.Campaign(options(self.fresh(directory, "unknown"), case=saved))
-            with patch.object(unknown, "tool", return_value=self.generated("core-g0-v9/lcg64-v1")), \
-                    self.assertRaisesRegex(ValueError, "unsupported recorded"):
-                unknown.prepare_cases()
+            for version in ("core-g0-v9/lcg64-v1", "core-g0-v3/lcg64-v1"):
+                unknown = campaign.Campaign(options(self.fresh(directory, version.split("/")[0]), case=saved))
+                with patch.object(unknown, "tool", return_value=self.generated(version)), \
+                        self.assertRaisesRegex(ValueError, "unsupported recorded"):
+                    unknown.prepare_cases()
             value = self.generated("core-g0-v2/lcg64-v1")
             raw = report(value)
             analysis = campaign.analyze(raw, value)
@@ -1538,7 +1539,9 @@ class G0VersionTests(unittest.TestCase):
             self.assertEqual(recorder.summary["generation"]["generatorVersions"], ["core-g0-v2/lcg64-v1"])
 
     def test_cli_refuses_a_version_that_disagrees_with_a_corpus(self):
-        for version, message in (("core-g0-v2/lcg64-v1", "disagrees with the supplied"), ("core-g0-v9/lcg64-v1", "invalid choice")):
+        # Revision three is a pure-profile revision: the stateful tools record no swarm mask.
+        for version, message in (("core-g0-v2/lcg64-v1", "disagrees with the supplied"), ("core-g0-v9/lcg64-v1", "invalid choice"),
+                                 ("core-g0-v3/lcg64-v1", "invalid choice")):
             with tempfile.TemporaryDirectory() as directory, patch.object(sys, "argv", [
                     "campaign", "--output", str(Path(directory) / "out"), "--corpus", str(ROOT / "scripts/semantic-storage-corpus.json"),
                     "--g0-version", version]), redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):

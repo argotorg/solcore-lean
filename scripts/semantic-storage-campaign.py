@@ -561,7 +561,7 @@ class Campaign:
         # case keeps the version it records.
         self.g0_version = getattr(args, "g0_version", None)
         if self.g0_version is None and not args.corpus and not args.case:
-            self.g0_version = legacy.RANDOM_G0_VERSION
+            self.g0_version = legacy.STATEFUL_RANDOM_G0_VERSION
         self.summary["configuration"]["g0Version"] = self.g0_version
         # Random generation requests the longest admitted sequence; a corpus or a
         # saved case keeps its own transactions.
@@ -648,7 +648,7 @@ class Campaign:
     def recorded_g0_version(self, versions):
         """Adopt the G0 version a corpus or saved case records; generation receives it explicitly."""
         recorded = versions.get("generatorVersion") if isinstance(versions, dict) else None
-        if recorded not in legacy.G0_VERSIONS:
+        if recorded not in legacy.STATEFUL_G0_VERSIONS:
             raise ValueError("unsupported recorded G0 generator version")
         if self.g0_version is not None and self.g0_version != recorded:
             raise ValueError("G0 generator version disagrees with the supplied case or corpus")
@@ -918,8 +918,8 @@ def main():
     parser.add_argument("--nodes", type=int, default=384)
     parser.add_argument("--cases", type=int)
     parser.add_argument("--attempts", type=int, default=256)
-    parser.add_argument("--g0-version", choices=legacy.G0_VERSIONS,
-                        help=f"G0 generator of the checked step in random generation; default {legacy.RANDOM_G0_VERSION}. "
+    parser.add_argument("--g0-version", choices=legacy.STATEFUL_G0_VERSIONS,
+                        help=f"G0 generator of the checked step in random generation; default {legacy.STATEFUL_RANDOM_G0_VERSION}. "
                              "A corpus or saved case uses the version it records")
     parser.add_argument("--transactions", type=int,
                         help=f"transactions per random scenario, 1 to {adapter.MAX_TRANSACTIONS}; default {adapter.MAX_TRANSACTIONS}. "

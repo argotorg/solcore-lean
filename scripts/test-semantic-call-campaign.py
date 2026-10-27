@@ -750,11 +750,14 @@ class G0VersionTests(unittest.TestCase):
             self.assertEqual(instance.summary["generation"]["generatorVersions"], ["core-g0-v2/lcg64-v1"])
 
     def test_cli_refuses_a_version_that_disagrees_with_a_corpus(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(sys, "argv", [
-                "campaign", "--output", str(Path(directory) / "out"), "--corpus", str(ROOT / "scripts/semantic-call-corpus.json"),
-                "--g0-version", "core-g0-v2/lcg64-v1"]), redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
-            campaign.main()
-        self.assertIn("disagrees with the supplied", errors.getvalue())
+        # Revision three is a pure-profile revision: the stateful tools record no swarm mask.
+        for version, message in (("core-g0-v2/lcg64-v1", "disagrees with the supplied"), ("core-g0-v3/lcg64-v1", "invalid choice")):
+            with tempfile.TemporaryDirectory() as directory, patch.object(sys, "argv", [
+                    "campaign", "--output", str(Path(directory) / "out"), "--corpus", str(ROOT / "scripts/semantic-call-corpus.json"),
+                    "--g0-version", version]), redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
+                campaign.main()
+            with self.subTest(version=version):
+                self.assertIn(message, errors.getvalue())
 
 
 class TransactionCountTests(unittest.TestCase):
