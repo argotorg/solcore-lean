@@ -1045,7 +1045,10 @@ or a saved case keeps its own sequence, and `--transactions` is refused with
 either. The summary records the length in `configuration.transactions` and
 `generation.transactions`. Every profile's reductions first remove one
 transaction, from the last to the first, so a long sequence loses the tail
-beyond a difference before the candidate limit is spent.
+beyond a difference before the candidate limit is spent. Sixteen
+eight-transaction cases per profile at the 512-node budget matched on O0 and
+O2 (208 scenarios and 1,664 prefixes per level); the slowest profile,
+nested-array, used 153 of its 900 suite seconds.
 
 The summary counts scenarios separately from transactions observed on any path,
 completed on all three paths, and matched ordered prefixes. Shrink executions

@@ -1898,6 +1898,14 @@ three-transaction case from the same seed has the identical source, so the
 sequence length is not involved. The crash's reduction removed seven
 transactions first.
 
+With scripts and native tools frozen on `c92375a7f`, the thirteen fixed
+corpora still pass on O0 and O2 with 167 scenarios and 460 prefixes per level.
+Every profile records revision one and no requested length. A random suite of
+sixteen eight-transaction cases per profile at the 512-node budget (seed
+20261028) passed on both levels with 208 scenarios and 1,664 matched prefixes
+per level and no finding. The slowest profile, nested-array, took 153 seconds
+on O0 and 143 on O2 of its 900, and no case took more than 11.2 seconds.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
