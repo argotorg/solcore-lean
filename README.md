@@ -140,9 +140,9 @@ execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
 connects the closed, runtime-input, named-helper, raw-primitive, call-graph,
 private-mutation, Word-aggregate, aggregate call-graph, call-graph loop,
-aggregate loop, generic, two-slot storage, storage rollback and keyed storage
-emitters' text to Core under an independent source semantics and a stated
-Rust-pipeline boundary.
+aggregate loop, generic, two-slot storage, storage rollback, keyed storage and
+event-log emitters' text to Core under an independent source semantics and a
+stated Rust-pipeline boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A

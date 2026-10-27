@@ -8,7 +8,11 @@ guarded site then applies the step to `result + guard` and calls the pinned
 64-byte buffer reserved from the free-memory pointer. Odd flags revert after
 every write and log with the result encoded as exactly 32 bytes; even flags
 return it through the ABI. Only the log arities a plan uses are imported. The
-arbitrary checked aggregate entry is preserved. -/
+arbitrary checked aggregate entry is preserved.
+`ScalarMeaning.EventLog.emit_source_meaning` relates the emitted text to the
+original Core contract's top-level transaction, returned with its storage and
+logs or reverted with no log, under an independent event-log source semantics;
+see `docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.EventLog
