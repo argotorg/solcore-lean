@@ -73,11 +73,12 @@ and the plain revision in `baseGeneratorVersion`.
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
 | v2 | `core-g0-v2/lcg64-v1` | `--g0-version` for the pure and stateful profiles |
 | v3 | `core-g0-v3/lcg64-v1` | random generation of every stateful step; `--g0-version` for the pure profiles |
-| v4 | `core-g0-v4/lcg64-v1` | random generation of the twelve G0-based pure profiles |
+| v4 | `core-g0-v4/lcg64-v1` | random generation of the fourteen G0-based pure profiles |
 
-The twelve are `closed-g0`, `runtime-word`, `runtime-primitives`,
-`runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-loops`,
-`runtime-nested-loops`, `runtime-generics`, `runtime-closures`,
+The fourteen are `closed-g0`, `runtime-word`, `runtime-primitives`,
+`runtime-assembly`, `runtime-functions`, `runtime-mutation`,
+`runtime-aggregates`, `runtime-loops`, `runtime-nested-loops`,
+`runtime-recursion`, `runtime-generics`, `runtime-closures`,
 `runtime-comptime` and `runtime-modules`. The three call-graph profiles use their own grammars.
 
 v1 takes each choice as the raw LCG state modulo its bound. Bit 0 of that state
@@ -200,6 +201,7 @@ emits exactly when it is declared.
 | --- | --- | --- |
 | Scalar | Bool and Word negation; add, sub, mul, and, or, xor, `==` and `>`; `let` and `if` (12 of 26) | `closed-g0`, `runtime-word`, `runtime-functions` and `runtime-mutation`; comptime and module constants |
 | Primitive, call-graph and aggregate | all 26 | `runtime-primitives`, `runtime-aggregates`, `runtime-loops`, `runtime-generics` and `runtime-closures`; comptime and module steps |
+| Inline Yul, in each of its three forms | all 26 | `runtime-assembly` |
 
 Where the emitter renders every feature, v4 is v3 apart from its version:
 `runtime-primitives`, `runtime-aggregates`, `runtime-loops`,
@@ -271,7 +273,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the fifteen runtime-input pure profiles, every pure
+Random campaigns of the sixteen runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -291,7 +293,7 @@ reduced case. An origin without the field, as in every fixed corpus, means the
 boundary inputs alone.
 
 One function now gives eight random cases in the four-input profiles, ten in
-the two loop profiles and twelve in `runtime-primitives`,
+the two loop profiles and twelve in `runtime-primitives`, `runtime-assembly`,
 `runtime-call-graphs` and `runtime-aggregate-call-graphs`. `--cases` still
 counts inputs, so a sixteen-case run of a four-input profile covers two
 functions rather than four. The admission filters still use the boundary
@@ -383,7 +385,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops`, `runtime-recursion` | not needed: a loop must already change a positive-trip boundary input, and a nested loop or a recursion some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
@@ -395,7 +397,7 @@ both profiles apply the filter. `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-two of the ten profiles do not use G0. Only generated cases pass filters:
+two of the eleven profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -408,7 +410,7 @@ filters only. Replay applies the recorded filter again: a saved identity that
 claims it is refused with the exclusion reason, and an unknown value with
 `unsupported acceptance filter`. Without the field, a filtered case is also a
 valid case of the profile's own filters, since the filter only narrows
-acceptance. Reductions record no filter. The generation commands of the ten
+acceptance. Reductions record no filter. The generation commands of the eleven
 profiles take the filter after `FUEL`, in any order with a G0 version and an
 input selection; the others refuse it:
 
@@ -570,7 +572,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the sixteen pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the seventeen pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -929,6 +931,117 @@ Native commands are `primitive-generate SEED NODES COUNT ATTEMPTS FUEL` and
 `primitive-emit FUNCTION.json INPUT [FUEL]`; `replay`, `observe` and `shrink`
 dispatch the new schema. Use `replay` to authenticate a saved case; `observe`
 only executes its admitted Core program and does not authenticate saved source.
+
+## Compare inline Yul
+
+`runtime-assembly` renders the functions of `runtime-primitives` partly or
+wholly as inline Yul in `assembly { }` blocks. Every other profile's source is
+Solcore expressions and statements only, so this is the profile that reaches
+the compiler's inline-assembly path: Yul parsing, Solcore locals inside
+`assembly`, builtin resolution and lowering to Hull.
+
+Its Core reference is the primitive profile's original checked Word-to-Word
+function for the same seed, budget and revision, generated by the same steps:
+the G0 program under the same swarm mask, then the same literal abstraction.
+The Core reference and its observations are therefore unchanged, and a Lean
+test requires both profiles to accept the same functions with the same
+programs, inputs, observations, generation records and exclusions.
+
+A plan has schema `solcore-lean.assembly-plan.v1`, the checked
+`functionProgram` and a `form`, drawn from a SplitMix64 hash of the case seed:
+
+- `switch`: the whole body is one `assembly` block assigning the Solcore
+  result local `sc_out`. Each Core `if` becomes a Yul `switch` whose `case 0`
+  computes the else branch and whose `default` computes the then branch, each
+  assigning one Yul local.
+- `if`: the whole body as in `switch`, with each Core `if` as a Yul local
+  holding the condition and two Yul `if`s, on it and on `iszero` of it.
+- `operations`: Solcore `let`, `if`, literals and `!`, as in the primitive
+  renderer, with every other operation in its own `assembly` block. The block
+  assigns a fresh Solcore Word local from Solcore Word operands, and a
+  comparison's Word becomes a Bool through std's `tobool`.
+
+Word literals become decimal Yul literals and Bool literals `1` or `0`; Yul
+never reads a Solcore Bool. The builtins are `not`, `clz`, `iszero` for `!`,
+`add`, `sub`, `mul`, `div`, `mod`, `and`, `or`, `xor`, `eq`, `gt`, `sgt`,
+`shl`, `shr` and `sar` (shift first), `byte`, `exp`, `signextend`, `sdiv`,
+`smod`, `addmod` and `mulmod`, so every form renders all 26 G0 features and
+revision four equals revision three for this profile. The ABI is
+`SynthesizedAssembly.run(uint256)`; no emitter proof covers it.
+
+Before the profile was written, a probe compiled five inline Yul sources with
+the pinned compiler and std: every builtin above, Yul `let`, `switch`, `if`,
+nested blocks, a `for` loop and a Yul function, assignments of Solcore locals
+from Yul in a contract method and a helper, and 256-bit literals. Checked Hull
+export, Sonatina O0 and O2, Yul through `export-rust-yul.py`, Anvil and the
+Lean Hull runner matched a model of EVM word semantics at ten inputs on every
+path, without a change to shared code.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-assembly --functions 8 --output .upstream/semantic-assembly
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-assembly-corpus.json --output .upstream/semantic-assembly-ci
+python3 Tests/scripts/test-semantic-assembly-corpus.py
+```
+
+Native commands are `assembly-generate SEED NODES COUNT ATTEMPTS FUEL
+[VERSION] [seeded-inputs-v1/splitmix64] [exclude-boundary-identity-v1]` and
+`assembly-emit PLAN.json INPUT [FUEL]`; saved cases contain `assemblyPlan` and
+the applied original Core `program`, whose exact correspondence native
+admission checks for every origin. The generated origin also records the form,
+and replay requires it to be the seed's.
+
+- Generation, its eight boundary inputs and its exclusions are those of
+  `runtime-primitives`, in its order, with a 96-node default budget; random
+  campaigns add four seeded inputs and apply the boundary identity filter,
+  since a primitive function can be the identity.
+- Reductions are the primitive reductions of the Core function (G0 shrinking
+  under the abstraction and smaller inputs), sealed by the full checker and
+  strictly smaller, each in the parent's form; a reduced origin records the
+  parent's plan.
+- `assemblyRequirements` declares the required `forms` and `formFeatures`
+  (`form:feature`), and `assemblyCoverage` counts only three-way matches
+  toward passing coverage.
+
+The fixed corpus is built from the primitive corpus: its 34 distinct
+hand-specified functions, in corpus order, in three consecutive groups of 12,
+11 and 11, each group combined by a balanced XOR tree into one function, so
+every operation keeps the operands the primitive corpus chose for it. Each
+function runs in each form at the eight boundary inputs: 72 cases from nine
+plans and eight sources, since one group has no `if` and its `switch` and `if`
+forms coincide. Every form covers all 29 AST features, and the functions shift
+only by the input or by the literal 1.
+`Tests/scripts/test-semantic-assembly-corpus.py` rebuilds the construction,
+emits and replays every entry natively, reads the features from the AST and
+checks reductions and tampering.
+
+Two other corpora were tried first. The 81 primitive cases in each form, 243
+cases from 102 sources, matched on O0 and O2 but needed more than the suite's
+900-second profile limit on Yul. Generated functions chosen for coverage from
+G0 revision one crashed Sonatina O0 code-image export in four of the 17
+whole-body functions tried, each shifting by a constant count of at least
+2^64 (recorded locally, not investigated). A fixed corpus that crashes would
+track a known upstream defect, so the corpus avoids that construct; random
+campaigns still generate it.
+
+Frozen matrices at `33d7c411d`:
+- The fixed corpus matched all 72 cases on all three paths with complete
+  form, feature and input coverage, compiling 8 sources, in 114 seconds on O0,
+  109 on O2 and 135 on Yul.
+- Random suites from root seed 1 with eight whole functions took 24
+  generation attempts, excluding 9 functions whose boundary outputs agree and
+  7 boundary identities. They drew four `switch`, one `if` and three
+  `operations` functions: 96 cases from 8 distinct sources.
+- All 96 matched on O2 in 127 seconds. On O0 and Yul, 84 matched and the twelve
+  inputs of the first `switch` function crashed Sonatina O0 code-image export
+  with `Integer overflow when casting to usize`, in 203 and 261 seconds; the
+  Yul runs export O0 images too.
+
+The reduction of that function kept the fingerprint with a left shift of the
+constant 0 by a constant count far above 256. The crash is retained as a
+finding and recorded locally without investigation, so those two random gates
+did not pass.
 
 ## Raw primitives in aggregate-based step functions
 
