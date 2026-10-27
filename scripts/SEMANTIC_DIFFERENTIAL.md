@@ -63,7 +63,7 @@ an unsupported expression with a different computation.
 
 ## G0 generator revisions
 
-The G0 generator has two replay revisions, both layered on the unchanged
+The G0 generator has three replay revisions, all layered on the unchanged
 `lcg64-v1` draws. A case records its revision in `generatorVersion`. The
 primitive profile records `core-primitives-v1/` followed by the revision there,
 and the plain revision in `baseGeneratorVersion`.
@@ -71,7 +71,8 @@ and the plain revision in `baseGeneratorVersion`.
 | Revision | `generatorVersion` | Used by |
 | --- | --- | --- |
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
-| v2 | `core-g0-v2/lcg64-v1` | random generation of the eleven G0-based pure profiles |
+| v2 | `core-g0-v2/lcg64-v1` | `--g0-version` only, since revision three |
+| v3 | `core-g0-v3/lcg64-v1` | random generation of the eleven G0-based pure profiles |
 
 The eleven are `closed-g0`, `runtime-word`, `runtime-primitives`,
 `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-loops`,
@@ -132,14 +133,56 @@ regenerate unchanged; an unknown version is rejected. `replay` regenerates a
 seeded case with its recorded revision, and `shrink` gives each reduction its
 parent's revision. The call-graph commands take no version.
 
-`scripts/semantic-campaign.py` passes `core-g0-v2/lcg64-v1` in random mode for
+`scripts/semantic-campaign.py` passes `core-g0-v3/lcg64-v1` in random mode for
 the eleven profiles; `--g0-version` selects a revision explicitly. With
 `--corpus` it passes the manifest's version, and with `--case` it keeps the
 saved case's; a disagreeing `--g0-version` is refused. The campaign summary
 records `configuration.g0Version` and the generated cases' versions in
 `generation.generatorVersions`. `semantic-suite.py --mode random` therefore
-generates v2 for these profiles, and fixed mode stays on v1. The stateful
+generates v3 for these profiles, and fixed mode stays on v1. The stateful
 profiles still build their aggregate steps with v1, under their own tools.
+
+### Revision three: swarm masks
+
+v3 is v2's grammar restricted by a swarm mask drawn once per case. The mask
+covers the 26 operators and non-leaf forms: Bool and Word negation, leading
+zeros, the nineteen binary operators including the three comparisons,
+`addmod`, `mulmod`, `let` and `if`. Literals and locals always stay available.
+Each is enabled by its own bit of one mixed, domain-separated SplitMix64 draw
+from the case seed, so about half are enabled; every G0 program of a case,
+such as each helper and a comptime constant, uses the same mask.
+
+A form stays available while the mask enables it or one of its operators, and
+an operator is then chosen uniformly among the enabled ones. Choosing a form
+first draws as v2 does. Only when that form is disabled does a second draw pick
+uniformly among the enabled non-leaf forms, so leaves keep v2's probability
+and masked programs keep v2's size instead of ending early. With the full mask
+nothing is redrawn and v3 is v2 exactly.
+
+A v3 case records the enabled features in `provenance.swarmMask`, as
+`features` names in catalog order. Replay requires the mask of a v3 case,
+checks that a seeded case's mask is its seed's, and rejects a mask on any other
+revision. A reduction copies its parent's mask. Random campaigns have no
+coverage requirements of their own, since required features, literals and
+inputs come only from a manifest, so masks cannot fail a random run on
+coverage.
+
+Over 1,024 consecutive seeds, the registered Lean test's sample:
+
+| Measure, per 1,024 programs | v2, 32 nodes | v3, 32 nodes | v2, 64 nodes | v3, 64 nodes |
+| --- | ---: | ---: | ---: | ---: |
+| Operators | 7,281 | 7,153 | 12,059 | 12,035 |
+| Distinct operators | 4,670 | 3,810 | 6,201 | 4,866 |
+| Distinct parent-child operator pairs | 5,810 | 5,187 | 9,638 | 8,292 |
+| Sum of maximum operator depths | 4,205 | 4,322 | 5,363 | 5,469 |
+| An operator directly inside itself, besides `let` | 486 | 934 | 898 | 1,674 |
+| Programs using one operator three times or more | 464 | 564 | 616 | 673 |
+| Distinct operator pairs in the whole sample | 428 | 508 | 504 | 551 |
+
+The masks enable 13.0 of the 26 features on average, and each feature is
+enabled in 900 to 1,148 of 2,048 masks. Both revisions use all 26 features over
+the sample. Before the second draw, a disabled form fell to a leaf instead;
+those programs had 5,561 operators at 32 nodes, a quarter fewer than v2.
 
 ## Seeded runtime inputs
 

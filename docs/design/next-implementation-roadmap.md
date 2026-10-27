@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision two is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision three, revision two under per-case swarm masks, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; all thirteen stateful profiles compare the observed contracts' whole committed storage on all three paths; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -614,8 +614,45 @@ root seed 1 and sixteen cases each, `runtime-word`, `runtime-primitives`,
 `runtime-loops` and `runtime-call-graphs` matched all 64 cases on O0 and on
 O2, in 304 and 306 seconds, twenty of them at seeded inputs, with no findings.
 Seeded small and negated inputs of `runtime-word` and `runtime-call-graphs`
-replayed exactly from their archives. The next unit of this lane is per-case
-operator and feature masks.
+replayed exactly from their archives.
+
+**G0 generator revision three.** Random mode now generates the eleven G0-based
+pure profiles with `core-g0-v3/lcg64-v1`: revision two's grammar under a swarm
+mask drawn once per case from its seed and shared by all of the case's G0
+programs. Each of the 26 operators and non-leaf forms is enabled by its own
+bit of one mixed draw, 13.0 on average. A form drawn as in revision two but
+disabled is replaced by a uniform second choice among the enabled non-leaf
+forms. Leaves therefore keep their probability and programs their size; a first
+version that let disabled forms fall to leaves lost a quarter of the operators.
+With the full mask nothing is redrawn and revision three is revision two.
+Cases record the mask in `provenance.swarmMask`; replay requires it for
+revision three, checks it against the seed and refuses it on other revisions,
+and reductions copy it.
+
+Over 1,024 seeds at 32 nodes, masked programs kept revision two's size (7,153
+operators against 7,281) and slightly more depth, used 18% fewer distinct
+operators, put an operator directly inside itself nearly twice as often (934
+against 486 times) and gave 19% more distinct operator pairs across the sample
+(508 against 428); at 64 nodes the same comparisons held. Random campaigns
+have no coverage requirements of their own, since manifests supply them all,
+so no requirement changed and fixed corpora stay on revision one.
+
+The new case tool and the previous build gave identical output for 388
+generation runs, every existing form including explicit revision two and
+seeded inputs, and for the replay, reduction and observation of 360 cases.
+The full Lean build (10,140 jobs) and registered test driver passed, with new
+tests for the mask catalog, vectors and frequencies, equality with revision two
+under the full mask, mask conformance and the shape statistics, and for masked
+generation, replay, tampering and reduction in all eleven profiles. The Python
+policy suite passed 592 tests and the ten fixed-corpus validators passed
+unchanged. With root seed 1 and sixteen cases each, `closed-g0`,
+`runtime-primitives`, `runtime-aggregates` and `runtime-comptime` matched all
+64 cases on O0 in 313 seconds. On O2 the first three matched, but all eight
+inputs of one `runtime-comptime` function crashed the compiler during code-image
+export with `arithmetic operation overflow` in `primitive-types`, the panic
+recorded earlier for the event-log profile; checked Hull export succeeded.
+Automatic reduction kept the fingerprint. That O2 random gate failed. Per the
+user's instruction, the symptom is recorded without upstream investigation.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
