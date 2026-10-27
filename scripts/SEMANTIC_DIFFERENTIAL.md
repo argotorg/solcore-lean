@@ -3277,8 +3277,9 @@ exactly the selector std prescribes, while the fourteen other stateful corpora
 kept their 180 scenarios and 496 prefixes. Random suites of sixteen
 eight-transaction cases (seed `20261031`) matched all 16 scenarios and 128
 prefixes on both levels, at 448 nodes and at 512. Both budgets draw the same
-transactions with different steps: 67 rows were compared by selector, 61
-transactions were accepted, and no seed was excluded. A case took about 8.5
+transactions, and the step differs in 15 of the 16 cases. 67 rows were
+compared by selector, 61 transactions were accepted, and no seed was
+excluded. A case took about 8.5
 seconds. Neither run produced a finding.
 
 ## Compare malformed bytes
@@ -3379,6 +3380,19 @@ long-bytes contract. Required coverage:
 - all twelve bank payload lengths and the six boundary Words as chunks;
 - one to three helpers and transactions, all four templates, both outcomes
   and eight completion patterns.
+
+Local validation used committed code with frozen scripts and native tools. The
+fixed suite matched all thirteen scenarios and 36 prefixes on Sonatina O0 and
+O2 with complete coverage. Its 14 std rejections reverted on Hull and EVM with
+exactly the selector std prescribes, and its 22 accepted transactions,
+including cut and nonzero padding, matched exactly. The fifteen other stateful
+corpora kept their 193 scenarios and 532 prefixes. Random suites of sixteen
+eight-transaction cases (seed `20261031`) matched all 16 scenarios and 128
+prefixes on both levels, at 448 nodes and at 512. Both budgets draw the same
+transactions, and the step differs in 14 of the 16 cases. 75 rows were
+compared by selector, 53 transactions were accepted, and no seed was
+excluded. A case took about 6.5
+seconds. Neither run produced a finding.
 
 ## Compare whole committed storage
 

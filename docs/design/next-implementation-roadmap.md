@@ -2297,7 +2297,8 @@ and native tools frozen on `bc2932d19`:
 - Random suites of sixteen eight-transaction cases (seed 20261031) at 448 and
   512 nodes matched 16 scenarios and 128 prefixes on each level, every case
   on revision three with its mask:
-  - the two budgets draw the same transactions with different steps;
+  - the two budgets draw the same transactions, and the step differs in 15
+    of the 16 cases;
   - 67 rows were compared by selector (28 `0x4924aef0`, 39 `0x08638556`);
   - 61 transactions were accepted, 15 of them with a row malformation;
   - no seed was excluded.
@@ -2367,6 +2368,40 @@ and `selectorRows`. The definitions were fixed before execution:
   - then shorter bank payloads, a zeroed payload and the flags reductions.
 - Exclusions: gas, value-bearing transactions, calldata over 1 KiB, malformed
   constructor calldata, and memory.
+
+What std does with each bytes malformation, from that reading:
+- Short calldata and a wrong selector revert with `0x4924aef0`.
+- These revert with `0x08638556`:
+  - a cut in the head, the length Word or the payload;
+  - every out-of-range or wrapping offset;
+  - a length past the data, above `~0 - 63`, `2^255` or the maximum.
+- These are accepted:
+  - trailing bytes, whose result counts the larger calldata size;
+  - a cut inside the padding only;
+  - nonzero padding, which is ignored;
+  - a length that runs into the padding, up to the most that fits, and a
+    shorter or zero length;
+  - offset 0, whose payload is the first two bytes of the offset Word;
+  - offset 32, whose payload is the original length Word.
+
+Before any random run, the golden cases passed on both models. With scripts
+and native tools frozen on `0276e84a9`:
+- Fixed corpora on O0 and O2: the fifteen other stateful ones still pass with
+  193 scenarios and 532 prefixes per level. The new one matched its 13
+  scenarios and 36 prefixes with complete coverage:
+  - its 14 std rejections (5 `0x4924aef0`, 9 `0x08638556`) reverted on Hull
+    and EVM with exactly the selector std prescribes;
+  - its 22 accepted transactions matched exactly.
+- Random suites of sixteen eight-transaction cases (seed 20261031) at 448 and
+  512 nodes matched 16 scenarios and 128 prefixes on each level, every case
+  on revision three with its mask:
+  - the two budgets draw the same transactions, and the step differs in 14
+    of the 16 cases;
+  - 75 rows were compared by selector (30 `0x4924aef0`, 45 `0x08638556`);
+  - 53 transactions were accepted, among them seven with nonzero padding,
+    seven offset overlaps and a cut inside the padding;
+  - all twelve bank payload lengths were sent and no seed was excluded.
+- A case took about 6.5 seconds. There was no finding.
 
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
