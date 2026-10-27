@@ -94,7 +94,8 @@ class FakeSuite:
             summary_rows.append({"profile": profile, "status": "failed" if findings else "passed", "output": folder.name,
                                  "seed": str(seed), "findings": entries, "secondaryFindings": [], "command": ["campaign"],
                                  "campaign": {"counts": {"executed": 4, "matched": 4 - len(findings), "errors": len(findings)},
-                                              "generation": {"generatorVersions": [f"{profile}-v2"]}}})
+                                              "generation": {"requested": 4, "generatorVersions": [f"{profile}-v2"],
+                                                             "transactions": 8}}})
         status = "failed" if any(row["findings"] for row in summary_rows) else "passed"
         counts = {"executed": 4 * len(rows), "matched": sum(row["campaign"]["counts"]["matched"] for row in summary_rows)}
         fuzz.save(output / "summary.json", {"schema": "solcore-lean.semantic-suite.v1", "status": status,
@@ -184,9 +185,9 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual([(call["backend"], call["seed"]) for call in fake.calls], [("sonatina-o0", 102), ("sonatina-o2", 102)])
         self.assertEqual([row["rootSeed"] for row in self.ledger()], ["100", "100", "101", "101", "102", "102"])
-        # Seeds replay with the generator versions each profile recorded.
-        self.assertEqual({tuple(entry["generatorVersions"]) for row in self.ledger() for entry in row["profiles"]},
-                         {("closed-g0-v2",)})
+        # Seeds replay with the generation fields each profile recorded.
+        self.assertEqual({json.dumps(entry["generation"]) for row in self.ledger() for entry in row["profiles"]},
+                         {json.dumps({"generatorVersions": ["closed-g0-v2"], "transactions": 8})})
         code, fake = self.main("run", "--state", str(self.state), "--cases", "8")
         self.assertEqual((code, fake.calls), (2, []))
 

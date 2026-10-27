@@ -50,6 +50,8 @@ PROGRAM_KEYS = ("finalCaseSha256", "finalProgramSha256", "caseSha256", "programS
                 "originalProgramSha256")
 RECENT = 20
 MISSING_SUMMARY_LIMIT = 3
+# Campaign generation fields besides the seed that decide what a random case regenerates.
+REPLAY_FIELDS = ("generatorVersions", "inputSelections", "transactions")
 CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backend": list(BACKENDS), "profile": None,
                    "cases": 16, "attempts": 2048, "nodes": None, "size_cycle": [1.0, 2.0], "seconds": 14400.0,
                    "profile_seconds": 900.0,
@@ -552,6 +554,11 @@ def unrecorded_runs(state, ledger):
     return found
 
 
+def replay_fields(row):
+    generation = (row.get("campaign") or {}).get("generation") or {}
+    return {key: generation[key] for key in REPLAY_FIELDS if key in generation}
+
+
 def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started, elapsed, keep, sites=None):
     occurrences = register(state, config, epoch, iteration, backend, run_dir, summary, sites)
     row = {"schema": SCHEMA + "/run", "iteration": iteration, "backend": backend,
@@ -561,7 +568,7 @@ def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_
            "elapsedSeconds": elapsed, "exitCode": exit_code, "suiteStatus": summary.get("status", "missing-summary"),
            "stop": summary.get("stop"), "counts": summary.get("counts", {}),
            "profiles": [{"profile": row.get("profile"), "status": row.get("status"), "seed": row.get("seed"),
-                         "generatorVersions": ((row.get("campaign") or {}).get("generation") or {}).get("generatorVersions"),
+                         "generation": replay_fields(row),
                          "findings": len(row.get("findings") or []),
                          "secondaryFindings": len(row.get("secondaryFindings") or [])}
                         for row in summary.get("profiles", [])],

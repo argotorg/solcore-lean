@@ -198,7 +198,7 @@ The first `--examples` occurrences of a signature (default three) keep their
 complete archives under `findings/SIGNATURE/` with an `occurrence.json`. Later
 occurrences are counted with their seeds, from which random cases replay with
 the tools and scripts of the run's epoch; the ledger also records each
-profile's generator versions.
+profile's generator versions, input selections and transaction count.
 Runs that pass are deleted. Other runs keep their suite summary and the
 summaries and logs of the profiles that did not pass. A profile that did not
 pass without a finding, or was left unexecuted, is listed as a problem.
