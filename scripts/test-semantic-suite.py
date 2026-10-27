@@ -508,6 +508,24 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(command[command.index("--seed") + 1], str(seeds["runtime-loops"]))
         self.assertEqual(command[command.index("--nodes") + 1], "384")
 
+    def test_whole_function_campaigns_scale_their_default_attempts(self):
+        selected = ("--profile", "runtime-word", "--profile", "runtime-call-graphs", "--profile", "closed-g0",
+                    "--profile", "stateful-storage")
+        random = self.args("--mode", "random", "--functions", "80", *selected)
+        self.assertEqual([suite.profile_attempts(random, p) for p in ("runtime-word", "runtime-call-graphs", "closed-g0",
+                                                                       "stateful-storage")], [1280, 1280, 512, 512])
+        small = self.args("--mode", "random", "--functions", "4", "--profile", "runtime-call-graphs")
+        self.assertEqual(suite.profile_attempts(small, "runtime-call-graphs"), 1024)
+        explicit = self.args("--mode", "random", "--functions", "80", "--attempts", "9", "--profile", "runtime-word")
+        self.assertEqual(suite.profile_attempts(explicit, "runtime-word"), 9)
+        self.assertEqual(suite.profile_attempts(self.args("--mode", "random", "--profile", "runtime-word"), "runtime-word"), 512)
+        command = suite.command(random, "runtime-word", self.directory / "word", 10, 64 * 1024**2)
+        self.assertEqual(command[command.index("--attempts") + 1], "1280")
+        seed = int(command[command.index("--seed") + 1])
+        self.assertEqual(seed, suite.derived_seed(random.seed, "runtime-word", 0, 1, 1280))
+        self.assertLess(seed + 1280 - 1, 1 << 64)
+        self.assertEqual((suite.pure_campaign.ATTEMPTS_PER_FUNCTION, suite.pure_campaign.MAX_ATTEMPTS), (16, 10000))
+
     def test_nested_loop_profile_is_a_pure_profile_with_its_corpus_budget_and_whole_functions(self):
         self.assertEqual(suite.PROFILES["runtime-nested-loops"], ("semantic-nested-loop", "pure", 384))
         fixed = self.args("--profile", "runtime-nested-loops")

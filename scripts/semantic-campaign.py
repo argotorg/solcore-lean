@@ -117,6 +117,12 @@ IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-funct
                             "runtime-call-graphs", "runtime-aggregate-call-graphs")
 # The case tool returns at most this many cases per generation request.
 MAX_CASES = 1024
+# Default random attempts with --functions: at least this many candidates per
+# requested function, within the case tool's limit of 10,000 per request. From
+# seed 1 the slowest profile under the identity filter needed 6.8.
+ATTEMPTS_PER_FUNCTION = 16
+MAX_ATTEMPTS = 10000
+SEED_MODULUS = 2**64
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
@@ -149,6 +155,52 @@ def acceptance(profile: str, case: dict) -> str | None:
         return None
     origin = case.get("provenance", {}).get("origin")
     return origin.get("acceptance", "profile") if isinstance(origin, dict) else "profile"
+
+
+def generate_in_requests(request, count: int, attempts: int, seed: int, per_function: int,
+                         functions: int | None = None) -> tuple[dict, dict]:
+    """Generate `count` cases from `seed` within `attempts` candidates in one or
+    more case-tool requests; `request(first_seed, cases, attempts)` makes one.
+
+    The case tool tries candidate `index` at seed `(first_seed + index) mod 2^64`
+    and stops once it holds its case count, so a request that continues after
+    `attempted` candidates starts at `(seed + attempted) mod 2^64` with the
+    attempts left. Every request but the last asks for whole functions of
+    `per_function` cases, so none cuts a function short, and the merged cases,
+    exclusions, attempts and status equal those of one request for any request
+    sizes. The first request asks for every case. A response over the output
+    limit is requested again from the same seed for half as many whole functions,
+    and later requests keep that size; one function whose cases alone exceed the
+    limit stays an inconclusive `output-limit`."""
+    functions = functions or -(-count // per_function)
+    cases, excluded, attempted, requests, retries = [], [], 0, 0, 0
+    while True:
+        wanted = min(count - len(cases), functions * per_function)
+        budget = attempts - attempted
+        try:
+            response = request((seed + attempted) % SEED_MODULUS, wanted, budget)
+        except m2.Finding as error:
+            covered = -(-wanted // per_function)
+            if error.category == RESOURCE and error.detail == "output-limit" and covered > 1:
+                functions = covered // 2
+                retries += 1
+                continue
+            raise
+        got, skipped, used = response.get("cases"), response.get("excluded"), response.get("attempted")
+        if (response.get("schema") != "solcore-lean.semantic-corpus.v1" or not isinstance(got, list)
+                or not isinstance(skipped, list) or type(used) is not int or not 0 <= used <= budget
+                or len(got) > wanted or (len(got) < wanted and used != budget)):
+            raise ValueError("invalid bounded generation response")
+        cases += got
+        excluded += skipped
+        attempted += used
+        requests += 1
+        if len(cases) == count or len(got) < wanted or attempted == attempts:
+            break
+    merged = {"schema": "solcore-lean.semantic-corpus.v1", "requested": count, "attempted": attempted,
+              "status": "complete" if len(cases) == count else "generation-exhausted",
+              "excluded": excluded, "cases": cases}
+    return merged, {"requests": requests, "outputLimitRetries": retries}
 
 
 def directory_bytes(path: Path) -> int:
@@ -738,6 +790,8 @@ class Campaign:
         # one compilation; reduction candidates compile on their own.
         self.compilations = m2.CompileCache(self.work / "compilations")
         self.compiled_sources = set()
+        # Random generation records how many case-tool requests it took.
+        self.generation_requests = {"requests": None, "outputLimitRetries": None}
         self.counter = 0
         self.shrink_attempts = 0
         random = getattr(args, "corpus", None) is None and getattr(args, "case", None) is None
@@ -1119,8 +1173,16 @@ class Campaign:
                 options.append(self.input_selection)
             if self.args.profile in IDENTITY_FILTER_PROFILES and self.acceptance != "profile":
                 options.append(self.acceptance)
-            return self.tool([command, str(self.args.seed), str(self.args.nodes), str(self.args.cases),
-                              str(self.args.attempts), str(self.args.direct_fuel), *options], "generation")
+
+            def request(first_seed: int, cases: int, attempts: int) -> dict:
+                return self.tool([command, str(first_seed), str(self.args.nodes), str(cases), str(attempts),
+                                  str(self.args.direct_fuel), *options], "generation")
+
+            per_function = (1 if self.args.profile == "closed-g0"
+                            else inputs_per_function(self.args.profile, self.input_selection))
+            response, self.generation_requests = generate_in_requests(
+                request, self.args.cases, self.args.attempts, self.args.seed, per_function)
+            return response
         manifest = validate_manifest(m2.read_json(self.args.corpus))
         profile = manifest.get("profile", "closed-g0")
         runtime_input = profile != "closed-g0"
@@ -1257,6 +1319,7 @@ class Campaign:
             "manifest entries" if self.args.corpus else
             "function graph candidates" if self.args.profile in HELPER_PROFILES else
             "function candidates" if self.args.profile != "closed-g0" else "program candidates")
+        self.summary["generation"].update(self.generation_requests)
         self.summary["generation"]["generatorVersions"] = sorted({case["provenance"]["generatorVersion"] for case in cases})
         self.summary["generation"]["inputSelections"] = sorted(
             {selection for case in cases if (selection := input_selection(self.args.profile, case)) is not None})
@@ -1266,7 +1329,8 @@ class Campaign:
         self.summary["generation"]["requestedFunctions"] = functions
         self.summary["generation"]["inputsPerFunction"] = (
             None if functions is None else inputs_per_function(self.args.profile, self.input_selection))
-        save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
+        save_json(self.args.output / "generation.json",
+                  {**{key: value for key, value in response.items() if key != "cases"}, **self.generation_requests})
         coverage = self.summary["coverage"]
         coverage["generatedFeatures"] = sorted({feature for case in cases for feature in case["provenance"]["features"]})
         coverage["generatedWordLiterals"] = sorted({value for case in cases for value in word_literals(case["program"])}, key=int)
@@ -1343,7 +1407,8 @@ def main() -> int:
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path, help="fixed versioned CI corpus manifest")
     selection.add_argument("--case", type=Path, help="re-execute one saved case, including a reduced finding")
-    parser.add_argument("--attempts", type=int, help="generation attempt limit; default 1024 for call graphs, 512 for primitives/comptime/modules, otherwise 256")
+    parser.add_argument("--attempts", type=int, help="generation attempt limit; default 1024 for call graphs, 512 for primitives/comptime/modules, otherwise 256, "
+                                                      f"and with --functions at least {ATTEMPTS_PER_FUNCTION} per function, up to {MAX_ATTEMPTS}")
     parser.add_argument("--g0-version", choices=G0_VERSIONS,
                         help=f"G0 generator for random G0-based profiles; default {RANDOM_G0_VERSION}. "
                              "A corpus or saved case uses the version it records")
@@ -1419,6 +1484,8 @@ def main() -> int:
         args.cases = args.functions * per_function
     if args.attempts is None:
         args.attempts = 1024 if args.profile == "runtime-call-graphs" else 512 if args.profile in ("runtime-primitives", "runtime-comptime", "runtime-modules") else 256
+        if args.functions is not None:
+            args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
         args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
@@ -1428,7 +1495,7 @@ def main() -> int:
             parser.error(str(error))
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
-    limits = {"seed": (0, 2**64 - 1), "nodes": (minimum_nodes(args.profile), 512), "cases": (1, MAX_CASES), "attempts": (0, 10000),
+    limits = {"seed": (0, SEED_MODULUS - 1), "nodes": (minimum_nodes(args.profile), 512), "cases": (1, MAX_CASES), "attempts": (0, MAX_ATTEMPTS),
               "seconds": (0.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10),
               "shrink_attempts": (0, 10000), "shrink_candidates": (1, 4096), "case_timeout": (0.001, 3600),
               "direct_fuel": (1, 10000000), "core_fuel": (1, 1000000000), "gas": (1, 1000000000)}

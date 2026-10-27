@@ -28,6 +28,13 @@ def matched():
     return {"comparison": campaign.m2.compare(observed), "observations": observed}
 
 
+def exhausted(arguments):
+    """A command-capture stub's answer: no case, every requested attempt used."""
+    attempts = arguments[4] if len(arguments) > 4 else '0'
+    return {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': 0, 'status': 'generation-exhausted',
+            'attempted': int(attempts) if attempts.isdigit() else 0, 'excluded': [], 'cases': []}
+
+
 def options(directory):
     return SimpleNamespace(output=Path(directory), profile='closed-g0', seed=1, nodes=16, cases=2, attempts=16,
         seconds=30, disk_bytes=16 * 1024 * 1024, shrink_attempts=4, shrink_candidates=8,
@@ -614,7 +621,7 @@ class ManifestTests(unittest.TestCase):
 
                 def tool(arguments, stage):
                     calls.append((arguments, stage))
-                    return {'generation': 'dispatch test only'}
+                    return exhausted(arguments)
 
                 instance.tool = tool
                 instance.prepare_cases()
@@ -1779,7 +1786,7 @@ class CallGraphCoverageTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory:
                 seen = []
                 def run(instance):
-                    instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                    instance.tool = lambda arguments, stage: seen.append(arguments) or exhausted(arguments)
                     instance.prepare_cases(); instance.summary['status'] = 'generation-exhausted'
                 with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory)/'run'),
                         '--profile', 'runtime-call-graphs', '--cases', '1', *extra]),                         patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
@@ -1839,7 +1846,7 @@ class CallGraphLoopCoverageTests(unittest.TestCase):
             configured, seen = [], []
             def run(instance):
                 configured.append(instance.args)
-                instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                instance.tool = lambda arguments, stage: seen.append(arguments) or exhausted(arguments)
                 if prepare: instance.prepare_cases()
                 instance.summary['status'] = 'generation-exhausted'
             with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory) / 'run'), *argv]), \
@@ -2385,7 +2392,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
             configured, seen = [], []
             def run(instance):
                 configured.append(instance.args)
-                instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                instance.tool = lambda arguments, stage: seen.append(arguments) or exhausted(arguments)
                 if prepare: instance.prepare_cases()
                 instance.summary['status'] = 'generation-exhausted'
             with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory) / 'run'), *argv]), \
@@ -3053,7 +3060,7 @@ class CommandLine:
         with tempfile.TemporaryDirectory() as directory:
             summaries, seen = [], []
             def run(instance):
-                instance.tool = lambda arguments, stage: seen.append(arguments) or {}
+                instance.tool = lambda arguments, stage: seen.append(arguments) or exhausted(arguments)
                 if prepare: instance.prepare_cases()
                 summaries.append(copy.deepcopy(instance.summary))
                 instance.summary['status'] = 'generation-exhausted'
@@ -3404,6 +3411,145 @@ class AcceptanceTests(CommandLine, unittest.TestCase):
                 instance.run()
             self.assertEqual(instance.summary['configuration']['acceptance'], self.FILTER)
             self.assertEqual(instance.summary['generation']['acceptances'], [self.FILTER, self.PROFILE])
+
+
+def model_generation(first_seed, count, attempts, per_function, overflow_functions=None):
+    """The case tool's generation loop over a seed-determined acceptance rule:
+    candidate `index` uses seed `(first_seed + index) mod 2^64`, an accepted one
+    yields `per_function` cases, and attempts stop once `count` cases exist."""
+    if overflow_functions is not None and -(-count // per_function) > overflow_functions:
+        raise campaign.m2.Finding(campaign.RESOURCE, 'generation', 'output-limit')
+    cases, excluded, attempted = [], [], 0
+    for index in range(attempts):
+        if len(cases) >= count:
+            break
+        attempted += 1
+        seed = (first_seed + index) % campaign.SEED_MODULUS
+        if (seed * 0x9e3779b97f4a7c15 >> 61) % 3:
+            for position in range(per_function):
+                if len(cases) < count:
+                    cases.append({'seed': str(seed), 'inputIndex': position})
+        else:
+            excluded.append({'seed': str(seed), 'reason': 'excluded', 'category': 'excluded'})
+    return {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': count, 'attempted': attempted,
+            'status': 'complete' if len(cases) == count else 'generation-exhausted', 'excluded': excluded, 'cases': cases}
+
+
+class GenerationRequestTests(CommandLine, unittest.TestCase):
+    """Generation in several requests merges to one request's result."""
+
+    def requests(self, per_function, overflow_functions=None):
+        calls = []
+        def request(first_seed, cases, attempts):
+            self.assertTrue(0 <= first_seed < campaign.SEED_MODULUS)
+            calls.append((first_seed, cases, attempts))
+            return model_generation(first_seed, cases, attempts, per_function, overflow_functions)
+        return request, calls
+
+    def test_any_request_sizes_merge_to_the_single_request(self):
+        for per_function in (1, 8, 10, 12):
+            for count in (1, 5, per_function, 3 * per_function - 1, 64, 1024):
+                for attempts in (0, 1, 3, 50, 10000):
+                    for functions in (1, 2, 3, None):
+                        with self.subTest(per=per_function, count=count, attempts=attempts, functions=functions):
+                            request, calls = self.requests(per_function)
+                            merged, stats = campaign.generate_in_requests(request, count, attempts, 5, per_function, functions)
+                            self.assertEqual(merged, model_generation(5, count, attempts, per_function))
+                            self.assertEqual(stats, {'requests': len(calls), 'outputLimitRetries': 0})
+                            # Every request but the last asks for whole functions.
+                            self.assertTrue(all(cases % per_function == 0 for _, cases, _ in calls[:-1]))
+
+    def test_an_overflowing_response_is_requested_again_with_half_the_functions(self):
+        request, calls = self.requests(10, overflow_functions=3)
+        merged, stats = campaign.generate_in_requests(request, 1020, 10000, 1, 10)
+        self.assertEqual(merged, model_generation(1, 1020, 10000, 10))
+        # 102 functions overflow, then 51, 25, 12 and 6; three fit and are kept.
+        self.assertEqual(stats['outputLimitRetries'], 5)
+        self.assertEqual([cases for _, cases, _ in calls[:7]], [1020, 510, 250, 120, 60, 30, 30])
+        self.assertEqual(stats['requests'], len(calls) - 5)
+        self.assertEqual(merged['status'], 'complete')
+
+    def test_one_function_over_the_limit_stays_inconclusive(self):
+        request, calls = self.requests(8, overflow_functions=0)
+        with self.assertRaises(campaign.m2.Finding) as raised:
+            campaign.generate_in_requests(request, 64, 256, 1, 8)
+        self.assertEqual((raised.exception.category, raised.exception.detail), (campaign.RESOURCE, 'output-limit'))
+        self.assertEqual([cases for _, cases, _ in calls], [64, 32, 16, 8])
+        # A final partial function cannot be split either.
+        request, calls = self.requests(8, overflow_functions=0)
+        with self.assertRaises(campaign.m2.Finding):
+            campaign.generate_in_requests(request, 5, 256, 1, 8)
+        self.assertEqual(len(calls), 1)
+
+    def test_requests_continue_across_the_seed_boundary(self):
+        for first in (campaign.SEED_MODULUS - 1, campaign.SEED_MODULUS - 7):
+            with self.subTest(first=first):
+                request, calls = self.requests(10)
+                merged, _ = campaign.generate_in_requests(request, 60, 100, first, 10, functions=1)
+                self.assertEqual(merged, model_generation(first, 60, 100, 10))
+                self.assertTrue(any(seed < first for seed, _, _ in calls))
+                seeds = [int(entry['seed']) for entry in merged['cases'] + merged['excluded']]
+                self.assertTrue(any(seed < 100 for seed in seeds) and any(seed >= first for seed in seeds))
+
+    def test_exhaustion_and_status_come_from_the_shared_attempt_budget(self):
+        request, calls = self.requests(8)
+        merged, _ = campaign.generate_in_requests(request, 80, 7, 3, 8, functions=1)
+        self.assertEqual(merged, model_generation(3, 80, 7, 8))
+        self.assertEqual((merged['status'], merged['attempted']), ('generation-exhausted', 7))
+        self.assertEqual(sum(attempts for _, _, attempts in calls[:1]), 7)
+        self.assertEqual(len(merged['excluded']) + len(merged['cases']) // 8, 7)
+        request, calls = self.requests(8)
+        merged, stats = campaign.generate_in_requests(request, 8, 0, 3, 8)
+        self.assertEqual((merged['status'], merged['attempted'], stats['requests'], len(calls)),
+                         ('generation-exhausted', 0, 1, 1))
+
+    def test_inconsistent_responses_are_refused(self):
+        valid = model_generation(1, 16, 50, 8)
+        for broken in ({**valid, 'schema': 'other'}, {**valid, 'cases': None}, {**valid, 'attempted': 51},
+                       {**valid, 'attempted': True}, {**valid, 'cases': valid['cases'][:8]},
+                       {**valid, 'cases': valid['cases'] * 2}):
+            with self.subTest(broken=broken.get('attempted')), self.assertRaises(ValueError):
+                campaign.generate_in_requests(lambda *_: broken, 16, 50, 1, 8)
+
+    def test_campaign_records_its_requests_and_retries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-functions', 24, 0
+            config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+            instance = campaign.Campaign(config)
+            calls = []
+            def tool(arguments, stage):
+                calls.append(arguments)
+                seed, count, attempts = int(arguments[1]), int(arguments[3]), int(arguments[4])
+                if count > 8:
+                    raise campaign.m2.Finding(campaign.RESOURCE, 'generation', 'output-limit')
+                return {**model_generation(seed, count, attempts, 8),
+                        'cases': [function_case(1) for _ in range(min(count, 8))]}
+            instance.tool = tool
+            def execute(adapter_args, report):
+                report.update(matched(), backend=adapter_args.backend)
+            with patch.object(campaign.m2, 'execute', side_effect=execute), redirect_stdout(io.StringIO()):
+                instance.run()
+            generation = instance.summary['generation']
+            # Three functions overflow, so one-function requests follow.
+            self.assertEqual((generation['requests'], generation['outputLimitRetries'], generation['status']), (3, 1, 'complete'))
+            self.assertEqual([call[3] for call in calls], ['24', '8', '8', '8'])
+            self.assertEqual(instance.summary['counts']['generated'], 24)
+            saved = json.loads((Path(directory) / 'generation.json').read_text())
+            self.assertEqual((saved['requests'], saved['outputLimitRetries'], saved['attempted']),
+                             (3, 1, generation['attempted']))
+
+    def test_whole_function_campaigns_raise_the_default_attempts(self):
+        for profile, functions, attempts in (('runtime-word', 3, '256'), ('runtime-word', 128, '2048'),
+                                             ('runtime-aggregate-call-graphs', 85, '1360'),
+                                             ('runtime-call-graphs', 20, '1024'), ('runtime-primitives', 40, '640')):
+            with self.subTest(profile=profile, functions=functions):
+                summary, seen = self.run_main('--profile', profile, '--functions', str(functions))
+                self.assertEqual((seen[0][4], summary['configuration']['attempts']), (attempts, int(attempts)))
+        summary, seen = self.run_main('--profile', 'runtime-word', '--functions', '128', '--attempts', '7')
+        self.assertEqual(seen[0][4], '7')
+        self.assertEqual(self.run_main('--profile', 'runtime-word', '--cases', '1024')[1][0][4], '256')
+        self.assertEqual(campaign.MAX_ATTEMPTS, 10000)
 
 
 class CompilationReuseTests(unittest.TestCase):

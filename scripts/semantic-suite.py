@@ -139,9 +139,16 @@ def requested(args, profile):
 
 
 def profile_attempts(args, profile):
-    if profile == "runtime-call-graphs" and not getattr(args, "attempts_explicit", True):
-        return 1024
-    return args.attempts
+    """An explicit budget wins. Otherwise 1024 for call graphs and 512 elsewhere,
+    raised under --functions to the campaign's attempts per function, within the
+    case tool's limit; the derived seed keeps that many attempts below 2^64."""
+    if getattr(args, "attempts_explicit", True):
+        return args.attempts
+    default = 1024 if profile == "runtime-call-graphs" else args.attempts
+    functions = function_count(args, profile)
+    if functions is None:
+        return default
+    return min(pure_campaign.MAX_ATTEMPTS, max(default, pure_campaign.ATTEMPTS_PER_FUNCTION * functions))
 
 
 def node_budget(args, profile):
@@ -435,7 +442,8 @@ def parse_args(argv=None):
                              "inputs, instead of --cases; closed-g0 and the stateful profiles keep --cases")
     parser.add_argument("--nodes", type=int, help="override random node budget; otherwise profile-specific defaults")
     parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512")
-    parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles")
+    parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles, "
+                                                      "and with --functions at least 16 per function, up to 10000")
     defaults = {"seconds": 7200., "profile_seconds": 900., "disk_bytes": 1024**3,
                 "profile_disk_bytes": 256 * 1024**2, "output_limit": 8 * 1024**2, "cleanup_seconds": 10.,
                 "case_timeout": 90., "direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000,
