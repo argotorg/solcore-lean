@@ -54,6 +54,8 @@ AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
 LOOP_CASE_SCHEMA = "solcore-lean.semantic-loop-case.v1"
 NESTED_LOOP_CASE_SCHEMA = "solcore-lean.semantic-nested-loop-case.v1"
 NESTED_LOOP_BOUNDS = ("input", "counter", "accumulator")
+RECURSION_CASE_SCHEMA = "solcore-lean.semantic-recursion-case.v1"
+RECURSION_FORMS = ("tail", "nontail", "mutual")
 GENERIC_CASE_SCHEMA = "solcore-lean.semantic-generic-case.v1"
 CLOSURE_CASE_SCHEMA = "solcore-lean.semantic-closure-case.v1"
 COMPTIME_CASE_SCHEMA = "solcore-lean.semantic-comptime-case.v1"
@@ -64,7 +66,7 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime-aggregate-call-graphs",
                  FUNCTION_CASE_SCHEMA: "runtime-functions", MUTATION_CASE_SCHEMA: "runtime-mutation",
                  AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
-                 NESTED_LOOP_CASE_SCHEMA: "runtime-nested-loops",
+                 NESTED_LOOP_CASE_SCHEMA: "runtime-nested-loops", RECURSION_CASE_SCHEMA: "runtime-recursion",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
@@ -72,7 +74,7 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "SynthesizedAggregateCallGraphs",
                   FUNCTION_CASE_SCHEMA: "SynthesizedFunctions", MUTATION_CASE_SCHEMA: "SynthesizedMutation",
                   AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
-                  NESTED_LOOP_CASE_SCHEMA: "SynthesizedNestedLoops",
+                  NESTED_LOOP_CASE_SCHEMA: "SynthesizedNestedLoops", RECURSION_CASE_SCHEMA: "SynthesizedRecursion",
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
@@ -265,6 +267,19 @@ def validate_nested_loop_plan(plan) -> dict:
     return plan
 
 
+def validate_recursion_plan(plan) -> dict:
+    """Validate the envelope; native replay checks the entire canonical program."""
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.recursion-plan.v1":
+        raise ValueError("unsupported recursion plan schema")
+    if type(plan.get("depthMask")) is not int or plan["depthMask"] not in (0, 1, 3, 7):
+        raise ValueError("recursion depth mask must be zero, one, three or seven")
+    if plan.get("form") not in RECURSION_FORMS:
+        raise ValueError("recursion form must be tail, nontail or mutual")
+    if not isinstance(plan.get("stepProgram"), dict):
+        raise ValueError("recursion plan requires its original step function graph")
+    return plan
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -342,6 +357,8 @@ def validate_case(case: dict) -> None:
         validate_loop_plan(case.get("loopPlan"))
     if case["schema"] == NESTED_LOOP_CASE_SCHEMA:
         validate_nested_loop_plan(case.get("nestedLoopPlan"))
+    if case["schema"] == RECURSION_CASE_SCHEMA:
+        validate_recursion_plan(case.get("recursionPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == GENERIC_CASE_SCHEMA:
@@ -404,7 +421,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -864,6 +881,7 @@ def execute(args, report: dict) -> None:
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
         NESTED_LOOP_CASE_SCHEMA: "runtime Word input, bounded source while nested in a bounded while versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
+        RECURSION_CASE_SCHEMA: "runtime Word input, bounded self or mutual source recursion versus finite Core guards, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
         GENERIC_CASE_SCHEMA: "runtime Word input, generic Word/pair/sum selection versus checked monomorphic Core, aggregate step graph, Sonatina O0, run(uint256) ABI Word",
         CLOSURE_CASE_SCHEMA: "runtime Word capture, repeated or independent snapshot closures and outer mutation, checked Core lambdas, Sonatina O0, run(uint256) ABI Word",
         COMPTIME_CASE_SCHEMA: "original closed G0 expression evaluated by source comptime versus Core, runtime aggregate step and Word input, Sonatina O0, run(uint256) ABI Word",

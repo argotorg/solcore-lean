@@ -42,16 +42,20 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-aggregates": ("aggregate-generate", "aggregate-emit", "aggregate-generated"),
                     "runtime-loops": ("loop-generate", "loop-emit", "loop-generated"),
                     "runtime-nested-loops": ("nested-loop-generate", "nested-loop-emit", "nested-loop-generated"),
+                    "runtime-recursion": ("recursion-generate", "recursion-emit", "recursion-generated"),
                     "runtime-generics": ("generic-generate", "generic-emit", "generic-generated"),
                     "runtime-closures": ("closure-generate", "closure-emit", "closure-generated"),
                     "runtime-comptime": ("comptime-generate", "comptime-emit", "comptime-generated"),
                     "runtime-modules": ("module-generate", "module-emit", "module-generated")}
 CALL_GRAPH_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops")
 LOOP_PROFILES = ("runtime-loops", "runtime-call-graph-loops")
-HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-aggregate-call-graphs", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
+HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-aggregate-call-graphs", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 LOOP_INPUTS = ("0", "1", "3", "7", str(2**256 - 1), str(2**255))
 NESTED_LOOP_INPUTS = ("0", "1", "2", "3", str(2**256 - 1), str(2**255))
+RECURSION_INPUTS = ("0", "1", "2", "3", "7", str(2**256 - 1), str(2**255))
+# Generation shapes: depth mask and form; plans also admit a depth mask of zero.
+RECURSION_SHAPES = tuple(f"{mask}:{form}" for form in m2.RECURSION_FORMS for mask in (1, 3, 7))
 # Generation shapes: outer mask, inner mask and inner bound; plans also admit masks of zero.
 NESTED_LOOP_SHAPES = tuple(f"{outer}x{inner}:{bound}" for bound in m2.NESTED_LOOP_BOUNDS
                            for outer in (1, 3) for inner in (1, 3))
@@ -77,6 +81,8 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                                             "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
                           "runtime-nested-loops": ("profileVersion", "functionVersion", "templateVersion",
                                                    "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
+                          "runtime-recursion": ("profileVersion", "functionVersion", "templateVersion",
+                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
                           "runtime-generics": ("profileVersion", "functionVersion", "templateVersion",
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion"),
                           "runtime-closures": ("profileVersion", "functionVersion", "templateVersion",
@@ -87,8 +93,8 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                                                "stepProfileVersion", "stepTemplateVersion", "stepFunctionVersion")}
 # Profiles whose programs come from the G0 generator; call-graph profiles use their own grammars.
 G0_PROFILES = ("closed-g0", "runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
-               "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-generics", "runtime-closures",
-               "runtime-comptime", "runtime-modules")
+               "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-generics",
+               "runtime-closures", "runtime-comptime", "runtime-modules")
 G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1", "core-g0-v3/lcg64-v1", "core-g0-v4/lcg64-v1")
 # Random generation uses v4: v2 under v3's per-case swarm mask, restricted to the
 # features each profile's emitter renders. A fixed corpus or a saved case keeps
@@ -264,6 +270,7 @@ def declared_helper_count(program: dict) -> int:
 def helper_counts(case: dict) -> set[int]:
     plans = {m2.LOOP_CASE_SCHEMA: ("loopPlan", m2.validate_loop_plan),
              m2.NESTED_LOOP_CASE_SCHEMA: ("nestedLoopPlan", m2.validate_nested_loop_plan),
+             m2.RECURSION_CASE_SCHEMA: ("recursionPlan", m2.validate_recursion_plan),
              m2.GENERIC_CASE_SCHEMA: ("genericPlan", m2.validate_generic_plan),
              m2.CLOSURE_CASE_SCHEMA: ("closurePlan", m2.validate_closure_plan),
              m2.COMPTIME_CASE_SCHEMA: ("comptimePlan", m2.validate_comptime_plan),
@@ -390,6 +397,30 @@ def specified_nested_loops(case: dict) -> dict[str, set]:
     return result
 
 
+def recursion_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("recursionRequirements", {"shapes": [], "depths": []})
+    if not isinstance(requirements, dict) or set(requirements) != {"shapes", "depths"}:
+        raise ValueError("recursionRequirements requires shapes and depths arrays")
+    admitted = {f"{mask}:{form}" for form in m2.RECURSION_FORMS for mask in (0, 1, 3, 7)}
+    for key, allowed, kind in (("shapes", admitted, str), ("depths", set(range(8)), int)):
+        values = requirements[key]
+        if (not isinstance(values, list) or any(type(v) is not kind or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid recursion {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-recursion" and any(requirements.values()):
+        raise ValueError("only recursion corpora can require shapes and depths")
+    return requirements
+
+
+def specified_recursion(case: dict) -> dict[str, set]:
+    """The plan's shape and the prescribed depth `input & mask`; never a measured trace."""
+    if case.get("schema") != m2.RECURSION_CASE_SCHEMA:
+        return {"Shapes": set(), "Depths": set()}
+    plan = m2.validate_recursion_plan(case.get("recursionPlan"))
+    return {"Shapes": {f"{plan['depthMask']}:{plan['form']}"},
+            "Depths": {int(m2.word(case.get("input"))) & plan["depthMask"]}}
+
+
 def generic_requirements(manifest: dict) -> dict:
     requirements = manifest.get("genericRequirements", {"instantiations": []})
     if not isinstance(requirements, dict) or set(requirements) != {"instantiations"}:
@@ -502,9 +533,9 @@ def recipe_requirements(manifest: dict) -> dict:
         if len(values) != len(set(values)):
             raise ValueError(f"recipe {key} must not contain duplicates")
     profile = manifest.get("profile", "closed-g0")
-    if profile not in ("runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules") and any(requirements.values()):
+    if profile not in ("runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules") and any(requirements.values()):
         raise ValueError("only step-based corpora can require generation recipes")
-    if profile in ("runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules") and requirements["updates"]:
+    if profile in ("runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules") and requirements["updates"]:
         raise ValueError("this profile has no update-count recipe dimension")
     return requirements
 
@@ -513,11 +544,11 @@ def generation_recipes(case: dict) -> dict[str, set[int]]:
     """Read claimed generator metadata; native replay authenticates matched cases."""
     result = {"Templates": set(), "Updates": set()}
     schema = case.get("schema")
-    if schema not in (m2.MUTATION_CASE_SCHEMA, m2.AGGREGATE_CASE_SCHEMA, m2.LOOP_CASE_SCHEMA, m2.NESTED_LOOP_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA, m2.COMPTIME_CASE_SCHEMA, m2.MODULE_CASE_SCHEMA):
+    if schema not in (m2.MUTATION_CASE_SCHEMA, m2.AGGREGATE_CASE_SCHEMA, m2.LOOP_CASE_SCHEMA, m2.NESTED_LOOP_CASE_SCHEMA, m2.RECURSION_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA, m2.COMPTIME_CASE_SCHEMA, m2.MODULE_CASE_SCHEMA):
         return result
     origin_kind = {m2.MUTATION_CASE_SCHEMA: "mutation-generated",
                    m2.AGGREGATE_CASE_SCHEMA: "aggregate-generated", m2.LOOP_CASE_SCHEMA: "loop-generated",
-                   m2.NESTED_LOOP_CASE_SCHEMA: "nested-loop-generated",
+                   m2.NESTED_LOOP_CASE_SCHEMA: "nested-loop-generated", m2.RECURSION_CASE_SCHEMA: "recursion-generated",
                    m2.GENERIC_CASE_SCHEMA: "generic-generated", m2.CLOSURE_CASE_SCHEMA: "closure-generated",
                    m2.COMPTIME_CASE_SCHEMA: "comptime-generated", m2.MODULE_CASE_SCHEMA: "module-generated"}[schema]
     provenance = case.get("provenance")
@@ -528,7 +559,7 @@ def generation_recipes(case: dict) -> dict[str, set[int]]:
         raise ValueError("recipe case origin must be an object")
     if origin.get("kind") != origin_kind:
         return result
-    if schema in (m2.LOOP_CASE_SCHEMA, m2.NESTED_LOOP_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA, m2.COMPTIME_CASE_SCHEMA, m2.MODULE_CASE_SCHEMA):
+    if schema in (m2.LOOP_CASE_SCHEMA, m2.NESTED_LOOP_CASE_SCHEMA, m2.RECURSION_CASE_SCHEMA, m2.GENERIC_CASE_SCHEMA, m2.CLOSURE_CASE_SCHEMA, m2.COMPTIME_CASE_SCHEMA, m2.MODULE_CASE_SCHEMA):
         origin = origin.get("stepOrigin")
         if not isinstance(origin, dict) or origin.get("kind") != "aggregate-generated":
             raise ValueError("generated plan recipe requires its aggregate step origin")
@@ -550,6 +581,7 @@ def generation_recipes(case: dict) -> dict[str, set[int]]:
 
 
 NESTED_LOOP_DIMENSIONS = ("Shapes", "OuterIterations", "InnerIterations", "TotalIterations")
+RECURSION_DIMENSIONS = ("Shapes", "Depths")
 
 
 def missing_coverage(summary: dict) -> bool:
@@ -557,6 +589,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["recipeCoverage"]["missing" + dimension] for dimension in ("Templates", "Updates"))
         or any(summary["loopCoverage"]["missing" + dimension] for dimension in ("Masks", "Iterations"))
         or any(summary["nestedLoopCoverage"]["missing" + dimension] for dimension in NESTED_LOOP_DIMENSIONS)
+        or any(summary["recursionCoverage"]["missing" + dimension] for dimension in RECURSION_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -609,6 +642,7 @@ def validate_manifest(manifest) -> dict:
     recipe_requirements(manifest)
     loop_requirements(manifest)
     nested_loop_requirements(manifest)
+    recursion_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -621,9 +655,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -662,6 +696,8 @@ def validate_manifest(manifest) -> dict:
             (m2.validate_call_graph_loop_plan if profile == "runtime-call-graph-loops" else m2.validate_loop_plan)(entry["loopPlan"])
         elif "nestedLoopPlan" in entry:
             m2.validate_nested_loop_plan(entry["nestedLoopPlan"])
+        elif "recursionPlan" in entry:
+            m2.validate_recursion_plan(entry["recursionPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -680,6 +716,8 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
         return LOOP_INPUTS
     if profile == "runtime-nested-loops":
         return NESTED_LOOP_INPUTS
+    if profile == "runtime-recursion":
+        return RECURSION_INPUTS
     if profile in ("runtime-primitives", "runtime-call-graphs", "runtime-aggregate-call-graphs"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
@@ -831,6 +869,8 @@ class Campaign:
                 "generatedIterations": [], "matchedIterations": [], "requiredIterations": []},
             "nestedLoopCoverage": {"classification": "nested loop plan shapes and iteration counts specified by the plan, the input and the step's original Core results; matched plans verified by native replay; not measured traces or opcode coverage",
                 **{prefix + dimension: [] for dimension in NESTED_LOOP_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "recursionCoverage": {"classification": "recursion plan shapes and depths prescribed by the plan and the input; matched plans verified by native replay; not measured traces or opcode coverage",
+                **{prefix + dimension: [] for dimension in RECURSION_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -875,6 +915,9 @@ class Campaign:
         nested = self.summary["nestedLoopCoverage"]
         for dimension in NESTED_LOOP_DIMENSIONS:
             nested["missing" + dimension] = sorted(set(nested["required" + dimension]) - set(nested["matched" + dimension]))
+        recursion = self.summary["recursionCoverage"]
+        for dimension in RECURSION_DIMENSIONS:
+            recursion["missing" + dimension] = sorted(set(recursion["required" + dimension]) - set(recursion["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -909,6 +952,11 @@ class Campaign:
         for dimension, values in specified_nested_loops(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["nestedLoopCoverage"][key] = sorted(set(self.summary["nestedLoopCoverage"][key]) | values)
+
+    def record_recursion(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_recursion(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["recursionCoverage"][key] = sorted(set(self.summary["recursionCoverage"][key]) | values)
 
     def record_generics(self, case: dict, *, matched: bool = False) -> None:
         key = ("matched" if matched else "generated") + "Instantiations"
@@ -1206,6 +1254,9 @@ class Campaign:
         nested = nested_loop_requirements(manifest)
         for key, dimension in zip(("shapes", "outerIterations", "innerIterations", "totalIterations"), NESTED_LOOP_DIMENSIONS):
             self.summary["nestedLoopCoverage"]["required" + dimension] = sorted(nested[key])
+        recursion = recursion_requirements(manifest)
+        self.summary["recursionCoverage"]["requiredShapes"] = sorted(recursion["shapes"])
+        self.summary["recursionCoverage"]["requiredDepths"] = sorted(recursion["depths"])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1243,9 +1294,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -1288,6 +1339,7 @@ class Campaign:
             self.record_recipes(case)
             self.record_loops(case)
             self.record_nested_loops(case)
+            self.record_recursion(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1340,6 +1392,7 @@ class Campaign:
             self.record_recipes(case)
             self.record_loops(case)
             self.record_nested_loops(case)
+            self.record_recursion(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1366,6 +1419,7 @@ class Campaign:
                 self.record_recipes(case, matched=True)
                 self.record_loops(case, matched=True)
                 self.record_nested_loops(case, matched=True)
+                self.record_recursion(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -1487,7 +1541,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

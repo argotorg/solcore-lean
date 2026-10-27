@@ -6,6 +6,7 @@ import Solcore.Synthesis.Core.LocalMutationDAG
 import Solcore.Synthesis.Core.AggregateDAG
 import Solcore.Synthesis.Core.BoundedLoop
 import Solcore.Synthesis.Core.NestedLoop
+import Solcore.Synthesis.Core.Recursion
 import Solcore.Synthesis.Core.GenericPlan
 import Solcore.Synthesis.Core.ClosurePlan
 import Solcore.Synthesis.Core.ComptimePlan
