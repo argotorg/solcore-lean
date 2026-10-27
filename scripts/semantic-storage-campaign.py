@@ -64,6 +64,9 @@ BYTES_DIMENSIONS = DIMENSIONS + BYTES_EXTRA
 LEDGER_EXTRA = ("Senders", "Recipients", "Amounts", "SenderCounts", "RevertCauses")
 LEDGER_DIMENSIONS = DIMENSIONS + LEDGER_EXTRA + ("Aliases",)
 LEDGER_CAUSES = ("odd-flags", "insufficient-balance")
+# Outer lengths of nested values and the lengths of their present rows.
+NESTED_EXTRA = {"RowCounts": tuple(range(4)), "RowLengths": tuple(range(3))}
+NESTED_DIMENSIONS = DIMENSIONS + tuple(NESTED_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -76,7 +79,7 @@ TEST_FIELD = re.compile(r"output|log|balance|storage:(?:0|[1-9][0-9]{0,77})")
 
 def dimensions(profile_name):
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
-            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS}.get(
+            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS}.get(
         adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
 
 
@@ -104,6 +107,12 @@ def bytes_coverage(case, statuses):
             "RevertedPayloadLengths": {length for length, status in zip(lengths, statuses) if status == "reverted"}}
 
 
+def nested_coverage(case):
+    """Outer lengths, and the lengths of the rows present."""
+    values = [adapter.nested_values(tx) for tx in case["transactions"]]
+    return {"RowCounts": {len(value) for value in values}, "RowLengths": {len(row) for value in values for row in value}}
+
+
 def versions(profile_name):
     return LOG_VERSIONS if adapter.PROFILES[profile_name].get("logs") else VERSIONS
 
@@ -124,10 +133,12 @@ def log_coverage(case, statuses, rows=None):
 
 
 def inputs(case):
-    """Runtime Words: the ABI input, every element of the dynamic arrays, or
-    every zero-padded payload chunk the bytes step folds."""
+    """Runtime Words: the ABI input, every element of the dynamic or nested
+    arrays, or every zero-padded payload chunk the bytes step folds."""
     if adapter.profile(case)["abi"] == "array":
         return {value for tx in case["transactions"] for value in tx["values"]}
+    if adapter.has_nested(case):
+        return {str(value) for tx in case["transactions"] for row in adapter.nested_values(tx) for value in row}
     if adapter.has_bytes(case):
         return {str(chunk) for tx in case["transactions"] for chunk in adapter.payload_chunks(tx)}
     return {tx["input"] for tx in case["transactions"]}
@@ -296,6 +307,13 @@ def validate_manifest(manifest):
                 raise ValueError(f"bytes coverage requires unique required{dimension} from zero to {bound}")
     elif any("required" + dimension in manifest for dimension in BYTES_EXTRA):
         raise ValueError("payload coverage belongs to the bytes profile")
+    if selected["abi"] == "nested":
+        for dimension, allowed in NESTED_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"nested-array coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in NESTED_EXTRA):
+        raise ValueError("row coverage belongs to the nested-array profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
     ids = set()
@@ -433,7 +451,8 @@ def keyed_analysis(analysis):
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
                                                 adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
-                                                adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA)
+                                                adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
+                                                adapter.NESTED_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -575,6 +594,8 @@ class Campaign:
             values.update(bytes_coverage(case, statuses))
         elif self.specification["abi"] == "ledger":
             values.update(ledger_coverage(case, statuses), Aliases=aliases(case))
+        elif self.specification["abi"] == "nested":
+            values.update(nested_coverage(case))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -620,7 +641,7 @@ class Campaign:
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
-                          "ledger": LEDGER_EXTRA + ("Aliases",)}.get(self.specification["abi"], ()):
+                          "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA)}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []

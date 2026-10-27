@@ -2256,5 +2256,133 @@ class LongBytesTests(unittest.TestCase):
         self.assertEqual(runner.compare({**long_bytes_histories(value), "importedHull": history}, value)["category"], "matched")
 
 
+def nested_calldata(flags, values):
+    """Written from the ABI rules, independently of the adapter's encoder: the
+    flags, the head offset, the outer length, each row's offset from the start
+    of the offset table, then each row's length and elements."""
+    offsets = [32 * len(values) + sum(32 + 32 * len(row) for row in values[:index]) for index in range(len(values))]
+    tails = [word for row in values for word in (len(row), *row)]
+    return "0x7095aff8" + "".join(f"{word:064x}" for word in (flags, 64, len(values), *offsets, *tails))
+
+
+def nested_case(rows=((0, [[1, 3], [], [7]]), (1, [[MAX_WORD, 2**255], [0]]), (2, []))):
+    """Envelope fixture only: native replay checks the actual nested-array program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "values": [[str(value) for value in row] for row in values],
+        "value": "0", "calldata": nested_calldata(flags, values)} for index, (flags, values) in enumerate(rows)]
+    return {"schema": runner.NESTED_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "nestedArrayPlan": {"schema": "solcore-lean.nested-array-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(9)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedNestedArray", "method": "run", "signature": "run(uint256,uint256[][])",
+            "selector": "0x7095aff8", "deployPath": ["SynthesizedNestedArrayDeploy"],
+            "runtimePath": ["SynthesizedNestedArrayDeploy", "SynthesizedNestedArray"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def nested_slots(values=(0,) * 9):
+    return [{"slot": str(index), "value": str(value)} for index, value in enumerate(values)]
+
+
+def nested_history(value, path):
+    """Rows that follow the nested-array protocol: slots zero to six are
+    fixtures, slot seven counts committed rows and slot eight committed
+    elements, and a returned value is slots zero, seven and eight. Odd flags
+    revert and keep the prior snapshot."""
+    rows, prior = [], [0] * 9
+    for index, tx in enumerate(value["transactions"]):
+        reverted = int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else [index + 10] + [index + 20 + slot for slot in range(6)] + [
+            prior[7] + len(tx["values"]), prior[8] + sum(len(row) for row in tx["values"])]
+        output = index + 3 if reverted else committed[0] + committed[7] + committed[8]
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{output:064x}", "committedStorage": nested_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.NESTED_HISTORY_SCHEMA, "observedSlots": [str(slot) for slot in range(9)],
+        "initialStorage": nested_slots(), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def nested_histories(value=None):
+    value = nested_case() if value is None else value
+    return {path: nested_history(value, path) for path in runner.PATHS}
+
+
+class NestedArrayTests(unittest.TestCase):
+    def test_nested_case_admits_three_rows_of_two_canonical_elements(self):
+        value = nested_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["shrinkBatch"]),
+                         ("semantic-nested-array-tool", "rust-hull-keyed-storage-scenario", True, "nested", 32))
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(9)))
+        self.assertTrue(runner.has_nested(value))
+        self.assertFalse(runner.has_bytes(value))
+        # `cast calldata "run(uint256,uint256[][])" 1 VALUE` from the pinned Foundry release.
+        for values, words in (([[5], [7, 8]], (1, 0x40, 2, 0x40, 0x80, 1, 5, 2, 7, 8)), ([], (1, 0x40, 0)),
+                              ([[1, 2], [3, 4], [5, 6]], (1, 0x40, 3, 0x60, 0xc0, 0x120, 2, 1, 2, 2, 3, 4, 2, 5, 6))):
+            expected = "0x7095aff8" + "".join(f"{word:064x}" for word in words)
+            self.assertEqual((nested_calldata(1, values), runner.nested_calldata("0x7095aff8", 1, values)), (expected, expected))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        runner.validate_case(nested_case(rows=((0, [[1, 2], [3, 4], [5, 6]]),)))
+        original = value["transactions"][0]["calldata"]
+        for key, changed in (("values", [["1", "3"], [], ["07"]]), ("values", [["1", "3"], [], ["7"], []]),
+                             ("values", [["1", "3", "0"], [], ["7"]]), ("values", ["1", "3", "7"]), ("values", [[1, 3], [], [7]]),
+                             ("values", [["1", "3"], [], [str(2**256)]]), ("values", [["1", "3"], ["7"]]),
+                             ("calldata", original[:-64]), ("calldata", original.replace(f"{0x60:064x}", f"{0x80:064x}", 1)),
+                             ("calldata", nested_calldata(0, [[1, 3], [7]])), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for slots in (["0", "1", "2", "3", "4"], [str(slot) for slot in range(8)], [str(slot) for slot in range(10)]):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        self.assertIn("run(uint256,uint256[][])", runner.scope(value))
+        self.assertIn("slots 0..8", runner.scope(value))
+        self.assertIn("slots 0..4", runner.scope(array_case()))
+
+    def test_nested_rows_record_row_and_element_counts_and_sum_in_slots_seven_and_eight(self):
+        value = nested_case()
+        self.assertEqual(runner.compare(nested_histories(value), value)["category"], "matched")
+        for name, slot, text in (("row count", 7, "4"), ("element count", 8, "2")):
+            agreed = nested_histories(value)
+            for history in agreed.values():
+                history["transactions"][0]["committedStorage"][slot]["value"] = text
+            result = runner.compare(agreed, value)
+            with self.subTest(change=name):
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-0", ["committedStorage", "output"]))
+        observed = nested_histories(value)
+        observed["importedHull"]["transactions"][2]["committedStorage"][6]["value"] = "5"
+        observed["importedHull"]["finalStorage"] = copy.deepcopy(observed["importedHull"]["transactions"][2]["committedStorage"])
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-2", ["committedStorage"]))
+        history = runner.normalize_history(nested_history(value, "rustEvm"), value, "rustEvm")
+        self.assertEqual(runner.nested_fields(value["transactions"][0], history["transactions"][0], history["initialStorage"]), [])
+        self.assertTrue(runner.conforms(value, value["transactions"][0], history["transactions"][0], history["initialStorage"]))
+        broken = copy.deepcopy(history["transactions"][0])
+        broken["output"] = "0x" + f"{1:064x}"
+        self.assertEqual(runner.nested_fields(value["transactions"][0], broken, history["initialStorage"]), ["output"])
+        self.assertFalse(runner.conforms(value, value["transactions"][0], broken, history["initialStorage"]))
+        array_schema = nested_histories(value)
+        array_schema["directCore"]["schema"] = runner.ARRAY_HISTORY_SCHEMA
+        self.assertEqual(runner.compare(array_schema, value)["category"], "adapter-error")
+
+    def test_nested_hull_history_uses_the_declared_slot_runner_rows(self):
+        value = nested_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": nested_slots(), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in nested_history(value, "importedHull")["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"]), (runner.NESTED_HISTORY_SCHEMA, [str(slot) for slot in range(9)]))
+        self.assertEqual(runner.compare({**nested_histories(value), "importedHull": history}, value)["category"], "matched")
+
+
 if __name__ == "__main__":
     unittest.main()

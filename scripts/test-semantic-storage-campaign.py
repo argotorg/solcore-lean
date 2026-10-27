@@ -1303,5 +1303,69 @@ class LongBytesCampaignTests(unittest.TestCase):
             self.assertEqual(tool.call_args.args[0][2], 32)
 
 
+def nested_case(rows=None):
+    value = fixtures.nested_case() if rows is None else fixtures.nested_case(rows)
+    value["nestedArrayPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def nested_report(value):
+    histories = fixtures.nested_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class NestedArrayCampaignTests(unittest.TestCase):
+    def test_nested_coverage_counts_outer_and_row_lengths(self):
+        self.assertEqual(campaign.dimensions("stateful-nested-array"), campaign.NESTED_DIMENSIONS)
+        self.assertEqual(campaign.versions("stateful-nested-array"), campaign.VERSIONS)
+        value = nested_case()
+        self.assertEqual(campaign.nested_coverage(value), {"RowCounts": {3, 2, 0}, "RowLengths": {2, 0, 1}})
+        self.assertEqual(campaign.inputs(value), {"1", "3", "7", str(2**256 - 1), str(2**255), "0"})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-nested-array"))
+            instance.summary["coverage"].update(requiredRowCounts=[0, 1, 2, 3], requiredRowLengths=[0, 1, 2])
+            instance.record_coverage(value, "matched", nested_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedRowCounts"], coverage["missingRowCounts"]), ([0, 2, 3], [1]))
+            self.assertEqual((coverage["matchedRowLengths"], coverage["missingRowLengths"]), ([0, 1, 2], []))
+
+    def test_nested_manifest_requires_bounded_row_coverage(self):
+        manifest = json.loads((ROOT / "scripts/semantic-nested-array-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual((manifest["requiredRowCounts"], manifest["requiredRowLengths"]), ([0, 1, 2, 3], [0, 1, 2]))
+        for change in (lambda m: m.update(requiredRowCounts=[0, 4]), lambda m: m.update(requiredRowLengths=[3]),
+                       lambda m: m.update(requiredRowLengths=[0, 0]), lambda m: m.pop("requiredRowCounts"),
+                       lambda m: m.update(requiredLengths=[0]),
+                       lambda m: m["cases"][0].update(dynamicArrayPlan=m["cases"][0].pop("nestedArrayPlan"))):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        flat = json.loads((ROOT / "scripts/semantic-dynamic-array-corpus.json").read_text())
+        flat["requiredRowCounts"] = [0]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(flat)
+
+    def test_nested_slots_are_named_and_shrinking_requests_at_most_32_candidates(self):
+        value = nested_case()
+        raw = nested_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        changed = campaign.analyze(raw, value, "importedHull", "tx-2", "storage:8")
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["transactionId"]), (["8"], "tx-2"))
+        self.assertFalse(campaign.analyze(raw, value, "importedHull", "tx-2", "storage:9")["synthetic"])
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-nested-array", shrink_attempts=40, shrink_candidates=64))
+            folder, _, _ = saved_execution(instance, value, raw, changed)
+            finding = instance.retain_finding(0, folder, value, changed)
+            with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
+                instance.shrink(value, finding)
+            self.assertEqual(tool.call_args.args[0][2], 32)
+
+
 if __name__ == "__main__":
     unittest.main()

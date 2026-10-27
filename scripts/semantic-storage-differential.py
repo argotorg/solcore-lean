@@ -47,6 +47,8 @@ BYTES_CASE_SCHEMA = "solcore-lean.semantic-bytes-case.v1"
 BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v1"
 LONG_BYTES_CASE_SCHEMA = "solcore-lean.semantic-long-bytes-case.v1"
 LONG_BYTES_HISTORY_SCHEMA = "solcore-lean.long-bytes-history.v1"
+NESTED_CASE_SCHEMA = "solcore-lean.semantic-nested-array-case.v1"
+NESTED_HISTORY_SCHEMA = "solcore-lean.nested-array-history.v1"
 MAPPING_CASE_SCHEMA = "solcore-lean.semantic-mapping-case.v1"
 MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v1"
 LEDGER_CASE_SCHEMA = "solcore-lean.semantic-ledger-case.v1"
@@ -131,6 +133,15 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.ledger-contract-scenario.v1", "historySchema": LEDGER_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b", "rollback": True, "keyed": False,
         "declared": True, "abi": "ledger", "senders": True, "shrinkBatch": 16},
+    # One bounded uint256[][] input in the canonical nested head/tail encoding. A
+    # case reaches about 70 KB, so a native shrink response carries at most 32 candidates.
+    "stateful-nested-array": {"caseSchema": NESTED_CASE_SCHEMA, "planSchema": "solcore-lean.nested-array-plan.v1",
+        "planKey": "nestedArrayPlan", "corpusSchema": "solcore-lean.semantic-nested-array-corpus.v1",
+        "originKind": "nested-array-generated", "contract": "SynthesizedNestedArray",
+        "caseTool": "semantic-nested-array-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": NESTED_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256[][])", "selector": "0x7095aff8", "rollback": True, "keyed": False,
+        "declared": True, "abi": "nested", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
@@ -141,6 +152,11 @@ COUNTER_SLOT = "0"
 MAX_UNDECLARED_SLOTS = 256
 ARRAY_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_ELEMENTS = 3
+# Nested values have at most three rows of at most two elements. Slot 1 + 2i + j
+# holds element (i, j)'s result, slot seven the row count, slot eight the element count.
+NESTED_SLOTS = [str(slot) for slot in range(9)]
+MAX_ROWS, MAX_COLUMNS = 3, 2
+ROW_SLOT, CELL_SLOT = "7", "8"
 LOG_SLOTS = ["0", "1"]
 MAX_SITES, MAX_TOPICS, MAX_DATA_WORDS = 3, 4, 2
 MAX_LOGS = 64
@@ -187,7 +203,7 @@ def expected_status(case: dict, transaction: dict) -> str | None:
     """The profile fixes completion polarity, not the returned value or world.
     A ledger's even flags may still revert for an insufficient balance, so only
     its odd flags fix a status; `ledger_fields` checks the rest."""
-    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value", "bytes", "mapping", "ledger") else "input"]
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger") else "input"]
     odd = int(common.word(parity)) % 2
     if has_senders(case) and not odd:
         return None
@@ -359,6 +375,49 @@ def bytes_fields(transaction: dict, row: dict, prior: list[dict], count: str = "
     return fields
 
 
+def has_nested(case: dict) -> bool:
+    return profile(case)["abi"] == "nested"
+
+
+def nested_values(transaction: dict) -> list[list[int]]:
+    """A nested transaction's value: at most three rows of at most two canonical decimal Words."""
+    values = transaction.get("values") if isinstance(transaction, dict) else None
+    if not isinstance(values, list) or len(values) > MAX_ROWS or any(not isinstance(row, list) or len(row) > MAX_COLUMNS for row in values):
+        raise ValueError("nested-array transactions carry at most three rows of at most two elements")
+    return [[int(common.word(value, "nested element")) for value in row] for row in values]
+
+
+def nested_calldata(selector: str, flags: int, values: list[list[int]]) -> str:
+    """Canonical nested head/tail ABI: flags, head offset 64, the outer length,
+    one offset per row measured from the start of the offset table, then each
+    row's length and elements."""
+    offsets, offset = [], 32 * len(values)
+    for row in values:
+        offsets.append(offset)
+        offset += 32 + 32 * len(row)
+    words = [flags, 64, len(values), *offsets, *(word for row in values for word in (len(row), *row))]
+    return selector + "".join(f"{word:064x}" for word in words)
+
+
+def nested_fields(transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a completed row that break the nested-array protocol: a
+    returned transaction adds its row count to slot seven and its element count
+    to slot eight and returns the committed slots zero, seven and eight. A
+    revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    values = nested_values(transaction)
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after[ROW_SLOT] != (before[ROW_SLOT] + len(values)) % 2**256 or \
+            after[CELL_SLOT] != (before[CELL_SLOT] + sum(len(cells) for cells in values)) % 2**256:
+        fields.append("committedStorage")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after[ROW_SLOT] + after[CELL_SLOT]) % 2**256:
+        fields.append("output")
+    return fields
+
+
 def log_sites(case: dict) -> list[dict]:
     """The plan's static sites: increasing guards one to three, each with at
     most four topics and two data Words. Native replay checks the program."""
@@ -418,6 +477,10 @@ def scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_nested(case):
+        return ("ordered zero-value run(uint256,uint256[][]) transactions with canonical nested values of at most three "
+                "rows of at most two elements; initially empty storage; committed values at slots 0..8 on all paths and "
+                "no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
     if has_senders(case):
         return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions from three fixed funded senders on "
                 "a sender-keyed Keccak-addressed ledger; initially empty storage; committed values at the counter and "
@@ -476,6 +539,11 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != expected or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
+        if selected["abi"] == "nested":
+            expected = nested_calldata(selected["selector"], int(common.word(tx.get("flags"), "transaction flags")), nested_values(tx))
+            if tx.get("calldata") != expected or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its canonical nested ABI encoding")
+            continue
         if selected["abi"] == "bytes":
             expected = bytes_calldata(selected["selector"], int(common.word(tx.get("flags"), "transaction flags")),
                                       payload(tx, bytes_layout(selected)[0]))
@@ -522,6 +590,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "nested":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != NESTED_SLOTS:
+            raise Finding("unsupported-scope", "input", "nested-array profile starts empty and observes slots zero through eight")
     elif selected["abi"] == "mapping":
         validate_transactions(case, selected)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != mapping_slots(case["transactions"]):
@@ -678,9 +749,9 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     rollback of the committed slots and, for logs, the static log shapes from
     the contract address; a reverted row commits no logs. For call value, the
     balance is the deployment value plus slot one and a revert keeps it. For
-    bytes, a returned row records its payload length, last byte and sum. For
-    the ledger, `ledger_fields` fixes what the balance-dependent polarity leaves
-    open."""
+    bytes, a returned row records its payload length, last byte and sum, and for
+    nested arrays its row and element counts and sum. For the ledger,
+    `ledger_fields` fixes what the balance-dependent polarity leaves open."""
     expected = expected_status(case, tx)
     if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
             len(common.hex_bytes(row["output"], "output")) != 32:
@@ -688,6 +759,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if row["status"] == "reverted" and row["committedStorage"] != prior:
         return False
     if has_bytes(case) and bytes_fields(tx, row, prior, *bytes_layout(profile(case))[2:]):
+        return False
+    if has_nested(case) and nested_fields(tx, row, prior):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -784,6 +857,13 @@ def compare(histories: dict, case: dict) -> dict:
             broken = sorted({field for name, row in rows.items() for field in bytes_fields(tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"],
                 *bytes_layout(profile(case))[2:])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_nested(case):
+            # A returned row adds its row and element counts and returns the
+            # committed sum; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in nested_fields(tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
         if has_senders(case):

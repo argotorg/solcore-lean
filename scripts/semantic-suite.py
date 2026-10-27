@@ -59,10 +59,11 @@ PROFILES = {
     "stateful-mapping": ("semantic-mapping", "storage", 384),
     "stateful-ledger": ("semantic-ledger", "storage", 384),
     "stateful-long-bytes": ("semantic-long-bytes", "storage", 384),
+    "stateful-nested-array": ("semantic-nested-array", "storage", 384),
 }
 # Profiles that declare their observed slots share the declared-slot Hull runner.
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping",
-                          "stateful-long-bytes")
+                          "stateful-long-bytes", "stateful-nested-array")
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
 
@@ -125,7 +126,8 @@ def command(args, profile, output, seconds, disk_bytes):
     storage_tools = {"stateful-keyed-storage": args.keyed_case_tool, "stateful-dynamic-array": args.array_case_tool,
                      "stateful-logs": args.log_case_tool, "stateful-call-value": args.value_case_tool,
                      "stateful-bytes": args.bytes_case_tool, "stateful-mapping": args.mapping_case_tool,
-                     "stateful-ledger": args.ledger_case_tool, "stateful-long-bytes": args.long_bytes_case_tool}
+                     "stateful-ledger": args.ledger_case_tool, "stateful-long-bytes": args.long_bytes_case_tool,
+                     "stateful-nested-array": args.nested_array_case_tool}
     forwarded = profile == "stateful-forwarded-value"
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
             storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else args.call_case_tool}[family]
@@ -386,7 +388,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default twenty-six for Sonatina, fourteen pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default twenty-seven for Sonatina, fourteen pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -408,7 +410,7 @@ def parse_args(argv=None):
                 "bytes_case_tool": "semantic-bytes-tool", "forward_case_tool": "semantic-forward-tool",
                 "forward_core_runner": "rust-hull-forward-scenario", "mapping_case_tool": "semantic-mapping-tool",
                 "ledger_case_tool": "semantic-ledger-tool", "ledger_core_runner": "rust-hull-ledger-scenario",
-                "long_bytes_case_tool": "semantic-long-bytes-tool"}
+                "long_bytes_case_tool": "semantic-long-bytes-tool", "nested_array_case_tool": "semantic-nested-array-tool"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
