@@ -1,9 +1,9 @@
 import Solcore.Frontend.RustHull.Syntax
 
 /-! The inline Yul the common recursive proof accepts: statement lists of `let`
-with one name, assignment to one name and expression statements, over
-literals, variables and calls of supported names. Effect layers that support no
-name accept no block. -/
+with one name, assignment to one name, expression statements, nested blocks,
+`if` and `switch` without string case literals, over literals, variables and
+calls of supported names. Effect layers that support no name accept no block. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull.YulFragment
 
@@ -29,6 +29,18 @@ inductive StatementEligible (supported : String → Prop) : YulStmt → Prop whe
       StatementEligible supported ⟨.assign [name] value, span⟩
   | expression {value : YulExpr} {span : Option Span} (eligible : ExpressionEligible supported value) :
       StatementEligible supported ⟨.expression value, span⟩
+  | block {body : List YulStmt} {span : Option Span}
+      (eligible : ∀ statement ∈ body, StatementEligible supported statement) :
+      StatementEligible supported ⟨.block body, span⟩
+  | ifThen {condition : YulExpr} {body : List YulStmt} {span : Option Span}
+      (tested : ExpressionEligible supported condition)
+      (eligible : ∀ statement ∈ body, StatementEligible supported statement) :
+      StatementEligible supported ⟨.ifThen condition body, span⟩
+  | switch {value : YulExpr} {cases : List YulCase} {defaultBody : Option (List YulStmt)} {span : Option Span}
+      (scrutinee : ExpressionEligible supported value) (literals : ∀ arm ∈ cases, ∀ text, arm.lit ≠ .string text)
+      (arms : ∀ arm ∈ cases, ∀ statement ∈ arm.body, StatementEligible supported statement)
+      (defaults : ∀ statement ∈ defaultBody.getD [], StatementEligible supported statement) :
+      StatementEligible supported ⟨.switch value cases defaultBody, span⟩
 
 def Eligible (supported : String → Prop) (body : List YulStmt) : Prop :=
   (∃ name, supported name) ∧ ∀ statement ∈ body, StatementEligible supported statement
