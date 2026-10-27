@@ -127,12 +127,16 @@ locally, so a moved archive does not depend on its original source directory.
 
 ## Workflow behavior
 
-Pull requests and pushes to `main` run the full Lean build/tests, kernel policy,
-Python policy tests, all fixed corpora and the controlled finding check. The
-daily run at 18:23 UTC also explores new seeds. Manual dispatch accepts an
+Automatic triggers are disabled for now because hosted runs take too long:
+pull requests, pushes to `main` and the daily schedule start no run. Manual
+dispatch runs the full Lean build/tests, kernel policy, Python policy tests, all
+fixed corpora, the controlled finding check and new seeds. It accepts an
 optional unsigned 64-bit root seed; otherwise random runs use the recorded
-GitHub run number. Every action is pinned to a commit, and jobs have read-only
-repository permissions. Replaced pull-request runs cancel their predecessors.
+GitHub run number. Restoring the `pull_request`, `push` and `schedule` triggers
+in the workflow brings back the fixed gate for pull requests and `main` pushes
+and the daily seed exploration at 18:23 UTC, where a replaced pull-request run
+cancels its predecessor. Every action is pinned to a commit, and jobs have
+read-only repository permissions.
 
 The proof job removes the unused Android and .NET SDKs only on its disposable
 GitHub-hosted runner to make room for the complete proof build. The differential

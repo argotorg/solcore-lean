@@ -163,8 +163,9 @@ See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
 tools, supported operations and validation commands. Closed generated programs
 may be constant-folded; source coverage is not runtime opcode coverage.
 
-The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
-gate for pull requests and recorded random seeds for daily and manual runs.
+The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
+gate and recorded random seeds. Its automatic triggers are disabled for now, so
+it runs only on manual dispatch.
 The same twenty-seven-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).

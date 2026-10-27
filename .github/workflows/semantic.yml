@@ -1,11 +1,9 @@
 name: Semantic checks
 
 on:
-  pull_request:
-  push:
-    branches: [main]
-  schedule:
-    - cron: '23 18 * * *'
+  # Automatic triggers are disabled while hosted runs take too long. To re-enable
+  # them, restore `pull_request:`, `push: branches: [main]` and
+  # `schedule: - cron: '23 18 * * *'` here.
   workflow_dispatch:
     inputs:
       seed:

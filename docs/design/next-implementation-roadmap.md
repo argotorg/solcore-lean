@@ -32,7 +32,7 @@ test corpus.
 
 | Order | Deliverable | Status | Completion boundary |
 | --- | --- | --- | --- |
-| 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; hosted run pending | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
+| 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
@@ -111,6 +111,8 @@ Implemented operational components:
   Pull requests and `main` pushes run fixed gates; daily/manual runs add new
   recorded seeds. Reports and findings have fourteen-day retention. Local
   workflow syntax validation does not claim a completed GitHub-hosted run.
+  The automatic triggers were later disabled because hosted runs took too
+  long; the workflow now runs only on manual dispatch.
 
 The full Lean build (9,900 jobs), registered tests, semantic-kernel policy,
 272 Python policy tests and workflow syntax validation passed. The Python
