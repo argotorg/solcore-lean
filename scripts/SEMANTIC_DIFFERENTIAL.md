@@ -73,12 +73,12 @@ and the plain revision in `baseGeneratorVersion`.
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
 | v2 | `core-g0-v2/lcg64-v1` | `--g0-version` for the pure and stateful profiles |
 | v3 | `core-g0-v3/lcg64-v1` | random generation of every stateful step; `--g0-version` for the pure profiles |
-| v4 | `core-g0-v4/lcg64-v1` | random generation of the eleven G0-based pure profiles |
+| v4 | `core-g0-v4/lcg64-v1` | random generation of the twelve G0-based pure profiles |
 
-The eleven are `closed-g0`, `runtime-word`, `runtime-primitives`,
+The twelve are `closed-g0`, `runtime-word`, `runtime-primitives`,
 `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-loops`,
-`runtime-generics`, `runtime-closures`, `runtime-comptime` and
-`runtime-modules`. The three call-graph profiles use their own grammars.
+`runtime-nested-loops`, `runtime-generics`, `runtime-closures`,
+`runtime-comptime` and `runtime-modules`. The three call-graph profiles use their own grammars.
 
 v1 takes each choice as the raw LCG state modulo its bound. Bit 0 of that state
 alternates on every draw, and the other low bits have short periods. A v1
@@ -135,7 +135,7 @@ seeded case with its recorded revision, and `shrink` gives each reduction its
 parent's revision. The call-graph commands take no version.
 
 `scripts/semantic-campaign.py` passes `core-g0-v4/lcg64-v1` in random mode for
-the eleven profiles; `--g0-version` selects a revision explicitly. With
+the twelve profiles; `--g0-version` selects a revision explicitly. With
 `--corpus` it passes the manifest's version, and with `--case` it keeps the
 saved case's; a disagreeing `--g0-version` is refused. The campaign summary
 records `configuration.g0Version` and the generated cases' versions in

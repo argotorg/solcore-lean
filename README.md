@@ -135,7 +135,7 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
-Random campaigns of the eleven G0-based profiles use the generator's fourth
+Random campaigns of the twelve G0-based profiles use the generator's fourth
 revision: the second revision, which mixes each draw and widens its bank of
 boundary literals, under a per-case swarm mask that enables about half of the
 operators and forms, restricted to those the profile's emitter renders. Random
@@ -164,7 +164,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the fourteen pure profiles with `--backend yul`. Its EVM bytes are
+available for the fifteen pure profiles with `--backend yul`. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images;
 Yul object linking and stateful Yul are outside this comparison.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
@@ -174,7 +174,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same thirty-profile suite runs locally with shared time and disk limits.
+The same thirty-one-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -186,10 +186,11 @@ and modular arithmetic through raw opcode wrappers. Its 81-case corpus covers
 zero divisors/moduli, signed and 256-bit boundaries, and argument ordering.
 Generated cases, typed reduction and strict replay use a separate version so
 older profiles retain their saved-case semantics.
-The eleven profiles whose step functions use the aggregate renderer
-(aggregates, loops, generics, closures, comptime and module steps, and the five
-stateful profiles) render the same raw primitives since emitter version 2,
-importing the aliases only when a step uses one. Programs without a primitive
+The eleven profiles whose step functions used the aggregate renderer at
+emitter version 2 (aggregates, loops, generics, closures, comptime and module
+steps, and the five stateful profiles of that time) render the same raw
+primitives since that version, as do the profiles added on that renderer
+later, such as nested loops; the aliases are imported only when a step uses one. Programs without a primitive
 keep byte-identical source; older saved cases of these profiles are rejected by
 their version check. See [raw primitives in aggregate-based step functions](scripts/SEMANTIC_DIFFERENTIAL.md#raw-primitives-in-aggregate-based-step-functions).
 
@@ -213,7 +214,10 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs. A further profile supports one to three acyclic
+inputs, and in the ten profiles whose functions can be identities they exclude
+a function that returns every boundary input unchanged
+([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
+A further profile supports one to three acyclic
 named helpers, including shared callees, with checked generation and reduction
 of the complete Core function graph. The local-mutation profile compares private
 Word cells, ordered reads and writes, Unit sequencing, and helper-local state.
@@ -224,6 +228,10 @@ and helper calls. All 32 fixed aggregate cases agree across the three paths.
 The ABI and helper arguments/results remain Word-only. Bounded loops use an
 actual source `while` and an independently executed finite Core reference, with
 up to seven iterations. All 48 fixed loop cases match across the three paths.
+Nested bounded loops run a second bounded `while` inside the first, with up to
+nine step calls, against an unrolled finite Core reference; all 72 fixed
+nested-loop cases match on O0, O2 and Yul
+([nested bounded loops](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nested-bounded-loops)).
 M1 through M4 are complete for these restricted profiles.
 
 The first stateful profile compares one to three ordered transactions against
