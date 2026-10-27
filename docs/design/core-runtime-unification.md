@@ -224,6 +224,25 @@ adds its cell producer. The accepted flow and the derived write inputs are
 generic in the protocol, so accepted bodies can run on it. The head also uses
 `ProgramWellFormed`, which the public named support does not carry.
 
+[CellAwareInvocationAcceptedNamedApplication](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedApplication.lean)
+derives that input from the callee's own accepted body. From the receipts of
+the public named root, its `preserves` and `reflects` prove `PreservesAt` and
+`ReflectsAt` of a named row's header. The only expression input is the meaning
+of the body's accepted expressions below the grade on the slot-retaining
+protocol, for every owner key with physical locations. The entry,
+[CellAwareInvocationAcceptedNamedEntry](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedEntry.lean),
+is `CellAwareNamedEntry.prepare_selected` over any instance model of the
+caller's cells. It also returns the parameter spine, and it inverts a sized
+native completion into a strictly smaller body completion through a sized
+prefix agreement (`SizedAgreement`). The spine, the caller's physical cache and
+the capture's slots give the body a starting state on the slot-retaining
+protocol, and the entry, body and restoration effects compose. For reflection
+the callee's registry scope is a row receipt, as at the public root.
+`expressions_closed` discharges the expression input when every accepted
+expression of the callee lies in the closed subset, so `preserves_closed` and
+`reflects_closed` give the input for such a callee at every grade without the
+induction.
+
 The public connection of this subset starts at
 [CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
 Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
@@ -344,13 +363,12 @@ On the accepted-body route above, the next connected steps are:
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Extend the expression closure beyond its first subset over the same actual
-  accepted expression compiler. For direct calls, discharge the application
-  input of the direct-call head from the callee's own accepted body. This needs
-  a named entry from accepted caller cells that exports the parameter spine,
-  the body on the physical canonical protocol, and the entry and restoration
-  effects. Then add call sites to the subset and its receipt tree, and close
-  them by one size induction over a family of rows whose bodies each meet the
-  accepted-body premises. After direct calls come indirect and builtin calls,
+  accepted expression compiler. For direct calls, add call sites to the subset
+  and its receipt tree, and close them by one size induction over a family of
+  rows whose bodies each meet the accepted-body premises. At a call of a given
+  grade the head needs the callee's application below that grade, which the
+  row lemma derives from the callee body's expressions below it. After direct
+  calls come indirect and builtin calls,
   methods, indices, tuples, constructors, generalized reads, closures and
   coercions. Expressions of contextual closures need the relation between the
   compiler view and the Source that their writes and matches also need.
