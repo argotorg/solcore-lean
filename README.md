@@ -140,8 +140,9 @@ execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
 connects the closed, runtime-input, named-helper, raw-primitive, call-graph,
 private-mutation, Word-aggregate, aggregate call-graph, call-graph loop,
-aggregate loop, generic and two-slot storage emitters' text to Core under an
-independent source semantics and a stated Rust-pipeline boundary.
+aggregate loop, generic, two-slot storage and storage rollback emitters' text
+to Core under an independent source semantics and a stated Rust-pipeline
+boundary.
 
 The [differential-testing milestones](docs/design/semantic-differential-testing.md)
 specify source emission, seed replay, failure classification and reduction. A
@@ -164,7 +165,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 
 The [CI workflow](.github/workflows/semantic.yml) defines a complete fixed-corpus
 gate for pull requests and recorded random seeds for daily and manual runs.
-The same twenty-five-profile suite runs locally with shared time and disk limits.
+The same twenty-six-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 
@@ -337,6 +338,15 @@ from the prior committed slots. Its twelve fixed scenarios and sixteen
 recorded random scenarios match on both Sonatina levels, with reduction and
 exact archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-a-sender-keyed-mapping-ledger).
+
+The long-bytes profile extends the bytes profile to payloads of up to 256
+bytes, folding up to eight 32-byte chunks through the checked step into their
+own slots, which generalizes the bytes profile's two-chunk contract. Multi-word
+return values were not built: original Core's contract entry returns exactly
+one Word, so they need a new entry convention in the shared contract runtime.
+Its twelve fixed scenarios and sixteen recorded random scenarios match on both
+Sonatina levels, with reduction and exact archive replay. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bytes-payloads-beyond-64-bytes).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases

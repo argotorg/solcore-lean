@@ -4,7 +4,11 @@ import Solcore.Synthesis.Source.AggregateRenderer
 /-! Emit the fixed two-slot rollback protocol. Odd original inputs revert after
 both writes, returning the tentative reread sum as exactly 32 bytes. Even inputs
 return that same Word through the ABI. Memory at zero is touched only immediately
-before the terminal revert. The arbitrary checked aggregate entry is preserved. -/
+before the terminal revert. The arbitrary checked aggregate entry is preserved.
+`ScalarMeaning.StorageRollback.emit_source_meaning` relates the emitted text to
+the original Core contract's top-level transaction, returned or reverted, under
+an independent rollback source semantics; see
+`docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.StorageRollback

@@ -24,7 +24,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-offline and the twenty native Lean tools in one Lake invocation. Existing
+offline and the twenty-one native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -59,8 +59,8 @@ builds Rust and Lean tools; solc is supplied and checked separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 738 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 738 | Sonatina O2 | Sonatina O2 |
+| `sonatina-o0` | 750 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 750 | Sonatina O2 | Sonatina O2 |
 | `yul` | 595, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
@@ -68,10 +68,10 @@ linked layout is not supplied to the Hull importer. Its pure result can still
 be compared with both other paths; code-dependent and stateful Yul observations
 remain unsupported. Reports record this distinction in `pathBackends`.
 
-The default selection is all twenty-five profiles: fourteen pure profiles,
+The default selection is all twenty-six profiles: fourteen pure profiles,
 storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
 event logs, call value, bounded bytes, forwarded value, Keccak-addressed
-mappings and a sender-keyed ledger. Fixed mode runs all 738 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
+mappings, a sender-keyed ledger and 256-byte `bytes` payloads. Fixed mode runs all 750 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
 than silently truncating required coverage. Repeat `--profile NAME` to select a
 smaller suite.
 
