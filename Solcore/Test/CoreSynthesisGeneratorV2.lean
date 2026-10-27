@@ -60,7 +60,7 @@ private def vectorChecks : IO Unit := do
   ensure (GeneratorRevision.all.all fun revision =>
       GeneratorRevision.ofVersion? revision.version == some revision)
     "a G0 revision does not round-trip through its version"
-  ensure (GeneratorRevision.ofVersion? "core-g0-v3/lcg64-v1" == none &&
+  ensure (GeneratorRevision.ofVersion? "core-g0-v4/lcg64-v1" == none &&
       GeneratorRevision.ofVersion? "core-primitives-v1/core-g0-v2/lcg64-v1" == none)
     "an unknown version named a G0 revision"
   -- SplitMix64's first output from state zero.

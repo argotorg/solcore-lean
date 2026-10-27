@@ -15,11 +15,13 @@ open Solcore.Core.Wire
 
 /--
 The replay-visible G0 choice semantics. Fixed corpora pin `v1`; `v2` mixes
-each draw, takes choices from its upper bits and widens the literal bank.
+each draw, takes choices from its upper bits and widens the literal bank; `v3`
+restricts `v2` to a swarm mask drawn once per case.
 -/
 inductive GeneratorRevision where
   | v1
   | v2
+  | v3
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- The complete replay input for one generated Program. -/
@@ -27,6 +29,8 @@ structure GenerationRequest where
   seed : Seed
   maxProgramNodes : Nat
   revision : GeneratorRevision := .v1
+  /-- Revision three's swarm mask; the other revisions use the full grammar. -/
+  mask : FeatureMask := FeatureMask.all
   deriving Repr, BEq, DecidableEq
 
 /-- Configuration failure and the one impossible-by-design invariant failure. -/
@@ -43,15 +47,23 @@ def generatorVersion : String := "core-g0-v1/" ++ Seed.algorithmId
 
 namespace GeneratorRevision
 
-def all : List GeneratorRevision := [.v1, .v2]
+def all : List GeneratorRevision := [.v1, .v2, .v3]
 
-/-- Both revisions layer their choices on the unchanged lcg64-v1 draws. -/
+/-- Every revision layers its choices on the unchanged lcg64-v1 draws. -/
 def version : GeneratorRevision → String
   | .v1 => generatorVersion
   | .v2 => "core-g0-v2/" ++ Seed.algorithmId
+  | .v3 => "core-g0-v3/" ++ Seed.algorithmId
 
 def ofVersion? (version : String) : Option GeneratorRevision :=
   all.find? (·.version = version)
+
+/-- The mask of a case: drawn from the case seed for `v3`, otherwise full. Every
+G0 program of one case, such as each of its helpers, uses this one mask. -/
+def caseMask (revision : GeneratorRevision) (seed : Seed) : FeatureMask :=
+  match revision with
+  | .v3 => GeneratorV2.swarmMask seed
+  | _ => FeatureMask.all
 
 end GeneratorRevision
 
@@ -62,6 +74,7 @@ structure GeneratedProgram where
   finalSeed : Seed
   maxProgramNodes : Nat
   revision : GeneratorRevision
+  mask : FeatureMask
   checkedProgram : CheckedWordProgram
 
 namespace GeneratedProgram
@@ -294,9 +307,11 @@ def generate (request : GenerationRequest) : Except GenerationError GeneratedPro
     .error .budgetTooSmall
   else
     let bodyBudget := request.maxProgramNodes - 2
+    let mask := if request.revision = .v3 then request.mask else FeatureMask.all
     let (body, finalSeed) := match request.revision with
       | .v1 => generateExpr .word 0 bodyBudget request.seed
       | .v2 => GeneratorV2.generateExpr .word 0 bodyBudget request.seed
+      | .v3 => GeneratorV2.generateExpr .word 0 bodyBudget request.seed mask
     let program : Program := {
       resultType := .word
       dataDefinitions := []
@@ -309,6 +324,7 @@ def generate (request : GenerationRequest) : Except GenerationError GeneratedPro
         finalSeed
         maxProgramNodes := request.maxProgramNodes
         revision := request.revision
+        mask
         checkedProgram
       }
 

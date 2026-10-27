@@ -2914,7 +2914,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
 class G0VersionTests(unittest.TestCase):
     """Random G0-based generation uses v2; a corpus or saved case keeps its recorded version."""
-    V1, V2 = campaign.G0_VERSIONS
+    V1, V2, V3 = campaign.G0_VERSIONS
 
     def run_main(self, *argv, prepare=True):
         """Parse the real command line; capture the configuration and native commands only."""
@@ -2943,17 +2943,17 @@ class G0VersionTests(unittest.TestCase):
     def test_only_call_graph_profiles_use_their_own_grammar(self):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregate-call-graphs'})
-        self.assertEqual(campaign.RANDOM_G0_VERSION, self.V2)
+        self.assertEqual(campaign.RANDOM_G0_VERSION, self.V3)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
         self.assertEqual(campaign.g0_version('runtime-word', {'generatorVersion': self.V2}), self.V2)
         self.assertIsNone(campaign.g0_version('runtime-call-graphs', {'generatorVersion': 'other'}))
 
-    def test_random_g0_profiles_request_v2_and_record_it(self):
+    def test_random_g0_profiles_request_v3_and_record_it(self):
         for profile in campaign.PROFILES:
             with self.subTest(profile=profile):
                 summary, seen = self.run_main('--profile', profile, '--cases', '1')
-                expected = [self.V2] if profile in campaign.G0_PROFILES else []
+                expected = [self.V3] if profile in campaign.G0_PROFILES else []
                 inputs = [campaign.RANDOM_INPUT_SELECTION] if profile in campaign.RUNTIME_INPUT_PROFILES else []
                 self.assertEqual(len(seen), 1)
                 self.assertEqual(seen[0][0], campaign.PROFILE_COMMANDS[profile][0])
@@ -2965,7 +2965,7 @@ class G0VersionTests(unittest.TestCase):
         self.assertEqual(seen, [['aggregate-generate', '1', '256', '1', '256', '1000000', self.V1, campaign.RANDOM_INPUT_SELECTION]])
         self.assertEqual(summary['configuration']['g0Version'], self.V1)
         self.refused('--profile', 'runtime-call-graphs', '--g0-version', self.V2)
-        self.refused('--g0-version', 'core-g0-v3/lcg64-v1')
+        self.refused('--g0-version', 'core-g0-v4/lcg64-v1')
 
     def test_committed_g0_corpora_pin_v1(self):
         pinned = 0
@@ -2979,7 +2979,7 @@ class G0VersionTests(unittest.TestCase):
 
     def test_corpus_generation_passes_the_manifest_version(self):
         with tempfile.TemporaryDirectory() as directory:
-            for version in (self.V1, self.V2):
+            for version in (self.V1, self.V2, self.V3):
                 with self.subTest(version=version):
                     path = Path(directory) / 'manifest.json'
                     path.write_text(json.dumps(self.manifest(version)))
@@ -3013,7 +3013,7 @@ class G0VersionTests(unittest.TestCase):
             config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
             instance = campaign.Campaign(config)
             case = function_case(1)
-            case['provenance']['generatorVersion'] = self.V2
+            case['provenance']['generatorVersion'] = self.V3
             instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': 1, 'attempted': 1,
                                         'status': 'complete', 'excluded': [], 'cases': [case]}
 
@@ -3022,8 +3022,8 @@ class G0VersionTests(unittest.TestCase):
 
             with patch.object(campaign.m2, 'execute', side_effect=execute), redirect_stdout(io.StringIO()):
                 instance.run()
-            self.assertEqual(instance.summary['configuration']['g0Version'], self.V2)
-            self.assertEqual(instance.summary['generation']['generatorVersions'], [self.V2])
+            self.assertEqual(instance.summary['configuration']['g0Version'], self.V3)
+            self.assertEqual(instance.summary['generation']['generatorVersions'], [self.V3])
 
 
 class InputSelectionTests(unittest.TestCase):

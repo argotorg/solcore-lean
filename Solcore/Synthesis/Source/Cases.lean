@@ -38,6 +38,28 @@ def observe (checked : CheckedWordProgram) (fuel : Nat) : Json :=
         [("status", toJson "core-fault"), ("detail", toJson (reprStr reason))]
   Json.mkObj (("stage", toJson "execution") :: fields)
 
+def maskJson (mask : FeatureMask) : Json := toJson (mask.enabled.map featureName)
+
+/-- Revision three records its swarm mask in the provenance; the others record none. -/
+def swarmField (revision : GeneratorRevision) (mask : FeatureMask) : List (String × Json) :=
+  if revision = .v3 then [("swarmMask", maskJson mask)] else []
+
+/-- The mask a saved provenance records: required for revision three, absent otherwise. -/
+def savedMask (provenance : Json) (revision : GeneratorRevision) : Except String FeatureMask :=
+  match provenance.getObjVal? "swarmMask", revision with
+  | .error _, .v3 => throw "revision three requires a swarm mask"
+  | .error _, _ => pure FeatureMask.all
+  | .ok value, .v3 => do
+      let names ← value.getArr?
+      let features ← names.toList.mapM fun name => do
+        let name ← name.getStr?
+        let some feature := FeatureMask.catalog.find? (featureName · = name) |
+          throw "unknown swarm mask feature"
+        pure feature
+      let some mask := FeatureMask.ofFeatures? features | throw "noncanonical swarm mask"
+      pure mask
+  | .ok _, _ => throw "a swarm mask requires revision three"
+
 def contractJson (emitted : EmittedProgram) : Json := Json.mkObj [
   ("name", toJson emitted.contractName),
   ("method", toJson emitted.methodName),
@@ -48,11 +70,12 @@ def contractJson (emitted : EmittedProgram) : Json := Json.mkObj [
   ("constructorCalldata", toJson "0x")]
 
 def makeCase (checked : CheckedWordProgram) (emitted : EmittedProgram)
-    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Json := Json.mkObj [
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1)
+    (mask : FeatureMask := FeatureMask.all) : Json := Json.mkObj [
   ("schema", toJson caseSchema),
   ("program", Solcore.Core.Wire.encodeProgram checked.program),
   ("source", toJson emitted.source),
-  ("provenance", Json.mkObj [
+  ("provenance", Json.mkObj <| swarmField revision mask ++ [
     ("origin", origin),
     ("generatorVersion", toJson revision.version),
     ("emitterVersion", toJson emitterVersion),
@@ -63,9 +86,10 @@ def makeCase (checked : CheckedWordProgram) (emitted : EmittedProgram)
   ("directCore", observe checked fuel)]
 
 def emitCase (checked : CheckedWordProgram) (origin : Json) (fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Except EmitError Json := do
+    (revision : GeneratorRevision := .v1)
+    (mask : FeatureMask := FeatureMask.all) : Except EmitError Json := do
   let emitted ← emit checked
-  return makeCase checked emitted origin fuel revision
+  return makeCase checked emitted origin fuel revision mask
 
 /--
 The G0 revision named by saved provenance. An unknown version yields `v1`,
@@ -86,7 +110,8 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
     if cases.size < count then
       attempted := attempted + 1
       let seed := Seed.ofNat (firstSeed.toNat + index)
-      match generate {seed, maxProgramNodes := nodes, revision} with
+      let mask := revision.caseMask seed
+      match generate {seed, maxProgramNodes := nodes, revision, mask} with
       | .error error =>
           excluded := excluded.push (Json.mkObj [
             ("seed", toJson (toString seed.toNat)),
@@ -97,7 +122,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
             ("seed", toJson (toString generated.initialSeed.toNat)),
             ("finalSeed", toJson (toString generated.finalSeed.toNat)),
             ("maxProgramNodes", toJson generated.maxProgramNodes)]
-          match emitCase generated.checkedProgram origin fuel revision with
+          match emitCase generated.checkedProgram origin fuel revision mask with
           | .error error =>
               excluded := excluded.push (Json.mkObj [
                 ("seed", toJson (toString seed.toNat)),
@@ -137,6 +162,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   unless (← provenance.getObjValAs? String "wrapperVersion") = wrapperVersion do
     throw "wrapper version changed"
   let origin ← provenance.getObjVal? "origin"
+  let mask ← savedMask provenance revision
   let emitted ← (emit checked).mapError reprStr
   unless (← json.getObjValAs? String "source") = emitted.source do
     throw "saved source differs from emission of the original Core program"
@@ -152,28 +178,32 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let seedText ← origin.getObjValAs? String "seed"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
+    unless mask == revision.caseMask (Seed.ofNat seed) do
+      throw "saved swarm mask differs from its generation seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     unless nodes ≤ 512 do throw "saved generation budget exceeds limit"
     let generated ←
-      (generate {seed := Seed.ofNat seed, maxProgramNodes := nodes, revision}).mapError reprStr
+      (generate {seed := Seed.ofNat seed, maxProgramNodes := nodes, revision, mask}).mapError reprStr
     unless Solcore.Core.Wire.encodeProgram generated.program ==
         Solcore.Core.Wire.encodeProgram checked.program do
       throw "saved program differs from its generation seed"
     unless (← origin.getObjValAs? String "finalSeed") = toString generated.finalSeed.toNat do
       throw "saved final seed differs from generation"
-  return makeCase checked emitted origin fuel revision
+  return makeCase checked emitted origin fuel revision mask
 
 /-- Reduced candidates keep the parent's G0 revision. -/
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let checked ← caseProgram json
-  let revision := savedRevision (← json.getObjVal? "provenance")
+  let provenance ← json.getObjVal? "provenance"
+  let revision := savedRevision provenance
+  let mask ← savedMask provenance revision
   let mut results : Array Json := #[]
   for candidate in (shrink checked).take limit do
     let origin := Json.mkObj [
       ("kind", toJson "reduced"),
       ("parentProgram", Solcore.Core.Wire.encodeProgram checked.program)]
-    let result ← (emitCase candidate.checkedProgram origin fuel revision).mapError reprStr
+    let result ← (emitCase candidate.checkedProgram origin fuel revision mask).mapError reprStr
     results := results.push result
   return Json.mkObj [("schema", toJson corpusSchema), ("cases", .arr results)]
 

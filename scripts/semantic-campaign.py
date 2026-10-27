@@ -82,9 +82,10 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
 G0_PROFILES = ("closed-g0", "runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
                "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime",
                "runtime-modules")
-G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1")
-# Random generation uses v2; a fixed corpus or a saved case keeps the version it records.
-RANDOM_G0_VERSION = "core-g0-v2/lcg64-v1"
+G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1", "core-g0-v3/lcg64-v1")
+# Random generation uses v3, v2 under a per-case swarm mask; a fixed corpus or a
+# saved case keeps the version it records.
+RANDOM_G0_VERSION = "core-g0-v3/lcg64-v1"
 # Random runtime-input generation appends seeded inputs to each function's boundary inputs.
 RUNTIME_INPUT_PROFILES = tuple(profile for profile in PROFILES if profile != "closed-g0")
 INPUT_SELECTIONS = ("boundary", "seeded-inputs-v1/splitmix64")

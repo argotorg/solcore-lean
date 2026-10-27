@@ -1,13 +1,16 @@
 import Solcore.Core.Primitive
+import Solcore.Synthesis.Core.FeatureMask
 import Solcore.Synthesis.Core.Fragment
 import Solcore.Synthesis.Core.Seed
 
 /-!
-Revision two of the pure G0 generation choices.
+Revisions two and three of the pure G0 generation choices.
 
 The grammar, the budget split and the checker sealing are those of revision
 one. Only the way lcg64-v1 draws become choices and Word literals differs, so
-revision one stays bit-for-bit for the fixed corpora.
+revision one stays bit-for-bit for the fixed corpora. Revision three restricts
+revision two's grammar to a per-case swarm mask; with the full mask the
+grammar is revision two itself.
 -/
 
 set_option autoImplicit false
@@ -97,7 +100,7 @@ private def generateLeaf
           (.var index, seed)
 
 /- Revision one's odd bounds only avoided low-bit correlation; these choices
-are uniform over each operator list. -/
+are uniform over each operator list. A mask keeps the order of what it enables. -/
 private def wordUnaryOps : Array UnaryOp := #[.wordNot, .wordClz]
 
 private def wordBinaryOps : Array BinaryOp :=
@@ -122,14 +125,62 @@ private def splitThree
   let (secondExtra, seed) := choose seed (remaining + 1)
   ((firstExtra + 1, secondExtra + 1, remaining - secondExtra + 1), seed)
 
-private def wordFormCount (budget : Nat) : Nat :=
-  if budget < 2 then 1 else if budget < 3 then 2 else if budget < 4 then 4 else 6
+/-- The grammar's forms, in revision two's choice order. -/
+private inductive Form where
+  | leaf | unary | binary | ternary | letE | ifE
 
-private def boolFormCount (budget : Nat) : Nat :=
-  if budget < 2 then 1 else if budget < 3 then 2 else if budget < 4 then 4 else 5
+/-- Revision two's Word forms for a budget. -/
+private def wordForms (budget : Nat) : List Form :=
+  if budget < 2 then [.leaf]
+  else if budget < 3 then [.leaf, .unary]
+  else if budget < 4 then [.leaf, .unary, .binary, .letE]
+  else [.leaf, .unary, .binary, .ternary, .letE, .ifE]
 
-/-- Revision one's forms and budget split, with this revision's choices. -/
-private def generateExprWithFuel :
+/-- Revision two's Bool forms for a budget. -/
+private def boolForms (budget : Nat) : List Form :=
+  if budget < 2 then [.leaf]
+  else if budget < 3 then [.leaf, .unary]
+  else if budget < 4 then [.leaf, .unary, .binary, .letE]
+  else [.leaf, .unary, .binary, .letE, .ifE]
+
+/-- A form is enabled when the mask allows it or one of its operators. -/
+private def enabled (mask : FeatureMask) (target : Target) : Form → Bool
+  | .leaf => true
+  | .unary => match target with
+      | .word => wordUnaryOps.any fun op => mask.allows (.unary op)
+      | .bool => mask.allows (.unary .boolNot)
+  | .binary => match target with
+      | .word => wordBinaryOps.any fun op => mask.allows (.binary op)
+      | .bool => boolBinaryOps.any fun op => mask.allows (.binary op)
+  | .ternary => ternaryOps.any fun op => mask.allows (.ternary op)
+  | .letE => mask.allows .letE
+  | .ifE => mask.allows .ifE
+
+/--
+Revision two's form choice. A disabled form is replaced by a second, uniform
+choice among the enabled non-leaf forms, so a mask keeps revision two's leaf
+probability, and therefore its program sizes, instead of ending programs early.
+With the full mask no form is replaced.
+-/
+private def chooseForm (mask : FeatureMask) (target : Target) (budget : Nat) (seed : Seed) :
+    Form × Seed :=
+  let forms := match target with
+    | .word => wordForms budget
+    | .bool => boolForms budget
+  let (formChoice, seed) := choose seed forms.length
+  let form := forms[formChoice]?.getD .leaf
+  if enabled mask target form then (form, seed)
+  else
+    let others := forms.filter fun form =>
+      match form with
+      | .leaf => false
+      | form => enabled mask target form
+    let (otherChoice, seed) := choose seed others.length
+    (others[otherChoice]?.getD .leaf, seed)
+
+/-- Revision one's forms and budget split, with this revision's choices. The
+mask removes forms and operators; the full mask gives revision two itself. -/
+private def generateExprWithFuel (mask : FeatureMask) :
     Nat → Target → Nat → Nat → Seed → Expr × Seed
   | 0, target, localWordDepth, _, seed =>
       generateLeaf target localWordDepth seed
@@ -137,97 +188,85 @@ private def generateExprWithFuel :
       if budget ≤ 1 then
         generateLeaf target localWordDepth seed
       else
-        let formCount :=
-          match target with
-          | .word => wordFormCount budget
-          | .bool => boolFormCount budget
-        let (form, seed) := choose seed formCount
+        let (form, seed) := chooseForm mask target budget seed
         match target, form with
-        | .word, 0 => generateLeaf .word localWordDepth seed
-        | .word, 1 =>
-            let (opChoice, seed) := choose seed wordUnaryOps.size
+        | _, .leaf => generateLeaf target localWordDepth seed
+        | .word, .unary =>
+            let ops := wordUnaryOps.filter fun op => mask.allows (.unary op)
+            let (opChoice, seed) := choose seed ops.size
             let (operand, seed) :=
-              generateExprWithFuel fuel .word localWordDepth (budget - 1) seed
-            (.unary (wordUnaryOps[opChoice]?.getD .wordNot) operand, seed)
-        | .word, 2 =>
-            let (opChoice, seed) := choose seed wordBinaryOps.size
+              generateExprWithFuel mask fuel .word localWordDepth (budget - 1) seed
+            (.unary (ops[opChoice]?.getD .wordNot) operand, seed)
+        | .word, .binary =>
+            let ops := wordBinaryOps.filter fun op => mask.allows (.binary op)
+            let (opChoice, seed) := choose seed ops.size
             let ((leftBudget, rightBudget), seed) := splitTwo (budget - 1) seed
             let (left, seed) :=
-              generateExprWithFuel fuel .word localWordDepth leftBudget seed
+              generateExprWithFuel mask fuel .word localWordDepth leftBudget seed
             let (right, seed) :=
-              generateExprWithFuel fuel .word localWordDepth rightBudget seed
-            (.binary (wordBinaryOps[opChoice]?.getD .wordAdd) left right, seed)
-        | .word, 3 =>
-            if budget < 4 then
-              let ((valueBudget, bodyBudget), seed) := splitTwo (budget - 1) seed
-              let (value, seed) :=
-                generateExprWithFuel fuel .word localWordDepth valueBudget seed
-              let (body, seed) :=
-                generateExprWithFuel fuel .word (localWordDepth + 1) bodyBudget seed
-              (.letE value body, seed)
-            else
-              let (opChoice, seed) := choose seed ternaryOps.size
-              let ((firstBudget, secondBudget, thirdBudget), seed) :=
-                splitThree (budget - 1) seed
-              let (first, seed) :=
-                generateExprWithFuel fuel .word localWordDepth firstBudget seed
-              let (second, seed) :=
-                generateExprWithFuel fuel .word localWordDepth secondBudget seed
-              let (third, seed) :=
-                generateExprWithFuel fuel .word localWordDepth thirdBudget seed
-              (.ternary (ternaryOps[opChoice]?.getD .wordAddMod) first second third, seed)
-        | .word, 4 =>
+              generateExprWithFuel mask fuel .word localWordDepth rightBudget seed
+            (.binary (ops[opChoice]?.getD .wordAdd) left right, seed)
+        | .word, .ternary =>
+            let ops := ternaryOps.filter fun op => mask.allows (.ternary op)
+            let (opChoice, seed) := choose seed ops.size
+            let ((firstBudget, secondBudget, thirdBudget), seed) :=
+              splitThree (budget - 1) seed
+            let (first, seed) :=
+              generateExprWithFuel mask fuel .word localWordDepth firstBudget seed
+            let (second, seed) :=
+              generateExprWithFuel mask fuel .word localWordDepth secondBudget seed
+            let (third, seed) :=
+              generateExprWithFuel mask fuel .word localWordDepth thirdBudget seed
+            (.ternary (ops[opChoice]?.getD .wordAddMod) first second third, seed)
+        | target, .letE =>
             let ((valueBudget, bodyBudget), seed) := splitTwo (budget - 1) seed
             let (value, seed) :=
-              generateExprWithFuel fuel .word localWordDepth valueBudget seed
+              generateExprWithFuel mask fuel .word localWordDepth valueBudget seed
             let (body, seed) :=
-              generateExprWithFuel fuel .word (localWordDepth + 1) bodyBudget seed
+              generateExprWithFuel mask fuel target (localWordDepth + 1) bodyBudget seed
             (.letE value body, seed)
-        | .word, _ =>
+        | target, .ifE =>
             let ((conditionBudget, thenBudget, elseBudget), seed) :=
               splitThree (budget - 1) seed
             let (condition, seed) :=
-              generateExprWithFuel fuel .bool localWordDepth conditionBudget seed
+              generateExprWithFuel mask fuel .bool localWordDepth conditionBudget seed
             let (thenBranch, seed) :=
-              generateExprWithFuel fuel .word localWordDepth thenBudget seed
+              generateExprWithFuel mask fuel target localWordDepth thenBudget seed
             let (elseBranch, seed) :=
-              generateExprWithFuel fuel .word localWordDepth elseBudget seed
+              generateExprWithFuel mask fuel target localWordDepth elseBudget seed
             (.ifE condition thenBranch elseBranch, seed)
-        | .bool, 0 => generateLeaf .bool localWordDepth seed
-        | .bool, 1 =>
+        | .bool, .unary =>
             let (operand, seed) :=
-              generateExprWithFuel fuel .bool localWordDepth (budget - 1) seed
+              generateExprWithFuel mask fuel .bool localWordDepth (budget - 1) seed
             (.unary .boolNot operand, seed)
-        | .bool, 2 =>
-            let (opChoice, seed) := choose seed boolBinaryOps.size
+        | .bool, .binary =>
+            let ops := boolBinaryOps.filter fun op => mask.allows (.binary op)
+            let (opChoice, seed) := choose seed ops.size
             let ((leftBudget, rightBudget), seed) := splitTwo (budget - 1) seed
             let (left, seed) :=
-              generateExprWithFuel fuel .word localWordDepth leftBudget seed
+              generateExprWithFuel mask fuel .word localWordDepth leftBudget seed
             let (right, seed) :=
-              generateExprWithFuel fuel .word localWordDepth rightBudget seed
-            (.binary (boolBinaryOps[opChoice]?.getD .wordEq) left right, seed)
-        | .bool, 3 =>
-            let ((valueBudget, bodyBudget), seed) := splitTwo (budget - 1) seed
-            let (value, seed) :=
-              generateExprWithFuel fuel .word localWordDepth valueBudget seed
-            let (body, seed) :=
-              generateExprWithFuel fuel .bool (localWordDepth + 1) bodyBudget seed
-            (.letE value body, seed)
-        | .bool, _ =>
-            let ((conditionBudget, thenBudget, elseBudget), seed) :=
-              splitThree (budget - 1) seed
-            let (condition, seed) :=
-              generateExprWithFuel fuel .bool localWordDepth conditionBudget seed
-            let (thenBranch, seed) :=
-              generateExprWithFuel fuel .bool localWordDepth thenBudget seed
-            let (elseBranch, seed) :=
-              generateExprWithFuel fuel .bool localWordDepth elseBudget seed
-            (.ifE condition thenBranch elseBranch, seed)
+              generateExprWithFuel mask fuel .word localWordDepth rightBudget seed
+            (.binary (ops[opChoice]?.getD .wordEq) left right, seed)
+        | .bool, .ternary => generateLeaf .bool localWordDepth seed
 
+/-- Revision two generates with the full mask; revision three passes its swarm mask. -/
 def generateExpr
     (target : Target)
     (localWordDepth budget : Nat)
-    (seed : Seed) : Expr × Seed :=
-  generateExprWithFuel budget target localWordDepth budget seed
+    (seed : Seed)
+    (mask : FeatureMask := FeatureMask.all) : Expr × Seed :=
+  generateExprWithFuel mask budget target localWordDepth budget seed
+
+private def swarmDomain : UInt64 := 0x737761726d6d736b
+
+/--
+Revision three's swarm mask of a case seed. Each catalog feature is enabled by
+its own bit of one mixed, domain-separated draw, so about half are enabled.
+Leaves stay available; a mask without any Word operator or form, of
+probability 2^-22, generates single leaves.
+-/
+def swarmMask (seed : Seed) : FeatureMask :=
+  FeatureMask.ofBits (mix ((seed.toUInt64 ^^^ swarmDomain) + 0x9e3779b97f4a7c15)).toNat
 
 end Solcore.Synthesis.Core.GeneratorV2

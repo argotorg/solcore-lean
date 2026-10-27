@@ -59,11 +59,12 @@ def contractJson (emitted : EmittedProgram) (input : Word) : Json := Json.mkObj 
   ("calldata", toJson (Input.calldata input)), ("constructorCalldata", toJson "0x")]
 
 def makeCase (plan : CheckedPlan) (input : Word) (emitted : EmittedProgram)
-    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1) : Json := Json.mkObj [
+    (origin : Json) (fuel : Nat) (revision : GeneratorRevision := .v1)
+    (mask : FeatureMask := FeatureMask.all) : Json := Json.mkObj [
   ("schema", toJson caseSchema), ("genericPlan", planJson plan),
   ("program", Wire.encodeProgram (plan.instantiate input)),
   ("input", toJson (toString input.val)), ("source", toJson emitted.source),
-  ("provenance", Json.mkObj [
+  ("provenance", Json.mkObj <| swarmField revision mask ++ [
     ("origin", origin), ("profileVersion", toJson profileVersion),
     ("functionVersion", toJson Solcore.Synthesis.Core.Generic.version), ("templateVersion", toJson templateVersion),
     ("stepProfileVersion", toJson Aggregate.profileVersion),
@@ -76,12 +77,13 @@ def makeCase (plan : CheckedPlan) (input : Word) (emitted : EmittedProgram)
   ("directCore", observe plan input fuel)]
 
 def emitCase (plan : CheckedPlan) (input : Word) (origin : Json) (fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Except String Json := do
+    (revision : GeneratorRevision := .v1)
+    (mask : FeatureMask := FeatureMask.all) : Except String Json := do
   unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
   unless Wire.programNodes (plan.instantiate input) ≤ 512 do
     throw "canonical applied generic exceeds the 512-node case limit"
   let emitted ← (emit plan).mapError reprStr
-  return makeCase plan input emitted origin fuel revision
+  return makeCase plan input emitted origin fuel revision mask
 
 /-- Even imported and reduced cases must retain the exact canonical reference;
 there is no origin for which a saved arbitrary Core program is trusted. -/
@@ -169,7 +171,8 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
               let origin := (origin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
                 "validationFuel" (toJson fuel)
               cases := cases.push
-                (makeCase plan input emitted (inputSelection.record origin) fuel revision)
+                (makeCase plan input emitted (inputSelection.record origin) fuel revision
+                  (revision.caseMask seed))
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -227,6 +230,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
       ("emitterVersion", emitterVersion), ("wrapperVersion", wrapperVersion)] do
     unless (← provenance.getObjValAs? String name) = expected do throw (name ++ " changed")
   let origin ← provenance.getObjVal? "origin"
+  let mask ← savedMask provenance revision
   let emitted ← (emit admitted.plan).mapError reprStr
   unless (← json.getObjValAs? String "source") = emitted.source do
     throw "saved source differs from emission of the canonical generic plan"
@@ -242,6 +246,8 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless seedText.length ≤ 20 do throw "saved seed exceeds limit"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
+    unless mask == revision.caseMask (Seed.ofNat seed) do
+      throw "saved swarm mask differs from its generation seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     let (plan, expectedOrigin) ← generatedPlan (Seed.ofNat seed) nodes revision
     unless planJson plan == planJson admitted.plan do
@@ -270,20 +276,22 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless origin == Json.mkObj [("kind", toJson "reduced"), ("parentPlan", planJson parent.plan),
         ("parentProgram", Wire.encodeProgram parent.program), ("parentInput", toJson (toString parent.input.val))] do
       throw "noncanonical reduced origin"
-  return makeCase admitted.plan admitted.input emitted origin fuel revision
+  return makeCase admitted.plan admitted.input emitted origin fuel revision mask
 
 
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
-  let revision := savedRevision (← json.getObjVal? "provenance")
+  let provenance ← json.getObjVal? "provenance"
+  let revision := savedRevision provenance
+  let mask ← savedMask provenance revision
   let mut cases : Array Json := #[]
   for reduced in (reductions source).take limit do
     let origin := Json.mkObj [
       ("kind", toJson "reduced"), ("parentProgram", Wire.encodeProgram source.program),
       ("parentPlan", planJson source.plan), ("parentInput", toJson (toString source.input.val))]
     cases := cases.push
-      (← emitCase reduced.candidate.plan reduced.candidate.input origin fuel revision)
+      (← emitCase reduced.candidate.plan reduced.candidate.input origin fuel revision mask)
   return Json.mkObj [("schema", toJson corpusSchema), ("cases", .arr cases)]
 
 end Solcore.Synthesis.Source.Generic

@@ -112,7 +112,7 @@ private def checkProfile (profile : Profile) : IO Unit := do
     -- Replaying under the other revision regenerates a different program.
     ensure (profile.replay (← withVersions case (profile.versions .v1)) fuel matches .error _)
       s!"{profile.name}: a v2 case replayed as v1"
-    let unknown := (profile.versions .v2).map fun (name, _) => (name, "core-g0-v3/lcg64-v1")
+    let unknown := (profile.versions .v2).map fun (name, _) => (name, "core-g0-v4/lcg64-v1")
     ensure (profile.replay (← withVersions case unknown) fuel matches .error _)
       s!"{profile.name}: an unknown G0 version replayed"
   let some first := current[0]? | throw (IO.userError s!"{profile.name}: no v2 case")
