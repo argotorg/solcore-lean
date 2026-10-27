@@ -1868,6 +1868,7 @@ import Solcore.Test.SourceModuleEmitter
 import Solcore.Test.SourceModuleCases
 import Solcore.Test.SourceGeneratorRevisionCases
 import Solcore.Test.SourceStatefulGeneratorRevisionCases
+import Solcore.Test.SourceStatefulSequenceCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -4005,6 +4006,7 @@ def run : IO Unit := do
   SourceModuleCases.testSourceModuleCases
   SourceGeneratorRevisionCases.testSourceGeneratorRevisionCases
   SourceStatefulGeneratorRevisionCases.testSourceStatefulGeneratorRevisionCases
+  SourceStatefulSequenceCases.testSourceStatefulSequenceCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter

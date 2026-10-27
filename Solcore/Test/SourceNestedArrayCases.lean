@@ -149,7 +149,9 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
     "noncanonical row offset accepted"
   rejected (NestedArray.decodeTransactions (toJson [first, first])) "duplicate transaction IDs accepted"
   rejected (NestedArray.decodeTransactions (toJson ([] : List Json))) "empty transaction list accepted"
-  rejected (NestedArray.decodeTransactions (toJson (List.replicate 4 first))) "unbounded transaction count accepted"
+  rejected (NestedArray.decodeTransactions
+    (toJson (List.replicate (Solcore.Synthesis.Stateful.Sequence.maxTransactions + 1) first)))
+    "unbounded transaction count accepted"
   for (name, bad) in [("initialState", Json.mkObj [("storage", toJson [first])]),
       ("observedSlots", toJson ((List.range 10).map toString)),
       ("observedSlots", toJson (["0", "1", "2", "3", "4"] : List String)),

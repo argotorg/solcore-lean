@@ -91,7 +91,7 @@ def histories(value=None):
 
 class CaseTests(unittest.TestCase):
     def test_fixed_wrapper_and_canonical_abi_inputs(self):
-        for count in (1, 2, 3):
+        for count in (1, 2, 3, runner.MAX_TRANSACTIONS):
             runner.validate_case(case(count))
         value = case(1)
         value["transactions"][0].update(input=str(2**256 - 1), calldata="0xa444f5e9" + "ff" * 32)
@@ -108,7 +108,7 @@ class CaseTests(unittest.TestCase):
                         {"contract": {}}):
             with self.subTest(changed=changed), self.assertRaises(runner.Finding):
                 runner.validate_case({**case(), **changed})
-        for count in (0, 4):
+        for count in (0, runner.MAX_TRANSACTIONS + 1):
             with self.assertRaises(ValueError):
                 runner.validate_case(case(count))
         for identifier in (None, "", "../tx", "x" * 65, "tx-0"):
@@ -2223,7 +2223,7 @@ class LongBytesTests(unittest.TestCase):
         selected = runner.profile(value)
         self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
                           selected["maxPayload"], selected["countSlot"], selected["tailSlot"], selected["shrinkBatch"]),
-                         ("semantic-long-bytes-tool", "rust-hull-keyed-storage-scenario", True, "bytes", 256, "9", "10", 32))
+                         ("semantic-long-bytes-tool", "rust-hull-keyed-storage-scenario", True, "bytes", 256, "9", "10", 16))
         self.assertEqual(runner.bytes_layout(selected), (256, [str(slot) for slot in range(11)], "9", "10"))
         self.assertEqual(runner.bytes_layout(runner.profile(bytes_case())), (64, ["0", "1", "2", "3", "4"], "3", "4"))
         self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(11)))
@@ -2351,7 +2351,7 @@ class NestedArrayTests(unittest.TestCase):
         runner.validate_case(value)
         selected = runner.profile(value)
         self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["shrinkBatch"]),
-                         ("semantic-nested-array-tool", "rust-hull-keyed-storage-scenario", True, "nested", 32))
+                         ("semantic-nested-array-tool", "rust-hull-keyed-storage-scenario", True, "nested", 16))
         self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(9)))
         self.assertTrue(runner.has_nested(value))
         self.assertFalse(runner.has_bytes(value))

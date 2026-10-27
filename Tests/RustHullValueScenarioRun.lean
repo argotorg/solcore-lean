@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.Synthesis.Stateful.AccountStorage
+import Solcore.Synthesis.Stateful.Sequence
 
 /-! Execute a bounded sequence of persistent, value-bearing calls on one linked
 Hull contract with declared observed slots. As for ordinary Hull top-level
@@ -80,7 +81,8 @@ private structure Call where
 /-- Validate the whole sequence before deploying or executing any part of it. -/
 private def calls (config : Json) (constructor : Contract.Context) : Except String (List Call) := do
   let values ← config.getObjValAs? (List Json) "calls"
-  unless 1 ≤ values.length && values.length ≤ 3 do throw "storage scenarios require 1 to 3 calls"
+  unless 1 ≤ values.length && values.length ≤ Solcore.Synthesis.Stateful.Sequence.maxTransactions do
+    throw s!"storage scenarios require 1 to {Solcore.Synthesis.Stateful.Sequence.maxTransactions} calls"
   values.foldlM (init := []) fun previous value => do
     let id ← value.getObjValAs? String "id"
     unless !id.isEmpty && id.length ≤ 64 && id.toList.all (fun char =>
@@ -146,7 +148,7 @@ private def undeclaredStorage (slots : List Core.Word) (storage : Core.WordMappi
 /-- Canonical, strictly increasing decimal Words; at most sixteen. -/
 private def observedSlots (config : Json) : Except String (List Core.Word) := do
   let values ← config.getObjValAs? (List Json) "observedSlots"
-  unless 1 ≤ values.length && values.length ≤ 16 do throw "observedSlots must contain 1 to 16 slots"
+  unless 1 ≤ values.length && values.length ≤ 32 do throw "observedSlots must contain 1 to 32 slots"
   let slots ← values.mapM fun value => do
     let text ← value.getStr?
     unless text.length ≤ 78 && !text.isEmpty && text.toList.all Char.isDigit do

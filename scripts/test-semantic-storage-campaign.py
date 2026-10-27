@@ -80,7 +80,8 @@ def options(directory, **overrides):
         direct_fuel=1000, core_fuel=1000, gas=100000, case_timeout=10,
         case_tool=Path("/unused/case-tool"), core_runner=Path("/unused/core-runner"),
         anvil=Path("/unused/anvil"), upstream=Path("/unused/upstream"), target_dir=Path("/unused/target"),
-        test_perturb_path=None, test_transaction_id=None, test_field="output", case=None, corpus=None, g0_version=None)
+        test_perturb_path=None, test_transaction_id=None, test_field="output", case=None, corpus=None, g0_version=None,
+        transactions=None)
     for key, value in overrides.items():
         setattr(result, key, value)
     return result
@@ -1300,7 +1301,7 @@ class LongBytesCampaignTests(unittest.TestCase):
             finding = instance.retain_finding(0, folder, value, changed)
             with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
                 instance.shrink(value, finding)
-            self.assertEqual(tool.call_args.args[0][2], 32)
+            self.assertEqual(tool.call_args.args[0][2], 16)
 
 
 def nested_case(rows=None):
@@ -1364,7 +1365,7 @@ class NestedArrayCampaignTests(unittest.TestCase):
             finding = instance.retain_finding(0, folder, value, changed)
             with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
                 instance.shrink(value, finding)
-            self.assertEqual(tool.call_args.args[0][2], 32)
+            self.assertEqual(tool.call_args.args[0][2], 16)
 
 
 class StrayWriteAdapterTests(unittest.TestCase):
@@ -1484,11 +1485,11 @@ class G0VersionTests(unittest.TestCase):
                         "attempted": 1, "status": "complete", "excluded": []}
             with patch.object(instance, "tool", return_value=response) as tool:
                 instance.prepare_cases()
-            self.assertEqual(tool.call_args.args[0][-1], "core-g0-v2/lcg64-v1")
+            self.assertEqual(tool.call_args.args[0][-2:], ["core-g0-v2/lcg64-v1", 8])
             explicit = campaign.Campaign(options(self.fresh(directory, "explicit"), g0_version="core-g0-v1/lcg64-v1"))
             with patch.object(explicit, "tool", return_value=response) as tool:
                 explicit.prepare_cases()
-            self.assertEqual(tool.call_args.args[0][-1], "core-g0-v1/lcg64-v1")
+            self.assertEqual(tool.call_args.args[0][-2:], ["core-g0-v1/lcg64-v1", 8])
 
     def test_a_corpus_generates_with_its_recorded_version(self):
         manifest = json.loads((ROOT / "scripts/semantic-storage-corpus.json").read_text())
@@ -1544,6 +1545,41 @@ class G0VersionTests(unittest.TestCase):
                 campaign.main()
             with self.subTest(version=version):
                 self.assertIn(message, errors.getvalue())
+
+
+class TransactionCountTests(unittest.TestCase):
+    """Random generation requests the longest admitted sequence or an explicit
+    length; a corpus or a saved case keeps its own transactions."""
+
+    def test_random_generation_requests_and_records_the_length(self):
+        response = {"schema": campaign.CORPUS_SCHEMA, "cases": [], "requested": 1, "attempted": 1,
+                    "status": "generation-exhausted", "excluded": []}
+        with tempfile.TemporaryDirectory() as directory:
+            for name, requested, expected in (("default", None, campaign.adapter.MAX_TRANSACTIONS), ("explicit", 4, 4)):
+                path = Path(directory) / name
+                path.mkdir()
+                instance = campaign.Campaign(options(path, transactions=requested))
+                self.assertEqual(instance.summary["configuration"]["transactions"], expected)
+                with patch.object(instance, "tool", return_value=response) as tool:
+                    instance.prepare_cases()
+                self.assertEqual(tool.call_args.args[0][-1], expected)
+                self.assertEqual(instance.summary["generation"]["transactions"], expected)
+            saved = Path(directory) / "case.json"
+            saved.write_text(json.dumps(case()))
+            path = Path(directory) / "saved"
+            path.mkdir()
+            self.assertIsNone(campaign.Campaign(options(path, case=saved)).summary["configuration"]["transactions"])
+
+    def test_cli_limits_the_length_to_random_generation(self):
+        for extra, message in ((["--transactions", "0"], "between 1 and"),
+                               (["--transactions", str(campaign.adapter.MAX_TRANSACTIONS + 1)], "between 1 and"),
+                               (["--corpus", str(ROOT / "scripts/semantic-storage-corpus.json"), "--transactions", "3"],
+                                "only to random generation")):
+            with tempfile.TemporaryDirectory() as directory, \
+                    patch.object(sys, "argv", ["campaign", "--output", str(Path(directory) / "out"), *extra]), \
+                    redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
+                campaign.main()
+            self.assertIn(message, errors.getvalue())
 
 
 if __name__ == "__main__":

@@ -119,7 +119,7 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LONG_BYTES_HISTORY_SCHEMA,
         "signature": "run(uint256,bytes)", "selector": "0x220eb9b6", "rollback": True, "keyed": False,
         "declared": True, "abi": "bytes", "maxPayload": 256, "slots": [str(slot) for slot in range(11)],
-        "countSlot": "9", "tailSlot": "10", "shrinkBatch": 32},
+        "countSlot": "9", "tailSlot": "10", "shrinkBatch": 16},
     # One mapping case embeds the fixed Keccak closure (about 110 KB of Core),
     # so each bounded native shrink response carries at most 16 candidates.
     "stateful-mapping": {"caseSchema": MAPPING_CASE_SCHEMA, "planSchema": "solcore-lean.mapping-plan.v1",
@@ -145,7 +145,7 @@ PROFILES = {
         "caseTool": "semantic-nested-array-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": NESTED_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256[][])", "selector": "0x7095aff8", "rollback": True, "keyed": False,
-        "declared": True, "abi": "nested", "shrinkBatch": 32},
+        "declared": True, "abi": "nested", "shrinkBatch": 16},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -158,6 +158,9 @@ MAX_UNDECLARED_SLOTS = 256
 # entries per account.
 CONTRACT_ROLE = "contract"
 MAX_ACCOUNT_SLOTS = 1024
+# A scenario has one to eight ordered transactions; generation keeps three unless
+# a longer random sequence is requested, and the fixed corpora keep one to three.
+MAX_TRANSACTIONS = 8
 ARRAY_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_ELEMENTS = 3
 # Nested values have at most three rows of at most two elements. Slot 1 + 2i + j
@@ -533,8 +536,8 @@ def observed_slots(case: dict) -> tuple:
 
 def validate_transactions(case: dict, selected: dict) -> None:
     transactions = case.get("transactions")
-    if not isinstance(transactions, list) or not 1 <= len(transactions) <= 3:
-        raise ValueError("storage case requires one to three ordered transactions")
+    if not isinstance(transactions, list) or not 1 <= len(transactions) <= MAX_TRANSACTIONS:
+        raise ValueError(f"storage case requires 1 to {MAX_TRANSACTIONS} ordered transactions")
     ids = set()
     for tx in transactions:
         if not isinstance(tx, dict) or not isinstance(tx.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", tx["id"]) or tx["id"] in ids:

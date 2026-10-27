@@ -37,7 +37,7 @@ def valueBank : List Word :=
 def maxValue : Nat := 2 ^ 70
 
 def validTransactions (transactions : List Transaction) : Prop :=
-  1 ≤ transactions.length ∧ transactions.length ≤ 3 ∧
+  1 ≤ transactions.length ∧ transactions.length ≤ Stateful.Sequence.maxTransactions ∧
     (transactions.map (·.id)).Nodup ∧ transactions.all (fun tx => Storage.validId tx.id) = true ∧
     transactions.all (fun tx => tx.value.val ≤ maxValue && tx.amount.val ≤ maxValue) = true
 
@@ -59,7 +59,7 @@ def checkedScenario (plan : CheckedPlan) (transactions : List Transaction) : Exc
     if bounded : ForwardedCall.combinedNodes plan.step ≤ 512 then
       return ⟨plan, transactions, valid, bounded⟩
     else throw "canonical forwarded-value contracts exceed the 512-node case limit"
-  else throw "forwarded-value scenario requires 1..3 transactions with distinct valid IDs and values and amounts of at most 2^70"
+  else throw s!"forwarded-value scenario requires 1..{Stateful.Sequence.maxTransactions} transactions with distinct valid IDs and values and amounts of at most 2^70"
 
 def transactionJson (tx : Transaction) : Json := Json.mkObj [
   ("id", toJson tx.id), ("input", toJson (toString tx.input.val)),
@@ -75,7 +75,8 @@ private def wordField (row : Json) (key : String) : Except String Word := do
 
 def decodeTransactions (json : Json) : Except String (List Transaction) := do
   let rows ← json.getArr?
-  unless 1 ≤ rows.size && rows.size ≤ 3 do throw "transaction count must be between 1 and 3"
+  unless 1 ≤ rows.size && rows.size ≤ Stateful.Sequence.maxTransactions do
+    throw s!"transaction count must be between 1 and {Stateful.Sequence.maxTransactions}"
   let transactions ← rows.toList.mapM fun row => do
     let transaction : Transaction := ⟨← row.getObjValAs? String "id", ← wordField row "input",
       ← wordField row "value", ← wordField row "amount"⟩
@@ -190,31 +191,46 @@ makes the child revert and bit two the root. -/
 def modeInput (input : Word) (mode : Nat) : Word :=
   (input.bitAnd (Word.ofNatModulo 3).bitNot).bitOr (Word.ofNatModulo mode)
 
-def generatedTransactions (seed : Seed) : List Transaction :=
+def blockTransactions (seed : Seed) (first : Nat) : List Transaction :=
   let choices := sequenceChoices seed
   (List.range 3).map fun index =>
-    ⟨"tx-" ++ toString index,
+    ⟨"tx-" ++ toString (first + index),
       modeInput (boundaryInputs.getD (choices.getD index 0) Word.zero) (choices.getD (3 + index) 0),
       valueBank.getD (choices.getD (6 + index) 0) Word.zero, valueBank.getD (choices.getD (9 + index) 0) Word.zero⟩
+
+/-- Keep the forwarded amounts within the parent's endowment in total, so the
+parent can always pay: an amount that would exceed it is zero. Three
+transactions never reach the endowment. -/
+def boundedAmounts (transactions : List Transaction) : List Transaction :=
+  (transactions.foldl (fun (total, result) tx =>
+      if total + tx.amount.val ≤ parentEndowment then (total + tx.amount.val, result ++ [tx])
+      else (total, result ++ [{tx with amount := Word.zero}]))
+    (0, [])).2
+
+/-- The first `count` transactions of the seed's consecutive blocks. -/
+def generatedTransactions (seed : Seed) (count : Nat := 3) : List Transaction :=
+  boundedAmounts (Stateful.Sequence.blocks blockTransactions seed count)
 
 private def statusName (reverted : Bool) : String := if reverted then "reverted" else "returned"
 
 /-- Reserve the measured host wrappers before generating the independent step;
 the complete contracts are remeasured as the final budget authority. -/
-def generatedScenario (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1) :
-    Except String (CheckedScenario × Json) := do
+def generatedScenario (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1)
+    (transactions : Nat := 3) : Except String (CheckedScenario × Json) := do
+  Stateful.Sequence.checkCount transactions
   unless nodes ≤ 512 && ForwardedCall.programOverhead < nodes do
     throw "node budget is too small for the forwarded-value wrappers or exceeds 512"
   let (step, stepOrigin) ← Aggregate.generatedFunction seed (nodes - ForwardedCall.programOverhead) revision
   let some plan := CheckedPlan.ofStep? step | throw "generated forwarded-value plan failed full Core admission"
-  let scenario ← checkedScenario plan (generatedTransactions seed)
+  let scenario ← checkedScenario plan (generatedTransactions seed transactions)
   unless ForwardedCall.combinedNodes scenario.plan.step ≤ nodes do
     throw "forwarded-value contracts exceed their requested node budget"
-  return (scenario, Json.mkObj [
+  return (scenario, Stateful.Sequence.recordCount (Json.mkObj [
     ("kind", toJson "forward-generated"), ("seed", toJson (toString seed.toNat)),
     ("finalSeed", ← stepOrigin.getObjVal? "finalSeed"), ("maxProgramNodes", toJson nodes),
-    ("stepOrigin", stepOrigin), ("sequenceChoices", toJson (sequenceChoices seed)),
-    ("sequenceCompletions", toJson (scenario.transactions.map fun tx => statusName (rootReverts tx)))])
+    ("stepOrigin", stepOrigin),
+    ("sequenceChoices", toJson (Stateful.Sequence.blockChoices sequenceChoices seed transactions)),
+    ("sequenceCompletions", toJson (scenario.transactions.map fun tx => statusName (rootReverts tx)))]) transactions)
 
 private def decimal (row : Json) (key : String) : Except String Nat := do
   let some value := (← row.getObjValAs? String key).toNat? | throw ("invalid " ++ key)
@@ -275,7 +291,7 @@ def validateGenerated (scenario : CheckedScenario) (fuel : Nat) : Except String 
     throw "forwarded-value history did not follow its prescribed root parities"
 
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Json := Id.run do
+    (revision : GeneratorRevision := .v1) (transactions : Nat := 3) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -285,7 +301,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
       let seed := Seed.ofNat (firstSeed.toNat + index)
       let result := do
         unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
-        let (scenario, origin) ← generatedScenario seed nodes revision
+        let (scenario, origin) ← generatedScenario seed nodes revision transactions
         let emitted ← (emit scenario.plan).mapError reprStr
         validateGenerated scenario fuel
         return (scenario, origin.setObjVal! "validationFuel" (toJson fuel), emitted)
@@ -363,10 +379,14 @@ preserve a finding. -/
 def reductions (source : CheckedScenario) : List (Reduction source) := Id.run do
   let step := source.plan.step
   let mut raw : List (Aggregates.CheckedDAG × List Transaction) := []
+  -- Removing one transaction comes first, from the last back: a long
+  -- sequence loses the tail beyond a difference before the candidate limit.
+  for index in (List.range source.transactions.length).reverse do
+    raw := raw ++ [(step,
+      (source.transactions.zipIdx.filter (fun (_, current) => current != index)).map Prod.fst)]
   for reduced in Aggregate.reductions ⟨step, Word.zero⟩ do
     raw := raw ++ [(reduced.candidate.function, source.transactions)]
   for (transaction, index) in source.transactions.zipIdx do
-    raw := raw ++ [(step, (source.transactions.zipIdx.filter (fun (_, current) => current != index)).map Prod.fst)]
     for input in boundaryInputs do
       raw := raw ++ [(step, replaceAt source.transactions index fun tx => {tx with input := input})]
     for bit in [1, 2] do
@@ -411,6 +431,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
     let (expected, expectedOrigin) ← generatedScenario (Seed.ofNat seed) (← origin.getObjValAs? Nat "maxProgramNodes") revision
+      (← Stateful.Sequence.savedCount origin)
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
     unless origin == expectedOrigin.setObjVal! "validationFuel" (toJson validationFuel) do

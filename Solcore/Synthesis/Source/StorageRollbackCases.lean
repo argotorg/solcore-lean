@@ -36,7 +36,7 @@ def checkedScenario (plan : CheckedPlan) (transactions : List Transaction) : Exc
     if bounded : Wire.programNodes plan.program ≤ 512 then
       return ⟨plan, transactions, valid, bounded⟩
     else throw "canonical storage contract exceeds the 512-node case limit"
-  else throw "storage scenario requires 1..3 transactions with distinct valid IDs"
+  else throw s!"storage scenario requires 1..{Stateful.Sequence.maxTransactions} transactions with distinct valid IDs"
 
 abbrev transactionJson := Storage.transactionJson
 abbrev transactionsJson := Storage.transactionsJson
@@ -108,25 +108,33 @@ def parityInput (odd : Bool) (input : Word) : Word :=
   if odd then input.bitOr (Word.ofNatModulo 1)
   else input.bitAnd (Word.ofNatModulo (2 ^ 256 - 2))
 
-def generatedTransactions (seed : Seed) : List Transaction :=
+def blockTransactions (seed : Seed) (first : Nat) : List Transaction :=
   (sequenceIndices seed).zipIdx.map fun (inputIndex, index) =>
-    ⟨"tx-" ++ toString index, parityInput (index == 1) (boundaryInputs[inputIndex]?.getD Word.zero)⟩
+    ⟨"tx-" ++ toString (first + index), parityInput (index == 1) (boundaryInputs[inputIndex]?.getD Word.zero)⟩
+
+/-- The first `count` transactions of the seed's consecutive blocks. -/
+def generatedTransactions (seed : Seed) (count : Nat := 3) : List Transaction :=
+  Stateful.Sequence.blocks blockTransactions seed count
 
 /-- Reserve the measured host wrapper before generating its independent step;
 the complete contract is remeasured as the final budget authority. -/
-def generatedScenario (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1) :
-    Except String (CheckedScenario × Json) := do
+def generatedScenario (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1)
+    (transactions : Nat := 3) : Except String (CheckedScenario × Json) := do
+  Stateful.Sequence.checkCount transactions
   unless nodes ≤ 512 && StorageRollback.programOverhead < nodes do
     throw "node budget is too small for the storage wrapper or exceeds 512"
   let (step, stepOrigin) ← Aggregate.generatedFunction seed (nodes - StorageRollback.programOverhead) revision
   let some plan := CheckedPlan.ofStep? step | throw "generated storage plan failed full Core admission"
-  let scenario ← checkedScenario plan (generatedTransactions seed)
+  let scenario ← checkedScenario plan (generatedTransactions seed transactions)
   unless Wire.programNodes scenario.program ≤ nodes do throw "storage contract exceeds its requested node budget"
-  return (scenario, Json.mkObj [
+  return (scenario, Stateful.Sequence.recordCount (Json.mkObj [
     ("kind", toJson "storage-rollback-generated"), ("seed", toJson (toString seed.toNat)),
     ("finalSeed", ← stepOrigin.getObjVal? "finalSeed"), ("maxProgramNodes", toJson nodes),
-    ("stepOrigin", stepOrigin), ("sequenceIndices", toJson (sequenceIndices seed)),
-    ("sequenceParities", toJson (["even", "odd", "even"] : List String))])
+    ("stepOrigin", stepOrigin),
+    ("sequenceIndices", toJson (Stateful.Sequence.blocks (fun blockSeed _ => sequenceIndices blockSeed) seed
+      transactions)),
+    ("sequenceParities", toJson (Stateful.Sequence.blocks (fun _ _ => ["even", "odd", "even"]) seed
+      transactions))]) transactions)
 
 def validateGenerated (scenario : CheckedScenario) (fuel : Nat) : Except String Unit := do
   Aggregate.inputSensitive scenario.plan.step fuel
@@ -135,11 +143,12 @@ def validateGenerated (scenario : CheckedScenario) (fuel : Nat) : Except String 
     throw "storage history exhausted Core fuel"
   let rows ← observed.getObjValAs? (List Json) "transactions"
   unless rows.map (fun row => (row.getObjValAs? String "status").toOption) ==
-      [some "returned", some "reverted", some "returned"] do
-    throw "rollback history did not produce the prescribed return/revert/return sequence"
+      (List.range scenario.transactions.length).map (fun index =>
+        some (if index % 3 == 1 then "reverted" else "returned")) do
+    throw "rollback history did not produce the prescribed return/revert/return blocks"
 
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Json := Id.run do
+    (revision : GeneratorRevision := .v1) (transactions : Nat := 3) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -149,7 +158,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
       let seed := Seed.ofNat (firstSeed.toNat + index)
       let result := do
         unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
-        let (scenario, origin) ← generatedScenario seed nodes revision
+        let (scenario, origin) ← generatedScenario seed nodes revision transactions
         let emitted ← (emit scenario.plan).mapError reprStr
         validateGenerated scenario fuel
         return (scenario, origin.setObjVal! "validationFuel" (toJson fuel), emitted)
@@ -207,11 +216,14 @@ private def sealReduction (source : CheckedScenario) (step : Aggregates.CheckedD
 
 def reductions (source : CheckedScenario) : List (Reduction source) := Id.run do
   let mut raw : List (Aggregates.CheckedDAG × List Transaction) := []
+  -- Removing one transaction comes first, from the last back: a long
+  -- sequence loses the tail beyond a difference before the candidate limit.
+  for index in (List.range source.transactions.length).reverse do
+    raw := raw ++ [(source.plan.step,
+      (source.transactions.zipIdx.filter (fun (_, current) => current != index)).map Prod.fst)]
   for reduced in Aggregate.reductions ⟨source.plan.step, Word.zero⟩ do
     raw := raw ++ [(reduced.candidate.function, source.transactions)]
   for index in List.range source.transactions.length do
-    raw := raw ++ [(source.plan.step,
-      (source.transactions.zipIdx.filter (fun (_, current) => current != index)).map Prod.fst)]
     for input in boundaryInputs do
       let transactions := source.transactions.zipIdx.map fun (transaction, current) =>
         if current == index then {transaction with input := input} else transaction
@@ -251,6 +263,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
     let (expected, expectedOrigin) ← generatedScenario (Seed.ofNat seed) (← origin.getObjValAs? Nat "maxProgramNodes") revision
+      (← Stateful.Sequence.savedCount origin)
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
     unless origin == expectedOrigin.setObjVal! "validationFuel" (toJson validationFuel) do

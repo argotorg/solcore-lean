@@ -134,7 +134,9 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
       "noncanonical forwarded-value transaction accepted"
   rejected (ForwardedCall.decodeTransactions (toJson [first, first])) "duplicate transaction IDs accepted"
   rejected (ForwardedCall.decodeTransactions (toJson ([] : List Json))) "empty transaction list accepted"
-  rejected (ForwardedCall.decodeTransactions (toJson (List.replicate 4 first))) "unbounded transaction count accepted"
+  rejected (ForwardedCall.decodeTransactions
+    (toJson (List.replicate (Solcore.Synthesis.Stateful.Sequence.maxTransactions + 1) first)))
+    "unbounded transaction count accepted"
   let initial ← field saved "initialState"
   for (name, bad) in [("initialState", initial.setObjVal! "callerBalance" (toJson "0")),
       ("initialState", Json.mkObj [("accounts", toJson ([] : List Json))]),

@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.Synthesis.Stateful.AccountStorage
+import Solcore.Synthesis.Stateful.Sequence
 
 /-! Execute a bounded sequence of persistent, zero-value calls on one linked
 Hull contract. Every row exposes the committed values of slots 0 and 1, including
@@ -76,7 +77,8 @@ private structure Call where
 /-- Validate the whole sequence before deploying or executing any part of it. -/
 private def calls (config : Json) (constructor : Contract.Context) : Except String (List Call) := do
   let values ← config.getObjValAs? (List Json) "calls"
-  unless 1 ≤ values.length && values.length ≤ 3 do throw "storage scenarios require 1 to 3 calls"
+  unless 1 ≤ values.length && values.length ≤ Solcore.Synthesis.Stateful.Sequence.maxTransactions do
+    throw s!"storage scenarios require 1 to {Solcore.Synthesis.Stateful.Sequence.maxTransactions} calls"
   values.foldlM (init := []) fun previous value => do
     let id ← value.getObjValAs? String "id"
     unless !id.isEmpty && id.length ≤ 64 && id.toList.all (fun char =>

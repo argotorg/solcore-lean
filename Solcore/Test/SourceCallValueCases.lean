@@ -129,7 +129,9 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
     rejected (CallValue.decodeTransactions (toJson [first.setObjVal! name bad]))
       "noncanonical call-value transaction accepted"
   rejected (CallValue.decodeTransactions (toJson ([] : List Json))) "empty transaction list accepted"
-  rejected (CallValue.decodeTransactions (toJson (List.replicate 4 first))) "unbounded transaction count accepted"
+  rejected (CallValue.decodeTransactions
+    (toJson (List.replicate (Solcore.Synthesis.Stateful.Sequence.maxTransactions + 1) first)))
+    "unbounded transaction count accepted"
   let plan ← makePlan (.var 0) 5
   rejected (CallValue.checkedScenario plan (transactions [(0, 0, 1), (0, 0, 1)] |>.map fun tx => {tx with id := "same"}))
     "duplicate transaction IDs accepted"

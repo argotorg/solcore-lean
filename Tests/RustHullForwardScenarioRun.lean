@@ -2,6 +2,7 @@ import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.ContractRuntime.RuntimeScalars
 import Solcore.Synthesis.Stateful.AccountStorage
+import Solcore.Synthesis.Stateful.Sequence
 
 /-! Execute the fixed two-contract value-forwarding protocol from actual linked
 Hull. Both constructors must return their exact runtime images, and the parent's
@@ -113,7 +114,8 @@ private def decodeConfig (json : Json) : Except String Config := do
   let availableGas ← word json "availableGas"
   unless availableGas.val > 0 do throw "availableGas must be positive"
   let values ← json.getObjValAs? (List Json) "calls"
-  unless 1 ≤ values.length && values.length ≤ 3 do throw "call scenarios require one to three transactions"
+  unless 1 ≤ values.length && values.length ≤ Solcore.Synthesis.Stateful.Sequence.maxTransactions do
+    throw s!"call scenarios require 1 to {Solcore.Synthesis.Stateful.Sequence.maxTransactions} transactions"
   let calls ← values.foldlM (init := ([] : List Call)) fun prior value => do
     exactFields value ["id", "input", "amount", "calldata", "value", "persist"]
     let id ← value.getObjValAs? String "id"

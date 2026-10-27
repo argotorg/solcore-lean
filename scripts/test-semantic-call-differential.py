@@ -109,6 +109,17 @@ class EnvelopeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             adapter.validate_case(invalid)
 
+    def test_a_case_has_one_to_the_bound_of_transactions(self):
+        for count in (1, adapter.MAX_TRANSACTIONS, 0, adapter.MAX_TRANSACTIONS + 1):
+            value = case()
+            value["transactions"] = [{**value["transactions"][0], "id": f"tx-{index}"} for index in range(count)]
+            with self.subTest(count=count):
+                if 1 <= count <= adapter.MAX_TRANSACTIONS:
+                    adapter.validate_case(value)
+                else:
+                    with self.assertRaisesRegex(ValueError, "transactions"):
+                        adapter.validate_case(value)
+
 
 class ComparisonTests(unittest.TestCase):
     def test_return_child_rollback_and_root_rollback_history_matches(self):

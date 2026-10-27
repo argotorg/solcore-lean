@@ -563,6 +563,12 @@ class Campaign:
         if self.g0_version is None and not args.corpus and not args.case:
             self.g0_version = legacy.RANDOM_G0_VERSION
         self.summary["configuration"]["g0Version"] = self.g0_version
+        # Random generation requests the longest admitted sequence; a corpus or a
+        # saved case keeps its own transactions.
+        self.transactions = getattr(args, "transactions", None)
+        if self.transactions is None and not args.corpus and not args.case:
+            self.transactions = adapter.MAX_TRANSACTIONS
+        self.summary["configuration"]["transactions"] = self.transactions
         self.checkpoint()
 
     def checkpoint(self):
@@ -658,13 +664,14 @@ class Campaign:
             return
         if not self.args.corpus:
             response = self.tool(["generate", self.args.seed, self.args.nodes, self.args.cases, self.args.attempts, self.args.direct_fuel,
-                                  self.g0_version], "generation")
+                                  self.g0_version, self.transactions], "generation")
             if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > self.args.cases:
                 raise ValueError("invalid native storage corpus")
             excluded = response.get("excluded", [])
             self.summary["counts"]["excluded"] = len(excluded)
             self.summary["counts"]["generationResourceExclusions"] = legacy.generation_resource_exclusions(excluded)
-            self.summary["generation"] = {key: response.get(key) for key in ("requested", "attempted", "status")}
+            self.summary["generation"] = {**{key: response.get(key) for key in ("requested", "attempted", "status")},
+                                          "transactions": self.transactions}
             save_json(self.args.output / "generation.json", {key: value for key, value in response.items() if key != "cases"})
             for index, case in enumerate(response["cases"]):
                 self.add_case(case, f"generated-{index}")
@@ -914,6 +921,9 @@ def main():
     parser.add_argument("--g0-version", choices=legacy.G0_VERSIONS,
                         help=f"G0 generator of the checked step in random generation; default {legacy.RANDOM_G0_VERSION}. "
                              "A corpus or saved case uses the version it records")
+    parser.add_argument("--transactions", type=int,
+                        help=f"transactions per random scenario, 1 to {adapter.MAX_TRANSACTIONS}; default {adapter.MAX_TRANSACTIONS}. "
+                             "A corpus or saved case keeps its own sequence")
     parser.add_argument("--seconds", type=float, default=300)
     parser.add_argument("--disk-bytes", type=int, default=256 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32)
@@ -960,6 +970,10 @@ def main():
         parser.error(str(error))
     if args.g0_version is not None and (args.corpus or args.case) and args.g0_version != recorded:
         parser.error("--g0-version disagrees with the supplied case or corpus")
+    if args.transactions is not None and (args.corpus or args.case):
+        parser.error("--transactions applies only to random generation")
+    if args.transactions is not None and not 1 <= args.transactions <= adapter.MAX_TRANSACTIONS:
+        parser.error(f"transactions must be between 1 and {adapter.MAX_TRANSACTIONS}")
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
     if args.test_transaction_id and (not args.test_perturb_path or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", args.test_transaction_id)):

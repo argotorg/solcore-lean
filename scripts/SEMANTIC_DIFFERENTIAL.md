@@ -1032,6 +1032,21 @@ same way. A suite sample of four random cases for each of the thirteen
 stateful profiles recorded revision two and matched on O0 and O2, while the
 fixed corpora kept revision one and their 167 scenarios.
 
+Random generation also requests `--transactions` transactions per scenario,
+from one to eight and eight by default, and passes the count after the version
+to `generate`. A sequence is the first transactions of consecutive
+three-transaction blocks. Block zero is the scenario seed's original three
+transactions, so three transactions regenerate the fixed corpora bit for bit;
+each later block draws the same choices from a derived seed. A generated origin
+records a count other than three as `transactionCount`, and replay
+regenerates exactly that length. Call-value and forwarded-value generation send
+zero where a value or a forwarded amount would exceed its 2^72 total. A corpus
+or a saved case keeps its own sequence, and `--transactions` is refused with
+either. The summary records the length in `configuration.transactions` and
+`generation.transactions`. Every profile's reductions first remove one
+transaction, from the last to the first, so a long sequence loses the tail
+beyond a difference before the candidate limit is spent.
+
 The summary counts scenarios separately from transactions observed on any path,
 completed on all three paths, and matched ordered prefixes. Shrink executions
 are excluded from these transaction counts. The campaign enforces generation,
@@ -2597,9 +2612,10 @@ so generation reserves only the measured 102-node wrapper and the 384-node
 default leaves 282 nodes for the step. All 300 of the first 300 seeds were
 accepted, and their 900 transactions used every bank length. Generated
 scenarios must complete with the prescribed outcomes and follow the length,
-last-byte and sum protocol under original Core. A case reaches about 75 KB, so
-a native shrink response carries at most 32 candidates, the profile's
-`shrinkBatch`.
+last-byte and sum protocol under original Core. A case reaches about 75 KB. At
+the 512-node budget, 32 candidates of an eight-transaction case reached
+4.13 MB, so a native shrink response carries at most 16 candidates, the
+profile's `shrinkBatch`, within the campaign's 4 MiB bound on tool output.
 
 The fixed corpus has twelve scenarios and 33 transactions: eight imported
 plans, which reuse the dynamic-array corpus steps with payloads of 0 to 256
@@ -2752,8 +2768,9 @@ first 300 seeds were accepted; their 900 transactions used every outer length
 223 to 227 times and every row length 418 to 485 times. Generated scenarios
 must complete with the prescribed outcomes and follow the row-count,
 element-count and sum protocol under original Core. A case reaches about 73
-KB, so a native shrink response carries at most 32 candidates, the profile's
-`shrinkBatch`.
+KB. At the 512-node budget, 32 candidates of an eight-transaction case reached
+3.35 MB, so a native shrink response carries at most 16 candidates, the
+profile's `shrinkBatch`, within the campaign's 4 MiB bound on tool output.
 
 The fixed corpus has twelve scenarios and 33 transactions: eight imported
 plans, which reuse the dynamic-array corpus steps with values of up to three

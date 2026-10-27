@@ -127,7 +127,9 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
       "noncanonical mapping transaction accepted"
   rejected (StorageMapping.decodeTransactions (toJson [first, first])) "duplicate transaction IDs accepted"
   rejected (StorageMapping.decodeTransactions (toJson ([] : List Json))) "empty transaction list accepted"
-  rejected (StorageMapping.decodeTransactions (toJson (List.replicate 4 first))) "unbounded transaction count accepted"
+  rejected (StorageMapping.decodeTransactions
+    (toJson (List.replicate (Solcore.Synthesis.Stateful.Sequence.maxTransactions + 1) first)))
+    "unbounded transaction count accepted"
   let slots ← get (saved.getObjValAs? (Array Json) "observedSlots")
   for (name, bad) in [("initialState", Json.mkObj [("storage", toJson [first])]),
       ("observedSlots", .arr slots.pop), ("observedSlots", .arr (slots.push (toJson "1"))),

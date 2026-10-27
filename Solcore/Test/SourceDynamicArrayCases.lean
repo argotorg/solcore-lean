@@ -120,7 +120,9 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
       "noncanonical array transaction accepted"
   rejected (DynamicArray.decodeTransactions (toJson [first, first])) "duplicate transaction IDs accepted"
   rejected (DynamicArray.decodeTransactions (toJson ([] : List Json))) "empty transaction list accepted"
-  rejected (DynamicArray.decodeTransactions (toJson (List.replicate 4 first))) "unbounded transaction count accepted"
+  rejected (DynamicArray.decodeTransactions
+    (toJson (List.replicate (Solcore.Synthesis.Stateful.Sequence.maxTransactions + 1) first)))
+    "unbounded transaction count accepted"
   for (name, bad) in [("initialState", Json.mkObj [("storage", toJson [first])]),
       ("observedSlots", toJson (["0", "1", "2", "3"] : List String)),
       ("observedSlots", toJson (["1", "0", "2", "3", "4"] : List String)),

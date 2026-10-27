@@ -30,7 +30,7 @@ storage = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(storage)
 common = storage.common
 Finding, RpcError = common.Finding, common.RpcError
-PATHS, SLOTS = storage.PATHS, storage.SLOTS
+PATHS, SLOTS, MAX_TRANSACTIONS = storage.PATHS, storage.SLOTS, storage.MAX_TRANSACTIONS
 CASE_SCHEMA = "solcore-lean.semantic-call-case.v1"
 REPORT_SCHEMA = "solcore-lean.semantic-call-differential.v2"
 HISTORY_SCHEMA = "solcore-lean.call-history.v2"
@@ -40,8 +40,9 @@ ROLES = ("parent", "child")
 FORWARD_CASE_SCHEMA = "solcore-lean.semantic-forward-case.v1"
 FORWARD_HISTORY_SCHEMA = "solcore-lean.forward-history.v2"
 FORWARD_SELECTOR = "0x24b912e5"
-# The forwarding parent's endowment covers three forwards of the largest bank
-# value; original Core and Hull fund the caller with 2^80.
+# The forwarding parent's endowment covers every generated forward: a generated
+# sequence forwards at most the endowment in total. Original Core and Hull fund
+# the caller with 2^80.
 ENDOWMENT, CALLER_FUNDS, MAX_VALUE = 2**72, 2**80, 2**70
 PROFILES = {
     "stateful-calls": {"caseSchema": CASE_SCHEMA, "historySchema": HISTORY_SCHEMA, "planKey": "callPlan",
@@ -133,8 +134,8 @@ def validate_case(case):
             for key in ("generatorVersion", "emitterVersion", "wrapperVersion")):
         raise ValueError("missing versioned call provenance")
     transactions = case.get("transactions")
-    if not isinstance(transactions, list) or not 1 <= len(transactions) <= 3:
-        raise ValueError("call case requires one to three transactions")
+    if not isinstance(transactions, list) or not 1 <= len(transactions) <= MAX_TRANSACTIONS:
+        raise ValueError(f"call case requires 1 to {MAX_TRANSACTIONS} transactions")
     ids = set()
     for tx in transactions:
         keys = {"id", "input", "value", "target", "callee"} | ({"amount"} if forwards else set())

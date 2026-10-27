@@ -1836,6 +1836,68 @@ recording revision one. A random suite sample of four cases per profile (seed
 20261027) passed on both levels with 52 scenarios and 156 prefixes, and every
 profile recorded `core-g0-v2/lcg64-v1`. There were no findings.
 
+**Longer random transaction sequences.** Random stateful scenarios had exactly
+three transactions. They now take a requested length up to a bound B. The
+definitions were fixed before execution:
+
+- Length: generation takes a transaction count from one to B. The default is
+  three, which leaves generation, the origin and every fixed corpus unchanged,
+  bit for bit. A generated origin records a count other than three as
+  `transactionCount`; replay regenerates exactly that length, and a recorded
+  count of three is noncanonical.
+- Sequence: the first L transactions of consecutive three-transaction blocks.
+  Block zero is the profile's existing three transactions from the scenario
+  seed. Block k > 0 draws the same choices from its own seed, the high half of
+  draw k of a stream seeded with the scenario seed xor `tx-block`. IDs run
+  `tx-0` to `tx-(L-1)`. The step, the wrapper and every scenario-level choice,
+  such as the deployment value or the log sites, come from the scenario seed
+  alone. Every transaction follows its block's prescribed completion, which
+  generation validates. The origin's per-transaction lists (indices, parities,
+  completions, flags) have L entries, and `sequenceChoices` lists the choices
+  of every block used.
+- Value bounds: call-value scenarios still send at most 2^72 including the
+  deployment value, and a forwarded-value parent forwards at most its 2^72
+  endowment in total, so the funded sender and the parent can always pay. A
+  generated value or amount that would exceed its total is zero. Three
+  transactions never reach either total. The eight-unit `stateful-calls`
+  parent sends at most one unit per transaction, so B is at most eight.
+- Limits: case decoders, adapters and Hull runners admit one to B
+  transactions. Declared-slot runners admit up to 32 observed slots, more than
+  the 1 + 2B that a keyed, mapping or ledger sequence declares. Fixed corpora
+  and their manifests keep one to three.
+- Reduction: the candidates that remove one transaction come first, from the
+  last to the first, followed by the existing step, plan and input reductions
+  in their order. A tail beyond a finding's first differing transaction is
+  then removed before the candidate limit is spent. Each accepted candidate is
+  still rerun on all three paths.
+- Campaigns: `--transactions` sets the random length, from one to B, and
+  defaults to B. A corpus or a saved case keeps its own sequence. Summaries
+  record the requested length.
+- Time and disk: B is the largest length up to eight whose measured case time
+  on O0 and O2, at the suite's default and doubled node budgets, keeps sixteen
+  cases well inside the suite's 900-second profile budget and every case well
+  inside the 90-second case timeout. The native responses, histories and
+  reports of B-transaction cases must stay inside their existing output and
+  artifact limits.
+
+B is eight. Suites of four random cases per profile (seed 20261027), run on O0
+and O2 in parallel like every matrix here, took at most 9.0 seconds per
+eight-transaction case at the 384-node budget and 9.7 seconds at 512 nodes,
+both for nested-array, against 8.2 seconds for three transactions. Outside a
+reduction no case took more than 13.2 seconds. Sixteen cases therefore use
+about 155 of the 900 seconds, and a full sixteen-attempt reduction took 116
+seconds more. At 512 nodes, generating sixteen eight-transaction cases wrote at
+most 2.4 MB, and the largest cases' reports were at most 4.6 MB, within the 4
+MiB native output and 64 MiB artifact limits. A 32-candidate shrink response
+for the largest long-bytes and nested-array cases reached 4.13 and 3.35 MB, so
+both profiles now cap a response at sixteen candidates, as mapping and ledger
+do. The suite's sixteen shrink attempts already capped every batch at sixteen.
+The timing runs matched every scenario except one O2 compiler crash at 512
+nodes (`stateful-dynamic-array`, recorded in the local questions file). The
+three-transaction case from the same seed has the identical source, so the
+sequence length is not involved. The crash's reduction removed seven
+transactions first.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

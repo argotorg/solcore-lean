@@ -164,7 +164,9 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
     "calldata that differs from the row's Words accepted"
   rejected (StorageLedger.decodeTransactions (toJson [first, first])) "duplicate transaction IDs accepted"
   rejected (StorageLedger.decodeTransactions (toJson ([] : List Json))) "empty transaction list accepted"
-  rejected (StorageLedger.decodeTransactions (toJson (List.replicate 4 first))) "unbounded transaction count accepted"
+  rejected (StorageLedger.decodeTransactions
+    (toJson (List.replicate (Solcore.Synthesis.Stateful.Sequence.maxTransactions + 1) first)))
+    "unbounded transaction count accepted"
   let slots ← get (saved.getObjValAs? (Array Json) "observedSlots")
   for (name, bad) in [("initialState", Json.mkObj [("storage", toJson [first])]),
       ("observedSlots", .arr slots.pop), ("observedSlots", .arr (slots.push (toJson "1"))),
