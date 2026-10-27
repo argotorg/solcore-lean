@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; all thirteen stateful profiles compare the observed contracts' whole committed storage on all three paths; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and the init-template catalog premise of the public theorems, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch`, nested memory and termination calls and the word operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero` connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1632,7 +1632,7 @@ input or the decoder's revert paths, multi-word return values, gas, balances,
 nonces, code or memory. Agreement is test evidence, not a preservation proof.
 
 **Whole committed storage.** The comparisons above observe declared slots on
-all three paths, and seven profiles add Hull/EVM containment of undeclared
+all three paths, and nine profiles add Hull/EVM containment of undeclared
 slots. A miscompiled write outside the declaration, or a stray write by the
 original Core contract itself, was therefore invisible on at least one path.
 All thirteen stateful profiles now also compare the observed accounts' whole
@@ -1672,11 +1672,16 @@ execution:
   returned or reverted parent. Writes that leave a value unchanged inside one
   transaction are not reported: 0 to 5 to 0, 3 to 4 to 3, same-value writes,
   and writes rolled back with a frame. The opcode trace shows that those
-  writes ran, but committed storage cannot observe them. As a second exact
-  method, `anvil_dumpState` after deployment and after every mined
-  transaction must give the same nonzero storage for every observed account.
-  A disagreement or an unreadable dump fails closed as an adapter error.
-  Anvil 1.5.1 lacks `debug_storageRangeAt`.
+  writes ran, but committed storage cannot observe them. The probe's final
+  `anvil_dumpState` held exactly the storage the reported changes imply, and
+  `scripts/check-evm-storage-diff.py` repeats the probe. Anvil 1.5.1 lacks
+  `debug_storageRangeAt`. The first matrix also compared `anvil_dumpState`
+  after deployment and every mined transaction. Under `--steps-tracing` the
+  dump embeds every transaction's step trace, so on the nested-array corpus
+  it outgrew its 64 MiB bound within two transactions and failed four O0
+  scenarios closed as adapter errors; longer sequences would also exceed the
+  4 MiB RPC output limit. That run-time cross-check was dropped, and only the
+  probe keeps it.
 - Zero and absent are equal. Observations list only nonzero values, and
   writing zero removes an entry on every path, so no observation distinguishes
   a cleared slot from one never written.
@@ -1711,7 +1716,8 @@ execution:
   2^256 - 2 to one path's observation of the selected transaction. A candidate
   that removes the transaction, or declares or already holds that slot,
   cannot keep the synthetic finding.
-- Schemas and versions: the thirteen history schemas move from `.v1` to `.v2`.
+- Schemas and versions: the twelve history schemas of the thirteen profiles
+  (the two-slot and rollback profiles share one) move from `.v1` to `.v2`.
   They now require `initialAccountStorage`, `accountStorage` on every row and
   `finalAccountStorage`. The storage and call report schemas
   (`semantic-storage-differential`, `semantic-call-differential`) and analysis

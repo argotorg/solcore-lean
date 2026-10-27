@@ -7,7 +7,6 @@ Python subprocess. Compiler/Core/EVM agreement is tested by the actual adapter.
 """
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 import copy
-import gzip
 import importlib.util
 import io
 import json
@@ -74,12 +73,6 @@ def row(index, value=7, first=3, second=4, status="returned"):
         "status": status, "committedStorage": slots(first, second), "accountStorage": whole(slots(first, second))}
     result.update({"output": "0x" + f"{value:064x}"} if status in ("returned", "reverted") else {"detail": "test resource"})
     return result
-
-
-def state_dump(accounts):
-    """An uncompressed Anvil state dump: lowercase hexadecimal address to a storage map."""
-    return "0x" + json.dumps({"accounts": {address.lower(): {"storage": {hex(int(slot)): hex(int(value)) for slot, value in values.items()}}
-                                           for address, values in accounts.items()}}).encode().hex()
 
 
 def history(value=None, rows=None):
@@ -616,8 +609,6 @@ class InterruptedExecutionPolicyTests(unittest.TestCase):
                 # An intentional prior output difference; the final failure
                 # must not erase this already completed observation.
                 return {"failed": False, "returnValue": f"{8:064x}"}
-            if method == "anvil_dumpState":
-                return state_dump({address: {"0": "3", "1": "4"} if len(submitted) > 1 else {}})
             self.fail(f"unexpected RPC method: {method}")
 
         rpc.call.side_effect = rpc_call
@@ -2141,8 +2132,6 @@ class LedgerTests(unittest.TestCase):
                 if params[1] == runner.PRESTATE_DIFF:
                     return {"pre": {}, "post": {}}
                 return {"failed": False, "returnValue": f"{0:064x}"}
-            if method == "anvil_dumpState":
-                return state_dump({address: {}})
             self.fail(f"unexpected RPC method: {method}")
 
         rpc.call.side_effect = rpc_call
@@ -2562,38 +2551,24 @@ class WholeStorageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside the deployed contract"):
             runner.changed_storage(diff, [parent])
 
-    def test_evm_whole_storage_rereads_reported_slots_and_must_equal_the_state_dump(self):
+    def test_evm_whole_storage_rereads_every_reported_slot_and_drops_zero(self):
         address = "0x" + "ab" * 20
         calls = []
         values = {"0": 3, "9": 0, "12": 2**256 - 1}
         class Rpc:
-            def __init__(self, dumped):
-                self.dumped = dumped
             def call(self, method, params):
                 calls.append((method, params))
-                if method == "anvil_dumpState":
-                    return self.dumped
                 return "0x" + f"{values[str(int(params[1], 16))]:064x}"
         accounts = [("contract", str(int(address, 16)))]
         expected = [{"role": "contract", "address": accounts[0][1],
                      "storage": [{"slot": "0", "value": "3"}, {"slot": "12", "value": str(2**256 - 1)}]}]
-        touched = {address: {"12", "0", "9"}}
-        self.assertEqual(runner.evm_account_storage(Rpc(None), accounts, touched, "0x4"), expected)
-        self.assertEqual([params[1:] for method, params in calls], [[hex(0), "0x4"], [hex(9), "0x4"], [hex(12), "0x4"]])
-        dumped = state_dump({address: {"0": "3", "12": str(2**256 - 1), "5": "0"}})
-        record = {}
-        self.assertEqual(runner.evm_whole_storage(Rpc(dumped), accounts, touched, "0x4", record), expected)
-        self.assertEqual(set(record["stateDump"]), {"sha256", "bytes"})
-        compressed = "0x" + gzip.compress(bytes.fromhex(dumped[2:])).hex()
-        self.assertEqual(runner.evm_dumped_storage(Rpc(compressed), accounts)[0], expected)
-        for name, bad in (("missing", state_dump({})), ("disagreeing", state_dump({address: {"0": "3"}}))):
-            with self.subTest(name=name), self.assertRaises((runner.Finding, ValueError)) as caught:
-                runner.evm_whole_storage(Rpc(bad), accounts, touched, "0x4", {})
-            if name == "disagreeing":
-                self.assertEqual((caught.exception.category, caught.exception.stage), ("adapter-error", "evm-storage-enumeration"))
-        with self.assertRaises(ValueError):
-            runner.evm_dumped_storage(Rpc("0x" + gzip.compress(b"{" * 10)[:12].hex()), accounts)
-
+        self.assertEqual(runner.evm_account_storage(Rpc(), accounts, {address: {"12", "0", "9"}}, "0x4"), expected)
+        self.assertEqual([(method, params[1:]) for method, params in calls],
+                         [("eth_getStorageAt", [hex(0), "0x4"]), ("eth_getStorageAt", [hex(9), "0x4"]),
+                          ("eth_getStorageAt", [hex(12), "0x4"])])
+        # An account no diff has reported holds no storage, and needs no read.
+        self.assertEqual(runner.evm_account_storage(Rpc(), accounts, {}, "0x4")[0]["storage"], [])
+        self.assertEqual(len(calls), 3)
 
 if __name__ == "__main__":
     unittest.main()

@@ -547,8 +547,7 @@ def execute(args, report):
         report["histories"]["importedHull"] = hull_history(imported["stdout"], imported["returncode"], case, bindings, runtimes)
         initial = evm_accounts(rpc, bindings, initial_block)
         observed_accounts = [(role, bindings[role]) for role in ROLES]
-        report["evmInitialStorage"] = {}
-        initial_whole = storage.evm_whole_storage(rpc, observed_accounts, touched, initial_block, report["evmInitialStorage"])
+        initial_whole = storage.evm_account_storage(rpc, observed_accounts, touched, initial_block)
         report["initialBlock"] = initial_block
         evm_rows, records = [], []
         report["evmTransactions"] = records
@@ -584,7 +583,7 @@ def execute(args, report):
             record["storageDiff"] = diff
             for account, slots in storage.changed_storage(diff, [f"0x{int(address):040x}" for _, address in observed_accounts]).items():
                 touched.setdefault(account, set()).update(slots)
-            whole = storage.evm_whole_storage(rpc, observed_accounts, touched, mined["blockNumber"], record)
+            whole = storage.evm_account_storage(rpc, observed_accounts, touched, mined["blockNumber"])
             evm_rows.append({"id": tx["id"], "index": index, **outcome, "committedAccounts": state, "logs": committed_logs,
                              "accountStorage": whole})
             checkpoint()

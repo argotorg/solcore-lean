@@ -14,12 +14,11 @@ contract's committed balance; the sender's balance is never observed.
 Every profile also compares the contract's whole committed storage after
 deployment and after every transaction: original Core enumerates its account,
 Hull canonicalizes its committed entries, and the EVM rereads every slot the
-prestate diffs reported, cross-checked against Anvil's own state dump.
+prestate diffs reported (`check-evm-storage-diff.py` verifies that method).
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib.util
 import json
 import math
@@ -31,7 +30,6 @@ import subprocess
 import sys
 import time
 import urllib.error
-import zlib
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
@@ -156,11 +154,10 @@ CONTAINMENT_PATHS = ("importedHull", "rustEvm")
 SLOTS = ("0", "1")
 COUNTER_SLOT = "0"
 MAX_UNDECLARED_SLOTS = 256
-# Whole committed storage: the observed contract's role, a bound on listed
-# entries per account, and a bound on Anvil's decompressed state dump.
+# Whole committed storage: the observed contract's role and a bound on listed
+# entries per account.
 CONTRACT_ROLE = "contract"
 MAX_ACCOUNT_SLOTS = 1024
-MAX_STATE_DUMP = 64 * 1024 * 1024
 ARRAY_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_ELEMENTS = 3
 # Nested values have at most three rows of at most two elements. Slot 1 + 2i + j
@@ -1142,52 +1139,6 @@ def evm_account_storage(rpc, accounts, touched: dict, block: str) -> list[dict]:
     return result
 
 
-def evm_dumped_storage(rpc, accounts) -> tuple[list[dict], dict]:
-    """The same observation from Anvil's own dump of the latest state. The
-    adapter calls it right after a receipt and before the next submission, so
-    the latest block is that receipt's block."""
-    dumped = common.hex_bytes(rpc.call("anvil_dumpState", []), "state dump")
-    if len(dumped) > MAX_STATE_DUMP:
-        raise ValueError("state dump exceeds its bound")
-    raw = dumped
-    if dumped[:2] == b"\x1f\x8b":
-        inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
-        raw = inflater.decompress(dumped, MAX_STATE_DUMP)
-        if inflater.unconsumed_tail or not inflater.eof:
-            raise ValueError("state dump exceeds its bound or is truncated")
-    state = json.loads(raw)
-    known = state.get("accounts") if isinstance(state, dict) else None
-    if not isinstance(known, dict):
-        raise ValueError("state dump lacks its account map")
-    known = {str(key).lower(): value for key, value in known.items()}
-    result = []
-    for role, address in accounts:
-        entry = known.get(f"0x{int(address):040x}")
-        values = entry.get("storage", {}) if isinstance(entry, dict) else None
-        if not isinstance(values, dict) or len(values) > MAX_ACCOUNT_SLOTS:
-            raise ValueError("state dump lacks an observed account's bounded storage")
-        rows = []
-        for key, value in values.items():
-            if not isinstance(key, str) or not re.fullmatch(r"0x[0-9a-fA-F]{1,64}", key) or \
-                    not isinstance(value, str) or not re.fullmatch(r"0x[0-9a-fA-F]{1,64}", value):
-                raise ValueError("invalid state dump storage entry")
-            if int(value, 16):
-                rows.append({"slot": str(int(key, 16)), "value": str(int(value, 16))})
-        result.append({"role": role, "address": address, "storage": sorted(rows, key=lambda row: int(row["slot"]))})
-    return result, {"sha256": hashlib.sha256(dumped).hexdigest(), "bytes": len(dumped)}
-
-
-def evm_whole_storage(rpc, accounts, touched: dict, block: str, record: dict) -> list[dict]:
-    """Whole storage from the prestate diffs, required to equal the state dump."""
-    whole = evm_account_storage(rpc, accounts, touched, block)
-    dumped, identity = evm_dumped_storage(rpc, accounts)
-    record["stateDump"] = identity
-    if dumped != whole:
-        record["stateDumpStorage"] = dumped
-        raise Finding("adapter-error", "evm-storage-enumeration", "prestate diffs and the state dump disagree on committed storage")
-    return whole
-
-
 def evm_undeclared(rpc, address: str, block: str, touched: set[str], slots) -> list[dict]:
     """Every changed slot outside the declaration, reread at the receipt block."""
     outside = sorted((slot for slot in touched if slot not in slots), key=int)
@@ -1389,8 +1340,8 @@ def execute(args, report: dict) -> None:
         keyed = {"observedSlots": list(slots), "initialUndeclaredStorage":
             evm_undeclared(rpc, address, deployed["blockNumber"], touched, slots)} if selected["declared"] else {}
         observed_accounts = [(CONTRACT_ROLE, bindings["address"])]
-        keyed["initialAccountStorage"] = evm_whole_storage(rpc, observed_accounts, {address.lower(): touched},
-                                                           deployed["blockNumber"], report["evmDeployment"])
+        keyed["initialAccountStorage"] = evm_account_storage(rpc, observed_accounts, {address.lower(): touched},
+                                                             deployed["blockNumber"])
         if deployment_logs(case):
             keyed["initialLogs"] = evm_logs(deployed)
         if selected.get("logs"):
@@ -1438,7 +1389,7 @@ def execute(args, report: dict) -> None:
             touched |= changed_slots(diff, address)
             if selected["declared"]:
                 row["undeclaredStorage"] = evm_undeclared(rpc, address, mined["blockNumber"], touched, slots)
-            row["accountStorage"] = evm_whole_storage(rpc, observed_accounts, {address.lower(): touched}, mined["blockNumber"], record)
+            row["accountStorage"] = evm_account_storage(rpc, observed_accounts, {address.lower(): touched}, mined["blockNumber"])
             evm_rows.append(row)
             checkpoint()
             if outcome["status"] not in {"returned", "reverted"}:
