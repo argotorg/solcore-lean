@@ -43,16 +43,16 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_twenty_nine_profiles_match_real_manifests_and_campaign_families(self):
+    def test_thirty_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 29)
+        self.assertEqual(len(args.profile), 30)
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
                          "runtime-aggregate-call-graphs", "stateful-keyed-storage", "stateful-dynamic-array",
                          "stateful-logs", "stateful-call-value", "stateful-bytes", "stateful-forwarded-value",
                          "stateful-mapping", "stateful-ledger", "stateful-long-bytes", "stateful-nested-array",
-                         "stateful-malformed-calldata", "stateful-malformed-nested-array")), 378)
+                         "stateful-malformed-calldata", "stateful-malformed-nested-array", "stateful-malformed-bytes")), 378)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
         self.assertGreater(suite.requested(args, "runtime-aggregate-call-graphs"), 0)
@@ -120,6 +120,14 @@ class SuiteTests(unittest.TestCase):
         random = self.args("--mode", "random", "--profile", "stateful-malformed-nested-array")
         command = suite.command(random, "stateful-malformed-nested-array", self.directory / "nested", 30, 64 * 1024**2)
         self.assertEqual(command[command.index("--nodes") + 1], "448")
+        # The malformed-bytes profile likewise.
+        self.assertEqual(suite.PROFILES["stateful-malformed-bytes"], ("semantic-malformed-bytes", "storage", 448))
+        self.assertEqual(suite.requested(args, "stateful-malformed-bytes"),
+                         len(json.loads(suite.manifest("stateful-malformed-bytes").read_text())["cases"]))
+        self.assertIn("stateful-malformed-bytes", suite.DECLARED_SLOT_PROFILES)
+        random = self.args("--mode", "random", "--profile", "stateful-malformed-bytes")
+        command = suite.command(random, "stateful-malformed-bytes", self.directory / "bytes", 30, 64 * 1024**2)
+        self.assertEqual(command[command.index("--nodes") + 1], "448")
 
     def test_primitive_profile_routes_its_manifest_and_random_defaults_under_all_backends(self):
         self.assertEqual(suite.PROFILES['runtime-primitives'], ('semantic-primitive', 'pure', 96))
@@ -152,7 +160,7 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 459, 29), ('sonatina-o2', 459, 29), ('yul', 417, 14)):
+        for backend, old_count, profile_count in (('sonatina-o0', 459, 30), ('sonatina-o2', 459, 30), ('yul', 417, 14)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
@@ -164,6 +172,7 @@ class SuiteTests(unittest.TestCase):
                      + suite.requested(args, 'stateful-long-bytes') + suite.requested(args, 'stateful-nested-array')
                      + suite.requested(args, 'stateful-malformed-calldata')
                      + suite.requested(args, 'stateful-malformed-nested-array')
+                     + suite.requested(args, 'stateful-malformed-bytes')
                      if backend != 'yul' else 0)
             self.assertEqual(sum(suite.requested(args, p) for p in args.profile),
                 old_count + count + suite.requested(args, 'runtime-call-graph-loops')
@@ -440,7 +449,7 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 29)
+            self.assertEqual(len(sonatina.profile), 30)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -448,7 +457,8 @@ class SuiteTests(unittest.TestCase):
         for profile in ('stateful-storage', 'stateful-storage-rollback', 'stateful-calls', 'stateful-keyed-storage',
                         'stateful-dynamic-array', 'stateful-logs', 'stateful-call-value', 'stateful-bytes',
                         'stateful-forwarded-value', 'stateful-mapping', 'stateful-ledger', 'stateful-long-bytes',
-                        'stateful-nested-array', 'stateful-malformed-calldata', 'stateful-malformed-nested-array'):
+                        'stateful-nested-array', 'stateful-malformed-calldata', 'stateful-malformed-nested-array',
+                        'stateful-malformed-bytes'):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.args('--backend', 'yul', '--profile', 'closed-g0', '--profile', profile)
             with self.assertRaises(ValueError):
@@ -489,7 +499,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 29)
+        self.assertEqual(len(set(seeds.values())), 30)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for profile, seed in seeds.items():
             self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)
@@ -517,7 +527,8 @@ class SuiteTests(unittest.TestCase):
                     "stateful-long-bytes": ("semantic-long-bytes-tool", "rust-hull-keyed-storage-scenario"),
                     "stateful-nested-array": ("semantic-nested-array-tool", "rust-hull-keyed-storage-scenario"),
                     "stateful-malformed-calldata": ("semantic-malformed-calldata-tool", "rust-hull-keyed-storage-scenario"),
-                    "stateful-malformed-nested-array": ("semantic-malformed-nested-array-tool", "rust-hull-keyed-storage-scenario")}
+                    "stateful-malformed-nested-array": ("semantic-malformed-nested-array-tool", "rust-hull-keyed-storage-scenario"),
+                    "stateful-malformed-bytes": ("semantic-malformed-bytes-tool", "rust-hull-keyed-storage-scenario")}
         for profile, (tool, runner) in expected.items():
             command = suite.command(args, profile, self.directory / profile, 10, 64 * 1024**2)
             self.assertEqual(Path(command[command.index("--case-tool") + 1]).name, tool)

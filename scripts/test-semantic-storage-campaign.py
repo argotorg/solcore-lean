@@ -823,6 +823,59 @@ class MalformedNestedArrayCampaignTests(unittest.TestCase):
                 campaign.validate_manifest(invalid)
 
 
+def malformed_bytes_case(rows=None):
+    value = fixtures.malformed_bytes_case() if rows is None else fixtures.malformed_bytes_case(rows)
+    value["malformedBytesPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def malformed_bytes_report(value):
+    histories = fixtures.malformed_bytes_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class MalformedBytesCampaignTests(unittest.TestCase):
+    def test_coverage_names_payload_lengths_malformations_and_std_outcomes(self):
+        value = malformed_bytes_case()
+        self.assertEqual(campaign.dimensions("stateful-malformed-bytes"),
+                         campaign.DIMENSIONS + ("PayloadLengths", "Malformations", "Rejections"))
+        self.assertEqual(campaign.malformed_coverage(value),
+                         {"PayloadLengths": {65}, "Malformations": {"none", "truncate", "padding", "length"},
+                          "Rejections": {"accepted", "0x08638556"}})
+        self.assertEqual(len(campaign.inputs(value)), 3)
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-malformed-bytes"))
+            instance.summary["coverage"].update(requiredPayloadLengths=[0, 65], requiredMalformations=["padding", "offset"])
+            instance.record_coverage(value, "matched", malformed_bytes_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["missingPayloadLengths"], coverage["missingMalformations"]), ([0], ["offset"]))
+
+    def test_a_bytes_rejection_counts_as_a_matched_prefix_and_its_analysis_names_the_selector(self):
+        value = malformed_bytes_case()
+        raw = malformed_bytes_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 5, "completed": 5, "matched": 5})
+        self.assertEqual(campaign.analyze(raw, value)["selectorRows"], [{"id": "tx-2", "index": 2, "selector": "0x08638556"}])
+
+    def test_the_manifest_requires_payload_lengths_and_padding_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-malformed-bytes-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        for change in (lambda m: m.pop("requiredPayloadLengths"), lambda m: m.update(requiredPayloadLengths=[257]),
+                       lambda m: m.update(requiredRevertedPayloadLengths=[0]), lambda m: m.update(requiredLengths=[0]),
+                       lambda m: m.update(requiredMalformations=["row-offset"]), lambda m: m.update(requiredMalformedRows=[0])):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        array = json.loads((ROOT / "scripts/semantic-malformed-calldata-corpus.json").read_text())
+        array["requiredMalformations"] = ["none", "padding"]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(array)
+
+
 def log_case(sites=((1, 2, 1), (3, 0, 2)), rows=((2, 5), (11, 1), (8, fixtures.HIGH_WORD))):
     value = fixtures.log_case(sites, rows)
     value["logPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]

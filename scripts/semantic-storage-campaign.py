@@ -76,6 +76,8 @@ MALFORMED_OUTCOMES = adapter.STD_ERRORS + ("accepted",)
 # malformations target, the malformation kinds and the prescribed std outcomes.
 MALFORMED_NESTED_EXTRA = {"RowCounts": tuple(range(5)), "RowLengths": tuple(range(4)), "MalformedRows": tuple(range(4))}
 MALFORMED_NESTED_DIMENSIONS = DIMENSIONS + tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:]
+# Malformed bytes: the canonical payload lengths, malformation kinds and outcomes.
+MALFORMED_BYTES_DIMENSIONS = DIMENSIONS + ("PayloadLengths",) + MALFORMED_EXTRA[1:]
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -92,6 +94,8 @@ STRAY_SLOT = str(2**256 - 2)
 def dimensions(profile_name):
     if adapter.encoding(adapter.PROFILES[profile_name]) == "nested":
         return MALFORMED_NESTED_DIMENSIONS
+    if adapter.encoding(adapter.PROFILES[profile_name]) == "bytes":
+        return MALFORMED_BYTES_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -124,13 +128,17 @@ def bytes_coverage(case, statuses):
 
 def malformed_coverage(case):
     """Canonical lengths, malformation kinds and prescribed std outcomes; for
-    nested values, outer and row lengths and the rows row malformations target."""
+    nested values, outer and row lengths and the rows row malformations target;
+    for bytes, payload lengths."""
     transactions = case["transactions"]
-    shapes = {"Lengths": {len(tx["values"]) for tx in transactions}}
     if adapter.has_malformed_nested(case):
         values = [adapter.malformed_nested_values(tx) for tx in transactions]
         shapes = {"RowCounts": {len(value) for value in values}, "RowLengths": {len(row) for value in values for row in value},
                   "MalformedRows": {tx["malformation"]["row"] for tx in transactions if "row" in tx["malformation"]}}
+    elif adapter.has_malformed_bytes(case):
+        shapes = {"PayloadLengths": {len(adapter.payload(tx)) for tx in transactions}}
+    else:
+        shapes = {"Lengths": {len(tx["values"]) for tx in transactions}}
     return {**shapes, "Malformations": {tx["malformation"]["kind"] for tx in transactions},
             "Rejections": {tx["stdRejection"] or "accepted" for tx in transactions}}
 
@@ -165,6 +173,8 @@ def inputs(case):
     arrays, or every zero-padded payload chunk the bytes step folds."""
     if adapter.has_malformed_nested(case):
         return {str(value) for tx in case["transactions"] for row in adapter.malformed_nested_values(tx) for value in row}
+    if adapter.has_malformed_bytes(case):
+        return {str(chunk) for tx in case["transactions"] for chunk in adapter.payload_chunks(tx)}
     if adapter.profile(case)["abi"] in ("array", "malformed"):
         return {value for tx in case["transactions"] for value in tx["values"]}
     if adapter.has_nested(case):
@@ -308,14 +318,16 @@ def validate_manifest(manifest):
     if selected["abi"] != "ledger" and any("required" + dimension in manifest for dimension in LEDGER_EXTRA):
         raise ValueError("sender coverage belongs to the ledger profile")
     nested_malformed = selected["abi"] == "malformed" and adapter.encoding(selected) == "nested"
-    if selected["abi"] in ("array", "malformed") and not nested_malformed:
+    bytes_malformed = selected["abi"] == "malformed" and adapter.encoding(selected) == "bytes"
+    if selected["abi"] == "array" or (selected["abi"] == "malformed" and adapter.encoding(selected) == "array"):
         lengths = manifest.get("requiredLengths")
         if not isinstance(lengths, list) or not lengths or any(type(v) is not int or v not in ARRAY_LENGTHS for v in lengths) or len(set(lengths)) != len(lengths):
             raise ValueError("dynamic-array coverage requires unique lengths from zero to three")
     elif "requiredLengths" in manifest:
         raise ValueError("length coverage belongs to the dynamic-array profiles")
     if selected["abi"] == "malformed":
-        kinds = adapter.NESTED_MALFORMATION_KINDS if nested_malformed else adapter.MALFORMATION_KINDS
+        kinds = (adapter.NESTED_MALFORMATION_KINDS if nested_malformed else
+                 adapter.BYTES_MALFORMATION_KINDS if bytes_malformed else adapter.MALFORMATION_KINDS)
         for dimension, allowed in (("Malformations", kinds), ("Rejections", MALFORMED_OUTCOMES)):
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(v not in allowed for v in values) or len(set(values)) != len(values):
@@ -344,6 +356,12 @@ def validate_manifest(manifest):
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(type(v) is not int or not 0 <= v <= bound for v in values) or len(set(values)) != len(values):
                 raise ValueError(f"bytes coverage requires unique required{dimension} from zero to {bound}")
+    elif bytes_malformed:
+        values = manifest.get("requiredPayloadLengths")
+        if not isinstance(values, list) or not values or any(type(v) is not int or not 0 <= v <= 256 for v in values) or len(set(values)) != len(values):
+            raise ValueError("malformed-bytes coverage requires unique requiredPayloadLengths from zero to 256")
+        if "requiredRevertedPayloadLengths" in manifest:
+            raise ValueError("reverted payload coverage belongs to the bytes profiles")
     elif any("required" + dimension in manifest for dimension in BYTES_EXTRA):
         raise ValueError("payload coverage belongs to the bytes profile")
     if selected["abi"] == "nested" or nested_malformed:
@@ -514,7 +532,7 @@ def keyed_analysis(analysis):
                                                 adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
                                                 adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
-                                                adapter.MALFORMED_NESTED_HISTORY_SCHEMA)
+                                                adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -740,8 +758,9 @@ class Campaign:
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
-                          "malformed": (tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:]
-                                        if adapter.encoding(self.specification) == "nested" else MALFORMED_EXTRA)}.get(
+                          "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
+                                        "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
+                                            adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(
                               self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()

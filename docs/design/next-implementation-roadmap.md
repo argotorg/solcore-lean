@@ -2303,6 +2303,71 @@ and native tools frozen on `bc2932d19`:
   - no seed was excluded.
 - A case took about 8.5 seconds. There was no finding.
 
+**Malformed bytes.** The `stateful-malformed-bytes` profile sends malformed
+calldata to the long-bytes contract, with the same selector rule, narrowing
+and `selectorRows`. The definitions were fixed before execution:
+
+- Contract: the long-bytes step, emitted source and Hull runner are reused, so
+  the compiled contract is the long-bytes one (`run(uint256,bytes)`,
+  `0x220eb9b6`, a `memory<bytes>` parameter). Its original Core contract is a
+  new wrapper, `core-malformed-bytes-contract-v1`: std's dispatch and head
+  checks through the same input host functions, std's payload check, then the
+  long-bytes protocol on the decoded payload.
+- Reference semantics, from `dispatch.sol` and `std.sol` (`decodeBytesLike`,
+  `CalldataWordReader`, `checkReaderRange`):
+  1. Dispatch and the head are checked as for malformed calldata, with this
+     selector: with tail offset `o`, `o > size - 4` or fewer than 32 bytes at
+     `4 + o` reverts with `0x08638556`.
+  2. With payload length `L`, the Word at `4 + o`, the call reverts with
+     `0x08638556` when `L > size - (36 + o)`. std's later
+     `require(length <= ~0 - 63)` can then no longer fail, so a length above
+     `~0 - 63` is rejected by the first check, with the same selector.
+  3. std copies the length Word and the `L` payload bytes into memory and
+     zeroes the padding there. The calldata padding is neither required nor
+     read: a cut inside it is accepted and nonzero padding is ignored.
+  4. The body reads only memory, so it adds no std check. It folds chunk
+     `k < 8` when `L > 32k`, stores the last payload byte and the running
+     length, and returns or reverts with the slots' sum plus the actual
+     calldata size.
+  A std rejection reverts with exactly its four selector bytes and commits
+  nothing. `0xb5988ea3` cannot arise, because no transaction carries value,
+  and the body never indexes the payload.
+- In Core, chunk `k` is the aligned calldata Word at `36 + o + 32k` masked to
+  the payload. When a cut in the padding leaves that Word incomplete, chunk `k`
+  is instead the Word that ends at the last payload byte, which always exists
+  once std's check has passed, shifted left to the chunk's start.
+- Malformations, one per transaction and at most 1 KiB of calldata: the
+  malformed-calldata kinds and banks (none, short, selector, truncate,
+  trailing, offset, length), and padding.
+  - Truncation cuts inside the head, the length Word, the last payload byte,
+    the padding, the last Word or the last byte.
+  - Lengths are one too long (inside the padding when there is padding), the
+    most that fits, one more than fits, `2^256 - 63` (above `~0 - 63`),
+    `2^256 - 1`, `2^255`, one shorter, and zero.
+  - Padding is `0xff`, a ramp, or a single `0x01` in the last padding byte; it
+    needs a payload that does not fill its last Word.
+  Each transaction records its malformation, its calldata and std's
+  prescribed outcome, from a second std model written over the bytes.
+- Golden cases come before any random run. They cover every kind and std's
+  padding rules: a cut inside the padding and nonzero padding are accepted, a
+  cut inside the payload is rejected, and a length may run into the padding.
+  They also check the decode order. An accepted case must behave exactly like
+  the canonical long-bytes contract on the decoded payload, except that its
+  result counts the actual calldata size.
+- Observations: as for long bytes — status, output, slots 0 to 10 and the
+  whole committed storage — compared per prefix.
+- Generation: the long-bytes canonical blocks, each transaction drawing a
+  malformation kind and parameter from a separate high-bit stream. A kind
+  whose bank is empty for the payload, such as padding for a whole number of
+  Words, sends the canonical calldata.
+- Reduction:
+  - one-transaction removals first, then step reductions;
+  - then, per transaction: no malformation, then simpler parameters of the
+    same kind;
+  - then shorter bank payloads, a zeroed payload and the flags reductions.
+- Exclusions: gas, value-bearing transactions, calldata over 1 KiB, malformed
+  constructor calldata, and memory.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

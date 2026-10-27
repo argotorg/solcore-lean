@@ -3281,6 +3281,105 @@ transactions with different steps: 67 rows were compared by selector, 61
 transactions were accepted, and no seed was excluded. A case took about 8.5
 seconds. Neither run produced a finding.
 
+## Compare malformed bytes
+
+`stateful-malformed-bytes` sends the long-bytes contract,
+`run(uint256 flags, bytes payload)`, calldata with one malformation per
+transaction and compares the three paths against the pinned std's dispatcher
+and `bytes` decoder. The compiled contract is the long-bytes one, emitted from
+the same step, and the declared-slot Hull runner serves it unchanged. The
+selector rule, its narrowing and `selectorRows` are exactly those of
+`stateful-malformed-calldata`.
+
+### Definitions
+
+The original Core contract `core-malformed-bytes-contract-v1` evaluates std's
+checks on the actual calldata through the same input host functions:
+
+1. Dispatch and the head are checked as for malformed calldata, with the
+   selector `0x220eb9b6`: with tail offset `o`, `o > size - 4` or fewer than
+   32 bytes at `4 + o` reverts with `0x08638556`.
+2. With payload length `L`, the Word at `4 + o`, `L > size - (36 + o)`
+   reverts with `0x08638556` (`decodeBytesLike`'s advance over the payload).
+   std's later `require(length <= ~0 - 63)` can then no longer fail, so a
+   length above `~0 - 63` is rejected by the first check with the same
+   selector.
+3. std copies the length Word and the payload into memory and zeroes the
+   padding there, so the calldata padding is neither required nor read: a cut
+   inside it is accepted and nonzero padding is ignored.
+4. The body reads memory only. It folds chunk `k < 8` when `L > 32k`, writes
+   the last payload byte and the running length, and returns or reverts with
+   the slots' sum plus the actual calldata size.
+
+Core reads chunk `k` as the aligned calldata Word at `36 + o + 32k`, masked to
+the payload. When a cut inside the padding leaves that Word incomplete, it
+reads the Word that ends at the last payload byte instead, shifted left to the
+chunk's start; that Word exists once std's check has passed.
+`NonPayableReceivedValue()` cannot arise, since no transaction carries value.
+
+Each transaction records `{id, flags, payload, malformation, calldata,
+stdRejection, value}`. The malformation is one of the malformed-calldata kinds
+(`none`, `short`, `selector`, `truncate`, `trailing`, `offset`, `length`) or
+`padding`. The banks are:
+- `truncate`: cuts inside the head, the length Word, the last payload byte,
+  the padding, the last Word or the last byte;
+- `length`: one too long, the most that fits, one more than fits,
+  `2^256 - 63`, `2^256 - 1`, `2^255`, one shorter, and zero;
+- `padding`: `ones`, `ramp` or `last-byte`, for a payload that does not fill
+  its last Word.
+A kind whose bank is empty for a payload sends the canonical calldata. The
+adapter checks the calldata and the outcome with its own encoder and a third
+model, `bytes_std_decode`. A returned row must also follow the long-bytes
+protocol on the decoded payload: its length goes to slot 9 and its last byte
+to slot 10, and the row returns the committed sum plus the actual calldata
+size.
+
+Reductions remove transactions first and then reduce the step. For each
+transaction they then replace the malformation with `none`, try simpler
+malformations of the same kind, and finally shorten the payload to a bank
+length, zero it and reduce the flags. Gas, value-bearing malformations,
+malformed constructor calldata, calldata over 1 KiB and memory are out of
+scope.
+
+### Running and validation
+
+```sh
+lake build semanticMalformedBytesTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-malformed-bytes-corpus.json \
+  --output .upstream/semantic-malformed-bytes-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-malformed-bytes \
+  --cases 16 --output .upstream/semantic-malformed-bytes-random
+```
+
+Plans use `solcore-lean.malformed-bytes-plan.v1` under `malformedBytesPlan`.
+Cases use `solcore-lean.semantic-malformed-bytes-case.v1` and histories
+`solcore-lean.malformed-bytes-history.v1`. The wrapper keeps 211 Core nodes
+inside the step budget. Its 416 nodes of chunk guards lie outside it, as the
+long-bytes guards do. The suite's default budget is 448 nodes, which leaves 237
+for the step.
+
+`Solcore/Test/SourceMalformedBytesGolden.lean` checks the wrapper and
+`stdDecode` against 40 golden cases written out from the std reading: 34
+malformations and six decode-order cases. They cover every malformation kind
+and std's padding rules: cuts inside the padding and nonzero padding are
+accepted, a cut inside the payload is rejected, and lengths may run into the
+padding. The offset overlaps differ from the array's: offset 0 decodes the
+flags as a two-byte length, and offset 32 decodes the original length Word as
+a 32-byte payload. Each accepted case must behave exactly like the canonical
+long-bytes contract on the decoded payload, except that its result counts the
+actual calldata size.
+
+The fixed corpus has thirteen scenarios and 36 transactions: eight imported
+scenarios, which reuse the long-bytes corpus steps and payloads with one
+malformation per transaction, and five generated seeds. Its expected histories
+were computed without the std wrapper, from `stdDecode` and the canonical
+long-bytes contract. Required coverage:
+- every malformation kind, both std selectors and acceptance;
+- all twelve bank payload lengths and the six boundary Words as chunks;
+- one to three helpers and transactions, all four templates, both outcomes
+  and eight completion patterns.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The ten

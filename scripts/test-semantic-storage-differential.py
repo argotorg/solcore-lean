@@ -2884,5 +2884,146 @@ class MalformedNestedArrayTests(unittest.TestCase):
         self.assertFalse(runner.conforms(value, value["transactions"][3], changed["directCore"]["transactions"][3], prior))
         self.assertNotEqual(runner.compare(changed, value)["category"], "matched")
 
+
+MALFORMED_BYTES_SELECTOR = "0x220eb9b6"
+RAMP_65 = bytes(range(1, 66))
+
+
+def malformed_bytes_tx(index, flags, data, malformation):
+    tx = {"id": f"tx-{index}", "flags": str(flags), "payload": "0x" + data.hex(), "malformation": malformation, "value": "0"}
+    calldata = runner.malformed_bytes_calldata(MALFORMED_BYTES_SELECTOR, tx)
+    return {**tx, "calldata": "0x" + calldata.hex(), "stdRejection": runner.bytes_std_decode(calldata, MALFORMED_BYTES_SELECTOR)[0]}
+
+
+def malformed_bytes_case(rows=((0, RAMP_65, {"kind": "none"}), (0, RAMP_65, {"kind": "truncate", "kept": 180}),
+                               (0, RAMP_65, {"kind": "truncate", "kept": 164}), (0, RAMP_65, {"kind": "padding", "pattern": "ramp"}),
+                               (1, RAMP_65, {"kind": "length", "value": "66"}))):
+    """Envelope fixture only: native replay checks the actual std-modeling program."""
+    return {"schema": runner.MALFORMED_BYTES_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "malformedBytesPlan": {"schema": "solcore-lean.malformed-bytes-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(11)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedLongBytes", "method": "run", "signature": "run(uint256,bytes)",
+            "selector": MALFORMED_BYTES_SELECTOR, "deployPath": ["SynthesizedLongBytesDeploy"],
+            "runtimePath": ["SynthesizedLongBytesDeploy", "SynthesizedLongBytes"], "constructorCalldata": "0x"},
+        "transactions": [malformed_bytes_tx(index, *row) for index, row in enumerate(rows)]}
+
+
+def malformed_bytes_slots(values):
+    return [{"slot": str(index), "value": str(value)} for index, value in enumerate(values)]
+
+
+def malformed_bytes_history(value, path):
+    """Rows that follow the long-bytes protocol on the payload std decodes:
+    slot nine counts decoded bytes, slot ten holds the last one, and a returned
+    value adds the actual calldata size. A std rejection reverts with its
+    selector, as a Word on original Core and as four bytes on Hull and EVM; odd
+    flags revert."""
+    rows, prior = [], [0] * 11
+    for index, tx in enumerate(value["transactions"]):
+        data = bytes.fromhex(tx["calldata"][2:])
+        rejection, decoded = runner.bytes_std_decode(data, MALFORMED_BYTES_SELECTOR)
+        reverted = rejection is not None or int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else [index + 10] + [index + 20 + slot for slot in range(8)] + [
+            prior[9] + len(decoded), decoded[-1] if decoded else 0]
+        output = "0x" + f"{(committed[0] + committed[9] + committed[10] + len(data)) if not reverted else index + 3:064x}"
+        if rejection is not None:
+            output = selector_word(rejection) if path == "directCore" else rejection
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned", "output": output,
+               "committedStorage": malformed_bytes_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.MALFORMED_BYTES_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": malformed_bytes_slots([0] * 11), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def malformed_bytes_histories(value=None):
+    value = malformed_bytes_case() if value is None else value
+    return {path: malformed_bytes_history(value, path) for path in runner.PATHS}
+
+
+class MalformedBytesTests(unittest.TestCase):
+    def test_a_bytes_case_records_its_malformation_calldata_and_std_outcome(self):
+        value = malformed_bytes_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
+                          runner.encoding(selected), selected["shrinkBatch"]),
+                         ("semantic-malformed-bytes-tool", "rust-hull-keyed-storage-scenario", True, "malformed", "bytes", 16))
+        self.assertTrue(runner.has_malformed_bytes(value) and runner.is_malformed(value))
+        self.assertFalse(runner.has_bytes(value) or runner.has_malformed_nested(value))
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(11)))
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [None, None, runner.STD_TRUNCATED, None, None])
+        self.assertEqual(value["transactions"][3]["calldata"][-62:], bytes(range(1, 32)).hex())
+        self.assertIn("compared by its error selector", runner.scope(value))
+        self.assertIn("run(uint256,bytes)", runner.scope(value))
+        for key, changed in (("calldata", value["transactions"][0]["calldata"]), ("stdRejection", None), ("value", "1"),
+                             ("payload", "0x" + bytes(257).hex()), ("payload", "0x0"),
+                             ("malformation", {"kind": "padding", "pattern": "twos"}),
+                             ("malformation", {"kind": "padding", "pattern": "ones", "count": 1}),
+                             ("malformation", {"kind": "row-offset", "row": 0, "value": "0"}),
+                             ("malformation", {"kind": "truncate", "kept": 196})):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][2][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # Padding needs padding bytes.
+        with self.assertRaises(ValueError):
+            malformed_bytes_tx(0, 0, bytes(64), {"kind": "padding", "pattern": "ones"})
+
+    def test_the_bytes_byte_model_follows_std_decoding(self):
+        """The golden decisions of the Lean model, from the pinned dispatch.sol and std.sol."""
+        decode = lambda data, malformation: runner.bytes_std_decode(
+            bytes.fromhex(malformed_bytes_tx(0, 2, data, malformation)["calldata"][2:]), MALFORMED_BYTES_SELECTOR)
+        cases = [(RAMP_65, {"kind": "none"}, (None, RAMP_65)),
+                 (RAMP_65, {"kind": "short", "bytes": 3}, (runner.STD_NO_SELECTOR, b"")),
+                 (RAMP_65, {"kind": "truncate", "kept": 99}, (runner.STD_TRUNCATED, b"")),
+                 (RAMP_65, {"kind": "truncate", "kept": 164}, (runner.STD_TRUNCATED, b"")),
+                 (RAMP_65, {"kind": "truncate", "kept": 165}, (None, RAMP_65)),
+                 (RAMP_65, {"kind": "offset", "value": "0"}, (None, bytes(2))),
+                 (RAMP_65, {"kind": "offset", "value": "32"}, (None, bytes(31) + bytes([65]))),
+                 (RAMP_65, {"kind": "offset", "value": str(2**256 - 4)}, (runner.STD_TRUNCATED, b"")),
+                 (RAMP_65, {"kind": "length", "value": "66"}, (None, RAMP_65 + bytes(1))),
+                 (RAMP_65, {"kind": "length", "value": "96"}, (None, RAMP_65 + bytes(31))),
+                 (RAMP_65, {"kind": "length", "value": "97"}, (runner.STD_TRUNCATED, b"")),
+                 (RAMP_65, {"kind": "length", "value": str(2**256 - 63)}, (runner.STD_TRUNCATED, b"")),
+                 (RAMP_65, {"kind": "length", "value": "0"}, (None, b"")),
+                 (RAMP_65, {"kind": "padding", "pattern": "ones"}, (None, RAMP_65)),
+                 (bytes(range(1, 65)), {"kind": "length", "value": "65"}, (runner.STD_TRUNCATED, b""))]
+        for data, malformation, expected in cases:
+            with self.subTest(malformation=malformation):
+                self.assertEqual(decode(data, malformation), expected)
+
+    def test_the_selector_rule_applies_to_bytes_rejections(self):
+        value = malformed_bytes_case()
+        result = runner.compare(malformed_bytes_histories(value), value)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["selectorRows"], [{"id": "tx-2", "index": 2, "selector": runner.STD_TRUNCATED}])
+        observed = malformed_bytes_histories(value)
+        observed["rustEvm"]["transactions"][2]["output"] = selector_word(runner.STD_TRUNCATED)
+        self.assertEqual(runner.compare(observed, value)["category"], "semantic-mismatch")
+
+    def test_a_returned_bytes_row_follows_the_protocol_on_the_decoded_payload(self):
+        value = malformed_bytes_case()
+        histories = malformed_bytes_histories(value)
+        rows = histories["directCore"]["transactions"]
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, {**rows[index], "output": tx["stdRejection"] or rows[index]["output"]}, prior))
+        # A result that counts the canonical calldata size instead of the cut one breaks the protocol on every path.
+        changed = malformed_bytes_histories(value)
+        for path in runner.PATHS:
+            row = changed[path]["transactions"][1]
+            row["output"] = "0x" + f"{int(row['output'], 16) + 16:064x}"
+        prior = changed["directCore"]["transactions"][0]["committedStorage"]
+        self.assertFalse(runner.conforms(value, value["transactions"][1], changed["directCore"]["transactions"][1], prior))
+        self.assertNotEqual(runner.compare(changed, value)["category"], "matched")
+
 if __name__ == "__main__":
     unittest.main()
