@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback and keyed-storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, and direct calls at expression roots closed by one size induction over a family of rows; nested calls, the public connection of call-containing bodies, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch` and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch`, nested memory and termination calls and the word operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero` connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -1666,17 +1666,21 @@ statement changes.
 Inline Yul is connected for statement lists: `let` with one name and an
 optional value, assignment to one name, expression statements, nested blocks,
 `if` and `switch`, over literals, Yul and Hull word locals and nested calls of
-`mload`, `msize`, `mstore`, `mstore8`, `return` and `revert`. Arguments are
+`mload`, `msize`, `mstore`, `mstore8`, `return` and `revert` and of the word
+operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero`. Arguments are
 evaluated from right to left, which nested calls with effects observe; the
 locals of a nested body end with it, and a `return` or fault in a nested body
 stops the block. A separate assembly obligation, which only the call-mode layer
 discharges, connects the actual `YulLowering` builders by induction over the
 source derivation; the builders are public for the proof, a visibility-only
-change. Four independent source scenarios reach the call-mode theorem with
-runtime checks: one whose returned word depends on the argument order, one
-that assigns and reads a Hull local, one with `if` and a nested block and one
-with two `switch` statements, besides the four one-call scenarios. `for` with
-`break` and `continue`, local functions, multi-name `let` and assignment,
+change. The effect builtins go through the frame model's `BuiltinStep`; the
+word operations compile to pure Core primitives, which one proof covers for
+every model. Five independent source scenarios reach the call-mode theorem
+with runtime checks: one whose returned word depends on the argument order, one
+that assigns and reads a Hull local, one with `if` and a nested block, one
+with two `switch` statements, and one that uses all six word operations,
+including a subtraction that wraps, besides the four one-call scenarios. `for`
+with `break` and `continue`, local functions, multi-name `let` and assignment,
 string literals and other builtins remain in assembly, followed by object
 linking; the Hull design document lists what `for` needs.
 
