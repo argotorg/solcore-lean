@@ -41,83 +41,91 @@ private def fuelValue (rest : List String) : IO Nat := do
   | [fuel] => natural "execution fuel" fuel 10000000
   | _ => throw (IO.userError "too many arguments")
 
-/-- The G0-based generation commands. -/
-private def g0Generator (command : String) :
-    Option (Seed → Nat → Nat → Nat → Nat → GeneratorRevision → Json) :=
+/-- A generation command and the options it accepts after its five arguments. -/
+private structure Generator where
+  g0 : Bool
+  runtimeInput : Bool
+  run : Seed → Nat → Nat → Nat → Nat → GeneratorRevision → InputSelection → Json
+
+private def generator (command : String) : Option Generator :=
   match command with
-  | "generate" => some fun seed nodes count attempts fuel revision =>
-      generateCases seed nodes count attempts fuel revision
-  | "input-generate" => some fun seed nodes count attempts fuel revision =>
-      Input.generateCases seed nodes count attempts fuel revision
-  | "primitive-generate" => some fun seed nodes count attempts fuel revision =>
-      Primitive.generateCases seed nodes count attempts fuel revision
-  | "function-generate" => some fun seed nodes count attempts fuel revision =>
-      Function.generateCases seed nodes count attempts fuel revision
-  | "mutation-generate" => some fun seed nodes count attempts fuel revision =>
-      Mutation.generateCases seed nodes count attempts fuel revision
-  | "aggregate-generate" => some fun seed nodes count attempts fuel revision =>
-      Aggregate.generateCases seed nodes count attempts fuel revision
-  | "loop-generate" => some fun seed nodes count attempts fuel revision =>
-      Loop.generateCases seed nodes count attempts fuel revision
-  | "generic-generate" => some fun seed nodes count attempts fuel revision =>
-      Generic.generateCases seed nodes count attempts fuel revision
-  | "closure-generate" => some fun seed nodes count attempts fuel revision =>
-      Closure.generateCases seed nodes count attempts fuel revision
-  | "comptime-generate" => some fun seed nodes count attempts fuel revision =>
-      Comptime.generateCases seed nodes count attempts fuel revision
-  | "module-generate" => some fun seed nodes count attempts fuel revision =>
-      Modules.generateCases seed nodes count attempts fuel revision
+  | "generate" => some ⟨true, false,
+      fun seed nodes count attempts fuel revision _ =>
+        generateCases seed nodes count attempts fuel revision⟩
+  | "input-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Input.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "primitive-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Primitive.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "call-graph-generate" => some ⟨false, true,
+      fun seed nodes count attempts fuel _ inputs =>
+        CallGraph.generateCases seed nodes count attempts fuel inputs⟩
+  | "call-graph-loop-generate" => some ⟨false, true,
+      fun seed nodes count attempts fuel _ inputs =>
+        CallGraphLoop.generateCases seed nodes count attempts fuel inputs⟩
+  | "aggregate-call-graph-generate" => some ⟨false, true,
+      fun seed nodes count attempts fuel _ inputs =>
+        AggregateCallGraph.generateCases seed nodes count attempts fuel inputs⟩
+  | "function-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Function.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "mutation-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Mutation.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "aggregate-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Aggregate.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "loop-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Loop.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "generic-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Generic.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "closure-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Closure.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "comptime-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Comptime.generateCases seed nodes count attempts fuel revision inputs⟩
+  | "module-generate" => some ⟨true, true,
+      fun seed nodes count attempts fuel revision inputs =>
+        Modules.generateCases seed nodes count attempts fuel revision inputs⟩
   | _ => none
 
-/-- A trailing generator version selects the G0 revision; without one, the
-commands keep `v1`, which the fixed corpora pin. -/
-private def g0Revision : List String → IO GeneratorRevision
-  | [] => pure .v1
-  | [version] => match GeneratorRevision.ofVersion? version with
-      | some revision => pure revision
-      | none => throw (IO.userError "unknown G0 generator version")
-  | _ => throw (IO.userError "too many arguments")
+/-- Each option appears at most once. A G0 generator version selects the G0
+revision of a G0-based command, `v1` by default; the seeded input selection
+applies to runtime-input commands, `boundary` by default. Fixed corpora use
+both defaults. -/
+private def generationOptions (spec : Generator) (options : List String) :
+    IO (GeneratorRevision × InputSelection) := do
+  let mut revision : Option GeneratorRevision := none
+  let mut inputs : Option InputSelection := none
+  for option in options do
+    if let some value := GeneratorRevision.ofVersion? option then
+      unless spec.g0 && revision.isNone do
+        throw (IO.userError s!"unexpected G0 generator version {option}")
+      revision := some value
+    else if let some value := InputSelection.ofVersion? option then
+      unless spec.runtimeInput && inputs.isNone do
+        throw (IO.userError s!"unexpected input selection {option}")
+      inputs := some value
+    else throw (IO.userError s!"unknown generation option {option}")
+  return (revision.getD .v1, inputs.getD .boundary)
 
 private def execute (args : List String) : IO Json := do
-  if let command :: seed :: nodes :: count :: attempts :: fuel :: version := args then
-    if let some generator := g0Generator command then
-      if version.length ≤ 1 then
+  if let command :: seed :: nodes :: count :: attempts :: fuel :: options := args then
+    if let some spec := generator command then
+      if options.length ≤ 2 then
         let count ← natural "case count" count 1024
         unless count > 0 do throw (IO.userError "case count must be positive")
-        return generator (Seed.ofNat (← natural "seed" seed (2 ^ 64 - 1)))
-          (← natural "node budget" nodes 512)
-          count
-          (← natural "attempt limit" attempts 10000)
-          (← natural "execution fuel" fuel 10000000)
-          (← g0Revision version)
+        let seed := Seed.ofNat (← natural "seed" seed (2 ^ 64 - 1))
+        let nodes ← natural "node budget" nodes 512
+        let attempts ← natural "attempt limit" attempts 10000
+        let fuel ← natural "execution fuel" fuel 10000000
+        let (revision, inputs) ← generationOptions spec options
+        return spec.run seed nodes count attempts fuel revision inputs
   match args with
-  | ["aggregate-call-graph-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return AggregateCallGraph.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["call-graph-loop-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return CallGraphLoop.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
-  | ["call-graph-generate", seed, nodes, count, attempts, fuel] =>
-      let count ← natural "case count" count 1024
-      unless count > 0 do throw (IO.userError "case count must be positive")
-      return CallGraph.generateCases (Solcore.Synthesis.Core.Seed.ofNat
-        (← natural "seed" seed (2 ^ 64 - 1)))
-        (← natural "node budget" nodes 512)
-        count
-        (← natural "attempt limit" attempts 10000)
-        (← natural "execution fuel" fuel 10000000)
   | "emit" :: file :: rest =>
       let checked ← get (checkedProgram (← readJson file))
       get ((emitCase checked (Json.mkObj [("kind", toJson "imported")])
@@ -291,7 +299,7 @@ private def execute (args : List String) : IO Json := do
           AggregateCallGraph.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|call-graph-generate|call-graph-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands] [seeded-inputs-v1/splitmix64, not for generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|call-graph-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

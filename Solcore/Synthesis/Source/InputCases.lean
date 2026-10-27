@@ -1,4 +1,5 @@
 import Solcore.Synthesis.Source.Cases
+import Solcore.Synthesis.Source.InputSelection
 import Solcore.Synthesis.Source.InputEmitter
 
 /-! Runtime-input cases retain an applied original Core lambda. Input selection
@@ -131,7 +132,8 @@ def inputSensitive (function : CheckedWordFunction) (fuel : Nat) : Except String
 /-- Attempt limits count functions; case limits count individual runtime inputs.
 One accepted function emits the fixed four inputs in order, truncated by count. -/
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Json := Id.run do
+    (revision : GeneratorRevision := .v1) (inputSelection : InputSelection := .boundary) :
+    Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -153,7 +155,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
             ("code", toJson (if resource then "boundary-out-of-fuel" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (generated, literalIndex, function, emitted) =>
-          for (input, inputIndex) in boundaryInputs.zipIdx do
+          for (input, inputIndex) in (inputSelection.inputs boundaryInputs seed).zipIdx do
             if cases.size < count then
               let origin := Json.mkObj [
                 ("kind", toJson "input-generated"),
@@ -162,7 +164,8 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
                 ("maxProgramNodes", toJson generated.maxProgramNodes),
                 ("literalIndex", toJson literalIndex), ("inputIndex", toJson inputIndex),
                 ("validationFuel", toJson fuel)]
-              cases := cases.push (makeCase function input emitted origin fuel revision)
+              cases := cases.push
+                (makeCase function input emitted (inputSelection.record origin) fuel revision)
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -204,7 +207,8 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless (← origin.getObjValAs? String "finalSeed") = toString generated.finalSeed.toNat do
       throw "saved final seed differs from generation"
     let inputIndex ← origin.getObjValAs? Nat "inputIndex"
-    unless boundaryInputs[inputIndex]? = some admitted.input do
+    let inputSelection ← InputSelection.ofOrigin origin
+    unless (inputSelection.inputs boundaryInputs (Seed.ofNat seed))[inputIndex]? = some admitted.input do
       throw "saved input differs from its boundary index"
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"

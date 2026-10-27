@@ -145,7 +145,8 @@ def inputSensitive (function : Aggregates.CheckedDAG) (fuel : Nat) : Except Stri
 
 /-- Attempts count complete graph candidates. Accepted graphs yield up to eight
 cases in fixed input order. Fuel exhaustion is an inconclusive exclusion. -/
-def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json := Id.run do
+def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
+    (inputSelection : InputSelection := .boundary) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -168,11 +169,12 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
             ("code", toJson (if resource then "boundary-out-of-fuel" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (function, origin, emitted) =>
-          for (input, inputIndex) in boundaryInputs.zipIdx do
+          for (input, inputIndex) in (inputSelection.inputs boundaryInputs seed).zipIdx do
             if cases.size < count then
               let origin := (origin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
                 "validationFuel" (toJson fuel)
-              cases := cases.push (makeCase function input emitted origin fuel)
+              cases := cases.push
+                (makeCase function input emitted (inputSelection.record origin) fuel)
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -212,14 +214,15 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless Wire.encodeProgram function.program == Wire.encodeProgram admitted.function.program do
       throw "saved aggregate graph differs from its generation seed"
     let inputIndex ← origin.getObjValAs? Nat "inputIndex"
-    unless boundaryInputs[inputIndex]? = some admitted.input do
+    let inputSelection ← InputSelection.ofOrigin origin
+    unless (inputSelection.inputs boundaryInputs (Seed.ofNat seed))[inputIndex]? = some admitted.input do
       throw "saved input differs from its boundary index"
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
     inputSensitive function validationFuel
     let canonicalOrigin := (expectedOrigin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
       "validationFuel" (toJson validationFuel)
-    unless origin == canonicalOrigin do throw "generated aggregate graph provenance is not canonical"
+    unless origin == inputSelection.record canonicalOrigin do throw "generated aggregate graph provenance is not canonical"
   else if kind = "imported" then
     unless origin == Json.mkObj [("kind", toJson "imported")] do
       throw "imported aggregate graph provenance is not canonical"

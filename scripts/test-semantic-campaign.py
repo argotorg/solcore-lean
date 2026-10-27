@@ -603,7 +603,8 @@ class ManifestTests(unittest.TestCase):
 
                 instance.tool = tool
                 instance.prepare_cases()
-                self.assertEqual(calls, [([command, '1', '16', '2', '16', '1000', campaign.RANDOM_G0_VERSION], 'generation')])
+                inputs = [campaign.RANDOM_INPUT_SELECTION] if profile in campaign.RUNTIME_INPUT_PROFILES else []
+                self.assertEqual(calls, [([command, '1', '16', '2', '16', '1000', campaign.RANDOM_G0_VERSION, *inputs], 'generation')])
 
     def test_secondary_finding_archive_survives_work_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1493,7 +1494,8 @@ class PrimitiveCoverageTests(unittest.TestCase):
             with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(output), '--profile', 'runtime-primitives', '--cases', '1']), \
                     patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
                 campaign.main()
-            self.assertEqual(seen, [(['primitive-generate', '1', '96', '1', '512', '1000000', campaign.RANDOM_G0_VERSION], 'generation')])
+            self.assertEqual(seen, [(['primitive-generate', '1', '96', '1', '512', '1000000', campaign.RANDOM_G0_VERSION,
+                                      campaign.RANDOM_INPUT_SELECTION], 'generation')])
 
     def test_primitive_execution_and_shrink_keep_every_backend(self):
         for backend in campaign.m2.BACKENDS:
@@ -1652,7 +1654,7 @@ class CallGraphCoverageTests(unittest.TestCase):
                 with patch.object(sys, 'argv', ['semantic-campaign', '--output', str(Path(directory)/'run'),
                         '--profile', 'runtime-call-graphs', '--cases', '1', *extra]),                         patch.object(campaign.Campaign, 'run', run), redirect_stdout(io.StringIO()):
                     campaign.main()
-                self.assertEqual(seen, [['call-graph-generate', '1', *expected, '1000000']])
+                self.assertEqual(seen, [['call-graph-generate', '1', *expected, '1000000', campaign.RANDOM_INPUT_SELECTION]])
 
     def test_call_graph_shrink_keeps_schema_backend_and_explicit_synthetic_separation(self):
         for backend in campaign.m2.BACKENDS:
@@ -2181,7 +2183,7 @@ class CallGraphLoopCoverageTests(unittest.TestCase):
                                 (['--nodes', '39'], ['39', '1', '256']), (['--nodes', '512'], ['512', '1', '256'])):
             with self.subTest(extra=extra):
                 args, seen = self.run_main('--profile', self.PROFILE, '--cases', '1', *extra)
-                self.assertEqual(seen, [['call-graph-loop-generate', '1', *expected, '1000000']])
+                self.assertEqual(seen, [['call-graph-loop-generate', '1', *expected, '1000000', campaign.RANDOM_INPUT_SELECTION]])
         # Neighbouring defaults are untouched.
         for profile, command, nodes, attempts in (('runtime-loops', 'loop-generate', '384', '256'),
                 ('runtime-call-graphs', 'call-graph-generate', '192', '1024'),
@@ -2189,13 +2191,14 @@ class CallGraphLoopCoverageTests(unittest.TestCase):
                 ('runtime-primitives', 'primitive-generate', '96', '512')):
             _, seen = self.run_main('--profile', profile, '--cases', '1')
             version = [campaign.RANDOM_G0_VERSION] if profile in campaign.G0_PROFILES else []
+            version += [campaign.RANDOM_INPUT_SELECTION] if profile in campaign.RUNTIME_INPUT_PROFILES else []
             self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000', *version]])
         for nodes in ('38', '3', '513'):
             with self.subTest(nodes=nodes), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.run_main('--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
         # The lower bound is specific to this profile: the ordinary loop profile still accepts 38.
         _, seen = self.run_main('--profile', 'runtime-loops', '--cases', '1', '--nodes', '38')
-        self.assertEqual(seen, [['loop-generate', '1', '38', '1', '256', '1000000', campaign.RANDOM_G0_VERSION]])
+        self.assertEqual(seen, [['loop-generate', '1', '38', '1', '256', '1000000', campaign.RANDOM_G0_VERSION, campaign.RANDOM_INPUT_SELECTION]])
 
     def test_call_graph_loop_shrink_keeps_schema_backend_and_explicit_synthetic_separation(self):
         for backend in campaign.m2.BACKENDS:
@@ -2865,7 +2868,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
                                 (['--nodes', '13'], ['13', '1', '256']), (['--nodes', '512'], ['512', '1', '256'])):
             with self.subTest(extra=extra):
                 _, seen = self.run_main('--profile', self.PROFILE, '--cases', '1', *extra)
-                self.assertEqual(seen, [['aggregate-call-graph-generate', '1', *expected, '1000000']])
+                self.assertEqual(seen, [['aggregate-call-graph-generate', '1', *expected, '1000000', campaign.RANDOM_INPUT_SELECTION]])
         # Neighbouring defaults are untouched.
         for profile, command, nodes, attempts in (('runtime-call-graphs', 'call-graph-generate', '192', '1024'),
                 ('runtime-call-graph-loops', 'call-graph-loop-generate', '256', '256'),
@@ -2874,13 +2877,15 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
                 ('runtime-primitives', 'primitive-generate', '96', '512')):
             _, seen = self.run_main('--profile', profile, '--cases', '1')
             version = [campaign.RANDOM_G0_VERSION] if profile in campaign.G0_PROFILES else []
+            version += [campaign.RANDOM_INPUT_SELECTION] if profile in campaign.RUNTIME_INPUT_PROFILES else []
             self.assertEqual(seen, [[command, '1', nodes, '1', attempts, '1000000', *version]])
         for nodes in ('12', '3', '513'):
             with self.subTest(nodes=nodes), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.run_main('--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
         # The lower bound is specific to the call-graph profiles: the template aggregate profile still accepts 12.
         _, seen = self.run_main('--profile', 'runtime-aggregates', '--cases', '1', '--nodes', '12')
-        self.assertEqual(seen, [['aggregate-generate', '1', '12', '1', '256', '1000000', campaign.RANDOM_G0_VERSION]])
+        self.assertEqual(seen, [['aggregate-generate', '1', '12', '1', '256', '1000000', campaign.RANDOM_G0_VERSION,
+                                 campaign.RANDOM_INPUT_SELECTION]])
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.run_main('--profile', 'runtime-call-graphs', '--cases', '1', '--nodes', '12')
 
@@ -2949,14 +2954,15 @@ class G0VersionTests(unittest.TestCase):
             with self.subTest(profile=profile):
                 summary, seen = self.run_main('--profile', profile, '--cases', '1')
                 expected = [self.V2] if profile in campaign.G0_PROFILES else []
+                inputs = [campaign.RANDOM_INPUT_SELECTION] if profile in campaign.RUNTIME_INPUT_PROFILES else []
                 self.assertEqual(len(seen), 1)
                 self.assertEqual(seen[0][0], campaign.PROFILE_COMMANDS[profile][0])
-                self.assertEqual(seen[0][6:], expected)
+                self.assertEqual(seen[0][6:], expected + inputs)
                 self.assertEqual(summary['configuration']['g0Version'], expected[0] if expected else None)
 
     def test_explicit_v1_reaches_the_native_generator(self):
         summary, seen = self.run_main('--profile', 'runtime-aggregates', '--cases', '1', '--g0-version', self.V1)
-        self.assertEqual(seen, [['aggregate-generate', '1', '256', '1', '256', '1000000', self.V1]])
+        self.assertEqual(seen, [['aggregate-generate', '1', '256', '1', '256', '1000000', self.V1, campaign.RANDOM_INPUT_SELECTION]])
         self.assertEqual(summary['configuration']['g0Version'], self.V1)
         self.refused('--profile', 'runtime-call-graphs', '--g0-version', self.V2)
         self.refused('--g0-version', 'core-g0-v3/lcg64-v1')
@@ -3018,6 +3024,93 @@ class G0VersionTests(unittest.TestCase):
                 instance.run()
             self.assertEqual(instance.summary['configuration']['g0Version'], self.V2)
             self.assertEqual(instance.summary['generation']['generatorVersions'], [self.V2])
+
+
+class InputSelectionTests(unittest.TestCase):
+    """Random runtime-input generation appends seeded inputs; corpora keep boundary inputs."""
+    BOUNDARY, SEEDED = campaign.INPUT_SELECTIONS
+    run_main = G0VersionTests.run_main
+    refused = G0VersionTests.refused
+
+    def manifest(self):
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': 'runtime-word',
+            **{key: 'test' for key in ('emitterVersion', 'wrapperVersion', *campaign.INPUT_VERSIONS)},
+            'generatorVersion': campaign.G0_VERSIONS[0], 'requiredFeatures': [], 'requiredWordLiterals': [],
+            'requiredInputs': [], 'cases': [{'id': 'seeded', 'input': '1',
+                'generation': {'seed': '5', 'maxProgramNodes': 32}, 'expectedFeatures': []}]}
+
+    def test_every_pure_profile_but_closed_g0_takes_runtime_inputs(self):
+        self.assertEqual(set(campaign.PROFILES) - set(campaign.RUNTIME_INPUT_PROFILES), {'closed-g0'})
+        self.assertEqual(campaign.RANDOM_INPUT_SELECTION, self.SEEDED)
+        case = function_case(1)
+        self.assertEqual(campaign.input_selection('runtime-functions', case), self.BOUNDARY)
+        case['provenance']['origin']['inputSelection'] = self.SEEDED
+        self.assertEqual(campaign.input_selection('runtime-functions', case), self.SEEDED)
+        self.assertIsNone(campaign.input_selection('closed-g0', case))
+
+    def test_random_runtime_input_profiles_request_seeded_inputs(self):
+        for profile in campaign.PROFILES:
+            with self.subTest(profile=profile):
+                summary, seen = self.run_main('--profile', profile, '--cases', '1')
+                runtime = profile in campaign.RUNTIME_INPUT_PROFILES
+                self.assertEqual(seen[0][-1] == self.SEEDED, runtime)
+                self.assertEqual(seen[0].count(self.SEEDED), int(runtime))
+                self.assertEqual(summary['configuration']['inputSelection'], self.SEEDED if runtime else None)
+
+    def test_boundary_selection_omits_the_option(self):
+        summary, seen = self.run_main('--profile', 'runtime-call-graphs', '--cases', '1',
+                                      '--input-selection', self.BOUNDARY)
+        self.assertEqual(seen, [['call-graph-generate', '1', '192', '1', '1024', '1000000']])
+        self.assertEqual(summary['configuration']['inputSelection'], self.BOUNDARY)
+        self.refused('--profile', 'closed-g0', '--input-selection', self.SEEDED)
+        self.refused('--profile', 'runtime-word', '--input-selection', 'seeded-inputs-v9/splitmix64')
+
+    def test_corpus_generation_keeps_boundary_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'manifest.json'
+            path.write_text(json.dumps(self.manifest()))
+            summary, seen = self.run_main('--corpus', str(path))
+            self.assertEqual(seen, [['input-generate', '5', '32', '4', '1', '1000000', campaign.G0_VERSIONS[0]]])
+            self.assertEqual(summary['configuration']['inputSelection'], self.BOUNDARY)
+            self.assertEqual(self.run_main('--corpus', str(path), '--input-selection', self.BOUNDARY)[1], seen)
+            self.refused('--corpus', str(path), '--input-selection', self.SEEDED)
+            config = options(directory)
+            config.output, config.corpus, config.input_selection = Path(directory) / 'direct', path, self.SEEDED
+            config.output.mkdir()
+            with self.assertRaises(ValueError):
+                campaign.Campaign(config).prepare_cases()
+
+    def test_saved_case_keeps_its_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            saved = Path(directory) / 'case.json'
+            case = function_case(1)
+            case['provenance']['origin']['inputSelection'] = self.SEEDED
+            saved.write_text(json.dumps(case))
+            summary, seen = self.run_main('--case', str(saved))
+            self.assertEqual((summary['configuration']['inputSelection'], seen), (self.SEEDED, []))
+            self.refused('--case', str(saved), '--input-selection', self.BOUNDARY)
+            del case['provenance']['origin']['inputSelection']
+            saved.write_text(json.dumps(case))
+            self.assertEqual(self.run_main('--case', str(saved))[0]['configuration']['inputSelection'], self.BOUNDARY)
+
+    def test_summary_lists_the_generated_selections(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-functions', 2, 0
+            config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+            instance = campaign.Campaign(config)
+            seeded, boundary = function_case(1), function_case(1)
+            seeded['provenance']['origin']['inputSelection'] = self.SEEDED
+            instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': 2, 'attempted': 1,
+                                        'status': 'complete', 'excluded': [], 'cases': [seeded, boundary]}
+
+            def execute(adapter_args, report):
+                report.update(matched(), backend=adapter_args.backend)
+
+            with patch.object(campaign.m2, 'execute', side_effect=execute), redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(instance.summary['configuration']['inputSelection'], self.SEEDED)
+            self.assertEqual(instance.summary['generation']['inputSelections'], [self.BOUNDARY, self.SEEDED])
 
 
 class CancellationTests(unittest.TestCase):

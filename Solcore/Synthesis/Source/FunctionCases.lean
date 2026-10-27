@@ -135,7 +135,8 @@ def inputSensitive (function : CheckedWordFunctionDAG) (fuel : Nat) : Except Str
     throw "all four boundary inputs returned the same Word"
 
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Json := Id.run do
+    (revision : GeneratorRevision := .v1) (inputSelection : InputSelection := .boundary) :
+    Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -157,11 +158,12 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
             ("code", toJson (if resource then "boundary-out-of-fuel" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (function, origin, emitted) =>
-          for (input, inputIndex) in Input.boundaryInputs.zipIdx do
+          for (input, inputIndex) in (inputSelection.inputs Input.boundaryInputs seed).zipIdx do
             if cases.size < count then
               let origin := (origin.setObjVal! "inputIndex" (toJson inputIndex)).setObjVal!
                 "validationFuel" (toJson fuel)
-              cases := cases.push (makeCase function input emitted origin fuel revision)
+              cases := cases.push
+                (makeCase function input emitted (inputSelection.record origin) fuel revision)
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -199,7 +201,8 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless Wire.encodeProgram function.program == Wire.encodeProgram admitted.function.program do
       throw "saved function DAG differs from its generation seed"
     let inputIndex ← origin.getObjValAs? Nat "inputIndex"
-    unless Input.boundaryInputs[inputIndex]? = some admitted.input do
+    let inputSelection ← InputSelection.ofOrigin origin
+    unless (inputSelection.inputs Input.boundaryInputs (Seed.ofNat seed))[inputIndex]? = some admitted.input do
       throw "saved input differs from its boundary index"
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
