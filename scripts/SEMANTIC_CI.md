@@ -27,7 +27,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-offline and the twenty-five native Lean tools in one Lake invocation. Existing
+offline and the twenty-six native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -52,7 +52,7 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
 Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
 profile's default node budget, capped at 512; an explicit `--nodes` wins.
 
-Random campaigns of the twelve G0-based pure profiles generate with [G0
+Random campaigns of the thirteen G0-based pure profiles generate with [G0
 revision four](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
 (`core-g0-v4/lcg64-v1`): revision two under a per-case swarm mask, restricted
 to the features the profile's emitter renders. The random steps of every
@@ -73,11 +73,13 @@ twelve cases, and its last function may lose inputs. `--functions N` instead
 gives every random runtime-input pure profile N whole functions with all of
 their inputs, while `closed-g0` and the stateful profiles keep `--cases`; the
 report records N in `functions`. A campaign returns at most 1,024 cases, so N
-is at most 85 while a twelve-input profile is selected. One generation response
-is also limited to 2 MiB, which profiles with large cases reach first: at the
-default budgets about six whole loop functions fit, or 64 `runtime-word`
-functions, and a larger request stops at generation as an inconclusive
-`output-limit`.
+is at most 85 while a twelve-input profile is selected. Without `--attempts`,
+`--functions N` also gives each of those profiles at least 16 attempts per
+function, up to 10,000. One generation response is limited to 2 MiB, so a
+larger request is generated in several requests of whole functions that
+continue the same seed sequence and merge to the same cases; only a function
+whose cases alone exceed 2 MiB stops at generation as an inconclusive
+`output-limit` ([whole functions](SEMANTIC_DIFFERENTIAL.md#seeded-runtime-inputs)).
 
 Use `--backend sonatina-o2` with either suite command to compare the same cases
 after O2 compilation. O0 remains the default. The CI matrix runs each backend
@@ -85,28 +87,29 @@ in a separate job with separate reports and artifacts; failure in one does not
 cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
 
-`--backend yul` selects the fifteen pure profiles by default (667 fixed cases).
+`--backend yul` selects the sixteen pure profiles by default (730 fixed cases).
 Explicitly selecting a stateful profile fails before execution. Each random
-Yul run with `--cases 16` requests 240 cases. The shared preparation command
+Yul run with `--cases 16` requests 256 cases. The shared preparation command
 builds Rust and Lean tools; solc is supplied and checked separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 873 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 873 | Sonatina O2 | Sonatina O2 |
-| `yul` | 667, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
+| `sonatina-o0` | 948 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 948 | Sonatina O2 | Sonatina O2 |
+| `yul` | 730, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
 linked layout is not supplied to the Hull importer. Its pure result can still
 be compared with both other paths; code-dependent and stateful Yul observations
 remain unsupported. Reports record this distinction in `pathBackends`.
 
-The default selection is all thirty-one profiles: fifteen pure profiles, storage,
+The default selection is all thirty-three profiles: sixteen pure profiles, storage,
 storage rollback, parent/child calls, keyed storage, dynamic arrays, event
 logs, call value, bounded bytes, forwarded value, Keccak-addressed mappings, a
 sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]` inputs,
-and malformed calldata for the dynamic-array, nested-array and 256-byte
-`bytes` contracts. Fixed mode runs all 873 manifest cases or scenarios. It
+malformed calldata for the dynamic-array, nested-array and 256-byte `bytes`
+contracts, and a contract with several external methods. Fixed mode runs all
+948 manifest cases or scenarios. It
 rejects `--cases`, `--functions` and `--nodes` overrides rather than silently
 truncating required coverage. Repeat `--profile NAME` to select a smaller
 suite.

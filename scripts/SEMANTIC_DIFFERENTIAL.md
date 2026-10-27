@@ -3962,11 +3962,11 @@ Neither run produced a finding.
 
 ## Compare whole committed storage
 
-Every stateful profile compares the declared slots on all three paths. The twelve
+Every stateful profile compares the declared slots on all three paths. The thirteen
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-sixteen stateful profiles now also compare the observed contracts' whole
+seventeen stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -3975,7 +3975,7 @@ this section describes how the paths observe it.
 
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
-`contract` for the fourteen storage-family profiles, `parent` and `child` for
+`contract` for the fifteen storage-family profiles, `parent` and `child` for
 `stateful-calls` and `stateful-forwarded-value`. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
@@ -4054,10 +4054,11 @@ it. Candidates are rerun on all three paths, and `same_failure` requires the
 whole fingerprint.
 
 Histories now use the `.v2` schemas of the thirteen profiles that existed
-then; the later malformed-calldata profiles start at
+then; the later profiles start at
 `solcore-lean.malformed-calldata-history.v1`,
-`solcore-lean.malformed-nested-array-history.v1` and
-`solcore-lean.malformed-bytes-history.v1`, whole storage included. Reports use
+`solcore-lean.malformed-nested-array-history.v1`,
+`solcore-lean.malformed-bytes-history.v1` and
+`solcore-lean.methods-history.v1`, whole storage included. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
 `solcore-lean.semantic-storage-analysis.v2` and

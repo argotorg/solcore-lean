@@ -135,7 +135,7 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
-Random campaigns of the twelve G0-based profiles use the generator's fourth
+Random campaigns of the thirteen G0-based profiles use the generator's fourth
 revision: the second revision, which mixes each draw and widens its bank of
 boundary literals, under a per-case swarm mask that enables about half of the
 operators and forms, restricted to those the profile's emitter renders. Random
@@ -164,7 +164,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the fifteen pure profiles with `--backend yul`. Its EVM bytes are
+available for the sixteen pure profiles with `--backend yul`. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images;
 Yul object linking and stateful Yul are outside this comparison.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
@@ -174,7 +174,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same thirty-one-profile suite runs locally with shared time and disk limits.
+The same thirty-three-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -190,9 +190,9 @@ The eleven profiles whose step functions used the aggregate renderer at
 emitter version 2 (aggregates, loops, generics, closures, comptime and module
 steps, and the five stateful profiles of that time) render the same raw
 primitives since that version, as do the profiles added on that renderer
-later, such as nested loops; the aliases are imported only when a step uses one. Programs without a primitive
-keep byte-identical source; older saved cases of these profiles are rejected by
-their version check. See [raw primitives in aggregate-based step functions](scripts/SEMANTIC_DIFFERENTIAL.md#raw-primitives-in-aggregate-based-step-functions).
+later, such as nested loops and recursion; the aliases are imported only when
+a step uses one. Programs without a primitive keep byte-identical source; older
+saved cases of these profiles are rejected by their version check. See [raw primitives in aggregate-based step functions](scripts/SEMANTIC_DIFFERENTIAL.md#raw-primitives-in-aggregate-based-step-functions).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -232,6 +232,10 @@ Nested bounded loops run a second bounded `while` inside the first, with up to
 nine step calls, against an unrolled finite Core reference; all 72 fixed
 nested-loop cases match on O0, O2 and Yul
 ([nested bounded loops](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nested-bounded-loops)).
+Bounded recursion calls a recursive source function, or two that call each
+other, to a depth of up to seven taken from the input, against an unrolled
+finite Core reference; all 63 fixed recursion cases match on O0, O2 and Yul
+([bounded recursion](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-recursion)).
 M1 through M4 are complete for these restricted profiles.
 
 The first stateful profile compares one to three ordered transactions against
@@ -414,15 +418,27 @@ levels. See
 [malformed nested arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-malformed-nested-arrays)
 and [malformed bytes](scripts/SEMANTIC_DIFFERENTIAL.md#compare-malformed-bytes).
 
-All sixteen stateful profiles also compare the installed contracts' whole
+The several-methods profile gives one contract two to four external methods
+over shared slots, each with its own checked step. Method names, and so the
+selectors and their order, are drawn per scenario. Original Core dispatches as
+the pinned std does: it compares the selector Word with each method's selector
+in declaration order, reverts with std's fallback selector on short calldata or
+a missing selector, and checks the called method's argument head before it
+runs. Transactions call recorded methods or send a recorded missing selector,
+which is compared under the same selector rule. Golden cases fix std's
+dispatch for 110 single calls. The twelve fixed scenarios and sixteen random
+scenarios at each of two node budgets match on both Sonatina levels. See
+[several methods](scripts/SEMANTIC_DIFFERENTIAL.md#compare-several-methods).
+
+All seventeen stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The fixed corpora of all sixteen profiles, 206
-scenarios and 568 transaction prefixes, still match on both Sonatina levels,
+whole storage unchanged. The fixed corpora of all seventeen profiles, 218
+scenarios and 601 transaction prefixes, still match on both Sonatina levels,
 and a synthetic stray write that the declared slots could not see is caught and
 reduced to one transaction. See
 [whole committed storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage).
