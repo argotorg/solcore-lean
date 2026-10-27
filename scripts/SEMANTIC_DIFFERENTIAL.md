@@ -271,7 +271,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the thirteen runtime-input pure profiles, every pure
+Random campaigns of the fourteen runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -306,12 +306,21 @@ N:
 | Profiles | Inputs per function, seeded (boundary) | Largest N, seeded (boundary) |
 | --- | ---: | ---: |
 | `runtime-word`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-generics`, `runtime-closures`, `runtime-comptime`, `runtime-modules` | 8 (4) | 128 (256) |
-| `runtime-loops`, `runtime-call-graph-loops` | 10 (6) | 102 (170) |
+| `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops` | 10 (6) | 102 (170) |
 | `runtime-primitives`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | 12 (8) | 85 (128) |
 
 The summary records `configuration.functions`,
 `generation.requestedFunctions` and `generation.inputsPerFunction`, all null
-without the option. The campaign refuses `--functions` with `--cases`, with a
+without the option. The campaign also limits one tool response to 2 MiB, and
+generation is one request, so the case size caps N well below these bounds. At
+the suite's node budgets one request holds about 64 whole `runtime-word`
+functions, 50 `runtime-functions`, 24 `runtime-primitives` and
+`runtime-mutation`, 14 `runtime-aggregates`, 11 for each call-graph profile, 9
+`runtime-call-graph-loops` and `runtime-closures`, 8 `runtime-generics`,
+`runtime-comptime` and `runtime-modules`, 7 `runtime-nested-loops` and 6
+`runtime-loops`; a larger request stops at generation with `output-limit`,
+an inconclusive resource exclusion. These are averages from seed 1; the size
+varies with the seed. The campaign refuses `--functions` with `--cases`, with a
 corpus or a saved case, for `closed-g0` and outside the bounds above.
 
 These profiles' generation commands take the selection after `FUEL`, in either
@@ -348,7 +357,7 @@ still return some seeded input unchanged.
 | Profiles | Identity filter |
 | --- | --- |
 | `runtime-word`, `runtime-primitives`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
-| `runtime-loops`, `runtime-call-graph-loops` | not needed: a loop must already change a positive-trip boundary input |
+| `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops` | not needed: a loop must already change a positive-trip boundary input, and a nested loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
 A closure returns `5 * step(x) + 4 * x + 4` (snapshot) or `+ 5`
@@ -430,6 +439,32 @@ default of 256 attempts covers about 119 whole `runtime-word` functions,
 below its bound of 128, and about 37 `runtime-aggregate-call-graphs`
 functions; 512 attempts cover about 75 of the latter, below their bound of 85.
 
+Frozen random matrices from root seed 1 ran the eleven G0 profiles and both
+call-graph profiles before the filter (`8d62b8e2b`) and with it (`83f590764`)
+side by side, with eight whole functions per runtime profile and sixteen
+`closed-g0` cases:
+
+| Matrix | Matched | Distinct sources | Seconds | Sources per minute |
+| --- | ---: | ---: | ---: | ---: |
+| O0 before | 752/752 | 92 | 981 | 5.6 |
+| O0 with the filter | 752/752 | 95 | 996 | 5.7 |
+| O2 before | 744/752 | 84 | 876 | 5.8 |
+| O2 with the filter | 744/752 | 87 | 889 | 5.9 |
+
+Sources and seconds count the profiles that completed; O2 sources and seconds
+leave out `runtime-comptime`, whose third function is the recorded plan
+`13439332813997308049` and crashed O2 code-image export on all eight of its
+inputs on both sides. `runtime-word` rose from 7 to 8 distinct sources of 8
+functions and `runtime-primitives` from 5 to 7, in 19 and 26 generation
+attempts instead of 10 and 17; every other profile compiled 8 sources on both
+sides. With a fixed number of whole functions the rate moves little: each
+excluded identity is replaced by another function with as many cases, so the
+gain is the repeated sources the identities would have been. `runtime-loops` and `runtime-closures` stopped at generation on both
+sides, since one request's 80 and 64 cases exceeded the 2 MiB limit on a tool
+response (see [seeded runtime inputs](#seeded-runtime-inputs)); with four
+whole functions both matched all 40 and 32 cases on O0 and on O2 on both
+sides, with four sources each.
+
 ## Validate the emitter against Rust
 
 Prepare the checked Hull exporter as described in
@@ -506,7 +541,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the fourteen pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the fifteen pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -1245,6 +1280,87 @@ tolerates it. Random seed `20261026` with sixteen cases and 2,048
 attempts matched all sixteen on each backend. A controlled synthetic reduction
 accepted four typed reductions per backend, all keeping three helpers, and
 original and reduced archives replayed exactly.
+
+## Compare nested bounded loops
+
+`runtime-nested-loops` runs a bounded source `while` loop whose body runs a
+second bounded `while` loop around the step. A plan has schema
+`solcore-lean.nested-loop-plan.v1`, a checked aggregate `stepProgram`, an
+`outerMask` and an `innerMask` in zero, one or three, and an `innerBound` that
+reads the `input`, the `counter` or the `accumulator`. With input `x`, the
+wrapper sets `acc = x` and runs `x & outerMask` outer iterations; each first
+sets the inner bound, `x & innerMask`, `(i + 1) & innerMask` for outer counter
+`i`, or `acc & innerMask`, resets the inner counter and then calls
+`acc = sc_step(acc)` once per inner iteration. Both counters, the bound and the
+accumulator are declared before the outer loop and assigned inside it. A call
+therefore runs at most three outer iterations, three inner iterations in each
+and nine step calls. The original Core reference unrolls the outer and inner
+ordinal guards over one accumulator cell, without a counter cell, and checks
+the complete applied program against the 512-node limit. The ABI is
+`SynthesizedNestedLoops.run(uint256)`; no emitter proof covers this wrapper.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-nested-loops --functions 4 --output .upstream/semantic-nested-loops
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-nested-loop-corpus.json --output .upstream/semantic-nested-loop-ci
+python3 Tests/scripts/test-semantic-nested-loop-corpus.py
+```
+
+Native commands are `nested-loop-generate SEED NODES COUNT ATTEMPTS FUEL
+[VERSION] [seeded-inputs-v1/splitmix64]` and `nested-loop-emit PLAN.json INPUT
+[FUEL]`; saved cases contain `nestedLoopPlan` and the applied original Core
+`program`, whose exact correspondence native admission checks for every
+origin. The step is generated as for `runtime-loops`, so the profile is
+G0-based and revision four equals revision three for it. Generation draws one
+of twelve shapes, both masks from one and three and the bound, from a
+SplitMix64 hash of the case seed, and defaults to 384 nodes. Each function
+runs at the boundary inputs zero, one, two, three, the maximum Word and the high
+bit, which give zero to three outer iterations, and random campaigns add four
+seeded inputs. Generation excludes a node budget too small for the shape, the
+step's own exclusions, a step whose boundary inputs agree, fuel exhaustion and
+a function that returns every boundary input unchanged (`boundary-identity`);
+a boundary input without a step call returns itself, so the profile needs no
+acceptance filter.
+
+Every case records in `provenance.iterations` the inner trip count of each
+outer iteration it runs, specified by the plan, the input and, for the
+`accumulator` bound, the step's original Core results evaluated call by call;
+it is `null` if a step call does not return within the fuel. It is not a
+measured trace. Replay recomputes it, and the Lean test requires that the
+unrolled reference returns the accumulator of that call-by-call evaluation.
+Reductions keep the step's helper count and binders and may shrink the step,
+lower either mask, replace the `counter` or `accumulator` bound by the `input`
+bound or move the input to a boundary input; each candidate is sealed by the
+full checker and is strictly smaller in nodes, then literal weight.
+
+The fixed corpus has twelve plans, one per shape, at all six inputs: 72 cases
+from G0 revision one. `nestedLoopRequirements` requires every shape, outer
+iterations zero to three, inner trip counts zero to three within a run outer
+iteration and total step calls 0, 1, 2, 3, 4, 6 and 9; the corpus also reaches
+5 and 7. It covers all 39 step AST features its cases use, the 37 of the loop
+corpus with `and` and `==`, one to three helpers and all four aggregate
+templates. `nestedLoopCoverage` in the summary counts only three-way matches
+toward passing coverage. `Tests/scripts/test-semantic-nested-loop-corpus.py`
+materializes each case twice, recomputes the outer trips and every input or
+counter bound and the first accumulator bound, which reads the input, and
+checks replay, reductions and tampering natively.
+
+Over the first 256 functions accepted from seed 1 under revision four with
+seeded inputs, generation took 1.13 attempts per function, excluding 30
+boundary identities and 4 step template budgets. All 256 sources were distinct
+and every shape appeared 12 to 29 times. Of the 2,560 cases, 1,134 made no
+step call, since inputs zero and the high bit, and any input without a set bit
+under the outer mask, skip the outer loop.
+
+Frozen matrices at `01344eea3` matched every case on all three paths. The
+fixed corpus matched all 72 cases with complete shape, iteration, feature,
+input, helper and template coverage, compiling 12 sources, in 118 seconds on
+O0, 114 on O2 and 162 on Yul. Random suites from root seed 1 with four whole
+functions matched all 40 cases on each backend in 52, 47 and 65 seconds, with
+four distinct sources, shapes `1x1:accumulator`, `1x1:counter`, `1x1:input` and
+`3x3:accumulator`, outer iterations zero to three and totals 0, 1, 4 and 9;
+generation took five attempts, excluding one boundary identity.
 
 ## Compare aggregate compositions with call graphs
 
