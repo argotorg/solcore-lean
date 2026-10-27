@@ -55,9 +55,10 @@ LOG_DIMENSIONS = DIMENSIONS + tuple(LOG_EXTRA)
 # Call values, the values reverted transactions must refund, and deployment values.
 VALUE_EXTRA = ("Values", "RevertedValues", "DeploymentValues")
 VALUE_DIMENSIONS = DIMENSIONS + VALUE_EXTRA
-# Payload lengths, and those of reverted transactions, whose slot writes rollback discards.
-BYTES_EXTRA = {"PayloadLengths": tuple(range(adapter.MAX_PAYLOAD + 1)), "RevertedPayloadLengths": tuple(range(adapter.MAX_PAYLOAD + 1))}
-BYTES_DIMENSIONS = DIMENSIONS + tuple(BYTES_EXTRA)
+# Payload lengths, and those of reverted transactions, whose slot writes rollback discards;
+# each bytes profile admits lengths up to its own bound.
+BYTES_EXTRA = ("PayloadLengths", "RevertedPayloadLengths")
+BYTES_DIMENSIONS = DIMENSIONS + BYTES_EXTRA
 # Ledger senders, recipients and amounts, distinct senders per scenario, and
 # revert causes: odd flags, or an insufficient balance under even flags.
 LEDGER_EXTRA = ("Senders", "Recipients", "Amounts", "SenderCounts", "RevertCauses")
@@ -288,10 +289,11 @@ def validate_manifest(manifest):
     elif any("required" + dimension in manifest for dimension in VALUE_EXTRA):
         raise ValueError("value coverage belongs to the call-value profile")
     if selected["abi"] == "bytes":
-        for dimension, allowed in BYTES_EXTRA.items():
+        bound = adapter.bytes_layout(selected)[0]
+        for dimension in BYTES_EXTRA:
             values = manifest.get("required" + dimension)
-            if not isinstance(values, list) or not values or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
-                raise ValueError(f"bytes coverage requires unique required{dimension} from zero to 64")
+            if not isinstance(values, list) or not values or any(type(v) is not int or not 0 <= v <= bound for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"bytes coverage requires unique required{dimension} from zero to {bound}")
     elif any("required" + dimension in manifest for dimension in BYTES_EXTRA):
         raise ValueError("payload coverage belongs to the bytes profile")
     if not isinstance(manifest.get("cases"), list):
@@ -431,7 +433,7 @@ def keyed_analysis(analysis):
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
                                                 adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
-                                                adapter.LEDGER_HISTORY_SCHEMA)
+                                                adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -617,7 +619,7 @@ class Campaign:
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
-                          "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": tuple(BYTES_EXTRA),
+                          "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",)}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()

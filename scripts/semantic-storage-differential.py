@@ -45,6 +45,8 @@ VALUE_CASE_SCHEMA = "solcore-lean.semantic-call-value-case.v1"
 VALUE_HISTORY_SCHEMA = "solcore-lean.call-value-history.v1"
 BYTES_CASE_SCHEMA = "solcore-lean.semantic-bytes-case.v1"
 BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v1"
+LONG_BYTES_CASE_SCHEMA = "solcore-lean.semantic-long-bytes-case.v1"
+LONG_BYTES_HISTORY_SCHEMA = "solcore-lean.long-bytes-history.v1"
 MAPPING_CASE_SCHEMA = "solcore-lean.semantic-mapping-case.v1"
 MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v1"
 LEDGER_CASE_SCHEMA = "solcore-lean.semantic-ledger-case.v1"
@@ -101,6 +103,17 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": BYTES_HISTORY_SCHEMA,
         "signature": "run(uint256,bytes)", "selector": "0x220eb9b6", "rollback": True, "keyed": False,
         "declared": True, "abi": "bytes"},
+    # The bytes protocol over eight chunks: `maxPayload`, the observed `slots` and
+    # the `countSlot`/`tailSlot` names replace the bytes profile's defaults. A case
+    # reaches about 75 KB, so a native shrink response carries at most 32 candidates.
+    "stateful-long-bytes": {"caseSchema": LONG_BYTES_CASE_SCHEMA, "planSchema": "solcore-lean.long-bytes-plan.v1",
+        "planKey": "longBytesPlan", "corpusSchema": "solcore-lean.semantic-long-bytes-corpus.v1",
+        "originKind": "long-bytes-generated", "contract": "SynthesizedLongBytes",
+        "caseTool": "semantic-long-bytes-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LONG_BYTES_HISTORY_SCHEMA,
+        "signature": "run(uint256,bytes)", "selector": "0x220eb9b6", "rollback": True, "keyed": False,
+        "declared": True, "abi": "bytes", "maxPayload": 256, "slots": [str(slot) for slot in range(11)],
+        "countSlot": "9", "tailSlot": "10", "shrinkBatch": 32},
     # One mapping case embeds the fixed Keccak closure (about 110 KB of Core),
     # so each bounded native shrink response carries at most 16 candidates.
     "stateful-mapping": {"caseSchema": MAPPING_CASE_SCHEMA, "planSchema": "solcore-lean.mapping-plan.v1",
@@ -137,6 +150,8 @@ VALUE_SLOTS = ["0", "1"]
 MAX_VALUE, MAX_TOTAL, CALLER_FUNDS = 2**70, 2**72, 2**80
 BYTES_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_PAYLOAD = 64
+# The longest payload any bytes profile admits; each profile checks its own bound.
+MAX_PAYLOAD_BOUND = 256
 # The mapping profile's counter slot and the mapping field's base slot.
 MAPPING_COUNTER, MAPPING_BASE = 0, 1
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
@@ -298,12 +313,18 @@ def has_bytes(case: dict) -> bool:
     return profile(case)["abi"] == "bytes"
 
 
-def payload(transaction: dict) -> bytes:
-    """A bytes transaction's payload: 0..64 bytes as canonical lowercase hex."""
+def payload(transaction: dict, limit: int = MAX_PAYLOAD_BOUND) -> bytes:
+    """A bytes transaction's payload: at most `limit` bytes as canonical lowercase hex."""
     text = transaction.get("payload") if isinstance(transaction, dict) else None
-    if not isinstance(text, str) or not re.fullmatch(r"0x(?:[0-9a-f]{2}){0,%d}" % MAX_PAYLOAD, text):
-        raise ValueError("bytes payloads carry 0..64 bytes as canonical lowercase hexadecimal")
+    if not isinstance(text, str) or not re.fullmatch(r"0x(?:[0-9a-f]{2}){0,%d}" % limit, text):
+        raise ValueError(f"bytes payloads carry 0..{limit} bytes as canonical lowercase hexadecimal")
     return bytes.fromhex(text[2:])
+
+
+def bytes_layout(selected: dict) -> tuple[int, list[str], str, str]:
+    """A bytes profile's payload bound, observed slots and count and last-byte slots."""
+    return (selected.get("maxPayload", MAX_PAYLOAD), selected.get("slots", BYTES_SLOTS),
+            selected.get("countSlot", "3"), selected.get("tailSlot", "4"))
 
 
 def bytes_calldata(selector: str, flags: int, data: bytes) -> str:
@@ -318,21 +339,22 @@ def payload_chunks(transaction: dict) -> list[int]:
     return [int.from_bytes((data[start:start + 32] + bytes(32))[:32], "big") for start in range(0, len(data), 32)]
 
 
-def bytes_fields(transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+def bytes_fields(transaction: dict, row: dict, prior: list[dict], count: str = "3", tail: str = "4") -> list[str]:
     """Fields of a completed row that break the bytes protocol: a returned
-    transaction adds its payload length to slot three, leaves its last byte
-    (zero when empty) in slot four and returns the committed slots zero, three
-    and four plus its calldata size. A revert is checked by rollback."""
+    transaction adds its payload length to the count slot (three, or nine for
+    long bytes), leaves its last byte (zero when empty) in the tail slot (four,
+    or ten) and returns the committed slot zero, count and last byte plus its
+    calldata size. A revert is checked by rollback."""
     if row["status"] != "returned":
         return []
     data = payload(transaction)
     after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
     before = {entry["slot"]: int(entry["value"]) for entry in prior}
     fields = []
-    if after["3"] != (before["3"] + len(data)) % 2**256 or after["4"] != (data[-1] if data else 0):
+    if after[count] != (before[count] + len(data)) % 2**256 or after[tail] != (data[-1] if data else 0):
         fields.append("committedStorage")
     size = 100 + len(data) + -len(data) % 32
-    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after["3"] + after["4"] + size) % 2**256:
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after[count] + after[tail] + size) % 2**256:
         fields.append("output")
     return fields
 
@@ -406,9 +428,10 @@ def scope(case: dict) -> str:
                 "empty storage; committed values at the counter and every key's and successor's keccak256(1 ++ key) slot "
                 "on all paths and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce equivalence")
     if has_bytes(case):
-        return ("ordered zero-value run(uint256,bytes) transactions with canonical, zero-padded 0..64-byte payloads; "
-                "initially empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on "
-                "Hull/EVM; no gas/balance/nonce or memory equivalence")
+        bound, slots, _, _ = bytes_layout(profile(case))
+        return (f"ordered zero-value run(uint256,bytes) transactions with canonical, zero-padded 0..{bound}-byte payloads; "
+                f"initially empty storage; committed values at slots 0..{slots[-1]} on all paths and no nonzero undeclared "
+                "slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
     if has_balances(case):
         return ("ordered value-bearing payable run(uint256,uint256) transactions after a funded payable deployment; "
                 "committed slots 0/1 and the contract's committed balance on all paths and no nonzero undeclared slot on "
@@ -454,7 +477,8 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
         if selected["abi"] == "bytes":
-            expected = bytes_calldata(selected["selector"], int(common.word(tx.get("flags"), "transaction flags")), payload(tx))
+            expected = bytes_calldata(selected["selector"], int(common.word(tx.get("flags"), "transaction flags")),
+                                      payload(tx, bytes_layout(selected)[0]))
             if tx.get("calldata") != expected or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
@@ -507,8 +531,9 @@ def validate_case(case) -> None:
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ledger_slots(case["transactions"]):
             raise Finding("unsupported-scope", "input", "ledger profile starts empty and observes the counter and every sender's and recipient's entry slot")
     elif selected["abi"] == "bytes":
-        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_SLOTS:
-            raise Finding("unsupported-scope", "input", "bytes profile starts empty and observes slots zero through four")
+        slots = bytes_layout(selected)[1]
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
+            raise Finding("unsupported-scope", "input", f"bytes profile starts empty and observes slots 0 through {slots[-1]}")
     elif selected["abi"] == "flags":
         log_sites(case)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != LOG_SLOTS:
@@ -662,7 +687,7 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
         return False
     if row["status"] == "reverted" and row["committedStorage"] != prior:
         return False
-    if has_bytes(case) and bytes_fields(tx, row, prior):
+    if has_bytes(case) and bytes_fields(tx, row, prior, *bytes_layout(profile(case))[2:]):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -757,7 +782,8 @@ def compare(histories: dict, case: dict) -> dict:
             # A returned row records its payload length and last byte and returns
             # the committed sum; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in bytes_fields(tx, row,
-                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"],
+                *bytes_layout(profile(case))[2:])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
         if has_senders(case):

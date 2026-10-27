@@ -1239,5 +1239,69 @@ class LedgerCampaignTests(unittest.TestCase):
             self.assertEqual(tool.call_args.args[0][2], 16)
 
 
+def long_bytes_case(rows=None):
+    value = fixtures.long_bytes_case() if rows is None else fixtures.long_bytes_case(rows)
+    value["longBytesPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def long_bytes_report(value):
+    histories = fixtures.long_bytes_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class LongBytesCampaignTests(unittest.TestCase):
+    def test_long_bytes_shares_the_bytes_dimensions_up_to_its_own_bound(self):
+        self.assertEqual(campaign.dimensions("stateful-long-bytes"), campaign.BYTES_DIMENSIONS)
+        self.assertEqual(campaign.versions("stateful-long-bytes"), campaign.VERSIONS)
+        value = long_bytes_case()
+        self.assertEqual(campaign.bytes_coverage(value, ["returned", "reverted", "returned"]),
+                         {"PayloadLengths": {97, 256, 0}, "RevertedPayloadLengths": {256}})
+        self.assertEqual(len(campaign.inputs(value)), 5)
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-long-bytes"))
+            instance.summary["coverage"].update(requiredPayloadLengths=[0, 97, 255, 256], requiredRevertedPayloadLengths=[0, 256])
+            instance.record_coverage(value, "matched", long_bytes_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedPayloadLengths"], coverage["missingPayloadLengths"]), ([0, 97, 256], [255]))
+            self.assertEqual((coverage["matchedRevertedPayloadLengths"], coverage["missingRevertedPayloadLengths"]), ([256], [0]))
+
+    def test_long_bytes_manifest_bounds_lengths_by_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-long-bytes-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(manifest["requiredPayloadLengths"], [0, 1, 64, 65, 96, 97, 128, 129, 192, 223, 255, 256])
+        for change in (lambda m: m.update(requiredPayloadLengths=[0, 257]), lambda m: m.update(requiredRevertedPayloadLengths=[300]),
+                       lambda m: m.pop("requiredRevertedPayloadLengths"), lambda m: m.update(requiredLengths=[0]),
+                       lambda m: m["cases"][0].update(bytesPlan=m["cases"][0].pop("longBytesPlan"))):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        short = json.loads((ROOT / "scripts/semantic-bytes-corpus.json").read_text())
+        short["requiredPayloadLengths"] = short["requiredPayloadLengths"] + [65]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(short)
+
+    def test_long_bytes_slots_are_named_and_shrinking_requests_at_most_32_candidates(self):
+        value = long_bytes_case()
+        raw = long_bytes_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        changed = campaign.analyze(raw, value, "importedHull", "tx-2", "storage:9")
+        fingerprint = campaign.fingerprint(changed)
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["transactionId"]), (["9"], "tx-2"))
+        self.assertFalse(campaign.analyze(raw, value, "importedHull", "tx-2", "storage:11")["synthetic"])
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-long-bytes", shrink_attempts=40, shrink_candidates=64))
+            folder, _, _ = saved_execution(instance, value, raw, changed)
+            finding = instance.retain_finding(0, folder, value, changed)
+            with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
+                instance.shrink(value, finding)
+            self.assertEqual(tool.call_args.args[0][2], 32)
+
+
 if __name__ == "__main__":
     unittest.main()

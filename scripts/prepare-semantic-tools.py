@@ -50,6 +50,7 @@ TARGETS = {
     "semanticMappingTool": "semantic-mapping-tool",
     "semanticLedgerTool": "semantic-ledger-tool",
     "rustHullLedgerScenario": "rust-hull-ledger-scenario",
+    "semanticLongBytesTool": "semantic-long-bytes-tool",
 }
 PATCHES = {
     "crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),

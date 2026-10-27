@@ -2135,5 +2135,126 @@ class LedgerTests(unittest.TestCase):
                 self.assertEqual((caught.exception.category, caught.exception.stage), ("adapter-error", "evm-senders"))
 
 
+def long_bytes_case(rows=((0, bytes(range(1, 98))), (1, b"\xff" * 256), (2, b""))):
+    """Envelope fixture only: native replay checks the actual long-bytes program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "payload": "0x" + data.hex(), "value": "0",
+        "calldata": bytes_calldata(flags, data)} for index, (flags, data) in enumerate(rows)]
+    return {"schema": runner.LONG_BYTES_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "longBytesPlan": {"schema": "solcore-lean.long-bytes-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(11)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedLongBytes", "method": "run", "signature": "run(uint256,bytes)",
+            "selector": "0x220eb9b6", "deployPath": ["SynthesizedLongBytesDeploy"],
+            "runtimePath": ["SynthesizedLongBytesDeploy", "SynthesizedLongBytes"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def long_bytes_slots(values=(0,) * 11):
+    return [{"slot": str(index), "value": str(value)} for index, value in enumerate(values)]
+
+
+def long_bytes_history(value, path):
+    """Rows that follow the long-bytes protocol: slots zero to eight are
+    fixtures, slot nine counts committed payload bytes, slot ten holds the last
+    byte, and a returned payload is slots zero, nine and ten plus the calldata
+    size. Odd flags revert and keep the prior snapshot."""
+    rows, prior = [], [0] * 11
+    for index, tx in enumerate(value["transactions"]):
+        data = bytes.fromhex(tx["payload"][2:])
+        reverted = int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else [index + 10] + [index + 20 + slot for slot in range(8)] + [
+            prior[9] + len(data), data[-1] if data else 0]
+        output = index + 3 if reverted else committed[0] + committed[9] + committed[10] + 100 + len(data) + -len(data) % 32
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{output:064x}", "committedStorage": long_bytes_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.LONG_BYTES_HISTORY_SCHEMA, "observedSlots": [str(slot) for slot in range(11)],
+        "initialStorage": long_bytes_slots(), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def long_bytes_histories(value=None):
+    value = long_bytes_case() if value is None else value
+    return {path: long_bytes_history(value, path) for path in runner.PATHS}
+
+
+class LongBytesTests(unittest.TestCase):
+    def test_long_bytes_case_admits_payloads_of_up_to_256_bytes(self):
+        value = long_bytes_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
+                          selected["maxPayload"], selected["countSlot"], selected["tailSlot"], selected["shrinkBatch"]),
+                         ("semantic-long-bytes-tool", "rust-hull-keyed-storage-scenario", True, "bytes", 256, "9", "10", 32))
+        self.assertEqual(runner.bytes_layout(selected), (256, [str(slot) for slot in range(11)], "9", "10"))
+        self.assertEqual(runner.bytes_layout(runner.profile(bytes_case())), (64, ["0", "1", "2", "3", "4"], "3", "4"))
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(11)))
+        self.assertTrue(runner.has_bytes(value))
+        # `cast calldata "run(uint256,bytes)" 0 0x0102...ff00`, the 256-byte wrapping ramp, is 356 bytes long.
+        ramp = bytes((index + 1) % 256 for index in range(256))
+        self.assertEqual(bytes_calldata(0, ramp), "0x220eb9b6" + "".join(f"{word:064x}" for word in (0, 0x40, 0x100)) + ramp.hex())
+        self.assertEqual(runner.bytes_calldata("0x220eb9b6", 0, ramp), bytes_calldata(0, ramp))
+        self.assertEqual(len(runner.payload_chunks({"payload": "0x" + ramp.hex()})), 8)
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        runner.validate_case(long_bytes_case(rows=((0, ramp),)))
+        original = value["transactions"][1]["calldata"]
+        for key, changed in (("payload", "0x" + "01" * 257), ("payload", "0x" + "FF" * 256), ("payload", "ff" * 256),
+                             ("calldata", original[:-2]), ("calldata", original[:-2] + "01"),
+                             ("calldata", bytes_calldata(1, b"\xff" * 255)), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][1][key] = changed
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for slots in (["0", "1", "2", "3", "4"], [str(slot) for slot in range(10)], [str(slot) for slot in range(12)]):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        # The 64-byte profile keeps its own bound and slots.
+        with self.assertRaises(ValueError):
+            runner.validate_case(bytes_case(rows=((0, bytes(65)),)))
+        with self.assertRaises(runner.Finding):
+            runner.validate_case({**bytes_case(), "observedSlots": [str(slot) for slot in range(11)]})
+        self.assertIn("0..256-byte payloads", runner.scope(value))
+        self.assertIn("slots 0..10", runner.scope(value))
+        self.assertIn("0..64-byte payloads", runner.scope(bytes_case()))
+
+    def test_long_bytes_rows_record_length_last_byte_and_sum_in_slots_nine_and_ten(self):
+        value = long_bytes_case()
+        self.assertEqual(runner.compare(long_bytes_histories(value), value)["category"], "matched")
+        for name, slot, text in (("count", 9, "98"), ("last byte", 10, "96")):
+            agreed = long_bytes_histories(value)
+            for history in agreed.values():
+                history["transactions"][0]["committedStorage"][slot]["value"] = text
+            result = runner.compare(agreed, value)
+            with self.subTest(change=name):
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", "tx-0", ["committedStorage", "output"]))
+        observed = long_bytes_histories(value)
+        observed["importedHull"]["transactions"][2]["committedStorage"][8]["value"] = "5"
+        observed["importedHull"]["finalStorage"] = copy.deepcopy(observed["importedHull"]["transactions"][2]["committedStorage"])
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-2", ["committedStorage"]))
+        history = runner.normalize_history(long_bytes_history(value, "rustEvm"), value, "rustEvm")
+        self.assertEqual(runner.bytes_fields(value["transactions"][0], history["transactions"][0], history["initialStorage"], "9", "10"), [])
+        self.assertTrue(runner.conforms(value, value["transactions"][0], history["transactions"][0], history["initialStorage"]))
+        bytes_schema = long_bytes_histories(value)
+        bytes_schema["directCore"]["schema"] = runner.BYTES_HISTORY_SCHEMA
+        self.assertEqual(runner.compare(bytes_schema, value)["category"], "adapter-error")
+
+    def test_long_bytes_hull_history_uses_the_declared_slot_runner_rows(self):
+        value = long_bytes_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": long_bytes_slots(), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in long_bytes_history(value, "importedHull")["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"]), (runner.LONG_BYTES_HISTORY_SCHEMA, [str(slot) for slot in range(11)]))
+        self.assertEqual(runner.compare({**long_bytes_histories(value), "importedHull": history}, value)["category"], "matched")
+
+
 if __name__ == "__main__":
     unittest.main()
