@@ -27,7 +27,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-offline and the twenty-two native Lean tools in one Lake invocation. Existing
+offline and the twenty-three native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -52,17 +52,17 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
 Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
 profile's default node budget, capped at 512; an explicit `--nodes` wins.
 
-Random campaigns of the eleven G0-based pure profiles generate with
-[G0 revision three](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
-(`core-g0-v3/lcg64-v1`), revision two under a per-case swarm mask; random
-stateful steps use revision two. Random runtime-input cases run each function
-at its boundary inputs and then at four seed-derived inputs, and random stateful
-scenarios have eight transactions. Fixed corpora and saved cases keep the
-revision, inputs and sequence they record. Each profile row of the report lists
-`generatorVersions`, `inputSelections` and `transactions` under
-`campaign.generation`; the suite does not select other values. `--cases`
-counts a function's inputs separately, so a random run of a runtime-input
-profile covers a function per eight to twelve cases.
+Random campaigns of the eleven G0-based pure profiles, and the random steps of
+every stateful profile, generate with [G0 revision
+three](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions) (`core-g0-v3/lcg64-v1`),
+revision two under a per-case swarm mask. Random runtime-input cases run each
+function at its boundary inputs and then at four seed-derived inputs, and random
+stateful scenarios have eight transactions. Fixed corpora and saved cases keep
+the revision, inputs and sequence they record. Each profile row of the report
+lists `generatorVersions`, `inputSelections` and `transactions` under
+`campaign.generation`; the suite does not select other values. `--cases` counts
+a function's inputs separately, so a random run of a runtime-input profile
+covers a function per eight to twelve cases.
 
 Use `--backend sonatina-o2` with either suite command to compare the same cases
 after O2 compilation. O0 remains the default. The CI matrix runs each backend
@@ -77,8 +77,8 @@ builds Rust and Lean tools; solc is supplied and checked separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 762 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 762 | Sonatina O2 | Sonatina O2 |
+| `sonatina-o0` | 775 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 775 | Sonatina O2 | Sonatina O2 |
 | `yul` | 595, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
@@ -86,11 +86,11 @@ linked layout is not supplied to the Hull importer. Its pure result can still
 be compared with both other paths; code-dependent and stateful Yul observations
 remain unsupported. Reports record this distinction in `pathBackends`.
 
-The default selection is all twenty-seven profiles: fourteen pure profiles,
+The default selection is all twenty-eight profiles: fourteen pure profiles,
 storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
 event logs, call value, bounded bytes, forwarded value, Keccak-addressed
-mappings, a sender-keyed ledger, 256-byte `bytes` payloads and nested `uint256[][]`
-inputs. Fixed mode runs all 762 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
+mappings, a sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]`
+inputs and malformed calldata. Fixed mode runs all 775 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
 than silently truncating required coverage. Repeat `--profile NAME` to select a
 smaller suite.
 
@@ -121,7 +121,12 @@ exports. Findings retain full original and reduced archives and their failure
 fingerprints. Use the corresponding pure, storage or call adapter to replay
 the archive. Exact replay requires the recorded tools and pinned library
 identities. With changed tools, start a new comparison from the saved case;
-do not describe that as exact replay of the earlier environment.
+do not describe that as exact replay of the earlier environment. A pure
+campaign compiles each distinct source once per backend and shares it among
+cases whose source files, backend, library, exporters and compiler builds match
+by digest; every archive still holds its own copies of the outputs and records
+the shared compilation in `report.compilation`, and exact replay compiles
+again.
 
 The CI finding check uses a reducible fixed addition case:
 

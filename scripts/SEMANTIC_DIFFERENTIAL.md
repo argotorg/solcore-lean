@@ -71,8 +71,8 @@ and the plain revision in `baseGeneratorVersion`.
 | Revision | `generatorVersion` | Used by |
 | --- | --- | --- |
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
-| v2 | `core-g0-v2/lcg64-v1` | random stateful steps; `--g0-version` for the pure profiles |
-| v3 | `core-g0-v3/lcg64-v1` | random generation of the eleven G0-based pure profiles |
+| v2 | `core-g0-v2/lcg64-v1` | `--g0-version` for the pure and stateful profiles |
+| v3 | `core-g0-v3/lcg64-v1` | random generation of the eleven G0-based pure profiles and of every stateful step |
 
 The eleven are `closed-g0`, `runtime-word`, `runtime-primitives`,
 `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-loops`,
@@ -140,8 +140,9 @@ saved case's; a disagreeing `--g0-version` is refused. The campaign summary
 records `configuration.g0Version` and the generated cases' versions in
 `generation.generatorVersions`. `semantic-suite.py --mode random` therefore
 generates v3 for these profiles, and fixed mode stays on v1. The stateful
-profiles build their random aggregate steps with v2 under their own tools,
-and their fixed corpora stay on v1 (see
+profiles build their random aggregate steps with v3 under their own tools,
+which record, replay and pass on each case's mask, and their fixed corpora
+stay on v1 (see
 [storage campaigns](#run-and-reduce-storage-campaigns)).
 
 ### Revision three: swarm masks
@@ -3155,11 +3156,11 @@ A case took about 7 seconds. Neither run produced a finding.
 
 ## Compare whole committed storage
 
-Every stateful profile compares the declared slots on all three paths. The nine
+Every stateful profile compares the declared slots on all three paths. The ten
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-thirteen stateful profiles now also compare the observed contracts' whole
+fourteen stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -3168,7 +3169,7 @@ this section describes how the paths observe it.
 
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
-`contract` for the eleven storage-family profiles, `parent` and `child` for
+`contract` for the twelve storage-family profiles, `parent` and `child` for
 `stateful-calls` and `stateful-forwarded-value`. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
@@ -3246,7 +3247,9 @@ but not to a declared slot, another account or another set of paths that lack
 it. Candidates are rerun on all three paths, and `same_failure` requires the
 whole fingerprint.
 
-Histories now use the `.v2` schemas of all thirteen profiles. Reports use
+Histories now use the `.v2` schemas of the thirteen profiles that existed
+then; the later malformed-calldata profile starts at
+`solcore-lean.malformed-calldata-history.v1`, whole storage included. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
 `solcore-lean.semantic-storage-analysis.v2` and

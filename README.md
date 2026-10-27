@@ -138,8 +138,8 @@ versions, rechecks saved inputs and recomputes the original Core result.
 Random campaigns of the eleven G0-based profiles use the generator's third
 revision: the second revision, which mixes each draw and widens its bank of
 boundary literals, under a per-case swarm mask that enables about half of the
-operators and forms. Random stateful steps use the second revision, and fixed
-corpora keep the first
+operators and forms. Random stateful steps use the third revision as well, and
+fixed corpora keep the first
 ([G0 generator revisions](scripts/SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)).
 Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
@@ -156,10 +156,11 @@ single-case runner compares the original generated Core result, Rust-produced
 EVM execution, and execution of Rust Hull on Lean Core. It saves all three
 observations and verifies tools and artifact hashes during replay. A campaign
 runner reduces failures while preserving their classification and disagreeing
-paths, with explicit time, disk and attempt limits. Sonatina O0 is the default;
-`--backend sonatina-o2` selects O2 for pure and stateful comparisons. Saved
-archives and reductions retain that choice. Core fuel, EVM gas and process
-timeouts remain separate resource limits.
+paths, with explicit time, disk and attempt limits; a pure campaign compiles
+each distinct source once per backend and shares it among its cases. Sonatina O0
+is the default; `--backend sonatina-o2` selects O2 for pure and stateful
+comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
+gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
 available for the fourteen pure profiles with `--backend yul`. Its EVM bytes are
@@ -172,7 +173,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same twenty-seven-profile suite runs locally with shared time and disk limits.
+The same twenty-eight-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -371,15 +372,32 @@ scenarios and sixteen recorded random scenarios match on both Sonatina levels,
 with reduction and exact archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nested-dynamic-arrays).
 
-All thirteen stateful profiles also compare the installed contracts' whole
+The malformed-calldata profile sends the dynamic-array contract calldata with
+one malformation per transaction, at most 1 KiB and without value: short
+calldata, a wrong selector, truncation, trailing bytes, out-of-range, wrapping
+or overlapping head offsets, and over-long, wrapping or short lengths. Its
+original Core contract evaluates the pinned std's dispatcher and decoder checks
+on the actual calldata in std's order, then runs the dynamic-array protocol on
+the decoded words. A std rejection reverts with a four-byte error selector,
+while original Core's contract entry returns one Word, so such a row is compared
+by selector. The rule applies only when original Core reverts with exactly that
+selector as a Word and the transaction's std prescription is that rejection;
+Rust EVM and imported Hull must then revert with exactly those four bytes. Every
+other row, and Hull against EVM in every row, is compared exactly, and each
+analysis lists the rows compared by selector. Golden cases fix std's outcome for
+each malformation. Its thirteen fixed scenarios and sixteen random scenarios at
+each of two node budgets match on both Sonatina levels. See the
+[usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-malformed-calldata).
+
+All fourteen stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The fixed corpora of all thirteen profiles, 167
-scenarios and 460 transaction prefixes, still match on both Sonatina levels,
+whole storage unchanged. The fixed corpora of all fourteen profiles, 180
+scenarios and 496 transaction prefixes, still match on both Sonatina levels,
 and a synthetic stray write that the declared slots could not see is caught and
 reduced to one transaction. See
 [whole committed storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage).

@@ -318,8 +318,10 @@ emission and provenance on replay. Keep the existing closed G0 profile stable.
 This first slice tests runtime input without claiming M4 completion or measured
 opcode coverage. Initially each input is a separate comparison case; the source
 function stays identical across its inputs, but compilation and deployment may
-repeat. Extend this to acyclic named functions and the remaining pure feature
-families listed in M4, with mixed cases and failure-preserving reduction.
+repeat. Campaigns now compile each distinct source once per backend and share
+it among those cases; deployment still repeats per case. Extend this to
+acyclic named functions and the remaining pure feature families listed in M4,
+with mixed cases and failure-preserving reduction.
 
 The runtime-input slice is delivered:
 
