@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic and two-slot storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage and two-slot rollback emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping and sender-keyed ledger extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, a direct-call head and the row lemma that derives its input from the callee's own accepted body; call sites in the subset and the size induction across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -680,11 +680,31 @@ read-after-write lemmas; no existing statement changed. The new assumptions
 are the parsing of the import selection, call statements and infix call
 arguments, the resolution of `sload` and `sstore` to the `std.opcodes`
 wrappers, their `SLOAD` and `SSTORE` meaning, and storage lowering and ABI
-dispatch. The other emitters that render with the aggregate renderer
-(closures, comptime, modules, storage rollback, keyed storage, storage
-mappings, dynamic arrays, dynamic bytes, event logs, call value, calls and
-forwarded value) are not covered; their texts use forms outside the source
-fragments.
+dispatch.
+
+`StorageRollback.emit_source_meaning` covers the `stateful-storage-rollback`
+emitter and both of its outcomes. Its method runs the storage protocol and binds
+the sum of both slots read back. For an odd input it stores the sum at memory
+offset 0 and reverts with those 32 bytes; otherwise it returns the sum. The
+rollback grammar extends the storage grammar with an operation `let` and the
+terminal revert block `if (a op b) { mstore(o, v); revert_(o, 32); }`. In the
+rollback meaning a call returns its word with the final storage, or reverts
+with a word and keeps none of its storage writes. A revert that reads other
+memory has no meaning. The theorem states that the source call reverts exactly
+when the input is odd, and that the Core transaction settles as the source
+outcome. A returned call returns the same ABI bytes and commits the same
+storage. A reverted one reverts with the 32-byte encoding of the same word and
+commits the world the transaction started from, so the installed account keeps
+its storage. The proof reuses the storage path, extended by the Core
+completion that selects the outcome profile's tag, and adds a top-level lemma
+for the reverted outcome; no existing statement changed. The new assumptions
+are the parsing of the `if` without `else`, the call statements and the
+operation `let`, and the `MSTORE` and `REVERT` meaning of the wrappers. They
+also include that a reverting call discards its storage writes. The other
+emitters that render with the aggregate renderer (closures, comptime, modules,
+keyed storage, storage mappings, sender-keyed ledgers, dynamic arrays, dynamic
+bytes, event logs, call value, calls and forwarded value) are not covered;
+their texts use forms outside the source fragments.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -730,8 +750,13 @@ transactions starts from the committed account's storage and agrees with the
 Core transaction on its word, its ABI bytes and the committed slots, and the
 regression plans also follow the two-slot recurrence. Altered stores and loads
 change the result, and a free function that reads storage has no meaning. The
-full Lean build (10,081 jobs), registered tests and the semantic-kernel
-policy passed.
+registered `SourceRollbackMeaning` test runs six regression plans, fourteen raw
+primitive steps and 23 generated scenarios through the same kind of histories.
+Their 675 transactions, 363 returned and 312 reverted, settle as Core. Odd
+inputs revert with the recurrence's sum and keep every compared slot, even
+inputs return and commit their slots, and altered revert blocks lose or change
+their meaning. The full Lean build (10,096 jobs), registered tests and the
+semantic-kernel policy passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

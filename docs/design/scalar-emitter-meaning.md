@@ -25,15 +25,18 @@ semantic-kernel policy check now covers.
 | `Loop.emit_source_meaning` | If `Loop.emit plan = .ok emitted` (profile `runtime-loops`), then for every Word input `x` there is `w` with `loopSourceCall fuel emitted.source "run" [x.val] = some w.val` for every `fuel > plan.mask`, and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `Generic.emit_source_meaning` | If `Generic.emit plan = .ok emitted` (profile `runtime-generics`), then for every Word input `x` there is `w` with `genericSourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `Storage.emit_source_meaning` | If `Storage.emit plan = .ok emitted` (profile `stateful-storage`), then for every world in which `plan.contract` is installed at the invocation's target account `a` (`installed`) and every invocation whose calldata holds the Word `x` at offset 4, there are a Word `w` and a storage `s` with `storageSourceCall emitted.source (accountStorage a) "run" [x.val] = some (w.val, s)` and `CoreCommits plan.contract invocation installed w s`. |
+| `StorageRollback.emit_source_meaning` | If `StorageRollback.emit plan = .ok emitted` (profile `stateful-storage-rollback`), then for every such world, installed account `a` and invocation, there is an outcome `o` with `rollbackSourceCall emitted.source (accountStorage a) "run" [x.val] = some o`; `o` is a revert exactly when `x` is odd, and `CoreSettles plan.contract invocation installed o`. |
 | `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
 | `CallGraphLoop.emit_preserves_meaning`, `Loop.emit_preserves_meaning` | The same results, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
 | `Generic.emit_preserves_meaning` | The same result, exposing the generic file `file` with `emitted.source = file.print`, `parseGenericSource emitted.source = some file` and `file.call "run" [x.val] = some w.val`. |
 | `Storage.emit_preserves_meaning` | The same result, exposing the storage file `file` with `emitted.source = file.print`, `parseStorageSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some (w.val, s)`. |
+| `StorageRollback.emit_preserves_meaning` | The same result, exposing the rollback file `file` with `emitted.source = file.print`, `parseRollbackSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some o`. |
 | `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 | `parseLoopSource_print` | The same for loop files under the loop grammar. |
 | `parseGenericSource_print` | The same for generic files under the generic grammar, when every generic function has a type parameter and every method-body `match` is in the generic form that the parser produces. |
 | `parseStorageSource_print` | The same for storage files under the storage grammar. |
+| `parseRollbackSource_print` | The same for rollback files under the rollback grammar. |
 | `loopSourceCall_of_parseSource` | On every text that `parseSource` accepts, `loopSourceCall fuel` is `sourceCall`, for every fuel. |
 | `genericSourceCall_print_loopFree` | On the printing of every loop-free file whose names are lexically valid and not reserved, `genericSourceCall` is `sourceCall`. |
 | `loopSourceCall_mono`, `loopSourceCall_unique` | More fuel keeps the result of a completed loop call, so all completed calls of a text return the same word. |
@@ -95,6 +98,23 @@ the input. The canonical calldata, the `run(uint256)` selector followed by the
 ABI word, has this property, as the executable checks confirm; the theorem says
 nothing about other calldata.
 
+`rollbackSourceCall source s` reads a text with the rollback grammar below and
+calls the method from the storage `s`. The call either returns its word with
+the final storage (`RollbackOutcome.returned`) or reverts with the word whose
+32-byte big-endian encoding is the revert data (`RollbackOutcome.reverted`). A
+reverted call keeps none of its storage writes. The rollback reference,
+`StorageRollback.canonicalProgram`, is a host-runtime contract with the
+three-way Word outcome profile `wordOutcomeV1`.
+`CoreSettles contract invocation installed o` states two things. With enough
+fuel, the top-level transaction completes, and every completed run settles as
+`o`. For a returned outcome, the run returns the ABI encoding of the word and
+commits a world whose target account holds the returned storage at every slot.
+For a reverted outcome, it reverts with the 32-byte encoding of the word and
+commits the world the transaction started from, so the installed account keeps
+its storage. The rollback theorem also states that the source call reverts
+exactly when the input is odd. Its world, account and calldata hypotheses are
+those of the storage theorem.
+
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -113,7 +133,10 @@ for generic programs,
 and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean),
 and, for storage programs,
 [StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/StorageSemantics.lean)
-and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean))
+and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean),
+and, for rollback programs,
+[RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackSemantics.lean)
+and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean))
 does not import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
@@ -285,6 +308,31 @@ in the file's context without `sload`, so a free function that calls `sload`
 has no meaning in this fragment, and no expression can call `sstore`. The
 pinned `std.opcodes` wrappers pass their `word` arguments to the EVM `SLOAD`
 and `SSTORE` instructions (`std/opcodes.sol`).
+
+Rollback. [RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackSemantics.lean)
+and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean)
+extend the storage fragment with the terminal revert, again as a separate
+grammar and meaning. A rollback file imports `sload`, `sstore`, `mstore` and
+`revert_` from `std.opcodes`, optionally followed by aliases. Its method body
+may contain the storage statements and `let x: T = a op b;`, with one infix
+operation without parentheses. It may also contain the revert block
+`if (a op b) { mstore(offset, value); revert_(offset', size); }`: an `if`
+without `else` whose condition is one infix operation, its parentheses
+belonging to the `if` as for loops (`crates/parser/src/parse/stmt.rs`).
+`parseRollbackSource` recognizes the block and the operation `let` by an infix
+operator after the first expression of their condition or value. There a
+loop-free `if` condition is followed by `)` and a loop-free `let` value by
+`;`, and the value of a call `let` is no complete expression. A call returns
+its word with the final storage, or reverts. The block's condition must be a
+Boolean. When it is `false`, the block does nothing. When it is `true`, the
+store's offset and value and the revert's offset and size must be words. The
+call then reverts with `value` exactly when the revert reads the 32 bytes just
+written, that is when `offset' = offset` and `size = 32`. The pinned
+`std.opcodes` wrappers pass their arguments to the EVM `MSTORE` and `REVERT`
+instructions, so those bytes are the 32-byte big-endian encoding of `value`.
+Any other offset or size reads memory that the fragment does not model and has
+no meaning. A revert discards the call's storage writes, so the storage after a
+reverted call is the storage it started from.
 
 ## Connection to the actual emitter
 
@@ -511,6 +559,23 @@ committed account, whose storage agrees with the source storage at every slot
 (`storageAgrees_writes`). By `TopLevelExecution.resumeWithFuel_run`, every
 completed run has the same result.
 
+[RollbackEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackEmitter.lean)
+connects the actual `StorageRollback.emit` (profile
+`stateful-storage-rollback`). It prints the helpers, the step and the storage
+protocol as the storage emitter does. The method then binds `sc_result` to the
+sum of both slots read back. For an odd input it stores that sum at memory
+offset 0 and reverts with those 32 bytes; otherwise it returns the sum
+(`rollbackMethod_run`). The Core wrapper of `StorageRollback.canonicalProgram`
+is restated (`rollbackExpression`). After the same seven host requests, it
+binds the sum and, by the input's low bit, selects either the revert tag with
+the sum or the sum on the left of its `wordOutcomeV1` result
+(`rollbackCompletion_evaluates`). `rollback_handled` is the handled path of
+`storage_handled` with that completion. `topLevel_run_settled` shows that a raw
+run that returns a value completes the transaction with the contract's
+decoding of it. A returned outcome commits the working world, and a reverted
+one the world the transaction started from. `rollback_parity` turns the
+low-bit test into the input's parity.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
@@ -519,7 +584,9 @@ the same for loop files (`parseLoopSource_print`), and
 [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean)
 for generic files (`parseGenericSource_print`), and
 [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean)
-for storage files (`parseStorageSource_print`). The meaning is therefore a
+for storage files (`parseStorageSource_print`), and
+[RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean)
+for rollback files (`parseRollbackSource_print`). The meaning is therefore a
 function of the emitted `String`, not of an internal printer argument.
 
 ## Assumptions outside the theorem
@@ -606,6 +673,22 @@ the word at offset 4 of the calldata as the `uint256` argument, which is the
 theorem's calldata hypothesis. Gas, including the costs and refunds of
 `SSTORE`, is not modeled.
 
+The rollback emitter adds the terminal revert. Under assumption 1, the pinned
+parser reads `if ((sc_input & 1) == 1) { ... }` as an `if` statement without
+`else` whose condition is the `==` operation, and `mstore(0, sc_result);` and
+`revert_(0, 32);` as expression statements (`crates/parser/src/parse/stmt.rs`).
+It reads `let sc_result: word = sc_final0 + sc_final1;` with the operation in
+parentheses (`crates/parser/src/parse/expr_pat.rs`), and the import as the
+selection of `mstore` and `revert_` too. Under assumption 2, `mstore` and
+`revert_` resolve to the `std.opcodes` wrappers, and the frontend accepts the
+`if` without `else` whose block ends in a revert. Under assumption 3, the
+wrappers mean the EVM `MSTORE` and `REVERT` (`std/opcodes.sol`), as described
+above. Under assumption 4, lowering, code generation and EVM execution keep
+that meaning: the revert returns the 32-byte encoding of `sc_result`, and a
+reverting call discards its storage writes. Memory at offset 0 is written only
+just before the revert, and `std.dispatch` encodes a returned word as before.
+Gas, including memory expansion, is not modeled.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -613,20 +696,21 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and twelve
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and thirteen
 actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
 named helpers (`runtime-functions`), raw primitive aliases
 (`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
 locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`), aggregate
 call graphs (`runtime-aggregate-call-graphs`), call-graph loops
 (`runtime-call-graph-loops`), aggregate loops (`runtime-loops`), generic
-selection (`runtime-generics`) and two-slot storage (`stateful-storage`). They
-do not yet cover the other emitters that render with `AggregateRenderer`
-(closures, comptime, modules, storage rollback, keyed storage, storage
-mappings, dynamic arrays, dynamic bytes, event logs, call value, contract calls
-and forwarded value). Their texts use forms outside these fragments, such as
-reverts, keyed or hashed storage access, external calls, lambdas and
-multi-file module bundles. The loop grammar admits loops only at the top level
+selection (`runtime-generics`), two-slot storage (`stateful-storage`) and
+two-slot rollback (`stateful-storage-rollback`). They do not yet cover the
+other emitters that render with `AggregateRenderer` (closures, comptime,
+modules, keyed storage, storage mappings, sender-keyed ledgers, dynamic arrays,
+dynamic bytes, event logs, call value, contract calls and forwarded value).
+Their texts use forms outside these fragments, such as keyed or hashed storage
+access, memory buffers, logs, external calls, lambdas and multi-file module
+bundles. The loop grammar admits loops only at the top level
 of a method body, with a loop-free body and an infix condition. The generic
 grammar has no loops, admits early returns only as guards on a local in
 generic function bodies, and admits unparenthesized infix operations only as
@@ -636,7 +720,10 @@ method body. It admits unparenthesized infix operations only as the argument of
 a call `let`, as a store operand and in the returned `uint256(...)`. Its
 theorem covers one transaction of an installed contract with calldata whose
 word at offset 4 is the input. Deployment, other accounts, balances, logs,
-reverts and gas are outside it.
+reverts and gas are outside it. The rollback grammar adds one revert form, a
+block whose revert reads the 32 bytes that its store wrote. Its theorem covers
+both outcomes of one transaction under the same hypotheses; the transaction's
+other effects, memory beyond that word and gas are outside it.
 
 ## Executable checks
 
@@ -790,3 +877,25 @@ loading another slot and dropping the second store change the result. A
 parenthesized step argument keeps it. Two infix operations without parentheses
 and an import line without `sstore` are rejected. A free function that reads
 storage and a stored Boolean have no meaning.
+
+[SourceRollbackMeaning](../../Solcore/Test/SourceRollbackMeaning.lean) is
+registered as well. It runs actual `StorageRollback.emit` output through
+`rollbackSourceCall` transaction by transaction, as the storage check does,
+from the same three initial storages. A returned call must match the Core
+transaction's returned ABI bytes and committed slots. A reverted call must
+match its reverted bytes, and every compared slot must keep its word. Odd
+inputs must revert and even inputs return. The six regression plans of the
+rollback emitter's test (identity, a step that clears one, a step that
+allocates a private cell, a mixed step, constant and a raw division) run nine
+inputs of both parities. Their words and slots must also follow the two-slot
+recurrence. The fourteen opcodes applied to a helper result run four inputs,
+and 23 generated scenarios run their generated inputs and two more. In all,
+675 transactions settle as Core: 363 return and 312 revert. Each text must
+reparse under the rollback grammar and print back to itself, and both the
+loop-free and the storage grammars must reject it. Two storage texts are
+outside the rollback grammar. A revert of 64 bytes or from offset 32 has no
+meaning, while even inputs keep theirs. Storing another word changes the
+reverted word, a flipped condition swaps the outcomes, and dropping the block
+makes odd inputs return. A condition in two pairs of parentheses and two infix
+operations without parentheses are rejected, and storing a Boolean in memory
+has no meaning.
