@@ -39,7 +39,7 @@ test corpus.
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic and two-slot storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance and a direct-call head given the callee's application meaning; discharging that input across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
-| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and one-call inline Yul blocks connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
+| 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
 An ambiguous comparison or confirmed defect can justify a narrowly scoped
@@ -1408,15 +1408,19 @@ call-mode layer discharges, and four independent source scenarios reach the
 call-mode theorem with runtime checks of the revert bytes. No public theorem
 statement changes.
 
-Inline Yul is connected for one-call blocks: `mstore`, `mstore8`, `return` or
-`revert` on two literal words, with right-to-left argument evaluation. A
-separate assembly obligation, which only the call-mode layer discharges,
-connects the actual `YulLowering` code, and four independent source scenarios
-reach the call-mode theorem with runtime checks of the returned and reverted
-bytes. Larger fragments need the private recursive `YulLowering` builders
-unfolded for statement lists of any length, which a public `rfl` restatement
-cannot provide; the Hull design document lists the options. The rest of
-assembly and object linking remain, in that order.
+Inline Yul is connected for statement lists: `let` with one name and an
+optional value, assignment to one name and expression statements over
+literals, Yul and Hull word locals and nested calls of `mload`, `msize`,
+`mstore`, `mstore8`, `return` and `revert`. Arguments are evaluated from right
+to left, which nested calls with effects observe. A separate assembly
+obligation, which only the call-mode layer discharges, connects the actual
+`YulLowering` builders by induction over the source derivation; the builders
+are public for the proof, a visibility-only change. Two independent source
+scenarios reach the call-mode theorem with runtime checks, one whose returned
+word depends on the argument order and one that assigns and reads a Hull
+local, besides the four one-call scenarios. Control flow, local functions,
+multi-name `let` and assignment, string literals and other builtins remain in
+assembly, followed by object linking.
 
 ## Handoff rules
 
