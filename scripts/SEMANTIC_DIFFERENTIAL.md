@@ -578,7 +578,9 @@ enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
 separately validated Sonatina O0 images, recorded explicitly in `pathBackends`.
 This compares the same pure result without claiming Yul-linked Hull execution.
-The stateful adapters reject Yul. No backend silently falls back to another.
+The storage adapter and campaign accept Yul for the fifteen storage-family
+profiles ([storage-family contracts on Yul](#compare-storage-family-contracts-on-yul));
+the call adapter rejects it. No backend silently falls back to another.
 
 The result is `report.json`. It records tool versions and hashes, pinned
 compiler/exporter receipts, source and artifact hashes, deployment and call
@@ -2151,7 +2153,7 @@ python3 scripts/semantic-suite.py --mode random --profile stateful-keyed-storage
 
 The storage runner and campaign select the keyed native tool, Hull runner and
 comparison rules from the case or manifest profile. `--backend sonatina-o2`
-works as for the other storage profiles; Yul is rejected. The synthetic
+and `--backend yul` work as for the other storage profiles. The synthetic
 adapter accepts `--test-field storage:SLOT` for any declared decimal slot of
 the original scenario; a candidate that no longer declares that slot is an
 ordinary, non-preserving analysis. Fingerprints name differing slots and, for
@@ -2390,8 +2392,8 @@ EVM path only, `chainLogs`. The declared-slot Hull runner
 `rust-hull-keyed-storage-scenario` already exported every receipt's logs, so
 it serves this profile unchanged. The storage runner and campaign select the
 native tool and comparison rules from the case or manifest profile.
-`--backend sonatina-o2` works as for the other storage profiles; Yul is
-rejected.
+`--backend sonatina-o2` and `--backend yul` work as for the other storage
+profiles.
 
 Generation measures the wrapper of the chosen sites and gives the remaining
 node budget to the aggregate step generator. A separate high-bit stream
@@ -4279,7 +4281,7 @@ boundary; this section describes how to run it.
 - **No layout dependence:** the wrappers' runtime code reads no code, and
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the sixteen pure and the twelve
+- **Admission:** `export-rust-yul.py` admits the seventeen pure and the twelve
   storage-family wrappers, taken from the adapters' profile tables; the three
   malformed profiles reuse wrappers. Each must compile to one creation object
   with one runtime sub-object and no link or immutable references.
@@ -4308,7 +4310,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the sixteen pure profiles. `--backend yul`
+Its default Yul selection stays the seventeen pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 

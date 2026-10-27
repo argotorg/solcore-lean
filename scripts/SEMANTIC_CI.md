@@ -52,14 +52,14 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
 Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
 profile's default node budget, capped at 512; an explicit `--nodes` wins.
 
-Random campaigns of the thirteen G0-based pure profiles generate with [G0
+Random campaigns of the fourteen G0-based pure profiles generate with [G0
 revision four](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
 (`core-g0-v4/lcg64-v1`): revision two under a per-case swarm mask, restricted
 to the features the profile's emitter renders. The random steps of every
 stateful profile generate with revision three (`core-g0-v3/lcg64-v1`), the same
 mask without that restriction; the stateful tools refuse revision four. In the
-ten runtime-input profiles whose functions can be identities, random campaigns
-also apply the acceptance filter `exclude-boundary-identity-v1`, which
+eleven runtime-input profiles whose functions can be identities, random
+campaigns also apply the acceptance filter `exclude-boundary-identity-v1`, which
 excludes a function that returns every boundary input unchanged
 ([boundary identities](SEMANTIC_DIFFERENTIAL.md#boundary-identities)). Random
 runtime-input cases run each function at its boundary inputs and then at four
@@ -87,29 +87,35 @@ in a separate job with separate reports and artifacts; failure in one does not
 cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
 
-`--backend yul` selects the sixteen pure profiles by default (730 fixed cases).
-Explicitly selecting a stateful profile fails before execution. Each random
-Yul run with `--cases 16` requests 256 cases. The shared preparation command
-builds Rust and Lean tools; solc is supplied and checked separately.
+`--backend yul` selects the seventeen pure profiles by default (802 fixed
+cases). The fifteen storage-family profiles also run on Yul when `--profile`
+selects them, with 190 fixed scenarios
+([storage-family contracts on Yul](SEMANTIC_DIFFERENTIAL.md#compare-storage-family-contracts-on-yul));
+selecting either call profile fails before execution. Each random Yul run of
+the default selection with `--cases 16` requests 272 cases. The shared
+preparation command builds Rust and Lean tools; solc is supplied and checked
+separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 948 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 948 | Sonatina O2 | Sonatina O2 |
-| `yul` | 730, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
+| `sonatina-o0` | 1,020 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 1,020 | Sonatina O2 | Sonatina O2 |
+| `yul` | 802 pure; 190 storage-family when selected | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
-linked layout is not supplied to the Hull importer. Its pure result can still
-be compared with both other paths; code-dependent and stateful Yul observations
-remain unsupported. Reports record this distinction in `pathBackends`.
+linked layout is not supplied to the Hull importer. Its pure and
+storage-family results can still be compared with both other paths, because
+those observations do not depend on code layout; code-dependent observations
+and the two call profiles remain unsupported on Yul. Reports record this
+distinction in `pathBackends`.
 
-The default selection is all thirty-three profiles: sixteen pure profiles, storage,
+The default selection is all thirty-four profiles: seventeen pure profiles, storage,
 storage rollback, parent/child calls, keyed storage, dynamic arrays, event
 logs, call value, bounded bytes, forwarded value, Keccak-addressed mappings, a
 sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]` inputs,
 malformed calldata for the dynamic-array, nested-array and 256-byte `bytes`
 contracts, and a contract with several external methods. Fixed mode runs all
-948 manifest cases or scenarios. It
+1,020 manifest cases or scenarios. It
 rejects `--cases`, `--functions` and `--nodes` overrides rather than silently
 truncating required coverage. Repeat `--profile NAME` to select a smaller
 suite.

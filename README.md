@@ -135,7 +135,7 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
-Random campaigns of the thirteen G0-based profiles use the generator's fourth
+Random campaigns of the fourteen G0-based profiles use the generator's fourth
 revision: the second revision, which mixes each draw and widens its bank of
 boundary literals, under a per-case swarm mask that enables about half of the
 operators and forms, restricted to those the profile's emitter renders. Random
@@ -164,9 +164,11 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the sixteen pure profiles with `--backend yul`. Its EVM bytes are
-compared with original Core and with Hull using Sonatina O0 code images;
-Yul object linking and stateful Yul are outside this comparison.
+available for the seventeen pure profiles with `--backend yul`, and for the
+fifteen storage-family profiles when they are selected. Its EVM bytes are
+compared with original Core and with Hull using Sonatina O0 code images. Yul
+object linking and the two call profiles, whose sources compile a parent and a
+child contract, are outside this comparison.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
 tools, supported operations and validation commands. Closed generated programs
 may be constant-folded; source coverage is not runtime opcode coverage.
@@ -174,7 +176,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same thirty-three-profile suite runs locally with shared time and disk limits.
+The same thirty-four-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -193,6 +195,14 @@ primitives since that version, as do the profiles added on that renderer
 later, such as nested loops and recursion; the aliases are imported only when
 a step uses one. Programs without a primitive keep byte-identical source; older
 saved cases of these profiles are rejected by their version check. See [raw primitives in aggregate-based step functions](scripts/SEMANTIC_DIFFERENTIAL.md#raw-primitives-in-aggregate-based-step-functions).
+
+The `runtime-assembly` profile renders the same primitive functions as inline
+Yul: the whole body in one `assembly` block, with each conditional as a Yul
+`switch` or as two Yul `if`s, or each operation in its own block assigning a
+Solcore local. Its original Core is the primitive function itself, so only the
+source differs. The 72-case corpus combines the primitive corpus's functions
+in each of the three forms at the eight boundary inputs
+([inline Yul](scripts/SEMANTIC_DIFFERENTIAL.md#compare-inline-yul)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -214,8 +224,8 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the ten profiles whose functions can be identities they exclude
-a function that returns every boundary input unchanged
+inputs, and in the eleven profiles whose functions can be identities they
+exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
 named helpers, including shared callees, with checked generation and reduction
