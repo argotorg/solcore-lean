@@ -141,6 +141,53 @@ records `configuration.g0Version` and the generated cases' versions in
 generates v2 for these profiles, and fixed mode stays on v1. The stateful
 profiles still build their aggregate steps with v1, under their own tools.
 
+## Seeded runtime inputs
+
+Random campaigns of the thirteen runtime-input pure profiles, every pure
+profile except `closed-g0`, run each accepted function at its boundary inputs
+and then at four inputs derived from the case seed. Fixed corpora keep the
+boundary inputs alone. The four come from a SplitMix64 stream that starts at
+the case seed XOR a fixed domain constant, five outputs each:
+
+1. a full random 256-bit Word;
+2. a random Word whose bit width is uniform from one to 256;
+3. a small value below 512;
+4. the two's-complement negation of another uniform-width value.
+
+A seeded input can coincide with a boundary input. The generated origin then
+records `"inputSelection": "seeded-inputs-v1/splitmix64"`, and `inputIndex`
+counts the boundary inputs first. Replay recomputes the list from the recorded
+seed; it rejects a seeded index whose origin names no selection, an unknown
+selection and a changed input. A reduction keeps its input as data, like any
+reduced case. An origin without the field, as in every fixed corpus, means the
+boundary inputs alone.
+
+One function now gives eight random cases in the four-input profiles, ten in
+the two loop profiles and twelve in `runtime-primitives`,
+`runtime-call-graphs` and `runtime-aggregate-call-graphs`. `--cases` still
+counts inputs, so a sixteen-case run of a four-input profile covers two
+functions rather than four. The admission filters still use the boundary
+inputs only.
+
+These profiles' generation commands take the selection after `FUEL`, in either
+order with a G0 version:
+
+```text
+semantic-case-tool input-generate SEED NODES COUNT ATTEMPTS FUEL [VERSION] [seeded-inputs-v1/splitmix64]
+semantic-case-tool call-graph-generate SEED NODES COUNT ATTEMPTS FUEL [seeded-inputs-v1/splitmix64]
+```
+
+`scripts/semantic-campaign.py` passes it in random mode, and
+`--input-selection boundary` returns to the boundary inputs. A corpus refuses
+the seeded selection and `--case` keeps the saved case's. The summary records
+`configuration.inputSelection` and the generated cases' selections in
+`generation.inputSelections`.
+
+Over 2,048 consecutive seeds, the registered Lean test requires the top bit of
+the full random input in 900 to 1,148 cases (1,024 expected), widths from at
+most eight bits to more than 248, more than 400 distinct small values with some
+below 32 and some from 256, and a negative fourth input in at least 2,000.
+
 ## Validate the emitter against Rust
 
 Prepare the checked Hull exporter as described in

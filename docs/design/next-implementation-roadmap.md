@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision two is the random default for the eleven G0-based pure profiles; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision two is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; all thirteen stateful profiles compare the observed contracts' whole committed storage on all three paths; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -588,8 +588,33 @@ forty-eight revision-two cases on O0 and on O2, in 223 and 219 seconds, with 65
 ordinary generation exclusions, no resource exclusions and no findings. A
 revision-one and a revision-two case of the closed and primitive profiles each
 replayed exactly from its archive, and 64 cases saved by earlier campaigns
-replayed unchanged. Hosted CI still has not been run. The next units of this
-lane are random non-boundary inputs for the pure profiles, then per-case
+replayed unchanged. Hosted CI still has not been run.
+
+**Seeded runtime inputs.** Random campaigns of the thirteen runtime-input pure
+profiles, including the three call-graph families, now run each accepted
+function at its boundary inputs and then at four inputs derived from the case
+seed: a full random Word, a Word of uniform bit width, a value below 512 and
+the negation of another uniform-width value. They come from a domain-separated
+SplitMix64 stream of the case seed. A generated origin names the selection
+`seeded-inputs-v1/splitmix64`; replay recomputes the list, and an origin
+without it means the boundary inputs alone, as in every fixed corpus. The
+generation commands take the selection as an option, the campaign passes it in
+random mode, corpora refuse it and saved cases keep theirs. The admission
+filters still use only the boundary inputs, and `--cases` still counts inputs,
+so a sixteen-case run of a four-input profile now covers two functions.
+
+The new case tool and the previous build gave identical output for 244
+generation runs over all fourteen generate commands, with no option and with
+explicit G0 versions, and for the replay, reduction and observation of 227
+cases. The full Lean build (10,137 jobs) and registered test driver passed,
+including value-range checks over 2,048 seeds and seeded generation, replay,
+tampering and reduction in all thirteen profiles. The Python policy suite
+passed 592 tests and the ten fixed-corpus validators passed unchanged. With
+root seed 1 and sixteen cases each, `runtime-word`, `runtime-primitives`,
+`runtime-loops` and `runtime-call-graphs` matched all 64 cases on O0 and on
+O2, in 304 and 306 seconds, twenty of them at seeded inputs, with no findings.
+Seeded small and negated inputs of `runtime-word` and `runtime-call-graphs`
+replayed exactly from their archives. The next unit of this lane is per-case
 operator and feature masks.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
