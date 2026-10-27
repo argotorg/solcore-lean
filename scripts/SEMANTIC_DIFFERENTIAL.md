@@ -3210,7 +3210,8 @@ present row `row` and replaces its table Word or its length Word with
   - overlapping another row: that row's offset, or that offset plus 32;
 - `row-length`: one too long, the most that fits, one more than fits,
   `2^251`, `2^251 + 1`, `2^256 - 1`, one shorter, and zero.
-Banks leave out changes that keep the canonical calldata as it is.
+Banks leave out changes that keep the canonical calldata as it is, and a row
+kind drawn for a value without rows sends the canonical calldata.
 `stdRejection` comes from a second std model written over the bytes
 (`stdDecode`). The adapter checks the calldata and the outcome with its own
 encoder and a third model, `nested_std_decode`. A returned row must also
@@ -3268,6 +3269,17 @@ Required coverage:
   0 to 3;
 - one to three helpers and transactions, all four templates, both outcomes
   and eight completion patterns.
+
+Local validation used committed code with frozen scripts and native tools. The
+fixed suite matched all thirteen scenarios and 36 prefixes on Sonatina O0 and
+O2 with complete coverage. Its 20 std rejections reverted on Hull and EVM with
+exactly the selector std prescribes, while the fourteen other stateful corpora
+kept their 180 scenarios and 496 prefixes. Random suites of sixteen
+eight-transaction cases (seed `20261031`) matched all 16 scenarios and 128
+prefixes on both levels, at 448 nodes and at 512. Both budgets draw the same
+transactions with different steps: 67 rows were compared by selector, 61
+transactions were accepted, and no seed was excluded. A case took about 8.5
+seconds. Neither run produced a finding.
 
 ## Compare whole committed storage
 

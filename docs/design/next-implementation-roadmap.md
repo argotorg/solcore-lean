@@ -688,6 +688,21 @@ identity. The emitter of the first two rejects the extended operators, which
 caused nearly all of their exclusions, while a one-leaf program always passes
 as the identity.
 
+Random stateful steps do not repeat that way. Each of the fourteen stateful
+profiles generated 64 scenarios under revision three, from its suite seed for
+root seed 1 at its default budget, and every one had a distinct step source.
+Each step was run in original Core on a bank of sixteen Words:
+- no step was constant: every template folds the input into a private cell
+  with `+` or `xor`, and generation rejects steps whose boundary inputs agree;
+- 89 of the 896 steps, four to nine per profile, were the identity, mostly a
+  single helper whose closed scalar is zero;
+- 142 more were a pure offset `x + c`;
+- distinct behaviours on the bank were 54 to 60 per profile.
+The aggregate emitter supports every G0 operator, so 936 attempts had no
+operator exclusion. The only exclusions were 40 template-budget refusals, 0 to
+12 per profile, the most in malformed calldata, whose wrapper leaves its step
+175 nodes.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
@@ -2242,6 +2257,51 @@ The definitions were fixed before execution:
   - then the nested-array row, element and flags reductions.
 - Exclusions: gas, value-bearing transactions, calldata over 1 KiB, malformed
   constructor calldata, and memory.
+
+What std does with each nested malformation, from that reading:
+- Short calldata and a wrong selector revert with `0x4924aef0`.
+- These revert with `0x08638556`:
+  - a cut in the head, the outer length Word, the offset table or a read
+    row, including inside a read row's skipped third element;
+  - every bad head offset, including 32;
+  - an outer length of `2^251`, `2^251 + 1` or the maximum;
+  - an outer length one too long whose extra table entry, the next Word,
+    starts a read row.
+  For a read row, these also revert:
+  - a table Word past the end or at the end;
+  - a table Word with a partial length Word, with the high bit, or wrapping
+    onto the outer length Word;
+  - a table Word into the table other than its own entry;
+  - a row length one more than fits, `2^251`, `2^251 + 1` or the maximum.
+- These are accepted:
+  - trailing bytes;
+  - offset 0, which makes the flags the outer length and the offset Word
+    the first table Word;
+  - a shorter or zero outer length, or one too long whose extra row is the
+    fourth;
+  - a row on its own table Word, which is then empty;
+  - a row that aliases another, or starts inside another row's elements where
+    that element fits as a length;
+  - a row length up to the most that fits, and a shorter or zero row length;
+  - every malformation of, or cut inside, the fourth row, which is never
+    decoded.
+
+Before any random run, the golden cases passed on both models. With scripts
+and native tools frozen on `bc2932d19`:
+- Fixed corpora on O0 and O2: the fourteen existing ones still pass with 180
+  scenarios and 496 prefixes per level. The new one matched its 13 scenarios
+  and 36 prefixes with complete coverage:
+  - its 20 std rejections (8 `0x4924aef0`, 12 `0x08638556`) reverted on Hull
+    and EVM with exactly the selector std prescribes;
+  - its 16 accepted transactions matched exactly.
+- Random suites of sixteen eight-transaction cases (seed 20261031) at 448 and
+  512 nodes matched 16 scenarios and 128 prefixes on each level, every case
+  on revision three with its mask:
+  - the two budgets draw the same transactions with different steps;
+  - 67 rows were compared by selector (28 `0x4924aef0`, 39 `0x08638556`);
+  - 61 transactions were accepted, 15 of them with a row malformation;
+  - no seed was excluded.
+- A case took about 8.5 seconds. There was no finding.
 
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
