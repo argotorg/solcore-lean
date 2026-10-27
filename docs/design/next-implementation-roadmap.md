@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage and two-slot rollback emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback and keyed-storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, and direct calls at expression roots closed by one size induction over a family of rows; nested calls, the public connection of call-containing bodies, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch` and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -700,11 +700,25 @@ completion that selects the outcome profile's tag, and adds a top-level lemma
 for the reverted outcome; no existing statement changed. The new assumptions
 are the parsing of the `if` without `else`, the call statements and the
 operation `let`, and the `MSTORE` and `REVERT` meaning of the wrappers. They
-also include that a reverting call discards its storage writes. The other
-emitters that render with the aggregate renderer (closures, comptime, modules,
-keyed storage, storage mappings, sender-keyed ledgers, dynamic arrays, dynamic
-bytes, event logs, call value, calls and forwarded value) are not covered;
-their texts use forms outside the source fragments.
+also include that a reverting call discards its storage writes.
+
+`KeyedStorage.emit_source_meaning` covers the `stateful-keyed-storage` emitter.
+Its method takes a key and an input and writes the key slot, the key's wrapping
+successor and counter slot zero in the original Core contract's order. It then
+reads all three back and reverts with their sum for an odd input, otherwise
+returning it. Computed slots need no new source form, since `sload` and
+`sstore` take any word. The keyed grammar extends the rollback one only by the
+left-folded sum `let x: T = a + b + c;`. The theorem is the rollback statement
+for two calldata words, at offsets 4 and 36, and covers every key. That
+includes zero and `2^256 - 1`, whose writes alias the counter. One agreement
+lemma for single writes carries the source and Core storage through the
+writes in order, so aliasing needs no case analysis. The new assumptions are
+the left association of `+`, the dispatch of two arguments and that `SLOAD` and
+`SSTORE` address computed slots. The other emitters that render with the
+aggregate renderer (closures, comptime, modules, storage mappings,
+sender-keyed ledgers, dynamic arrays, dynamic bytes, long bytes, event logs,
+call value, calls and forwarded value) are not covered; their texts use forms
+outside the source fragments.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -755,8 +769,13 @@ primitive steps and 23 generated scenarios through the same kind of histories.
 Their 675 transactions, 363 returned and 312 reverted, settle as Core. Odd
 inputs revert with the recurrence's sum and keep every compared slot, even
 inputs return and commit their slots, and altered revert blocks lose or change
-their meaning. The full Lean build (10,096 jobs), registered tests and the
-semantic-kernel policy passed.
+their meaning. The registered `SourceKeyedMeaning` test runs the four golden
+histories, five regression plans, fourteen raw primitive steps and 22
+generated scenarios with aliasing keys. All 674 transactions settle as Core,
+and reordered writes change the result for the aliasing key zero but not for
+key one. The full Lean
+build (10,110 jobs), registered tests and the semantic-kernel policy
+passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded
 call profiles to selected dynamic ABI values and richer account/storage or

@@ -26,17 +26,20 @@ semantic-kernel policy check now covers.
 | `Generic.emit_source_meaning` | If `Generic.emit plan = .ok emitted` (profile `runtime-generics`), then for every Word input `x` there is `w` with `genericSourceCall emitted.source "run" [x.val] = some w.val` and `CoreReturnsWithStore (plan.instantiate x).toCore w`. |
 | `Storage.emit_source_meaning` | If `Storage.emit plan = .ok emitted` (profile `stateful-storage`), then for every world in which `plan.contract` is installed at the invocation's target account `a` (`installed`) and every invocation whose calldata holds the Word `x` at offset 4, there are a Word `w` and a storage `s` with `storageSourceCall emitted.source (accountStorage a) "run" [x.val] = some (w.val, s)` and `CoreCommits plan.contract invocation installed w s`. |
 | `StorageRollback.emit_source_meaning` | If `StorageRollback.emit plan = .ok emitted` (profile `stateful-storage-rollback`), then for every such world, installed account `a` and invocation, there is an outcome `o` with `rollbackSourceCall emitted.source (accountStorage a) "run" [x.val] = some o`; `o` is a revert exactly when `x` is odd, and `CoreSettles plan.contract invocation installed o`. |
+| `KeyedStorage.emit_source_meaning` | If `KeyedStorage.emit plan = .ok emitted` (profile `stateful-keyed-storage`), then for every such world, installed account `a` and invocation whose calldata holds the Words `k` and `x` at offsets 4 and 36, there is an outcome `o` with `keyedSourceCall emitted.source (accountStorage a) "run" [k.val, x.val] = some o`; `o` is a revert exactly when `x` is odd, and `CoreSettles plan.contract invocation installed o`. |
 | `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
 | `CallGraphLoop.emit_preserves_meaning`, `Loop.emit_preserves_meaning` | The same results, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
 | `Generic.emit_preserves_meaning` | The same result, exposing the generic file `file` with `emitted.source = file.print`, `parseGenericSource emitted.source = some file` and `file.call "run" [x.val] = some w.val`. |
 | `Storage.emit_preserves_meaning` | The same result, exposing the storage file `file` with `emitted.source = file.print`, `parseStorageSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some (w.val, s)`. |
 | `StorageRollback.emit_preserves_meaning` | The same result, exposing the rollback file `file` with `emitted.source = file.print`, `parseRollbackSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some o`. |
+| `KeyedStorage.emit_preserves_meaning` | The same result, exposing the keyed file `file` with `emitted.source = file.print`, `parseKeyedSource emitted.source = some file` and `file.call (accountStorage a) "run" [k.val, x.val] = some o`. |
 | `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 | `parseLoopSource_print` | The same for loop files under the loop grammar. |
 | `parseGenericSource_print` | The same for generic files under the generic grammar, when every generic function has a type parameter and every method-body `match` is in the generic form that the parser produces. |
 | `parseStorageSource_print` | The same for storage files under the storage grammar. |
 | `parseRollbackSource_print` | The same for rollback files under the rollback grammar. |
+| `parseKeyedSource_print` | The same for keyed files under the keyed grammar. |
 | `loopSourceCall_of_parseSource` | On every text that `parseSource` accepts, `loopSourceCall fuel` is `sourceCall`, for every fuel. |
 | `genericSourceCall_print_loopFree` | On the printing of every loop-free file whose names are lexically valid and not reserved, `genericSourceCall` is `sourceCall`. |
 | `loopSourceCall_mono`, `loopSourceCall_unique` | More fuel keeps the result of a completed loop call, so all completed calls of a text return the same word. |
@@ -115,6 +118,14 @@ its storage. The rollback theorem also states that the source call reverts
 exactly when the input is odd. Its world, account and calldata hypotheses are
 those of the storage theorem.
 
+`keyedSourceCall source s` reads a text with the keyed grammar below and calls
+the two-parameter method from the storage `s`, with the same outcomes as the
+rollback call. The keyed reference, `KeyedStorage.canonicalProgram`, reads its
+key and its input from calldata at offsets 4 and 36. The keyed theorem assumes
+calldata whose words there are the key and the input, as the canonical
+`run(uint256,uint256)` calldata has. It then states `CoreSettles` and the
+parity of the outcome as the rollback theorem does.
+
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -136,7 +147,10 @@ and, for storage programs,
 and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean),
 and, for rollback programs,
 [RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackSemantics.lean)
-and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean))
+and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean),
+and, for keyed programs,
+[KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedSemantics.lean)
+and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean))
 does not import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
@@ -333,6 +347,20 @@ instructions, so those bytes are the 32-byte big-endian encoding of `value`.
 Any other offset or size reads memory that the fragment does not model and has
 no meaning. A revert discards the call's storage writes, so the storage after a
 reverted call is the storage it started from.
+
+Keyed storage. [KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedSemantics.lean)
+and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean)
+extend the rollback fragment, again as a separate grammar and meaning. Keyed
+slots need no new form. `sload` and `sstore` already take any word as their
+slot, so `sload(sc_key)`, `sload(sc_key + 1)` and `sstore(sc_key + 1, sc_old)`
+are storage statements: the latter two are a call `let` and a store with an
+operation operand. The one new statement is `let x: T = a + b + c;`. As in the
+pinned frontend, the additive operators fold to the left
+(`crates/parser/src/parse/expr_pat.rs`), so it means `let x: T = ((a + b) + c);`.
+`parseKeyedSource` recognizes it by a second `+` where an operation `let` ends
+with `;`. A slot is a word, so the key's successor wraps from `2^256 - 1` to 0.
+Writes to aliased slots replace one another in program order, and later loads
+see the last write.
 
 ## Connection to the actual emitter
 
@@ -576,6 +604,24 @@ decoding of it. A returned outcome commits the working world, and a reverted
 one the world the transaction started from. `rollback_parity` turns the
 low-bit test into the input's parity.
 
+[KeyedEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedEmitter.lean)
+connects the actual `KeyedStorage.emit` (profile `stateful-keyed-storage`). Its
+method `run(key, input)` reads the key slot and counter slot zero. It stores
+the step's result for the input plus the old key slot in the key slot, the old
+key slot in the key's wrapping successor and the counter plus one in slot
+zero, in that order. It then reads the three slots back and binds their sum.
+The revert block and the return are the rollback ones (`keyedMethod_run`). The
+Core wrapper of `KeyedStorage.canonicalProgram` is restated
+(`keyedExpression`). `keyed_handled` is its handled path through ten host
+requests: the key and the input from calldata, the two reads, the three writes
+and the three reads back. The path ends with the completion of the outcome
+profile. The source and the Core reference write the same slots in the same
+order. `storageAgrees_write` shows that each write keeps the account in
+agreement with the source storage at every slot, whether or not the slots
+alias. Agreement after the three writes therefore gives both the committed
+storage and the three words read back, for every key, including zero and
+`2^256 - 1`. The top-level step reuses `topLevel_run_settled`.
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
@@ -586,7 +632,9 @@ for generic files (`parseGenericSource_print`), and
 [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean)
 for storage files (`parseStorageSource_print`), and
 [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean)
-for rollback files (`parseRollbackSource_print`). The meaning is therefore a
+for rollback files (`parseRollbackSource_print`), and
+[KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean)
+for keyed files (`parseKeyedSource_print`). The meaning is therefore a
 function of the emitted `String`, not of an internal printer argument.
 
 ## Assumptions outside the theorem
@@ -689,6 +737,17 @@ reverting call discards its storage writes. Memory at offset 0 is written only
 just before the revert, and `std.dispatch` encodes a returned word as before.
 Gas, including memory expansion, is not modeled.
 
+The keyed-storage emitter adds computed slots and a three-term sum to these
+assumptions. Under assumption 1, the pinned parser reads
+`sc_final_key + sc_final_next + sc_final_count` as
+`(sc_final_key + sc_final_next) + sc_final_count`
+(`crates/parser/src/parse/expr_pat.rs`), and the method's two `uint256`
+parameters as the selector's two arguments. Under assumption 3, `SLOAD` and
+`SSTORE` address any word slot, so a slot computed from the key, its
+wrapping successor included, is the storage word the source semantics reads
+and writes. Under assumption 4, `std.dispatch` decodes the words at offsets 4
+and 36 as `key` and `input`, which is the theorem's calldata hypothesis.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -696,21 +755,21 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and thirteen
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and fourteen
 actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
 named helpers (`runtime-functions`), raw primitive aliases
 (`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
 locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`), aggregate
 call graphs (`runtime-aggregate-call-graphs`), call-graph loops
 (`runtime-call-graph-loops`), aggregate loops (`runtime-loops`), generic
-selection (`runtime-generics`), two-slot storage (`stateful-storage`) and
-two-slot rollback (`stateful-storage-rollback`). They do not yet cover the
-other emitters that render with `AggregateRenderer` (closures, comptime,
-modules, keyed storage, storage mappings, sender-keyed ledgers, dynamic arrays,
-dynamic bytes, event logs, call value, contract calls and forwarded value).
-Their texts use forms outside these fragments, such as keyed or hashed storage
-access, memory buffers, logs, external calls, lambdas and multi-file module
-bundles. The loop grammar admits loops only at the top level
+selection (`runtime-generics`), two-slot storage (`stateful-storage`),
+two-slot rollback (`stateful-storage-rollback`) and keyed storage
+(`stateful-keyed-storage`). They do not yet cover the other emitters that
+render with `AggregateRenderer` (closures, comptime, modules, storage
+mappings, sender-keyed ledgers, dynamic arrays, dynamic bytes, long bytes,
+event logs, call value, contract calls and forwarded value). Their texts use
+forms outside these fragments, such as hashed storage access, memory buffers,
+calldata reads, logs, external calls, lambdas and multi-file module bundles. The loop grammar admits loops only at the top level
 of a method body, with a loop-free body and an infix condition. The generic
 grammar has no loops, admits early returns only as guards on a local in
 generic function bodies, and admits unparenthesized infix operations only as
@@ -723,7 +782,10 @@ word at offset 4 is the input. Deployment, other accounts, balances, logs,
 reverts and gas are outside it. The rollback grammar adds one revert form, a
 block whose revert reads the 32 bytes that its store wrote. Its theorem covers
 both outcomes of one transaction under the same hypotheses; the transaction's
-other effects, memory beyond that word and gas are outside it.
+other effects, memory beyond that word and gas are outside it. The keyed
+grammar adds only the left-folded sum of three expressions. Its theorem covers
+both outcomes of one transaction for every key, with calldata whose words at
+offsets 4 and 36 are the key and the input.
 
 ## Executable checks
 
@@ -899,3 +961,25 @@ reverted word, a flipped condition swaps the outcomes, and dropping the block
 makes odd inputs return. A condition in two pairs of parentheses and two infix
 operations without parentheses are rejected, and storing a Boolean in memory
 has no meaning.
+
+[SourceKeyedMeaning](../../Solcore/Test/SourceKeyedMeaning.lean) is registered
+as well. It runs actual `KeyedStorage.emit` output through `keyedSourceCall`
+transaction by transaction, as the rollback check does, from the same three
+initial storages. Each transaction's key slot, the key's successor and nine
+fixed slots around zero, `2^255` and the maximum are compared. The canonical
+calldata must carry the key and the input at offsets 4 and 36, and odd inputs
+must revert. The four golden histories of the keyed-storage emitter's test run
+from empty storage and must give their hand-known words. They cover key zero,
+which aliases the counter, the key `2^256 - 1`, whose successor is the counter,
+zero results and a private cell. Five regression plans run eleven rows with
+both parities and the aliasing keys; their words and slots must also follow
+the keyed recurrence. The fourteen opcodes applied to a helper result run four
+rows, and 22 generated scenarios run their generated rows and two more. In
+all, 674 transactions settle as Core. Each text must reparse under the keyed
+grammar and print back to itself, and the loop-free, storage and rollback
+grammars must reject it. A key of `2^256` and a missing argument have no
+meaning. Writing two slots on and reading the key from the input change the
+result. Moving the counter write first changes the result for key zero, which
+aliases the counter, and keeps it for key one. A parenthesized sum or load
+argument keeps the result. A sum of four terms and a mixed
+chain without parentheses are rejected.

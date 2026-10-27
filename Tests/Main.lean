@@ -2192,6 +2192,7 @@ import Solcore.Test.RustHullYulControlCorrespondence
 import Solcore.Test.SourceLongBytesEmitter
 import Solcore.Test.SourceLongBytesCases
 import Solcore.Test.SourceLongBytesCorpus
+import Solcore.Test.SourceKeyedMeaning
 set_option autoImplicit false
 
 open Solcore
@@ -4177,5 +4178,6 @@ def main : IO UInt32 := do
   Tests.SourceLongBytesEmitter.testSourceLongBytesEmitter
   Tests.SourceLongBytesCases.testSourceLongBytesCases
   Tests.SourceLongBytesCorpus.testSourceLongBytesCorpus
+  Tests.SourceKeyedMeaning.testSourceKeyedMeaning
   IO.println "solcore-lean tests passed"
   return 0
