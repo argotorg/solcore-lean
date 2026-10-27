@@ -77,20 +77,20 @@ private def siteDepth : Nat := 9
 
 /-- Header, data Words and topics of one site. Each payload is built at the
 depth where its record is bound; `value` is the site's own binder. -/
-private def frame (site : Site) (value : Nat) : List (Nat × (Nat → Expr)) :=
+def frame (site : Site) (value : Nat) : List (Nat × (Nat → Expr)) :=
   [(headerTag site, fun _ => word 0)] ++
     ((List.range site.dataWords).map fun index =>
       (dataTag (index + 1), fun depth => bound depth (if index = 0 then value else resultPosition))) ++
     ((List.range site.topics).map fun index =>
       (topicTag (index + 1), fun depth => .binary .wordAdd (bound depth value) (word (index + 1))))
 
-private def emitRecords (depth : Nat) : List (Nat × (Nat → Expr)) → Expr
+def emitRecords (depth : Nat) : List (Nat × (Nat → Expr)) → Expr
   | [] => .unit
   | (tag, payload) :: rest =>
       .letE (host 13 depth (.pair (word tag) (payload depth))) (emitRecords (depth + 1) rest)
 
 /-- A guarded site binds `step(result + guard)` and then its frame records. -/
-private def siteExpression (depth : Nat) (site : Site) : Expr :=
+def siteExpression (depth : Nat) (site : Site) : Expr :=
   .ifE (.binary .wordEq (.binary .wordAnd (bound depth flagsPosition) (word (2 ^ site.guard)))
       (word (2 ^ site.guard)))
     (.letE (.apply (bound depth stepPosition)
@@ -103,13 +103,13 @@ private def completion (depth : Nat) : Expr :=
     (.inRight .word (.inLeft .word (bound depth resultPosition)))
     (.inLeft (.sum .word .word) (bound depth resultPosition))
 
-private def withSites (depth : Nat) : List Site → Expr
+def withSites (depth : Nat) : List Site → Expr
   | [] => completion depth
   | site :: rest => .letE (siteExpression depth site) (withSites (depth + 1) rest)
 
 /-- Every host application names its exact local depth. Both writes precede
 every log, and every log precedes the completion. -/
-private def contractExpression (stepBody : Expr) (sites : List Site) : Expr :=
+def contractExpression (stepBody : Expr) (sites : List Site) : Expr :=
   .letE stepBody
     (.letE (readInput 1 4)
       (.letE (readInput 2 36)

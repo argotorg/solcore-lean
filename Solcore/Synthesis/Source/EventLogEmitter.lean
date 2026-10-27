@@ -32,7 +32,7 @@ def logAlias (topics : Nat) : String := "sc_log" ++ toString topics
 def usedArities (sites : List Site) : List Nat :=
   (List.range 5).filter fun topics => sites.any (·.topics == topics)
 
-private def siteLines (site : Site) : List String :=
+def siteLines (site : Site) : List String :=
   let value := "sc_value" ++ toString site.guard
   let mask := toString (2 ^ site.guard)
   let data := (List.range site.dataWords).map fun index =>
