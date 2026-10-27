@@ -2188,6 +2188,7 @@ import Solcore.Test.SourceStorageLedgerEmitter
 import Solcore.Test.SourceStorageLedgerCases
 import Solcore.Test.SourceStorageLedgerCorpus
 import Solcore.Test.SourceRollbackMeaning
+import Solcore.Test.RustHullYulControlCorrespondence
 set_option autoImplicit false
 
 open Solcore
@@ -4169,5 +4170,6 @@ def main : IO UInt32 := do
   Tests.SourceStorageLedgerCases.testSourceStorageLedgerCases
   Tests.SourceStorageLedgerCorpus.testSourceStorageLedgerCorpus
   Tests.SourceRollbackMeaning.testSourceRollbackMeaning
+  Tests.RustHullYulControlCorrespondence.run
   IO.println "solcore-lean tests passed"
   return 0
