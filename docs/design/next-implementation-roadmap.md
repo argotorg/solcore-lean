@@ -38,7 +38,7 @@ test corpus.
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop and generic emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value and Keccak-addressed mapping extensions validated locally; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
-| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection and one concrete instance; remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
+| 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance and a direct-call head given the callee's application meaning; discharging that input across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and one-call inline Yul blocks connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
 Complete each operational connection before starting the next large expansion.
@@ -1269,9 +1269,14 @@ recursion, and its `body_preserves` and `body_reflects` are whole-body theorems
 without the `Expressions` premise. In its place they take `Closed`, the
 read-fault interpretation (`Reads`) and selected-body typing of the staged
 registry. Other
-expression forms, including direct calls, which need the shared size induction
-across bodies, and every expression of a contextual closure still need the
-premise. Contextual-view writes and matches are not yet closed.
+expression forms and every expression of a contextual closure still need the
+premise. A direct call is preserved and reflected at an accepted site when the
+callee's application meaning holds below the grade of the call
+(`CellAwareInvocationAcceptedDirectCalls`). Discharging that input from the
+callee's own accepted body is the remaining size induction across bodies. The
+head's caller carrier retains every ordinary global slot; the cell producer of
+`CellAwareInvocationAcceptedGlobalSlots` lets accepted bodies run on such a
+protocol. Contextual-view writes and matches are not yet closed.
 
 For these named rows the subset is connected to the unchanged public root
 (`CellAwarePublicAcceptedNamedRoot` and `CellAwarePublicAcceptedNamedForward`).

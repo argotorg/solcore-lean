@@ -204,6 +204,26 @@ need the shared size induction across bodies. Indirect, builtin and method
 calls, indices, longer tuples, constructors, builtin references, generalized
 reads, lambdas and coercions are also outside the subset.
 
+Direct calls have their own head,
+[CellAwareInvocationAcceptedDirectCalls](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedDirectCalls.lean).
+At a site with the actual compiler receipt, call authority and evidence (the
+plain-heap family's `Receipt`, `Port` and `EvidenceAt`), `preserves` and
+`reflects` close the argument vector with the cell-aware sequence, read the
+issued global cell and restore the caller carrier; argument faults stop before
+the read. Applying the selected closure is an explicit input below the grade of
+the call. `PreservesBelow` and `ReflectsBelow` of the callee header state that
+applying its issued closure from a reached caller pool enters the callee, runs
+it and restores the same pool over accepted cells, with the Source application
+at its own grade. The pool comes with its physical capture and cache, stable
+rows and argument rows. As in the plain-heap direct head, the caller carrier
+retains every ordinary global slot (`Globals`) and every reached caller retains
+the physical cache. The physical canonical protocol has both. Its bindings,
+administrative transport and ordinary caller carrier already exist, and
+[CellAwareInvocationAcceptedGlobalSlots](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedGlobalSlots.lean)
+adds its cell producer. The accepted flow and the derived write inputs are
+generic in the protocol, so accepted bodies can run on it. The head also uses
+`ProgramWellFormed`, which the public named support does not carry.
+
 The public connection of this subset starts at
 [CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
 Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
@@ -324,11 +344,16 @@ On the accepted-body route above, the next connected steps are:
   function, which the existing flows cannot express, need a separate argument;
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Extend the expression closure beyond its first subset over the same actual
-  accepted expression compiler: direct calls through the shared size induction
-  across bodies, then indirect and builtin calls, methods, indices, tuples,
-  constructors, generalized reads, closures and coercions. Expressions of
-  contextual closures need the relation between the compiler view and the
-  Source that their writes and matches also need.
+  accepted expression compiler. For direct calls, discharge the application
+  input of the direct-call head from the callee's own accepted body. This needs
+  a named entry from accepted caller cells that exports the parameter spine,
+  the body on the physical canonical protocol, and the entry and restoration
+  effects. Then add call sites to the subset and its receipt tree, and close
+  them by one size induction over a family of rows whose bodies each meet the
+  accepted-body premises. After direct calls come indirect and builtin calls,
+  methods, indices, tuples, constructors, generalized reads, closures and
+  coercions. Expressions of contextual closures need the relation between the
+  compiler view and the Source that their writes and matches also need.
 - Strengthen the named-row public connection. Instantiate the theorems at a
   body with declarations, assignments, conditionals, operators and pairs: this
   needs a fixture with the older root's receipts and an independent Source
