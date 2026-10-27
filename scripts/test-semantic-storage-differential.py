@@ -1833,5 +1833,307 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(runner.compare({**mapping_histories(value), "importedHull": history}, value)["category"], "matched")
 
 
+# Anvil's first three default accounts, from their checksummed hex, and
+# `cast to-dec $(cast keccak 0x$(printf %064x 1)$(cast to-uint256 KEY | cut -c3-))`
+# for every ledger key the fixtures use.
+LEDGER_SENDERS = (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266, 0x70997970C51812dc3A010C7d01b50e0d17dc79C8,
+                  0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
+CAST_LEDGER_SLOTS = {
+    LEDGER_SENDERS[0]: 78570585682356430730071959328554860354235701529430903318287531160901974441362,
+    LEDGER_SENDERS[1]: 20716297545289759526027067151373890095476849666992757577977631027685962156767,
+    LEDGER_SENDERS[2]: 41239936133192089133110966148978916085433226010267689210672645629181891175976,
+    0: CAST_ENTRY_SLOTS[0], 2**160 - 1: 43383778025841973631710988075798902187352068724127397131308783529513977091473,
+    MAX_WORD: CAST_ENTRY_SLOTS[MAX_WORD]}
+# Solidity's order for the first sender, `keccak256(sender ++ 1)`, which the pinned std does not use.
+CAST_SOLIDITY_SENDER_SLOT = 74068266984026185789299592274225996433761640432391943524119001479168938317058
+
+
+def ledger_calldata(flags, recipient, amount, value):
+    """Written from the ABI rules, independently of the adapter's encoder."""
+    return "0x15509d2b" + f"{flags:064x}" + f"{recipient:064x}" + f"{amount:064x}" + f"{value:064x}"
+
+
+def ledger_case(rows=((0, 0, LEDGER_SENDERS[1], 1, 7), (1, 0, LEDGER_SENDERS[1], 2**64, 3), (2, 1, MAX_WORD, 7, 7))):
+    """Envelope fixture only: native replay checks the actual ledger program.
+    Rows are (sender position, flags, recipient, amount, input)."""
+    transactions = [{"id": f"tx-{index}", "sender": str(LEDGER_SENDERS[position]), "flags": str(flags),
+        "recipient": str(recipient), "amount": str(amount), "input": str(value), "value": "0",
+        "calldata": ledger_calldata(flags, recipient, amount, value)}
+        for index, (position, flags, recipient, amount, value) in enumerate(rows)]
+    slots = {0} | {CAST_LEDGER_SLOTS[LEDGER_SENDERS[row[0]]] for row in rows} | {CAST_LEDGER_SLOTS[row[2]] for row in rows}
+    return {"schema": runner.LEDGER_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "ledgerPlan": {"schema": "solcore-lean.ledger-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in sorted(slots)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedLedger", "method": "run", "signature": "run(uint256,uint256,uint256,uint256)",
+            "selector": "0x15509d2b", "deployPath": ["SynthesizedLedgerDeploy"],
+            "runtimePath": ["SynthesizedLedgerDeploy", "SynthesizedLedger"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def ledger_slots(value, values=None):
+    values = values or {}
+    return [{"slot": slot, "value": str(values.get(slot, 0))} for slot in value["observedSlots"]]
+
+
+def ledger_history(value, path):
+    """Rows of the ledger protocol with the identity step: credit the input,
+    revert with the credited balance when the amount exceeds it, otherwise move
+    the amount, count the transaction and return both entries plus the
+    counter; odd flags revert after the writes and keep the prior snapshot."""
+    rows, committed = [], {}
+    for index, tx in enumerate(value["transactions"]):
+        source, target = str(CAST_LEDGER_SLOTS[int(tx["sender"])]), str(CAST_LEDGER_SLOTS[int(tx["recipient"])])
+        amount = int(tx["amount"])
+        balance = (committed.get(source, 0) + int(tx["input"])) % 2**256
+        if amount > balance:
+            status, output = "reverted", balance
+        else:
+            work = {**committed, source: balance - amount}
+            work[target] = (work.get(target, 0) + amount) % 2**256
+            work["0"] = work.get("0", 0) + 1
+            output = (work[source] + work[target] + work["0"]) % 2**256
+            status = "reverted" if int(tx["flags"]) % 2 else "returned"
+            committed = work if status == "returned" else committed
+        row = {"id": tx["id"], "index": index, "status": status, "output": "0x" + f"{output:064x}",
+               "committedStorage": ledger_slots(value, committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.LEDGER_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": ledger_slots(value), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return result
+
+
+def ledger_histories(value=None):
+    value = ledger_case() if value is None else value
+    return {path: ledger_history(value, path) for path in runner.PATHS}
+
+
+class LedgerTests(unittest.TestCase):
+    def test_ledger_case_requires_fixed_senders_four_word_calldata_and_derived_slots(self):
+        value = ledger_case()
+        runner.validate_case(value)
+        self.assertEqual(runner.LEDGER_SENDERS, tuple(str(sender) for sender in LEDGER_SENDERS))
+        for key, slot in CAST_LEDGER_SLOTS.items():
+            with self.subTest(key=key):
+                self.assertEqual(runner.entry_slot(key), slot)
+        self.assertEqual(len(value["observedSlots"]), 5)
+        self.assertEqual(runner.ledger_slots(value["transactions"]), value["observedSlots"])
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["scenarioSchema"], selected["declared"],
+                          selected["abi"], selected["senders"], selected["shrinkBatch"]),
+                         ("semantic-ledger-tool", "rust-hull-ledger-scenario", "solcore-lean.ledger-contract-scenario.v1",
+                          True, "ledger", True, 16))
+        self.assertTrue(runner.has_senders(value))
+        self.assertFalse(runner.has_senders(mapping_case()) or runner.has_bytes(value) or runner.has_logs(value) or runner.has_balances(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], [None, None, "reverted"])
+        original = value["transactions"][0]["calldata"]
+        for key, changed in (("sender", "1"), ("sender", "0" + str(LEDGER_SENDERS[0])), ("sender", str(LEDGER_SENDERS[0] + 2**160)),
+                             ("sender", None), ("flags", "01"), ("recipient", str(2**256)), ("amount", "01"), ("input", None),
+                             ("calldata", ledger_calldata(0, 1, LEDGER_SENDERS[1], 7)), ("calldata", original[:-2]),
+                             ("calldata", "0x24b912e5" + original[10:]), ("calldata", original + "00"), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        solidity = sorted({int(slot) for slot in value["observedSlots"]} - {CAST_LEDGER_SLOTS[LEDGER_SENDERS[0]]}
+                          | {CAST_SOLIDITY_SENDER_SLOT})
+        for slots in ([str(slot) for slot in solidity], value["observedSlots"][:-1],
+                      sorted(value["observedSlots"] + ["2"], key=int), list(reversed(value["observedSlots"])),
+                      runner.mapping_slots([{"key": tx["recipient"]} for tx in value["transactions"]])):
+            with self.subTest(slots=slots), self.assertRaises(runner.Finding):
+                runner.validate_case({**value, "observedSlots": slots})
+        for key in ("schema", "ledgerPlan", "contract"):
+            mixed = copy.deepcopy(value)
+            mixed[key] = mapping_case()[key] if key != "ledgerPlan" else {"schema": "solcore-lean.mapping-plan.v1", "stepProgram": {}}
+            with self.subTest(key=key), self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(mixed)
+        self.assertIn("run(uint256,uint256,uint256,uint256)", runner.scope(value))
+        self.assertIn("senders", runner.scope(value))
+
+    def test_ledger_fields_apply_the_protocol_without_the_step(self):
+        value = ledger_case()
+        history = ledger_history(value, "rustEvm")
+        prior, rows = history["initialStorage"], history["transactions"]
+        transactions = value["transactions"]
+        self.assertEqual([row["status"] for row in rows], ["returned", "reverted", "reverted"])
+        for tx, row in zip(transactions, rows):
+            self.assertEqual(runner.ledger_fields(tx, row, prior), [])
+            self.assertTrue(runner.conforms(value, tx, row, prior))
+            prior = row["committedStorage"] if row["status"] == "returned" else prior
+        source = value["observedSlots"].index(str(CAST_LEDGER_SLOTS[LEDGER_SENDERS[0]]))
+        target = value["observedSlots"].index(str(CAST_LEDGER_SLOTS[LEDGER_SENDERS[1]]))
+        initial = history["initialStorage"]
+        for name, change, fields in (("overpaid recipient", lambda r: r["committedStorage"][target].update(value="2"), ["committedStorage", "output"]),
+                                     ("wrapped sender", lambda r: r["committedStorage"][source].update(value=str(MAX_WORD)), ["committedStorage", "output"]),
+                                     ("counter", lambda r: r["committedStorage"][0].update(value="2"), ["committedStorage", "output"]),
+                                     ("payload", lambda r: r.update(output="0x" + f"{7:064x}"), ["output"]),
+                                     ("odd flags returned", lambda r: None, ["status"])):
+            row = copy.deepcopy(rows[0])
+            change(row)
+            tx = dict(transactions[0], flags="1") if name == "odd flags returned" else transactions[0]
+            with self.subTest(change=name):
+                self.assertEqual(runner.ledger_fields(tx, row, initial), fields)
+                self.assertFalse(runner.conforms(value, tx, row, initial))
+        # Another declared slot that changed breaks the protocol even if all else holds.
+        other = value["observedSlots"].index(str(CAST_LEDGER_SLOTS[LEDGER_SENDERS[2]]))
+        row = copy.deepcopy(rows[0])
+        row["committedStorage"][other]["value"] = "1"
+        self.assertEqual(runner.ledger_fields(transactions[0], row, initial), ["committedStorage"])
+        # An even-flag revert must report a credited balance below the amount.
+        insufficient = copy.deepcopy(rows[1])
+        insufficient["output"] = "0x" + f"{2**64:064x}"
+        self.assertEqual(runner.ledger_fields(transactions[1], insufficient, rows[0]["committedStorage"]), ["output"])
+        # A self-transfer leaves an entry of at least the amount.
+        self_case = ledger_case(((2, 0, LEDGER_SENDERS[2], 7, 7),))
+        self_rows = ledger_history(self_case, "rustEvm")["transactions"]
+        self.assertEqual((self_rows[0]["status"], int(self_rows[0]["output"], 16)), ("returned", 15))
+        self.assertEqual(runner.ledger_fields(self_case["transactions"][0], self_rows[0], ledger_slots(self_case)), [])
+        short = copy.deepcopy(self_rows[0])
+        short["committedStorage"][self_case["observedSlots"].index(str(CAST_LEDGER_SLOTS[LEDGER_SENDERS[2]]))]["value"] = "6"
+        self.assertIn("committedStorage", runner.ledger_fields(self_case["transactions"][0], short, ledger_slots(self_case)))
+
+    def test_ledger_histories_compare_entries_containment_and_agreed_protocol_breaks(self):
+        value = ledger_case()
+        self.assertEqual(runner.compare(ledger_histories(value), value)["category"], "matched")
+        target = value["observedSlots"].index(str(CAST_LEDGER_SLOTS[LEDGER_SENDERS[1]]))
+        for path in runner.PATHS:
+            observed = ledger_histories(value)
+            observed[path]["transactions"][0]["committedStorage"][target]["value"] = "5"
+            result = runner.compare(observed, value)
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+                self.assertFalse(all(result["pairs"].values()))
+        # All three paths agreeing that an insufficient transfer went through is still wrong.
+        agreed = ledger_histories(value)
+        for history in agreed.values():
+            row = history["transactions"][1]
+            row["status"], row["output"] = "returned", "0x" + f"{3:064x}"
+        result = runner.compare(agreed, value)
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        # A path that keyed the sender in Solidity's order leaves an undeclared slot.
+        for path in runner.CONTAINMENT_PATHS:
+            observed = ledger_histories(value)
+            row = observed[path]["transactions"][0]
+            source = value["observedSlots"].index(str(CAST_LEDGER_SLOTS[LEDGER_SENDERS[0]]))
+            row["undeclaredStorage"] = [{"slot": str(CAST_SOLIDITY_SENDER_SLOT), "value": row["committedStorage"][source]["value"]}]
+            row["committedStorage"][source]["value"] = "0"
+            result = runner.compare(observed, value)
+            with self.subTest(path=path, layout="solidity"):
+                self.assertEqual((result["category"], result["transactionId"], result["undeclaredPaths"]), ("semantic-mismatch", "tx-0", [path]))
+        keyed_schema = ledger_histories(value)
+        keyed_schema["directCore"]["schema"] = runner.MAPPING_HISTORY_SCHEMA
+        self.assertEqual(runner.compare(keyed_schema, value)["category"], "adapter-error")
+
+    def test_ledger_hull_history_uses_the_ledger_runner_rows(self):
+        value = ledger_case()
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": ledger_slots(value), "undeclaredStorage": []}
+        calls = [{"stage": "execution", **row} for row in ledger_history(value, "importedHull")["transactions"]]
+        history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
+        self.assertEqual((history["schema"], history["observedSlots"], history["initialUndeclaredStorage"]),
+                         (runner.LEDGER_HISTORY_SCHEMA, value["observedSlots"], []))
+        self.assertEqual(runner.compare({**ledger_histories(value), "importedHull": history}, value)["category"], "matched")
+
+    def run_ledger_execution(self, directory, accounts):
+        """Mocked execution: returns every submitted request and the Hull scenario."""
+        original = ledger_case()
+        source = directory / "case.json"
+        source.write_text(json.dumps(original))
+        output = directory / "run"
+        output.mkdir()
+        arguments = SimpleNamespace(case=source, replay=None, output=output, artifact_limit=1 << 20,
+            case_tool=Path("case-tool"), core_runner=Path("core-runner"), anvil=Path("anvil"),
+            direct_fuel=1000, core_fuel=2000, gas=100000, timeout=1,
+            upstream=directory / "upstream", target_dir=directory / "target")
+        address = "0x" + "02" * 20
+        bindings = {"schema": "solcore-lean.storage-bindings.v1", "caller": str(LEDGER_SENDERS[0]), "address": str(int(address, 16))}
+        direct = {**ledger_history(original, "directCore"), "bindings": bindings, "fuelPerTransaction": 1000}
+        scenarios = []
+        fake_runner = Mock()
+        fake_runner.identity.return_value = {"sha256": "0" * 64}
+        fake_runner.args = arguments
+        fake_runner.remaining.return_value = 10
+
+        def process(stage, command, *_args):
+            if stage == "imported-hull":
+                scenarios.append(json.loads(Path(command[1]).read_text()))
+                hull = ledger_history(original, "importedHull")
+                observations = [{"stage": "deployment", "status": "returned", "committedStorage": ledger_slots(original),
+                                 "undeclaredStorage": []}, *[{"stage": "execution", **row} for row in hull["transactions"]]]
+                return {"returncode": 0, "stdout": "\n".join(json.dumps(item) for item in observations)}
+            return {"returncode": 0, "stdout": "revision"}
+
+        fake_runner.process.side_effect = process
+
+        def checked_process(_runner, stage, *_args):
+            if stage == "direct-core-replay":
+                return {"stdout": json.dumps(original)}
+            if stage == "direct-core-observe":
+                return {"stdout": json.dumps(direct)}
+            if stage == "rust-code-images":
+                (output / "images.json").write_text("{}")
+            return {"stdout": ""}
+
+        rpc = Mock()
+        submitted = []
+
+        def rpc_call(method, params):
+            if method == "eth_accounts":
+                return accounts
+            if method == "eth_sendTransaction":
+                submitted.append(params[0])
+                return "0x" + f"{len(submitted):064x}"
+            if method == "eth_getTransactionReceipt":
+                deploy = params[0] == "0x" + f"{1:064x}"
+                return {"transactionHash": params[0], "status": "0x1", "blockNumber": hex(int(params[0], 16)),
+                        "contractAddress": address if deploy else None}
+            if method == "eth_getCode":
+                return "0x6000"
+            if method == "eth_getStorageAt":
+                return "0x" + "00" * 32
+            if method == "debug_traceTransaction":
+                if params[1] == runner.PRESTATE_DIFF:
+                    return {"pre": {}, "post": {}}
+                return {"failed": False, "returnValue": f"{0:064x}"}
+            self.fail(f"unexpected RPC method: {method}")
+
+        rpc.call.side_effect = rpc_call
+
+        @contextmanager
+        def anvil(*_args, steps_tracing=False):
+            yield rpc
+
+        report = {"histories": {}, "processes": []}
+        with patch.object(runner.common, "Runner", return_value=fake_runner), \
+                patch.object(runner.common, "checked_process", side_effect=checked_process), \
+                patch.object(runner.common, "validate_export", return_value={}), \
+                patch.object(runner.common, "image_bytes", return_value=b"\x60\x00"), \
+                patch.object(runner.common, "anvil", side_effect=anvil):
+            runner.execute(arguments, report)
+        return original, submitted, scenarios
+
+    def test_ledger_execution_sends_each_transaction_from_its_sender(self):
+        accounts = [f"0x{sender:040x}" for sender in LEDGER_SENDERS] + ["0x" + "0a" * 20]
+        with tempfile.TemporaryDirectory() as temporary:
+            original, submitted, scenarios = self.run_ledger_execution(Path(temporary), accounts)
+        self.assertEqual([request["from"] for request in submitted],
+                         [accounts[0]] + [f"0x{int(tx['sender']):040x}" for tx in original["transactions"]])
+        self.assertEqual(scenarios[0]["senders"], [str(sender) for sender in LEDGER_SENDERS])
+        self.assertEqual(scenarios[0]["schema"], "solcore-lean.ledger-contract-scenario.v1")
+        self.assertEqual(scenarios[0]["constructor"]["caller"], str(LEDGER_SENDERS[0]))
+        self.assertEqual([call["context"]["caller"] for call in scenarios[0]["calls"]],
+                         [tx["sender"] for tx in original["transactions"]])
+        for missing in (accounts[1:], [accounts[0], accounts[1]], [accounts[1], accounts[0], accounts[2]]):
+            with self.subTest(accounts=missing), tempfile.TemporaryDirectory() as temporary:
+                with self.assertRaises(runner.Finding) as caught:
+                    self.run_ledger_execution(Path(temporary), missing)
+                self.assertEqual((caught.exception.category, caught.exception.stage), ("adapter-error", "evm-senders"))
+
+
 if __name__ == "__main__":
     unittest.main()

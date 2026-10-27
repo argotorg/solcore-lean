@@ -47,10 +47,13 @@ BYTES_CASE_SCHEMA = "solcore-lean.semantic-bytes-case.v1"
 BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v1"
 MAPPING_CASE_SCHEMA = "solcore-lean.semantic-mapping-case.v1"
 MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v1"
+LEDGER_CASE_SCHEMA = "solcore-lean.semantic-ledger-case.v1"
+LEDGER_HISTORY_SCHEMA = "solcore-lean.ledger-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
-# the deployment receipt must carry no logs even when transactions' logs are not compared.
+# the deployment receipt must carry no logs even when transactions' logs are not compared;
+# `senders`: each transaction names one of LEDGER_SENDERS, which sends it on every path.
 _TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "declared": False, "abi": "word",
     "signature": "run(uint256)", "selector": "0xa444f5e9",
     "historySchema": HISTORY_SCHEMA, "coreRunner": "rust-hull-storage-scenario",
@@ -107,6 +110,14 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": MAPPING_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256,uint256)", "selector": "0x24b912e5", "rollback": True, "keyed": False,
         "declared": True, "abi": "mapping", "shrinkBatch": 16},
+    # The ledger embeds the same closure, so it keeps the mapping's bounded batch.
+    "stateful-ledger": {"caseSchema": LEDGER_CASE_SCHEMA, "planSchema": "solcore-lean.ledger-plan.v1",
+        "planKey": "ledgerPlan", "corpusSchema": "solcore-lean.semantic-ledger-corpus.v1",
+        "originKind": "ledger-generated", "contract": "SynthesizedLedger",
+        "caseTool": "semantic-ledger-tool", "coreRunner": "rust-hull-ledger-scenario",
+        "scenarioSchema": "solcore-lean.ledger-contract-scenario.v1", "historySchema": LEDGER_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b", "rollback": True, "keyed": False,
+        "declared": True, "abi": "ledger", "senders": True, "shrinkBatch": 16},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
@@ -128,6 +139,9 @@ BYTES_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_PAYLOAD = 64
 # The mapping profile's counter slot and the mapping field's base slot.
 MAPPING_COUNTER, MAPPING_BASE = 0, 1
+# The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
+LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
+                  str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
 # Ethereum Keccak-256, written from the Keccak reference for the slot check; the
 # lane at index x + 5y has rotation KECCAK_ROTATIONS[x + 5y].
 KECCAK_ROUND_CONSTANTS = (
@@ -154,10 +168,19 @@ def profile(case: dict) -> dict:
     raise ValueError("unsupported storage case schema")
 
 
-def expected_status(case: dict, transaction: dict) -> str:
-    """The profile fixes completion polarity, not the returned value or world."""
-    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value", "bytes", "mapping") else "input"]
-    return "reverted" if profile(case)["rollback"] and int(common.word(parity)) % 2 else "returned"
+def expected_status(case: dict, transaction: dict) -> str | None:
+    """The profile fixes completion polarity, not the returned value or world.
+    A ledger's even flags may still revert for an insufficient balance, so only
+    its odd flags fix a status; `ledger_fields` checks the rest."""
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "flags", "value", "bytes", "mapping", "ledger") else "input"]
+    odd = int(common.word(parity)) % 2
+    if has_senders(case) and not odd:
+        return None
+    return "reverted" if profile(case)["rollback"] and odd else "returned"
+
+
+def has_senders(case: dict) -> bool:
+    return profile(case).get("senders", False)
 
 
 def has_logs(case: dict) -> bool:
@@ -230,6 +253,45 @@ def mapping_slots(transactions) -> list[str]:
         key = int(common.word(tx.get("key") if isinstance(tx, dict) else None, "transaction key"))
         values.update((entry_slot(key), entry_slot(key + 1)))
     return [str(value) for value in sorted(values)]
+
+
+def ledger_slots(transactions) -> list[str]:
+    """The ledger protocol's complete write set: the counter and the entry slots
+    of every transaction's sender and recipient, in increasing numeric order."""
+    values = {MAPPING_COUNTER}
+    for tx in transactions:
+        sender = common.word(tx.get("sender") if isinstance(tx, dict) else None, "transaction sender")
+        values.update((entry_slot(int(sender)), entry_slot(int(common.word(tx.get("recipient"), "transaction recipient")))))
+    return [str(value) for value in sorted(values)]
+
+
+def ledger_fields(transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a completed row that break the ledger protocol. Odd flags
+    revert; an even-flag revert is an insufficient balance, so its payload (the
+    credited balance) is below the amount. A returned row increments the
+    counter, changes no declared slot but the counter and the two entries, and
+    returns their sum; a transfer to another key credits exactly the amount and
+    leaves a sender entry the amount does not wrap, and a self-transfer leaves an
+    entry of at least the amount. Rollback is checked separately."""
+    odd = int(transaction["flags"]) % 2 == 1
+    amount = int(transaction["amount"])
+    output = int.from_bytes(common.hex_bytes(row["output"], "output"), "big")
+    if row["status"] == "reverted":
+        return [] if odd or output < amount else ["output"]
+    if row["status"] != "returned":
+        return []
+    if odd:
+        return ["status"]
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    source, target = str(entry_slot(int(transaction["sender"]))), str(entry_slot(int(transaction["recipient"])))
+    kept = all(after[slot] == before[slot] for slot in after if slot not in ("0", source, target))
+    moved = (after[source] >= amount if source == target else
+             after[target] == (before[target] + amount) % 2**256 and after[source] + amount < 2**256)
+    fields = [] if after["0"] == (before["0"] + 1) % 2**256 and kept and moved else ["committedStorage"]
+    if output != (after[source] + after[target] + after["0"]) % 2**256:
+        fields.append("output")
+    return fields
 
 
 def has_bytes(case: dict) -> bool:
@@ -334,6 +396,11 @@ def scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_senders(case):
+        return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions from three fixed funded senders on "
+                "a sender-keyed Keccak-addressed ledger; initially empty storage; committed values at the counter and "
+                "every sender's and recipient's keccak256(1 ++ key) slot on all paths and no nonzero undeclared slot on "
+                "Hull/EVM; no gas/balance/nonce equivalence")
     if profile(case)["abi"] == "mapping":
         return ("ordered zero-value run(uint256,uint256,uint256) transactions on a Keccak-addressed mapping; initially "
                 "empty storage; committed values at the counter and every key's and successor's keccak256(1 ++ key) slot "
@@ -396,6 +463,13 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its three original Words")
             continue
+        if selected["abi"] == "ledger":
+            if tx.get("sender") not in LEDGER_SENDERS:
+                raise ValueError("ledger transactions are sent by one of the fixed senders")
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "recipient", "amount", "input")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its four original Words")
+            continue
         value = int(common.word(tx.get("input"), "transaction input"))
         prefix = {"keyed": "key", "flags": "flags", "value": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
@@ -428,6 +502,10 @@ def validate_case(case) -> None:
         validate_transactions(case, selected)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != mapping_slots(case["transactions"]):
             raise Finding("unsupported-scope", "input", "mapping profile starts empty and observes the counter and every key's and successor's entry slot")
+    elif selected["abi"] == "ledger":
+        validate_transactions(case, selected)
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ledger_slots(case["transactions"]):
+            raise Finding("unsupported-scope", "input", "ledger profile starts empty and observes the counter and every sender's and recipient's entry slot")
     elif selected["abi"] == "bytes":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_SLOTS:
             raise Finding("unsupported-scope", "input", "bytes profile starts empty and observes slots zero through four")
@@ -575,12 +653,18 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     rollback of the committed slots and, for logs, the static log shapes from
     the contract address; a reverted row commits no logs. For call value, the
     balance is the deployment value plus slot one and a revert keeps it. For
-    bytes, a returned row records its payload length, last byte and sum."""
-    if row["status"] != expected_status(case, tx) or len(common.hex_bytes(row["output"], "output")) != 32:
+    bytes, a returned row records its payload length, last byte and sum. For
+    the ledger, `ledger_fields` fixes what the balance-dependent polarity leaves
+    open."""
+    expected = expected_status(case, tx)
+    if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
+            len(common.hex_bytes(row["output"], "output")) != 32:
         return False
     if row["status"] == "reverted" and row["committedStorage"] != prior:
         return False
     if has_bytes(case) and bytes_fields(tx, row, prior):
+        return False
+    if has_senders(case) and ledger_fields(tx, row, prior):
         return False
     if has_balances(case) and (row["committedBalance"] != expected_balance(case, row) or
                                (row["status"] == "reverted" and row["committedBalance"] != prior_balance)):
@@ -652,7 +736,9 @@ def compare(histories: dict, case: dict) -> dict:
         compared = {name: without_containment(row) for name, row in rows.items()}
         pairs = pairwise(compared)
         fields = [key for key in observed if len({json.dumps(row[key], sort_keys=True) for row in rows.values()}) != 1]
-        normal = all(row["status"] == expected_status(case, tx) and len(common.hex_bytes(row["output"], "output")) == 32 for row in rows.values())
+        expected = expected_status(case, tx)
+        normal = all((expected is None or row["status"] == expected) and len(common.hex_bytes(row["output"], "output")) == 32
+                     for row in rows.values())
         rollback = all(row["status"] != "reverted" or row["committedStorage"] ==
             (values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])
             for name, row in rows.items())
@@ -671,6 +757,12 @@ def compare(histories: dict, case: dict) -> dict:
             # A returned row records its payload length and last byte and returns
             # the committed sum; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in bytes_fields(tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_senders(case):
+            # The ledger protocol fixes the rest of each row; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in ledger_fields(tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
@@ -960,6 +1052,10 @@ def execute(args, report: dict) -> None:
         if not accounts or not re.fullmatch(r"0x[0-9a-fA-F]{40}", accounts[0]):
             raise ValueError("local Anvil supplied no valid sender")
         sender, gas = accounts[0], hex(args.gas)
+        if has_senders(case):
+            unlocked = {account.lower() for account in accounts if isinstance(account, str)}
+            if sender.lower() != f"0x{int(LEDGER_SENDERS[0]):040x}" or any(f"0x{int(value):040x}" not in unlocked for value in LEDGER_SENDERS):
+                raise Finding("adapter-error", "evm-senders", "local Anvil does not unlock the fixed ledger senders, the first one deploying")
         report["evmDeployment"] = {}
         tx_hash = submit(rpc, {"from": sender, "data": "0x" + init.hex(), "value": hex(deployment_value(case)), "gas": gas}, report["evmDeployment"])
         deployed = receipt(rpc, tx_hash, runner)
@@ -997,6 +1093,10 @@ def execute(args, report: dict) -> None:
             "deployPath": case["contract"]["deployPath"], "runtimePath": case["contract"]["runtimePath"], "fuel": args.core_fuel,
             "observedSlots": list(slots), "constructor": {**base, "calldata": "0x"},
             "calls": [{"id": tx["id"], "context": {**base, "calldata": tx["calldata"]}, "persist": True} for tx in case["transactions"]]}
+        if has_senders(case):
+            scenario["senders"] = list(LEDGER_SENDERS)
+            for call, tx in zip(scenario["calls"], case["transactions"]):
+                call["context"]["caller"] = tx["sender"]
         if selected.get("balances"):
             scenario["callerFunds"] = str(CALLER_FUNDS)
             scenario["constructor"]["value"] = str(deployment_value(case))
@@ -1032,7 +1132,7 @@ def execute(args, report: dict) -> None:
             records.append(record)
             checkpoint(tx["id"])
             try:
-                tx_hash = submit(rpc, {"from": sender, "to": address, "data": tx["calldata"],
+                tx_hash = submit(rpc, {"from": f"0x{int(tx['sender']):040x}" if has_senders(case) else sender, "to": address, "data": tx["calldata"],
                                        "value": hex(int(tx["value"])), "gas": gas}, record)
             except BaseException:
                 if record.get("submission") == "rejected":

@@ -58,17 +58,24 @@ VALUE_DIMENSIONS = DIMENSIONS + VALUE_EXTRA
 # Payload lengths, and those of reverted transactions, whose slot writes rollback discards.
 BYTES_EXTRA = {"PayloadLengths": tuple(range(adapter.MAX_PAYLOAD + 1)), "RevertedPayloadLengths": tuple(range(adapter.MAX_PAYLOAD + 1))}
 BYTES_DIMENSIONS = DIMENSIONS + tuple(BYTES_EXTRA)
+# Ledger senders, recipients and amounts, distinct senders per scenario, and
+# revert causes: odd flags, or an insufficient balance under even flags.
+LEDGER_EXTRA = ("Senders", "Recipients", "Amounts", "SenderCounts", "RevertCauses")
+LEDGER_DIMENSIONS = DIMENSIONS + LEDGER_EXTRA + ("Aliases",)
+LEDGER_CAUSES = ("odd-flags", "insufficient-balance")
 ARRAY_LENGTHS = (0, 1, 2, 3)
-NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA
+NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
 # Static entry aliasing of the mapping: the maximum key's successor wraps to zero.
 MAPPING_ALIASES = ("repeated-key", "successor-key", "wrapped-successor")
+# Static ledger aliasing: a self-transfer, a sender an earlier transaction paid, a repeated sender.
+LEDGER_ALIASES = ("self-transfer", "received-then-sent", "repeated-sender")
 TEST_FIELD = re.compile(r"output|log|balance|storage:(?:0|[1-9][0-9]{0,77})")
 
 
 def dimensions(profile_name):
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
-            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS}.get(
+            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS}.get(
         adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
 
 
@@ -77,6 +84,16 @@ def value_coverage(case, statuses):
     return {"Values": {tx["value"] for tx in case["transactions"]},
             "RevertedValues": {tx["value"] for tx, status in zip(case["transactions"], statuses) if status == "reverted"},
             "DeploymentValues": {str(adapter.deployment_value(case))}}
+
+
+def ledger_coverage(case, statuses):
+    """Senders, recipients, amounts, distinct senders and the cause of each
+    revert: odd flags, or an insufficient balance under even flags."""
+    transactions = case["transactions"]
+    return {"Senders": {tx["sender"] for tx in transactions}, "Recipients": {tx["recipient"] for tx in transactions},
+            "Amounts": {tx["amount"] for tx in transactions}, "SenderCounts": {len({tx["sender"] for tx in transactions})},
+            "RevertCauses": {"odd-flags" if int(tx["flags"]) % 2 else "insufficient-balance"
+                             for tx, status in zip(transactions, statuses) if status == "reverted"}}
 
 
 def bytes_coverage(case, statuses):
@@ -117,7 +134,19 @@ def inputs(case):
 
 def aliases(case):
     """Static aliasing among transaction keys, independent of execution: of raw
-    slots for keyed storage and of entry slots for the mapping."""
+    slots for keyed storage, of entry slots for the mapping, and of sender and
+    recipient entries for the ledger."""
+    if adapter.profile(case)["abi"] == "ledger":
+        senders = [int(common.word(tx["sender"], "transaction sender")) for tx in case["transactions"]]
+        recipients = [int(common.word(tx["recipient"], "transaction recipient")) for tx in case["transactions"]]
+        found = set()
+        if any(sender == recipient for sender, recipient in zip(senders, recipients)):
+            found.add("self-transfer")
+        if any(recipients[i] == senders[j] for i in range(len(senders)) for j in range(i + 1, len(senders))):
+            found.add("received-then-sent")
+        if len(set(senders)) < len(senders):
+            found.add("repeated-sender")
+        return found
     keys = [int(common.word(tx["key"], "transaction key")) for tx in case["transactions"]]
     found = set()
     if adapter.profile(case)["abi"] == "mapping":
@@ -214,8 +243,28 @@ def validate_manifest(manifest):
             common.word(value, "required key")
         if not isinstance(kinds, list) or any(v not in catalog for v in kinds) or len(set(kinds)) != len(kinds):
             raise ValueError("invalid keyed alias requirements")
+    elif selected["abi"] == "ledger":
+        if "requiredKeys" in manifest:
+            raise ValueError("key coverage belongs to the keyed storage and mapping profiles")
+        for dimension in ("Senders", "Recipients", "Amounts"):
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(not isinstance(v, str) for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"ledger coverage requires unique required{dimension}")
+            for value in values:
+                common.word(value, "required " + dimension)
+        if any(value not in adapter.LEDGER_SENDERS for value in manifest["requiredSenders"]):
+            raise ValueError("required senders must be fixed ledger senders")
+        counts, causes, kinds = (manifest.get(key) for key in ("requiredSenderCounts", "requiredRevertCauses", "requiredAliases"))
+        if not isinstance(counts, list) or not counts or any(type(v) is not int or v not in (1, 2, 3) for v in counts) or len(set(counts)) != len(counts):
+            raise ValueError("ledger coverage requires unique distinct-sender counts from one to three")
+        if not isinstance(causes, list) or not causes or any(v not in LEDGER_CAUSES for v in causes) or len(set(causes)) != len(causes):
+            raise ValueError("invalid ledger revert-cause requirements")
+        if not isinstance(kinds, list) or any(v not in LEDGER_ALIASES for v in kinds) or len(set(kinds)) != len(kinds):
+            raise ValueError("invalid ledger alias requirements")
     elif "requiredKeys" in manifest or "requiredAliases" in manifest:
         raise ValueError("key coverage belongs to the keyed storage and mapping profiles")
+    if selected["abi"] != "ledger" and any("required" + dimension in manifest for dimension in LEDGER_EXTRA):
+        raise ValueError("sender coverage belongs to the ledger profile")
     if selected["abi"] == "array":
         lengths = manifest.get("requiredLengths")
         if not isinstance(lengths, list) or not lengths or any(type(v) is not int or v not in ARRAY_LENGTHS for v in lengths) or len(set(lengths)) != len(lengths):
@@ -381,7 +430,8 @@ def keyed_analysis(analysis):
     histories = analysis.get("histories", {})
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
-                                                adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA)
+                                                adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
+                                                adapter.LEDGER_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -507,7 +557,9 @@ class Campaign:
                 raise ValueError("coverage requires actual matched histories")
             statuses = [row["status"] for row in histories["directCore"]["transactions"]]
         else:
-            statuses = [adapter.expected_status(case, tx) for tx in case["transactions"]]
+            # A ledger's even flags are planned to return; only matched coverage,
+            # from actual histories, can show an insufficient balance.
+            statuses = [adapter.expected_status(case, tx) or "returned" for tx in case["transactions"]]
         values.update(Outcomes=set(statuses), CompletionPatterns={",".join(statuses)})
         if self.specification["abi"] in ("keyed", "mapping"):
             values.update(Keys={tx["key"] for tx in case["transactions"]}, Aliases=aliases(case))
@@ -519,6 +571,8 @@ class Campaign:
             values.update(value_coverage(case, statuses))
         elif self.specification["abi"] == "bytes":
             values.update(bytes_coverage(case, statuses))
+        elif self.specification["abi"] == "ledger":
+            values.update(ledger_coverage(case, statuses), Aliases=aliases(case))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -563,7 +617,8 @@ class Campaign:
         for dimension in ("Outcomes", "CompletionPatterns"):
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
-                          "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": tuple(BYTES_EXTRA)}.get(self.specification["abi"], ()):
+                          "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": tuple(BYTES_EXTRA),
+                          "ledger": LEDGER_EXTRA + ("Aliases",)}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []

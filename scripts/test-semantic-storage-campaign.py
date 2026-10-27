@@ -1128,5 +1128,116 @@ class MappingCampaignTests(unittest.TestCase):
                 self.assertEqual(campaign.common.read_json(Path(directory) / finding["history"])["status"], "no-preserving-candidate")
 
 
+def ledger_case(rows=None):
+    value = fixtures.ledger_case() if rows is None else fixtures.ledger_case(rows)
+    value["ledgerPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def ledger_report(value):
+    histories = fixtures.ledger_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class LedgerCampaignTests(unittest.TestCase):
+    def test_ledger_dimensions_and_static_aliases(self):
+        self.assertEqual(campaign.dimensions("stateful-ledger"), campaign.DIMENSIONS + (
+            "Senders", "Recipients", "Amounts", "SenderCounts", "RevertCauses", "Aliases"))
+        self.assertEqual(campaign.versions("stateful-ledger"), campaign.VERSIONS)
+        s0, s1, s2 = fixtures.LEDGER_SENDERS
+        maximum = fixtures.MAX_WORD
+        for rows, expected in ((((0, 0, 0, 1, 1),), set()), (((0, 0, s0, 1, 1),), {"self-transfer"}),
+                               (((0, 0, s1, 1, 1), (1, 0, 0, 1, 1)), {"received-then-sent"}),
+                               (((1, 0, 0, 1, 1), (0, 0, s1, 1, 1)), set()),
+                               (((2, 0, maximum, 1, 1), (2, 0, 2**160 - 1, 1, 1)), {"repeated-sender"}),
+                               (((0, 0, s1, 1, 7), (1, 0, s1, 2**64, 3), (2, 1, maximum, 7, 7)),
+                                {"received-then-sent", "self-transfer"})):
+            with self.subTest(rows=rows):
+                self.assertEqual(campaign.aliases(ledger_case(rows)), expected)
+        value = ledger_case()
+        statuses = [row["status"] for row in fixtures.ledger_history(value, "directCore")["transactions"]]
+        self.assertEqual(statuses, ["returned", "reverted", "reverted"])
+        self.assertEqual(campaign.ledger_coverage(value, statuses), {
+            "Senders": {str(s0), str(s1), str(s2)}, "Recipients": {str(s1), str(maximum)}, "Amounts": {"1", str(2**64), "7"},
+            "SenderCounts": {3}, "RevertCauses": {"insufficient-balance", "odd-flags"}})
+
+    def test_ledger_manifest_requires_its_dimensions_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-ledger-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(manifest["requiredAliases"], list(campaign.LEDGER_ALIASES))
+        self.assertEqual(manifest["requiredSenders"], list(campaign.adapter.LEDGER_SENDERS))
+        changes = [lambda m: m.pop("requiredSenders"), lambda m: m.update(requiredSenders=["1"]),
+            lambda m: m.update(requiredRecipients=["00"]), lambda m: m.update(requiredAmounts=[]),
+            lambda m: m.update(requiredSenderCounts=[4]), lambda m: m.update(requiredRevertCauses=["unknown"]),
+            lambda m: m.update(requiredRevertCauses=[]), lambda m: m.update(requiredAliases=["repeated-key"]),
+            lambda m: m.update(requiredKeys=["0"]), lambda m: m.update(requiredLengths=[0]),
+            lambda m: m.update(requiredOutcomes=["returned"]),
+            lambda m: m["cases"][0].update(mappingPlan=m["cases"][0].pop("ledgerPlan")),
+            lambda m: m["cases"][0].update(expectedHistory={})]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        mapping = json.loads((ROOT / "scripts/semantic-mapping-corpus.json").read_text())
+        for key, value in (("requiredSenders", list(campaign.adapter.LEDGER_SENDERS)), ("requiredRevertCauses", ["odd-flags"])):
+            invalid = copy.deepcopy(mapping)
+            invalid[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_ledger_coverage_counts_insufficient_balances_only_from_matched_histories(self):
+        value = ledger_case()
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-ledger"))
+            self.assertIn("requiredRevertCauses", instance.summary["coverage"])
+            instance.summary["coverage"].update(requiredRevertCauses=list(campaign.LEDGER_CAUSES), requiredSenderCounts=[1, 2, 3],
+                                                requiredAliases=list(campaign.LEDGER_ALIASES))
+            instance.record_coverage(value, "generated")
+            self.assertEqual(instance.summary["coverage"]["generatedRevertCauses"], ["odd-flags"])
+            instance.record_coverage(value, "matched", ledger_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedRevertCauses"], ["insufficient-balance", "odd-flags"])
+            self.assertEqual((coverage["missingRevertCauses"], coverage["missingSenderCounts"], coverage["missingAliases"]),
+                             ([], [1, 2], ["repeated-sender"]))
+            self.assertEqual(coverage["matchedSenders"], sorted(campaign.adapter.LEDGER_SENDERS, key=int))
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertNotIn("requiredSenders", campaign.Campaign(options(directory, profile="stateful-mapping")).summary["coverage"])
+
+    def test_ledger_entry_slots_are_named_in_fingerprints_and_injection(self):
+        value = ledger_case()
+        raw = ledger_report(value)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        slot = str(fixtures.CAST_LEDGER_SLOTS[fixtures.LEDGER_SENDERS[1]])
+        changed = campaign.analyze(raw, value, "importedHull", "tx-0", "storage:" + slot)
+        self.assertTrue(changed["synthetic"])
+        fingerprint = campaign.fingerprint(changed)
+        # The perturbed entry also breaks the returned sum, which the ledger protocol reports.
+        self.assertEqual((fingerprint["storageSlots"], fingerprint["fields"], fingerprint["transactionId"]),
+                         ([slot], ["committedStorage", "output"], "tx-0"))
+        self.assertFalse(campaign.analyze(raw, value, "importedHull", "tx-0", "storage:" + str(fixtures.CAST_SOLIDITY_SENDER_SLOT))["synthetic"])
+        # A reduced recipient that no longer declares the slot cannot keep the finding.
+        reduced = ledger_case(((0, 0, 0, 1, 7), (1, 0, 0, 2**64, 3), (2, 1, fixtures.MAX_WORD, 7, 7)))
+        dropped = campaign.analyze(ledger_report(reduced), reduced, "importedHull", "tx-0", "storage:" + slot)
+        self.assertFalse(dropped["synthetic"] and campaign.same_failure(fingerprint, dropped))
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+
+    def test_ledger_shrink_requests_at_most_its_native_batch(self):
+        value = ledger_case()
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-ledger", shrink_attempts=40, shrink_candidates=64))
+            raw = ledger_report(value)
+            analysis = campaign.analyze(raw, value, "rustEvm", "tx-0", "storage:0")
+            folder, _, _ = saved_execution(instance, value, raw, analysis)
+            finding = instance.retain_finding(0, folder, value, analysis)
+            with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
+                instance.shrink(value, finding)
+            self.assertEqual(tool.call_args.args[0][2], 16)
+
+
 if __name__ == "__main__":
     unittest.main()

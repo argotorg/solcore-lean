@@ -57,6 +57,7 @@ PROFILES = {
     "stateful-bytes": ("semantic-bytes", "storage", 384),
     "stateful-forwarded-value": ("semantic-forward", "call", 384),
     "stateful-mapping": ("semantic-mapping", "storage", 384),
+    "stateful-ledger": ("semantic-ledger", "storage", 384),
 }
 # Profiles that declare their observed slots share the declared-slot Hull runner.
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping")
@@ -121,11 +122,13 @@ def command(args, profile, output, seconds, disk_bytes):
         raise ValueError("Yul is restricted to pure profiles")
     storage_tools = {"stateful-keyed-storage": args.keyed_case_tool, "stateful-dynamic-array": args.array_case_tool,
                      "stateful-logs": args.log_case_tool, "stateful-call-value": args.value_case_tool,
-                     "stateful-bytes": args.bytes_case_tool, "stateful-mapping": args.mapping_case_tool}
+                     "stateful-bytes": args.bytes_case_tool, "stateful-mapping": args.mapping_case_tool,
+                     "stateful-ledger": args.ledger_case_tool}
     forwarded = profile == "stateful-forwarded-value"
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
             storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else args.call_case_tool}[family]
     runner = {"pure": args.core_runner, "storage": args.value_core_runner if profile == "stateful-call-value" else
+              args.ledger_core_runner if profile == "stateful-ledger" else
               args.keyed_core_runner if profile in DECLARED_SLOT_PROFILES else args.storage_core_runner,
               "call": args.forward_core_runner if forwarded else args.call_core_runner}[family]
     result = [sys.executable, str(ROOT / "scripts" / CAMPAIGNS[family]), "--output", str(output), "--profile", profile,
@@ -381,7 +384,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default twenty-four for Sonatina, fourteen pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default twenty-five for Sonatina, fourteen pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -401,7 +404,8 @@ def parse_args(argv=None):
                 "array_case_tool": "semantic-dynamic-array-tool", "log_case_tool": "semantic-log-tool",
                 "value_case_tool": "semantic-call-value-tool", "value_core_runner": "rust-hull-value-scenario",
                 "bytes_case_tool": "semantic-bytes-tool", "forward_case_tool": "semantic-forward-tool",
-                "forward_core_runner": "rust-hull-forward-scenario", "mapping_case_tool": "semantic-mapping-tool"}
+                "forward_core_runner": "rust-hull-forward-scenario", "mapping_case_tool": "semantic-mapping-tool",
+                "ledger_case_tool": "semantic-ledger-tool", "ledger_core_runner": "rust-hull-ledger-scenario"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
