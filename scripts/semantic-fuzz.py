@@ -561,6 +561,7 @@ def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_
            "elapsedSeconds": elapsed, "exitCode": exit_code, "suiteStatus": summary.get("status", "missing-summary"),
            "stop": summary.get("stop"), "counts": summary.get("counts", {}),
            "profiles": [{"profile": row.get("profile"), "status": row.get("status"), "seed": row.get("seed"),
+                         "generatorVersions": ((row.get("campaign") or {}).get("generation") or {}).get("generatorVersions"),
                          "findings": len(row.get("findings") or []),
                          "secondaryFindings": len(row.get("secondaryFindings") or [])}
                         for row in summary.get("profiles", [])],
