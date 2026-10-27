@@ -871,7 +871,9 @@ data, linked code observations, all four message-call modes, finite nested
 children, root reentry and account destruction within the documented premises.
 See [Hull meaning preservation](hull-meaning-preservation.md) for exact scope.
 
-Precompile dispatch, creation/deployment, independent assembly semantics and
+The identity, SHA-256 and RIPEMD-160 precompiles, creation attempts that run
+no init code and a fragment of inline Yul are connected. The elliptic-curve
+precompiles, creation with init frames, the rest of assembly and
 object-linking correspondence remain open. Reverse correspondence and
 divergence are also outside these bounded milestones. The
 [next roadmap](next-implementation-roadmap.md) orders this proof work after

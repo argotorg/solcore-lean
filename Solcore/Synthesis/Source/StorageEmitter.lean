@@ -3,8 +3,10 @@ import Solcore.Synthesis.Source.AggregateRenderer
 
 /-! Emit the fixed two-slot storage protocol with an arbitrary checked step
 entry. ABI validation belongs to the case boundary; this profile claims no
-correspondence for malformed calldata. The source printer is tested separately
-from the original Core contract and its checked host-runtime admission. -/
+correspondence for malformed calldata. `ScalarMeaning.Storage.emit_source_meaning`
+relates the emitted text to the original Core contract's top-level transaction
+under an independent storage source semantics; see
+`docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.Storage
