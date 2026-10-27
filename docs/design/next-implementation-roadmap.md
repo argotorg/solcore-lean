@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback and keyed-storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; nested `uint256[][]` inputs defined; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch`, nested memory and termination calls and the word operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero` connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1549,11 +1549,59 @@ definitions were fixed before execution:
 - Node budget: the row and element guards are a fixed part of the wrapper.
   Like the long-bytes chunk guards, they lie outside the step's node budget.
 
-Further state/ABI work, such as nested or multi-word ABI elements, `bytes`
-beyond 256 bytes, strings, ABI-encoded return values, which first need a
-contract entry convention for more than one Word, or callers beyond the three
-fixed senders, needs its own observation, rollback, deployment and reduction
-definitions first.
+Original Core reads the head offset, the outer length, each present row's
+offset and length and each present element with `inputDataWordBE?`, so Core,
+its hosts and the contract runtime are unchanged. The source reads the same
+Words through the lazy calldata view. The adapter, campaign and suite add the
+profile as a twenty-seventh suite profile with one new native tool; the
+twenty-one other native tools are byte-identical to main's. The row and
+element guards (270 nodes) lie outside the step budget, so generation reserves
+the measured 86-node wrapper. All 300 of the first 300 seeds at 384 nodes were
+accepted, and their 900 transactions used every outer and row length. A case
+reaches about 73 KB, so a native shrink response carries at most 32
+candidates. The fallback, a static multi-word element beside a dynamic one,
+was not needed.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions. Its histories were computed outside Lean by a separate evaluator
+of the step programs and a direct model of the protocol. A registered Lean
+validator confirmed every status, payload and slot against original Core and
+rejected tampered entries. Coverage includes all 32 step features of the
+corpus, the six boundary Words as elements, one to three helpers and
+transactions, four templates, both outcomes, six completion patterns, outer
+lengths 0 to 3 and row lengths 0 to 2. The calldata of all 33 fixed and 48
+random transactions matched `cast calldata`.
+
+The full Lean build (10,113 jobs), registered tests, kernel policy and 538
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (93.8 and 91.0 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+sixteen attempts with no exclusions. Both levels matched all sixteen and 48
+prefixes (166.1 and 163.6 seconds), covering every outer and row length, with
+reverts at outer lengths 0 to 3. Neither random run produced a finding.
+
+A copied Hull difference in slot 6, which only a third row with two elements
+writes, at the first of three transactions was reduced on each level to that
+transaction with an empty outer array and a reduced step: seven accepted
+reductions in nine actual candidate executions. Original and reduced archives
+replayed exactly with agreement (four replays), and synthetic fingerprints
+reproduced. Core or Hull fuel one was inconclusive. With the extended storage
+and suite scripts, the storage, rollback, call, keyed, dynamic-array, log,
+call-value, bytes, forwarded-value, mapping, ledger and long-bytes fixed
+corpora still matched all 155 scenarios and 427 prefixes on both levels. An
+offline preparation of the worktree's cloned cache verified all twenty-two
+native tools as ready. Hosted CI has not been run.
+
+This scope does not compare deeper nesting, static or multi-word elements,
+more than three rows or two elements per row, non-canonical offsets, truncated
+input or the decoder's revert paths, multi-word return values, gas, balances,
+nonces, code or memory. Agreement is test evidence, not a preservation proof.
+
+Further state/ABI work, such as deeper nesting, static multi-word ABI elements
+(`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
+return values, which first need a contract entry convention for more than one
+Word, or callers beyond the three fixed senders, needs its own observation,
+rollback, deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 

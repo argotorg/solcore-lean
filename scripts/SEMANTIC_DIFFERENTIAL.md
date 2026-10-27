@@ -2616,6 +2616,93 @@ stream; flags are just the parity. Coverage adds two dimensions: the outer
 lengths 0 to 3 and the row lengths 0 to 2. The elements are the runtime
 inputs.
 
+### Running and validation
+
+```sh
+lake build semanticNestedArrayTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-nested-array-cases
+.lake/build/bin/semantic-nested-array-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-nested-array-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-nested-array-corpus.json \
+  --output .upstream/semantic-nested-array-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-nested-array \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-nested-array-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the other storage tools. Plans use
+`solcore-lean.nested-array-plan.v1` under the case field `nestedArrayPlan`;
+cases use `solcore-lean.semantic-nested-array-case.v1`. Transactions are
+`{id, flags, values, calldata, value}`, where `values` lists the rows, each a
+list of canonical decimal Words. The adapter checks the calldata with its own
+encoder of the nested head/tail encoding, and checks every returned row's row
+count in slot 7, element count in slot 8 and committed sum. The calldata of
+all 33 fixed and 48 random transactions matched `cast calldata
+"run(uint256,uint256[][])"` from the pinned Foundry release byte for byte. The
+Lean tests retain four of its vectors, among them an empty outer array, an
+empty first row and three full rows, and the Python tests three. Histories use
+`solcore-lean.nested-array-history.v1`, and the declared-slot Hull runner
+`rust-hull-keyed-storage-scenario` serves the profile unchanged.
+
+The three row guards and their six element guards take 270 Core nodes. They
+lie outside the node budget, so generation reserves only the measured 86-node
+wrapper and the 384-node default leaves 298 nodes for the step. All 300 of the
+first 300 seeds were accepted; their 900 transactions used every outer length
+223 to 227 times and every row length 418 to 485 times. Generated scenarios
+must complete with the prescribed outcomes and follow the row-count,
+element-count and sum protocol under original Core. A case reaches about 73
+KB, so a native shrink response carries at most 32 candidates, the profile's
+`shrinkBatch`.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with values of up to three
+rows of two elements, and four generated seeds. Its expected histories were
+computed outside Lean by a separate evaluator of the step programs and a
+direct model of the protocol. `Tests/Main.lean` registers a validator that
+compares every status, payload and slot with original Core. It rejects
+tampered outputs, row counts, element counts and element results, a written
+slot of an absent element, committed writes of a reverted transaction, and
+consistently re-encoded values with a changed element, an empty row in place
+of a row or a dropped row. Required coverage is all 32 step AST features in
+the corpus, the six storage boundary Words as elements, one to three helpers
+and transactions, all four templates, both outcomes, six completion patterns,
+outer lengths 0 to 3 and row lengths 0 to 2. Its reverted transactions have
+outer lengths 0 to 3.
+
+Local validation used committed code with frozen scripts and native tools; the
+twenty-one existing native tools are byte-identical to main's. The fixed suite
+matched all twelve scenarios and 33 prefixes on Sonatina O0 and O2, with
+complete coverage, in 93.8 and 91.0 seconds. The recorded random suite (root
+seed `20261026`, sixteen cases, 2,048 attempts) accepted sixteen scenarios
+from sixteen attempts with no exclusions. All sixteen scenarios and 48
+prefixes matched on both levels in 166.1 and 163.6 seconds. They covered every
+outer and row length, four completion patterns and 39 step AST features, and
+their reverted transactions had outer lengths 0 to 3. Neither run produced a
+finding.
+
+A copied `importedHull` difference in slot 6, the slot that only a third row
+with two elements writes, at `tx-0` of the `increment-full-values` scenario
+(three full rows, then a reverted full value, then three empty rows) was
+reduced on each level to that transaction with an empty outer array and a
+reduced step: seven accepted reductions in nine candidate executions, all of
+whose actual comparisons matched. The two rejected candidates removed `tx-0`
+itself. Removing its rows kept the finding because every declared slot is
+observed whether or not a transaction writes it. Both levels took the same
+path to the same reduced case. The original and reduced archives replayed
+exactly with three-way agreement (four replays), and synthetic replays
+reproduced the fingerprint. Core or Hull fuel one was classified as
+inconclusive. With the extended adapter, campaign and suite, the two-slot
+storage, rollback, call, keyed, dynamic-array, log, call-value, bytes,
+forwarded-value, mapping, ledger and long-bytes fixed corpora still matched all
+155 scenarios and 427 prefixes on each level.
+
+This profile does not compare gas, balances, nonces, code or memory, deeper
+nesting, static or multi-word elements, more than three rows or two elements
+per row, non-canonical offsets, truncated input and the decoder's revert
+paths, or return values longer than one Word. Agreement is test evidence, not
+a preservation proof.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function
