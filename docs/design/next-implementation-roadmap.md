@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision two is the random default for the eleven G0-based pure profiles; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; all thirteen stateful profiles compare the observed contracts' whole committed storage on all three paths; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -544,6 +544,53 @@ for Yul. Hosted CI still has not been run.
 The three planned priority-4 families are now connected. Private-cell effects in
 the direct grammar and unrestricted recursion remain outside these profiles.
 The next priority is the minimal Rust-dialect emitter proof below.
+
+**G0 generator revision two.** Random mode now generates the eleven G0-based
+pure profiles with `core-g0-v2/lcg64-v1`; the three call-graph families keep
+their own grammars. Revision one took every choice from the low bits of the raw
+LCG state, whose bit 0 alternates, so the kind of a literal followed its
+position in the stream. Over 1,024 consecutive seeds at a 32-node budget,
+0.2% of adjacent literal pairs and none of the 380 binary operations with two
+literal operands were both edge values, only 22.8% of literals came from its
+eight-value bank, and the root forms of consecutive seeds always advanced by
+three or five. A Word binary operation's leaf left operand was always a random
+Word outside a `let` and always a variable inside one, so `byte` and
+`signextend` never received a literal index below 256 in 2,000 programs at the
+primitive profile's budget.
+
+Revision two keeps the forms and budget split. Each draw passes through the
+SplitMix64 finalizer and each choice takes its upper 32 bits. A literal
+decides edge versus random from its own draw, half each, and the edge value is
+uniform over a 32-entry bank of shift counts, byte and sign-extension indices,
+width masks and their successors, limb boundaries, the address mask and the
+int256 limits. The same sample then has 25.6%, 50.5% and 23.9% adjacent pairs
+that are both edge, mixed and both random, 50.6% bank literals, every bank
+value at least 73 times and all six root-form steps. High bits alone, without
+the finalizer, still locked consecutive seeds to four of the six steps.
+
+Revision one stays bit for bit. The case tool keeps it when no version is
+given, the campaign passes each manifest's own version, and all eleven G0
+manifests record it. The new case tool and a build at the base commit gave
+identical output for 88 generation runs over all fourteen generate commands,
+with and without an explicit `v1`, and for the replay, reduction and
+observation of 81 cases. Cases, reductions and campaign summaries record the
+revision; replay regenerates seeded cases with the recorded one. The stateful
+profiles still build their aggregate steps with revision one under their own
+tools.
+
+The full Lean build (10,134 jobs) and registered test driver passed, including
+new tests for the revision-two vectors, bounds and statistics and for
+revision-two generation, replay, tampering and reduction in all eleven
+profiles. The Python policy suite passed 559 tests, and the ten fixed-corpus
+validators passed unchanged. With root seed 1 and sixteen cases each,
+`closed-g0`, `runtime-primitives` and `runtime-aggregates` matched all
+forty-eight revision-two cases on O0 and on O2, in 223 and 219 seconds, with 65
+ordinary generation exclusions, no resource exclusions and no findings. A
+revision-one and a revision-two case of the closed and primitive profiles each
+replayed exactly from its archive, and 64 cases saved by earlier campaigns
+replayed unchanged. Hosted CI still has not been run. The next units of this
+lane are random non-boundary inputs for the pure profiles, then per-case
+operator and feature masks.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

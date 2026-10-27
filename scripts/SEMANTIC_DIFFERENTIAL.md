@@ -61,6 +61,86 @@ invocation. The seed must be an exact unsigned 64-bit decimal integer. Explicit
 case-tool fuel is at most 10,000,000. Corpus generation never silently replaces
 an unsupported expression with a different computation.
 
+## G0 generator revisions
+
+The G0 generator has two replay revisions, both layered on the unchanged
+`lcg64-v1` draws. A case records its revision in `generatorVersion`. The
+primitive profile records `core-primitives-v1/` followed by the revision there,
+and the plain revision in `baseGeneratorVersion`.
+
+| Revision | `generatorVersion` | Used by |
+| --- | --- | --- |
+| v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
+| v2 | `core-g0-v2/lcg64-v1` | random generation of the eleven G0-based pure profiles |
+
+The eleven are `closed-g0`, `runtime-word`, `runtime-primitives`,
+`runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-loops`,
+`runtime-generics`, `runtime-closures`, `runtime-comptime` and
+`runtime-modules`. The three call-graph profiles use their own grammars.
+
+v1 takes each choice as the raw LCG state modulo its bound. Bit 0 of that state
+alternates on every draw, and the other low bits have short periods. A v1
+literal is an edge value when its first draw is even, so the edge decision of
+a literal depends on its position in the stream. v1 stays bit for bit: the fixed
+corpora regenerate it from their seeds.
+
+v2 keeps v1's forms and budget split. Each draw passes the new LCG state through
+the SplitMix64 finalizer, a bijection, and each choice is the upper 32 bits of
+the result modulo the bound. Mixing also separates the streams of consecutive
+seeds, which campaigns and helper chains use. Operator choices are uniform; v1's
+odd bounds only worked around its low bits. Every literal consumes six draws:
+edge versus random with one half each, a uniform index into a 32-value bank, and
+four limbs of a random 256-bit Word. The bank is 0, 1, 2, 3, 7, 8, 30, 31, 32,
+63, 64, 127, 128, 255, 256, 257, 2^16−1, 2^16, 2^32−1, 2^32, 2^64−1, 2^64,
+2^128−1, 2^128, 2^160−1, 2^192, 2^248, 2^255−1, 2^255, 2^255+1, 2^256−2 and
+2^256−1. These are shift counts and byte or sign-extension indices with their
+neighbours, fixed-width masks and their successors, 64-bit limb boundaries, the
+address mask, and the int256 limits with their neighbours.
+
+Over 1,024 consecutive seeds at a 32-node budget, the sample of the registered
+Lean test:
+
+| Measure | v1 | v2 |
+| --- | ---: | ---: |
+| Adjacent literals both edge / mixed / both random | 0.2% / 51.2% / 48.7% | 25.6% / 50.5% / 23.9% |
+| Literal operands of one binary operation, both edge | 0 of 380 | 105 of 359 |
+| Literals from the edge bank | 22.8% | 50.6% |
+| Adjacent Bool literals that differ | 56.5% | 53.4% |
+| Consecutive seeds with the same root form | 0% | 15.2% |
+| Root-form steps between consecutive seeds, mod 6 | 3 and 5 only | all six |
+
+Every v2 bank value appeared at least 73 times. Taking only the upper bits of
+the raw state, without the finalizer, fixes the literal pairing but still
+locks consecutive seeds together: their root-form steps were 0, 1, 2 and 5 only.
+
+Position also fixed v1's literal kind. A Word binary operation's form draw is
+even, so a leaf left operand starts at an odd draw: outside every `let` it is a
+random Word, and inside one it is always a variable. Over 2,000 seeds at the
+primitive profile's 94-node G0 budget, none of v1's 180 literal `byte` or
+`signextend` indices was below 256, against 49 of 221 for v2. Literal shift
+counts below 256 rose from 48 of 330 to 88 of 378, and v2 also produced 17
+shift counts of 2^16, 2^32 or 2^64.
+
+The G0-based generation commands take an optional version after `FUEL`:
+
+```text
+semantic-case-tool generate|input-generate|primitive-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [VERSION]
+```
+
+Without `VERSION` they generate v1, so the fixed manifests and their validators
+regenerate unchanged; an unknown version is rejected. `replay` regenerates a
+seeded case with its recorded revision, and `shrink` gives each reduction its
+parent's revision. The call-graph commands take no version.
+
+`scripts/semantic-campaign.py` passes `core-g0-v2/lcg64-v1` in random mode for
+the eleven profiles; `--g0-version` selects a revision explicitly. With
+`--corpus` it passes the manifest's version, and with `--case` it keeps the
+saved case's; a disagreeing `--g0-version` is refused. The campaign summary
+records `configuration.g0Version` and the generated cases' versions in
+`generation.generatorVersions`. `semantic-suite.py --mode random` therefore
+generates v2 for these profiles, and fixed mode stays on v1. The stateful
+profiles still build their aggregate steps with v1, under their own tools.
+
 ## Validate the emitter against Rust
 
 Prepare the checked Hull exporter as described in
