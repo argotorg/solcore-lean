@@ -27,12 +27,14 @@ semantic-kernel policy check now covers.
 | `Storage.emit_source_meaning` | If `Storage.emit plan = .ok emitted` (profile `stateful-storage`), then for every world in which `plan.contract` is installed at the invocation's target account `a` (`installed`) and every invocation whose calldata holds the Word `x` at offset 4, there are a Word `w` and a storage `s` with `storageSourceCall emitted.source (accountStorage a) "run" [x.val] = some (w.val, s)` and `CoreCommits plan.contract invocation installed w s`. |
 | `StorageRollback.emit_source_meaning` | If `StorageRollback.emit plan = .ok emitted` (profile `stateful-storage-rollback`), then for every such world, installed account `a` and invocation, there is an outcome `o` with `rollbackSourceCall emitted.source (accountStorage a) "run" [x.val] = some o`; `o` is a revert exactly when `x` is odd, and `CoreSettles plan.contract invocation installed o`. |
 | `KeyedStorage.emit_source_meaning` | If `KeyedStorage.emit plan = .ok emitted` (profile `stateful-keyed-storage`), then for every such world, installed account `a` and invocation whose calldata holds the Words `k` and `x` at offsets 4 and 36, there is an outcome `o` with `keyedSourceCall emitted.source (accountStorage a) "run" [k.val, x.val] = some o`; `o` is a revert exactly when `x` is odd, and `CoreSettles plan.contract invocation installed o`. |
+| `EventLog.emit_source_meaning` | If `EventLog.emit plan = .ok emitted` (profile `stateful-logs`), then for every such world, installed account `a`, invocation whose calldata holds the Words `f` and `x` at offsets 4 and 36, and memory `m` with `m 64 = some p` and `p + 64 ≤ 2^256`, there is an outcome `o` with `logSourceCall emitted.source (accountStorage a) m "run" [f.val, x.val] = some o`; `o` is a revert exactly when `f` is odd, and `CoreLogs plan.contract invocation installed o`. |
 | `emit_preserves_meaning`, `Input.emit_preserves_meaning`, `Function.emit_preserves_meaning`, `Primitive.emit_preserves_meaning`, `CallGraph.emit_preserves_meaning`, `Mutation.emit_preserves_meaning`, `Aggregate.emit_preserves_meaning`, `AggregateCallGraph.emit_preserves_meaning` | The same results, also exposing the source file `file` with `emitted.source = file.print` and `parseSource emitted.source = some file`. |
 | `CallGraphLoop.emit_preserves_meaning`, `Loop.emit_preserves_meaning` | The same results, exposing the loop file `file` with `emitted.source = file.print`, `parseLoopSource emitted.source = some file` and `file.call fuel "run" [x.val] = some w.val` for every `fuel > plan.mask`. |
 | `Generic.emit_preserves_meaning` | The same result, exposing the generic file `file` with `emitted.source = file.print`, `parseGenericSource emitted.source = some file` and `file.call "run" [x.val] = some w.val`. |
 | `Storage.emit_preserves_meaning` | The same result, exposing the storage file `file` with `emitted.source = file.print`, `parseStorageSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some (w.val, s)`. |
 | `StorageRollback.emit_preserves_meaning` | The same result, exposing the rollback file `file` with `emitted.source = file.print`, `parseRollbackSource emitted.source = some file` and `file.call (accountStorage a) "run" [x.val] = some o`. |
 | `KeyedStorage.emit_preserves_meaning` | The same result, exposing the keyed file `file` with `emitted.source = file.print`, `parseKeyedSource emitted.source = some file` and `file.call (accountStorage a) "run" [k.val, x.val] = some o`. |
+| `EventLog.emit_preserves_meaning` | The same result, exposing the log file `file` with `emitted.source = file.print`, `parseLogSource emitted.source = some file` and `file.call (accountStorage a) m "run" [f.val, x.val] = some o`. |
 | `render_spec`, `primitive_render_spec`, `callGraph_render_spec`, `mutation_render_spec`, `aggregate_render_spec`, `aggregateCallGraph_render_spec` | The inductions over the actual `ScalarRenderer.renderWithFunctions` (with or without earlier helpers), `PrimitiveRenderer.render`, `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`, `AggregateRenderer.render` and `AggregateCallGraphRenderer.render`, described below. |
 | `parseSource_print` | The printed text of any file whose names are lexically valid and not reserved parses back to that file. |
 | `parseLoopSource_print` | The same for loop files under the loop grammar. |
@@ -40,6 +42,7 @@ semantic-kernel policy check now covers.
 | `parseStorageSource_print` | The same for storage files under the storage grammar. |
 | `parseRollbackSource_print` | The same for rollback files under the rollback grammar. |
 | `parseKeyedSource_print` | The same for keyed files under the keyed grammar. |
+| `parseLogSource_print` | The same for log files under the log grammar, when no logger is named `mstore`. |
 | `loopSourceCall_of_parseSource` | On every text that `parseSource` accepts, `loopSourceCall fuel` is `sourceCall`, for every fuel. |
 | `genericSourceCall_print_loopFree` | On the printing of every loop-free file whose names are lexically valid and not reserved, `genericSourceCall` is `sourceCall`. |
 | `loopSourceCall_mono`, `loopSourceCall_unique` | More fuel keeps the result of a completed loop call, so all completed calls of a text return the same word. |
@@ -126,6 +129,25 @@ calldata whose words there are the key and the input, as the canonical
 `run(uint256,uint256)` calldata has. It then states `CoreSettles` and the
 parity of the outcome as the rollback theorem does.
 
+`logSourceCall source s m` reads a text with the log grammar below and calls
+the two-parameter method from the storage `s` and the memory `m` that the
+dispatcher leaves. The call either returns its word with the final storage and
+the logs it emitted, in order (`LogOutcome.returned`), or reverts with the word
+of its revert data (`LogOutcome.reverted`). A reverted call keeps neither its
+storage writes nor its logs. The event-log reference,
+`EventLog.canonicalProgram`, reads its flags and its input from calldata at
+offsets 4 and 36. It writes each log as a frame of word logs under
+`EventLog.framingVersion`: a header naming the topic count and the data length
+with payload zero, then the data Words and the topics, each numbered from one.
+`logFrame emitter l` is that framing of a source log `l`, all from `emitter`.
+`CoreLogs contract invocation installed o` states the clauses of `CoreSettles`
+and the committed journal. For a returned outcome with logs `ls`, the committed
+journal's word logs are `ls.flatMap (logFrame invocation.target)`. For a
+reverted outcome, the committed journal is empty. The log theorem assumes
+calldata as the keyed theorem does, and a memory whose word at offset 64 is a
+pointer `p` with `p + 64 ≤ 2^256`. It states `CoreLogs` and that the call
+reverts exactly when the flags are odd.
+
 Unsupported operations remain explicit emitter errors; the theorems say
 nothing about failed emissions.
 
@@ -150,7 +172,10 @@ and, for rollback programs,
 and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean),
 and, for keyed programs,
 [KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedSemantics.lean)
-and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean))
+and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean),
+and, for log programs,
+[LogSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LogSemantics.lean)
+and [LogText](../../Solcore/Synthesis/Source/ScalarMeaning/LogText.lean))
 does not import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
@@ -361,6 +386,30 @@ pinned frontend, the additive operators fold to the left
 with `;`. A slot is a word, so the key's successor wraps from `2^256 - 1` to 0.
 Writes to aliased slots replace one another in program order, and later loads
 see the last write.
+
+Logs. [LogSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LogSemantics.lean)
+and [LogText](../../Solcore/Synthesis/Source/ScalarMeaning/LogText.lean)
+extend the rollback fragment with memory and logs, again as a separate grammar
+and meaning. The import adds `mload` after `sstore`, and an alias of `log0` to
+`log4` names that `std.opcodes` wrapper. The method body may also contain the
+store `mstore(offset, value);` and the log block
+`if (a op b) { let x: T = f(c op' d); mstore(o, v); ... logger(offset, size, t1, ..., tn); }`.
+That is an `if` without `else` that binds one call `let` in its own scope,
+writes memory and emits one log. `parseLogSource` recognizes a store by
+`mstore (`, which no rollback statement starts with, and a log block by a call
+`let` after its brace, where the revert block goes on with `mstore`. Inside a
+block, stores are read while the next tokens are `mstore (`, so the round trip
+excludes a logger named `mstore`. Memory is known word by word: a byte offset
+maps to the word whose 32-byte big-endian encoding starts there, when the
+fragment knows it. `mstore` makes its word known and forgets every known word
+whose bytes overlap it. `mload` and a log read only known words, and every
+access must lie below `2^256`. A log's topics are its topic operands, and its
+data are the `size / 32` known words from its offset. Its logger must reach
+the wrapper `logN` for its `N ≤ 4` topics through an import alias, and its size
+must be a multiple of 32; anything else has no meaning. The method body's
+calls to `mload` read the current memory, as its calls to `sload` read the
+current storage. The revert block is the rollback one, which does not read
+memory. A revert discards the call's storage writes and its logs.
 
 ## Connection to the actual emitter
 
@@ -622,6 +671,37 @@ alias. Agreement after the three writes therefore gives both the committed
 storage and the three words read back, for every key, including zero and
 `2^256 - 1`. The top-level step reuses `topLevel_run_settled`.
 
+[LogEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LogEmitter.lean)
+connects the actual `EventLog.emit` (profile `stateful-logs`). Its method
+`run(flags, input)` reads slots zero and one, stores the step's result for the
+input plus slot zero in slot zero and the counter plus one in slot one, and
+reserves 64 bytes from the free-memory pointer: `sc_ptr` is the word at offset
+64, and `sc_ptr + 64` is stored there. Every site prints as a log block
+(`siteStmt_lines`). A site whose guard bit is set binds the step's value for
+the result plus its guard and stores it at `sc_ptr`, and the result at
+`sc_ptr + 32`, as its data Words require. It emits as topics the value plus
+one to the value plus its topic count. A site reads only the words it has just
+stored, so the memory before it does not matter (`siteStmt_run`), and
+`logMethod_run` runs the method by induction over the sites. The revert block
+and the return are the rollback ones. The Core wrapper of
+`EventLog.canonicalProgram` is restated through its private helpers
+(`contractExpression_eq`, `siteExpression_eq`, `frame_eq`). `log_handled` is
+its handled path: the two calldata reads, the two slot reads, the step and the
+two writes, then the sites by induction (`sites_handled`). An enabled site
+applies the step and emits its frame's records by induction over the records
+(`emitRecords_handled`), and the handler appends each attributed word log to
+the working journal. A site's word logs are the framing of its source log
+(`siteFrame_eq`), so the final working journal is the framing of the source
+logs in order (`sitesContext_logList`). One step function serves every
+argument and every store, since the source call fixes the step's word.
+`aggregateLoop_specWith` restates the aggregate helper loop for an alias list
+with the wrappers before the raw aliases, and also exports that every helper
+is named `sc_fnN`. No free function therefore shadows a wrapper
+(`logContext_opcode`). `topLevel_run_logged` adds the terminal context to
+`topLevel_run_settled`. A returned transaction commits its working journal and
+a reverted one the empty checkpoint journal (`committedJournal_returned`,
+`committedJournal_reverted`).
+
 [Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
@@ -634,7 +714,9 @@ for storage files (`parseStorageSource_print`), and
 [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean)
 for rollback files (`parseRollbackSource_print`), and
 [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean)
-for keyed files (`parseKeyedSource_print`). The meaning is therefore a
+for keyed files (`parseKeyedSource_print`), and
+[LogText](../../Solcore/Synthesis/Source/ScalarMeaning/LogText.lean)
+for log files (`parseLogSource_print`). The meaning is therefore a
 function of the emitted `String`, not of an internal printer argument.
 
 ## Assumptions outside the theorem
@@ -748,6 +830,29 @@ wrapping successor included, is the storage word the source semantics reads
 and writes. Under assumption 4, `std.dispatch` decodes the words at offsets 4
 and 36 as `key` and `input`, which is the theorem's calldata hypothesis.
 
+The event-log emitter adds memory and logs. Under assumption 1, the pinned
+parser reads each site as an `if` statement without `else`, and `mstore(...)`
+and `sc_logN(...)` as expression statements. It reads the infix offsets and
+topics as their parenthesized forms, and the import as the selection of `mload`
+and of `logN as sc_logN` for each topic count a site uses
+(`crates/parser/src/parse/imports.rs`). Under assumption 2, `mload`, `mstore`
+and the aliases resolve to the `std.opcodes` wrappers, and the frontend accepts
+the calls of wrappers returning `()` as statements. Under assumption 3, the
+wrappers pass their `word` arguments to the EVM `MLOAD`, `MSTORE` and `LOG0` to
+`LOG4` (`std/opcodes.sol`), so a log's data are the bytes from its offset and
+its topics are its last arguments. Under assumption 4, `std.dispatch` leaves
+the free-memory pointer at offset 64 (`mstore(0x40, memoryguard(128))` in
+`std/dispatch.sol`, the bump arena of `std/std.sol`). The theorem's memory
+hypothesis is that this word is known and that its 64-byte buffer lies below
+`2^256`; nothing else about memory is assumed, and dirty bytes past the pointer
+do not matter. Lowering, code generation and EVM execution keep the wrappers'
+meaning, and a reverting transaction discards its logs with its storage writes.
+The Core reference writes each log as a frame of word logs under
+`EventLog.framingVersion`. Reading committed frames as multi-topic logs is the
+observer's convention (`EventLogExecution.decodeJournal`), which the executable
+checks exercise and the theorem does not restate. Gas, including memory
+expansion and log costs, is not modeled.
+
 Differential agreement remains evidence for these steps, not a proof. Agreement
 in a corpus also does not replace this theorem for the printer.
 
@@ -755,7 +860,7 @@ in a corpus also does not replace this theorem for the printer.
 
 The theorems cover `ScalarRenderer.renderWithFunctions`, `PrimitiveRenderer.render`,
 `CallGraphRenderer.renderWithFunctions`, `MutationRenderer.render`,
-`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and fourteen
+`AggregateRenderer.render`, `AggregateCallGraphRenderer.render` and fifteen
 actual emitters: closed G0 (`closed-g0`), runtime input (`runtime-word`),
 named helpers (`runtime-functions`), raw primitive aliases
 (`runtime-primitives`), call graphs (`runtime-call-graphs`), private mutable
@@ -763,13 +868,14 @@ locals (`runtime-mutation`), Word aggregates (`runtime-aggregates`), aggregate
 call graphs (`runtime-aggregate-call-graphs`), call-graph loops
 (`runtime-call-graph-loops`), aggregate loops (`runtime-loops`), generic
 selection (`runtime-generics`), two-slot storage (`stateful-storage`),
-two-slot rollback (`stateful-storage-rollback`) and keyed storage
-(`stateful-keyed-storage`). They do not yet cover the other emitters that
-render with `AggregateRenderer` (closures, comptime, modules, storage
-mappings, sender-keyed ledgers, dynamic arrays, dynamic bytes, long bytes,
-event logs, call value, contract calls and forwarded value). Their texts use
-forms outside these fragments, such as hashed storage access, memory buffers,
-calldata reads, logs, external calls, lambdas and multi-file module bundles. The loop grammar admits loops only at the top level
+two-slot rollback (`stateful-storage-rollback`), keyed storage
+(`stateful-keyed-storage`) and event logs (`stateful-logs`). They do not yet
+cover the other emitters that render with `AggregateRenderer` (closures,
+comptime, modules, storage mappings, sender-keyed ledgers, dynamic arrays,
+dynamic bytes, long bytes, call value, contract calls and forwarded value).
+Their texts use forms outside these fragments, such as hashed storage access,
+dynamically sized memory, calldata reads, external calls, lambdas and
+multi-file module bundles. The loop grammar admits loops only at the top level
 of a method body, with a loop-free body and an infix condition. The generic
 grammar has no loops, admits early returns only as guards on a local in
 generic function bodies, and admits unparenthesized infix operations only as
@@ -785,7 +891,11 @@ both outcomes of one transaction under the same hypotheses; the transaction's
 other effects, memory beyond that word and gas are outside it. The keyed
 grammar adds only the left-folded sum of three expressions. Its theorem covers
 both outcomes of one transaction for every key, with calldata whose words at
-offsets 4 and 36 are the key and the input.
+offsets 4 and 36 are the key and the input. The log grammar adds word-level
+memory, stores and the log block. Its theorem covers both outcomes of one
+transaction with the logs a returned transaction commits, for every memory
+whose pointer word at offset 64 is known with its buffer below `2^256`. Memory
+the fragment does not know, memory expansion and gas are outside it.
 
 ## Executable checks
 
@@ -983,3 +1093,29 @@ result. Moving the counter write first changes the result for key zero, which
 aliases the counter, and keeps it for key one. A parenthesized sum or load
 argument keeps the result. A sum of four terms and a mixed
 chain without parentheses are rejected.
+
+[SourceLogMeaning](../../Solcore/Test/SourceLogMeaning.lean) is registered as
+well. It runs actual `EventLog.emit` output through `logSourceCall`
+transaction by transaction from the same three initial storages, each with
+three buffer pointers at offset 64. The pointers are 128, then 64, whose buffer
+overlaps the pointer word, then `2^256 - 64`, the last whose buffer lies below
+`2^256`. Six slots are compared. A returned transaction's committed journal
+must be the framing of the source logs and decode to them with
+`EventLogExecution.decodeJournal`. A reverted transaction must keep the slots
+and commit no log. The three golden histories of the event-log emitter's test
+run from empty storage with the pointer 128 and must give their hand-known
+words and logs. Twenty-five regression plans, five steps over five site layouts
+covering guards one to three, zero to four topics and zero to two data Words,
+run ten rows. Their flags enable no site, each site, every site and high noise
+bits, and their words and logs must also follow the event-log recurrence. The
+fourteen opcodes applied to a helper result run four rows over two sites, and
+16 generated scenarios run their generated rows and two more. In all, 3,474
+transactions settle as Core, 2,250 of them in the regression plans, and 2,394
+committed logs agree. Each text must reparse under the log grammar and print
+back to itself, and the loop-free, storage, rollback and keyed grammars must
+reject it. Flags of `2^256` and a memory without a free-memory pointer have no
+meaning. Reading the pointer from offset 96, storing the second data Word past
+the buffer, dropping the only enabled site's first data store, a log size of
+33 and a logger called with the wrong topic count lose the meaning. Swapping
+two topics and moving a site to another guard bit change the outcome. A log
+block followed by `else` is rejected.

@@ -36,7 +36,7 @@ test corpus.
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
-| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback and keyed-storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
+| 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes` and nested `uint256[][]` input extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame and the init-template catalog premise of the public theorems, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch`, nested memory and termination calls and the word operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero` connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
@@ -714,11 +714,33 @@ includes zero and `2^256 - 1`, whose writes alias the counter. One agreement
 lemma for single writes carries the source and Core storage through the
 writes in order, so aliasing needs no case analysis. The new assumptions are
 the left association of `+`, the dispatch of two arguments and that `SLOAD` and
-`SSTORE` address computed slots. The other emitters that render with the
-aggregate renderer (closures, comptime, modules, storage mappings,
-sender-keyed ledgers, dynamic arrays, dynamic bytes, long bytes, event logs,
-call value, calls and forwarded value) are not covered; their texts use forms
-outside the source fragments.
+`SSTORE` address computed slots.
+
+`EventLog.emit_source_meaning` covers the `stateful-logs` emitter and the logs
+a transaction commits. Its method takes flags and an input, runs the two-slot
+storage protocol and reserves a 64-byte buffer from the free-memory pointer at
+offset 64. It then runs up to three static log sites. A site whose guard bit is
+set applies the step to the result plus its guard, writes zero to two data
+Words to the buffer and emits a log with zero to four topics through the
+`std.opcodes` wrapper `log0` to `log4`. Odd flags then revert with the result.
+The log grammar extends the rollback one with the store `mstore(o, v);` and a
+guarded log block. Its meaning adds a memory, known word by word, and puts the
+emitted logs in the outcome; a revert discards the logs with the writes. The
+theorem holds for every memory whose word at offset 64 is known and points to a
+buffer below `2^256`. The Core reference writes each log as a frame of word
+logs under `EventLog.framingVersion`. The theorem states that the committed
+journal is the framing of the source logs, in order and from the target, and
+that it is empty on revert. The event-log wrapper's private Core definitions
+were made public in a visibility-only commit, and a named copy of the
+aggregate helper-loop lemma admits the wrapper aliases in front of the raw
+aliases; no existing statement changed. The new assumptions are the parsing of
+the site blocks and wrapper calls, the `MLOAD`, `MSTORE` and `LOG0` to `LOG4`
+meaning of the wrappers, the free-memory pointer that `std.dispatch` leaves at
+offset 64, and that a revert discards logs. The other emitters that render
+with the aggregate renderer (closures, comptime, modules, storage mappings,
+sender-keyed ledgers, dynamic arrays, dynamic bytes, long bytes, call value,
+calls and forwarded value) are not covered; their texts use forms outside the
+source fragments.
 
 The registered `SourceScalarMeaning` test runs actual emitted texts through
 the same lexer, parser and semantics. Fifteen closed fixtures, twelve input
@@ -773,8 +795,13 @@ their meaning. The registered `SourceKeyedMeaning` test runs the four golden
 histories, five regression plans, fourteen raw primitive steps and 22
 generated scenarios with aliasing keys. All 674 transactions settle as Core,
 and reordered writes change the result for the aliasing key zero but not for
-key one. The full Lean
-build (10,110 jobs), registered tests and the semantic-kernel policy
+key one. The registered `SourceLogMeaning` test runs the three golden histories,
+25 regression plans over five site layouts, fourteen raw primitive steps and 16
+generated scenarios from three storages and three buffer pointers, 64 and
+`2^256 - 64` among them. All 3,474 transactions settle as Core, and the 2,394
+committed logs are the framing of the source logs and decode to them. Altered
+pointers, stores, sizes and topic counts lose or change the meaning. The full
+Lean build (10,120 jobs), registered tests and the semantic-kernel policy
 passed.
 
 **State and ABI:** expand from the existing two-slot, Word-input and bounded

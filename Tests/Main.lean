@@ -2193,6 +2193,7 @@ import Solcore.Test.SourceLongBytesEmitter
 import Solcore.Test.SourceLongBytesCases
 import Solcore.Test.SourceLongBytesCorpus
 import Solcore.Test.SourceKeyedMeaning
+import Solcore.Test.SourceLogMeaning
 import Solcore.Test.RustHullYulArithmeticCorrespondence
 import Solcore.Test.SourceNestedArrayEmitter
 import Solcore.Test.SourceNestedArrayCases
@@ -4183,6 +4184,7 @@ def main : IO UInt32 := do
   Tests.SourceLongBytesCases.testSourceLongBytesCases
   Tests.SourceLongBytesCorpus.testSourceLongBytesCorpus
   Tests.SourceKeyedMeaning.testSourceKeyedMeaning
+  Tests.SourceLogMeaning.testSourceLogMeaning
   Tests.RustHullYulArithmeticCorrespondence.run
   Tests.SourceNestedArrayEmitter.testSourceNestedArrayEmitter
   Tests.SourceNestedArrayCases.testSourceNestedArrayCases
