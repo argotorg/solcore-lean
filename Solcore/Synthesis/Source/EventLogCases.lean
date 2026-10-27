@@ -114,7 +114,8 @@ def initialStateJson : Json := Json.mkObj [("storage", toJson ([] : List Json))]
 def observedSlotsJson : Json :=
   Solcore.Synthesis.Stateful.KeyedStorageExecution.slotsJson Solcore.Synthesis.Stateful.EventLogExecution.observedSlots
 
-def makeCase (scenario : CheckedScenario) (emitted : EmittedProgram) (origin : Json) (fuel : Nat) : Json :=
+def makeCase (scenario : CheckedScenario) (emitted : EmittedProgram) (origin : Json) (fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Json :=
   Json.mkObj [
     ("schema", toJson caseSchema), ("logPlan", planJson scenario.plan),
     ("program", Wire.encodeProgram scenario.program), ("source", toJson emitted.source),
@@ -128,15 +129,16 @@ def makeCase (scenario : CheckedScenario) (emitted : EmittedProgram) (origin : J
       ("stepProfileVersion", toJson Aggregate.profileVersion),
       ("stepFunctionVersion", toJson Aggregates.version),
       ("stepTemplateVersion", toJson Aggregate.templateVersion),
-      ("generatorVersion", toJson generatorVersion),
+      ("generatorVersion", toJson revision.version),
       ("emitterVersion", toJson emitterVersion), ("wrapperVersion", toJson wrapperVersion),
       ("features", toJson scenario.plan.step.features)]),
     ("contract", contractJson emitted), ("executionFuel", toJson fuel)]
 
-def emitCase (scenario : CheckedScenario) (origin : Json) (fuel : Nat) : Except String Json := do
+def emitCase (scenario : CheckedScenario) (origin : Json) (fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Except String Json := do
   unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
   let emitted ← (emit scenario.plan).mapError reprStr
-  return makeCase scenario emitted origin fuel
+  return makeCase scenario emitted origin fuel revision
 
 /-- Every origin must reconstruct the fixed host contract, including imports and
 reductions. An arbitrary well-typed program is not an admissible replacement. -/
@@ -224,12 +226,13 @@ private def statusName (odd : Bool) : String := if odd then "reverted" else "ret
 
 /-- Reserve the measured host wrapper of the chosen sites before generating the
 independent step; the complete contract is remeasured as the final authority. -/
-def generatedScenario (seed : Seed) (nodes : Nat) : Except String (CheckedScenario × Json) := do
+def generatedScenario (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1) :
+    Except String (CheckedScenario × Json) := do
   let sites := generatedSites seed
   let overhead := Solcore.Synthesis.Core.EventLog.programOverhead sites
   unless nodes ≤ 512 && overhead < nodes do
     throw "node budget is too small for the event-log wrapper or exceeds 512"
-  let (step, stepOrigin) ← Aggregate.generatedFunction seed (nodes - overhead)
+  let (step, stepOrigin) ← Aggregate.generatedFunction seed (nodes - overhead) revision
   let some plan := CheckedPlan.ofParts? step sites | throw "generated event-log plan failed full Core admission"
   let scenario ← checkedScenario plan (generatedTransactions seed)
   unless Wire.programNodes scenario.program ≤ nodes do throw "event-log contract exceeds its requested node budget"
@@ -270,7 +273,8 @@ def validateGenerated (scenario : CheckedScenario) (fuel : Nat) : Except String 
   unless statuses == scenario.transactions.map (fun tx => statusName (reverts tx)) do
     throw "event-log history did not follow its prescribed flags parities"
 
-def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json := Id.run do
+def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
+    (revision : GeneratorRevision := .v1) : Json := Id.run do
   let mut cases : Array Json := #[]
   let mut excluded : Array Json := #[]
   let mut attempted := 0
@@ -280,7 +284,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
       let seed := Seed.ofNat (firstSeed.toNat + index)
       let result := do
         unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
-        let (scenario, origin) ← generatedScenario seed nodes
+        let (scenario, origin) ← generatedScenario seed nodes revision
         let emitted ← (emit scenario.plan).mapError reprStr
         validateGenerated scenario fuel
         return (scenario, origin.setObjVal! "validationFuel" (toJson fuel), emitted)
@@ -294,7 +298,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json :=
             ("code", toJson (if resource then "validation-out-of-fuel" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (scenario, origin, emitted) =>
-          cases := cases.push (makeCase scenario emitted origin fuel)
+          cases := cases.push (makeCase scenario emitted origin fuel revision)
   return Json.mkObj [("schema", toJson logCorpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -387,8 +391,9 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
   let admitted ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
+  let revision := savedRevision provenance
   for (name, expected) in [
-      ("generatorVersion", generatorVersion), ("profileVersion", profileVersion),
+      ("generatorVersion", revision.version), ("profileVersion", profileVersion),
       ("functionVersion", Solcore.Synthesis.Core.EventLog.version),
       ("framingVersion", Solcore.Synthesis.Core.EventLog.framingVersion), ("templateVersion", templateVersion),
       ("stepProfileVersion", Aggregate.profileVersion), ("stepFunctionVersion", Aggregates.version),
@@ -406,7 +411,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless seedText.length ≤ 20 do throw "invalid saved seed"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
-    let (expected, expectedOrigin) ← generatedScenario (Seed.ofNat seed) (← origin.getObjValAs? Nat "maxProgramNodes")
+    let (expected, expectedOrigin) ← generatedScenario (Seed.ofNat seed) (← origin.getObjValAs? Nat "maxProgramNodes") revision
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
     unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
     unless origin == expectedOrigin.setObjVal! "validationFuel" (toJson validationFuel) do
@@ -428,14 +433,16 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
         ("parentProgram", Wire.encodeProgram parent.program), ("parentTransactions", transactionsJson parent.transactions)] do
       throw "noncanonical reduced origin"
   else throw "unsupported event-log case origin"
-  return makeCase admitted emitted origin fuel
+  return makeCase admitted emitted origin fuel revision
 
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
   let origin := Json.mkObj [("kind", toJson "reduced"), ("parentPlan", planJson source.plan),
     ("parentProgram", Wire.encodeProgram source.program), ("parentTransactions", transactionsJson source.transactions)]
-  let cases ← ((reductions source).take limit).mapM fun reduced => emitCase reduced.candidate origin fuel
+  -- Reductions inherit the parent case's recorded G0 revision.
+  let revision := savedRevision (← json.getObjVal? "provenance")
+  let cases ← ((reductions source).take limit).mapM fun reduced => emitCase reduced.candidate origin fuel revision
   return Json.mkObj [("schema", toJson logCorpusSchema), ("cases", toJson cases)]
 
 end Solcore.Synthesis.Source.EventLog

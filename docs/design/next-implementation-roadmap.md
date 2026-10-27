@@ -1807,6 +1807,29 @@ This observation does not cover accounts other than the deployed contracts,
 transient storage, gas, nonces or code. Agreement is test evidence, not a
 preservation proof.
 
+**G0 revision two for stateful steps.** Random stateful campaigns generate the
+checked step with
+[G0 revision two](../../scripts/SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
+(`core-g0-v2/lcg64-v1`), as the G0-based pure profiles already do. The
+definitions:
+
+- Generation: every stateful case tool's `generate` takes an optional G0
+  version after `FUEL`. Without one it keeps revision one, so the corpus
+  validators and fixed manifests regenerate their seeds bit for bit. Only the
+  step's helper programs depend on the revision; the transaction choices,
+  wrappers and protocols are unchanged.
+- Record and replay: a case records its version in `generatorVersion`.
+  Replay regenerates a generated case's step with that version and rejects a
+  case whose recorded version would regenerate a different step, or which
+  names an unknown version. Imported plans record revision one.
+- Reduction: candidates inherit their parent's recorded version, so a
+  reduced revision-two case replays as revision two.
+- Campaigns: the storage and call campaigns take `--g0-version`. Random
+  generation defaults to revision two; a fixed corpus or saved case uses the
+  version it records and refuses a disagreeing explicit one. Summaries record
+  `configuration.g0Version` and `generation.generatorVersions`, which the
+  fuzzing ledger already reads. The suite needs no change.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

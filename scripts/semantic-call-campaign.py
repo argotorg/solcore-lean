@@ -397,6 +397,12 @@ class Campaign:
                          **{prefix + dimension: [] for prefix in ("generated", "matched", "required", "missing") for dimension in self.dimensions}},
             "cases": [], "materializedIds": [], "findings": [], "secondaryFindings": [],
             "retention": "input cases/compact receipts; complete archives for original/final/secondary findings; matched exports removed (use --case; exact archive replay unavailable)"}
+        # Random generation draws steps with G0 revision two; a corpus or a saved
+        # case keeps the version it records.
+        self.g0_version = getattr(args, "g0_version", None)
+        if self.g0_version is None and not args.corpus and not args.case:
+            self.g0_version = legacy.RANDOM_G0_VERSION
+        self.summary["configuration"]["g0Version"] = self.g0_version
         self.checkpoint()
 
     def checkpoint(self):
@@ -466,12 +472,26 @@ class Campaign:
         self.record_coverage(case, "generated")
         self.checkpoint()
 
+    def recorded_g0_version(self, versions):
+        """Adopt the G0 version a corpus or saved case records; generation receives it explicitly."""
+        recorded = versions.get("generatorVersion") if isinstance(versions, dict) else None
+        if recorded not in legacy.G0_VERSIONS:
+            raise ValueError("unsupported recorded G0 generator version")
+        if self.g0_version is not None and self.g0_version != recorded:
+            raise ValueError("G0 generator version disagrees with the supplied case or corpus")
+        self.g0_version = recorded
+        self.summary["configuration"]["g0Version"] = recorded
+        return recorded
+
     def prepare_cases(self):
         if self.args.case:
-            self.add_case(self.tool(["replay", self.args.case, self.args.direct_fuel], "case-replay"), "saved-case")
+            case = self.tool(["replay", self.args.case, self.args.direct_fuel], "case-replay")
+            self.recorded_g0_version(case.get("provenance"))
+            self.add_case(case, "saved-case")
             return
         if not self.args.corpus:
-            response = self.tool(["generate", self.args.seed, self.args.nodes, self.args.cases, self.args.attempts, self.args.direct_fuel], "generation")
+            response = self.tool(["generate", self.args.seed, self.args.nodes, self.args.cases, self.args.attempts, self.args.direct_fuel,
+                                  self.g0_version], "generation")
             if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > self.args.cases:
                 raise ValueError("invalid native call corpus")
             excluded = response.get("excluded", [])
@@ -485,6 +505,7 @@ class Campaign:
         manifest = validate_manifest(common.read_json(self.args.corpus))
         if manifest["profile"] != self.profile:
             raise ValueError("manifest differs from the selected campaign profile")
+        version = self.recorded_g0_version(manifest)
         save_json(self.args.output / "corpus.json", manifest)
         self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": common.digest(common.json_bytes(manifest))}
         for dimension in ("Features", "Inputs", "HelperCounts", "TransactionCounts"):
@@ -498,7 +519,8 @@ class Campaign:
             self.guard()
             if "generation" in entry:
                 request = entry["generation"]
-                response = self.tool(["generate", request["seed"], request["maxProgramNodes"], 1, 1, self.args.direct_fuel], "corpus-generation")
+                response = self.tool(["generate", request["seed"], request["maxProgramNodes"], 1, 1, self.args.direct_fuel, version],
+                                     "corpus-generation")
                 if response.get("schema") != self.specification["corpusSchema"] or not isinstance(response.get("cases"), list) or len(response["cases"]) > 1:
                     raise ValueError("invalid bounded corpus generation")
                 if not response["cases"]:
@@ -664,6 +686,9 @@ class Campaign:
 
     def run(self):
         self.prepare_cases()
+        self.summary.setdefault("generation", {})["generatorVersions"] = sorted(
+            {case["provenance"]["generatorVersion"] for case in self.materialized})
+        self.checkpoint()
         for index, case in enumerate(self.materialized):
             self.guard()
             if self.args.test_perturb_path and self.args.test_transaction_id and self.args.test_transaction_id not in {tx["id"] for tx in case["transactions"]}:
@@ -714,6 +739,9 @@ def main():
     parser.add_argument("--nodes", type=int, default=384)
     parser.add_argument("--cases", type=int)
     parser.add_argument("--attempts", type=int, default=256)
+    parser.add_argument("--g0-version", choices=legacy.G0_VERSIONS,
+                        help=f"G0 generator of the checked step in random generation; default {legacy.RANDOM_G0_VERSION}. "
+                             "A corpus or saved case uses the version it records")
     parser.add_argument("--seconds", type=float, default=300)
     parser.add_argument("--disk-bytes", type=int, default=256 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32)
@@ -734,15 +762,20 @@ def main():
     selected = adapter.PROFILES[args.profile]
     args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
     args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
+    recorded = None
     try:
         if args.corpus:
-            validate_manifest(common.read_json(args.corpus))
+            recorded = validate_manifest(common.read_json(args.corpus)).get("generatorVersion")
         if args.case:
-            adapter.validate_case(common.read_json(args.case))
+            case = common.read_json(args.case)
+            adapter.validate_case(case)
+            recorded = case["provenance"].get("generatorVersion")
         if args.cases is None:
             args.cases = 1 if args.case else len(common.read_json(args.corpus)["cases"]) if args.corpus else 10
     except (ValueError, OSError, KeyError, TypeError, common.Finding) as error:
         parser.error(str(error))
+    if args.g0_version is not None and (args.corpus or args.case) and args.g0_version != recorded:
+        parser.error("--g0-version disagrees with the supplied case or corpus")
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
     if args.test_transaction_id and (not args.test_perturb_path or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", args.test_transaction_id)):

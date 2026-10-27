@@ -32,9 +32,18 @@ private def fuelValue (rest : List String) : IO Nat :=
   | [fuel] => natural "execution fuel" fuel 10000000
   | _ => throw (IO.userError "too many arguments")
 
+/-- A trailing G0 generator version selects the step generator's revision;
+without one, generation keeps `v1`, which the fixed corpora pin. -/
+private def g0Revision : List String → IO Solcore.Synthesis.Core.GeneratorRevision
+  | [] => pure .v1
+  | [version] => match Solcore.Synthesis.Core.GeneratorRevision.ofVersion? version with
+      | some revision => pure revision
+      | none => throw (IO.userError "unknown G0 generator version")
+  | _ => throw (IO.userError "too many arguments")
+
 private def execute (args : List String) : IO Json := do
   match args with
-  | ["generate", seed, nodes, count, attempts, fuel] =>
+  | "generate" :: seed :: nodes :: count :: attempts :: fuel :: version =>
       let count ← natural "scenario count" count 1024
       unless count > 0 do throw (IO.userError "scenario count must be positive")
       return StorageLedger.generateCases (Solcore.Synthesis.Core.Seed.ofNat
@@ -42,6 +51,7 @@ private def execute (args : List String) : IO Json := do
         (← natural "node budget" nodes 512) count
         (← natural "attempt limit" attempts 10000)
         (← natural "execution fuel" fuel 10000000)
+        (← g0Revision version)
   | "emit" :: file :: transactions :: rest =>
       let plan ← get (StorageLedger.checkedPlan (← readJson file))
       let transactions ← get (StorageLedger.decodeTransactions (← readJson transactions))
@@ -59,7 +69,7 @@ private def execute (args : List String) : IO Json := do
       return StorageLedger.observe scenario bindings fuel
   | "shrink" :: file :: limit :: rest =>
       get (StorageLedger.shrinkCases (← readJson file) (← natural "shrink limit" limit 4096) (← fuelValue rest))
-  | _ => throw (IO.userError "usage: semantic-ledger-tool generate SEED NODES COUNT ATTEMPTS FUEL | emit PLAN.json TRANSACTIONS.json [FUEL] | replay CASE.json [FUEL] | observe CASE.json BINDINGS.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+  | _ => throw (IO.userError "usage: semantic-ledger-tool generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION] | emit PLAN.json TRANSACTIONS.json [FUEL] | replay CASE.json [FUEL] | observe CASE.json BINDINGS.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

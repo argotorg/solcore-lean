@@ -100,7 +100,7 @@ def options(directory, **overrides):
         direct_fuel=1000, core_fuel=1000, gas=100000, case_timeout=10,
         case_tool=Path("/unused/case-tool"), core_runner=Path("/unused/core-runner"),
         anvil=Path("/unused/anvil"), upstream=Path("/unused/upstream"), target_dir=Path("/unused/target"),
-        test_perturb_path=None, test_transaction_id=None, test_field="output", case=None, corpus=None)
+        test_perturb_path=None, test_transaction_id=None, test_field="output", case=None, corpus=None, g0_version=None)
     for key, value in overrides.items():
         setattr(result, key, value)
     return result
@@ -700,6 +700,60 @@ class StrayWriteAdapterTests(unittest.TestCase):
         value = case()
         plain = campaign.fingerprint(campaign.analyze(report(), value))
         self.assertEqual((plain["accountStorageDifferences"], plain["accountStorageRollbackPaths"]), ([], []))
+
+
+class G0VersionTests(unittest.TestCase):
+    """Random call generation draws steps with G0 revision two; a saved case keeps its version."""
+
+    @staticmethod
+    def generated(version):
+        value = case()
+        value["provenance"]["generatorVersion"] = version
+        return value
+
+    def test_random_generation_requests_revision_two_and_a_saved_case_keeps_its_own(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory))
+            self.assertEqual(instance.summary["configuration"]["g0Version"], "core-g0-v2/lcg64-v1")
+            response = {"schema": campaign.CORPUS_SCHEMA, "cases": [self.generated("core-g0-v2/lcg64-v1")], "requested": 1,
+                        "attempted": 1, "status": "complete", "excluded": []}
+            with patch.object(instance, "tool", return_value=response) as tool:
+                instance.prepare_cases()
+            self.assertEqual(tool.call_args.args[0][-1], "core-g0-v2/lcg64-v1")
+            saved_path = Path(directory) / "case.json"
+            saved_path.write_text(json.dumps(self.generated("core-g0-v1/lcg64-v1")))
+            replayed = Path(directory) / "replayed"
+            replayed.mkdir()
+            saved = campaign.Campaign(options(replayed, case=saved_path))
+            self.assertIsNone(saved.summary["configuration"]["g0Version"])
+            with patch.object(saved, "tool", return_value=self.generated("core-g0-v1/lcg64-v1")):
+                saved.prepare_cases()
+            self.assertEqual(saved.summary["configuration"]["g0Version"], "core-g0-v1/lcg64-v1")
+            conflicting = Path(directory) / "conflicting"
+            conflicting.mkdir()
+            explicit = campaign.Campaign(options(conflicting, case=saved_path, g0_version="core-g0-v2/lcg64-v1"))
+            with patch.object(explicit, "tool", return_value=self.generated("core-g0-v1/lcg64-v1")), \
+                    self.assertRaisesRegex(ValueError, "disagrees"):
+                explicit.prepare_cases()
+
+    def test_run_records_the_generator_versions_of_its_cases(self):
+        value = self.generated("core-g0-v2/lcg64-v1")
+        raw = report(value)
+        analysis = campaign.analyze(raw, value)
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory))
+            with patch.object(instance, "prepare_cases", side_effect=lambda: instance.add_case(value, "policy")), \
+                 patch.object(instance, "execute_case", side_effect=lambda _: saved_execution(instance, value, raw, analysis)), \
+                 redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(instance.summary["generation"]["generatorVersions"], ["core-g0-v2/lcg64-v1"])
+
+    def test_cli_refuses_a_version_that_disagrees_with_a_corpus(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(sys, "argv", [
+                "campaign", "--output", str(Path(directory) / "out"), "--corpus", str(ROOT / "scripts/semantic-call-corpus.json"),
+                "--g0-version", "core-g0-v2/lcg64-v1"]), redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
+            campaign.main()
+        self.assertIn("disagrees with the supplied", errors.getvalue())
 
 
 if __name__ == "__main__":

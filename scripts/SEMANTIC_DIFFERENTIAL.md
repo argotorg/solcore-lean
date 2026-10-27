@@ -1021,6 +1021,15 @@ generator templates. Only fully matched scenarios count toward passing
 coverage. The native corpus validator checks materialization, strict replay and
 repeat observations; it does not execute an EVM.
 
+Random generation draws the checked step with
+[G0 revision two](#g0-generator-revisions) and passes `core-g0-v2/lcg64-v1`
+after `FUEL` to the native `generate` command; `--g0-version` selects revision
+one instead. A fixed corpus or a saved `--case` uses the version it records in
+`generatorVersion`, and a disagreeing `--g0-version` is refused. Reductions
+inherit their parent's version. The summary records `configuration.g0Version`
+and `generation.generatorVersions`. The call campaign handles the version the
+same way.
+
 The summary counts scenarios separately from transactions observed on any path,
 completed on all three paths, and matched ordered prefixes. Shrink executions
 are excluded from these transaction counts. The campaign enforces generation,
