@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback and keyed-storage emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; nested `uint256[][]` inputs defined; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch`, nested memory and termination calls and the word operations `add`, `sub`, `lt`, `gt`, `eq` and `iszero` connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1512,6 +1512,42 @@ This scope does not compare multi-word return values, payloads longer than 256
 bytes, strings, gas, balances, nonces, code or memory, non-canonical encodings
 or the decoder's revert paths. Agreement is test evidence, not a preservation
 proof.
+
+The tenth extension, `stateful-nested-array`, adds one nested dynamic ABI
+input. It changes inputs only: original Core reads calldata directly, so the
+contract runtime is unchanged. A probe compiled a contract with a
+`calldata<array<calldata<array<uint256>>>>` parameter, the dialect's
+`uint256[][]`, at O0 and O2. Hull and the EVM agreed on its status, payload
+and slots for ragged rows, an empty row and an odd-flags revert. Its
+definitions were fixed before execution:
+
+- Transactions: one to three zero-value calls of `run(uint256 flags,
+  uint256[][] values)` with the canonical nested head/tail encoding. That is
+  the flags, the head offset 64, the outer length, one offset per row relative
+  to the start of that offset table, then each row's length and elements. A
+  value has at most three rows of at most two elements each. Other encodings
+  are outside the scope.
+- Effects: for each present row `i` and each present element `j` of it, the
+  accumulator, starting from slot zero, becomes `step(accumulator +
+  values[i][j])` and is written to slot `1 + 2i + j`. Then the accumulator
+  goes to slot zero, the running row count plus the outer length to slot seven
+  and the running element count plus the number of elements to slot eight. The
+  result rereads slots zero, seven and eight; odd flags revert with it after
+  the writes.
+- Committed observations: status, payload and slots zero through eight after
+  every transaction on all three paths. The Hull and EVM paths must show no
+  nonzero committed slot outside them.
+- Protocol: odd flags revert, and a revert keeps the nine slots. A returned
+  transaction adds its row count to slot seven and its element count to slot
+  eight, and returns the sum of slots zero, seven and eight.
+- Rollback and deployment: as for the dynamic-array profile.
+- Sequence reduction: checked step reduction, transaction removal with stable
+  IDs, removal of one row, removal of one row's last element, zeroed elements,
+  and flags reduced to their parity or with the revert bit cleared. Candidates
+  are ordered by transaction count, program complexity, the total number of
+  rows and elements, then flags and elements.
+- Node budget: the row and element guards are a fixed part of the wrapper.
+  Like the long-bytes chunk guards, they lie outside the step's node budget.
 
 Further state/ABI work, such as nested or multi-word ABI elements, `bytes`
 beyond 256 bytes, strings, ABI-encoded return values, which first need a

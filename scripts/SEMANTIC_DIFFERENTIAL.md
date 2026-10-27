@@ -2543,6 +2543,79 @@ longer than 256 bytes, non-canonical offsets or padding, truncated input and
 the decoder's revert paths, strings, or return values longer than one Word.
 Agreement is test evidence, not a preservation proof.
 
+## Compare nested dynamic arrays
+
+The `stateful-nested-array` profile adds one nested dynamic ABI input. Each
+transaction calls `SynthesizedNestedArray.run(uint256 flags, uint256[][]
+values)`, selector `0x7095aff8`, with at most three rows of at most two
+elements each in the canonical nested head/tail encoding. That is the flags
+and the head offset 64, then at the offset the outer length and one offset per
+row, measured from the start of that offset table, and then each row's length
+and elements. The calldata is therefore 100 to 484 bytes long. The source
+parameter is the lazily decoded `calldata<array<calldata<array<uint256>>>>`;
+it reads `values.length()`, the row `values[uint256(i)]`, its `length()` and
+the element `row[uint256(j)]`. Original Core follows the head offset, the
+outer length, each row's offset and each row's length to the same Words with
+`inputDataWordBE?`, as the ABI does.
+
+The contract reads the accumulator from slot 0. For each present row `i` (at
+most three) and each present element `j` of it (at most two), unrolled in both
+Core and source, it computes `acc = step(acc + values[i][j])` and writes slot
+`1 + 2i + j`. It then writes the accumulator to slot 0, adds the outer length
+to a running row count in slot 7 and the number of elements to a running
+element count in slot 8, and returns the sum of slots 0, 7 and 8. Odd flags
+revert after those writes with the same Word. Absent rows and elements leave
+their slots untouched.
+
+### Definitions
+
+These definitions were fixed before any execution.
+
+- **Input scope.** A value has at most three rows of at most two elements,
+  including empty rows and an empty outer array, and its calldata is exactly
+  the canonical encoding. Non-canonical offsets, longer values, truncated
+  input and the decoder's revert paths are outside the profile.
+- **Reading.** Original Core reads the head offset `o` at byte 36, the outer
+  length at `4 + o`, row `i`'s offset `r_i` at `4 + o + 32 + 32i`, that row's
+  length at `4 + o + 32 + r_i` and element `j` one Word per index after it.
+  Core and its host interface are unchanged. The source reads the same Words
+  through the lazy calldata view, whose indexing checks each index against its
+  length.
+- **Committed observation.** After every transaction all three paths report
+  status, payload and slots 0 through 8. The keyed profile's containment rules
+  apply: the Hull and EVM paths must show no nonzero committed slot outside
+  them. Memory is per call and not observed.
+- **Committed comparison.** All three paths must agree on every observed field
+  after every transaction. Each path must also follow the fixed protocol: the
+  flags parity selects the completion and the payload is one Word. A revert
+  keeps the prior slots. A returned transaction adds its row count to slot 7
+  and its element count to slot 8 and returns the sum of the committed slots
+  0, 7 and 8.
+- **Rollback.** A revert keeps the prior committed slots on every path, chosen
+  by `ContractRuntime` for original Core. An incomplete transaction ends the
+  sequence.
+- **Deployment.** The constructor is empty and receives zero value. Every
+  declared slot is zero afterwards, and no undeclared slot is nonzero on the
+  Hull and EVM paths. Original Core starts from the declared post-deployment
+  world.
+- **Sequence reduction.** Candidates simplify the checked step (keeping every
+  helper and binder), remove one transaction with stable IDs, remove one row
+  of one value, remove the last element of one row, set every element of one
+  value to zero, or reduce one transaction's flags to their parity or clear
+  its revert bit. They are ordered by transaction count, complete program
+  complexity, the total number of rows and elements, then the sum of all flags
+  and elements.
+- **Node budget.** The row and element guards are a fixed part of the wrapper
+  and lie outside the step's node budget, as the long-bytes chunk guards do;
+  the complete contract may exceed the requested budget by exactly their size.
+
+Generation draws, for each of three transactions, an outer length from 0 to 3,
+a length from 0 to 2 for each present row and each element from the storage
+boundary inputs, and one of four completion patterns, from a separate high-bit
+stream; flags are just the parity. Coverage adds two dimensions: the outer
+lengths 0 to 3 and the row lengths 0 to 2. The elements are the runtime
+inputs.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function
