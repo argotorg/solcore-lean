@@ -23,8 +23,23 @@ CRASH = ("\nthread '<unnamed>' ({thread}) panicked at /home/{user}/.cargo/regist
          "Exported checked Hull: /tmp/{user}/.work/run-000013/hull.json\n")
 
 
-def crash(message="Integer overflow when casting to usize", thread=7, user="a"):
-    return ("compiler-crash", CRASH.format(thread=thread, user=user, message=message), "a" * 64)
+def crash(message="Integer overflow when casting to usize", thread=7, user="a", site=None):
+    return ("compiler-crash", CRASH.format(thread=thread, user=user, message=message), "a" * 64, site)
+
+# A stand-in for a crashing Rust stage: it needs the case in its rewritten root
+# and prints a backtrace only when RUST_BACKTRACE=1 reaches it.
+FAKE_STAGE = """import os, sys
+root = sys.argv[sys.argv.index("--root") + 1]
+assert os.path.exists(os.path.join(root, "case.sol")), root
+sys.stderr.write("thread '<unnamed>' (5) panicked at /x/index.crates.io-1949cf8c6b5b557f/primitive-types-0.14.0/src/lib.rs:43:1:\\n"
+                 "Integer overflow when casting to usize\\n")
+if os.environ.get("RUST_BACKTRACE") == "1":
+    frame = sys.argv[sys.argv.index("--frame") + 1]
+    sys.stderr.write("stack backtrace:\\n   0: __rustc::rust_begin_unwind\\n   1: core::panicking::panic_fmt\\n"
+                     "   2: primitive_types::U256::as_usize::h0123456789abcdef\\n   3: " + frame + "::h0123456789abcdef\\n"
+                     "             at /x/crates/codegen/src/a.rs:1:2\\n   4: sonatina_codegen::driver::run\\n")
+sys.exit(101)
+"""
 
 
 def mismatch(program):
@@ -34,8 +49,9 @@ def mismatch(program):
 class FakeSuite:
     """Writes a suite-shaped output for each requested (seed, backend)."""
 
-    def __init__(self, scenario):
+    def __init__(self, scenario, stage=None):
         self.scenario = scenario
+        self.stage = stage
         self.calls = []
 
     def __call__(self, argv, stdout_path, stderr_path, stop, grace=120.0):
@@ -58,10 +74,17 @@ class FakeSuite:
             (folder / "generation.json").write_text("{}")
             (output / f"{index:02d}-{profile}.stdout.log").write_text("log")
             entries = []
-            for case, (category, detail, program) in enumerate(findings):
+            for case, (category, detail, program, *site) in enumerate(findings):
                 location = folder / "findings/real" / f"{case:04d}"
                 (location / "original").mkdir(parents=True)
                 (location / "original/analysis.json").write_text(json.dumps({"comparison": {"category": category, "detail": detail}}))
+                if site and site[0]:
+                    work = output / ".work" / f"run-{case:06d}"
+                    (location / "original/case.sol").write_text("contract C {}")
+                    (location / "original/report.json").write_text(json.dumps({"processes": [
+                        {"stage": "rust-checked-source", "returncode": 0, "command": ["true"]},
+                        {"stage": "rust-code-images", "returncode": 2, "command": [
+                            sys.executable, str(self.stage), f"{work}/case.sol", "--root", str(work), "--frame", site[0]]}]}))
                 (location / "shrink.json").write_text("{}")
                 entries.append({"caseIndex": case, "synthetic": False, "finalCaseSha256": program,
                                 "fingerprint": {"backend": backend, "category": category, "stage": "rust-code-images",
@@ -88,12 +111,14 @@ class FuzzTests(unittest.TestCase):
         patcher = patch.object(fuzz, "verify_tools", lambda config: self.receipt)
         patcher.start()
         self.addCleanup(patcher.stop)
+        self.stage = self.directory / "fake_stage.py"
+        self.stage.write_text(FAKE_STAGE)
 
     def tearDown(self):
         self.temporary.cleanup()
 
     def main(self, *argv, scenario=lambda seed, backend: [("closed-g0", [])]):
-        fake = FakeSuite(scenario)
+        fake = FakeSuite(scenario, self.stage)
         with patch.object(fuzz, "run_suite", fake), contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(io.StringIO()):
             code = fuzz.main(list(argv))
@@ -291,6 +316,55 @@ class FuzzTests(unittest.TestCase):
         entry, = self.registry()["signatures"].values()
         self.assertEqual((entry["count"], len(entry["examples"])), (2, 2))
         self.assertEqual(sum(occurrence["new"] for row in self.ledger() for occurrence in row["occurrences"]), 1)
+
+    def test_size_cycle_scales_node_budgets_by_iteration(self):
+        code, fake = self.main("run", "--state", str(self.state), "--base-seed", "3", "--backend", "sonatina-o0",
+                               "--profile", "closed-g0", "--size-cycle", "1,1.5,3", "--iterations", "4")
+        self.assertEqual(code, 0)
+        self.assertEqual([row["nodesScale"] for row in self.ledger()], [1.0, 1.5, 3.0, 1.0])
+        config = json.loads((self.state / "config.json").read_text())
+        argv = fuzz.suite_command(config, 2, "sonatina-o0", self.directory / "x")
+        self.assertEqual(argv[argv.index("--nodes-scale") + 1], "3.0")
+        self.assertEqual(fuzz.suite.node_budget(fuzz.suite.parse_args(argv[2:]), "closed-g0"), 72)
+        code, fake = self.main("run", "--state", str(self.directory / "bad"), "--size-cycle", "0.5")
+        self.assertEqual((code, fake.calls), (2, []))
+        self.assertEqual(fuzz.CONFIG_DEFAULTS["size_cycle"], [1.0, 2.0])
+
+    def test_backtrace_frames_name_the_compiler_call_site(self):
+        output = ("thread 'x' panicked at y\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n"
+                  "   2: <primitive_types::U256>::as_usize::h0011223344556677\n   3: sonatina_codegen::bits::propagate::h0011223344556677\n"
+                  "             at /a/b.rs:1:1\n   4: <sonatina_ir::Inst as core::fmt::Debug>::fmt\n   5: std::rt::lang_start\n")
+        self.assertEqual(fuzz.backtrace_frames(output)[2:4], ["<primitive_types::U256>::as_usize", "sonatina_codegen::bits::propagate"])
+        self.assertEqual(fuzz.call_site(output, "primitive-types-0.14.0/src/lib.rs:43:1"),
+                         ["sonatina_codegen::bits::propagate", "<sonatina_ir::Inst as core::fmt::Debug>::fmt"])
+        self.assertEqual(fuzz.call_site("no panic here", "x"), ["not reproduced"])
+        self.assertEqual(fuzz.call_site("panicked at\n   0: core::panicking::panic_fmt\n", None), ["no compiler frame"])
+
+    def test_crash_replay_rewrites_the_archive_root_and_sets_rust_backtrace(self):
+        FakeSuite(lambda seed, backend: [("runtime-primitives", [crash(site="sonatina_codegen::bits::propagate")])], self.stage)(
+            ["--output", str(self.directory / "run"), "--backend", "sonatina-o2", "--seed", "1"],
+            self.directory / "o.log", self.directory / "e.log", None)
+        summary = json.loads((self.directory / "run/summary.json").read_text())
+        record, = fuzz.finding_records(self.directory / "run", summary["profiles"][0])
+        self.assertEqual(fuzz.crash_site(record), ["sonatina_codegen::bits::propagate", "sonatina_codegen::driver::run"])
+        self.assertIsNone(fuzz.crash_site({**record, "detail": "error: no panic"}))
+        self.assertEqual(fuzz.crash_site(record, timeout=1e-9), ["replay timeout"])
+
+    def test_crash_signatures_split_by_call_site_unless_replay_is_disabled(self):
+        def scenario(seed, backend):
+            return [("runtime-primitives", [crash(site="sonatina_codegen::bits::propagate"),
+                                            crash(site="sonatina_codegen::known::shift"),
+                                            crash(site="sonatina_codegen::bits::propagate")])]
+        self.main("run", "--state", str(self.state), "--base-seed", "1", "--backend", "sonatina-o2",
+                  "--profile", "runtime-primitives", "--iterations", "1", scenario=scenario)
+        sites = sorted((entry["symptom"]["site"][0], entry["count"]) for entry in self.registry()["signatures"].values())
+        self.assertEqual(sites, [("sonatina_codegen::bits::propagate", 2), ("sonatina_codegen::known::shift", 1)])
+        self.assertIn("sonatina_codegen::known::shift", (self.state / "report.md").read_text())
+        plain = self.directory / "plain"
+        self.main("run", "--state", str(plain), "--base-seed", "1", "--backend", "sonatina-o2", "--profile",
+                  "runtime-primitives", "--iterations", "1", "--no-crash-replay", scenario=scenario)
+        entry, = fuzz.State(plain).registry()["signatures"].values()
+        self.assertEqual((entry["count"], "site" in entry["symptom"]), (3, False))
 
     def test_next_run_fills_gaps_before_new_iterations(self):
         config = {"backend": ["sonatina-o0", "sonatina-o2"]}

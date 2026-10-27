@@ -29,6 +29,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -50,8 +51,10 @@ PROGRAM_KEYS = ("finalCaseSha256", "finalProgramSha256", "caseSha256", "programS
 RECENT = 20
 MISSING_SUMMARY_LIMIT = 3
 CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backend": list(BACKENDS), "profile": None,
-                   "cases": 16, "attempts": 2048, "nodes": None, "seconds": 14400.0, "profile_seconds": 900.0,
-                   "disk_bytes": 1024**3, "examples": 3, "bin_dir": None, "upstream": None, "target_dir": None,
+                   "cases": 16, "attempts": 2048, "nodes": None, "size_cycle": [1.0, 2.0], "seconds": 14400.0,
+                   "profile_seconds": 900.0,
+                   "disk_bytes": 1024**3, "examples": 3, "crash_replay": True, "bin_dir": None, "upstream": None,
+                   "target_dir": None,
                    "anvil": None, "solc": None}
 PATH_OPTIONS = ("bin_dir", "upstream", "target_dir", "anvil", "solc")
 
@@ -114,10 +117,71 @@ def symptom(detail):
     return {"message": normalize((errors or lines or [""])[0])[:400]}
 
 
-def signature_key(profile, fingerprint, detail, program):
+# Frames of the panic machinery and of the standard library never identify a compiler call site.
+MACHINERY = re.compile(r"^<?(std|core|alloc|__rustc|backtrace|panic_unwind|rust_begin_unwind)(::|\b)")
+
+
+def backtrace_frames(text):
+    """Function names of a Rust backtrace, without hash suffixes, in order."""
+    names = []
+    for line in text.splitlines():
+        match = re.match(r"\s*\d+:\s+(\S.*?)\s*$", line)
+        if match and not match.group(1).startswith("0x"):
+            names.append(re.sub(r"::h[0-9a-f]{16}$", "", match.group(1)))
+    return names
+
+
+def call_site(output, panic):
+    """The first two frames outside the panic machinery and the panicking library itself."""
+    if "panicked at" not in output:
+        return ["not reproduced"]
+    library = re.sub(r"-\d+(\.\d+)*(-[^/]*)?$", "", panic.split("/")[0]).replace("-", "_") if panic else None
+    frames = [name for name in backtrace_frames(output) if not MACHINERY.match(name)
+              and not (library and re.match(rf"^<?{re.escape(library)}(::|\b)", name))]
+    return frames[:2] or ["no compiler frame"]
+
+
+def crash_site(record, timeout=180):
+    """Replay a panicking Rust stage of a retained archive with RUST_BACKTRACE=1 and name its call site.
+
+    The replay runs in a scratch copy of the archive and only adds detail to the
+    signature; the run's own classification is never revisited.
+    """
+    archive, detail = record["archive"], record["detail"]
+    if not archive or not isinstance(detail, str) or "panicked at" not in detail:
+        return None
+    original = archive / "original" if (archive / "original").is_dir() else archive
+    report = load(original / "report.json") or {}
+    failing = [process for process in report.get("processes", [])
+               if process.get("returncode") and str(process.get("stage", "")).startswith("rust-")]
+    if not failing:
+        return None
+    command = [str(part) for part in failing[-1].get("command", [])]
+    root = command[command.index("--root") + 1] if "--root" in command[:-1] else \
+        next((str(Path(part).parent) for part in command if part.endswith(".sol")), None)
+    if not root:
+        return None
+    with tempfile.TemporaryDirectory(prefix="semantic-fuzz-replay-") as scratch:
+        shutil.copytree(original, scratch, dirs_exist_ok=True)
+        replay = [scratch + part[len(root):] if part.startswith(root) else part for part in command]
+        if Path(replay[0]).name.startswith("python"):
+            replay[0] = sys.executable
+        try:
+            result = subprocess.run(replay, cwd=ROOT, env={**os.environ, "RUST_BACKTRACE": "1"}, capture_output=True,
+                                    text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return ["replay timeout"]
+        except OSError as error:
+            return [f"replay failed: {error.__class__.__name__}"]
+    return call_site(result.stderr + result.stdout, symptom(detail).get("panic"))
+
+
+def signature_key(profile, fingerprint, detail, program, site=None):
     key = {"backend": fingerprint.get("backend"), "category": fingerprint.get("category"), "stage": fingerprint.get("stage")}
     if key["category"] in SYMPTOM_CATEGORIES:
         key["symptom"] = symptom(detail)
+        if site:
+            key["symptom"]["site"] = site
     else:
         # Coarse mismatch fingerprints are shared by unrelated miscompilations;
         # only the same reduced program counts as the same finding.
@@ -196,12 +260,19 @@ def root_seed(config, iteration):
     return (config["base_seed"] + iteration) % 2**64
 
 
+def nodes_scale(config, iteration):
+    """Every backend of an iteration uses the same scale, so they compare the same programs."""
+    cycle = config.get("size_cycle") or [1.0]
+    return cycle[iteration % len(cycle)]
+
+
 def suite_command(config, iteration, backend, output):
     argv = [sys.executable, str(ROOT / "scripts/semantic-suite.py"), "--mode", "random", "--backend", backend,
             "--seed", str(root_seed(config, iteration)), "--shard-index", str(config["shard_index"]),
             "--shard-count", str(config["shard_count"]), "--cases", str(config["cases"]),
             "--seconds", str(config["seconds"]), "--profile-seconds", str(config["profile_seconds"]),
-            "--disk-bytes", str(config["disk_bytes"]), "--output", str(output)]
+            "--disk-bytes", str(config["disk_bytes"]), "--nodes-scale", str(nodes_scale(config, iteration)),
+            "--output", str(output)]
     for key in ("attempts", "nodes"):
         if config.get(key) is not None:
             argv += ["--" + key, str(config[key])]
@@ -234,6 +305,8 @@ def configure(state, args):
         raise NotReady("select each backend at most once")
     if config["examples"] < 1:
         raise NotReady("--examples must be at least 1")
+    if not config["size_cycle"] or any(not 1 <= scale <= 4 for scale in config["size_cycle"]):
+        raise NotReady("--size-cycle needs scales between 1 and 4")
     for backend in config["backend"]:
         if config["profile"] is not None and not profiles_for(config, backend):
             raise NotReady(f"no selected profile runs on {backend}")
@@ -346,15 +419,30 @@ def finding_records(output, row):
     return records
 
 
-def register(state, config, epoch, iteration, backend, output, summary):
+def crash_sites(config, output, summary):
+    """Call sites of the run's panicking findings, computed before the archives move."""
+    if not config.get("crash_replay"):
+        return {}
+    sites = {}
+    for row in summary.get("profiles", []):
+        for record in finding_records(output, row):
+            site = crash_site(record)
+            if site:
+                sites[(row["profile"], record["ident"])] = site
+    return sites
+
+
+def register(state, config, epoch, iteration, backend, output, summary, sites=None):
     """Count every finding occurrence once and keep the first examples of each signature."""
+    sites = sites or {}
     registry = state.registry()
     run_id = f"{iteration:06d}-{backend}"
     first_time = run_id not in registry["processedRuns"]
     occurrences = []
     for row in summary.get("profiles", []):
         for record in finding_records(output, row):
-            key = signature_key(row["profile"], record["finding"]["fingerprint"], record["detail"], record["program"])
+            key = signature_key(row["profile"], record["finding"]["fingerprint"], record["detail"], record["program"],
+                                sites.get((row["profile"], record["ident"])))
             sid = canonical_id(key)
             brief = {"iteration": iteration, "backend": backend, "rootSeed": str(root_seed(config, iteration)),
                      "profile": row["profile"], "profileSeed": row.get("seed"), "kind": record["kind"],
@@ -464,10 +552,11 @@ def unrecorded_runs(state, ledger):
     return found
 
 
-def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started, elapsed, keep):
-    occurrences = register(state, config, epoch, iteration, backend, run_dir, summary)
+def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started, elapsed, keep, sites=None):
+    occurrences = register(state, config, epoch, iteration, backend, run_dir, summary, sites)
     row = {"schema": SCHEMA + "/run", "iteration": iteration, "backend": backend,
-           "rootSeed": str(root_seed(config, iteration)), "shardIndex": config["shard_index"],
+           "rootSeed": str(root_seed(config, iteration)), "nodesScale": nodes_scale(config, iteration),
+           "shardIndex": config["shard_index"],
            "shardCount": config["shard_count"], "epoch": epoch["id"], "started": started, "finished": now(),
            "elapsedSeconds": elapsed, "exitCode": exit_code, "suiteStatus": summary.get("status", "missing-summary"),
            "stop": summary.get("stop"), "counts": summary.get("counts", {}),
@@ -536,7 +625,8 @@ def markdown(data):
     config = data["config"]
     lines = ["# Semantic fuzzing report", "", f"Generated {data['generated']} from `{data['state']}`.", "",
              f"Base seed {config['base_seed']}, shard {config['shard_index']} of {config['shard_count']}, "
-             f"backends {', '.join(config['backend'])}, {config['cases']} cases per profile, profiles: "
+             f"backends {', '.join(config['backend'])}, {config['cases']} cases per profile, node-budget scales "
+             f"{', '.join(str(scale) for scale in config.get('size_cycle') or [1.0])} by iteration, profiles: "
              f"{'suite default' if config['profile'] is None else ', '.join(config['profile'])}.", ""]
     if data["epochs"]:
         epoch = data["epochs"][-1]
@@ -671,11 +761,13 @@ class Driver:
                 kept = retain_interrupted(state, run_dir)
                 self.end(f"interrupted in iteration {iteration} ({backend}); it reruns on resume", kept=kept)
             return
+        summary = summary if isinstance(summary, dict) else None
+        sites = crash_sites(config, run_dir, summary) if summary else {}  # Replays run outside the lock.
         with self.lock:
-            self.missing = self.missing + 1 if not isinstance(summary, dict) else 0
-            summary = summary if isinstance(summary, dict) else {"status": "missing-summary", "profiles": []}
+            self.missing = self.missing + 1 if summary is None else 0
+            summary = summary or {"status": "missing-summary", "profiles": []}
             row = record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started,
-                             round(time.monotonic() - began, 3), args.keep_runs)
+                             round(time.monotonic() - began, 3), args.keep_runs, sites)
             report(state)
             if self.missing >= MISSING_SUMMARY_LIMIT:
                 self.end(f"{self.missing} consecutive runs produced no suite summary; see their logs", 5)
@@ -695,7 +787,7 @@ def run(args):
         try:
             for iteration, backend, run_dir, summary in unrecorded_runs(state, state.ledger()):
                 record_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None, None, None,
-                           args.keep_runs)
+                           args.keep_runs, crash_sites(config, run_dir, summary))
             driver = Driver(state, config, args, stop)
             workers = [threading.Thread(target=driver.work, name=f"fuzz-worker-{index}", daemon=True)
                        for index in range(args.jobs)]
@@ -740,6 +832,8 @@ def parse_args(argv=None):
     runner.add_argument("--shard-count", type=int)
     runner.add_argument("--backend", action="append", choices=BACKENDS, help="repeat; default all three")
     runner.add_argument("--profile", action="append", choices=tuple(suite.PROFILES), help="repeat; default the suite's selection")
+    runner.add_argument("--size-cycle", type=lambda text: [float(part) for part in text.split(",")],
+                        help="comma-separated node-budget scales used by successive iterations (default 1,2)")
     for name, kind in (("cases", int), ("attempts", int), ("nodes", int), ("seconds", float), ("profile-seconds", float),
                        ("disk-bytes", int), ("examples", int)):
         runner.add_argument("--" + name, type=kind)
@@ -751,6 +845,8 @@ def parse_args(argv=None):
     runner.add_argument("--accept-new-epoch", action="store_true", help="continue after the tools or harness scripts changed")
     runner.add_argument("--keep-runs", action="store_true", help="keep complete run directories instead of pruning them")
     runner.add_argument("--notify-command", help="command run after a run with new signatures or missing summaries")
+    runner.add_argument("--no-crash-replay", dest="crash_replay", action="store_const", const=False,
+                        help="do not replay panics with RUST_BACKTRACE=1 to split crash signatures by call site")
     labeller.add_argument("signature")
     labeller.add_argument("text", nargs="?")
     labeller.add_argument("--clear", action="store_true")

@@ -145,7 +145,10 @@ Iteration `i` runs the suite in random mode once per backend, with root seed
 backends run by default, Yul with the pure profiles only. Machines that share
 a base seed use their own `--shard-index` of a common `--shard-count`. The
 first `run` fixes the configuration in `config.json`: backends, profiles,
-cases (default 16), attempts (2,048), time and disk limits and tool paths.
+cases (default 16), attempts (2,048), node-budget scales, time and disk limits
+and tool paths. `--size-cycle 1,2` (the default) gives iteration `i` the scale
+at position `i` modulo the cycle, so every other iteration doubles each
+profile's default node budget, capped at 512, and generates larger programs.
 Later runs resume after the last recorded run and refuse different options;
 use a new state directory for another configuration. `--iterations N` stops
 after N iterations, a `STOP` file in the state directory stops before the next
@@ -172,7 +175,12 @@ plus one of:
 
 - for compiler crashes, rejections and other tool failures, the first panic
   location and message, or the first error line, without paths, thread
-  identifiers or numbers;
+  identifiers or numbers. For a panic the driver also replays the failing Rust
+  stage from a scratch copy of the archive with `RUST_BACKTRACE=1` and adds the
+  first two frames outside the panic machinery and the panicking library, so
+  panics raised at one library location by different compiler code count
+  separately. The replay never revisits the run's classification;
+  `--no-crash-replay` turns it off;
 - for semantic mismatches, the profile, the rest of the mismatch fingerprint
   and the reduced program's digest.
 
@@ -194,11 +202,10 @@ signature or a missing suite summary, with `SEMANTIC_FUZZ_REPORT`,
 The driver exits with status 2 when the tools are not ready or another driver
 holds the state, 3 on an epoch change, 4 when the state reaches
 `--max-state-bytes` (50 GiB by default) and 5 after three consecutive runs
-without a suite summary. Signatures are conservative for mismatches and coarse
-for crashes. Panics raised inside a shared library macro, such as the
-`primitive-types` overflow checks, have one location even when different
-compiler code reaches them. Replay retained examples with `RUST_BACKTRACE=1`
-to tell them apart before labelling.
+without a suite summary. Signatures are conservative for mismatches: unrelated
+miscompilations share coarse fingerprints, so only the same reduced program
+counts as the same finding. A crash whose replay does not panic again records
+`not reproduced` as its call site.
 
 On a remote machine, use a Linux host with persistent disk, prepare the tools
 there once with `--prepare --allow-network`, and run the driver under a
