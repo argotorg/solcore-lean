@@ -271,25 +271,26 @@ def stepSeeds (seed : Seed) (position : Nat) : List Seed := Id.run do
     state := next
   return values.toList
 
-/-- A target and two inputs for each of three transactions, each the high half
-of one draw from a separate stream. -/
-def sequenceChoices (seed : Seed) : List Nat := Id.run do
+/-- A target below `2n + 1` for `n` methods and two inputs for each of three
+transactions, each the high half of one draw from a separate stream. -/
+def sequenceChoices (count : Nat) (seed : Seed) : List Nat := Id.run do
   let mut state := Seed.ofNat (seed.toNat ^^^ 0x6d6574686f642d74)
   let mut values : Array Nat := #[]
-  for bound in List.replicate 3 [2 * maxMethods + 1, 6, 6] |>.flatten do
+  for bound in List.replicate 3 [2 * count + 1, 6, 6] |>.flatten do
     let (value, next) := state.draw
     values := values.push (value.toNat / 2 ^ 32 % bound)
     state := next
   return values.toList
 
-/-- Transaction `i` targets the missing selector when its target choice is at
-least `2n`, otherwise method `choice % n`, with that method's arguments, or one
+/-- Transaction `i` targets the missing selector when its target choice is
+`2n`, otherwise method `choice % n`, so each method is called two times in
+`2n + 1` and the missing selector once, with that method's arguments, or one
 Word for the missing selector, from the boundary bank. -/
 def blockTransactions (methods : List Method) (seed : Seed) (first : Nat) : List Transaction :=
-  let choices := sequenceChoices seed
   let count := methods.length
+  let choices := sequenceChoices count seed
   (List.range 3).map fun index =>
-    let choice := choices.getD (3 * index) 0 % (2 * count + 1)
+    let choice := choices.getD (3 * index) 0
     let target := if choice < 2 * count then some (choice % count) else none
     let arity := match target with
       | some position => (methods.getD position ⟨"", 0⟩).arity
@@ -343,7 +344,7 @@ def generatedScenario (seed : Seed) (nodes : Nat) (revision : GeneratorRevision 
     ("kind", toJson "methods-generated"), ("seed", toJson (toString seed.toNat)),
     ("maxProgramNodes", toJson nodes), ("shapeChoices", toJson (shapeChoices seed)),
     ("stepOrigins", .arr stepOrigins),
-    ("sequenceChoices", toJson (Stateful.Sequence.blockChoices sequenceChoices seed transactions)),
+    ("sequenceChoices", toJson (Stateful.Sequence.blockChoices (sequenceChoices methods.length) seed transactions)),
     ("sequenceCompletions", toJson (scenario.transactions.map (completionName scenario)))]) transactions)
 
 private def rowStatus (row : Json) : Option String := (row.getObjValAs? String "status").toOption

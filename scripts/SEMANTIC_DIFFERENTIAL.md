@@ -3944,7 +3944,7 @@ arithmetic. Required coverage:
   orders, arities zero to two, the missing selector and acceptance;
 - the six boundary Words as inputs;
 - one to three helpers and transactions, all four templates, both outcomes
-  and nine completion patterns.
+  and ten completion patterns.
 
 ## Compare whole committed storage
 
