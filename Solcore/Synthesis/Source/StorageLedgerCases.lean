@@ -127,13 +127,13 @@ def observedSlotsJson (scenario : CheckedScenario) : Json :=
   Solcore.Synthesis.Stateful.KeyedStorageExecution.slotsJson scenario.observedSlots
 
 def makeCase (scenario : CheckedScenario) (emitted : EmittedProgram) (origin : Json) (fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Json :=
+    (revision : GeneratorRevision := .v1) (mask : FeatureMask := FeatureMask.all) : Json :=
   Json.mkObj [
     ("schema", toJson caseSchema), ("ledgerPlan", planJson scenario.plan),
     ("program", Wire.encodeProgram scenario.program), ("source", toJson emitted.source),
     ("transactions", transactionsJson scenario.transactions),
     ("initialState", initialStateJson), ("observedSlots", observedSlotsJson scenario),
-    ("provenance", Json.mkObj [
+    ("provenance", Json.mkObj <| swarmField revision mask ++ [
       ("origin", origin), ("profileVersion", toJson profileVersion),
       ("functionVersion", toJson Solcore.Synthesis.Core.StorageLedger.version),
       ("templateVersion", toJson templateVersion),
@@ -146,10 +146,10 @@ def makeCase (scenario : CheckedScenario) (emitted : EmittedProgram) (origin : J
     ("contract", contractJson emitted), ("executionFuel", toJson fuel)]
 
 def emitCase (scenario : CheckedScenario) (origin : Json) (fuel : Nat)
-    (revision : GeneratorRevision := .v1) : Except String Json := do
+    (revision : GeneratorRevision := .v1) (mask : FeatureMask := FeatureMask.all) : Except String Json := do
   unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
   let emitted ← (emit scenario.plan).mapError reprStr
-  return makeCase scenario emitted origin fuel revision
+  return makeCase scenario emitted origin fuel revision mask
 
 /-- Every origin must reconstruct the fixed host contract, including imports and
 reductions. An arbitrary well-typed program is not an admissible replacement. -/
@@ -344,7 +344,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
             ("code", toJson (if resource then "validation-out-of-fuel" else "profile-excluded")),
             ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
       | .ok (scenario, origin, emitted) =>
-          cases := cases.push (makeCase scenario emitted origin fuel revision)
+          cases := cases.push (makeCase scenario emitted origin fuel revision (revision.caseMask seed))
   return Json.mkObj [("schema", toJson ledgerCorpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -440,6 +440,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   let admitted ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
   let revision := savedRevision provenance
+  let mask ← savedMask provenance revision
   for (name, expected) in [
       ("generatorVersion", revision.version), ("profileVersion", profileVersion),
       ("functionVersion", Solcore.Synthesis.Core.StorageLedger.version), ("templateVersion", templateVersion),
@@ -458,6 +459,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless seedText.length ≤ 20 do throw "invalid saved seed"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
+    unless mask == revision.caseMask (Seed.ofNat seed) do throw "saved swarm mask differs from its generation seed"
     let (expected, expectedOrigin) ← generatedScenario (Seed.ofNat seed) (← origin.getObjValAs? Nat "maxProgramNodes") revision
       (← Stateful.Sequence.savedCount origin)
     let validationFuel ← origin.getObjValAs? Nat "validationFuel"
@@ -480,16 +482,18 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
         ("parentTransactions", transactionsJson parent.transactions)] do
       throw "noncanonical reduced origin"
   else throw "unsupported ledger case origin"
-  return makeCase admitted emitted origin fuel revision
+  return makeCase admitted emitted origin fuel revision mask
 
 def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
   let origin := Json.mkObj [("kind", toJson "reduced"), ("parentPlan", planJson source.plan),
     ("parentTransactions", transactionsJson source.transactions)]
-  -- Reductions inherit the parent case's recorded G0 revision.
-  let revision := savedRevision (← json.getObjVal? "provenance")
-  let cases ← ((reductions source).take limit).mapM fun reduced => emitCase reduced.candidate origin fuel revision
+  -- Reductions inherit the parent case's recorded G0 revision and swarm mask.
+  let provenance ← json.getObjVal? "provenance"
+  let revision := savedRevision provenance
+  let mask ← savedMask provenance revision
+  let cases ← ((reductions source).take limit).mapM fun reduced => emitCase reduced.candidate origin fuel revision mask
   return Json.mkObj [("schema", toJson ledgerCorpusSchema), ("cases", toJson cases)]
 
 end Solcore.Synthesis.Source.StorageLedger

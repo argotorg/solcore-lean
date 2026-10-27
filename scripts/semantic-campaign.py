@@ -86,10 +86,11 @@ G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1", "core-g0-v3/lcg64-v
 # Random generation uses v3, v2 under a per-case swarm mask; a fixed corpus or a
 # saved case keeps the version it records.
 RANDOM_G0_VERSION = "core-g0-v3/lcg64-v1"
-# The stateful case tools record no swarm mask, so stateful campaigns admit v1
-# and v2 only and draw random steps with v2.
-STATEFUL_G0_VERSIONS = G0_VERSIONS[:2]
-STATEFUL_RANDOM_G0_VERSION = "core-g0-v2/lcg64-v1"
+# The stateful case tools record, replay and pass on revision three's swarm mask
+# like the pure ones, so stateful campaigns admit all three revisions and draw
+# random steps with v3. A later revision needs stateful support before it is added.
+STATEFUL_G0_VERSIONS = G0_VERSIONS[:3]
+STATEFUL_RANDOM_G0_VERSION = "core-g0-v3/lcg64-v1"
 # Random runtime-input generation appends seeded inputs to each function's boundary inputs.
 RUNTIME_INPUT_PROFILES = tuple(profile for profile in PROFILES if profile != "closed-g0")
 INPUT_SELECTIONS = ("boundary", "seeded-inputs-v1/splitmix64")

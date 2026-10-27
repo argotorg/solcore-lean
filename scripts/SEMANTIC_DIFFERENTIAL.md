@@ -1120,18 +1120,21 @@ coverage. The native corpus validator checks materialization, strict replay and
 repeat observations; it does not execute an EVM.
 
 Random generation draws the checked step with
-[G0 revision two](#g0-generator-revisions) and passes `core-g0-v2/lcg64-v1`
-after `FUEL` to the native `generate` command; `--g0-version` selects revision
-one instead. Revision three is refused, as a version option and in a saved case
-or corpus, because the stateful case tools record no swarm mask; the pure
-campaign's random default does not apply here. A fixed corpus or a saved
-`--case` uses the version it records in `generatorVersion`, and a disagreeing
-`--g0-version` is refused. Reductions
-inherit their parent's version. The summary records `configuration.g0Version`
-and `generation.generatorVersions`. The call campaign handles the version the
-same way. A suite sample of four random cases for each of the thirteen
-stateful profiles recorded revision two and matched on O0 and O2, while the
-fixed corpora kept revision one and their 167 scenarios.
+[G0 revision three](#revision-three-swarm-masks) and passes
+`core-g0-v3/lcg64-v1` after `FUEL` to the native `generate` command;
+`--g0-version` selects revision one or two instead. Every helper of a
+revision-three step uses the scenario seed's swarm mask, which the case
+records in `provenance.swarmMask` as the pure profiles do. Replay requires the
+mask for revision three, compares a generated case's mask with its seed's and
+rejects a mask under the other revisions, so no case tool command accepts a
+revision-three case without its mask. A fixed corpus or a saved `--case` uses
+the version it records in `generatorVersion`, and a disagreeing
+`--g0-version` is refused. Reductions inherit their parent's version and mask.
+The summary records `configuration.g0Version` and
+`generation.generatorVersions`. The call campaign handles the version the same
+way. A suite sample of four random cases for each of the thirteen stateful
+profiles recorded revision two and matched on O0 and O2, while the fixed
+corpora kept revision one and their 167 scenarios.
 
 Random generation also requests `--transactions` transactions per scenario,
 from one to eight and eight by default, and passes the count after the version

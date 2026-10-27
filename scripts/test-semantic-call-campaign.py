@@ -712,15 +712,15 @@ class G0VersionTests(unittest.TestCase):
         value["provenance"]["generatorVersion"] = version
         return value
 
-    def test_random_generation_requests_revision_two_and_a_saved_case_keeps_its_own(self):
+    def test_random_generation_requests_revision_three_and_a_saved_case_keeps_its_own(self):
         with tempfile.TemporaryDirectory() as directory:
             instance = campaign.Campaign(options(directory))
-            self.assertEqual(instance.summary["configuration"]["g0Version"], "core-g0-v2/lcg64-v1")
-            response = {"schema": campaign.CORPUS_SCHEMA, "cases": [self.generated("core-g0-v2/lcg64-v1")], "requested": 1,
+            self.assertEqual(instance.summary["configuration"]["g0Version"], "core-g0-v3/lcg64-v1")
+            response = {"schema": campaign.CORPUS_SCHEMA, "cases": [self.generated("core-g0-v3/lcg64-v1")], "requested": 1,
                         "attempted": 1, "status": "complete", "excluded": []}
             with patch.object(instance, "tool", return_value=response) as tool:
                 instance.prepare_cases()
-            self.assertEqual(tool.call_args.args[0][-2:], ["core-g0-v2/lcg64-v1", 8])
+            self.assertEqual(tool.call_args.args[0][-2:], ["core-g0-v3/lcg64-v1", 8])
             saved_path = Path(directory) / "case.json"
             saved_path.write_text(json.dumps(self.generated("core-g0-v1/lcg64-v1")))
             replayed = Path(directory) / "replayed"
@@ -750,8 +750,8 @@ class G0VersionTests(unittest.TestCase):
             self.assertEqual(instance.summary["generation"]["generatorVersions"], ["core-g0-v2/lcg64-v1"])
 
     def test_cli_refuses_a_version_that_disagrees_with_a_corpus(self):
-        # Revision three is a pure-profile revision: the stateful tools record no swarm mask.
-        for version, message in (("core-g0-v2/lcg64-v1", "disagrees with the supplied"), ("core-g0-v3/lcg64-v1", "invalid choice")):
+        for version, message in (("core-g0-v2/lcg64-v1", "disagrees with the supplied"), ("core-g0-v3/lcg64-v1", "disagrees with the supplied"),
+                                 ("core-g0-v9/lcg64-v1", "invalid choice")):
             with tempfile.TemporaryDirectory() as directory, patch.object(sys, "argv", [
                     "campaign", "--output", str(Path(directory) / "out"), "--corpus", str(ROOT / "scripts/semantic-call-corpus.json"),
                     "--g0-version", version]), redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):

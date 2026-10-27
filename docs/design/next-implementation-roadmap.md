@@ -1971,6 +1971,25 @@ sixteen eight-transaction cases per profile at the 512-node budget (seed
 per level and no finding. The slowest profile, nested-array, took 153 seconds
 on O0 and 143 on O2 of its 900, and no case took more than 11.2 seconds.
 
+**G0 revision three for stateful steps.** Random stateful campaigns now
+generate the checked step with
+[G0 revision three](../../scripts/SEMANTIC_DIFFERENTIAL.md#revision-three-swarm-masks)
+(`core-g0-v3/lcg64-v1`), as the pure profiles do. The definitions:
+
+- Mask: a stateful case's swarm mask is `caseMask` of its scenario seed, the
+  seed its step generator receives, and it restricts every helper of the step.
+  Transactions, wrappers and protocols do not depend on it.
+- Record and replay: a revision-three case records the mask in
+  `provenance.swarmMask` (feature names in catalog order), as the pure
+  profiles do. Replay requires the mask for revision three, compares a
+  generated case's mask with its seed's, and rejects a mask under any other
+  revision. Every case tool command replays first, so none of them accepts a
+  revision-three case without its mask.
+- Reduction: candidates copy their parent's revision and mask.
+- Campaigns: the stateful campaigns admit revisions one to three and generate
+  random steps with revision three; fixed corpora and saved cases keep the
+  version they record, so the fixed corpora stay on revision one, bit for bit.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
