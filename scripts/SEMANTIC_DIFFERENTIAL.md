@@ -295,6 +295,8 @@ python3 scripts/semantic-campaign.py \
   --seconds 300 --disk-bytes 134217728 --shrink-attempts 32
 ```
 
+This search generates with [G0 revision two](#g0-generator-revisions); add
+`--g0-version core-g0-v1/lcg64-v1` to search revision one instead.
 `--attempts` bounds generation attempts. `--shrink-attempts` bounds candidate
 executions across the entire campaign, and `--shrink-candidates` bounds each
 candidate batch. Core fuel, EVM gas, per-case time, total campaign time and

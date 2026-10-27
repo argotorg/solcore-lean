@@ -10,6 +10,9 @@ records the scope and subsequent priorities.
 Install Python 3.11 or newer, Git, Rust 1.97.0 through rustup, the toolchain in
 `lean-toolchain` through elan, and Anvil 1.5.1. The EVM hardfork is Osaka. The
 bootstrap verifies these versions and never installs system tools itself.
+The stateful comparisons enumerate EVM storage from Anvil's prestate diffs;
+after changing Anvil, run `python3 scripts/check-evm-storage-diff.py`, which
+checks on probe contracts that those diffs report every changed slot.
 For Yul comparisons also install solc `0.8.35+commit.47b9dedd`; use `--solc`
 to choose its path. The Yul exporter checks its full version and binary hash.
 The CI Yul job downloads the Linux amd64 release from the
@@ -48,6 +51,13 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
 
 Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
 profile's default node budget, capped at 512; an explicit `--nodes` wins.
+
+Random campaigns of the eleven G0-based pure profiles generate with
+[G0 revision two](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
+(`core-g0-v2/lcg64-v1`). Fixed corpora and saved cases keep the revision they
+record, and each profile row of the report lists the generator versions of its
+cases under `campaign.generation.generatorVersions`. The suite does not select
+another revision.
 
 Use `--backend sonatina-o2` with either suite command to compare the same cases
 after O2 compilation. O0 remains the default. The CI matrix runs each backend
@@ -207,7 +217,10 @@ holds the state, 3 on an epoch change, 4 when the state reaches
 without a suite summary. Signatures are conservative for mismatches: unrelated
 miscompilations share coarse fingerprints, so only the same reduced program
 counts as the same finding. A crash whose replay does not panic again records
-`not reproduced` as its call site.
+`not reproduced` as its call site. A signature need not survive an epoch
+change: when a comparison gains observations, as the stateful profiles did with
+[whole committed storage](SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage),
+its mismatch fingerprints change and the same difference gets a new signature.
 
 On a remote machine, use a Linux host with persistent disk, prepare the tools
 there once with `--prepare --allow-network`, and run the driver under a

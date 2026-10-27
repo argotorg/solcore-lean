@@ -135,6 +135,10 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
+Random campaigns of the eleven G0-based profiles use the generator's second
+revision, which mixes each draw and widens its bank of boundary literals;
+fixed corpora keep the first
+([G0 generator revisions](scripts/SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)).
 Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
 a separate [source emitter theorem](docs/design/scalar-emitter-meaning.md)
@@ -246,14 +250,15 @@ exact archive replay passes. See the [call runner](scripts/semantic-call-differe
 and [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-parentchild-calls).
 All fourteen fixed call scenarios and 38 transaction prefixes match, and log
 differences survive failure-preserving reduction and replay. M5 is complete for
-these restricted profiles. Gas and nonce equivalence, arbitrary storage/accounts,
-precompiles and deeper calls are outside these comparisons.
+these restricted profiles. Gas and nonce equivalence, accounts other than the
+installed contracts, precompiles and deeper calls are outside these comparisons.
 
 The keyed-storage profile extends the two-slot protocol to a two-Word ABI input
 whose key selects an arbitrary slot. Each call writes the key slot, its wrapping
 successor and a counter slot, so keys can alias the counter and one another;
 odd inputs revert. Every case declares the slots it observes, and the Hull and
-EVM paths must also show no nonzero committed slot outside them. See the
+EVM paths must also show no nonzero committed slot outside them; the
+whole-storage comparison below extends this to original Core. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-keyed-storage-transactions).
 All twelve fixed scenarios and 33 transaction prefixes match on Sonatina O0 and
 O2, as do the sixteen recorded random scenarios. A slot difference survives
@@ -360,6 +365,19 @@ outer length and the element count; odd flags revert. Its twelve fixed
 scenarios and sixteen recorded random scenarios match on both Sonatina levels,
 with reduction and exact archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-nested-dynamic-arrays).
+
+All thirteen stateful profiles also compare the installed contracts' whole
+committed storage after deployment and after every transaction. Original
+Core's accounts keep an exact ordered list of their present slots, imported
+Hull lists its committed entries, and the EVM path rereads every slot that
+Anvil's `prestateTracer` diffs have reported since deployment;
+`scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
+Deployment must leave the storage empty, and a revert must leave each path's
+whole storage unchanged. The fixed corpora of all thirteen profiles, 167
+scenarios and 460 transaction prefixes, still match on both Sonatina levels,
+and a synthetic stray write that the declared slots could not see is caught and
+reduced to one transaction. See
+[whole committed storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage).
 
 The generic profile instantiates one source selection function at Word, pair
 and sum types, with a checked monomorphic Core reference. All 28 fixed cases
