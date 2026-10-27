@@ -43,6 +43,35 @@ def ofFeatures? (features : List Feature) : Option FeatureMask :=
 def allows (mask : FeatureMask) (feature : Feature) : Bool :=
   mask.enabled.contains feature
 
+/-- The catalog features an emitter renders, from its own operator predicates.
+Every G0 emitter renders `let` and `if`. -/
+def supporting (unary : UnaryOp → Bool) (binary : BinaryOp → Bool) (ternary : TernaryOp → Bool) :
+    FeatureMask :=
+  ⟨catalog.filter fun
+    | .unary operation => unary operation
+    | .binary operation => binary operation
+    | .ternary operation => ternary operation
+    | _ => true⟩
+
+/-- A unary, binary or ternary operator, rather than a `let` or `if` form. -/
+def isOperator : Feature → Bool
+  | .unary _ | .binary _ | .ternary _ => true
+  | _ => false
+
+def hasOperator (mask : FeatureMask) : Bool :=
+  mask.enabled.any isOperator
+
+/-- Whether every feature `mask` enables is in `support`. -/
+def subset (mask support : FeatureMask) : Bool :=
+  mask.enabled.all support.allows
+
+/-- `mask` restricted to `support`. When that removes every operator `mask`
+enables, the result is `support` itself, so that a restriction never leaves only
+leaves and forms; a mask that enables no operator restricts plainly. -/
+def within (mask support : FeatureMask) : FeatureMask :=
+  let kept : FeatureMask := ⟨mask.enabled.filter support.allows⟩
+  if kept.hasOperator || !mask.hasOperator then kept else support
+
 end FeatureMask
 
 end Solcore.Synthesis.Core

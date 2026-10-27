@@ -118,8 +118,9 @@ def generatedPlan (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .
   let available := nodes - overhead
   let constantBudget := min 8 (available / 8)
   let constantSeed := Seed.ofNat (seed.toNat + 104729)
-  -- The constant and the step share the case mask.
-  let mask := revision.caseMask seed
+  -- The constant shares the case mask, restricted under revision four to the
+  -- scalar renderer's features; that is the recorded step mask restricted alike.
+  let mask := revision.caseMask seed constantSupport
   let generated ←
     (generate {seed := constantSeed, maxProgramNodes := constantBudget, revision, mask}).mapError reprStr
   let constant := generated.checkedProgram
@@ -192,7 +193,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
                 "validationFuel" (toJson fuel)
               cases := cases.push
                 (makeCase plan input emitted (inputSelection.record origin) fuel revision
-                  (revision.caseMask seed))
+                  (revision.caseMask seed featureSupport))
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -244,7 +245,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
   let admitted ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  let revision := savedRevision provenance
+  let revision := savedPureRevision provenance
   for (name, expected) in [
       ("generatorVersion", revision.version), ("profileVersion", profileVersion),
       ("functionVersion", Solcore.Synthesis.Core.Comptime.version), ("templateVersion", templateVersion),
@@ -253,7 +254,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
       ("emitterVersion", emitterVersion), ("wrapperVersion", wrapperVersion)] do
     unless (← provenance.getObjValAs? String name) = expected do throw (name ++ " changed")
   let origin ← provenance.getObjVal? "origin"
-  let mask ← savedMask provenance revision
+  let mask ← savedMask provenance revision featureSupport
   let emitted ← (emit admitted.plan).mapError reprStr
   unless (← json.getObjValAs? String "source") = emitted.source do
     throw "saved source differs from emission of the canonical comptime plan"
@@ -272,7 +273,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     unless seedText.length ≤ 20 do throw "saved seed exceeds limit"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
-    unless mask == revision.caseMask (Seed.ofNat seed) do
+    unless mask == revision.caseMask (Seed.ofNat seed) featureSupport do
       throw "saved swarm mask differs from its generation seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     let (plan, expectedOrigin) ← generatedPlan (Seed.ofNat seed) nodes revision
@@ -309,8 +310,8 @@ def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  let revision := savedRevision provenance
-  let mask ← savedMask provenance revision
+  let revision := savedPureRevision provenance
+  let mask ← savedMask provenance revision featureSupport
   let mut cases : Array Json := #[]
   for reduced in (reductions source).take limit do
     let origin := Json.mkObj [

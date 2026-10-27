@@ -12,6 +12,9 @@ open Solcore.Synthesis.Core (CheckedWordProgram)
 
 def emitterVersion : String := "solcore-source-g0-v1"
 def wrapperVersion : String := "solcore-word-contract-v1"
+
+/-- The G0 features `emit` renders, those of `ScalarRenderer`. -/
+def featureSupport := scalarSupport
 def contractName : String := "SynthesizedG0"
 def methodName : String := "run"
 def methodSignature : String := "run()"

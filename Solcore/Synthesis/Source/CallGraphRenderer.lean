@@ -16,6 +16,9 @@ def supportedUnary := PrimitiveRenderer.supportedUnary
 def supportedBinary := PrimitiveRenderer.supportedBinary
 def supportedTernary := PrimitiveRenderer.supportedTernary
 
+/-- The G0 features this renderer renders, those of `PrimitiveRenderer`. -/
+def support := PrimitiveRenderer.support
+
 /-- Syntax support is separate from the existing checked function boundary. -/
 def supported : Expr → Bool
   | .word _ | .bool _ | .var _ => true

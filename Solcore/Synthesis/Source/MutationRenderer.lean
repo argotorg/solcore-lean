@@ -11,6 +11,10 @@ namespace Solcore.Synthesis.Source.MutationRenderer
 open Solcore.Core.Wire
 open Solcore.Synthesis.Core.LocalMutation (Target Local)
 
+/-- The G0 features this renderer renders: its unary and binary operations go
+through `ScalarRenderer`, and it renders no ternary. -/
+def support := scalarSupport
+
 inductive Binding where
   | word (name : String)
   | bool (name : String)

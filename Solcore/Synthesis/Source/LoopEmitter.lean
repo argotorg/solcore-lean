@@ -15,6 +15,9 @@ open Solcore.Synthesis.Core.BoundedLoop (CheckedPlan)
 
 def emitterVersion : String := "solcore-source-loops-v2"
 def wrapperVersion : String := "solcore-word-loops-contract-v1"
+
+/-- The G0 features `emit` renders in the step: every operator and form. -/
+def featureSupport := AggregateRenderer.support
 def contractName : String := "SynthesizedLoops"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

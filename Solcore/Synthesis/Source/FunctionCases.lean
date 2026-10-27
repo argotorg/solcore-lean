@@ -97,7 +97,7 @@ def generatedFunction (seed : Seed) (nodes : Nat) (revision : GeneratorRevision 
   let mut metadata : Array Json := #[]
   let mut finalSeed := seed
   -- One mask for every helper of the case.
-  let mask := revision.caseMask seed
+  let mask := revision.caseMask seed featureSupport
   for index in List.range count do
     let helperSeed := Seed.ofNat (seed.toNat + index)
     let generated ←
@@ -168,7 +168,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
                 "validationFuel" (toJson fuel)
               cases := cases.push
                 (makeCase function input emitted (inputSelection.record origin) fuel revision
-                  (revision.caseMask seed))
+                  (revision.caseMask seed featureSupport))
   return Json.mkObj [("schema", toJson corpusSchema),
     ("requested", toJson count), ("attempted", toJson attempted),
     ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
@@ -177,14 +177,14 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
 def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   let admitted ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  let revision := savedRevision provenance
+  let revision := savedPureRevision provenance
   for (name, expected) in [
       ("generatorVersion", revision.version), ("profileVersion", profileVersion),
       ("functionVersion", wordFunctionDAGVersion), ("abstractionVersion", abstractionVersion),
       ("emitterVersion", emitterVersion), ("wrapperVersion", wrapperVersion)] do
     unless (← provenance.getObjValAs? String name) = expected do throw (name ++ " changed")
   let origin ← provenance.getObjVal? "origin"
-  let mask ← savedMask provenance revision
+  let mask ← savedMask provenance revision featureSupport
   let emitted ← (emit admitted.function).mapError reprStr
   unless (← json.getObjValAs? String "source") = emitted.source do
     throw "saved source differs from emission of the original Core function DAG"
@@ -199,7 +199,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let seedText ← origin.getObjValAs? String "seed"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
-    unless mask == revision.caseMask (Seed.ofNat seed) do
+    unless mask == revision.caseMask (Seed.ofNat seed) featureSupport do
       throw "saved swarm mask differs from its generation seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     let (function, expectedOrigin) ← generatedFunction (Seed.ofNat seed) nodes revision
@@ -285,8 +285,8 @@ def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let source ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  let revision := savedRevision provenance
-  let mask ← savedMask provenance revision
+  let revision := savedPureRevision provenance
+  let mask ← savedMask provenance revision featureSupport
   let mut cases : Array Json := #[]
   for reduced in (reductions source).take limit do
     let origin := Json.mkObj [

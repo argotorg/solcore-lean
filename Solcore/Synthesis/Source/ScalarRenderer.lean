@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Core.Fragment
+import Solcore.Synthesis.Core.FeatureMask
 
 /-! Shared scalar statements for source synthesis. The renderer is a formatting
 component; checked profiles supply the scope and type boundary. -/
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Solcore.Synthesis.Source
 
 open Solcore.Core.Wire
-open Solcore.Synthesis.Core (Target)
+open Solcore.Synthesis.Core (Target FeatureMask)
 
 inductive EmitError where
   | unsupportedUnary (operation : UnaryOp)
@@ -42,6 +42,11 @@ def supported : Expr → Bool
   | .unary operation operand => supportedUnary operation && supported operand
   | .binary operation left right => supportedBinary operation && supported left && supported right
   | _ => false
+
+/-- The G0 features this renderer renders: the scalar operators of
+`supportedUnary` and `supportedBinary`, `let` and `if`, and no ternary. -/
+def scalarSupport : FeatureMask :=
+  FeatureMask.supporting supportedUnary supportedBinary fun _ => false
 
 namespace ScalarRenderer
 

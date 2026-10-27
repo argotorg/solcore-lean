@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Solcore.Synthesis.Source.PrimitiveRenderer
 
 open Solcore.Core.Wire
-open Solcore.Synthesis.Core (Target)
+open Solcore.Synthesis.Core (Target FeatureMask)
 open ScalarRenderer (Rendered)
 
 def supportedUnary : UnaryOp → Bool
@@ -22,6 +22,9 @@ def supportedBinary : BinaryOp → Bool
 
 def supportedTernary : TernaryOp → Bool
   | .wordAddMod | .wordMulMod => true
+
+/-- The G0 features this renderer renders: every operator and form. -/
+def support : FeatureMask := FeatureMask.supporting supportedUnary supportedBinary supportedTernary
 
 /-- Syntax support is separate from the existing checked function boundary. -/
 def supported : Expr → Bool

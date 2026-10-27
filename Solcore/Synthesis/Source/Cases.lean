@@ -40,16 +40,20 @@ def observe (checked : CheckedWordProgram) (fuel : Nat) : Json :=
 
 def maskJson (mask : FeatureMask) : Json := toJson (mask.enabled.map featureName)
 
-/-- Revision three records its swarm mask in the provenance; the others record none. -/
+/-- Revisions three and four record their swarm mask in the provenance; the
+others record none. -/
 def swarmField (revision : GeneratorRevision) (mask : FeatureMask) : List (String × Json) :=
-  if revision = .v3 then [("swarmMask", maskJson mask)] else []
+  if revision.masked then [("swarmMask", maskJson mask)] else []
 
-/-- The mask a saved provenance records: required for revision three, absent otherwise. -/
-def savedMask (provenance : Json) (revision : GeneratorRevision) : Except String FeatureMask :=
-  match provenance.getObjVal? "swarmMask", revision with
-  | .error _, .v3 => throw "revision three requires a swarm mask"
-  | .error _, _ => pure FeatureMask.all
-  | .ok value, .v3 => do
+/-- The mask a saved provenance records: required for revisions three and four,
+absent otherwise. A revision-four mask must lie within `support`, the features
+of the profile's emitter. -/
+def savedMask (provenance : Json) (revision : GeneratorRevision)
+    (support : FeatureMask := FeatureMask.all) : Except String FeatureMask :=
+  match provenance.getObjVal? "swarmMask", revision.masked with
+  | .error _, true => throw "revisions three and four require a swarm mask"
+  | .error _, false => pure FeatureMask.all
+  | .ok value, true => do
       let names ← value.getArr?
       let features ← names.toList.mapM fun name => do
         let name ← name.getStr?
@@ -57,8 +61,10 @@ def savedMask (provenance : Json) (revision : GeneratorRevision) : Except String
           throw "unknown swarm mask feature"
         pure feature
       let some mask := FeatureMask.ofFeatures? features | throw "noncanonical swarm mask"
+      if revision = .v4 && !mask.subset support then
+        throw "revision-four swarm mask enables a feature the profile's emitter rejects"
       pure mask
-  | .ok _, _ => throw "a swarm mask requires revision three"
+  | .ok _, false => throw "a swarm mask requires revision three or four"
 
 def contractJson (emitted : EmittedProgram) : Json := Json.mkObj [
   ("name", toJson emitted.contractName),
@@ -100,6 +106,12 @@ def savedRevision (provenance : Json) (field : String := "generatorVersion") : G
   | .ok version => (GeneratorRevision.ofVersion? version).getD .v1
   | .error _ => .v1
 
+/-- `savedRevision` for the pure profiles, which also generate revision four. -/
+def savedPureRevision (provenance : Json) (field : String := "generatorVersion") : GeneratorRevision :=
+  match provenance.getObjValAs? String field with
+  | .ok version => (GeneratorRevision.ofPureVersion? version).getD .v1
+  | .error _ => .v1
+
 /-- Bounded seed search with one G0 revision; `v1` stays the default. -/
 def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
     (revision : GeneratorRevision := .v1) : Json := Id.run do
@@ -110,7 +122,7 @@ def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat)
     if cases.size < count then
       attempted := attempted + 1
       let seed := Seed.ofNat (firstSeed.toNat + index)
-      let mask := revision.caseMask seed
+      let mask := revision.caseMask seed featureSupport
       match generate {seed, maxProgramNodes := nodes, revision, mask} with
       | .error error =>
           excluded := excluded.push (Json.mkObj [
@@ -154,7 +166,7 @@ def caseProgram (json : Json) : Except String CheckedWordProgram := do
 def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   let checked ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  let revision := savedRevision provenance
+  let revision := savedPureRevision provenance
   unless (← provenance.getObjValAs? String "generatorVersion") = revision.version do
     throw "generator version changed"
   unless (← provenance.getObjValAs? String "emitterVersion") = emitterVersion do
@@ -162,7 +174,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
   unless (← provenance.getObjValAs? String "wrapperVersion") = wrapperVersion do
     throw "wrapper version changed"
   let origin ← provenance.getObjVal? "origin"
-  let mask ← savedMask provenance revision
+  let mask ← savedMask provenance revision featureSupport
   let emitted ← (emit checked).mapError reprStr
   unless (← json.getObjValAs? String "source") = emitted.source do
     throw "saved source differs from emission of the original Core program"
@@ -178,7 +190,7 @@ def replayCase (json : Json) (fuel : Nat) : Except String Json := do
     let seedText ← origin.getObjValAs? String "seed"
     let some seed := seedText.toNat? | throw "invalid saved seed"
     unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
-    unless mask == revision.caseMask (Seed.ofNat seed) do
+    unless mask == revision.caseMask (Seed.ofNat seed) featureSupport do
       throw "saved swarm mask differs from its generation seed"
     let nodes ← origin.getObjValAs? Nat "maxProgramNodes"
     unless nodes ≤ 512 do throw "saved generation budget exceeds limit"
@@ -196,8 +208,8 @@ def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
   let _ ← replayCase json fuel
   let checked ← caseProgram json
   let provenance ← json.getObjVal? "provenance"
-  let revision := savedRevision provenance
-  let mask ← savedMask provenance revision
+  let revision := savedPureRevision provenance
+  let mask ← savedMask provenance revision featureSupport
   let mut results : Array Json := #[]
   for candidate in (shrink checked).take limit do
     let origin := Json.mkObj [

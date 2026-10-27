@@ -1832,6 +1832,7 @@ import Solcore.Test.CoreSynthesisFragment
 import Solcore.Test.CoreSynthesisGenerator
 import Solcore.Test.CoreSynthesisGeneratorV2
 import Solcore.Test.CoreSynthesisGeneratorV3
+import Solcore.Test.CoreSynthesisGeneratorV4
 import Solcore.Test.CoreSynthesisSeed
 import Solcore.Test.CoreSynthesisShrink
 import Solcore.Test.SourceSynthesisEmitter
@@ -1872,6 +1873,8 @@ import Solcore.Test.SourceStatefulGeneratorRevisionCases
 import Solcore.Test.SourceStatefulSequenceCases
 import Solcore.Test.SourceSeededInputCases
 import Solcore.Test.SourceSwarmMaskCases
+import Solcore.Test.SourceEmitterSupportCases
+import Solcore.Test.SourceRevisionFourCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -3983,6 +3986,7 @@ def run : IO Unit := do
   CoreSynthesisGenerator.testCoreSynthesisGenerator
   CoreSynthesisGeneratorV2.testCoreSynthesisGeneratorV2
   CoreSynthesisGeneratorV3.testCoreSynthesisGeneratorV3
+  CoreSynthesisGeneratorV4.testCoreSynthesisGeneratorV4
   CoreSynthesisShrink.testCoreSynthesisShrink
   SourceSynthesisEmitter.testSourceSynthesisEmitter
   SourceSynthesisCases.testSourceSynthesisCases
@@ -4022,6 +4026,8 @@ def run : IO Unit := do
   SourceStatefulSequenceCases.testSourceStatefulSequenceCases
   SourceSeededInputCases.testSourceSeededInputCases
   SourceSwarmMaskCases.testSourceSwarmMaskCases
+  SourceEmitterSupportCases.testSourceEmitterSupportCases
+  SourceRevisionFourCases.testSourceRevisionFourCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter

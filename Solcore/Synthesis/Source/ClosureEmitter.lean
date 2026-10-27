@@ -12,6 +12,9 @@ open Solcore.Synthesis.Core.Closure (CheckedPlan Variant)
 
 def emitterVersion : String := "solcore-source-closures-v2"
 def wrapperVersion : String := "solcore-word-closures-contract-v1"
+
+/-- The G0 features `emit` renders in the step: every operator and form. -/
+def featureSupport := AggregateRenderer.support
 def contractName : String := "SynthesizedClosures"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

@@ -58,10 +58,10 @@ private def vectorChecks : IO Unit := do
       GeneratorRevision.v2.version == "core-g0-v2/lcg64-v1")
     "G0 revision version strings changed"
   ensure (GeneratorRevision.all.all fun revision =>
-      GeneratorRevision.ofVersion? revision.version == some revision)
+      GeneratorRevision.ofPureVersion? revision.version == some revision)
     "a G0 revision does not round-trip through its version"
-  ensure (GeneratorRevision.ofVersion? "core-g0-v4/lcg64-v1" == none &&
-      GeneratorRevision.ofVersion? "core-primitives-v1/core-g0-v2/lcg64-v1" == none)
+  ensure (GeneratorRevision.ofPureVersion? "core-g0-v5/lcg64-v1" == none &&
+      GeneratorRevision.ofPureVersion? "core-primitives-v1/core-g0-v2/lcg64-v1" == none)
     "an unknown version named a G0 revision"
   -- SplitMix64's first output from state zero.
   ensure (GeneratorV2.mix 0x9e3779b97f4a7c15 == 0xe220a8397b1dcdaf)

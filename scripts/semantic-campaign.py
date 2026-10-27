@@ -82,13 +82,15 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
 G0_PROFILES = ("closed-g0", "runtime-word", "runtime-primitives", "runtime-functions", "runtime-mutation",
                "runtime-aggregates", "runtime-loops", "runtime-generics", "runtime-closures", "runtime-comptime",
                "runtime-modules")
-G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1", "core-g0-v3/lcg64-v1")
-# Random generation uses v3, v2 under a per-case swarm mask; a fixed corpus or a
-# saved case keeps the version it records.
-RANDOM_G0_VERSION = "core-g0-v3/lcg64-v1"
+G0_VERSIONS = ("core-g0-v1/lcg64-v1", "core-g0-v2/lcg64-v1", "core-g0-v3/lcg64-v1", "core-g0-v4/lcg64-v1")
+# Random generation uses v4: v2 under v3's per-case swarm mask, restricted to the
+# features each profile's emitter renders. A fixed corpus or a saved case keeps
+# the version it records.
+RANDOM_G0_VERSION = "core-g0-v4/lcg64-v1"
 # The stateful case tools record, replay and pass on revision three's swarm mask
-# like the pure ones, so stateful campaigns admit all three revisions and draw
-# random steps with v3. A later revision needs stateful support before it is added.
+# like the pure ones, so stateful campaigns admit the first three revisions and
+# draw random steps with v3. Their tools refuse v4, which needs each emitter's
+# features.
 STATEFUL_G0_VERSIONS = G0_VERSIONS[:3]
 STATEFUL_RANDOM_G0_VERSION = "core-g0-v3/lcg64-v1"
 # Random runtime-input generation appends seeded inputs to each function's boundary inputs.

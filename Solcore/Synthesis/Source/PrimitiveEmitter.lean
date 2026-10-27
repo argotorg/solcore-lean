@@ -11,6 +11,9 @@ open Solcore.Synthesis.Core (CheckedWordFunction)
 
 def emitterVersion : String := "solcore-source-primitives-v1"
 def wrapperVersion : String := "solcore-word-primitives-contract-v1"
+
+/-- The G0 features `emit` renders: every operator and form. -/
+def featureSupport := PrimitiveRenderer.support
 def contractName : String := "SynthesizedPrimitives"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

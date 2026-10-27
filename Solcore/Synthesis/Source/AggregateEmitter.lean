@@ -13,6 +13,9 @@ open Solcore.Synthesis.Core.Aggregates (CheckedDAG)
 
 def emitterVersion : String := "solcore-source-aggregates-v2"
 def wrapperVersion : String := "solcore-word-aggregates-contract-v1"
+
+/-- The G0 features `emit` renders in helpers: every operator and form. -/
+def featureSupport := AggregateRenderer.support
 def contractName : String := "SynthesizedAggregates"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

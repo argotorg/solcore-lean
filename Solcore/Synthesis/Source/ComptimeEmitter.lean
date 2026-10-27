@@ -12,6 +12,12 @@ open Solcore.Synthesis.Core.Comptime (CheckedPlan Variant)
 
 def emitterVersion : String := "solcore-source-comptime-v2"
 def wrapperVersion : String := "solcore-word-comptime-contract-v1"
+
+/-- The G0 features `emit` renders in the step: every operator and form. -/
+def featureSupport := AggregateRenderer.support
+
+/-- The G0 features `emit` renders in the constant, those of `ScalarRenderer`. -/
+def constantSupport := scalarSupport
 def contractName : String := "SynthesizedComptime"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

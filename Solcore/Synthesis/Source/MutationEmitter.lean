@@ -12,6 +12,9 @@ open Solcore.Synthesis.Core.LocalMutation (CheckedDAG)
 
 def emitterVersion : String := "solcore-source-mutation-v1"
 def wrapperVersion : String := "solcore-word-mutation-contract-v1"
+
+/-- The G0 features `emit` renders, those of `MutationRenderer`. -/
+def featureSupport := MutationRenderer.support
 def contractName : String := "SynthesizedMutation"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

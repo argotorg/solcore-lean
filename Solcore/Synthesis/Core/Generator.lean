@@ -16,12 +16,14 @@ open Solcore.Core.Wire
 /--
 The replay-visible G0 choice semantics. Fixed corpora pin `v1`; `v2` mixes
 each draw, takes choices from its upper bits and widens the literal bank; `v3`
-restricts `v2` to a swarm mask drawn once per case.
+restricts `v2` to a swarm mask drawn once per case; `v4` restricts that mask
+further to the features the profile's emitter renders.
 -/
 inductive GeneratorRevision where
   | v1
   | v2
   | v3
+  | v4
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- The complete replay input for one generated Program. -/
@@ -29,7 +31,7 @@ structure GenerationRequest where
   seed : Seed
   maxProgramNodes : Nat
   revision : GeneratorRevision := .v1
-  /-- Revision three's swarm mask; the other revisions use the full grammar. -/
+  /-- The swarm mask of revisions three and four; the others use the full grammar. -/
   mask : FeatureMask := FeatureMask.all
   deriving Repr, BEq, DecidableEq
 
@@ -47,22 +49,40 @@ def generatorVersion : String := "core-g0-v1/" ++ Seed.algorithmId
 
 namespace GeneratorRevision
 
-def all : List GeneratorRevision := [.v1, .v2, .v3]
+def all : List GeneratorRevision := [.v1, .v2, .v3, .v4]
 
 /-- Every revision layers its choices on the unchanged lcg64-v1 draws. -/
 def version : GeneratorRevision → String
   | .v1 => generatorVersion
   | .v2 => "core-g0-v2/" ++ Seed.algorithmId
   | .v3 => "core-g0-v3/" ++ Seed.algorithmId
+  | .v4 => "core-g0-v4/" ++ Seed.algorithmId
 
+/-- The revisions every generator accepts. Revision four needs the features of
+the profile's emitter, which only the pure profiles supply, so the stateful
+tools parse with this and stop at revision three. -/
 def ofVersion? (version : String) : Option GeneratorRevision :=
+  [GeneratorRevision.v1, .v2, .v3].find? (·.version = version)
+
+/-- Every revision, for the pure profiles, which pass their emitter's features
+to `caseMask`. -/
+def ofPureVersion? (version : String) : Option GeneratorRevision :=
   all.find? (·.version = version)
 
-/-- The mask of a case: drawn from the case seed for `v3`, otherwise full. Every
-G0 program of one case, such as each of its helpers, uses this one mask. -/
-def caseMask (revision : GeneratorRevision) (seed : Seed) : FeatureMask :=
+/-- Whether a revision draws, and records, a swarm mask per case. -/
+def masked : GeneratorRevision → Bool
+  | .v3 | .v4 => true
+  | _ => false
+
+/-- The mask of a case: drawn from the case seed for `v3`; for `v4` that mask
+restricted to `support`, the features of the profile's emitter; otherwise
+full. Every G0 program that one emitter renders, such as each helper of a case,
+uses this one mask. -/
+def caseMask (revision : GeneratorRevision) (seed : Seed) (support : FeatureMask := FeatureMask.all) :
+    FeatureMask :=
   match revision with
   | .v3 => GeneratorV2.swarmMask seed
+  | .v4 => (GeneratorV2.swarmMask seed).within support
   | _ => FeatureMask.all
 
 end GeneratorRevision
@@ -307,11 +327,11 @@ def generate (request : GenerationRequest) : Except GenerationError GeneratedPro
     .error .budgetTooSmall
   else
     let bodyBudget := request.maxProgramNodes - 2
-    let mask := if request.revision = .v3 then request.mask else FeatureMask.all
+    let mask := if request.revision.masked then request.mask else FeatureMask.all
     let (body, finalSeed) := match request.revision with
       | .v1 => generateExpr .word 0 bodyBudget request.seed
       | .v2 => GeneratorV2.generateExpr .word 0 bodyBudget request.seed
-      | .v3 => GeneratorV2.generateExpr .word 0 bodyBudget request.seed mask
+      | .v3 | .v4 => GeneratorV2.generateExpr .word 0 bodyBudget request.seed mask
     let program : Program := {
       resultType := .word
       dataDefinitions := []

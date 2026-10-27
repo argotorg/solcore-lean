@@ -102,7 +102,7 @@ private def generationOptions (spec : Generator) (options : List String) :
   let mut revision : Option GeneratorRevision := none
   let mut inputs : Option InputSelection := none
   for option in options do
-    if let some value := GeneratorRevision.ofVersion? option then
+    if let some value := GeneratorRevision.ofPureVersion? option then
       unless spec.g0 && revision.isNone do
         throw (IO.userError s!"unexpected G0 generator version {option}")
       revision := some value

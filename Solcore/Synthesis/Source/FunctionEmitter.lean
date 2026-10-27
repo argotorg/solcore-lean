@@ -13,6 +13,9 @@ open Solcore.Synthesis.Core (CheckedWordFunctionDAG)
 
 def emitterVersion : String := "solcore-source-functions-v1"
 def wrapperVersion : String := "solcore-word-functions-contract-v1"
+
+/-- The G0 features `emit` renders, those of `ScalarRenderer`. -/
+def featureSupport := scalarSupport
 def contractName : String := "SynthesizedFunctions"
 def methodName : String := "run"
 def methodSignature : String := "run(uint256)"

@@ -13,6 +13,10 @@ namespace Solcore.Synthesis.Source.AggregateRenderer
 open Solcore.Core.Wire
 open Solcore.Synthesis.Core.Aggregates (Target Local)
 
+/-- The G0 features this renderer renders: its scalar operations are
+`CallGraphRenderer`'s, so every operator and form. -/
+def support := CallGraphRenderer.support
+
 inductive Binding where
   | word (name : String)
   | bool (name : String)
