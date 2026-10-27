@@ -868,6 +868,80 @@ accumulator bound. Frozen matrices matched every case on O0, O2 and Yul: the
 fixed corpus with complete coverage in 118, 114 and 162 seconds, and random
 suites of four whole functions, 40 cases, in 52, 47 and 65 seconds.
 
+**Bounded recursion.** The second new program shape is `runtime-recursion`: a
+source function that calls itself, or two functions that call each other, to
+a depth taken from the input, over an aggregate step. Before any code, a probe
+compiled three recursive sources with the pinned compiler and std, exported
+checked Hull, built Sonatina O0, O2 and Yul code images, and ran them on Anvil
+and on the Lean Hull runner: self-recursion, mutual recursion and recursion
+with work after the call matched a model of the function at eight inputs on
+every path. Original Core needs no recursion and no shared runtime code or
+proof changes. The existing profiles, corpora, emitters and emitter proofs stay
+unchanged, and this emitter has no proof yet. The definitions were fixed before
+execution:
+
+- Step: an aggregate step DAG of one to three helpers, generated with the
+  current G0 revision as for `runtime-loops`, so revision four equals revision
+  three.
+- Recursion forms. With input `x`, depth mask `D` and depth `d = x & D`, the
+  contract returns `f(d, x)`, where each call with `d > 0` makes exactly one
+  call at depth `d - 1` and `f(0, acc) = acc`:
+  - `tail`: `f(d, acc) = f(d - 1, step(acc))`;
+  - `nontail`: `f(d, acc) = step(f(d - 1, acc)) + d`, so each frame's own work
+    and depth follow the inner call;
+  - `mutual`: `even(d, acc) = odd(d - 1, step(acc))` and
+    `odd(d, acc) = even(d - 1, acc + d)`, two functions calling each other,
+    entered at `even`.
+
+  Each function's single result local is assigned in both branches of one
+  `if`.
+- Bounds: plans admit depth masks 0, 1, 3 and 7; generation draws 1, 3 or 7.
+  A call therefore recurses at most seven frames deep, with at most seven step
+  calls (four in `mutual`).
+- The original Core reference unrolls the frames into at most seven ordinal
+  guards over one accumulator cell, with no recursion and no counter:
+  - `tail` applies the step at ordinals 0 to `d - 1`;
+  - `nontail` applies `step(acc) + k` for `k` from 1 to `d`, innermost frame
+    first;
+  - `mutual` applies the step at even ordinals `i < d` and `acc + (d - i)` at
+    odd ones.
+
+  It is checked by the full Core checker and the 512-node case limit.
+- Shapes: the nine combinations of form and generation mask, drawn from a
+  SplitMix64 hash of the case seed, independent of the step's helper count and
+  template.
+- Boundary inputs: 0, 1, 2, 3, 7, `2^256 - 1` and `2^255`, giving depths zero to
+  three and seven under mask seven and an even positive depth for `mutual`.
+  Random campaigns add the four seeded inputs.
+- Exclusions, in order:
+  - a node budget too small for the shape or above 512;
+  - the step's own generation exclusions;
+  - a step whose four boundary inputs return the same Word;
+  - fuel exhaustion on a boundary input, an inconclusive resource exclusion;
+  - a function that returns every boundary input unchanged
+    (`boundary-identity`).
+
+  A depth-zero input returns itself, so the last rule requires some input that
+  recurses to change; the profile needs no acceptance filter.
+- Specified depths: a case's depth is `x & D`, prescribed by the plan and the
+  input, not a measured trace.
+- Reductions:
+  - shrink the step through the aggregate step reductions, which keep the
+    helper count and binding inventory;
+  - lower the depth mask, removing whole guards;
+  - replace `nontail` or `mutual` by `tail`;
+  - move the input to a boundary input.
+
+  Every candidate is sealed by the full checker and must be strictly smaller
+  than its parent in nodes, then literal weight.
+- Fixed corpus coverage:
+  - every aggregate step AST feature its cases use, at least the loop corpus's
+    37;
+  - one to three helpers and all four aggregate templates;
+  - all seven boundary inputs;
+  - all nine generation shapes;
+  - depths 0, 1, 2, 3 and 7.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
