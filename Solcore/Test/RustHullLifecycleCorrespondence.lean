@@ -37,8 +37,8 @@ def compiledCatalog (scenario : Scenario) : List AccountRuntime.CodeDefinition :
   [{program := program scenario, path := ["Child"], bytes := childBytes}]
 def sourceCode (scenario : Scenario) : ChildFrameSemantics.Code := ⟨program scenario, childCode, childBytes⟩
 def catalog (scenario : Scenario) : ChildFrameModeSemantics.Catalog := [(w 100, sourceCode scenario)]
-def parentEffects (scenario : Scenario) := ChildFrameModeSemantics.effectsAt (catalog scenario) 1 none
-def childEffects (scenario : Scenario) := ChildFrameModeSemantics.effectsAt (catalog scenario) 0 (some childBytes)
+def parentEffects (scenario : Scenario) := ChildFrameModeSemantics.effectsAt (catalog scenario) {} 1 none
+def childEffects (scenario : Scenario) := ChildFrameModeSemantics.effectsAt (catalog scenario) {} 0 (some childBytes)
 def parentFunctions (scenario : Scenario) := [AccountRuntime.frameFunction (code scenario)]
 def childFunctions := [AccountRuntime.frameFunction childCode]
 def childAccount (scenario : Scenario) : AccountState.Account :=
@@ -194,7 +194,7 @@ theorem child_response (object : Contract.CompiledObject) (scenario : Scenario) 
   exact .empty rfl
 
 theorem child_called (object : Contract.CompiledObject) (scenario : Scenario) :
-    ChildFrameModeSemantics.Children (catalog scenario) (ChildFrameModeSemantics.effectsAt (catalog scenario) 0)
+    ChildFrameModeSemantics.Children (catalog scenario) (ChildFrameModeSemantics.effectsAt (catalog scenario) {} 0)
       (parentBefore object scenario).external .ordinary (w 0) (request object scenario)
       (RuntimeCallModeSemantics.shared (parentBefore object scenario).external) (.value response)
       (RuntimeCallModeSemantics.shared (childFinal object scenario).external) := by
@@ -208,7 +208,7 @@ theorem child_called (object : Contract.CompiledObject) (scenario : Scenario) :
   · exact child_response object scenario
 
 theorem invoked (object : Contract.CompiledObject) (scenario : Scenario) :
-    RuntimeCallModeSemantics.Call (ChildFrameModeSemantics.Children (catalog scenario) (ChildFrameModeSemantics.effectsAt (catalog scenario) 0))
+    RuntimeCallModeSemantics.Call (ChildFrameModeSemantics.Children (catalog scenario) (ChildFrameModeSemantics.effectsAt (catalog scenario) {} 0))
       .ordinary (w 100) (w 100) (w 0) (w 0) (w 0) (w 0) (w 0) (parentBefore object scenario).external
       (.value (.word (w 1))) (afterCall object scenario).external := by
   apply RuntimeCallModeSemantics.Call.invoked

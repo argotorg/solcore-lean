@@ -57,7 +57,8 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     (dispatcherAfter : ∀ cell ∈ sharedCells, cell.location < dispatcherLocation)
     (dispatcherBefore : dispatcherLocation < creatorLocation)
     {catalog : List AccountRuntime.CodeDefinition} {catalogValues : List Core.Value}
-    {sourceCatalog : ChildFrameSemantics.Catalog} {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
+    {sourceCatalog : ChildFrameSemantics.Catalog} {initCatalog : ChildFrameSemantics.InitCatalog}
+    {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
     (capture : ObjectCallbackCapture (RuntimeExtendedInitializedEffects.slots true) (others.length + 1) images catalog
       (closure :: catalogValues) sharedCells dispatcherLocation creatorLocation initial)
     {createValue : Core.Value} (createRead : initial.read? creatorLocation = some (.inRight .unit createValue))
@@ -68,11 +69,11 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
     (catalogCaptured : CapturedClosures captured others catalogValues)
     (connection : RootChildCatalogExecutionCorrespondence.CatalogConnection ⟨program, code, rootBytes⟩ sourceCatalog catalog anchors)
     (frameExecution : RootChildCatalogExecutionCorrespondence.FrameExecution ⟨program, code, rootBytes⟩ sourceCatalog catalog anchors
-      (ChildFrameModeSemantics.effectsAt sourceCatalog height))
+      (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog height))
     (initialLinks : CatalogWorldCorrespondence.Links anchors (StorageCorrespondence.canonical (object.initialWorld context)))
     {finalSource : Semantics.State RuntimeCallEffectsSemantics.State} {sourceResult : Semantics.Result Semantics.Value}
     (evaluated : Semantics.EvalFunction
-      (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code]) (ChildFrameModeSemantics.effectsAt sourceCatalog (height + 1) (some rootBytes))
+      (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code]) (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog (height + 1) (some rootBytes))
       (AccountRuntime.frameFunction code) [] ⟨[], contextInitialState (some rootBytes) object context⟩ sourceResult finalSource) :
     ∃ value final, Core.Evaluates environment initial
       (AccountRuntime.objectFrame (RuntimeExtendedInitializedEffects.slots true) (others.length + 1) images (some rootBytes) contextCode functions shared dispatcher creator depth)
@@ -378,7 +379,7 @@ theorem objectFrame_evaluates {program : Program} {code : CodeBlock} {fuel : Nat
       StateRel (RuntimeCallModeEffectsCorrespondence.model callReady.layout
         (prefixRead callReady.layout.boundary (initial ++ suffix)) slots (some rootBytes) handlers anchors callbackContext) world state current →
       ∀ operation, RuntimeCallModeEffectsCorrespondence.CallbackPreservation callReady.layout handlers anchors callbackContext
-        (ChildFrameModeSemantics.Children sourceCatalog (ChildFrameModeSemantics.effectsAt sourceCatalog height)) operation state.external := by
+        (ChildFrameModeSemantics.Children sourceCatalog (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog height)) operation state.external := by
     intro world state current related operation
     have base := RuntimeCallModeEffectsCorrespondence.base_related related
     have ambient := ChildCallbackContextCorrespondence.parent_observed inventory sharedMembers base related.external.2.2.1.2.1.1

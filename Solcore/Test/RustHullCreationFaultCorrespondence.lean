@@ -61,7 +61,7 @@ def program (scenario : Scenario) : Program :=
   {entryPoints := [], functions := [], objects := [.object "Creator" (code scenario) []]}
 def functions (scenario : Scenario) : List Function := [AccountRuntime.frameFunction (code scenario)]
 def effects : Semantics.ExternalSemantics RuntimeCallModeSemantics.State :=
-  ChildFrameModeSemantics.effectsAt [] 1 (some rootBytes)
+  ChildFrameModeSemantics.effectsAt [] {} 1 (some rootBytes)
 
 abbrev SourceState := Semantics.State RuntimeCallModeSemantics.State
 def frame (state : SourceState) := state.external.runtime.runtime.runtime.runtime.runtime
@@ -265,7 +265,7 @@ theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
         (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
         ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
   exact ContractCallModeCorrespondence.compileObject_resumes_exact (height := 0) (code := code scenario) (by rfl)
-    accepted rfl (eligible scenario names_supported) empty_connection (context scenario)
+    accepted rfl (eligible scenario names_supported) empty_connection (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by decide)) (context scenario)
     (by cases scenario <;> rfl) (empty_links object scenario) (source object scenario)
 
 private def check (scenario : Scenario) : IO Unit := do

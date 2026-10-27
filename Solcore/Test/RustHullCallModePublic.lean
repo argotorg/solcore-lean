@@ -45,7 +45,7 @@ theorem public_evaluates (scenario : Scenario) {object : Contract.CompiledObject
     ∃ value final, Core.Evaluates [] [] (object.instantiate context).expression value final ∧
       ContractCallModeCorrespondence.PublicMessageRel context result (finalState object scenario).external value := by
   exact ContractCallModeCorrespondence.compileObject_preserves (height := 0) (code := code scenario) (by rfl) accepted rfl
-    (eligible scenario names_supported) (catalog_connection scenario) context rfl
+    (eligible scenario names_supported) (catalog_connection scenario) (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by cases scenario <;> decide)) context rfl
     (initial_context_links scenario object) (source object scenario)
 
 theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
@@ -56,7 +56,7 @@ theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
         (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
         ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
   exact ContractCallModeCorrespondence.compileObject_resumes_exact (height := 0) (code := code scenario) (by rfl) accepted rfl
-    (eligible scenario names_supported) (catalog_connection scenario) context rfl
+    (eligible scenario names_supported) (catalog_connection scenario) (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by cases scenario <;> decide)) context rfl
     (initial_context_links scenario object) (source object scenario)
 
 end Tests.RustHullCallModeCorrespondence

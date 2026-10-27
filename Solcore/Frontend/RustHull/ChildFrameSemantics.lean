@@ -30,6 +30,12 @@ abbrev Catalog := List (Word × Code)
 def select (catalog : Catalog) (address : Word) : Option Code :=
   (catalog.find? (fun entry => entry.1 == address)).map Prod.snd
 
+/-- The code a creation's init frame may run, keyed by the bytes that begin the
+init code, and the runtime images a deployment may install. -/
+structure InitCatalog where
+  templates : List Code := []
+  runtimes : List (List UInt8) := []
+
 /-- Only block and transaction observations are inherited from the parent.
 Message observations, gas, code, memory and return data belong to this child. -/
 def initial (parent : RuntimeCallEffectsSemantics.State) (request : AccountCallSemantics.Request)

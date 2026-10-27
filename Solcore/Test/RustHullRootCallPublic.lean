@@ -38,7 +38,7 @@ theorem public_evaluates (scenario : Scenario) {object : Contract.CompiledObject
     rw [CatalogWorldCorrespondence.compileObject_images accepted]
     rfl
   exact ContractRootCallCorrespondence.compileObject_preserves (height := 0) (code := code scenario) rfl accepted
-    (eligible scenario names_supported) (catalog_connection scenario) context rfl
+    (eligible scenario names_supported) (catalog_connection scenario) (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by decide)) context rfl
     (initial_context_links object) (source object scenario image)
 
 theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
@@ -52,7 +52,7 @@ theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
     rw [CatalogWorldCorrespondence.compileObject_images accepted]
     rfl
   exact ContractRootCallCorrespondence.compileObject_resumes_exact (height := 0) (code := code scenario) rfl accepted
-    (eligible scenario names_supported) (catalog_connection scenario) context rfl
+    (eligible scenario names_supported) (catalog_connection scenario) (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by decide)) context rfl
     (initial_context_links object) (source object scenario image)
 
 end Tests.RustHullRootCallCorrespondence

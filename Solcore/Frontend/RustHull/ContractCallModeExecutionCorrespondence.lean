@@ -1,4 +1,5 @@
 import Solcore.Frontend.RustHull.ContractCallModeInitializedExecution
+import Solcore.Frontend.RustHull.InitCatalogConnection
 import Solcore.Frontend.RustHull.ModeChildFrameCorrespondence
 import Solcore.Frontend.RustHull.ContractChildCallInitialLinks
 
@@ -12,7 +13,8 @@ open ContractChildCallCorrespondence (InitialCatalogLinks initial_links)
 
 theorem objectRuntime_preserves {program : Program} {code : CodeBlock} {fuel : Nat} {compiled : Core.Expr}
     {image : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition} {others : List Core.Expr}
-    {sourceCatalog : ChildFrameSemantics.Catalog} {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
+    {sourceCatalog : ChildFrameSemantics.Catalog} {initCatalog : ChildFrameSemantics.InitCatalog}
+    {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
     (accepted : AccountRuntime.compileFrame program code (RuntimeExtendedInitializedEffects.slots true) fuel = .ok compiled)
     (catalogCompiled : ContractCatalogCorrespondence.CompiledCatalog (RuntimeExtendedInitializedEffects.slots true) fuel catalog others)
     (eligible : DerivationCorrespondence.ExecutableProgram (supported true)
@@ -25,7 +27,7 @@ theorem objectRuntime_preserves {program : Program} {code : CodeBlock} {fuel : N
     {finalSource : Semantics.State RuntimeCallEffectsSemantics.State} {sourceResult : Semantics.Result Semantics.Value}
     (evaluated : Semantics.EvalFunction
       (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code])
-      (ChildFrameModeSemantics.effectsAt sourceCatalog (height + 1) image)
+      (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog (height + 1) image)
       (AccountRuntime.frameFunction code) [] ⟨[], contextInitialState image object context⟩ sourceResult finalSource) :
     ∃ value final, Core.Evaluates environment initial
       (AccountRuntime.objectRuntime (RuntimeExtendedInitializedEffects.slots true) compiled others
@@ -55,21 +57,25 @@ def InitialContextLinks (image : Option (List UInt8)) (catalog : List AccountRun
   InitialCatalogLinks image catalog anchors (Contract.normalizeAddress normalized.address)
     (contextInitialState image object normalized).runtime.runtime.runtime.runtime.runtime.storage.world
 
+-- The init-frame creation rule, which reads `initConnection`, follows separately.
+set_option linter.unusedVariables false in
 theorem compileObject_preserves {program : Program} {path : List String} {code : CodeBlock} {fuel : Nat}
     {image : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition} {object : Contract.CompiledObject}
-    {sourceCatalog : ChildFrameSemantics.Catalog} {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
+    {sourceCatalog : ChildFrameSemantics.Catalog} {initCatalog : ChildFrameSemantics.InitCatalog}
+    {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
     (selected : AccountRuntime.select program.objects path = .ok code)
     (accepted : Contract.compileObject program path fuel image catalog = .ok object)
     (hasCode : (image.isSome || !catalog.isEmpty) = true)
     (eligible : DerivationCorrespondence.ExecutableProgram (supported true)
       (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code]))
     (connection : ModeChildCatalogExecutionCorrespondence.CatalogConnection sourceCatalog catalog anchors)
+    (initConnection : InitCatalogCorrespondence.InitCatalogConnection initCatalog image catalog)
     (context : Contract.Context) (notDeploying : context.deploying = false)
     (initialLinks : InitialContextLinks image catalog object context anchors)
     {finalSource : Semantics.State RuntimeCallEffectsSemantics.State} {sourceResult : Semantics.Result Semantics.Value}
     (evaluated : Semantics.EvalFunction
       (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code])
-      (ChildFrameModeSemantics.effectsAt sourceCatalog (height + 1) image)
+      (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog (height + 1) image)
       (AccountRuntime.frameFunction code) [] ⟨[], contextInitialState image object (Contract.normalizeContext context)⟩ sourceResult finalSource) :
     ∃ value final, Core.Evaluates [] [] (object.instantiate context).expression value final ∧
       PublicMessageRel context sourceResult finalSource.external value := by
@@ -100,19 +106,21 @@ theorem compileObject_preserves {program : Program} {path : List String} {code :
 exact for the independently derived parent and child result. -/
 theorem compileObject_resumes_exact {program : Program} {path : List String} {code : CodeBlock} {fuel : Nat}
     {image : Option (List UInt8)} {catalog : List AccountRuntime.CodeDefinition} {object : Contract.CompiledObject}
-    {sourceCatalog : ChildFrameSemantics.Catalog} {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
+    {sourceCatalog : ChildFrameSemantics.Catalog} {initCatalog : ChildFrameSemantics.InitCatalog}
+    {anchors : List CatalogWorldCorrespondence.Anchor} {height : Nat}
     (selected : AccountRuntime.select program.objects path = .ok code)
     (accepted : Contract.compileObject program path fuel image catalog = .ok object)
     (hasCode : (image.isSome || !catalog.isEmpty) = true)
     (eligible : DerivationCorrespondence.ExecutableProgram (supported true)
       (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code]))
     (connection : ModeChildCatalogExecutionCorrespondence.CatalogConnection sourceCatalog catalog anchors)
+    (initConnection : InitCatalogCorrespondence.InitCatalogConnection initCatalog image catalog)
     (context : Contract.Context) (notDeploying : context.deploying = false)
     (initialLinks : InitialContextLinks image catalog object context anchors)
     {finalSource : Semantics.State RuntimeCallEffectsSemantics.State} {sourceResult : Semantics.Result Semantics.Value}
     (evaluated : Semantics.EvalFunction
       (program.functions ++ code.functions ++ [AccountRuntime.frameFunction code])
-      (ChildFrameModeSemantics.effectsAt sourceCatalog (height + 1) image)
+      (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog (height + 1) image)
       (AccountRuntime.frameFunction code) [] ⟨[], contextInitialState image object (Contract.normalizeContext context)⟩ sourceResult finalSource) :
     ∃ value, PublicMessageRel context sourceResult finalSource.external value ∧
       ∃ required, ∀ initialFuel additional limit last,
@@ -120,7 +128,8 @@ theorem compileObject_resumes_exact {program : Program} {path : List String} {co
         (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
         ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
   obtain ⟨value, _, executed, related⟩ :=
-    compileObject_preserves selected accepted hasCode eligible connection context notDeploying initialLinks evaluated
+    compileObject_preserves selected accepted hasCode eligible connection initConnection context notDeploying initialLinks
+      evaluated
   exact ⟨value, related, Contract.evaluation_resumes_exact executed⟩
 
 end Solcore.Frontend.RustHull.ContractCallModeCorrespondence

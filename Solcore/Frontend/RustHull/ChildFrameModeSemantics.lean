@@ -41,10 +41,13 @@ inductive Children (catalog : Catalog)
       Children catalog effects parent mode source request shared response
         (RuntimeCallModeSemantics.shared final.external)
 
-def effectsAt (catalog : Catalog) : Nat → Option (List UInt8) →
+/-- Child frames at most `height` deep. `initCatalog` holds the init templates
+and runtime images of creation; no rule of this file reads it yet. -/
+def effectsAt (catalog : Catalog) (initCatalog : ChildFrameSemantics.InitCatalog) : Nat → Option (List UInt8) →
     Semantics.ExternalSemantics RuntimeCallModeSemantics.State
   | 0, image => RuntimeCallModeSemantics.effects image
-  | height + 1, image => RuntimeCallModeSemantics.effectsWith (Children catalog (effectsAt catalog height)) image
+  | height + 1, image =>
+      RuntimeCallModeSemantics.effectsWith (Children catalog (effectsAt catalog initCatalog height)) image
 
 theorem initial_shared (mode : AccountCallSemantics.Mode) (source : Word)
     (parent : RuntimeCallModeSemantics.State) (request : AccountCallSemantics.Request)

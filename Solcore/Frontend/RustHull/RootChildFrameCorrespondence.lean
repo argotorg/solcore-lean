@@ -8,8 +8,9 @@ namespace Solcore.Frontend.RustHull.RootChildFrameCorrespondence
 open RootChildCatalogExecutionCorrespondence
 
 theorem frame_execution (rootSource : ChildFrameSemantics.Code) (sourceCatalog : ChildFrameSemantics.Catalog)
+    {initCatalog : ChildFrameSemantics.InitCatalog}
     (catalog : List AccountRuntime.CodeDefinition) (anchors : List CatalogWorldCorrespondence.Anchor)
-    (height : Nat) : FrameExecution rootSource sourceCatalog catalog anchors (ChildFrameModeSemantics.effectsAt sourceCatalog height) := by
+    (height : Nat) : FrameExecution rootSource sourceCatalog catalog anchors (ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog height) := by
   induction height with
   | zero =>
       apply frame_execution_of_callbacks

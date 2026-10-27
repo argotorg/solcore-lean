@@ -40,7 +40,7 @@ def code : CodeBlock := {stmts := [⟨.assembly arithmeticBlock, none⟩], funct
 def program : Program := {entryPoints := [], functions := [], objects := [.object "Assembler" code []]}
 def functions : List Function := [AccountRuntime.frameFunction code]
 def effects : Semantics.ExternalSemantics RuntimeCallModeSemantics.State :=
-  ChildFrameModeSemantics.effectsAt [] 1 (some rootBytes)
+  ChildFrameModeSemantics.effectsAt [] {} 1 (some rootBytes)
 def context : Contract.Context := {}
 
 abbrev SourceState := Semantics.State RuntimeCallModeSemantics.State
@@ -160,7 +160,7 @@ theorem public_resumes {object : Contract.CompiledObject}
         (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
         ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
   exact ContractCallModeCorrespondence.compileObject_resumes_exact (height := 0) (code := code) (by rfl)
-    accepted rfl (eligible names_supported) empty_connection context rfl (empty_links object) (source object)
+    accepted rfl (eligible names_supported) empty_connection (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by decide)) context rfl (empty_links object) (source object)
 
 private def expected : List UInt8 := List.replicate 31 0 ++ [42] ++ List.replicate 31 0 ++ [1]
 

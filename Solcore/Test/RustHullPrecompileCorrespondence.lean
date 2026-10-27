@@ -386,7 +386,7 @@ def code (scenario : Scenario) : CodeBlock := {
 def program (scenario : Scenario) : Program :=
   {entryPoints := [], functions := [], objects := [.object "Precompile" (code scenario) []]}
 def effects : Semantics.ExternalSemantics RuntimeCallModeSemantics.State :=
-  ChildFrameModeSemantics.effectsAt [] 1 (some rootBytes)
+  ChildFrameModeSemantics.effectsAt [] {} 1 (some rootBytes)
 
 def initial (object : Contract.CompiledObject) : SourceState :=
   ⟨[], ContractCallCorrespondence.contextInitialState (some rootBytes) object (Contract.normalizeContext context)⟩
@@ -412,7 +412,7 @@ private theorem seed_source (object : Contract.CompiledObject) (scenario : Scena
   · exact .external (by rfl) rfl (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime (.runtime rfl))))))))
 
 private theorem invoked_source (object : Contract.CompiledObject) (scenario : Scenario) :
-    RuntimeCallModeSemantics.Call (ChildFrameModeSemantics.Children [] (ChildFrameModeSemantics.effectsAt [] 0))
+    RuntimeCallModeSemantics.Call (ChildFrameModeSemantics.Children [] (ChildFrameModeSemantics.effectsAt [] {} 0))
       (operation scenario) (w 100) (w 4) (value object scenario) (w 1) (w 1) (w 3) (w 2)
       (memoryWritten object).external (.value (.word (w 1))) (afterCall object).external := by
   apply RuntimeCallModeSemantics.Call.invoked
@@ -538,7 +538,7 @@ theorem public_resumes (scenario : Scenario) {object : Contract.CompiledObject}
         (last = Contract.finish limit value ↔ required ≤ initialFuel + additional) ∧
         ((∃ checkpoint, last.outcome = .outOfFuel checkpoint) ↔ initialFuel + additional < required) := by
   exact ContractCallModeCorrespondence.compileObject_resumes_exact (height := 0) (code := code scenario) (by rfl)
-    accepted rfl (eligible scenario names_supported) empty_connection context rfl (empty_links object)
+    accepted rfl (eligible scenario names_supported) empty_connection (InitCatalogCorrespondence.InitCatalogConnection.empty rfl (by decide)) context rfl (empty_links object)
     (source object scenario)
 
 private def check (scenario : Scenario) : IO Unit := do
