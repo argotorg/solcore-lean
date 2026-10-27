@@ -2463,6 +2463,86 @@ separate high-bit stream; flags are just the parity. Coverage adds the payload
 lengths and the payload lengths of reverted transactions, as for the bytes
 profile. The chunk Words are the runtime inputs.
 
+### Running and validation
+
+```sh
+lake build semanticLongBytesTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-long-bytes-cases
+.lake/build/bin/semantic-long-bytes-tool generate 0 384 2 512 1000000 \
+  > .upstream/semantic-long-bytes-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-long-bytes-corpus.json \
+  --output .upstream/semantic-long-bytes-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-long-bytes \
+  --seed 20261026 --cases 16 --attempts 2048 --output .upstream/semantic-long-bytes-random
+```
+
+The tool accepts the same `generate`, `emit`, `replay`, `observe` and `shrink`
+commands as the other storage tools. Plans use `solcore-lean.long-bytes-plan.v1`
+under the case field `longBytesPlan`; cases use
+`solcore-lean.semantic-long-bytes-case.v1`. Transactions are the bytes
+profile's `{id, flags, payload, calldata, value}`, with payloads of up to 256
+bytes. The adapter treats the profile as a bytes profile with its own payload
+bound, observed slots and count and last-byte slots (`maxPayload`, `slots`,
+`countSlot` and `tailSlot` in its profile entry). The bytes profile keeps its
+64-byte bound and slots 0 to 4. The calldata of all 33 fixed and 48 random
+transactions matched `cast calldata "run(uint256,bytes)"` from the pinned
+Foundry release byte for byte; the Lean tests retain a 65-byte vector.
+Histories use `solcore-lean.long-bytes-history.v1` with the bytes history
+fields, and the declared-slot Hull runner `rust-hull-keyed-storage-scenario`
+serves the profile unchanged.
+
+The eight chunk guards take 296 Core nodes. They lie outside the node budget,
+so generation reserves only the measured 102-node wrapper and the 384-node
+default leaves 282 nodes for the step. All 300 of the first 300 seeds were
+accepted, and their 900 transactions used every bank length. Generated
+scenarios must complete with the prescribed outcomes and follow the length,
+last-byte and sum protocol under original Core. A case reaches about 75 KB, so
+a native shrink response carries at most 32 candidates, the profile's
+`shrinkBatch`.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with payloads of 0 to 256
+bytes, and four generated seeds. Its expected histories were computed outside
+Lean by a separate evaluator of the step programs and a direct model of the
+protocol. `Tests/Main.lean` registers a validator that compares every status,
+payload and slot with original Core. It rejects tampered outputs, byte counts,
+last bytes and chunk results, committed writes of a reverted transaction, and
+consistently re-encoded payloads with a changed or appended byte. Required
+coverage is all 31 step AST features in the corpus, the six storage boundary
+Words as chunks, one to three helpers and transactions, all four templates,
+both outcomes, six completion patterns, all twelve bank lengths and reverted
+payloads of 0, 65, 97, 128, 223, 255 and 256 bytes.
+
+Local validation used committed code with frozen scripts and native tools; the
+twenty existing native tools are byte-identical to main's. The fixed suite
+matched all twelve scenarios and 33 prefixes on Sonatina O0 and O2, with
+complete coverage, in 76.7 and 76.5 seconds. The recorded random suite (root
+seed `20261026`, sixteen cases, 2,048 attempts) accepted sixteen scenarios
+from sixteen attempts with no exclusions. All sixteen scenarios and 48
+prefixes matched on both levels in 107.5 and 105.6 seconds. They covered all
+twelve bank lengths and reverted payloads of 64, 96, 97, 128, 192, 223, 255 and
+256 bytes. Neither run produced a finding.
+
+A copied `importedHull` difference in slot 8, the slot that only payloads of
+more than 224 bytes write, at `tx-0` of the `increment-all-ones` scenario
+(256, 128 and 97 bytes of `0xff`) was reduced on each level to that
+transaction with an empty payload and a reduced step: five accepted reductions
+in seven candidate executions, all of whose actual comparisons matched. The
+two rejected candidates removed `tx-0` itself. Truncating its payload kept the
+finding because every declared slot is observed whether or not a transaction
+writes it. The original and reduced archives replayed exactly with three-way
+agreement (four replays), and synthetic replays reproduced the fingerprint.
+Core or Hull fuel one was classified as inconclusive. With the extended
+adapter, campaign and suite, the two-slot storage, rollback, call, keyed,
+dynamic-array, log, call-value, bytes, forwarded-value, mapping and ledger
+fixed corpora still matched all 143 scenarios and 394 prefixes on each level.
+
+This profile does not compare gas, balances, nonces, code or memory, payloads
+longer than 256 bytes, non-canonical offsets or padding, truncated input and
+the decoder's revert paths, strings, or return values longer than one Word.
+Agreement is test evidence, not a preservation proof.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

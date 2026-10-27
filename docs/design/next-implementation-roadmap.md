@@ -37,7 +37,7 @@ test corpus.
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage and two-slot rollback emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
-| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping and sender-keyed ledger extensions validated locally; `bytes` payloads of up to 256 bytes defined; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
+| 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger and 256-byte `bytes` extensions validated locally; multi-word return values need a contract runtime change; O2 random log and forwarded-value runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, a direct-call head and the row lemma that derives its input from the callee's own accepted body; call sites in the subset and the size induction across bodies, remaining expression and statement forms, fault lifting, a richer instance and chained calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
 | 8 | Remaining Hull public connections | In progress: identity, SHA-256 and RIPEMD-160 precompiles, refused CREATE/CREATE2 attempts, admitted attempts without an init frame, Hull's explicit revert and inline Yul statement lists with locals, assignments, nested blocks, `if`, `switch` and nested memory and termination calls connected | Independent semantics through actual lowering, initialization and public execution for each remaining feature. |
 
@@ -1446,8 +1446,57 @@ every chunk. Its definitions were fixed before execution:
 - Node budget: the eight chunk guards are a fixed part of the wrapper. Like
   the mapping's Keccak closure, they lie outside the step's node budget.
 
-Further state/ABI work, such as nested or multi-word ABI elements, longer
-`bytes` or strings, ABI-encoded return values or callers beyond the three
+Original Core folds the eight chunks with the bytes profile's chunk
+expression; with two chunks and slots three and four it is exactly the bytes
+contract. The adapter, campaign and suite treat the profile as a bytes profile
+with its own payload bound, observed slots and count and last-byte slots, so
+the bytes profile keeps its 64-byte bound. The profile is a twenty-sixth suite
+profile with one new native tool; the twenty other native tools are
+byte-identical to main's. The eight chunk guards (296 nodes) lie outside the
+step budget, so generation reserves the measured 102-node wrapper. All 300 of
+the first 300 seeds at 384 nodes were accepted, and their 900 transactions
+used every bank length. A case reaches about 75 KB, so a native shrink
+response carries at most 32 candidates.
+
+The fixed corpus has twelve scenarios (eight imported, four generated) and 33
+transactions. Its histories were computed outside Lean by a separate evaluator
+of the step programs and a direct model of the protocol. A registered Lean
+validator confirmed every status, payload and slot against original Core and
+rejected tampered entries. Coverage includes all 31 step features of the
+corpus, the six boundary Words as chunks, one to three helpers and
+transactions, four templates, both outcomes, six completion patterns, all
+twelve bank lengths and reverted payloads of 0, 65, 97, 128, 223, 255 and 256
+bytes. The calldata of all 33 fixed and 48 random transactions matched `cast
+calldata`.
+
+The full Lean build (10,099 jobs), registered tests, kernel policy and 532
+Python policy tests passed. The fixed suite matched all 12 scenarios and 33
+prefixes on Sonatina O0 and O2 (76.7 and 76.5 seconds). Random seed
+`20261026`, sixteen cases and 2,048 attempts accepted sixteen scenarios from
+sixteen attempts with no exclusions. Both levels matched all sixteen and 48
+prefixes (107.5 and 105.6 seconds), covering every bank length. Neither random
+run produced a finding.
+
+A copied Hull difference in slot 8, which only payloads of more than 224 bytes
+write, at the first of three transactions was reduced on each level to that
+transaction with an empty payload and a reduced step: five accepted reductions
+in seven actual candidate executions. Original and reduced archives replayed
+exactly with agreement (four replays), and synthetic fingerprints reproduced.
+Core or Hull fuel one was inconclusive. With the extended storage and suite
+scripts, the storage, rollback, call, keyed, dynamic-array, log, call-value,
+bytes, forwarded-value, mapping and ledger fixed corpora still matched all 143
+scenarios and 394 prefixes on both levels. An offline preparation of the
+worktree's cloned cache verified all twenty-one native tools as ready. Hosted
+CI has not been run.
+
+This scope does not compare multi-word return values, payloads longer than 256
+bytes, strings, gas, balances, nonces, code or memory, non-canonical encodings
+or the decoder's revert paths. Agreement is test evidence, not a preservation
+proof.
+
+Further state/ABI work, such as nested or multi-word ABI elements, `bytes`
+beyond 256 bytes, strings, ABI-encoded return values, which first need a
+contract entry convention for more than one Word, or callers beyond the three
 fixed senders, needs its own observation, rollback, deployment and reduction
 definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
