@@ -48,6 +48,8 @@ import Solcore.Synthesis.Source.StorageLedgerEmitter
 import Solcore.Synthesis.Source.StorageLedgerCases
 import Solcore.Synthesis.Source.LongBytesEmitter
 import Solcore.Synthesis.Source.LongBytesCases
+import Solcore.Synthesis.Source.NestedArrayEmitter
+import Solcore.Synthesis.Source.NestedArrayCases
 import Solcore.Synthesis.Source.NestedCallEmitter
 import Solcore.Synthesis.Source.NestedCallCases
 

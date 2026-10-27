@@ -99,3 +99,7 @@ lean_exe rustHullLedgerScenario where
 lean_exe semanticLongBytesTool where
   root := `Tests.SemanticLongBytesTool
   exeName := "semantic-long-bytes-tool"
+
+lean_exe semanticNestedArrayTool where
+  root := `Tests.SemanticNestedArrayTool
+  exeName := "semantic-nested-array-tool"

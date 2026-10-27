@@ -2194,6 +2194,9 @@ import Solcore.Test.SourceLongBytesCases
 import Solcore.Test.SourceLongBytesCorpus
 import Solcore.Test.SourceKeyedMeaning
 import Solcore.Test.RustHullYulArithmeticCorrespondence
+import Solcore.Test.SourceNestedArrayEmitter
+import Solcore.Test.SourceNestedArrayCases
+import Solcore.Test.SourceNestedArrayCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4181,5 +4184,8 @@ def main : IO UInt32 := do
   Tests.SourceLongBytesCorpus.testSourceLongBytesCorpus
   Tests.SourceKeyedMeaning.testSourceKeyedMeaning
   Tests.RustHullYulArithmeticCorrespondence.run
+  Tests.SourceNestedArrayEmitter.testSourceNestedArrayEmitter
+  Tests.SourceNestedArrayCases.testSourceNestedArrayCases
+  Tests.SourceNestedArrayCorpus.testSourceNestedArrayCorpus
   IO.println "solcore-lean tests passed"
   return 0
