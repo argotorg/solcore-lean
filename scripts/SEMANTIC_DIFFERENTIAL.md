@@ -4199,6 +4199,55 @@ Its default Yul selection stays the sixteen pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 
+### Results
+
+A feasibility probe preceded the code. It ran the unchanged storage adapter on
+the first four scenarios of each fixed corpus, with the EVM deploying solc's
+bytes. All 60 scenarios and 173 transactions matched, and every wrapper
+compiled to one creation/runtime pair.
+
+The matrices then ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen. Each table entry
+gives scenarios and prefixes, all matched:
+- **Fixed corpora:** complete coverage.
+- **Random suites:** root seed `20261028`, sixteen eight-transaction scenarios
+  per profile, G0 revision three, the suite's default budgets.
+
+| Profile | Fixed | Seconds | Random | Seconds |
+| --- | ---: | ---: | ---: | ---: |
+| `stateful-storage` | 12 / 33 | 95.6 | 16 / 128 | 133.5 |
+| `stateful-storage-rollback` | 14 / 39 | 129.6 | 16 / 128 | 135.3 |
+| `stateful-keyed-storage` | 14 / 39 | 118.5 | 16 / 128 | 142.9 |
+| `stateful-dynamic-array` | 15 / 42 | 155.0 | 16 / 128 | 173.4 |
+| `stateful-logs` | 12 / 33 | 102.4 | 16 / 128 | 144.2 |
+| `stateful-call-value` | 12 / 33 | 100.6 | 16 / 128 | 144.1 |
+| `stateful-bytes` | 12 / 33 | 110.1 | 16 / 128 | 151.7 |
+| `stateful-long-bytes` | 12 / 33 | 116.2 | 16 / 128 | 168.9 |
+| `stateful-mapping` | 12 / 33 | 110.4 | 16 / 128 | 169.3 |
+| `stateful-ledger` | 12 / 32 | 112.5 | 16 / 128 | 172.5 |
+| `stateful-nested-array` | 12 / 33 | 137.9 | 16 / 128 | 203.5 |
+| `stateful-malformed-calldata` | 13 / 36 | 129.3 | 16 / 128 | 166.4 |
+| `stateful-malformed-nested-array` | 13 / 36 | 147.9 | 16 / 128 | 197.6 |
+| `stateful-malformed-bytes` | 13 / 36 | 124.7 | 16 / 128 | 166.0 |
+| `stateful-methods` | 12 / 33 | 113.3 | 16 / 128 | 163.8 |
+| Total | 190 / 524 | 1,804 | 240 / 1,920 | 2,433 |
+
+Selector-rule rows, logs and deployment values on the two suites:
+
+| | Fixed | Random |
+| --- | ---: | ---: |
+| Rows compared by std's error selector | 61 | 257 |
+| Logs | 27 | 83 |
+| Nonzero deployment values | 5 | 8 |
+
+Every report recorded the Yul export and `pathBackends`, and every
+deployment's prestate diff was empty. Random generation took 248 attempts,
+with eight ordinary budget exclusions and no resource exclusion. On the same
+code, Sonatina O0 still matched the storage, call-value and several-methods
+corpora, in 60.0, 63.1 and 71.6 seconds against 95.6, 100.6 and 113.3 on Yul.
+Neither suite produced a finding. Agreement is test evidence, not a
+preservation proof.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

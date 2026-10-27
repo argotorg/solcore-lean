@@ -347,6 +347,29 @@ its default Yul selection stays the sixteen pure profiles. A call profile with
 - random Yul runs of each profile with sixteen scenarios of eight transactions,
   G0 revision three with swarm masks, at the suite's default node budgets.
 
+**Results.** The gate passed on the final tree before the code commit
+`c159b604e`: the full Lean build and tests, the kernel check, 718 Python tests,
+every corpus check and the diff check. The matrices ran on that commit with 89
+digests frozen: scripts, native tools, solc, Anvil, and the Rust driver and
+code-image exporter. None changed during any run.
+- **Fixed Yul suite:** all fifteen storage-family corpora matched, 190
+  scenarios and 524 prefixes with complete coverage, in 1,804 seconds. 61 rows
+  compared by std's error selector, 27 logs and five nonzero deployment values
+  matched. Every report recorded the Yul export and `pathBackends`, and every
+  deployment's prestate diff was empty.
+- **Random Yul suites:** root seed `20261028`, sixteen eight-transaction
+  scenarios per profile with G0 revision three. All 240 scenarios and 1,920
+  prefixes matched, in 2,433 seconds. Generation took 248 attempts, with eight
+  ordinary budget exclusions and no resource exclusion. 257 rows compared by
+  selector, 83 logs and eight nonzero deployment values matched.
+- **Sonatina O0 on the same code:** the storage, call-value and several-methods
+  corpora still matched, 36 scenarios and 99 prefixes.
+
+Neither suite produced a finding. A Yul scenario took about 1.6 times as long
+as on O0, because each compiles its own Yul through a second checked Hull
+export and solc. That is about 9.5 seconds per fixed scenario and 10 per random
+one. Hosted CI has not run these profiles.
+
 ## 3. Missing runtime operation mappings
 
 Core and imported Hull already execute more operations than the generated
