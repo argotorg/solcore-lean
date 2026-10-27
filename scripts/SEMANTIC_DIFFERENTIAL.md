@@ -271,7 +271,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the fourteen runtime-input pure profiles, every pure
+Random campaigns of the fifteen runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -308,19 +308,46 @@ N:
 | `runtime-word`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-generics`, `runtime-closures`, `runtime-comptime`, `runtime-modules` | 8 (4) | 128 (256) |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops` | 10 (6) | 102 (170) |
 | `runtime-primitives`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | 12 (8) | 85 (128) |
+| `runtime-recursion` | 11 (7) | 93 (146) |
 
 The summary records `configuration.functions`,
 `generation.requestedFunctions` and `generation.inputsPerFunction`, all null
-without the option. The campaign also limits one tool response to 2 MiB, and
-generation is one request, so the case size caps N well below these bounds. At
-the suite's node budgets one request holds about 64 whole `runtime-word`
-functions, 50 `runtime-functions`, 24 `runtime-primitives` and
-`runtime-mutation`, 14 `runtime-aggregates`, 11 for each call-graph profile, 9
-`runtime-call-graph-loops` and `runtime-closures`, 8 `runtime-generics`,
-`runtime-comptime` and `runtime-modules`, 7 `runtime-nested-loops` and 6
-`runtime-loops`; a larger request stops at generation with `output-limit`,
-an inconclusive resource exclusion. These are averages from seed 1; the size
-varies with the seed. The campaign refuses `--functions` with `--cases`, with a
+without the option.
+
+The campaign limits each case-tool response to 2 MiB, which at the suite's
+node budgets holds about 64 whole `runtime-word` functions but only 6
+`runtime-loops` functions. Random generation therefore takes as many requests
+as it needs:
+
+- The first request asks for every case.
+- A response over the limit is requested again from the same seed for half as
+  many whole functions, and later requests keep that size.
+- Each later request starts at the seed after the previous request's last
+  attempt, modulo 2^64 as the case tool's `Seed.ofNat` reduces it, with the
+  attempts left. Every request but the last asks for whole functions.
+
+The merged cases, exclusions, attempts and status therefore equal one
+request's for any request sizes. One function whose cases alone exceed the
+limit stays an inconclusive `output-limit`. The summary and `generation.json`
+record `generation.requests` and `generation.outputLimitRetries`, both null
+for a corpus or a saved case. `Tests/scripts/test-semantic-chunked-generation.py`
+compares one native request with one-function, two-function and halving
+requests byte for byte for every pure profile, from seed 1 and from two below
+2^64, and with an exhausted attempt budget.
+
+With `--functions`, the default attempt budget is at least 16 candidates per
+function, up to the case tool's 10,000, in the campaign and in the suite. From
+six start seeds at each profile's bound, the most a profile needed was 6.8 per
+function (`runtime-aggregate-call-graphs`); `runtime-call-graph-loops` needed
+5.0, `runtime-call-graphs` 4.7, `runtime-primitives` 4.5, `runtime-word` 2.5
+and every other profile at most 1.7. The suite derives each profile's seed
+from that budget, so `--functions` runs from a root seed draw other seeds than
+before. The 1,024-case limit of a campaign, and so the bounds above, are
+unchanged. A frozen O0 random matrix from root seed 1 at `--functions 102`
+matched all 1,020 `runtime-loops` cases in 31 requests with 5 retries and all
+816 `runtime-closures` cases in 17 requests with 4 retries, with 102 distinct
+sources each, at 2.8 and 3.6 sources per minute; neither stopped at
+`output-limit`. The campaign refuses `--functions` with `--cases`, with a
 corpus or a saved case, for `closed-g0` and outside the bounds above.
 
 These profiles' generation commands take the selection after `FUEL`, in either
@@ -357,7 +384,7 @@ still return some seeded input unchanged.
 | Profiles | Identity filter |
 | --- | --- |
 | `runtime-word`, `runtime-primitives`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
-| `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops` | not needed: a loop must already change a positive-trip boundary input, and a nested loop some boundary input |
+| `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops`, `runtime-recursion` | not needed: a loop must already change a positive-trip boundary input, and a nested loop or a recursion some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
 A closure returns `5 * step(x) + 4 * x + 4` (snapshot) or `+ 5`
@@ -438,6 +465,8 @@ The filter raises the attempts per function. From seed 1, the campaign's
 default of 256 attempts covers about 119 whole `runtime-word` functions,
 below its bound of 128, and about 37 `runtime-aggregate-call-graphs`
 functions; 512 attempts cover about 75 of the latter, below their bound of 85.
+The default budget of a whole-function campaign now scales with N (see
+[seeded runtime inputs](#seeded-runtime-inputs)).
 
 Frozen random matrices from root seed 1 ran the eleven G0 profiles and both
 call-graph profiles before the filter (`8d62b8e2b`) and with it (`83f590764`)
@@ -541,7 +570,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the fifteen pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the sixteen pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -1361,6 +1390,106 @@ functions matched all 40 cases on each backend in 52, 47 and 65 seconds, with
 four distinct sources, shapes `1x1:accumulator`, `1x1:counter`, `1x1:input` and
 `3x3:accumulator`, outer iterations zero to three and totals 0, 1, 4 and 9;
 generation took five attempts, excluding one boundary identity.
+
+## Compare bounded recursion
+
+`runtime-recursion` calls a recursive source function, or two functions that
+call each other, to a depth taken from the input, over an aggregate step. A
+plan has schema `solcore-lean.recursion-plan.v1`, a checked aggregate
+`stepProgram`, a `depthMask` in zero, one, three or seven and a `form`. With
+input `x` and depth `d = x & depthMask`, the contract returns `f(d, x)`, where
+`f(0, acc) = acc` and every call with `d > 0` makes one call at depth `d - 1`:
+
+- `tail`: `sc_rec(d, acc) = sc_rec(d - 1, sc_step(acc))`;
+- `nontail`: `sc_rec(d, acc) = sc_step(sc_rec(d - 1, acc)) + d`, with each
+  frame's work after its call;
+- `mutual`: `sc_even(d, acc) = sc_odd(d - 1, sc_step(acc))` and
+  `sc_odd(d, acc) = sc_even(d - 1, acc + d)`, entered at `sc_even`.
+
+A call therefore recurses at most seven frames deep. The original Core
+reference unrolls the frames into ordinal guards over one accumulator cell,
+with no recursion and no counter:
+
+- `tail` steps at ordinals 0 to `d - 1`;
+- `nontail` applies `step(acc) + k` for `k` from 1 to `d`, innermost frame
+  first;
+- `mutual` steps at even ordinals and adds `d - i` at odd ordinal `i`.
+
+The complete applied program is checked against the 512-node limit. The ABI
+is `SynthesizedRecursion.run(uint256)`; no emitter proof covers this wrapper.
+Before the profile was written, the pinned compiler, std, checked Hull export,
+Sonatina O0 and O2, Yul, Anvil and the Lean Hull runner were checked on all
+three forms at eight inputs; every path matched a model of the function
+without a change to shared code.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-recursion --functions 4 --output .upstream/semantic-recursion
+python3 scripts/semantic-campaign.py \
+  --corpus scripts/semantic-recursion-corpus.json --output .upstream/semantic-recursion-ci
+python3 Tests/scripts/test-semantic-recursion-corpus.py
+```
+
+Native commands are `recursion-generate SEED NODES COUNT ATTEMPTS FUEL
+[VERSION] [seeded-inputs-v1/splitmix64]` and `recursion-emit PLAN.json INPUT
+[FUEL]`; saved cases contain `recursionPlan` and the applied original Core
+`program`, whose exact correspondence native admission checks for every
+origin. The step is generated as for `runtime-loops`, so the profile is
+G0-based and revision four equals revision three for it.
+
+Generation:
+- Each case draws one of nine shapes, a form with depth mask one, three or
+  seven, from a SplitMix64 hash of the case seed. The default budget is 384
+  nodes.
+- Each function runs at the boundary inputs 0, 1, 2, 3, 7, the maximum Word
+  and the high bit, giving depths zero to three and seven, and random
+  campaigns add four seeded inputs.
+- It excludes:
+  - a node budget too small for the shape;
+  - the step's own exclusions;
+  - a step whose boundary inputs agree;
+  - fuel exhaustion;
+  - a function that returns every boundary input unchanged
+    (`boundary-identity`).
+
+  A depth-zero input returns itself, so the profile needs no acceptance
+  filter.
+
+A case's depth is prescribed by the plan and the input.
+`recursionRequirements` declares the required `shapes` and `depths`, and
+`recursionCoverage` counts only three-way matches toward passing coverage.
+Reductions:
+- keep the step's helper count and binders and may shrink the step;
+- may lower the depth mask, replace `nontail` or `mutual` by `tail`, or move
+  the input to a boundary input;
+- are each sealed by the full checker and strictly smaller in nodes, then
+  literal weight.
+
+The Lean test compares the unrolled reference with a recursive model of the
+emitted source, frame by frame over the step's original Core, for 1,023
+generated cases.
+
+The fixed corpus has nine plans, one per shape, at all seven inputs: 63 cases
+from G0 revision one. It requires:
+- every shape and depths 0, 1, 2, 3 and 7;
+- all 39 step AST features its cases use, the 37 of the loop corpus with `and`
+  and `==`;
+- one to three helpers and all four aggregate templates.
+
+`Tests/scripts/test-semantic-recursion-corpus.py` materializes each case
+twice, recomputes each depth and checks replay, reductions and tampering
+natively. Over the first 256 functions accepted from seed 1 under revision
+four with seeded inputs, generation took 1.04 attempts per function,
+excluding 11 boundary identities. All 256 sources were distinct, and every
+shape appeared 20 to 36 times.
+
+Frozen matrices at `0d5a60935` matched every case on all three paths. The
+fixed corpus matched all 63 cases with complete shape, depth, feature, input,
+helper and template coverage, compiling 9 sources, in 115 seconds on O0, 105
+on O2 and 144 on Yul. Random suites from root seed 1 with four whole
+functions matched all 44 cases on each backend in 61, 59 and 77 seconds, with
+four distinct sources, shapes `1:nontail`, `3:tail` and `7:mutual`, and depths
+0 to 4, 6 and 7, in four generation attempts.
 
 ## Compare aggregate compositions with call graphs
 

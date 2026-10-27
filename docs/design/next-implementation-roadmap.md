@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the twelve G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the ten profiles whose functions can be identities, exclude functions that return every boundary input unchanged; a nested bounded loop profile is validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the twelve G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the ten profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop and bounded recursion profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]` and malformed-calldata extensions validated locally, the last for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector; all sixteen stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions; multi-word return values need a contract runtime change; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -794,6 +794,39 @@ levels. That limit, not the case count, caps `--functions` for every profile
 with large cases: about 6 loop functions at 384 nodes and 64 `runtime-word`
 functions.
 
+**Whole-function campaigns past the response limit.** Random generation now
+takes as many case-tool requests as a campaign's cases need:
+
+- The first request asks for every case.
+- A response over the 2 MiB limit is requested again from the same seed for
+  half as many whole functions, and later requests keep that size.
+- Each request continues at the seed after the previous request's last
+  attempt, modulo 2^64 as the case tool's `Seed.ofNat` reduces it, with the
+  attempts left.
+
+Every request but the last asks for whole functions, so the merged cases,
+exclusions, attempts and status equal one request's for any request sizes. A
+function that alone exceeds the limit stays an inconclusive `output-limit`.
+Halving needs no per-profile size table, which seed-dependent case sizes
+would make either wasteful or wrong, and it never changes a case.
+
+Evidence and budgets:
+- A native check compares one request byte for byte with one-function,
+  two-function and halving requests for every pure profile, from seed 1, from
+  two below 2^64 and with an exhausted budget.
+- Model-based tests cover every request size, retries, a single overflowing
+  function, the wrap, exhaustion and malformed responses.
+- With `--functions`, the default attempt budget is at least 16 per function,
+  up to 10,000, in the campaign and the suite. From six start seeds at each
+  bound, the slowest profile needed 6.8.
+- The 1,024-case limit and the `--functions` bounds are unchanged.
+
+A frozen O0 random matrix from root seed 1 at `--functions 102`, the loop
+bound, matched all 1,020 `runtime-loops` cases and all 816 `runtime-closures`
+cases with no output-limit stop. They took 31 and 17 requests with 5 and 4
+retries, and compiled 102 distinct sources each, at 2.8 and 3.6 sources per
+minute.
+
 **Nested bounded loops.** The first new program shape is
 `runtime-nested-loops`: a bounded source `while` loop whose body runs a second
 bounded `while` loop around the step. The existing profiles, their corpora,
@@ -941,6 +974,24 @@ execution:
   - all seven boundary inputs;
   - all nine generation shapes;
   - depths 0, 1, 2, 3 and 7.
+
+The registered Lean test compares the unrolled reference with a recursive
+model of the emitted source, evaluated frame by frame over the step's original
+Core, for 1,023 generated cases. It also requires that generation draws all
+nine shapes and replays exactly, that tampering with the mask or the form is
+refused, and that reductions lower the mask, fall back to `tail` and stay
+strictly smaller. The revision-four and emitter-feature tests include the
+profile.
+
+Over the first 256 functions accepted from seed 1 under revision four,
+generation took 1.04 attempts per function, excluding 11 boundary identities,
+with 256 distinct sources and every shape 20 to 36 times. The fixed corpus has
+one plan per shape at all seven inputs, 63 cases. It requires all 39 step
+features its cases use: the loop corpus's 37 with `and` and `==`.
+
+Frozen matrices matched every case on O0, O2 and Yul:
+- the fixed corpus, with complete coverage, in 115, 105 and 144 seconds;
+- random suites of four whole functions, 44 cases, in 61, 59 and 77 seconds.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
