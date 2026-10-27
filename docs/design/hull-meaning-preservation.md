@@ -525,43 +525,52 @@ of a resumption.
 Inline Yul is connected for a fragment of statement lists through the
 call-mode and root-reentry public theorems. `YulSemantics` specifies an
 assembly block as a list of statements: `let` with one name and an optional
-value, assignment to one name, and expression statements. Expressions are
-literals, variables and calls of `mload`, `msize`, `mstore`, `mstore8`,
-`return` and `revert`, nested to any depth. Number and hexadecimal literals
-denote words as Hull word literals do, and `true` and `false` denote one and
-zero. A call evaluates its arguments from right to left, as in Yul, and the
-order is observable: `mstore(mload(32), msize())` takes the memory size before
-`mload(32)` expands memory. Yul locals are Hull heap cells whose scope ends
-with the block, and a variable may also name a Hull word local, which the
-block reads and assigns in place. A builtin is the independent memory read,
-size, write or termination on the frame; a fault, including the termination
-sentinel, stops the block. The call-mode effects use this rule at every frame
-height.
+value, assignment to one name, expression statements, nested blocks, `if` and
+`switch`. Expressions are literals, variables and calls of `mload`, `msize`,
+`mstore`, `mstore8`, `return` and `revert`, nested to any depth. Number and
+hexadecimal literals denote words as Hull word literals do, and `true` and
+`false` denote one and zero. A call evaluates its arguments from right to
+left, as in Yul, and the order is observable: `mstore(mload(32), msize())`
+takes the memory size before `mload(32)` expands memory. An `if` runs its body
+when the condition word is nonzero, and a `switch` runs the first case whose
+literal denotes the scrutinee word, or else its default body; string case
+literals are outside the fragment. Yul locals are Hull heap cells whose scope
+ends with their block or body, and a variable may also name a Hull word local,
+which the block reads and assigns in place. A builtin is the independent memory
+read, size, write or termination on the frame; a fault, including the
+termination sentinel, stops the block, also from a nested body. The call-mode
+effects use this rule at every frame height.
 `ExecutableStatement` accepts an assembly block when `YulFragment.Eligible`
-holds: every statement has one of these forms, every call names a supported
-builtin, and the layer supports some name. Calls of other supported names are
-eligible, but `YulSemantics` gives them no rule, so the theorems say nothing
-about a run that reaches one. The common recursive proof discharges a block
-through a separate obligation, `AssemblyPreservation`, which
-`assemble_recursive_program_effects` meets by default for the effect layers
-without an assembly rule. The other layers' theorems therefore admit programs
-with such blocks but say nothing about a run that reaches one. No public
-theorem statement changes.
+holds: every statement, including those of nested bodies, has one of these
+forms, every call names a supported builtin, and the layer supports some name.
+Calls of other supported names are eligible, but `YulSemantics` gives them no
+rule, so the theorems say nothing about a run that reaches one. The common
+recursive proof discharges a block through a separate obligation,
+`AssemblyPreservation`, which `assemble_recursive_program_effects` meets by
+default for the effect layers without an assembly rule. The other layers'
+theorems therefore admit programs with such blocks but say nothing about a run
+that reaches one. No public theorem statement changes.
 
 The proof (`YulBlockCorrespondence`) follows the source derivation through the
 actual `YulLowering` builders. Expressions and argument lists are proved by
-mutual induction over their evaluations and statement lists by induction over
-the run: `let` allocates the fresh cell the lowering allocates, an assignment
-writes the cell of the variable's binding, a variable reads it through the
-Hull environment relation, and a call binds its argument words from right to
-left as word temporaries before the builtin code runs. The builtin code is a
-separate obligation, `BuiltinStep`, which `YulBuiltinCorrespondence.step`
-meets in the frame model for the six builtins; the frame, linked world and
-captured context relations carry over as for the explicit revert. The proof
-uses the `YulLowering` builders directly: `lowerSequence`, `lowerBlock`,
-`lowerFunction`, `lowerExpr` and the helpers they use are public for the
-proof. Making them public was a visibility-only change, and no definition
-changed; `validateControl`, `decodeChars` and `stringWord` stay private.
+mutual induction over their evaluations: `let` allocates the fresh cell the
+lowering allocates, an assignment writes the cell of the variable's binding, a
+variable reads it through the Hull environment relation, and a call binds its
+argument words from right to left as word temporaries before the builtin code
+runs. Nested blocks, `if` and `switch` form a second relation,
+`YulSemantics.Compound`, mutual with the statement run, and both are proved
+by one induction with two motives. The lowering joins such a statement to the
+rest of its list with `LocalLoop.sequence` and lowers its bodies in the
+enclosing context; the `if` condition is the lowering's nonzero test before
+`LocalLoop.conditional`, and the `switch` cases are its chain of word
+comparisons. The builtin code is a separate obligation, `BuiltinStep`, which
+`YulBuiltinCorrespondence.step` meets in the frame model for the six builtins;
+the frame, linked world and captured context relations carry over as for the
+explicit revert. The proof uses the `YulLowering` builders directly:
+`lowerSequence`, `lowerBlock`, `lowerFunction`, `lowerExpr` and the helpers
+they use are public for the proof. Making them public was a visibility-only
+change, and no definition changed; `validateControl`, `decodeChars` and
+`stringWord` stay private.
 
 `Tests.RustHullYulBlockCorrespondence.public_resumes` applies the call-mode
 theorem to two independent source scenarios. In the first, one block writes
@@ -569,11 +578,17 @@ memory, runs `mstore(mload(32), msize())`, binds `let r := mload(0)` and an
 uninitialized `let z`, assigns `z := r`, stores `z` and returns the word 32;
 the opposite argument order would return 64. In the second, a block after the
 Hull declaration `let x : word` assigns 42 to `x`, stores `x` and returns it.
-`Tests.RustHullAssemblyCorrespondence.public_resumes` keeps the four one-call
-scenarios: an `mstore` returned as a word, an `mstore8` of a hexadecimal byte,
-an `mstore` whose last byte is reverted, and an `mstore` of `true` whose last
-byte is returned. Runtime checks compare the returned or reverted bytes of a
-full run and of a resumption.
+`Tests.RustHullYulControlCorrespondence.public_resumes` applies it to two more.
+In the first, an `if` on a zero local skips a `return`, a nested block reads
+memory into a local of its own and stores it under an `if`, and a last `if`
+returns the stored word 7 before a statement that is not reached. In the
+second, a `switch` on `mload(0)` skips its first case and runs the second with
+a local of its own, and a second `switch` returns the word 20 from its default
+body. `Tests.RustHullAssemblyCorrespondence.public_resumes` keeps the four
+one-call scenarios: an `mstore` returned as a word, an `mstore8` of a
+hexadecimal byte, an `mstore` whose last byte is reverted, and an `mstore` of
+`true` whose last byte is returned. Runtime checks compare the returned or
+reverted bytes of a full run and of a resumption.
 
 ## Priorities
 
@@ -584,7 +599,7 @@ full run and of a resumption.
 | 2 | Accepted initialization and execution exclude malformed source observations. | Actual globals, parameter binding, locals and match binders supply scope coverage; compiler checks and typed heaps exclude malformed observations. The public theorem has no outcome-safety premise. | Connected |
 | 3 | Concrete external state is preserved. | Memory, storage, environment reads, logs, explicit termination, memory copying, hashing, account observations, linked code images and return data reach public receipts and resumptions; further state operations remain. | In progress |
 | 4 | External calls, creation and rollback preserve observable outcomes. | All four message-call operations, root reentry, the identity, SHA-256 and RIPEMD-160 precompiles, account destruction, refused CREATE/CREATE2 attempts and admitted attempts without an init frame reach public receipts, including finite nested children, transfers, return data, checkpoint rollback, new accounts and transaction finalization. ECRECOVER, P256VERIFY and creation with init frames remain. | In progress |
-| 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. Statement lists with `let`, assignments, Yul and Hull word locals and nested calls of the memory and termination builtins are connected; control flow, nested blocks, local functions, multi-name `let` and assignment, string literals and other builtins remain. | In progress |
+| 4 | Assembly preserves its independent meaning. | Yul statement derivations connect to actual lowering and public execution, reusing the concrete effect relations. Statement lists with `let`, assignments, nested blocks, `if`, `switch`, Yul and Hull word locals and nested calls of the memory and termination builtins are connected; `for` with `break` and `continue`, local functions, multi-name `let` and assignment, string literals and other builtins remain. | In progress |
 | 5 | Divergence and reverse correspondence. | Relate nontermination and characterize Core outcomes after terminating execution and effects are covered. | Open |
 
 Priorities 1 and 2 close gaps in the existing pure Hull theorem. Priorities 3
@@ -626,7 +641,7 @@ DELEGATECALL are covered by the same finite nested-child connection.
 | --- | --- | --- |
 | 1 | Contract calls | Connect ECRECOVER (1) and P256VERIFY (0x100) through independent affine elliptic-curve semantics, with field arithmetic, Jacobian-formula identities and ladder correctness. Reuse the connected dispatch, Keccak, checkpoint restoration and public resumptions. |
 | 2 | Contract creation | Connect init frames: nonempty init code at the next depth in a deployment context, runtime-code validation, installation of the exact image and failure rollback. Their source rule needs an init-template catalog, which changes the public theorem statements. Also connect existing empty accounts at the address. Refusals, collisions, empty init code, unknown targets and endowment overflow are connected. |
-| 3 | Assembly and source revert | Extend the connected Yul fragment (statement lists with `let`, assignment, Yul and Hull word locals and nested calls of `mload`, `msize`, `mstore`, `mstore8`, `return` and `revert`, in Yul's argument order) to control flow (`if`, `switch`, `for`, `break`, `continue`, nested blocks), local functions and `leave`, multi-name `let` and assignment, string literals and the other builtins. Hull's string revert is connected through its memory write and termination. |
+| 3 | Assembly and source revert | Extend the connected Yul fragment (statement lists with `let`, assignment, nested blocks, `if` and `switch`, Yul and Hull word locals and nested calls of `mload`, `msize`, `mstore`, `mstore8`, `return` and `revert`, in Yul's argument order) to `for` with `break` and `continue`, local functions and `leave`, multi-name `let` and assignment, string literals and the other builtins. Hull's string revert is connected through its memory write and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
 
 Creation's refusals, collisions, deployments of empty init code and the two
@@ -663,10 +678,16 @@ entries to the compiled `isInit` definitions.
 
 Larger Yul fragments keep the same public statements and the same assembly
 obligation, and the public `YulLowering` builders admit the same induction.
-Control flow needs `YulSemantics` rules for `if`, `switch` and `for` that
-match the lowering's control values and loop closures, and local functions
-need the closures `lowerBlock` installs and the `leave` result. Other builtins
-extend `BuiltinStep` one at a time.
+`for` needs two more pieces. The lowering lowers the init block with the loop
+as its continuation, so the statement-list simulation needs that continuation
+in place of fallthrough, together with the context and source environment
+after the init's locals. The loop itself needs a Yul relation for the
+condition, a body with `break` and `continue`, and the post block, matched
+against the installed closure of `LocalLoop.iterate` stage by stage, as the
+Hull loop proof does with the Core `loopBody` lemmas; the statement-list proof
+already carries the loop flag that `break` and `continue` require. Local
+functions need the closures `lowerBlock` installs and the `leave` result.
+Other builtins extend `BuiltinStep` one at a time.
 
 Lower-level helpers or isolated builtin results do not complete any row without
 its actual public execution consumer.
