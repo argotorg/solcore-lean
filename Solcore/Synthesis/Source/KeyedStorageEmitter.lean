@@ -6,7 +6,11 @@ slot; the key slot, its wrapping successor and counter slot zero are written in
 the same order as the original Core contract. Odd original inputs revert after
 all writes and rereads with the tentative sum encoded as exactly 32 bytes; even
 inputs return that Word through the ABI. Memory at zero is touched only before
-the terminal revert. The arbitrary checked aggregate entry is preserved. -/
+the terminal revert. The arbitrary checked aggregate entry is preserved.
+`ScalarMeaning.KeyedStorage.emit_source_meaning` relates the emitted text to the
+original Core contract's top-level transaction, returned or reverted, for every
+key under an independent keyed source semantics; see
+`docs/design/scalar-emitter-meaning.md`. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.KeyedStorage
