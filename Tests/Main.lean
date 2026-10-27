@@ -2189,6 +2189,9 @@ import Solcore.Test.SourceStorageLedgerCases
 import Solcore.Test.SourceStorageLedgerCorpus
 import Solcore.Test.SourceRollbackMeaning
 import Solcore.Test.RustHullYulControlCorrespondence
+import Solcore.Test.SourceLongBytesEmitter
+import Solcore.Test.SourceLongBytesCases
+import Solcore.Test.SourceLongBytesCorpus
 set_option autoImplicit false
 
 open Solcore
@@ -4171,5 +4174,8 @@ def main : IO UInt32 := do
   Tests.SourceStorageLedgerCorpus.testSourceStorageLedgerCorpus
   Tests.SourceRollbackMeaning.testSourceRollbackMeaning
   Tests.RustHullYulControlCorrespondence.run
+  Tests.SourceLongBytesEmitter.testSourceLongBytesEmitter
+  Tests.SourceLongBytesCases.testSourceLongBytesCases
+  Tests.SourceLongBytesCorpus.testSourceLongBytesCorpus
   IO.println "solcore-lean tests passed"
   return 0

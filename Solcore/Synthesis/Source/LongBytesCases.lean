@@ -1,0 +1,442 @@
+import Solcore.Synthesis.Source.StorageCases
+import Solcore.Synthesis.Source.LongBytesEmitter
+import Solcore.Synthesis.Stateful.LongBytesExecution
+
+/-! Long-bytes cases retain one original host-aware Core contract and an
+ordered history of `(flags, payload)` transactions, each payload of zero to 256
+bytes in its canonical ABI encoding. Reductions remove transactions, truncate a
+payload to a shorter bank length, zero its bytes or simplify flags. Saved
+outputs are never an oracle. -/
+set_option autoImplicit false
+
+namespace Solcore.Synthesis.Source.LongBytes
+open Lean Solcore.Core Solcore.Synthesis.Core
+open Solcore.Synthesis.Core.LongBytes (CheckedPlan maxPayloadBytes guardNodes countSlot tailSlot)
+open Solcore.Synthesis.Stateful.DynamicBytesExecution (Transaction paddedLength)
+open Solcore.Synthesis.Stateful.LongBytesExecution (Bindings)
+open Solcore.ContractRuntime (encodeBytesText decodeBytesText? encodeWordBytesBE)
+
+def caseSchema : String := "solcore-lean.semantic-long-bytes-case.v1"
+def planSchema : String := "solcore-lean.long-bytes-plan.v1"
+def profileVersion : String := "stateful-long-bytes-v1/long-bytes-sequence-seed-v1"
+def templateVersion : String := "bytes-eight-chunks-tail-size-revert-odd-flags-v1"
+def longBytesCorpusSchema : String := "solcore-lean.semantic-long-bytes-corpus.v1"
+
+/-- Payload lengths: empty, one byte, the bytes profile's bound, then both sides
+of the third, fourth and fifth chunk boundaries, inside the seventh chunk, one
+short of the bound and the bound. -/
+def lengthBank : List Nat := [0, 1, 64, 65, 96, 97, 128, 129, 192, 223, 255, 256]
+
+/-- Complete contracts may exceed the step budget by the fixed chunk guards. -/
+def maxProgramNodes : Nat := 512 + guardNodes
+
+def validTransactions (transactions : List Transaction) : Prop :=
+  1 ≤ transactions.length ∧ transactions.length ≤ 3 ∧
+    (transactions.map (·.id)).Nodup ∧ transactions.all (fun tx => Storage.validId tx.id) = true ∧
+    transactions.all (fun tx => tx.payload.length ≤ maxPayloadBytes) = true
+
+instance (transactions : List Transaction) : Decidable (validTransactions transactions) := by
+  unfold validTransactions
+  infer_instance
+
+structure CheckedScenario where private mk ::
+  plan : CheckedPlan
+  transactions : List Transaction
+  valid : validTransactions transactions
+  bounded : Wire.programNodes plan.program ≤ maxProgramNodes
+
+def CheckedScenario.program (scenario : CheckedScenario) : Wire.Program := scenario.plan.program
+
+def checkedScenario (plan : CheckedPlan) (transactions : List Transaction) : Except String CheckedScenario := do
+  if valid : validTransactions transactions then
+    if bounded : Wire.programNodes plan.program ≤ maxProgramNodes then
+      return ⟨plan, transactions, valid, bounded⟩
+    else throw "canonical long-bytes contract exceeds its case limit"
+  else throw "long-bytes scenario requires 1..3 transactions with distinct valid IDs and payloads of at most 256 bytes"
+
+def payloadText (payload : List UInt8) : String := encodeBytesText (ByteArray.mk payload.toArray)
+
+def transactionJson (tx : Transaction) : Json := Json.mkObj [
+  ("id", toJson tx.id), ("flags", toJson (toString tx.flags.val)),
+  ("payload", toJson (payloadText tx.payload)),
+  ("calldata", toJson (Solcore.Synthesis.Stateful.DynamicBytesExecution.calldata tx.flags tx.payload)),
+  ("value", toJson "0")]
+
+def transactionsJson (transactions : List Transaction) : Json := toJson (transactions.map transactionJson)
+
+private def word (text : String) : Except String Word := do
+  unless text.length ≤ 78 do throw "transaction Word exceeds 78 digits"
+  Input.inputWord text
+
+def decodeTransactions (json : Json) : Except String (List Transaction) := do
+  let rows ← json.getArr?
+  unless 1 ≤ rows.size && rows.size ≤ 3 do throw "transaction count must be between 1 and 3"
+  let transactions ← rows.toList.mapM fun row => do
+    let text ← row.getObjValAs? String "payload"
+    unless text.length ≤ 2 + 2 * maxPayloadBytes do throw "payload exceeds 256 bytes"
+    let some bytes := decodeBytesText? text | throw "payload is not canonical lowercase hexadecimal"
+    let transaction : Transaction := ⟨← row.getObjValAs? String "id",
+      ← word (← row.getObjValAs? String "flags"), bytes.data.toList⟩
+    unless row == transactionJson transaction do
+      throw "transaction differs from canonical ID, flags, payload, calldata or zero-value metadata"
+    return transaction
+  unless validTransactions transactions do
+    throw "long-bytes scenario requires distinct valid transaction IDs"
+  return transactions
+
+def planJson (plan : CheckedPlan) : Json := Json.mkObj [
+  ("schema", toJson planSchema), ("stepProgram", Wire.encodeProgram plan.step.program)]
+
+def checkedPlan (json : Json) : Except String CheckedPlan := do
+  unless (← json.getObjValAs? String "schema") = planSchema do throw "unsupported long-bytes plan schema"
+  let step ← Aggregate.checkedFunction (← json.getObjVal? "stepProgram")
+  let some plan := CheckedPlan.ofStep? step | throw "long-bytes contract failed full host-Core admission"
+  unless json == planJson plan do throw "long-bytes plan differs from its canonical checked representation"
+  unless Wire.programNodes plan.program ≤ maxProgramNodes do throw "long-bytes contract exceeds its case limit"
+  return plan
+
+def contractJson (emitted : EmittedProgram) : Json := Json.mkObj [
+  ("name", toJson emitted.contractName), ("method", toJson emitted.methodName),
+  ("signature", toJson emitted.methodSignature), ("selector", toJson selector),
+  ("deployPath", toJson emitted.deployPath), ("runtimePath", toJson emitted.runtimePath),
+  ("constructorCalldata", toJson "0x")]
+
+def initialStateJson : Json := Json.mkObj [("storage", toJson ([] : List Json))]
+
+def makeCase (scenario : CheckedScenario) (emitted : EmittedProgram) (origin : Json) (fuel : Nat) : Json :=
+  Json.mkObj [
+    ("schema", toJson caseSchema), ("longBytesPlan", planJson scenario.plan),
+    ("program", Wire.encodeProgram scenario.program), ("source", toJson emitted.source),
+    ("transactions", transactionsJson scenario.transactions),
+    ("initialState", initialStateJson),
+    ("observedSlots", Solcore.Synthesis.Stateful.LongBytesExecution.slotsJson),
+    ("provenance", Json.mkObj [
+      ("origin", origin), ("profileVersion", toJson profileVersion),
+      ("functionVersion", toJson Solcore.Synthesis.Core.LongBytes.version),
+      ("templateVersion", toJson templateVersion),
+      ("stepProfileVersion", toJson Aggregate.profileVersion),
+      ("stepFunctionVersion", toJson Aggregates.version),
+      ("stepTemplateVersion", toJson Aggregate.templateVersion),
+      ("generatorVersion", toJson generatorVersion),
+      ("emitterVersion", toJson emitterVersion), ("wrapperVersion", toJson wrapperVersion),
+      ("features", toJson scenario.plan.step.features)]),
+    ("contract", contractJson emitted), ("executionFuel", toJson fuel)]
+
+def emitCase (scenario : CheckedScenario) (origin : Json) (fuel : Nat) : Except String Json := do
+  unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
+  let emitted ← (emit scenario.plan).mapError reprStr
+  return makeCase scenario emitted origin fuel
+
+/-- Every origin must reconstruct the fixed host contract, including imports and
+reductions. An arbitrary well-typed program is not an admissible replacement. -/
+def caseProgram (json : Json) : Except String CheckedScenario := do
+  unless (← json.getObjValAs? String "schema") = caseSchema do throw "unsupported semantic long-bytes case schema"
+  let plan ← checkedPlan (← json.getObjVal? "longBytesPlan")
+  let transactions ← decodeTransactions (← json.getObjVal? "transactions")
+  let program ← (Wire.decodeProgramWithBudget
+    {maxDepth := 512, maxNodes := maxProgramNodes, maxIntegerBytes := 4096}
+    (← json.getObjVal? "program")).mapError (fun
+      | .protocol error => error.toJson.compress
+      | .exhausted exhaustion => "Core decode budget exceeded: " ++ reprStr exhaustion)
+  unless Wire.encodeProgram program == Wire.encodeProgram plan.program do
+    throw "saved original Core program differs from the canonical long-bytes plan"
+  unless (← json.getObjVal? "initialState") == initialStateJson do throw "initial storage must be empty"
+  unless (← json.getObjVal? "observedSlots") == Solcore.Synthesis.Stateful.LongBytesExecution.slotsJson do
+    throw "observed slots must be zero through ten"
+  unless (← json.getObjValAs? Nat "executionFuel") ≤ 10000000 do throw "saved execution fuel exceeds limit"
+  checkedScenario plan transactions
+
+def observe (scenario : CheckedScenario) (bindings : Bindings) (fuel : Nat) : Json :=
+  Solcore.Synthesis.Stateful.LongBytesExecution.observe scenario.plan scenario.transactions bindings fuel
+
+def reverts (tx : Transaction) : Bool := tx.flags.val % 2 == 1
+
+def parityFlags (odd : Bool) : Word := if odd then Word.ofNatModulo 1 else Word.zero
+
+/-- Revert positions of the four generated completion patterns. -/
+def parityPatterns : List (List Bool) :=
+  [[false, false, false], [false, true, false], [true, false, false], [false, false, true]]
+
+/-- Three lengths, three byte patterns, then the completion pattern. Each
+choice uses the high half of one draw from a separate stream: the low bits of a
+power-of-two LCG have short periods. -/
+def sequenceBounds : List Nat := [12, 12, 12, 4, 4, 4, 4]
+
+def sequenceChoices (seed : Seed) : List Nat := Id.run do
+  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6c6f6e672d747874)
+  let mut values : Array Nat := #[]
+  for bound in sequenceBounds do
+    let (value, next) := state.draw
+    values := values.push (value.toNat / 2 ^ 32 % bound)
+    state := next
+  return values.toList
+
+/-- 256 seeded bytes for each of three transactions from a further stream; each
+draw contributes the four bytes of its high half. -/
+def seededPayloads (seed : Seed) : List (List UInt8) := Id.run do
+  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6c6f6e672d646174)
+  let mut payloads : Array (List UInt8) := #[]
+  for _ in List.range 3 do
+    let mut bytes : Array UInt8 := #[]
+    for _ in List.range 64 do
+      let (value, next) := state.draw
+      let high := value.toNat / 2 ^ 32
+      bytes := bytes ++ #[(high / 2 ^ 24 % 256).toUInt8, (high / 2 ^ 16 % 256).toUInt8,
+        (high / 2 ^ 8 % 256).toUInt8, (high % 256).toUInt8]
+      state := next
+    payloads := payloads.push bytes.toList
+  return payloads.toList
+
+/-- Zeros, `0xff`, the ramp `1, 2, 3, ...` or the seeded bytes, cut to `length`. -/
+def patternBytes (pattern length : Nat) (seeded : List UInt8) : List UInt8 :=
+  match pattern with
+  | 0 => List.replicate length 0
+  | 1 => List.replicate length 0xff
+  | 2 => (List.range length).map fun position => (position + 1).toUInt8
+  | _ => seeded.take length
+
+def generatedParities (seed : Seed) : List Bool :=
+  parityPatterns.getD ((sequenceChoices seed).getD 6 0) [false, false, false]
+
+def generatedTransactions (seed : Seed) : List Transaction :=
+  let choices := sequenceChoices seed
+  let seeded := seededPayloads seed
+  (generatedParities seed).zipIdx.map fun (odd, index) =>
+    ⟨"tx-" ++ toString index, parityFlags odd,
+      patternBytes (choices.getD (3 + index) 0) (lengthBank.getD (choices.getD index 0) 0) (seeded.getD index [])⟩
+
+private def statusName (odd : Bool) : String := if odd then "reverted" else "returned"
+
+/-- Reserve the measured host wrapper before generating its independent step;
+the fixed chunk guards lie outside the step budget, and the complete contract
+is remeasured as the final budget authority. -/
+def generatedScenario (seed : Seed) (nodes : Nat) : Except String (CheckedScenario × Json) := do
+  unless nodes ≤ 512 && Solcore.Synthesis.Core.LongBytes.programOverhead < nodes do
+    throw "node budget is too small for the long-bytes wrapper or exceeds 512"
+  let (step, stepOrigin) ← Aggregate.generatedFunction seed
+    (nodes - Solcore.Synthesis.Core.LongBytes.programOverhead)
+  let some plan := CheckedPlan.ofStep? step | throw "generated long-bytes plan failed full Core admission"
+  let scenario ← checkedScenario plan (generatedTransactions seed)
+  unless Wire.programNodes scenario.program ≤ nodes + guardNodes do
+    throw "long-bytes contract exceeds its requested node budget"
+  return (scenario, Json.mkObj [
+    ("kind", toJson "long-bytes-generated"), ("seed", toJson (toString seed.toNat)),
+    ("finalSeed", ← stepOrigin.getObjVal? "finalSeed"), ("maxProgramNodes", toJson nodes),
+    ("stepOrigin", stepOrigin), ("sequenceChoices", toJson (sequenceChoices seed)),
+    ("sequenceCompletions", toJson ((generatedParities seed).map statusName))])
+
+private def decimal (row : Json) (key : String) : Except String Nat := do
+  let some value := (← row.getObjValAs? String key).toNat? | throw ("invalid " ++ key)
+  return value
+
+private def slotValue (row : Json) (slot : String) (field : String := "committedStorage") : Except String Nat := do
+  let rows ← row.getObjValAs? (List Json) field
+  let some entry := rows.find? (fun entry => (entry.getObjValAs? String "slot").toOption == some slot) |
+    throw "committed slot missing"
+  decimal entry "value"
+
+/-- The last payload byte, or zero for an empty payload. -/
+def tailByte (payload : List UInt8) : Nat := (payload.getLast?.map UInt8.toNat).getD 0
+
+/-- Selector, flags, offset and length Words, then the zero-padded payload. -/
+def calldataSize (payload : List UInt8) : Nat := 100 + paddedLength payload.length
+
+/-- Original Core must complete every transaction with the prescribed
+completion. A returned transaction adds its payload length to slot nine,
+leaves its last byte in slot ten and returns the sum of the committed slots
+zero, nine and ten plus its calldata size; a revert keeps the prior slots. -/
+def checkProtocol (scenario : CheckedScenario) (history : Json) : Except String (List String) := do
+  unless (← history.getObjValAs? String "status") = "complete" do
+    throw "long-bytes history exhausted Core fuel"
+  let rows ← history.getObjValAs? (List Json) "transactions"
+  unless rows.length == scenario.transactions.length do throw "long-bytes history length changed"
+  let mut statuses : List String := []
+  let mut prior ← history.getObjVal? "initialStorage"
+  let mut total ← slotValue history (toString countSlot) "initialStorage"
+  for (row, tx) in rows.zip scenario.transactions do
+    let status ← row.getObjValAs? String "status"
+    unless status == statusName (reverts tx) do throw "long-bytes history did not follow its flags parities"
+    let committed ← row.getObjVal? "committedStorage"
+    if status == "reverted" then
+      unless committed == prior do throw "a reverted long-bytes transaction changed the committed slots"
+    else
+      let counted ← slotValue row (toString countSlot)
+      unless counted == (total + tx.payload.length) % 2 ^ 256 && (← slotValue row (toString tailSlot)) == tailByte tx.payload do
+        throw "a returned long-bytes transaction did not commit its length and last byte"
+      let sum := ((← slotValue row "0") + counted + tailByte tx.payload + calldataSize tx.payload) % 2 ^ 256
+      unless (← row.getObjValAs? String "output") == encodeBytesText (encodeWordBytesBE (Word.ofNatModulo sum)) do
+        throw "a returned long-bytes transaction did not return its committed sum"
+      total := counted
+    prior := committed
+    statuses := statuses ++ [status]
+  return statuses
+
+def validateGenerated (scenario : CheckedScenario) (fuel : Nat) : Except String Unit := do
+  Aggregate.inputSensitive scenario.plan.step fuel
+  let observed := observe scenario Solcore.Synthesis.Stateful.StorageExecution.fixtureBindings fuel
+  let statuses ← checkProtocol scenario observed
+  unless statuses == scenario.transactions.map (fun tx => statusName (reverts tx)) do
+    throw "long-bytes history did not follow its prescribed flags parities"
+
+def generateCases (firstSeed : Seed) (nodes count attempts fuel : Nat) : Json := Id.run do
+  let mut cases : Array Json := #[]
+  let mut excluded : Array Json := #[]
+  let mut attempted := 0
+  for index in List.range attempts do
+    if cases.size < count then
+      attempted := attempted + 1
+      let seed := Seed.ofNat (firstSeed.toNat + index)
+      let result := do
+        unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
+        let (scenario, origin) ← generatedScenario seed nodes
+        let emitted ← (emit scenario.plan).mapError reprStr
+        validateGenerated scenario fuel
+        return (scenario, origin.setObjVal! "validationFuel" (toJson fuel), emitted)
+      match result with
+      | .error error =>
+          let resource := error == "boundary observation exhausted Core fuel" ||
+            error == "long-bytes history exhausted Core fuel"
+          excluded := excluded.push (Json.mkObj [
+            ("seed", toJson (toString seed.toNat)), ("stage", toJson "long-bytes-profile"),
+            ("reason", toJson error),
+            ("code", toJson (if resource then "validation-out-of-fuel" else "profile-excluded")),
+            ("category", toJson (if resource then "inconclusive-resource" else "excluded"))])
+      | .ok (scenario, origin, emitted) =>
+          cases := cases.push (makeCase scenario emitted origin fuel)
+  return Json.mkObj [("schema", toJson longBytesCorpusSchema),
+    ("requested", toJson count), ("attempted", toJson attempted),
+    ("status", toJson (if cases.size = count then "complete" else "generation-exhausted")),
+    ("excluded", .arr excluded), ("cases", .arr cases)]
+
+def payloadLength (scenario : CheckedScenario) : Nat :=
+  scenario.transactions.foldl (fun total transaction => total + transaction.payload.length) 0
+
+/-- Flags and payload bytes all contribute. -/
+def valueWeight (scenario : CheckedScenario) : Nat :=
+  scenario.transactions.foldl (fun total transaction =>
+    transaction.payload.foldl (fun sum byte => sum + byte.toNat) (total + transaction.flags.val)) 0
+
+/-- Transaction count, complete program size/literals, the total payload
+length, then flags and payload bytes. Every axis is a natural number and the
+comparison is lexicographic. -/
+def StrictlySmaller (candidate source : CheckedScenario) : Prop :=
+  candidate.transactions.length < source.transactions.length ∨
+  (candidate.transactions.length = source.transactions.length ∧
+    ((complexity candidate.program.body).StrictlySmaller (complexity source.program.body) ∨
+    (complexity candidate.program.body = complexity source.program.body ∧
+      (payloadLength candidate < payloadLength source ∨
+      (payloadLength candidate = payloadLength source ∧ valueWeight candidate < valueWeight source)))))
+
+instance (candidate source : CheckedScenario) : Decidable (StrictlySmaller candidate source) := by
+  unfold StrictlySmaller
+  infer_instance
+
+structure Reduction (source : CheckedScenario) where private mk ::
+  candidate : CheckedScenario
+  sameHelperCount : candidate.plan.step.helpers.length = source.plan.step.helpers.length
+  sameBindings : Aggregate.bindingInventory candidate.plan.step = Aggregate.bindingInventory source.plan.step
+  stableIds : (candidate.transactions.map (·.id)).Sublist (source.transactions.map (·.id))
+  strict : StrictlySmaller candidate source
+
+private def sealReduction (source : CheckedScenario) (step : Aggregates.CheckedDAG)
+    (transactions : List Transaction) : Option (Reduction source) := do
+  let plan ← CheckedPlan.ofStep? step
+  let candidate ← (checkedScenario plan transactions).toOption
+  if count : candidate.plan.step.helpers.length = source.plan.step.helpers.length then
+    if bindings : Aggregate.bindingInventory candidate.plan.step = Aggregate.bindingInventory source.plan.step then
+      if ids : (candidate.transactions.map (·.id)).Sublist (source.transactions.map (·.id)) then
+        if strict : StrictlySmaller candidate source then some ⟨candidate, count, bindings, ids, strict⟩
+        else none
+      else none
+    else none
+  else none
+
+private def replaceAt (transactions : List Transaction) (index : Nat) (change : Transaction → Transaction) :
+    List Transaction :=
+  transactions.zipIdx.map fun (transaction, current) => if current == index then change transaction else transaction
+
+/-- Step reductions, then per transaction: removal, truncation of the payload
+to each shorter bank length, zeroing its bytes, and flags reduced to their
+parity or with the revert bit cleared. Candidates still need execution to
+establish that they preserve a finding. -/
+def reductions (source : CheckedScenario) : List (Reduction source) := Id.run do
+  let step := source.plan.step
+  let mut raw : List (Aggregates.CheckedDAG × List Transaction) := []
+  for reduced in Aggregate.reductions ⟨step, Word.zero⟩ do
+    raw := raw ++ [(reduced.candidate.function, source.transactions)]
+  for (transaction, index) in source.transactions.zipIdx do
+    raw := raw ++ [(step, (source.transactions.zipIdx.filter (fun (_, current) => current != index)).map Prod.fst)]
+    for length in lengthBank.filter (· < transaction.payload.length) do
+      raw := raw ++ [(step, replaceAt source.transactions index fun tx => {tx with payload := tx.payload.take length})]
+    raw := raw ++ [(step, replaceAt source.transactions index fun tx =>
+      {tx with payload := List.replicate tx.payload.length 0})]
+    raw := raw ++ [(step, replaceAt source.transactions index fun tx =>
+      {tx with flags := tx.flags.bitAnd (Word.ofNatModulo 1)})]
+    raw := raw ++ [(step, replaceAt source.transactions index fun tx =>
+      {tx with flags := tx.flags.bitAnd (Word.ofNatModulo 1).bitNot})]
+  let mut seen : List String := []
+  let mut result := []
+  for (step, transactions) in raw do
+    if let some reduced := sealReduction source step transactions then
+      let identity := (Json.mkObj [("program", Wire.encodeProgram reduced.candidate.program),
+        ("transactions", transactionsJson reduced.candidate.transactions)]).compress
+      if !seen.contains identity then
+        seen := identity :: seen
+        result := result ++ [reduced]
+  return result
+
+def replayCase (json : Json) (fuel : Nat) : Except String Json := do
+  unless fuel ≤ 10000000 do throw "execution fuel exceeds limit"
+  let admitted ← caseProgram json
+  let provenance ← json.getObjVal? "provenance"
+  for (name, expected) in [
+      ("generatorVersion", generatorVersion), ("profileVersion", profileVersion),
+      ("functionVersion", Solcore.Synthesis.Core.LongBytes.version), ("templateVersion", templateVersion),
+      ("stepProfileVersion", Aggregate.profileVersion), ("stepFunctionVersion", Aggregates.version),
+      ("stepTemplateVersion", Aggregate.templateVersion),
+      ("emitterVersion", emitterVersion), ("wrapperVersion", wrapperVersion)] do
+    unless (← provenance.getObjValAs? String name) = expected do throw (name ++ " changed")
+  let origin ← provenance.getObjVal? "origin"
+  let emitted ← (emit admitted.plan).mapError reprStr
+  unless (← json.getObjValAs? String "source") = emitted.source do throw "saved source differs from long-bytes plan emission"
+  unless (← json.getObjVal? "contract") == contractJson emitted do throw "saved contract metadata differs from long-bytes wrapper"
+  unless (← provenance.getObjVal? "features") == toJson admitted.plan.step.features do throw "saved features differ from checked step"
+  let kind ← origin.getObjValAs? String "kind"
+  if kind = "long-bytes-generated" then
+    let seedText ← origin.getObjValAs? String "seed"
+    unless seedText.length ≤ 20 do throw "invalid saved seed"
+    let some seed := seedText.toNat? | throw "invalid saved seed"
+    unless seed < 2 ^ 64 && toString seed = seedText do throw "noncanonical saved seed"
+    let (expected, expectedOrigin) ← generatedScenario (Seed.ofNat seed) (← origin.getObjValAs? Nat "maxProgramNodes")
+    let validationFuel ← origin.getObjValAs? Nat "validationFuel"
+    unless validationFuel ≤ 10000000 do throw "saved validation fuel exceeds limit"
+    unless origin == expectedOrigin.setObjVal! "validationFuel" (toJson validationFuel) do
+      throw "saved origin differs from generated long-bytes provenance"
+    unless planJson expected.plan == planJson admitted.plan &&
+        transactionsJson expected.transactions == transactionsJson admitted.transactions do
+      throw "saved plan or transaction sequence differs from its generation seed"
+    validateGenerated expected validationFuel
+  else if kind = "imported" then
+    unless origin == Json.mkObj [("kind", toJson "imported")] do throw "noncanonical imported origin"
+  else if kind = "reduced" then
+    let parentPlan ← checkedPlan (← origin.getObjVal? "parentPlan")
+    let parentTransactions ← decodeTransactions (← origin.getObjVal? "parentTransactions")
+    let parent ← checkedScenario parentPlan parentTransactions
+    unless (← origin.getObjVal? "parentProgram") == Wire.encodeProgram parent.program do throw "reduction parent program differs from its plan"
+    unless (sealReduction parent admitted.plan.step admitted.transactions).isSome do
+      throw "reduction does not preserve bindings/IDs or decrease the complete scenario"
+    unless origin == Json.mkObj [("kind", toJson "reduced"), ("parentPlan", planJson parent.plan),
+        ("parentProgram", Wire.encodeProgram parent.program), ("parentTransactions", transactionsJson parent.transactions)] do
+      throw "noncanonical reduced origin"
+  else throw "unsupported long-bytes case origin"
+  return makeCase admitted emitted origin fuel
+
+def shrinkCases (json : Json) (limit fuel : Nat) : Except String Json := do
+  let _ ← replayCase json fuel
+  let source ← caseProgram json
+  let origin := Json.mkObj [("kind", toJson "reduced"), ("parentPlan", planJson source.plan),
+    ("parentProgram", Wire.encodeProgram source.program), ("parentTransactions", transactionsJson source.transactions)]
+  let cases ← ((reductions source).take limit).mapM fun reduced => emitCase reduced.candidate origin fuel
+  return Json.mkObj [("schema", toJson longBytesCorpusSchema), ("cases", toJson cases)]
+
+end Solcore.Synthesis.Source.LongBytes

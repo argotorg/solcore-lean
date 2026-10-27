@@ -95,3 +95,7 @@ lean_exe semanticLedgerTool where
 lean_exe rustHullLedgerScenario where
   root := `Tests.RustHullLedgerScenarioRun
   exeName := "rust-hull-ledger-scenario"
+
+lean_exe semanticLongBytesTool where
+  root := `Tests.SemanticLongBytesTool
+  exeName := "semantic-long-bytes-tool"
