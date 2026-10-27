@@ -169,6 +169,8 @@ it runs only on manual dispatch.
 The same twenty-seven-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
+[Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
+suites with advancing seeds and counts their findings in a signature registry.
 
 The `runtime-primitives` profile adds division/remainder, shifts, signed
 operations, byte selection, sign extension, exponentiation, leading-zero count

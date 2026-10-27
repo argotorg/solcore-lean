@@ -32,7 +32,7 @@ test corpus.
 
 | Order | Deliverable | Status | Completion boundary |
 | --- | --- | --- | --- |
-| 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
+| 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
 | 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
@@ -113,6 +113,11 @@ Implemented operational components:
   workflow syntax validation does not claim a completed GitHub-hosted run.
   The automatic triggers were later disabled because hosted runs took too
   long; the workflow now runs only on manual dispatch.
+- `semantic-fuzz.py` adds continuous operation on one machine: advancing root
+  seeds per iteration, an epoch over the prepared tools and harness scripts,
+  a registry that counts every finding occurrence by signature and keeps the
+  first examples, pruned run records, triage labels and reports. See
+  [continuous fuzzing](../../scripts/SEMANTIC_CI.md#continuous-fuzzing).
 
 The full Lean build (9,900 jobs), registered tests, semantic-kernel policy,
 272 Python policy tests and workflow syntax validation passed. The Python

@@ -125,6 +125,76 @@ Yul archives also retain the checked Yul, exact solc request/response, both
 bytecodes and matching Hull/source/tool receipts. Replay verifies these files
 locally, so a moved archive does not depend on its original source directory.
 
+## Continuous fuzzing
+
+`scripts/semantic-fuzz.py` runs the random suite repeatedly on one machine and
+keeps a registry of what it finds. Prepare the tools first, then start it:
+
+```sh
+python3 scripts/semantic-fuzz.py run --state .upstream/semantic-fuzz \
+  --base-seed 20261101 --shard-index 0 --shard-count 1
+python3 scripts/semantic-fuzz.py report --state .upstream/semantic-fuzz
+python3 scripts/semantic-fuzz.py label --state .upstream/semantic-fuzz SIGNATURE 'triage note'
+```
+
+Iteration `i` runs the suite in random mode once per backend, with root seed
+`base + i`, so the backends compare the same generated programs. All three
+backends run by default, Yul with the pure profiles only. Machines that share
+a base seed use their own `--shard-index` of a common `--shard-count`. The
+first `run` fixes the configuration in `config.json`: backends, profiles,
+cases (default 16), attempts (2,048), time and disk limits and tool paths.
+Later runs resume after the last recorded run and refuse different options;
+use a new state directory for another configuration. `--iterations N` stops
+after N iterations, a `STOP` file in the state directory stops before the next
+run, and SIGTERM or SIGINT stops the running suite, which records its
+unfinished work. An interrupted run moves to `interrupted/` and reruns from its
+seed on the next start; its partial findings are not counted.
+
+Before every run the driver verifies the prepared tools offline. The digests
+of the readiness receipt and of the harness scripts form an epoch. When the
+tools or scripts change, the driver stops until it is restarted with
+`--accept-new-epoch`, and the ledger records each run's epoch.
+
+Every run appends a line to `ledger.jsonl` with its seeds, statuses, counts,
+finding occurrences and problems. Each occurrence is counted in
+`registry.json` under a signature made of the backend, category and stage
+plus one of:
+
+- for compiler crashes, rejections and other tool failures, the first panic
+  location and message, or the first error line, without paths, thread
+  identifiers or numbers;
+- for semantic mismatches, the profile, the rest of the mismatch fingerprint
+  and the reduced program's digest.
+
+The first `--examples` occurrences of a signature (default three) keep their
+complete archives under `findings/SIGNATURE/` with an `occurrence.json`. Later
+occurrences are counted with their seeds, from which random cases replay.
+Runs that pass are deleted. Other runs keep their suite summary and the
+summaries and logs of the profiles that did not pass. A profile that did not
+pass without a finding, or was left unexecuted, is listed as a problem.
+
+`label` records a triage note for a signature in `labels.json`. A labelled
+signature is shown as known; it stays counted and listed, and its new
+occurrences still enter the ledger. `report.md` and `report.json` list the
+signatures (untriaged first, new ones marked), the run totals per backend and
+the latest problems. `--notify-command CMD` runs CMD after a run with a new
+signature or a missing suite summary, with `SEMANTIC_FUZZ_REPORT`,
+`SEMANTIC_FUZZ_NEW` and related variables set; outcomes go to `notify.log`.
+
+The driver exits with status 2 when the tools are not ready or another driver
+holds the state, 3 on an epoch change, 4 when the state reaches
+`--max-state-bytes` (50 GiB by default) and 5 after three consecutive runs
+without a suite summary. Signatures are conservative for mismatches and coarse
+for crashes. Panics raised inside a shared library macro, such as the
+`primitive-types` overflow checks, have one location even when different
+compiler code reaches them. Replay retained examples with `RUST_BACKTRACE=1`
+to tell them apart before labelling.
+
+On a remote machine, use a Linux host with persistent disk, prepare the tools
+there once with `--prepare --allow-network`, and run the driver under a
+service manager or `tmux`. Local validation so far ran on macOS, so start with
+a short run on the host to check its toolchain.
+
 ## Workflow behavior
 
 Automatic triggers are disabled for now because hosted runs take too long:
