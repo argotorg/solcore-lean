@@ -27,7 +27,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-offline and the twenty-three native Lean tools in one Lake invocation. Existing
+offline and the twenty-five native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -52,17 +52,24 @@ python3 scripts/semantic-suite.py --mode random --seed 20261026 \
 Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
 profile's default node budget, capped at 512; an explicit `--nodes` wins.
 
-Random campaigns of the eleven G0-based pure profiles, and the random steps of
-every stateful profile, generate with [G0 revision
-three](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions) (`core-g0-v3/lcg64-v1`),
-revision two under a per-case swarm mask. Random runtime-input cases run each
-function at its boundary inputs and then at four seed-derived inputs, and random
-stateful scenarios have eight transactions. Fixed corpora and saved cases keep
-the revision, inputs and sequence they record. Each profile row of the report
-lists `generatorVersions`, `inputSelections` and `transactions` under
-`campaign.generation`; the suite does not select other values. `--cases` counts
-a function's inputs separately, so a random run of a runtime-input profile
-covers a function per eight to twelve cases.
+Random campaigns of the eleven G0-based pure profiles generate with [G0
+revision four](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
+(`core-g0-v4/lcg64-v1`): revision two under a per-case swarm mask, restricted
+to the features the profile's emitter renders. The random steps of every
+stateful profile generate with revision three (`core-g0-v3/lcg64-v1`), the same
+mask without that restriction; the stateful tools refuse revision four. Random
+runtime-input cases run each function at its boundary inputs and then at four
+seed-derived inputs, and random stateful scenarios have eight transactions.
+Fixed corpora and saved cases keep the revision, inputs and sequence they
+record. Each profile row of the report lists `generatorVersions`,
+`inputSelections` and `transactions` under `campaign.generation`; the suite
+does not select other values. `--cases` counts a function's inputs separately,
+so a random run of a runtime-input profile covers a function per eight to
+twelve cases, and its last function may lose inputs. `--functions N` instead
+gives every random runtime-input pure profile N whole functions with all of
+their inputs, while `closed-g0` and the stateful profiles keep `--cases`; the
+report records N in `functions`. A campaign returns at most 1,024 cases, so N
+is at most 85 while a twelve-input profile is selected.
 
 Use `--backend sonatina-o2` with either suite command to compare the same cases
 after O2 compilation. O0 remains the default. The CI matrix runs each backend
@@ -77,8 +84,8 @@ builds Rust and Lean tools; solc is supplied and checked separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 775 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 775 | Sonatina O2 | Sonatina O2 |
+| `sonatina-o0` | 801 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 801 | Sonatina O2 | Sonatina O2 |
 | `yul` | 595, pure only | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
@@ -86,13 +93,15 @@ linked layout is not supplied to the Hull importer. Its pure result can still
 be compared with both other paths; code-dependent and stateful Yul observations
 remain unsupported. Reports record this distinction in `pathBackends`.
 
-The default selection is all twenty-eight profiles: fourteen pure profiles,
-storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
-event logs, call value, bounded bytes, forwarded value, Keccak-addressed
-mappings, a sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]`
-inputs and malformed calldata. Fixed mode runs all 775 manifest cases or scenarios. It rejects `--cases` and `--nodes` overrides rather
-than silently truncating required coverage. Repeat `--profile NAME` to select a
-smaller suite.
+The default selection is all thirty profiles: fourteen pure profiles, storage,
+storage rollback, parent/child calls, keyed storage, dynamic arrays, event
+logs, call value, bounded bytes, forwarded value, Keccak-addressed mappings, a
+sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]` inputs,
+and malformed calldata for the dynamic-array, nested-array and 256-byte
+`bytes` contracts. Fixed mode runs all 801 manifest cases or scenarios. It
+rejects `--cases`, `--functions` and `--nodes` overrides rather than silently
+truncating required coverage. Repeat `--profile NAME` to select a smaller
+suite.
 
 Random mode derives each profile's starting seed from the root seed, profile,
 shard index/count and the recorded derivation version. `--shard-index` and
@@ -165,8 +174,8 @@ Iteration `i` runs the suite in random mode once per backend, with root seed
 backends run by default, Yul with the pure profiles only. Machines that share
 a base seed use their own `--shard-index` of a common `--shard-count`. The
 first `run` fixes the configuration in `config.json`: backends, profiles,
-cases (default 16), attempts (2,048), node-budget scales, time and disk limits
-and tool paths. `--size-cycle 1,2` (the default) gives iteration `i` the scale
+cases (default 16), whole functions (`--functions`, unset by default),
+attempts (2,048), node-budget scales, time and disk limits and tool paths. `--size-cycle 1,2` (the default) gives iteration `i` the scale
 at position `i` modulo the cycle, so every other iteration doubles each
 profile's default node budget, capped at 512, and generates larger programs.
 Later runs resume after the last recorded run and refuse different options;

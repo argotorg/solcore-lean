@@ -487,7 +487,7 @@ python3 scripts/semantic-campaign.py \
   --seconds 300 --disk-bytes 134217728 --shrink-attempts 32
 ```
 
-This search generates with [G0 revision three](#g0-generator-revisions); add
+This search generates with [G0 revision four](#g0-generator-revisions); add
 `--g0-version` with another revision to search that one instead.
 `--attempts` bounds generation attempts. `--shrink-attempts` bounds candidate
 executions across the entire campaign, and `--shrink-candidates` bounds each
@@ -685,7 +685,8 @@ Word and the high bit, and accepts the function only if all four return and at
 least two results differ. One accepted function supplies up to four cases in
 that order, followed in random mode by four
 [seeded inputs](#seeded-runtime-inputs). `--attempts` counts function candidates; `--cases` counts individual
-input comparisons. The final function's inputs may be truncated by that limit.
+input comparisons. The final function's inputs may be truncated by that limit;
+[`--functions N`](#seeded-runtime-inputs) requests whole functions instead.
 Generation fuel failures appear in `generationResourceExclusions` as a subset
 of `excluded`, separately from executed-case resource failures.
 
@@ -3311,6 +3312,7 @@ present row `row` and replaces its table Word or its length Word with
   - overlapping another row: that row's offset, or that offset plus 32;
 - `row-length`: one too long, the most that fits, one more than fits,
   `2^251`, `2^251 + 1`, `2^256 - 1`, one shorter, and zero.
+
 Banks leave out changes that keep the canonical calldata as it is, and a row
 kind drawn for a value without rows sends the canonical calldata.
 `stdRejection` comes from a second std model written over the bytes
@@ -3355,6 +3357,7 @@ another row's elements, and overlaps it rejects. The lazy checks are covered:
 - a cut in the table is rejected;
 - a cut in a read row's skipped element is rejected;
 - a bad second row is rejected after the first is folded.
+
 So is the decode order: dispatch before decoding, the outer array before
 rows, an outer length that leaves a malformed row unread, and an accepted row
 before a rejected one. Each accepted case must behave exactly like the
@@ -3429,6 +3432,7 @@ stdRejection, value}`. The malformation is one of the malformed-calldata kinds
   `2^256 - 63`, `2^256 - 1`, `2^255`, one shorter, and zero;
 - `padding`: `ones`, `ramp` or `last-byte`, for a payload that does not fill
   its last Word.
+
 A kind whose bank is empty for a payload sends the canonical calldata. The
 adapter checks the calldata and the outcome with its own encoder and a third
 model, `bytes_std_decode`. A returned row must also follow the long-bytes
@@ -3497,11 +3501,11 @@ seconds. Neither run produced a finding.
 
 ## Compare whole committed storage
 
-Every stateful profile compares the declared slots on all three paths. The ten
+Every stateful profile compares the declared slots on all three paths. The twelve
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-fourteen stateful profiles now also compare the observed contracts' whole
+sixteen stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -3510,7 +3514,7 @@ this section describes how the paths observe it.
 
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
-`contract` for the twelve storage-family profiles, `parent` and `child` for
+`contract` for the fourteen storage-family profiles, `parent` and `child` for
 `stateful-calls` and `stateful-forwarded-value`. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
@@ -3589,8 +3593,10 @@ it. Candidates are rerun on all three paths, and `same_failure` requires the
 whole fingerprint.
 
 Histories now use the `.v2` schemas of the thirteen profiles that existed
-then; the later malformed-calldata profile starts at
-`solcore-lean.malformed-calldata-history.v1`, whole storage included. Reports use
+then; the later malformed-calldata profiles start at
+`solcore-lean.malformed-calldata-history.v1`,
+`solcore-lean.malformed-nested-array-history.v1` and
+`solcore-lean.malformed-bytes-history.v1`, whole storage included. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
 `solcore-lean.semantic-storage-analysis.v2` and

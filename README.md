@@ -135,11 +135,12 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
-Random campaigns of the eleven G0-based profiles use the generator's third
+Random campaigns of the eleven G0-based profiles use the generator's fourth
 revision: the second revision, which mixes each draw and widens its bank of
 boundary literals, under a per-case swarm mask that enables about half of the
-operators and forms. Random stateful steps use the third revision as well, and
-fixed corpora keep the first
+operators and forms, restricted to those the profile's emitter renders. Random
+stateful steps use the third revision, which keeps the whole mask, and fixed
+corpora keep the first
 ([G0 generator revisions](scripts/SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)).
 Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
@@ -173,7 +174,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same twenty-eight-profile suite runs locally with shared time and disk limits.
+The same thirty-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -389,15 +390,31 @@ each malformation. Its thirteen fixed scenarios and sixteen random scenarios at
 each of two node budgets match on both Sonatina levels. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-malformed-calldata).
 
-All fourteen stateful profiles also compare the installed contracts' whole
+Two more profiles send malformed calldata to other contracts under the same
+selector rule. The malformed nested-array profile adds out-of-range, wrapping
+or overlapping row offsets and over-long or wrapping row lengths. Std checks
+the outer array and its offset table when it decodes the parameter, but a row
+only when the body reads it, after the earlier rows are folded and written;
+original Core's contract makes the same checks at the same points. The
+malformed-bytes profile sends the 256-byte `bytes` contract out-of-range or
+wrapping offsets, lengths past the data, cuts inside the payload, cuts inside
+its padding, which std never reads, and nonzero padding, which std ignores.
+Golden cases, 64 for nested arrays and 40 for `bytes`, fix std's outcome for
+each malformation and its decode order. Each profile's thirteen fixed scenarios
+and sixteen random scenarios at each of two node budgets match on both Sonatina
+levels. See
+[malformed nested arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-malformed-nested-arrays)
+and [malformed bytes](scripts/SEMANTIC_DIFFERENTIAL.md#compare-malformed-bytes).
+
+All sixteen stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The fixed corpora of all fourteen profiles, 180
-scenarios and 496 transaction prefixes, still match on both Sonatina levels,
+whole storage unchanged. The fixed corpora of all sixteen profiles, 206
+scenarios and 568 transaction prefixes, still match on both Sonatina levels,
 and a synthetic stray write that the declared slots could not see is caught and
 reduced to one transaction. See
 [whole committed storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage).
