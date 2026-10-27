@@ -2159,6 +2159,90 @@ With scripts and native tools frozen on `20ba7418c`:
   900-second budget. Four seeds at 448 nodes left too few nodes for their
   step template. There was no finding.
 
+**Malformed nested arrays.** The `stateful-malformed-nested-array` profile
+sends malformed calldata to the nested-array contract. It keeps the selector
+rule, its narrowing and the `selectorRows` of the malformed-calldata profile.
+The definitions were fixed before execution:
+
+- Contract: the nested-array step, emitted source and Hull runner are
+  reused, so the compiled contract is the nested-array one
+  (`run(uint256,uint256[][])`, `0x7095aff8`). Its original Core contract is
+  a new wrapper, `core-malformed-nested-array-contract-v1`. The wrapper
+  evaluates std's dispatch and outer decode checks through the same input
+  host functions, then runs the nested-array protocol. Each row the body
+  reads is checked by std's row decode at the point where the body reads it.
+- Reference semantics, from `dispatch.sol` and `std.sol` (the lazy calldata
+  array decode, `abiArrayGet`, `checkArrayHead`, `checkReaderRange`):
+  1. Dispatch and the outer array are checked as for malformed calldata, with
+     this selector. With head offset `o` and outer length `n`, the call
+     reverts with `0x08638556` when `32n > size - (36 + o)`, so the offset
+     table at `T = 36 + o` is checked whole, including entries for rows the
+     body never reads.
+  2. The body reads `values.length()`, then, for each row `i < min(n, 3)` in
+     order, `values[i]`. That decodes row `i`: with `r` the table word at
+     `T + 32i`, it reverts with `0x08638556` when any of these holds:
+     - `r > size - T`;
+     - fewer than 32 bytes remain at `T + r`;
+     - the row length `m`, the Word at `T + r`, exceeds `2^251 - 1`;
+     - `32m > size - (T + r + 32)`.
+     Element `j` of the row is the Word at `T + r + 32 + 32j`. The body reads
+     `j < min(m, 2)` and counts `m`.
+  3. Row checks are lazy. A row the body never reads, at index 3 and above,
+     is never checked. Row `i` is checked after the rows before it have been
+     folded and written; a revert commits nothing, so only the selector is
+     observable. A read row's element region is checked whole, including the
+     elements the body skips.
+  4. Overlaps are not checked. A table entry may point into the table, at
+     another row or into a row's elements, and rows may share data. Trailing
+     bytes are ignored.
+  A std rejection reverts with exactly its four selector bytes and commits
+  nothing. `0x7f52b2bf` cannot arise, because the body guards every row index
+  by the outer length and every element index by the row length.
+  `0xb5988ea3` cannot arise, because no transaction carries value.
+- Canonical values have up to four rows of up to three elements. The body
+  still reads at most three rows of two elements, so a fourth row and third
+  elements exist that it never reads.
+- Malformations, one per transaction and at most 1 KiB of calldata:
+  - the malformed-calldata kinds on the outer array (none, short calldata, a
+    wrong selector, truncation, trailing bytes, a head offset and an outer
+    length) with the same banks. Truncation may also cut the offset table or
+    a row;
+  - a row offset, replacing table entry `k`:
+    - out of range: `size - T - 31`, `size - T`, `size - T + 1`, `2^255`;
+    - wrapping onto the outer head: `2^256 - 32`, which lands on the outer
+      length Word, and `2^256 - 1`;
+    - overlapping the table: `0`;
+    - overlapping another row: that row's offset, or that offset plus 32;
+  - a row length, replacing row `k`'s length Word: one too long, the most
+    that fits, one more than fits, `2^251`, `2^251 + 1` (whose 32-fold
+    product wraps to 32), `2^256 - 1`, one shorter, and zero.
+  Each transaction records its malformation, its calldata and std's
+  prescribed outcome. A second std model, written over the bytes, computes the
+  prescription, and generation and replay require original Core to agree with
+  it.
+- Golden cases come before any random run. They cover every kind, and the
+  lazy checks:
+  - a malformed fourth row and a cut inside it are accepted;
+  - a cut inside the offset table is rejected;
+  - a cut inside a read row's skipped third element is rejected;
+  - a malformed second row is rejected after the first row is folded.
+  They also check the decode order: dispatch before decoding, the outer array
+  before rows, and an earlier row before a later one.
+- Observations: as for nested-array — status, output, slots 0 to 8 and the
+  whole committed storage — compared per prefix. A rejection keeps the prior
+  slots and whole storage on every path.
+- Generation: own canonical blocks of zero to four rows of zero to three
+  elements, drawn from the boundary bank, with the nested-array parity
+  patterns. Each transaction draws a malformation kind, a parameter and a row
+  from a separate high-bit stream.
+- Reduction:
+  - one-transaction removals first, then step reductions;
+  - then, per transaction: no malformation, then simpler parameters of the
+    same kind;
+  - then the nested-array row, element and flags reductions.
+- Exclusions: gas, value-bearing transactions, calldata over 1 KiB, malformed
+  constructor calldata, and memory.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

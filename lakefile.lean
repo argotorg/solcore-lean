@@ -64,6 +64,10 @@ lean_exe semanticMalformedCalldataTool where
   root := `Tests.SemanticMalformedCalldataTool
   exeName := "semantic-malformed-calldata-tool"
 
+lean_exe semanticMalformedNestedArrayTool where
+  root := `Tests.SemanticMalformedNestedArrayTool
+  exeName := "semantic-malformed-nested-array-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

@@ -42,6 +42,7 @@ TARGETS = {
     "rustHullKeyedStorageScenario": "rust-hull-keyed-storage-scenario",
     "semanticDynamicArrayTool": "semantic-dynamic-array-tool",
     "semanticMalformedCalldataTool": "semantic-malformed-calldata-tool",
+    "semanticMalformedNestedArrayTool": "semantic-malformed-nested-array-tool",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",

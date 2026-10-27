@@ -2719,5 +2719,170 @@ class MalformedCalldataTests(unittest.TestCase):
         self.assertFalse(runner.conforms(value, tx, {**row, "status": "returned"}, prior))
         self.assertFalse(runner.conforms(value, tx, {**row, "committedStorage": keyed_slots(value, 2)}, prior))
 
+
+MALFORMED_NESTED_SELECTOR = "0x7095aff8"
+THREE_ROWS = [[1, 4], [9], []]
+FOUR_ROWS = [[3], [], [7, 1, 0], [1]]
+
+
+def malformed_nested_tx(index, flags, values, malformation):
+    tx = {"id": f"tx-{index}", "flags": str(flags), "values": [[str(value) for value in row] for row in values],
+          "malformation": malformation, "value": "0"}
+    data = runner.malformed_nested_calldata(MALFORMED_NESTED_SELECTOR, tx)
+    return {**tx, "calldata": "0x" + data.hex(), "stdRejection": runner.nested_std_decode(data, MALFORMED_NESTED_SELECTOR)[0]}
+
+
+def malformed_nested_case(rows=((0, THREE_ROWS, {"kind": "none"}),
+                                (0, FOUR_ROWS, {"kind": "row-length", "row": 3, "value": str(MAX_WORD)}),
+                                (0, THREE_ROWS, {"kind": "row-offset", "row": 1, "value": str(2**256 - 32)}),
+                                (0, THREE_ROWS, {"kind": "row-length", "row": 0, "value": "3"}),
+                                (1, THREE_ROWS, {"kind": "offset", "value": "0"}))):
+    """Envelope fixture only: native replay checks the actual std-modeling program."""
+    return {"schema": runner.MALFORMED_NESTED_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "malformedNestedArrayPlan": {"schema": "solcore-lean.malformed-nested-array-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(9)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedNestedArray", "method": "run", "signature": "run(uint256,uint256[][])",
+            "selector": MALFORMED_NESTED_SELECTOR, "deployPath": ["SynthesizedNestedArrayDeploy"],
+            "runtimePath": ["SynthesizedNestedArrayDeploy", "SynthesizedNestedArray"], "constructorCalldata": "0x"},
+        "transactions": [malformed_nested_tx(index, *row) for index, row in enumerate(rows)]}
+
+
+def malformed_nested_history(value, path):
+    """Rows that follow the nested-array protocol on the Words std decodes:
+    slot seven counts the decoded outer lengths and slot eight the read rows'
+    lengths. A std rejection reverts with its selector, as a Word on original
+    Core and as four bytes on Hull and EVM; odd flags revert."""
+    rows, prior = [], [0] * 9
+    for index, tx in enumerate(value["transactions"]):
+        rejection, outer, widths = runner.nested_std_decode(bytes.fromhex(tx["calldata"][2:]), MALFORMED_NESTED_SELECTOR)
+        reverted = rejection is not None or int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else [index + 10] + [index + 20 + slot for slot in range(6)] + [
+            prior[7] + outer, prior[8] + sum(widths)]
+        output = "0x" + f"{(committed[0] + committed[7] + committed[8]) if not reverted else index + 3:064x}"
+        if rejection is not None:
+            output = selector_word(rejection) if path == "directCore" else rejection
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned", "output": output,
+               "committedStorage": nested_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.MALFORMED_NESTED_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": nested_slots(), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def malformed_nested_histories(value=None):
+    value = malformed_nested_case() if value is None else value
+    return {path: malformed_nested_history(value, path) for path in runner.PATHS}
+
+
+class MalformedNestedArrayTests(unittest.TestCase):
+    def test_a_nested_case_records_its_malformation_calldata_and_std_outcome(self):
+        value = malformed_nested_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
+                          runner.encoding(selected), selected["shrinkBatch"]),
+                         ("semantic-malformed-nested-array-tool", "rust-hull-keyed-storage-scenario", True, "malformed", "nested", 16))
+        self.assertTrue(runner.has_malformed_nested(value) and runner.is_malformed(value))
+        self.assertFalse(runner.has_nested(value) or runner.has_malformed_nested(malformed_case()))
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(9)))
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [None, None, runner.STD_TRUNCATED, None, None])
+        self.assertEqual(value["transactions"][0]["calldata"], nested_calldata(0, THREE_ROWS))
+        self.assertIn("compared by its error selector", runner.scope(value))
+        self.assertIn("uint256[][]", runner.scope(value))
+        for key, changed in (("calldata", nested_calldata(0, FOUR_ROWS)), ("stdRejection", None), ("stdRejection", runner.STD_NO_SELECTOR),
+                             ("value", "1"), ("values", [[str(value) for value in row] for row in FOUR_ROWS + [[]]]),
+                             ("values", [["1", "2", "3", "4"]]),
+                             ("malformation", {"kind": "row-offset", "row": 4, "value": "0"}),
+                             ("malformation", {"kind": "row-length", "row": 0}),
+                             ("malformation", {"kind": "row-length", "row": "0", "value": "1"}),
+                             ("malformation", {"kind": "truncate", "kept": 388}), ("malformation", {"kind": "reorder"})):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][2][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # The dynamic-array profile has no row malformations.
+        array = malformed_case()
+        array["transactions"][0]["malformation"] = {"kind": "row-offset", "row": 0, "value": "0"}
+        with self.assertRaises(ValueError):
+            runner.validate_case(array)
+
+    def test_the_nested_byte_model_follows_std_lazy_decoding(self):
+        """The golden decisions of the Lean model, from the pinned dispatch.sol and std.sol."""
+        decode = lambda values, malformation: runner.nested_std_decode(
+            bytes.fromhex(malformed_nested_tx(0, 2, values, malformation)["calldata"][2:]), MALFORMED_NESTED_SELECTOR)
+        cases = [(THREE_ROWS, {"kind": "none"}, (None, 3, [2, 1, 0])),
+                 (THREE_ROWS, {"kind": "short", "bytes": 3}, (runner.STD_NO_SELECTOR, 0, [])),
+                 (THREE_ROWS, {"kind": "selector", "mask": "1"}, (runner.STD_NO_SELECTOR, 0, [])),
+                 (THREE_ROWS, {"kind": "truncate", "kept": 99}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "truncate", "kept": 116}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "truncate", "kept": 291}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "trailing", "count": 33, "pattern": "ones"}, (None, 3, [2, 1, 0])),
+                 (THREE_ROWS, {"kind": "offset", "value": "0"}, (None, 2, [0, 0])),
+                 (THREE_ROWS, {"kind": "offset", "value": "32"}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "length", "value": "4"}, (None, 4, [2, 1, 0])),
+                 (THREE_ROWS, {"kind": "length", "value": str(2**251 + 1)}, (runner.STD_TRUNCATED, 0, [])),
+                 ([[1, 4], [9]], {"kind": "length", "value": "3"}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "row-offset", "row": 1, "value": "289"}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "row-offset", "row": 1, "value": "288"}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "row-offset", "row": 1, "value": str(2**256 - 32)}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "row-offset", "row": 0, "value": "0"}, (None, 3, [0, 1, 0])),
+                 (THREE_ROWS, {"kind": "row-offset", "row": 1, "value": "0"}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "row-offset", "row": 1, "value": "128"}, (None, 3, [2, 1, 0])),
+                 (THREE_ROWS, {"kind": "row-length", "row": 0, "value": "5"}, (None, 3, [5, 1, 0])),
+                 (THREE_ROWS, {"kind": "row-length", "row": 0, "value": "6"}, (runner.STD_TRUNCATED, 0, [])),
+                 (THREE_ROWS, {"kind": "row-length", "row": 1, "value": str(2**251 + 1)}, (runner.STD_TRUNCATED, 0, [])),
+                 (FOUR_ROWS, {"kind": "row-offset", "row": 3, "value": str(MAX_WORD)}, (None, 4, [1, 0, 3])),
+                 (FOUR_ROWS, {"kind": "truncate", "kept": 515}, (None, 4, [1, 0, 3])),
+                 (FOUR_ROWS, {"kind": "truncate", "kept": 212}, (runner.STD_TRUNCATED, 0, [])),
+                 (FOUR_ROWS, {"kind": "truncate", "kept": 451}, (runner.STD_TRUNCATED, 0, []))]
+        for values, malformation, expected in cases:
+            with self.subTest(values=values, malformation=malformation):
+                self.assertEqual(decode(values, malformation), expected)
+        # Decode order: an outer length of two leaves a malformed row two unread.
+        canonical = bytearray.fromhex(nested_calldata(2, THREE_ROWS)[2:])
+        canonical[68:100] = (2).to_bytes(32, "big")
+        canonical[356:388] = MAX_WORD.to_bytes(32, "big")
+        self.assertEqual(runner.nested_std_decode(bytes(canonical), MALFORMED_NESTED_SELECTOR), (None, 2, [2, 1]))
+        canonical[0:4] = bytes.fromhex("9a94c44b")
+        self.assertEqual(runner.nested_std_decode(bytes(canonical), MALFORMED_NESTED_SELECTOR)[0], runner.STD_NO_SELECTOR)
+
+    def test_the_selector_rule_applies_to_nested_rejections(self):
+        value = malformed_nested_case()
+        result = runner.compare(malformed_nested_histories(value), value)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["selectorRows"], [{"id": "tx-2", "index": 2, "selector": runner.STD_TRUNCATED}])
+        for path, output in (("rustEvm", selector_word(runner.STD_TRUNCATED)), ("importedHull", runner.STD_NO_SELECTOR)):
+            observed = malformed_nested_histories(value)
+            observed[path]["transactions"][2]["output"] = output
+            result = runner.compare(observed, value)
+            with self.subTest(path=path, output=output):
+                self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-2"))
+
+    def test_a_returned_nested_row_follows_the_protocol_on_decoded_words(self):
+        value = malformed_nested_case()
+        histories = malformed_nested_histories(value)
+        rows = histories["directCore"]["transactions"]
+        # Row three's maximal length is never read: slot seven adds the outer length 4.
+        self.assertEqual(int(rows[1]["committedStorage"][7]["value"]) - int(rows[0]["committedStorage"][7]["value"]), 4)
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, {**rows[index], "output": tx["stdRejection"] or rows[index]["output"]}, prior))
+        # Counting the canonical row lengths instead of the decoded ones breaks the protocol on every path.
+        changed = malformed_nested_histories(value)
+        for path in runner.PATHS:
+            row = changed[path]["transactions"][3]
+            row["committedStorage"][8]["value"] = str(int(row["committedStorage"][8]["value"]) - 1)
+            row["output"] = "0x" + f"{int(row['output'], 16) - 1:064x}"
+        prior = changed["directCore"]["transactions"][2]["committedStorage"]
+        self.assertFalse(runner.conforms(value, value["transactions"][3], changed["directCore"]["transactions"][3], prior))
+        self.assertNotEqual(runner.compare(changed, value)["category"], "matched")
+
 if __name__ == "__main__":
     unittest.main()

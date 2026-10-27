@@ -59,11 +59,14 @@ LEDGER_CASE_SCHEMA = "solcore-lean.semantic-ledger-case.v1"
 LEDGER_HISTORY_SCHEMA = "solcore-lean.ledger-history.v2"
 MALFORMED_CASE_SCHEMA = "solcore-lean.semantic-malformed-calldata-case.v1"
 MALFORMED_HISTORY_SCHEMA = "solcore-lean.malformed-calldata-history.v1"
+MALFORMED_NESTED_CASE_SCHEMA = "solcore-lean.semantic-malformed-nested-array-case.v1"
+MALFORMED_NESTED_HISTORY_SCHEMA = "solcore-lean.malformed-nested-array-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
 # the deployment receipt must carry no logs even when transactions' logs are not compared;
 # `senders`: each transaction names one of LEDGER_SENDERS, which sends it on every path.
+# `encoding`: the canonical calldata a malformed-calldata profile changes, `array` by default.
 _TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "declared": False, "abi": "word",
     "signature": "run(uint256)", "selector": "0xa444f5e9",
     "historySchema": HISTORY_SCHEMA, "coreRunner": "rust-hull-storage-scenario",
@@ -157,6 +160,16 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": MALFORMED_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256[])", "selector": "0x9a94c44b", "rollback": True, "keyed": False,
         "declared": True, "abi": "malformed"},
+    # The nested-array contract under malformed calldata, with std's lazy row
+    # checks; cases reach about 80 KB.
+    "stateful-malformed-nested-array": {"caseSchema": MALFORMED_NESTED_CASE_SCHEMA,
+        "planSchema": "solcore-lean.malformed-nested-array-plan.v1", "planKey": "malformedNestedArrayPlan",
+        "corpusSchema": "solcore-lean.semantic-malformed-nested-array-corpus.v1",
+        "originKind": "malformed-nested-array-generated", "contract": "SynthesizedNestedArray",
+        "caseTool": "semantic-malformed-nested-array-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": MALFORMED_NESTED_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256[][])", "selector": "0x7095aff8", "rollback": True, "keyed": False,
+        "declared": True, "abi": "malformed", "encoding": "nested", "shrinkBatch": 16},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -203,6 +216,12 @@ MALFORMATION_KINDS = ("none", "short", "selector", "truncate", "trailing", "offs
 TRAILING_PATTERNS = ("zeros", "ones", "ramp")
 # std's bound on a 32-byte-element length, ~0 / 32.
 MAX_ARRAY_LENGTH = 2**251 - 1
+# Malformed nested values have at most four rows of at most three elements; the
+# body reads at most three rows of two. Row malformations replace a row's table
+# Word or its length Word. The canonical offset table starts at byte 100.
+NESTED_MALFORMATION_KINDS = MALFORMATION_KINDS + ("row-offset", "row-length")
+MALFORMED_MAX_ROWS, MALFORMED_MAX_COLUMNS, READ_ROWS = 4, 3, 3
+TABLE_START = 100
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -518,6 +537,12 @@ def declared_scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_malformed_nested(case):
+        return ("ordered zero-value run(uint256,uint256[][]) transactions with canonical values of at most four rows of at "
+                "most three elements and one malformation of at most 1 KiB of calldata each; initially empty storage; "
+                "committed values at slots 0..8 on all paths and no nonzero undeclared slot on Hull/EVM; a std rejection "
+                "compared by its error selector (original Core's selector Word for std's four revert bytes) when original "
+                "Core reverts with it and std prescribes it; no gas/balance/nonce or memory equivalence")
     if profile(case)["abi"] == "malformed":
         return ("ordered zero-value run(uint256,uint256[]) transactions with one malformation of at most 1 KiB of calldata "
                 "each; initially empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot "
@@ -552,22 +577,24 @@ def declared_scope(case: dict) -> str:
     return "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence"
 
 
-def malformed_calldata(selector: str, tx: dict) -> bytes:
-    """The calldata a malformed-calldata transaction sends: the canonical
-    `run(uint256,uint256[])` encoding of its flags and values, changed by its one
-    malformation. An invalid malformation is rejected."""
-    values = tx.get("values")
-    if not isinstance(values, list) or len(values) > MAX_ELEMENTS:
-        raise ValueError("malformed-calldata transactions carry zero to three elements")
-    words = [int(common.word(tx.get("flags"), "transaction flags")), 64, len(values),
-             *(int(common.word(value, "array element")) for value in values)]
-    canonical = bytes.fromhex(selector[2:]) + b"".join(word.to_bytes(32, "big") for word in words)
-    malformation = tx.get("malformation")
-    if not isinstance(malformation, dict) or malformation.get("kind") not in MALFORMATION_KINDS:
+def encoding(selected: dict) -> str:
+    """The canonical calldata a malformed-calldata profile changes."""
+    return selected.get("encoding", "array")
+
+
+def has_malformed_nested(case: dict) -> bool:
+    return profile(case)["abi"] == "malformed" and encoding(profile(case)) == "nested"
+
+
+def changed_calldata(canonical: bytes, malformation, kinds: tuple, position) -> bytes:
+    """One malformation's change to a canonical encoding: none, a selector
+    prefix, a selector xor mask, a cut, trailing bytes, or a Word replaced at the
+    byte position `position` gives for it. An invalid malformation is rejected."""
+    if not isinstance(malformation, dict) or malformation.get("kind") not in kinds:
         raise ValueError("unknown malformation")
     kind = malformation["kind"]
     fields = {"none": set(), "short": {"bytes"}, "selector": {"mask"}, "truncate": {"kept"}, "trailing": {"count", "pattern"},
-              "offset": {"value"}, "length": {"value"}}[kind]
+              "offset": {"value"}, "length": {"value"}, "row-offset": {"row", "value"}, "row-length": {"row", "value"}}[kind]
     if set(malformation) != {"kind"} | fields:
         raise ValueError("malformation fields differ from its kind")
     if kind == "none":
@@ -593,26 +620,144 @@ def malformed_calldata(selector: str, tx: dict) -> bytes:
             raise ValueError("trailing bytes are 1 to 64 bytes of zeros, ones or a ramp")
         tail = {"zeros": bytes(count), "ones": b"\xff" * count, "ramp": bytes((index + 1) % 256 for index in range(count))}[pattern]
         return canonical + tail
-    position = 36 if kind == "offset" else 68
+    at = position(malformation)
     value = int(common.word(malformation["value"], "malformation value"))
-    return canonical[:position] + value.to_bytes(32, "big") + canonical[position + 32:]
+    return canonical[:at] + value.to_bytes(32, "big") + canonical[at + 32:]
+
+
+def malformed_calldata(selector: str, tx: dict) -> bytes:
+    """The calldata a malformed-calldata transaction sends: the canonical
+    `run(uint256,uint256[])` encoding of its flags and values, changed by its one
+    malformation. An invalid malformation is rejected."""
+    values = tx.get("values")
+    if not isinstance(values, list) or len(values) > MAX_ELEMENTS:
+        raise ValueError("malformed-calldata transactions carry zero to three elements")
+    words = [int(common.word(tx.get("flags"), "transaction flags")), 64, len(values),
+             *(int(common.word(value, "array element")) for value in values)]
+    canonical = bytes.fromhex(selector[2:]) + b"".join(word.to_bytes(32, "big") for word in words)
+    return changed_calldata(canonical, tx.get("malformation"), MALFORMATION_KINDS,
+                            lambda malformation: 36 if malformation["kind"] == "offset" else 68)
+
+
+def malformed_nested_values(transaction: dict) -> list[list[int]]:
+    """A malformed nested transaction's canonical value: at most four rows of at
+    most three canonical decimal Words."""
+    values = transaction.get("values") if isinstance(transaction, dict) else None
+    if not isinstance(values, list) or len(values) > MALFORMED_MAX_ROWS or \
+            any(not isinstance(row, list) or len(row) > MALFORMED_MAX_COLUMNS for row in values):
+        raise ValueError("malformed nested-array transactions carry at most four rows of at most three elements")
+    return [[int(common.word(value, "nested element")) for value in row] for row in values]
+
+
+def malformed_nested_calldata(selector: str, tx: dict) -> bytes:
+    """The calldata a malformed nested-array transaction sends: the canonical
+    `run(uint256,uint256[][])` encoding of its flags and values, changed by its
+    one malformation. A row malformation replaces the row's table Word or its
+    length Word and names a present row."""
+    values = malformed_nested_values(tx)
+    canonical = bytes.fromhex(nested_calldata(selector, int(common.word(tx.get("flags"), "transaction flags")), values)[2:])
+    offsets, offset = [], 32 * len(values)
+    for row in values:
+        offsets.append(offset)
+        offset += 32 + 32 * len(row)
+
+    def position(malformation):
+        if malformation["kind"] in ("offset", "length"):
+            return 36 if malformation["kind"] == "offset" else 68
+        row = malformation["row"]
+        if type(row) is not int or not 0 <= row < len(values):
+            raise ValueError("a row malformation names a present row")
+        return TABLE_START + (32 * row if malformation["kind"] == "row-offset" else offsets[row])
+    return changed_calldata(canonical, tx.get("malformation"), NESTED_MALFORMATION_KINDS, position)
+
+
+def std_dynamic_head(data: bytes, selector: str) -> tuple:
+    """std's dispatch and the head of `(uint256 flags, T value)` for a dynamic
+    `T`: the error selector it reverts with, or None and the head offset `o`
+    once `o <= size - 4` and 32 bytes remain at `4 + o`."""
+    size = len(data)
+    if size < 4 or data[:4] != bytes.fromhex(selector[2:]):
+        return STD_NO_SELECTOR, 0
+    if size < 68:
+        return STD_TRUNCATED, 0
+    offset = int.from_bytes(data[36:68], "big")
+    if offset > size - 4 or size - (4 + offset) < 32:
+        return STD_TRUNCATED, 0
+    return None, offset
+
+
+def std_array_length(data: bytes, start: int) -> int | None:
+    """std's `checkArrayHead` for 32-byte elements of an array whose length Word
+    is at `start`: the length, or None when it exceeds ~0 / 32 or its elements
+    do not fit after the length Word."""
+    length = int.from_bytes(data[start:start + 32], "big")
+    if length > MAX_ARRAY_LENGTH or 32 * length > len(data) - (start + 32):
+        return None
+    return length
 
 
 def std_rejection(data: bytes, selector: str) -> str | None:
     """The pinned std's dispatcher and decoder for `run(uint256,uint256[])`: the
     error selector it reverts with, or None when the method body runs."""
-    size = len(data)
-    if size < 4 or data[:4] != bytes.fromhex(selector[2:]):
-        return STD_NO_SELECTOR
-    if size < 68:
-        return STD_TRUNCATED
-    offset = int.from_bytes(data[36:68], "big")
-    if offset > size - 4 or size - (4 + offset) < 32:
-        return STD_TRUNCATED
-    length = int.from_bytes(data[4 + offset:36 + offset], "big")
-    if length > MAX_ARRAY_LENGTH or 32 * length > size - (36 + offset):
-        return STD_TRUNCATED
-    return None
+    error, offset = std_dynamic_head(data, selector)
+    if error is not None:
+        return error
+    return None if std_array_length(data, 4 + offset) is not None else STD_TRUNCATED
+
+
+def nested_std_decode(data: bytes, selector: str) -> tuple:
+    """The pinned std's dispatcher and lazy decoder for `run(uint256,uint256[][])`:
+    the error selector it reverts with, or None with the outer length and the
+    length of each row the body reads, rows `i < min(n, 3)` in order. The whole
+    offset table must fit; a read row's table Word `r` must not exceed
+    `size - T`, 32 bytes must remain at `T + r` and its elements must fit. Rows
+    past the third are never decoded."""
+    error, offset = std_dynamic_head(data, selector)
+    if error is not None:
+        return error, 0, []
+    rows = std_array_length(data, 4 + offset)
+    if rows is None:
+        return STD_TRUNCATED, 0, []
+    table, widths = 36 + offset, []
+    for index in range(min(rows, READ_ROWS)):
+        entry = int.from_bytes(data[table + 32 * index:table + 32 * index + 32], "big")
+        if entry > len(data) - table or len(data) - (table + entry) < 32:
+            return STD_TRUNCATED, 0, []
+        width = std_array_length(data, table + entry)
+        if width is None:
+            return STD_TRUNCATED, 0, []
+        widths.append(width)
+    return None, rows, widths
+
+
+def malformed_input(selected: dict, tx: dict) -> tuple:
+    """The calldata a malformed-calldata transaction sends and std's prescribed
+    outcome for it: the rejecting selector, or None."""
+    if encoding(selected) == "nested":
+        data = malformed_nested_calldata(selected["selector"], tx)
+        return data, nested_std_decode(data, selected["selector"])[0]
+    data = malformed_calldata(selected["selector"], tx)
+    return data, std_rejection(data, selected["selector"])
+
+
+def malformed_nested_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the nested-array protocol on the
+    Words std decodes from the malformed calldata: the decoded outer length is
+    added to slot seven, the read rows' lengths to slot eight, and the committed
+    sum of slots zero, seven and eight is returned. A rejection is checked by its
+    payload and every revert by rollback."""
+    if row["status"] != "returned" or transaction.get("stdRejection") is not None:
+        return []
+    selector = profile(case)["selector"]
+    _, rows, widths = nested_std_decode(malformed_nested_calldata(selector, transaction), selector)
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after[ROW_SLOT] != (before[ROW_SLOT] + rows) % 2**256 or after[CELL_SLOT] != (before[CELL_SLOT] + sum(widths)) % 2**256:
+        fields.append("committedStorage")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after[ROW_SLOT] + after[CELL_SLOT]) % 2**256:
+        fields.append("output")
+    return fields
 
 
 def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
@@ -673,12 +818,12 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
             continue
         if selected["abi"] == "malformed":
-            data = malformed_calldata(selected["selector"], tx)
+            data, rejection = malformed_input(selected, tx)
             if len(data) > MAX_CALLDATA:
                 raise ValueError("malformed calldata exceeds 1 KiB")
             if tx.get("calldata") != "0x" + data.hex() or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its malformation")
-            if tx.get("stdRejection") != std_rejection(data, selected["selector"]):
+            if tx.get("stdRejection") != rejection:
                 raise ValueError("transaction std outcome differs from std's decision on its calldata")
             continue
         if selected["abi"] == "nested":
@@ -732,6 +877,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "malformed" and encoding(selected) == "nested":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != NESTED_SLOTS:
+            raise Finding("unsupported-scope", "input", "malformed nested-array profile starts empty and observes slots zero through eight")
     elif selected["abi"] == "malformed":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "malformed-calldata profile starts empty and observes slots zero through four")
@@ -972,6 +1120,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
         return False
     if has_nested(case) and nested_fields(tx, row, prior):
         return False
+    if has_malformed_nested(case) and malformed_nested_fields(case, tx, row, prior):
+        return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
     if has_balances(case) and (row["committedBalance"] != expected_balance(case, row) or
@@ -1106,6 +1256,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
             # A returned row adds its row and element counts and returns the
             # committed sum; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in nested_fields(tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_malformed_nested(case):
+            # A returned row follows the protocol on the Words std decodes.
+            broken = sorted({field for name, row in rows.items() for field in malformed_nested_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken

@@ -72,6 +72,10 @@ NESTED_DIMENSIONS = DIMENSIONS + tuple(NESTED_EXTRA)
 MALFORMED_EXTRA = ("Lengths", "Malformations", "Rejections")
 MALFORMED_DIMENSIONS = DIMENSIONS + MALFORMED_EXTRA
 MALFORMED_OUTCOMES = adapter.STD_ERRORS + ("accepted",)
+# Malformed nested values: outer and row lengths, the rows that row
+# malformations target, the malformation kinds and the prescribed std outcomes.
+MALFORMED_NESTED_EXTRA = {"RowCounts": tuple(range(5)), "RowLengths": tuple(range(4)), "MalformedRows": tuple(range(4))}
+MALFORMED_NESTED_DIMENSIONS = DIMENSIONS + tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:]
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -86,6 +90,8 @@ STRAY_SLOT = str(2**256 - 2)
 
 
 def dimensions(profile_name):
+    if adapter.encoding(adapter.PROFILES[profile_name]) == "nested":
+        return MALFORMED_NESTED_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -117,10 +123,15 @@ def bytes_coverage(case, statuses):
 
 
 def malformed_coverage(case):
-    """Canonical lengths, malformation kinds and prescribed std outcomes."""
+    """Canonical lengths, malformation kinds and prescribed std outcomes; for
+    nested values, outer and row lengths and the rows row malformations target."""
     transactions = case["transactions"]
-    return {"Lengths": {len(tx["values"]) for tx in transactions},
-            "Malformations": {tx["malformation"]["kind"] for tx in transactions},
+    shapes = {"Lengths": {len(tx["values"]) for tx in transactions}}
+    if adapter.has_malformed_nested(case):
+        values = [adapter.malformed_nested_values(tx) for tx in transactions]
+        shapes = {"RowCounts": {len(value) for value in values}, "RowLengths": {len(row) for value in values for row in value},
+                  "MalformedRows": {tx["malformation"]["row"] for tx in transactions if "row" in tx["malformation"]}}
+    return {**shapes, "Malformations": {tx["malformation"]["kind"] for tx in transactions},
             "Rejections": {tx["stdRejection"] or "accepted" for tx in transactions}}
 
 
@@ -152,6 +163,8 @@ def log_coverage(case, statuses, rows=None):
 def inputs(case):
     """Runtime Words: the ABI input, every element of the dynamic or nested
     arrays, or every zero-padded payload chunk the bytes step folds."""
+    if adapter.has_malformed_nested(case):
+        return {str(value) for tx in case["transactions"] for row in adapter.malformed_nested_values(tx) for value in row}
     if adapter.profile(case)["abi"] in ("array", "malformed"):
         return {value for tx in case["transactions"] for value in tx["values"]}
     if adapter.has_nested(case):
@@ -294,14 +307,16 @@ def validate_manifest(manifest):
         raise ValueError("key coverage belongs to the keyed storage and mapping profiles")
     if selected["abi"] != "ledger" and any("required" + dimension in manifest for dimension in LEDGER_EXTRA):
         raise ValueError("sender coverage belongs to the ledger profile")
-    if selected["abi"] in ("array", "malformed"):
+    nested_malformed = selected["abi"] == "malformed" and adapter.encoding(selected) == "nested"
+    if selected["abi"] in ("array", "malformed") and not nested_malformed:
         lengths = manifest.get("requiredLengths")
         if not isinstance(lengths, list) or not lengths or any(type(v) is not int or v not in ARRAY_LENGTHS for v in lengths) or len(set(lengths)) != len(lengths):
             raise ValueError("dynamic-array coverage requires unique lengths from zero to three")
     elif "requiredLengths" in manifest:
         raise ValueError("length coverage belongs to the dynamic-array profiles")
     if selected["abi"] == "malformed":
-        for dimension, allowed in (("Malformations", adapter.MALFORMATION_KINDS), ("Rejections", MALFORMED_OUTCOMES)):
+        kinds = adapter.NESTED_MALFORMATION_KINDS if nested_malformed else adapter.MALFORMATION_KINDS
+        for dimension, allowed in (("Malformations", kinds), ("Rejections", MALFORMED_OUTCOMES)):
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(v not in allowed for v in values) or len(set(values)) != len(values):
                 raise ValueError(f"malformed-calldata coverage requires unique required{dimension} from {list(allowed)}")
@@ -331,12 +346,15 @@ def validate_manifest(manifest):
                 raise ValueError(f"bytes coverage requires unique required{dimension} from zero to {bound}")
     elif any("required" + dimension in manifest for dimension in BYTES_EXTRA):
         raise ValueError("payload coverage belongs to the bytes profile")
-    if selected["abi"] == "nested":
-        for dimension, allowed in NESTED_EXTRA.items():
+    if selected["abi"] == "nested" or nested_malformed:
+        extra = MALFORMED_NESTED_EXTRA if nested_malformed else NESTED_EXTRA
+        for dimension, allowed in extra.items():
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
                 raise ValueError(f"nested-array coverage requires unique required{dimension} from {list(allowed)}")
-    elif any("required" + dimension in manifest for dimension in NESTED_EXTRA):
+        if any("required" + dimension in manifest for dimension in MALFORMED_NESTED_EXTRA if dimension not in extra):
+            raise ValueError("malformed-row coverage belongs to the malformed nested-array profile")
+    elif any("required" + dimension in manifest for dimension in MALFORMED_NESTED_EXTRA):
         raise ValueError("row coverage belongs to the nested-array profile")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
@@ -495,7 +513,8 @@ def keyed_analysis(analysis):
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
                                                 adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
                                                 adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
-                                                adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA)
+                                                adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
+                                                adapter.MALFORMED_NESTED_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -721,7 +740,9 @@ class Campaign:
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
-                          "malformed": MALFORMED_EXTRA}.get(self.specification["abi"], ()):
+                          "malformed": (tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:]
+                                        if adapter.encoding(self.specification) == "nested" else MALFORMED_EXTRA)}.get(
+                              self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []

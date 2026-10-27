@@ -3154,6 +3154,121 @@ prefixes on both levels, at 448 nodes and at 512:
   accepted.
 A case took about 7 seconds. Neither run produced a finding.
 
+## Compare malformed nested arrays
+
+`stateful-malformed-nested-array` sends the nested-array contract,
+`run(uint256 flags, uint256[][] values)`, calldata with one malformation per
+transaction and compares the three paths against the pinned std's dispatcher
+and lazy decoder. The compiled contract is the nested-array one, emitted from
+the same step, and the declared-slot Hull runner serves it unchanged. The
+selector rule, its narrowing and `selectorRows` are exactly those of
+`stateful-malformed-calldata`.
+
+### Definitions
+
+The original Core contract `core-malformed-nested-array-contract-v1` evaluates
+std's checks on the actual calldata through the same input host functions:
+
+1. Dispatch and the outer array are checked as for malformed calldata, with
+   the selector `0x7095aff8`. With head offset `o` and outer length `n`,
+   `32n > size - (36 + o)` reverts with `0x08638556`. The offset table at
+   `T = 36 + o` is therefore checked whole, including entries for rows the
+   body never reads.
+2. The protocol reads `values.length()` and then, for each row `i < min(n, 3)`
+   in order, `values[i]` (`abiArrayGet` and the lazy calldata array decode).
+   With `r` the table Word at `T + 32i`, row `i` reverts with `0x08638556`
+   when `r > size - T`, when fewer than 32 bytes remain at `T + r`, when its
+   length `m` (the Word at `T + r`) exceeds `2^251 - 1`, or when
+   `32m > size - (T + r + 32)`. Its element `j` is the Word at
+   `T + r + 32 + 32j`. The protocol folds `j < min(m, 2)` and counts `m`.
+3. Rows past the third are never decoded. Row `i` is checked after the
+   earlier rows have been folded and written, but a revert commits nothing,
+   so only its selector is observable. A read row's whole element region is
+   checked, including elements the protocol skips.
+4. Overlaps between table entries, rows and the head are not checked, and
+   trailing bytes are ignored.
+
+`ArrayOutOfBounds()` cannot arise, since the protocol guards every row index
+by the outer length and every element index by the row length.
+`NonPayableReceivedValue()` cannot arise either, since no transaction carries
+value. Canonical values have up to four rows of up to three elements, one row
+and one element more than the protocol reads. The shared modules
+`Solcore/Synthesis/Core/StdDispatch.lean` (std's dispatch and head checks in
+Core) and `Solcore/Synthesis/Stateful/StdCalldata.lean` (the byte-level model
+and the malformation changes) hold what the profiles share.
+
+Each transaction records `{id, flags, values, malformation, calldata,
+stdRejection, value}`. The malformation is one of the malformed-calldata kinds
+on the outer array (`none`, `short`, `selector`, `truncate`, `trailing`,
+`offset`, `length`), `row-offset` or `row-length`. A row malformation names a
+present row `row` and replaces its table Word or its length Word with
+`value`. The generation banks are:
+- `row-offset`:
+  - out of range: `size - T - 31`, `size - T`, `size - T + 1`, `2^255`;
+  - wrapping onto the outer head: `2^256 - 32` and `2^256 - 1`;
+  - overlapping the table: `0`;
+  - overlapping another row: that row's offset, or that offset plus 32;
+- `row-length`: one too long, the most that fits, one more than fits,
+  `2^251`, `2^251 + 1`, `2^256 - 1`, one shorter, and zero.
+Banks leave out changes that keep the canonical calldata as it is.
+`stdRejection` comes from a second std model written over the bytes
+(`stdDecode`). The adapter checks the calldata and the outcome with its own
+encoder and a third model, `nested_std_decode`. A returned row must also
+follow the nested-array protocol on the decoded Words: the decoded outer
+length goes to slot 7, the read rows' lengths to slot 8, and the row returns
+the committed sum.
+
+Reductions remove transactions first and then reduce the step. For each
+transaction they then replace the malformation with `none`, try simpler
+malformations of the same kind and row, and finally reduce rows, elements and
+flags as for nested arrays. Gas, value-bearing malformations, malformed
+constructor calldata, calldata over 1 KiB and memory are out of scope.
+
+### Running and validation
+
+```sh
+lake build semanticMalformedNestedArrayTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-malformed-nested-array-corpus.json \
+  --output .upstream/semantic-malformed-nested-array-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-malformed-nested-array \
+  --cases 16 --output .upstream/semantic-malformed-nested-array-random
+```
+
+Plans use `solcore-lean.malformed-nested-array-plan.v1` under
+`malformedNestedArrayPlan`. Cases use
+`solcore-lean.semantic-malformed-nested-array-case.v1` and histories
+`solcore-lean.malformed-nested-array-history.v1`. The wrapper keeps 197 Core
+nodes inside the step budget. Its 483 nodes of row checks and guards lie
+outside it, as the nested-array guards do. The suite's default budget is 448
+nodes, which leaves 251 for the step.
+
+`Solcore/Test/SourceMalformedNestedArrayGolden.lean` checks the wrapper and
+`stdDecode` against 64 golden cases written out from the std reading: 57
+malformations and seven decode-order cases. They cover every malformation kind
+and wrapping offsets and lengths. They also cover overlaps that std accepts,
+such as a row on its own table Word, a row aliasing another and a row inside
+another row's elements, and overlaps it rejects. The lazy checks are covered:
+- a malformed or cut fourth row is accepted;
+- a cut in the table is rejected;
+- a cut in a read row's skipped element is rejected;
+- a bad second row is rejected after the first is folded.
+So is the decode order: dispatch before decoding, the outer array before
+rows, an outer length that leaves a malformed row unread, and an accepted row
+before a rejected one. Each accepted case must behave exactly like the
+canonical nested-array contract on the decoded Words, with unread rows empty.
+
+The fixed corpus has thirteen scenarios and 36 transactions: eight imported
+plans, which reuse the nested-array corpus steps with malformed transactions,
+and five generated seeds. Its expected histories were computed without the
+std wrapper, from `stdDecode` and the canonical nested-array contract.
+Required coverage:
+- every malformation kind, both std selectors and acceptance;
+- zero to four rows of zero to three elements, and row malformations of rows
+  0 to 3;
+- one to three helpers and transactions, all four templates, both outcomes
+  and eight completion patterns.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The ten

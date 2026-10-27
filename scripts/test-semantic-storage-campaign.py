@@ -762,6 +762,67 @@ class MalformedCalldataCampaignTests(unittest.TestCase):
             campaign.validate_manifest(array)
 
 
+def malformed_nested_case(rows=None):
+    value = fixtures.malformed_nested_case() if rows is None else fixtures.malformed_nested_case(rows)
+    value["malformedNestedArrayPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def malformed_nested_report(value):
+    histories = fixtures.malformed_nested_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class MalformedNestedArrayCampaignTests(unittest.TestCase):
+    def test_coverage_names_rows_malformed_rows_malformations_and_std_outcomes(self):
+        value = malformed_nested_case()
+        self.assertEqual(campaign.inputs(value), {"0", "1", "3", "4", "7", "9"})
+        self.assertEqual(campaign.dimensions("stateful-malformed-nested-array"),
+                         campaign.DIMENSIONS + ("RowCounts", "RowLengths", "MalformedRows", "Malformations", "Rejections"))
+        self.assertEqual(campaign.malformed_coverage(value),
+                         {"RowCounts": {3, 4}, "RowLengths": {0, 1, 2, 3}, "MalformedRows": {0, 1, 3},
+                          "Malformations": {"none", "row-length", "row-offset", "offset"}, "Rejections": {"accepted", "0x08638556"}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-malformed-nested-array"))
+            instance.summary["coverage"].update(requiredMalformedRows=[0, 1, 2, 3],
+                                                requiredRejections=["0x4924aef0", "0x08638556", "accepted"])
+            instance.record_coverage(value, "matched", malformed_nested_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedMalformedRows"], [0, 1, 3])
+            self.assertEqual((coverage["missingMalformedRows"], coverage["missingRejections"]), ([2], ["0x4924aef0"]))
+
+    def test_a_nested_rejection_counts_as_a_matched_prefix_and_its_analysis_names_the_selector(self):
+        value = malformed_nested_case()
+        raw = malformed_nested_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 5, "completed": 5, "matched": 5})
+        self.assertEqual(campaign.analyze(raw, value)["selectorRows"], [{"id": "tx-2", "index": 2, "selector": "0x08638556"}])
+        changed = copy.deepcopy(raw)
+        changed["histories"]["importedHull"]["transactions"][2]["output"] = fixtures.selector_word("0x08638556")
+        self.assertEqual(campaign.transaction_counts(changed["histories"], value)["matched"], 2)
+
+    def test_the_manifest_requires_row_coverage_and_row_malformations_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-malformed-nested-array-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        for change in (lambda m: m.pop("requiredMalformedRows"), lambda m: m.update(requiredMalformedRows=[4]),
+                       lambda m: m.update(requiredRowCounts=[5]), lambda m: m.update(requiredLengths=[0]),
+                       lambda m: m.update(requiredMalformations=["reorder"]), lambda m: m.update(requiredRejections=["0x7f52b2bf"])):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        nested = json.loads((ROOT / "scripts/semantic-nested-array-corpus.json").read_text())
+        nested["requiredMalformedRows"] = [0]
+        array = json.loads((ROOT / "scripts/semantic-malformed-calldata-corpus.json").read_text())
+        array["requiredMalformations"] = ["none", "row-offset"]
+        for invalid in (nested, array):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+
 def log_case(sites=((1, 2, 1), (3, 0, 2)), rows=((2, 5), (11, 1), (8, fixtures.HIGH_WORD))):
     value = fixtures.log_case(sites, rows)
     value["logPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]

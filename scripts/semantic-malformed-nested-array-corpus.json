@@ -1,0 +1,3029 @@
+{
+  "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
+  "profile": "stateful-malformed-nested-array",
+  "generatorVersion": "core-g0-v1/lcg64-v1",
+  "profileVersion": "stateful-malformed-nested-array-v1/malformation-sequence-seed-v1",
+  "functionVersion": "core-malformed-nested-array-contract-v1",
+  "templateVersion": "std-dispatch-lazy-nested-fold-slots-counts-revert-odd-flags-v1",
+  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
+  "stepFunctionVersion": "core-aggregate-dag-v1",
+  "stepTemplateVersion": "word-aggregate-templates-v1",
+  "emitterVersion": "solcore-source-nested-array-v1",
+  "wrapperVersion": "solcore-word-nested-array-contract-v1",
+  "coverageKind": "step-core-ast-features",
+  "requiredFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+    "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "case",
+    "first",
+    "functionCall",
+    "if",
+    "inLeft",
+    "inRight",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+    "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+  ],
+  "requiredInputs": [
+    "0",
+    "1",
+    "3",
+    "7",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+  ],
+  "requiredHelperCounts": [
+    1,
+    2,
+    3
+  ],
+  "requiredTransactionCounts": [
+    1,
+    2,
+    3
+  ],
+  "generationRecipeRequirements": {
+    "templates": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "requiredOutcomes": [
+    "returned",
+    "reverted"
+  ],
+  "requiredCompletionPatterns": [
+    "reverted,reverted,returned",
+    "reverted,returned,reverted",
+    "reverted,reverted,reverted",
+    "returned,reverted,reverted",
+    "returned,reverted,returned",
+    "reverted",
+    "returned,returned",
+    "reverted,returned,returned"
+  ],
+  "requiredRowCounts": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "requiredRowLengths": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "requiredMalformedRows": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "requiredMalformations": [
+    "none",
+    "short",
+    "selector",
+    "truncate",
+    "trailing",
+    "offset",
+    "length",
+    "row-offset",
+    "row-length"
+  ],
+  "requiredRejections": [
+    "0x4924aef0",
+    "0x08638556",
+    "accepted"
+  ],
+  "cases": [
+    {
+      "expectedFeatures": [
+        "local",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "11"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "4"
+            },
+            {
+              "slot": "4",
+              "value": "11"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "2"
+            },
+            {
+              "slot": "8",
+              "value": "3"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000010",
+          "status": "returned"
+        }
+      ],
+      "id": "identity-outer-faults",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "argument": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "function": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "tag": "apply"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "initializer": {
+              "body": {
+                "index": 0,
+                "tag": "var"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095",
+          "flags": "0",
+          "id": "tx-0",
+          "malformation": {
+            "bytes": 2,
+            "kind": "short"
+          },
+          "stdRejection": "0x4924aef0",
+          "value": "0",
+          "values": [
+            [
+              "1",
+              "3"
+            ],
+            [
+              "7"
+            ]
+          ]
+        },
+        {
+          "calldata": "0xf095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000007",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kind": "selector",
+            "mask": "2147483648"
+          },
+          "stdRejection": "0x4924aef0",
+          "value": "0",
+          "values": [
+            [
+              "0"
+            ],
+            [],
+            [
+              "1",
+              "3",
+              "7"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000007",
+          "flags": "0",
+          "id": "tx-2",
+          "malformation": {
+            "kind": "none"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1"
+            ],
+            [
+              "3",
+              "7"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "local",
+        "wordLiteral",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "14"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "6"
+            },
+            {
+              "slot": "6",
+              "value": "14"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000016",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "14"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "6"
+            },
+            {
+              "slot": "6",
+              "value": "14"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        }
+      ],
+      "id": "increment-truncations",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "argument": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "function": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "tag": "apply"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "initializer": {
+              "body": {
+                "left": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "op": "wordAdd",
+                "right": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                },
+                "tag": "binary"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-0",
+          "malformation": {
+            "kept": 116,
+            "kind": "truncate"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": [
+            [
+              "7",
+              "7"
+            ],
+            [
+              "7"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kept": 515,
+            "kind": "truncate"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1"
+            ],
+            [],
+            [
+              "3",
+              "7",
+              "0"
+            ],
+            [
+              "1"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-2",
+          "malformation": {
+            "kept": 451,
+            "kind": "truncate"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": [
+            [
+              "1"
+            ],
+            [],
+            [
+              "3",
+              "7",
+              "0"
+            ],
+            [
+              "1"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "local",
+        "wordLiteral"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        }
+      ],
+      "id": "constant-outer-words",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "tag": "word",
+                "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "initializer": {
+              "body": {
+                "index": 0,
+                "tag": "var"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003",
+          "flags": "1",
+          "id": "tx-0",
+          "malformation": {
+            "kind": "offset",
+            "value": "0"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "3"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff80000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kind": "offset",
+            "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": []
+        },
+        {
+          "calldata": "0x7095aff800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-2",
+          "malformation": {
+            "kind": "length",
+            "value": "2"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": [
+            [
+              "0",
+              "0",
+              "0"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "local",
+        "wordLiteral",
+        "let",
+        "newCell",
+        "pair",
+        "loadCell",
+        "storeCell",
+        "first",
+        "second",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "20"
+            },
+            {
+              "slot": "1",
+              "value": "4"
+            },
+            {
+              "slot": "2",
+              "value": "10"
+            },
+            {
+              "slot": "3",
+              "value": "20"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "2"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000001a",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "20"
+            },
+            {
+              "slot": "1",
+              "value": "4"
+            },
+            {
+              "slot": "2",
+              "value": "10"
+            },
+            {
+              "slot": "3",
+              "value": "20"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "2"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "20"
+            },
+            {
+              "slot": "1",
+              "value": "4"
+            },
+            {
+              "slot": "2",
+              "value": "10"
+            },
+            {
+              "slot": "3",
+              "value": "20"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "2"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000029",
+          "status": "reverted"
+        }
+      ],
+      "id": "pair-row-lengths",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "body": {
+                  "argument": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 2,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "function": {
+                    "index": 1,
+                    "tag": "var"
+                  },
+                  "tag": "apply"
+                },
+                "parameterType": "word",
+                "resultType": "word",
+                "tag": "lambda"
+              },
+              "initializer": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "left": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "first"
+                      },
+                      "op": "wordAdd",
+                      "right": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "second"
+                      },
+                      "tag": "binary"
+                    },
+                    "initializer": {
+                      "left": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "loadCell"
+                      },
+                      "right": {
+                        "body": {
+                          "reference": {
+                            "index": 1,
+                            "tag": "var"
+                          },
+                          "tag": "loadCell"
+                        },
+                        "initializer": {
+                          "reference": {
+                            "index": 0,
+                            "tag": "var"
+                          },
+                          "tag": "storeCell",
+                          "value": {
+                            "tag": "word",
+                            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                          }
+                        },
+                        "tag": "let"
+                      },
+                      "tag": "pair"
+                    },
+                    "tag": "let"
+                  },
+                  "initializer": {
+                    "elementType": "word",
+                    "initializer": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "tag": "newCell"
+                  },
+                  "tag": "let"
+                },
+                "parameterType": "word",
+                "resultType": "word",
+                "tag": "lambda"
+              },
+              "tag": "let"
+            },
+            "initializer": {
+              "body": {
+                "left": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "op": "wordAdd",
+                "right": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                },
+                "tag": "binary"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000007",
+          "flags": "0",
+          "id": "tx-0",
+          "malformation": {
+            "kind": "row-length",
+            "row": 0,
+            "value": "3"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1",
+              "3"
+            ],
+            [
+              "7"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kind": "row-length",
+            "row": 1,
+            "value": "3618502788666131106986593281521497120414687020801267626233049500247285301249"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": [
+            [
+              "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+            ],
+            [
+              "0"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",
+          "flags": "1",
+          "id": "tx-2",
+          "malformation": {
+            "kind": "row-length",
+            "row": 2,
+            "value": "0"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1"
+            ],
+            [
+              "3"
+            ],
+            [
+              "7"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "local",
+        "wordLiteral",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "2625"
+            },
+            {
+              "slot": "1",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639427"
+            },
+            {
+              "slot": "2",
+              "value": "525"
+            },
+            {
+              "slot": "3",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129638429"
+            },
+            {
+              "slot": "4",
+              "value": "2625"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "3"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000a48",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "2625"
+            },
+            {
+              "slot": "1",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639427"
+            },
+            {
+              "slot": "2",
+              "value": "525"
+            },
+            {
+              "slot": "3",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129638429"
+            },
+            {
+              "slot": "4",
+              "value": "2625"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "3"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129617433"
+            },
+            {
+              "slot": "1",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129634435"
+            },
+            {
+              "slot": "2",
+              "value": "525"
+            },
+            {
+              "slot": "3",
+              "value": "11017"
+            },
+            {
+              "slot": "4",
+              "value": "2625"
+            },
+            {
+              "slot": "5",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129617433"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "7"
+            },
+            {
+              "slot": "8",
+              "value": "7"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa827",
+          "status": "returned"
+        }
+      ],
+      "id": "three-helper-row-offsets",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "argument": {
+                      "left": {
+                        "op": "wordNot",
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "unary"
+                      },
+                      "op": "wordXor",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x00000000000000000000000000000000000000000000000000000000000000ff"
+                      },
+                      "tag": "binary"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "initializer": {
+                "body": {
+                  "left": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "op": "wordAdd",
+                  "right": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "tag": "binary"
+                },
+                "parameterType": "word",
+                "resultType": "word",
+                "tag": "lambda"
+              },
+              "tag": "let"
+            },
+            "initializer": {
+              "body": {
+                "left": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "op": "wordAdd",
+                "right": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                },
+                "tag": "binary"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-0",
+          "malformation": {
+            "kind": "row-offset",
+            "row": 1,
+            "value": "96"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1",
+              "3"
+            ],
+            [
+              "7"
+            ],
+            []
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kind": "row-offset",
+            "row": 2,
+            "value": "115792089237316195423570985008687907853269984665640564039457584007913129639904"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": [
+            [
+              "1",
+              "3"
+            ],
+            [
+              "7"
+            ],
+            []
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000007",
+          "flags": "0",
+          "id": "tx-2",
+          "malformation": {
+            "kind": "row-offset",
+            "row": 3,
+            "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "0"
+            ],
+            [
+              "1"
+            ],
+            [
+              "3"
+            ],
+            [
+              "7"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "local",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0b",
+          "status": "reverted"
+        }
+      ],
+      "id": "branch-trailing",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "argument": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "function": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "tag": "apply"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "initializer": {
+              "body": {
+                "condition": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordGt",
+                  "right": {
+                    "tag": "word",
+                    "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                  },
+                  "tag": "binary"
+                },
+                "elseBranch": {
+                  "left": {
+                    "op": "wordNot",
+                    "operand": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "tag": "unary"
+                  },
+                  "op": "wordXor",
+                  "right": {
+                    "tag": "word",
+                    "value": "0x00000000000000000000000000000000000000000000000000000000000000ff"
+                  },
+                  "tag": "binary"
+                },
+                "tag": "if",
+                "thenBranch": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordSub",
+                  "right": {
+                    "tag": "word",
+                    "value": "0x8000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "tag": "binary"
+                }
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000003ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000070102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+          "flags": "1",
+          "id": "tx-0",
+          "malformation": {
+            "count": 64,
+            "kind": "trailing",
+            "pattern": "ramp"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+              "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+              "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+            ],
+            [
+              "1"
+            ],
+            [
+              "3"
+            ],
+            [
+              "7"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "local",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819975"
+            },
+            {
+              "slot": "1",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639681"
+            },
+            {
+              "slot": "2",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819716"
+            },
+            {
+              "slot": "3",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819975"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "3"
+            },
+            {
+              "slot": "8",
+              "value": "3"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x800000000000000000000000000000000000000000000000000000000000000d",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819730"
+            },
+            {
+              "slot": "1",
+              "value": "8"
+            },
+            {
+              "slot": "2",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819716"
+            },
+            {
+              "slot": "3",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819975"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639691"
+            },
+            {
+              "slot": "6",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819730"
+            },
+            {
+              "slot": "7",
+              "value": "7"
+            },
+            {
+              "slot": "8",
+              "value": "7"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff20",
+          "status": "returned"
+        }
+      ],
+      "id": "branch-row-in-row",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "argument": {
+                  "index": 0,
+                  "tag": "var"
+                },
+                "function": {
+                  "index": 1,
+                  "tag": "var"
+                },
+                "tag": "apply"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "initializer": {
+              "body": {
+                "condition": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordGt",
+                  "right": {
+                    "tag": "word",
+                    "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                  },
+                  "tag": "binary"
+                },
+                "elseBranch": {
+                  "left": {
+                    "op": "wordNot",
+                    "operand": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "tag": "unary"
+                  },
+                  "op": "wordXor",
+                  "right": {
+                    "tag": "word",
+                    "value": "0x00000000000000000000000000000000000000000000000000000000000000ff"
+                  },
+                  "tag": "binary"
+                },
+                "tag": "if",
+                "thenBranch": {
+                  "left": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "op": "wordSub",
+                  "right": {
+                    "tag": "word",
+                    "value": "0x8000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "tag": "binary"
+                }
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-0",
+          "malformation": {
+            "kind": "row-offset",
+            "row": 1,
+            "value": "128"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1",
+              "3"
+            ],
+            [
+              "7"
+            ],
+            []
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kind": "row-length",
+            "row": 3,
+            "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1"
+            ],
+            [],
+            [
+              "3",
+              "7",
+              "0"
+            ],
+            [
+              "1"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "newCell",
+        "wordLiteral",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "loadCell",
+        "local",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "22"
+            },
+            {
+              "slot": "1",
+              "value": "8"
+            },
+            {
+              "slot": "2",
+              "value": "16"
+            },
+            {
+              "slot": "3",
+              "value": "18"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "22"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000001f",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "31"
+            },
+            {
+              "slot": "1",
+              "value": "8"
+            },
+            {
+              "slot": "2",
+              "value": "16"
+            },
+            {
+              "slot": "3",
+              "value": "23"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "31"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "8"
+            },
+            {
+              "slot": "8",
+              "value": "7"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000002e",
+          "status": "returned"
+        }
+      ],
+      "id": "fresh-cell-lengths",
+      "malformedNestedArrayPlan": {
+        "schema": "solcore-lean.malformed-nested-array-plan.v1",
+        "stepProgram": {
+          "body": {
+            "body": {
+              "body": {
+                "left": {
+                  "argument": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "function": {
+                    "index": 1,
+                    "tag": "var"
+                  },
+                  "tag": "apply"
+                },
+                "op": "wordSub",
+                "right": {
+                  "tag": "word",
+                  "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                },
+                "tag": "binary"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "initializer": {
+              "body": {
+                "body": {
+                  "body": {
+                    "left": {
+                      "index": 2,
+                      "tag": "var"
+                    },
+                    "op": "wordAdd",
+                    "right": {
+                      "reference": {
+                        "index": 1,
+                        "tag": "var"
+                      },
+                      "tag": "loadCell"
+                    },
+                    "tag": "binary"
+                  },
+                  "initializer": {
+                    "reference": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "tag": "storeCell",
+                    "value": {
+                      "left": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "loadCell"
+                      },
+                      "op": "wordAdd",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                      },
+                      "tag": "binary"
+                    }
+                  },
+                  "tag": "let"
+                },
+                "initializer": {
+                  "elementType": "word",
+                  "initializer": {
+                    "tag": "word",
+                    "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "tag": "newCell"
+                },
+                "tag": "let"
+              },
+              "parameterType": "word",
+              "resultType": "word",
+              "tag": "lambda"
+            },
+            "tag": "let"
+          },
+          "dataDefinitions": [],
+          "resultType": {
+            "parameter": "word",
+            "result": "word",
+            "tag": "function"
+          },
+          "schema": "solcore-semantic-core"
+        }
+      },
+      "transactions": [
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003",
+          "flags": "0",
+          "id": "tx-0",
+          "malformation": {
+            "kind": "length",
+            "value": "3618502788666131106986593281521497120414687020801267626233049500247285301248"
+          },
+          "stdRejection": "0x08638556",
+          "value": "0",
+          "values": [
+            [
+              "1"
+            ],
+            [
+              "3"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003",
+          "flags": "0",
+          "id": "tx-1",
+          "malformation": {
+            "kind": "length",
+            "value": "4"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "7",
+              "7",
+              "7"
+            ],
+            [
+              "1"
+            ],
+            [
+              "3"
+            ]
+          ]
+        },
+        {
+          "calldata": "0x7095aff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000",
+          "flags": "0",
+          "id": "tx-2",
+          "malformation": {
+            "kind": "row-offset",
+            "row": 0,
+            "value": "0"
+          },
+          "stdRejection": null,
+          "value": "0",
+          "values": [
+            [
+              "1",
+              "3"
+            ],
+            [
+              "0"
+            ],
+            [
+              "7"
+            ],
+            [
+              "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "boolLiteral",
+        "wordLiteral",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "local",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "newCell",
+        "pair",
+        "loadCell",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "first",
+        "second",
+        "functionCall"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "10"
+            },
+            {
+              "slot": "1",
+              "value": "3"
+            },
+            {
+              "slot": "2",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819971"
+            },
+            {
+              "slot": "3",
+              "value": "3"
+            },
+            {
+              "slot": "4",
+              "value": "10"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000013",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "10"
+            },
+            {
+              "slot": "1",
+              "value": "3"
+            },
+            {
+              "slot": "2",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819971"
+            },
+            {
+              "slot": "3",
+              "value": "3"
+            },
+            {
+              "slot": "4",
+              "value": "10"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "10"
+            },
+            {
+              "slot": "1",
+              "value": "3"
+            },
+            {
+              "slot": "2",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819971"
+            },
+            {
+              "slot": "3",
+              "value": "3"
+            },
+            {
+              "slot": "4",
+              "value": "10"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "0"
+      },
+      "id": "generated-0"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+        "wordLiteral",
+        "boolLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "local",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "newCell",
+        "pair",
+        "loadCell",
+        "storeCell",
+        "first",
+        "second",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "5"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+            },
+            {
+              "slot": "4",
+              "value": "5"
+            },
+            {
+              "slot": "5",
+              "value": "5"
+            },
+            {
+              "slot": "6",
+              "value": "5"
+            },
+            {
+              "slot": "7",
+              "value": "3"
+            },
+            {
+              "slot": "8",
+              "value": "4"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000000c",
+          "status": "returned"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "1"
+      },
+      "id": "generated-1"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "newCell",
+        "pair",
+        "loadCell",
+        "storeCell",
+        "first",
+        "second",
+        "functionCall",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inRight",
+        "inLeft",
+        "case",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "boolLiteral"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "110277497284253201957805294767442719186716871800717832705318269071779075694071"
+            },
+            {
+              "slot": "1",
+              "value": "49698981780431029350252432947009345369169888043538398166693924609689591671694"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "113882859093166966653471530561235324818584213347141424286295874695673960980472"
+            },
+            {
+              "slot": "4",
+              "value": "104102970883713543444154570198247012867379876854348052266601925383147792479856"
+            },
+            {
+              "slot": "5",
+              "value": "110277497284253201957805294767442719186716871800717832705318269071779075694071"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0xf3ceda001777eff58477885cbdebbfdf7bfb2db595fb77e1d6ec301e8fbb9e00",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "110277497284253201957805294767442719186716871800717832705318269071779075694071"
+            },
+            {
+              "slot": "1",
+              "value": "49698981780431029350252432947009345369169888043538398166693924609689591671694"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "113882859093166966653471530561235324818584213347141424286295874695673960980472"
+            },
+            {
+              "slot": "4",
+              "value": "104102970883713543444154570198247012867379876854348052266601925383147792479856"
+            },
+            {
+              "slot": "5",
+              "value": "110277497284253201957805294767442719186716871800717832705318269071779075694071"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "110277497284253201957805294767442719186716871800717832705318269071779075694071"
+            },
+            {
+              "slot": "1",
+              "value": "49698981780431029350252432947009345369169888043538398166693924609689591671694"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "113882859093166966653471530561235324818584213347141424286295874695673960980472"
+            },
+            {
+              "slot": "4",
+              "value": "104102970883713543444154570198247012867379876854348052266601925383147792479856"
+            },
+            {
+              "slot": "5",
+              "value": "110277497284253201957805294767442719186716871800717832705318269071779075694071"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "4"
+            },
+            {
+              "slot": "8",
+              "value": "5"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0xcbd64c021ef3e7f497b3817cfde5bf0f3780e06c5ff78385d85d409e8f785bf0",
+          "status": "reverted"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "2"
+      },
+      "id": "generated-2"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "wordLiteral",
+        "newCell",
+        "local",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inRight",
+        "loadCell",
+        "inLeft",
+        "case",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
+        "boolLiteral",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "pair",
+        "first",
+        "second",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSar"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "5"
+      },
+      "id": "generated-5"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "if",
+        "boolLiteral",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "newCell",
+        "local",
+        "pair",
+        "loadCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "first",
+        "inRight",
+        "second",
+        "inLeft",
+        "case",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            },
+            {
+              "slot": "6",
+              "value": "0"
+            },
+            {
+              "slot": "7",
+              "value": "0"
+            },
+            {
+              "slot": "8",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "status": "reverted"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "8"
+      },
+      "id": "generated-8"
+    }
+  ]
+}
