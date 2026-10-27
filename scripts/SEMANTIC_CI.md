@@ -53,11 +53,16 @@ Random mode also accepts `--nodes-scale S`, from 1 to 4, which multiplies each
 profile's default node budget, capped at 512; an explicit `--nodes` wins.
 
 Random campaigns of the eleven G0-based pure profiles generate with
-[G0 revision two](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
-(`core-g0-v2/lcg64-v1`). Fixed corpora and saved cases keep the revision they
-record, and each profile row of the report lists the generator versions of its
-cases under `campaign.generation.generatorVersions`. The suite does not select
-another revision.
+[G0 revision three](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
+(`core-g0-v3/lcg64-v1`), revision two under a per-case swarm mask; random
+stateful steps use revision two. Random runtime-input cases run each function
+at its boundary inputs and then at four seed-derived inputs, and random stateful
+scenarios have eight transactions. Fixed corpora and saved cases keep the
+revision, inputs and sequence they record. Each profile row of the report lists
+`generatorVersions`, `inputSelections` and `transactions` under
+`campaign.generation`; the suite does not select other values. `--cases`
+counts a function's inputs separately, so a random run of a runtime-input
+profile covers a function per eight to twelve cases.
 
 Use `--backend sonatina-o2` with either suite command to compare the same cases
 after O2 compilation. O0 remains the default. The CI matrix runs each backend

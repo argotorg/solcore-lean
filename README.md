@@ -135,9 +135,11 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
-Random campaigns of the eleven G0-based profiles use the generator's second
-revision, which mixes each draw and widens its bank of boundary literals;
-fixed corpora keep the first
+Random campaigns of the eleven G0-based profiles use the generator's third
+revision: the second revision, which mixes each draw and widens its bank of
+boundary literals, under a per-case swarm mask that enables about half of the
+operators and forms. Random stateful steps use the second revision, and fixed
+corpora keep the first
 ([G0 generator revisions](scripts/SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)).
 Emitter regressions include actual checked Rust compilation and imported-Hull
 execution. Core typing does not establish the emitter's meaning preservation;
@@ -207,7 +209,9 @@ reduction. These inventories do not measure executed calls or payloads.
 A separate runtime-input profile applies checked Word-to-Word functions to
 recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
-for each function's inputs. A further profile supports one to three acyclic
+for each function's inputs. Random campaigns of the runtime-input profiles also
+run each function at four inputs derived from the case seed after its boundary
+inputs. A further profile supports one to three acyclic
 named helpers, including shared callees, with checked generation and reduction
 of the complete Core function graph. The local-mutation profile compares private
 Word cells, ordered reads and writes, Unit sequencing, and helper-local state.
@@ -221,7 +225,8 @@ up to seven iterations. All 48 fixed loop cases match across the three paths.
 M1 through M4 are complete for these restricted profiles.
 
 The first stateful profile compares one to three ordered transactions against
-the same two-slot storage contract. Original host-aware Core runs through
+the same two-slot storage contract; random campaigns of every stateful profile
+extend sequences to eight transactions. Original host-aware Core runs through
 `ContractRuntime`, retaining the committed world and using a fresh local heap
 for each call. The Rust path mines transactions and reads their actual output
 and committed storage; imported Hull supplies the third execution history.

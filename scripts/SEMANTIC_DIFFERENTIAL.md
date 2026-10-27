@@ -71,7 +71,7 @@ and the plain revision in `baseGeneratorVersion`.
 | Revision | `generatorVersion` | Used by |
 | --- | --- | --- |
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
-| v2 | `core-g0-v2/lcg64-v1` | `--g0-version` only, since revision three |
+| v2 | `core-g0-v2/lcg64-v1` | random stateful steps; `--g0-version` for the pure profiles |
 | v3 | `core-g0-v3/lcg64-v1` | random generation of the eleven G0-based pure profiles |
 
 The eleven are `closed-g0`, `runtime-word`, `runtime-primitives`,
@@ -140,7 +140,9 @@ saved case's; a disagreeing `--g0-version` is refused. The campaign summary
 records `configuration.g0Version` and the generated cases' versions in
 `generation.generatorVersions`. `semantic-suite.py --mode random` therefore
 generates v3 for these profiles, and fixed mode stays on v1. The stateful
-profiles still build their aggregate steps with v1, under their own tools.
+profiles build their random aggregate steps with v2 under their own tools,
+and their fixed corpora stay on v1 (see
+[storage campaigns](#run-and-reduce-storage-campaigns)).
 
 ### Revision three: swarm masks
 
@@ -385,8 +387,8 @@ python3 scripts/semantic-campaign.py \
   --seconds 300 --disk-bytes 134217728 --shrink-attempts 32
 ```
 
-This search generates with [G0 revision two](#g0-generator-revisions); add
-`--g0-version core-g0-v1/lcg64-v1` to search revision one instead.
+This search generates with [G0 revision three](#g0-generator-revisions); add
+`--g0-version` with another revision to search that one instead.
 `--attempts` bounds generation attempts. `--shrink-attempts` bounds candidate
 executions across the entire campaign, and `--shrink-candidates` bounds each
 candidate batch. Core fuel, EVM gas, per-case time, total campaign time and
@@ -471,7 +473,8 @@ Generation abstracts one Word literal from a G0 expression without capturing
 local variables. It evaluates the resulting Core function at zero, one, maximum
 Word and the high bit, and accepts the function only if all four return and at
 least two results differ. One accepted function supplies up to four cases in
-that order. `--attempts` counts function candidates; `--cases` counts individual
+that order, followed in random mode by four
+[seeded inputs](#seeded-runtime-inputs). `--attempts` counts function candidates; `--cases` counts individual
 input comparisons. The final function's inputs may be truncated by that limit.
 Generation fuel failures appear in `generationResourceExclusions` as a subset
 of `excluded`, separately from executed-case resource failures.
@@ -722,7 +725,8 @@ Native entry points are `function-generate SEED NODES COUNT ATTEMPTS FUEL` and
 by the saved schema. Node limits apply to the entire original Core application,
 including all helper definitions. Generation attempts count function graphs;
 each accepted graph supplies the same four ordered boundary inputs as the
-single-function profile. Generated graphs call every earlier helper in a
+single-function profile, and in random mode the four
+[seeded inputs](#seeded-runtime-inputs) after them. Generated graphs call every earlier helper in a
 chain; imported graphs can also share callees, as in the diamond fixture.
 
 The fixed corpus includes chains, a diamond and generated graphs with one,
@@ -903,7 +907,8 @@ alone needs 111. An accepted plan needs an entry call, step results that vary
 over the eight primitive inputs and a positive-trip loop input whose final
 value differs from that input. Imported and reduced plans may be constant or
 use mask zero. Each plan yields up to six inputs: zero, one, three, seven,
-maximum Word and the high bit. Attempts count plans; cases count inputs.
+maximum Word and the high bit, followed in random mode by four
+[seeded inputs](#seeded-runtime-inputs). Attempts count plans; cases count inputs.
 
 `call-graph-loop-generate SEED NODES COUNT ATTEMPTS FUEL` and
 `call-graph-loop-emit PLAN.json INPUT [FUEL]` produce the case schema
@@ -958,7 +963,8 @@ and `match` forms; a test checks scalar bodies render identically to the
 call-graph profile. The default budget is 192 complete-program nodes, admitted
 13–512. Accepted graphs need an entry call, a call composed with an aggregate
 value or payload scope, and varied results over the eight primitive inputs.
-Imported graphs may be constant. Each graph yields up to eight inputs.
+Imported graphs may be constant. Each graph yields up to eight inputs, followed
+in random mode by four [seeded inputs](#seeded-runtime-inputs).
 
 `aggregate-call-graph-generate SEED NODES COUNT ATTEMPTS FUEL` and
 `aggregate-call-graph-emit FUNCTION.json INPUT [FUEL]` produce the case schema
@@ -992,8 +998,10 @@ The M5a execution connection uses a separate storage case format and runner.
 `SynthesizedStorage.run(uint256)` reads slots zero and one, applies a checked
 aggregate step to `input + old0`, writes its result to slot zero, increments
 slot one, and returns the sum of both reread slots. Each scenario starts with
-empty storage. Generated scenarios contain three ordered transactions;
-imported and reduced scenarios may contain one through three.
+empty storage. Generated scenarios contain three ordered transactions, or up
+to eight in random [storage campaigns](#run-and-reduce-storage-campaigns);
+imported scenarios may contain one through three, and reductions keep at
+least one.
 
 Build the two native tools and generate a small corpus:
 
@@ -1260,8 +1268,9 @@ Original Core starts from that declared post-deployment world; it does not
 execute the source constructors. Rust EVM and imported Hull execute the actual
 deployments, and the runner checks their resulting initial accounts.
 
-Each of one to three zero-value transactions calls
-`SynthesizedCaller.run(uint256 target, uint256 input)`, selector `0x7357f5d2`.
+Each zero-value transaction, one to three or up to eight in random campaigns,
+calls `SynthesizedCaller.run(uint256 target, uint256 input)`, selector
+`0x7357f5d2`.
 The parent receives 68 bytes including the selector. It calls the payable child
 fallback with one raw 32-byte Word. The source reserves scratch memory through
 the free-memory pointer and rejects child returndata that is not exactly 32
@@ -1447,7 +1456,8 @@ boundaries adjusted to a prescribed parity, and one of four completion patterns
 choices use the high halves of draws from a separate stream, so they do not
 correlate with the step seed's helper and template digits. Generated scenarios
 must complete with exactly the prescribed outcomes under original Core.
-Imported and reduced scenarios may use any one to three transactions.
+Imported scenarios may use any one to three transactions; random scenarios
+have up to eight, and reductions keep at least one.
 
 Reduction simplifies the checked step (keeping every helper and binder),
 removes transactions while keeping stable IDs, and replaces one input or key by
@@ -2470,8 +2480,9 @@ These definitions were fixed before any execution.
   rederives its declared slots, so one that no longer declares a finding's
   slot cannot keep the finding.
 
-Generation draws each of three transactions' sender, recipient, amount and
-input, and one of four flags patterns, from a separate high-bit stream.
+For each block of three transactions, generation draws each transaction's
+sender, recipient, amount and input, and one of four flags patterns, from a
+separate high-bit stream.
 Recipients come from a bank of the three senders, 0, 2^160 - 1 and 2^256 - 1;
 amounts from 0, 1, 7, 2^64 - 1, 2^64 and 2^70; inputs from the storage
 boundary inputs. Coverage adds the senders, recipients and amounts, one to
@@ -2818,10 +2829,10 @@ These definitions were fixed before any execution.
   and lie outside the step's node budget, as the long-bytes chunk guards do;
   the complete contract may exceed the requested budget by exactly their size.
 
-Generation draws, for each of three transactions, an outer length from 0 to 3,
-a length from 0 to 2 for each present row and each element from the storage
-boundary inputs, and one of four completion patterns, from a separate high-bit
-stream; flags are just the parity. Coverage adds two dimensions: the outer
+Generation draws, for each transaction of a three-transaction block, an outer
+length from 0 to 3, a length from 0 to 2 for each present row and each element
+from the storage boundary inputs, and for the block one of four completion
+patterns, from a separate high-bit stream; flags are just the parity. Coverage adds two dimensions: the outer
 lengths 0 to 3 and the row lengths 0 to 2. The elements are the runtime
 inputs.
 

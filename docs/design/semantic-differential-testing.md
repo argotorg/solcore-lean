@@ -30,7 +30,7 @@ comparison must not share the Rust frontend with its reference computation.
 | Source emission and case replay | `Solcore/Synthesis/Source/Emitter.lean`, `Cases.lean`, `Tests/SemanticCaseTool.lean` | Restricted G0 source output, explicit exclusions, versioned cases, fresh original-Core observations and checked shrink candidates. |
 | Rust artifacts | `scripts/export-rust-hull.py`, `scripts/export-rust-code-image.py` | Checked Hull and exact Sonatina O0/O2 code images from a supplied source, with revision and hash receipts. |
 | Core contract execution | `Tests/RustHullScenarioRun.lean` | Deployment and ordered calls, with explicit account context and state observations. |
-| Generated storage scenarios | `Solcore/Synthesis/Core/StorageContract.lean`, `Source/StorageCases.lean`, `Stateful/StorageExecution.lean` | One checked host-aware contract, initially empty slots zero/one and one to three ordered zero-value transactions; fresh execution through `ContractRuntime`. |
+| Generated storage scenarios | `Solcore/Synthesis/Core/StorageContract.lean`, `Source/StorageCases.lean`, `Stateful/StorageExecution.lean` | One checked host-aware contract, initially empty slots zero/one and one to three ordered zero-value transactions, up to eight in random campaigns; fresh execution through `ContractRuntime`. |
 | Storage comparison and replay | `scripts/semantic-storage-differential.py`, `Tests/RustHullStorageScenarioRun.lean` | Actual mined EVM transactions, original Core and imported-Hull execution; initial and per-transaction committed storage comparison. |
 | Storage campaigns | `scripts/semantic-storage-campaign.py`, `scripts/semantic-storage-corpus.json` | Bounded execution, failure-preserving sequence reduction and ten fixed scenarios covering 27 transaction prefixes. |
 | Bounded parent/child execution | `Solcore/Synthesis/Core/NestedCall.lean`, `Source/NestedCallCases.lean`, `Stateful/NestedCallExecution.lean` | Two original checked host contracts, a funded parent, one child and up to three role-based transactions; committed accounts and logs from the nested runtime. |
@@ -457,7 +457,8 @@ M5 proceeds in three connected slices:
   reads slots zero and one, calls a checked aggregate step with `input + old0`,
   stores its result in slot zero, increments slot one, and returns the sum of
   both reread slots. Initial storage is empty. Generated cases use three ordered
-  transactions; imported/reduced cases may use one through three. The original
+  transactions, or up to eight in random campaigns; imported cases may use one
+  through three, and reductions keep at least one. The original
   host-aware Core program executes through `CheckedCoreContract` and
   `TopLevelExecution`, retaining `finalWorld` between calls. This is contract
   storage, not the private Core heap. The Rust path mines each transaction and
