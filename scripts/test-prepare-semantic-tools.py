@@ -159,6 +159,16 @@ class BootstrapTests(unittest.TestCase):
             with self.assertRaises(prep.NotReady): prep.tool_versions(runner, self.root, self.root / 'installed/anvil')
             self.assertFalse(any('install' in call[0] for call in runner.calls))
 
+    def test_anvil_release_builds_are_accepted(self):
+        for value in ('anvil Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2',
+                      'anvil Version: 1.5.1-v1.5.1\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2',
+                      'anvil Version: 1.5.1\nCommit SHA: test'):
+            runner = FakeRunner(self.f); runner.version_override['anvil'] = value
+            self.assertEqual(prep.tool_versions(runner, self.root, self.root / 'installed/anvil')['anvil']['version'], value)
+        for value in ('anvil Version: 1.5.10-stable', 'anvil Version: 1.5.1-v1.5.2', 'anvil Version: 1.5.0-v1.5.1'):
+            runner = FakeRunner(self.f); runner.version_override['anvil'] = value
+            with self.assertRaises(prep.NotReady): prep.tool_versions(runner, self.root, self.root / 'installed/anvil')
+
     def test_checkout_refuses_wrong_revision_and_unrelated_modifications(self):
         self.f.head = 'wrong'
         with self.assertRaises(prep.NotReady): prep.checkout(self.f.runner, self.f.upstream, True)

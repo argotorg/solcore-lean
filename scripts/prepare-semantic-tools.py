@@ -2,7 +2,7 @@
 """Prepare the pinned semantic-comparison tools, or verify them without writes.
 
 System prerequisites are installed separately: Python >=3.11, Git, rustup with
-Rust 1.97.0, elan with Lean 4.33.1, and Anvil 1.5.1-stable. Nothing here installs
+Rust 1.97.0, elan with Lean 4.33.1, and Anvil 1.5.1. Nothing here installs
 system tools. Network access is enabled only by --prepare --allow-network.
 The exporter-owned crate and Cargo target live under this checkout's .upstream.
 """
@@ -201,8 +201,10 @@ def tool_versions(runner: Runner, root: Path, anvil: Path) -> dict:
             raise NotReady(f"expected {name} {RUST}: {versions[name]}")
     if not re.search(r"\bversion 4\.33\.1(?:[,\s]|$)", versions["lean"], re.I):
         raise NotReady(f"expected Lean 4.33.1: {versions['lean']}")
-    if not re.search(r"^anvil Version: 1\.5\.1(?:-stable)?(?:\s|$)", versions["anvil"]):
-        raise NotReady(f"expected Anvil 1.5.1-stable: {versions['anvil']}")
+    # The stable channel and the v1.5.1 tag build report different suffixes for
+    # the same release; foundry-toolchain installs the latter.
+    if not re.search(r"^anvil Version: 1\.5\.1(?:-stable|-v1\.5\.1)?(?:\s|$)", versions["anvil"]):
+        raise NotReady(f"expected Anvil 1.5.1: {versions['anvil']}")
     runner.env["PATH"] = os.pathsep.join([str(paths["cargo"].parent), str(paths["lean"].parent), runner.env.get("PATH", "")])
     result = {name: {"version": versions[name], "sha256": digest(path)} for name, path in paths.items()}
     result["buildEnvironment"] = {name: runner.env.get(name, "") for name in (
@@ -410,7 +412,7 @@ def main(argv=None) -> int:
         upstream, target = configuration(args, ROOT, exporter)
         if args.plan:
             print(json.dumps({"schema": SCHEMA, "mode": "plan", "network": False,
-                "required": {"rust": RUST, "lean": LEAN, "anvil": "1.5.1-stable", "hardfork": "osaka"},
+                "required": {"rust": RUST, "lean": LEAN, "anvil": "1.5.1", "hardfork": "osaka"},
                 "upstream": str(upstream), "commit": COMMIT, "target": str(target),
                 "generatedCrate": str(exporter.TOOL), "lakeTargets": list(TARGETS),
                 "operations": ["validate installed tools", "fetch exact commit into empty destination when explicitly enabled",
