@@ -551,6 +551,54 @@ class SuiteTests(unittest.TestCase):
             with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.args(*arguments)
 
+    def test_functions_count_whole_functions_of_runtime_input_profiles_only(self):
+        args = self.args("--mode", "random", "--functions", "3")
+        self.assertEqual(args.functions, 3)
+        commands = {profile: suite.command(args, profile, self.directory / profile, 10, 64 * 1024**2)
+                    for profile in ("closed-g0", "runtime-word", "runtime-loops", "runtime-primitives",
+                                    "runtime-aggregate-call-graphs", "stateful-storage", "stateful-calls")}
+        for profile, command in commands.items():
+            counted = profile not in ("closed-g0", "stateful-storage", "stateful-calls")
+            flag, value = ("--functions", "3") if counted else ("--cases", "4")
+            self.assertEqual(command[command.index(flag) + 1], value, profile)
+            self.assertNotIn("--cases" if counted else "--functions", command, profile)
+        # Every function yields its boundary inputs and then four seeded inputs.
+        self.assertEqual({profile: suite.requested(args, profile) for profile in commands},
+                         {"closed-g0": 4, "runtime-word": 24, "runtime-loops": 30, "runtime-primitives": 36,
+                          "runtime-aggregate-call-graphs": 36, "stateful-storage": 4, "stateful-calls": 4})
+        self.assertIsNone(self.args("--mode", "random").functions)
+        self.assertEqual(suite.requested(self.args("--mode", "random", "--functions", "85"), "runtime-primitives"), 1020)
+        self.assertEqual(suite.requested(self.args("--mode", "random", "--profile", "runtime-word", "--functions", "128"),
+                                         "runtime-word"), 1024)
+        for arguments in (("--functions", "2"), ("--mode", "random", "--functions", "0"),
+                          ("--mode", "random", "--functions", "86"),
+                          ("--mode", "random", "--profile", "runtime-word", "--functions", "129"),
+                          ("--mode", "random", "--profile", "closed-g0", "--profile", "stateful-storage", "--functions", "2")):
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.args(*arguments)
+
+    def test_functions_runs_pass_only_with_every_input_of_every_function(self):
+        for reported, status in ((16, "passed"), (15, "incomplete")):
+            with self.subTest(reported=reported):
+                args = suite.parse_args(["--output", str(self.directory / f"run-{reported}"), "--mode", "random",
+                                         "--profile", "closed-g0", "--profile", "runtime-word", "--functions", "2"])
+                args.output.mkdir()
+
+                def run(command, args, deadline, stdout, stderr):
+                    profile = command[command.index("--profile") + 1]
+                    folder = Path(command[command.index("--output") + 1])
+                    folder.mkdir()
+                    # Two runtime-word functions of eight inputs each, or closed-g0's four cases.
+                    count = reported if "--functions" in command else int(command[command.index("--cases") + 1])
+                    suite.save(folder / "summary.json", completed(profile, count))
+                    return 0, None
+                with patch.object(suite, "run_process", side_effect=run), contextlib.redirect_stdout(io.StringIO()):
+                    suite_run = suite.Suite(args)
+                    suite_run.run()
+                self.assertEqual(suite_run.report["functions"], 2)
+                self.assertEqual([(row["profile"], row["requested"], row["status"]) for row in suite_run.report["profiles"]],
+                                 [("closed-g0", 4, "passed"), ("runtime-word", 16, status)])
+
     def test_invalid_bounds_duplicate_profiles_and_fixed_truncation_rejected(self):
         for arguments in (("--cases", "1"), ("--nodes", "32"), ("--seconds", "nan"), ("--seconds", "0"),
                           ("--disk-bytes", "1"), ("--seed", str(1 << 64)), ("--shard-count", "0"),

@@ -55,8 +55,8 @@ REPLAY_FIELDS = ("generatorVersions", "inputSelections", "transactions")
 # A pure campaign's shared-compilation counts, kept per profile beside them.
 COMPILATION_FIELDS = ("distinctSources", "compiled", "reused")
 CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backend": list(BACKENDS), "profile": None,
-                   "cases": 16, "attempts": 2048, "nodes": None, "size_cycle": [1.0, 2.0], "seconds": 14400.0,
-                   "profile_seconds": 900.0,
+                   "cases": 16, "functions": None, "attempts": 2048, "nodes": None, "size_cycle": [1.0, 2.0],
+                   "seconds": 14400.0, "profile_seconds": 900.0,
                    "disk_bytes": 1024**3, "examples": 3, "crash_replay": True, "bin_dir": None, "upstream": None,
                    "target_dir": None,
                    "anvil": None, "solc": None}
@@ -277,7 +277,7 @@ def suite_command(config, iteration, backend, output):
             "--seconds", str(config["seconds"]), "--profile-seconds", str(config["profile_seconds"]),
             "--disk-bytes", str(config["disk_bytes"]), "--nodes-scale", str(nodes_scale(config, iteration)),
             "--output", str(output)]
-    for key in ("attempts", "nodes"):
+    for key in ("functions", "attempts", "nodes"):
         if config.get(key) is not None:
             argv += ["--" + key, str(config[key])]
     for profile in profiles_for(config, backend) or []:
@@ -639,9 +639,13 @@ def seen(brief):
 
 def markdown(data):
     config = data["config"]
+    # Configurations created before --functions existed have no such key.
+    functions = config.get("functions")
+    counts = (f"{config['cases']} cases per profile" if functions is None else
+              f"{functions} whole functions per runtime-input profile and {config['cases']} cases per other profile")
     lines = ["# Semantic fuzzing report", "", f"Generated {data['generated']} from `{data['state']}`.", "",
              f"Base seed {config['base_seed']}, shard {config['shard_index']} of {config['shard_count']}, "
-             f"backends {', '.join(config['backend'])}, {config['cases']} cases per profile, node-budget scales "
+             f"backends {', '.join(config['backend'])}, {counts}, node-budget scales "
              f"{', '.join(str(scale) for scale in config.get('size_cycle') or [1.0])} by iteration, profiles: "
              f"{'suite default' if config['profile'] is None else ', '.join(config['profile'])}.", ""]
     if data["epochs"]:
@@ -850,8 +854,8 @@ def parse_args(argv=None):
     runner.add_argument("--profile", action="append", choices=tuple(suite.PROFILES), help="repeat; default the suite's selection")
     runner.add_argument("--size-cycle", type=lambda text: [float(part) for part in text.split(",")],
                         help="comma-separated node-budget scales used by successive iterations (default 1,2)")
-    for name, kind in (("cases", int), ("attempts", int), ("nodes", int), ("seconds", float), ("profile-seconds", float),
-                       ("disk-bytes", int), ("examples", int)):
+    for name, kind in (("cases", int), ("functions", int), ("attempts", int), ("nodes", int), ("seconds", float),
+                       ("profile-seconds", float), ("disk-bytes", int), ("examples", int)):
         runner.add_argument("--" + name, type=kind)
     for name in ("bin-dir", "upstream", "target-dir", "anvil", "solc"):
         runner.add_argument("--" + name, type=Path)

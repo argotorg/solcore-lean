@@ -28,6 +28,11 @@ _adapter_spec = importlib.util.spec_from_file_location("semantic_suite_adapter",
 assert _adapter_spec and _adapter_spec.loader
 adapter = importlib.util.module_from_spec(_adapter_spec)
 _adapter_spec.loader.exec_module(adapter)
+# The pure campaign's runtime-input profiles and the inputs each of their functions yields.
+_pure_spec = importlib.util.spec_from_file_location("semantic_suite_pure_campaign", ROOT / "scripts/semantic-campaign.py")
+assert _pure_spec and _pure_spec.loader
+pure_campaign = importlib.util.module_from_spec(_pure_spec)
+_pure_spec.loader.exec_module(pure_campaign)
 SCHEMA = "solcore-lean.semantic-suite.v1"
 SEED_VERSION = "sha256-profile-shard-v1"
 MIN_CAMPAIGN_BYTES = 16 * 1024 * 1024
@@ -110,9 +115,22 @@ def manifest(profile):
     return ROOT / "scripts" / (PROFILES[profile][0] + "-corpus.json")
 
 
+def function_count(args, profile):
+    """Whole functions a random runtime-input campaign generates under --functions, else None."""
+    if args.mode == "random" and args.functions is not None and profile in pure_campaign.RUNTIME_INPUT_PROFILES:
+        return args.functions
+    return None
+
+
+def inputs_per_function(profile):
+    """The cases one function yields under the campaign's default random input selection."""
+    return pure_campaign.inputs_per_function(profile, pure_campaign.RANDOM_INPUT_SELECTION)
+
+
 def requested(args, profile):
     if args.mode == "random":
-        return args.cases
+        functions = function_count(args, profile)
+        return args.cases if functions is None else functions * inputs_per_function(profile)
     data = json.loads(manifest(profile).read_text())
     if data.get("profile", "closed-g0") != profile or not isinstance(data.get("cases"), list) or not data["cases"]:
         raise ValueError("fixed manifest profile or cases changed: " + profile)
@@ -161,7 +179,9 @@ def command(args, profile, output, seconds, disk_bytes):
         result += ["--corpus", str(manifest(profile)), "--attempts", str(max(attempts, requested(args, profile)))]
     else:
         seed = derived_seed(args.seed, profile, args.shard_index, args.shard_count, profile_attempts(args, profile))
-        result += ["--seed", str(seed), "--nodes", str(node_budget(args, profile)), "--cases", str(args.cases), "--attempts", str(attempts)]
+        functions = function_count(args, profile)
+        count = ["--cases", str(args.cases)] if functions is None else ["--functions", str(functions)]
+        result += ["--seed", str(seed), "--nodes", str(node_budget(args, profile)), *count, "--attempts", str(attempts)]
     return result
 
 
@@ -323,6 +343,7 @@ class Suite:
         self.deadline = self.started + args.seconds
         self.report = {"schema": SCHEMA, "status": "running", "backend": args.backend, "mode": args.mode, "seedVersion": SEED_VERSION,
             "rootSeed": str(args.seed), "shardIndex": args.shard_index, "shardCount": args.shard_count, "nodesScale": args.nodes_scale,
+            "functions": args.functions,
             "selectedProfiles": args.profile, "profiles": [], "unexecutedProfiles": args.profile[:],
             "limits": {key: getattr(args, key) for key in ("seconds", "profile_seconds", "disk_bytes", "profile_disk_bytes", "output_limit", "cleanup_seconds")},
             "suiteSha256": digest(Path(__file__)), "executionOrder": "sequential",
@@ -403,11 +424,14 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default twenty-seven for Sonatina, fourteen pure profiles for Yul")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirty for Sonatina, the fourteen pure profiles for Yul")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
     parser.add_argument("--cases", type=int, help="random cases per profile (default 4); fixed mode always uses the entire manifest")
+    parser.add_argument("--functions", type=int,
+                        help="random runtime-input pure profiles generate this many whole functions, each with all of its "
+                             "inputs, instead of --cases; closed-g0 and the stateful profiles keep --cases")
     parser.add_argument("--nodes", type=int, help="override random node budget; otherwise profile-specific defaults")
     parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512")
     parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles")
@@ -439,8 +463,8 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     args.attempts_explicit = args.attempts is not None
     args.attempts = 512 if args.attempts is None else args.attempts
-    if args.mode == "fixed" and (args.cases is not None or args.nodes is not None or args.nodes_scale != 1):
-        parser.error("--cases, --nodes and --nodes-scale apply only to random mode; fixed corpora must remain complete")
+    if args.mode == "fixed" and (args.cases is not None or args.functions is not None or args.nodes is not None or args.nodes_scale != 1):
+        parser.error("--cases, --functions, --nodes and --nodes-scale apply only to random mode; fixed corpora must remain complete")
     args.cases = args.cases if args.cases is not None else 4
     if args.backend == "yul":
         if args.profile and any(PROFILES[profile][1] != "pure" for profile in args.profile):
@@ -450,6 +474,14 @@ def parse_args(argv=None):
         args.profile = args.profile or list(PROFILES)
     if len(args.profile) != len(set(args.profile)):
         parser.error("duplicate profile selection")
+    if args.functions is not None:
+        counted = [profile for profile in args.profile if profile in pure_campaign.RUNTIME_INPUT_PROFILES]
+        if not counted:
+            parser.error("--functions needs a selected runtime-input profile")
+        # Each campaign returns at most MAX_CASES cases, so the profile with the most inputs bounds N.
+        bound, binding = min((pure_campaign.MAX_CASES // inputs_per_function(profile), profile) for profile in counted)
+        if not 1 <= args.functions <= bound:
+            parser.error(f"--functions must be between 1 and {bound}, the most {binding} allows")
     limits = {"seed": (0, 2**64-1), "shard_count": (1, 1000000), "shard_index": (0, 999999), "cases": (1, 1024),
               "attempts": (0, 10000), "seconds": (.001, 86400), "profile_seconds": (.001, 86400),
               "disk_bytes": (MIN_CAMPAIGN_BYTES * 2, 10**10), "profile_disk_bytes": (MIN_CAMPAIGN_BYTES, 10**10),

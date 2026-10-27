@@ -340,6 +340,27 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual((code, fake.calls), (2, []))
         self.assertEqual(fuzz.CONFIG_DEFAULTS["size_cycle"], [1.0, 2.0])
 
+    def test_functions_reach_the_suite_and_stay_fixed(self):
+        code, fake = self.main("run", "--state", str(self.state), "--base-seed", "5", "--backend", "sonatina-o0",
+                               "--profile", "closed-g0", "--profile", "runtime-word", "--functions", "2", "--iterations", "1")
+        self.assertEqual(code, 0)
+        config = json.loads((self.state / "config.json").read_text())
+        self.assertEqual(config["functions"], 2)
+        argv = fuzz.suite_command(config, 0, "sonatina-o0", self.directory / "x")
+        self.assertEqual(argv[argv.index("--functions") + 1], "2")
+        parsed = fuzz.suite.parse_args(argv[2:])
+        # Two runtime-word functions of eight inputs each; closed-g0 keeps the sixteen default cases.
+        self.assertEqual((fuzz.suite.requested(parsed, "runtime-word"), fuzz.suite.requested(parsed, "closed-g0")), (16, 16))
+        self.assertIn("2 whole functions per runtime-input profile and 16 cases per other profile",
+                      (self.state / "report.md").read_text())
+        self.assertNotIn("--functions", fuzz.suite_command({**config, "functions": None}, 0, "sonatina-o0", self.directory / "y"))
+        code, fake = self.main("run", "--state", str(self.state), "--functions", "3")
+        self.assertEqual((code, fake.calls), (2, []))
+        # A configuration whose profiles have no runtime inputs is rejected before it is stored.
+        code, fake = self.main("run", "--state", str(self.directory / "closed"), "--base-seed", "1", "--backend", "sonatina-o0",
+                               "--profile", "closed-g0", "--functions", "2", "--iterations", "1")
+        self.assertEqual((code, fake.calls, (self.directory / "closed/config.json").exists()), (2, [], False))
+
     def test_backtrace_frames_name_the_compiler_call_site(self):
         output = ("thread 'x' panicked at y\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n"
                   "   2: <primitive_types::U256>::as_usize::h0011223344556677\n   3: sonatina_codegen::bits::propagate::h0011223344556677\n"
