@@ -1028,7 +1028,9 @@ one instead. A fixed corpus or a saved `--case` uses the version it records in
 `generatorVersion`, and a disagreeing `--g0-version` is refused. Reductions
 inherit their parent's version. The summary records `configuration.g0Version`
 and `generation.generatorVersions`. The call campaign handles the version the
-same way.
+same way. A suite sample of four random cases for each of the thirteen
+stateful profiles recorded revision two and matched on O0 and O2, while the
+fixed corpora kept revision one and their 167 scenarios.
 
 The summary counts scenarios separately from transactions observed on any path,
 completed on all three paths, and matched ordered prefixes. Shrink executions

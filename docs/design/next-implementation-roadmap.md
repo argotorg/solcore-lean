@@ -1830,6 +1830,12 @@ definitions:
   `configuration.g0Version` and `generation.generatorVersions`, which the
   fuzzing ledger already reads. The suite needs no change.
 
+With scripts and native tools frozen, the thirteen fixed corpora still pass on
+O0 and O2 with 167 scenarios and 460 matched prefixes per level, every profile
+recording revision one. A random suite sample of four cases per profile (seed
+20261027) passed on both levels with 52 scenarios and 156 prefixes, and every
+profile recorded `core-g0-v2/lcg64-v1`. There were no findings.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
