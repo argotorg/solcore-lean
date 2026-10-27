@@ -1132,9 +1132,10 @@ the version it records in `generatorVersion`, and a disagreeing
 `--g0-version` is refused. Reductions inherit their parent's version and mask.
 The summary records `configuration.g0Version` and
 `generation.generatorVersions`. The call campaign handles the version the same
-way. A suite sample of four random cases for each of the thirteen stateful
-profiles recorded revision two and matched on O0 and O2, while the fixed
-corpora kept revision one and their 167 scenarios.
+way. A suite sample of four random eight-transaction cases for each of the
+thirteen stateful profiles recorded revision three and its masks and matched
+on O0 and O2, while the fixed corpora kept revision one and their 167
+scenarios.
 
 Random generation also requests `--transactions` transactions per scenario,
 from one to eight and eight by default, and passes the count after the version

@@ -1990,6 +1990,15 @@ generate the checked step with
   random steps with revision three; fixed corpora and saved cases keep the
   version they record, so the fixed corpora stay on revision one, bit for bit.
 
+With scripts and native tools frozen on `6a16989b4`, the thirteen fixed
+corpora still pass on O0 and O2 with 167 scenarios and 460 prefixes per level,
+all on revision one without a mask. A random suite sample of four
+eight-transaction cases per profile (seed 20261029) passed on both levels
+with 52 scenarios and 416 prefixes. Every case recorded revision three and
+its seed's mask, the slowest profile took 9.1 seconds per case, and there
+was no finding. The one excluded seed, in dynamic-array, left too few nodes
+for its step template.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
