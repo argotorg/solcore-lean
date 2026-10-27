@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import copy
 import hashlib
 import importlib.util
 import json
@@ -23,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import urllib.error
 import urllib.request
 
@@ -80,6 +82,12 @@ RESOURCE = re.compile(GAS_RESOURCE.pattern + r"|out.of.fuel|fuel.{0,40}(exhaust|
                       r"(specialization|recursion|export|depth).{0,40}(limit|exhaust)|"
                       r"stack overflow|memory limit", re.I)
 COMPLETED = {"returned", "reverted"}
+COMPILATION_SCHEMA = "solcore-lean.semantic-compilation.v1"
+# Compiler verdicts on the source bytes themselves. A resource or adapter failure
+# says nothing about the source, so the next case with that source compiles again.
+SHARED_FAILURES = ("source-rejected", "compilation-rejected", "compiler-crash")
+COMPILERS = ("debug/solcore-driver", "lean-export-build.json",
+             "debug/solcore-code-image-export", "code-image-export-build.json")
 
 
 class Finding(Exception):
@@ -636,7 +644,8 @@ def image_bytes(images: dict, path: list[str]) -> bytes:
 
 
 def validate_export(hull_path: Path, image_path: Path, source: Path, limit: int,
-                    backend: str = "sonatina-o0") -> dict:
+                    backend: str = "sonatina-o0", compiled: Path | None = None) -> dict:
+    """`compiled` is where a shared compilation read `source`'s exact bytes."""
     hull = read_json(hull_path, limit)
     images = read_json(image_path, limit)
     validate_image_backend(images, backend)
@@ -650,7 +659,7 @@ def validate_export(hull_path: Path, image_path: Path, source: Path, limit: int,
         raise ValueError("Hull/image provenance differs")
     if ip.get("backendRevision") != BACKEND_COMMIT or ip.get("optimization") != optimization_for_backend(backend):
         raise ValueError("backend revision/optimization differs")
-    if hp.get("sources", {}).get(source.as_uri()) != file_digest(source):
+    if hp.get("sources", {}).get((compiled or source).as_uri()) != file_digest(source):
         raise ValueError("source hash differs from exported artifact")
     return {"hull": hp, "images": ip}
 
@@ -672,6 +681,139 @@ def checked_process(runner: Runner, stage: str, command: list[str], timeout=None
             category = "source-rejected" if stage == "rust-checked-source" else "compilation-rejected"
         raise Finding(category, stage, detail)
     return result
+
+
+def export_sources(args, runner: Runner, directory: Path, source: Path, linked_backend: str, audit) -> None:
+    """Export checked Hull and linked code images for the sources in `directory`."""
+    hull_path, image_path = directory / "hull.json", directory / "images.json"
+    common = [str(source), "--root", str(directory), "--upstream", str(args.upstream), "--target-dir", str(args.target_dir)]
+    audit()
+    checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *common, "--output", str(hull_path)])
+    audit()
+    checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *common,
+        "--output", str(image_path), "--hull-output", str(hull_path), "--timeout", str(args.timeout),
+        "--optimization", optimization_for_backend(linked_backend)], args.timeout * 3)
+    audit()
+
+
+def compile_identity(args, report: dict, backend: str, names: tuple[str, ...]) -> dict:
+    """Everything a compilation reads, by digest: the case's own source files, the
+    backend, the library, the exporters and both compiler builds."""
+    target, library = Path(args.target_dir), Path(args.upstream) / "std"
+    identity = {"schema": COMPILATION_SCHEMA, "backend": backend,
+        "imageOptimization": optimization_for_backend(image_backend(backend)),
+        "sources": {name: file_digest(args.output / name) for name in names},
+        "library": {path.relative_to(library).as_posix(): file_digest(path) for path in sorted(library.rglob("*.sol"))},
+        "upstream": str(args.upstream), "targetDir": str(args.target_dir), "python": sys.executable,
+        "runnerSha256": report["tools"]["runnerSha256"], "exporters": report["tools"]["exporters"],
+        "compilers": {name: file_digest(target / name) for name in COMPILERS}}
+    if "bundleTransportSha256" in report["tools"]:
+        identity["bundleTransportSha256"] = report["tools"]["bundleTransportSha256"]
+    if backend == "yul":
+        identity["yul"] = {key: report["tools"][key] for key in ("solc", "yulExporterSha256", "yulTransportSha256")}
+    return identity
+
+
+def accept_yul(args, case: dict, report: dict, expected: dict) -> tuple[bytes, bytes]:
+    """Check a copied shared Yul export as this case's own evidence."""
+    record = yul_transport("validate_export", args.output, case["contract"]["name"],
+                           report["exportProvenance"]["hull"], args.artifact_limit)
+    yul_transport("validate_tool_record", record, report["tools"])
+    if record != expected:
+        raise ValueError("copied Yul export differs from its shared compilation")
+    report["yulExportProvenance"] = record
+    artifact = read_json(args.output / "yul.json", args.artifact_limit)
+    return hex_bytes(artifact["initCode"], "Yul init code"), hex_bytes(artifact["runtimeCode"], "Yul runtime code")
+
+
+def shared_compilations(args):
+    """A campaign's shared compilations; exact replay always compiles its own case."""
+    return None if args.replay else getattr(args, "compile_cache", None)
+
+
+class CompileCache:
+    """Compilations shared within one campaign by cases whose source bytes,
+    backend and compiler tools are identical by digest.
+
+    A compilation runs once, in a directory named by the digest of that
+    identity, so every case reusing it saw the same paths. Each case copies all
+    of its outputs into its own run directory, keeping its archive
+    self-contained, and records the shared compiler processes. A rejection or
+    crash is shared the same way; a resource or adapter failure is not kept, so
+    the next case compiles again. Exact replay never uses a cache. The least
+    recently used compilations beyond `capacity` are deleted.
+    """
+
+    def __init__(self, directory: Path, capacity: int = 8):
+        self.directory, self.capacity = directory, capacity
+        self.entries: dict[str, dict] = {}
+
+    def compile(self, args, runner: Runner, case: dict, report: dict, backend: str, receipt: dict | None, audit) -> dict:
+        names = bundle_transport.FILES if receipt is not None else ("case.sol",)
+        identity = compile_identity(args, report, backend, names)
+        key = digest(json_bytes(identity))
+        entry = self.entries.pop(key, None)
+        reused = entry is not None
+        if entry is None:
+            entry = self.build(key, args, runner, case, report, backend, receipt, names, audit)
+        self.entries[key] = entry
+        while len(self.entries) > self.capacity:
+            shutil.rmtree(self.entries.pop(next(iter(self.entries)))["directory"], ignore_errors=True)
+        report["compilation"] = {"schema": COMPILATION_SCHEMA, "key": key, "identity": identity,
+            "directory": str(entry["directory"]), "reused": reused, "outputs": dict(entry["outputs"])}
+        if reused:
+            report["processes"].extend({**process, "reused": True} for process in entry["processes"])
+        for name, expected in entry["outputs"].items():
+            shutil.copyfile(entry["directory"] / name, args.output / name)
+            if file_digest(args.output / name) != expected:
+                raise ValueError("shared compilation output changed: " + name)
+        if entry["failure"] is not None:
+            report["compilation"]["failure"] = {field: entry["failure"][field] for field in ("category", "stage")}
+        return entry
+
+    @staticmethod
+    def fail(entry: dict, yul: bool = False) -> None:
+        """Raise a shared failure where its stage would have raised it: a Yul
+        export failure after the copied Sonatina exports are checked, others at once."""
+        failure = entry["failure"]
+        if failure is not None and (failure["stage"] == "rust-yul-evm") == yul:
+            raise Finding(**failure)
+
+    def build(self, key: str, args, runner: Runner, case: dict, report: dict, backend: str,
+              receipt: dict | None, names: tuple[str, ...], audit) -> dict:
+        directory = self.directory / key
+        shutil.rmtree(directory, ignore_errors=True)
+        directory.mkdir(parents=True)
+        source, linked_backend = directory / "case.sol", image_backend(backend)
+        if receipt is not None:
+            receipt = {**bundle_transport.write(directory, case), "libraries": receipt["libraries"]}
+        else:
+            source.write_text(case["source"])
+        first, failure, yul = len(report["processes"]), None, None
+        try:
+            export_sources(args, runner, directory, source, linked_backend, lambda: audit(directory))
+            if backend == "yul":
+                hull = directory / "hull.json"
+                shared = {"backend": backend, "pathBackends": report["pathBackends"], "tools": report["tools"],
+                          "exportProvenance": validate_export(hull, directory / "images.json", source,
+                                                              args.artifact_limit, linked_backend)}
+                audit(directory)
+                yul_transport("execute", SimpleNamespace(**{**vars(args), "output": directory}),
+                              runner, case, source, hull, shared)
+                audit(directory)
+                yul = shared["yulExportProvenance"]
+        except Finding as error:
+            if error.category not in SHARED_FAILURES:
+                shutil.rmtree(directory, ignore_errors=True)
+                raise
+            failure = {"category": error.category, "stage": error.stage, "detail": error.detail}
+        except BaseException:
+            shutil.rmtree(directory, ignore_errors=True)
+            raise
+        outputs = {path.name: file_digest(path) for path in sorted(directory.iterdir())
+                   if path.is_file() and path.name not in names}
+        return {"directory": directory, "source": source, "receipt": receipt, "outputs": outputs, "yul": yul,
+                "failure": failure, "processes": copy.deepcopy(report["processes"][first:])}
 
 
 def execute(args, report: dict) -> None:
@@ -726,9 +868,9 @@ def execute(args, report: dict) -> None:
     else:
         source.write_text(case["source"])
 
-    def audit_bundle():
+    def audit_bundle(directory=None):
         if bundle_receipt is not None:
-            bundle_transport.audit_files(args.output, bundle_receipt["files"])
+            bundle_transport.audit_files(directory or args.output, bundle_receipt["files"])
             if bundle_transport.library_files(args.upstream, library_paths) != bundle_receipt["libraries"]:
                 raise ValueError("standard-library sources changed during export")
     report.update(caseSha256=file_digest(case_path), sourceSha256=file_digest(source),
@@ -779,15 +921,20 @@ def execute(args, report: dict) -> None:
         report["comparison"] = {"category": "inconclusive-resource" if report["observations"]["directCore"]["status"] == "out-of-fuel" else "execution-error", "pairs": {}}
         return
     hull_path, image_path = args.output / "hull.json", args.output / "images.json"
-    common = [str(source), "--root", str(args.output), "--upstream", str(args.upstream), "--target-dir", str(args.target_dir)]
-    audit_bundle()
-    checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *common, "--output", str(hull_path)])
-    audit_bundle()
-    checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *common,
-        "--output", str(image_path), "--hull-output", str(hull_path), "--timeout", str(args.timeout),
-        "--optimization", optimization_for_backend(linked_backend)], args.timeout * 3)
-    audit_bundle()
-    report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit, linked_backend)
+    cache = shared_compilations(args)
+    compiled, shared = source, None
+    if cache is None:
+        export_sources(args, runner, args.output, source, linked_backend, audit_bundle)
+    else:
+        shared = cache.compile(args, runner, case, report, backend, bundle_receipt, audit_bundle)
+        compiled = shared["source"]
+        if bundle_receipt is not None:
+            # Hull provenance names the shared directory's files; this case's
+            # own copies have the same digests.
+            bundle_receipt = report["sourceBundleReceipt"] = copy.deepcopy(shared["receipt"])
+        audit_bundle()
+        cache.fail(shared)
+    report["exportProvenance"] = validate_export(hull_path, image_path, source, args.artifact_limit, linked_backend, compiled)
     if bundle_receipt is not None:
         bundle_transport.normalized_sources(report["exportProvenance"]["hull"].get("sources"), bundle_receipt, case)
     if args.replay and "exportProvenance" in previous:
@@ -810,7 +957,11 @@ def execute(args, report: dict) -> None:
     runtime = image_bytes(images, case["contract"]["runtimePath"])
     if backend == "yul":
         audit_bundle()
-        init, runtime = yul_transport("execute", args, runner, case, source, hull_path, report, previous)
+        if shared is None:
+            init, runtime = yul_transport("execute", args, runner, case, source, hull_path, report, previous)
+        else:
+            cache.fail(shared, yul=True)
+            init, runtime = accept_yul(args, case, report, shared["yul"])
         audit_bundle()
     with anvil(runner, args.anvil) as rpc:
         accounts = rpc.call("eth_accounts", [])

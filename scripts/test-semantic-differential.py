@@ -1031,6 +1031,241 @@ class ArtifactTests(unittest.TestCase):
                 runner.read_json(path, 4)
 
 
+class SharedCompilationTests(unittest.TestCase):
+    """Sharing policy with a stand-in exporter; campaigns check real compilations."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.target, self.upstream = self.root / "target", self.root / "upstream"
+        for name in runner.COMPILERS:
+            (self.target / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.target / name).write_text("build of " + name)
+        (self.upstream / "std").mkdir(parents=True)
+        (self.upstream / "std/prelude.sol").write_text("library")
+        self.cache = runner.CompileCache(self.root / "compilations")
+        self.exports, self.counter = [], 0
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def case(self, source="contract A {}", backend="sonatina-o0"):
+        self.counter += 1
+        output = self.root / f"run-{self.counter}"
+        output.mkdir()
+        (output / "case.sol").write_text(source)
+        args = SimpleNamespace(output=output, upstream=self.upstream, target_dir=self.target, timeout=10,
+                               artifact_limit=1024 * 1024, replay=None, compile_cache=self.cache)
+        report = {"processes": [], "pathBackends": runner.path_backends(backend),
+                  "tools": {"runnerSha256": "runner", "exporters": {"export-rust-hull.py": "exporter"}}}
+        return args, report, {"source": source, "contract": {"name": "SynthesizedInput"}}
+
+    def stages(self, failure=None):
+        """Both export stages: hull.json, a process record, then images.json or a failure."""
+        def export(args, process_runner, directory, source, linked_backend, audit):
+            self.exports.append((directory, linked_backend))
+            audit()
+            (directory / "hull.json").write_text("hull of " + source.read_text())
+            process_runner.report["processes"].append({"stage": "rust-checked-source", "returncode": 0})
+            if failure:
+                raise runner.Finding(*failure)
+            (directory / "images.json").write_text("images of " + source.read_text())
+        return patch.object(runner, "export_sources", side_effect=export)
+
+    def compile(self, args, report, case, backend="sonatina-o0", receipt=None, audited=None):
+        """Compile or reuse, then raise a shared Sonatina failure as the runner does."""
+        audit = (lambda directory=None: audited.append(directory)) if audited is not None else (lambda directory=None: None)
+        entry = self.cache.compile(args, SimpleNamespace(report=report), case, report, backend, receipt, audit)
+        runner.CompileCache.fail(entry)
+        return entry
+
+    def test_identical_sources_share_one_compilation_and_keep_their_own_copies(self):
+        with self.stages():
+            first_args, first, case = self.case()
+            entry = self.compile(first_args, first, case)
+            second_args, second, case = self.case()
+            self.assertIs(self.compile(second_args, second, case), entry)
+        self.assertEqual(len(self.exports), 1)
+        shared = entry["directory"]
+        identity = first["compilation"]["identity"]
+        self.assertEqual(shared, self.cache.directory / first["compilation"]["key"])
+        self.assertEqual(first["compilation"]["key"], runner.digest(runner.json_bytes(identity)))
+        self.assertEqual(second["compilation"]["identity"], identity)
+        self.assertEqual(identity["sources"], {"case.sol": runner.file_digest(first_args.output / "case.sol")})
+        self.assertEqual(identity["library"], {"prelude.sol": runner.file_digest(self.upstream / "std/prelude.sol")})
+        self.assertEqual(identity["compilers"], {name: runner.file_digest(self.target / name) for name in runner.COMPILERS})
+        self.assertEqual((first["compilation"]["reused"], second["compilation"]["reused"]), (False, True))
+        self.assertEqual(entry["source"], shared / "case.sol")
+        self.assertEqual(first["compilation"]["outputs"],
+                         {name: runner.file_digest(shared / name) for name in ("hull.json", "images.json")})
+        for args in (first_args, second_args):
+            for name in ("hull.json", "images.json"):
+                self.assertEqual((args.output / name).read_bytes(), (shared / name).read_bytes())
+        # The compiling case ran the stage itself; the other case records it as shared.
+        self.assertEqual(second["processes"], [{**first["processes"][0], "reused": True}])
+        self.assertNotIn("reused", first["processes"][0])
+
+    def test_a_different_source_backend_tool_or_library_compiles_again(self):
+        changes = [lambda report: None, lambda report: None,
+                   lambda report: (self.target / "debug/solcore-driver").write_text("rebuilt driver"),
+                   lambda report: report["tools"]["exporters"].update({"export-rust-hull.py": "changed"}),
+                   lambda report: (self.upstream / "std/prelude.sol").write_text("changed library")]
+        keys = []
+        with self.stages():
+            for index, change in enumerate(changes):
+                backend = "sonatina-o2" if index == 1 else "sonatina-o0"
+                args, report, case = self.case("contract B {}" if index == 0 else "contract A {}", backend)
+                change(report)
+                self.compile(args, report, case, backend)
+                self.assertFalse(report["compilation"]["reused"])
+                keys.append(report["compilation"]["key"])
+        self.assertEqual(len(set(keys)), len(changes))
+        self.assertEqual([backend for _, backend in self.exports],
+                         ["sonatina-o0", "sonatina-o2", "sonatina-o0", "sonatina-o0", "sonatina-o0"])
+
+    def test_rejections_and_crashes_are_shared_without_compiling_again(self):
+        for category in runner.SHARED_FAILURES:
+            with self.subTest(category=category):
+                self.cache, self.exports = runner.CompileCache(self.root / ("compilations-" + category)), []
+                failure = (category, "rust-code-images", "rejected: " + category)
+                outcomes = []
+                with self.stages(failure):
+                    for _ in range(3):
+                        args, report, case = self.case()
+                        with self.assertRaises(runner.Finding) as caught:
+                            self.compile(args, report, case)
+                        outcomes.append((args, report, caught.exception))
+                self.assertEqual(len(self.exports), 1)
+                for args, report, error in outcomes:
+                    self.assertEqual((error.category, error.stage, error.detail), failure)
+                    self.assertEqual(report["compilation"]["failure"], {"category": category, "stage": "rust-code-images"})
+                    # Partial outputs stay in every affected case's own archive.
+                    self.assertTrue((args.output / "hull.json").is_file())
+                    self.assertFalse((args.output / "images.json").exists())
+                compiled = outcomes[0][1]["processes"]
+                self.assertEqual([report["processes"] for _, report, _ in outcomes[1:]],
+                                 [[{**compiled[0], "reused": True}]] * 2)
+
+    def test_a_shared_failure_is_raised_where_its_own_stage_would_raise_it(self):
+        yul = {"failure": {"category": "compilation-rejected", "stage": "rust-yul-evm", "detail": "solc rejected"}}
+        images = {"failure": {"category": "compiler-crash", "stage": "rust-code-images", "detail": "panicked at"}}
+        # A Yul failure waits until the copied Sonatina exports are checked.
+        runner.CompileCache.fail(yul)
+        runner.CompileCache.fail(images, yul=True)
+        for entry, yul_stage in ((yul, True), (images, False)):
+            with self.assertRaises(runner.Finding) as caught:
+                runner.CompileCache.fail(entry, yul=yul_stage)
+            self.assertEqual((caught.exception.category, caught.exception.stage, caught.exception.detail),
+                             tuple(entry["failure"].values()))
+        for yul_stage in (False, True):
+            runner.CompileCache.fail({"failure": None}, yul=yul_stage)
+
+    def test_resource_adapter_and_interrupted_compilations_are_not_kept(self):
+        for failure in (("inconclusive-resource", "rust-code-images", "timeout"),
+                        ("adapter-error", "rust-checked-source", "export-rust-hull: receipt is stale")):
+            with self.subTest(category=failure[0]):
+                self.exports = []
+                with self.stages(failure):
+                    for _ in range(2):
+                        args, report, case = self.case()
+                        with self.assertRaises(runner.Finding):
+                            self.compile(args, report, case)
+                        self.assertNotIn("compilation", report)
+                        self.assertEqual(list(self.cache.directory.iterdir()), [])
+                self.assertEqual(len(self.exports), 2)
+        with patch.object(runner, "export_sources", side_effect=KeyboardInterrupt):
+            args, report, case = self.case()
+            with self.assertRaises(KeyboardInterrupt):
+                self.compile(args, report, case)
+        self.assertEqual((self.cache.entries, list(self.cache.directory.iterdir())), ({}, []))
+
+    def test_a_changed_shared_output_is_rejected_rather_than_copied(self):
+        with self.stages():
+            args, report, case = self.case()
+            entry = self.compile(args, report, case)
+            (entry["directory"] / "images.json").write_text("changed images")
+            args, report, case = self.case()
+            with self.assertRaisesRegex(ValueError, "shared compilation output changed: images.json"):
+                self.compile(args, report, case)
+
+    def test_least_recently_used_compilations_are_deleted(self):
+        self.cache.capacity = 2
+        with self.stages():
+            directories = []
+            for source in ("contract A {}", "contract B {}", "contract A {}", "contract C {}"):
+                args, report, case = self.case(source)
+                directories.append(self.compile(args, report, case)["directory"])
+            # A was used again after B, so C evicts B.
+            self.assertEqual([path.exists() for path in directories], [True, False, True, True])
+            args, report, case = self.case("contract B {}")
+            self.compile(args, report, case)
+            self.assertFalse(report["compilation"]["reused"])
+        self.assertEqual(len(self.exports), 4)
+        self.assertEqual(len(list(self.cache.directory.iterdir())), 2)
+
+    def test_bundle_provenance_names_the_shared_files_with_the_cases_own_digests(self):
+        bundle = runner.bundle_transport
+        case = {"source": "import common;", "contract": {"name": "SynthesizedModules"},
+                "sourceBundle": {"schema": bundle.SCHEMA, "entry": "case.sol", "files": [
+                    {"path": name, "source": "import common;" if name == "case.sol" else "module " + name}
+                    for name in bundle.FILES]}}
+        receipts, audited = [], []
+        with self.stages():
+            for _ in range(2):
+                args, report, _ = self.case()
+                (args.output / "case.sol").unlink()
+                receipt = {**bundle.write(args.output, case), "libraries": {(self.upstream / "std/prelude.sol").as_uri(): "0" * 64}}
+                entry = self.compile(args, report, case, receipt=receipt, audited=audited)
+                receipts.append(receipt)
+        self.assertEqual(len(self.exports), 1)
+        shared = entry["receipt"]
+        self.assertEqual(shared["generatedUris"], {(entry["directory"] / name).resolve().as_uri(): name for name in bundle.FILES})
+        self.assertEqual((shared["files"], shared["libraries"]), (receipts[0]["files"], receipts[0]["libraries"]))
+        self.assertEqual(set(report["compilation"]["identity"]["sources"]), set(bundle.FILES))
+        self.assertIn(entry["directory"], audited)
+        bundle.audit_files(entry["directory"], shared["files"])
+
+    def test_yul_compilations_share_their_yul_export(self):
+        calls = []
+
+        def transport(operation, args, process_runner, case, source, hull, report):
+            calls.append((operation, args.output, source, hull, report["exportProvenance"]))
+            (args.output / "yul.json").write_text("yul of " + source.read_text())
+            report["yulExportProvenance"] = {"record": "yul"}
+
+        exported = {"hull": {"sources": {}}, "images": {}}
+        with self.stages(), patch.object(runner, "validate_export", return_value=exported), \
+                patch.object(runner, "yul_transport", side_effect=transport):
+            for _ in range(2):
+                args, report, case = self.case(backend="yul")
+                report["tools"].update(solc={"sha256": "solc", "version": "0.8.35"},
+                                       yulExporterSha256="exporter", yulTransportSha256="transport")
+                entry = self.compile(args, report, case, "yul")
+                self.assertEqual((args.output / "yul.json").read_text(), "yul of contract A {}")
+        directory = entry["directory"]
+        self.assertEqual(calls, [("execute", directory, directory / "case.sol", directory / "hull.json", exported)])
+        self.assertEqual(entry["yul"], {"record": "yul"})
+        # The imported Hull path of a Yul run executes Sonatina O0 images.
+        self.assertEqual(self.exports, [(directory, "sonatina-o0")])
+        self.assertEqual(report["compilation"]["identity"]["yul"]["solc"], {"sha256": "solc", "version": "0.8.35"})
+
+    def test_a_copied_yul_export_must_equal_its_shared_record(self):
+        args, report, case = self.case(backend="yul")
+        (args.output / "yul.json").write_text(json.dumps({"initCode": "0x6001", "runtimeCode": "0x00"}))
+        report["exportProvenance"] = {"hull": {}}
+        validated = lambda operation, *_: {"record": "copied"} if operation == "validate_export" else None
+        with patch.object(runner, "yul_transport", side_effect=validated):
+            self.assertEqual(runner.accept_yul(args, case, report, {"record": "copied"}), (b"\x60\x01", b"\x00"))
+            self.assertEqual(report["yulExportProvenance"], {"record": "copied"})
+            with self.assertRaisesRegex(ValueError, "differs from its shared compilation"):
+                runner.accept_yul(args, case, report, {"record": "shared"})
+
+    def test_exact_replay_never_shares_a_compilation(self):
+        self.assertIs(runner.shared_compilations(SimpleNamespace(replay=None, compile_cache=self.cache)), self.cache)
+        self.assertIsNone(runner.shared_compilations(SimpleNamespace(replay=self.root, compile_cache=self.cache)))
+        self.assertIsNone(runner.shared_compilations(SimpleNamespace(replay=None)))
+
+
 class BackendTests(unittest.TestCase):
     def test_default_legacy_and_exact_replay_selection(self):
         self.assertEqual(runner.resolve_backend(None), "sonatina-o0")

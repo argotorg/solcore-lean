@@ -644,6 +644,10 @@ class Campaign:
         self.reserve = min(40 * 1024 * 1024, args.disk_bytes // 4)
         self.work = args.output / ".work"
         self.work.mkdir()
+        # Cases whose sources, backend and compiler tools agree by digest share
+        # one compilation; reduction candidates compile on their own.
+        self.compilations = m2.CompileCache(self.work / "compilations")
+        self.compiled_sources = set()
         self.counter = 0
         self.shrink_attempts = 0
         random = getattr(args, "corpus", None) is None and getattr(args, "case", None) is None
@@ -662,6 +666,9 @@ class Campaign:
                       "campaignSha256": m2.digest(Path(__file__).read_bytes()),
                       "differentialSha256": m2.digest((ROOT / "scripts/semantic-differential.py").read_bytes())},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
+            "compilation": {"policy": "cases whose source files, backend and compiler tools agree by digest share one compilation, "
+                                      "including a rejection or crash; resource failures, reductions and exact replay compile again",
+                            "distinctSources": 0, "compiled": 0, "reused": 0},
             "cases": [], "findings": [], "secondaryFindings": [], "shrinkAttempts": 0,
             "coverage": {"kind": "AST features, literals and declared helper counts; plan-based profiles count the step graph and exclude sc_step/ABI wrappers; not runtime call or opcode coverage",
                          "generatedFeatures": [], "generatedWordLiterals": [],
@@ -777,6 +784,18 @@ class Campaign:
         values = set(self.summary["aggregateShapeCoverage"][key]) | aggregate_shapes(case)
         self.summary["aggregateShapeCoverage"][key] = [name for name in m2.AGGREGATE_SHAPES if name in values]
 
+    def record_compilation(self, report: dict) -> str | None:
+        """Count a case's own or shared compilation; None if it reached no compiler."""
+        compilation = report.get("compilation")
+        if compilation is None:
+            return None
+        self.compiled_sources.add(compilation["key"])
+        summary = self.summary["compilation"]
+        summary["distinctSources"] = len(self.compiled_sources)
+        state = "reused" if compilation["reused"] else "compiled"
+        summary[state] += 1
+        return state
+
     def guard(self) -> None:
         if time.monotonic() >= self.deadline:
             raise m2.Finding(RESOURCE, "campaign-time", "campaign time limit reached")
@@ -800,9 +819,10 @@ class Campaign:
             self.summary["tools"]["caseToolSha256"] = runner.identity(self.args.case_tool)["sha256"]
         return value
 
-    def case_args(self, case_path: Path, run_dir: Path):
+    def case_args(self, case_path: Path, run_dir: Path, compilations=None):
         left = max(0.001, self.deadline - time.monotonic())
         return SimpleNamespace(case=case_path, replay=None, output=run_dir, backend=self.args.backend, solc=self.args.solc,
+            compile_cache=compilations,
             case_tool=self.args.case_tool, core_runner=self.args.core_runner, anvil=self.args.anvil,
             upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
@@ -812,14 +832,14 @@ class Campaign:
             artifact_limit=min(64 * 1024 * 1024, (self.args.disk_bytes - self.reserve) // 8),
             resource_guard=self.guard)
 
-    def execute_case(self, case: dict) -> tuple[Path, dict, dict]:
+    def execute_case(self, case: dict, reuse: bool = True) -> tuple[Path, dict, dict]:
         self.guard()
         self.counter += 1
         folder = self.work / f"run-{self.counter:06d}"
         folder.mkdir()
         input_path = self.work / f"input-{self.counter:06d}.json"
         save_json(input_path, case)
-        args = self.case_args(input_path, folder)
+        args = self.case_args(input_path, folder, self.compilations if reuse else None)
         report = {"schema": m2.REPORT_SCHEMA, "backend": self.args.backend, "processes": [], "observations": {}, "rawObservations": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
             "scope": "gas-independent generated Word program; " + self.args.backend}
@@ -903,7 +923,7 @@ class Campaign:
                         continue
                     seen.add(candidate_hash)
                     self.shrink_attempts += 1
-                    folder, report, analysis = self.execute_case(candidate)
+                    folder, report, analysis = self.execute_case(candidate, reuse=False)
                     keep = same_failure(expected, analysis)
                     step = {"attempt": self.shrink_attempts, "programSha256": candidate_hash,
                         "sourceSha256": m2.digest(candidate["source"].encode()),
@@ -1166,7 +1186,7 @@ class Campaign:
             case_id = self.summary.get("corpus", {}).get("acceptedIds", [f"generated-{i}" for i in range(len(cases))])[index]
             row = {"index": index, "id": case_id, "case": f"cases/{index:04d}.json", "result": f"results/{index:04d}.json",
                    "programSha256": program_hash(case), "category": category, "synthetic": analysis["synthetic"],
-                   "fingerprint": fingerprint(analysis)}
+                   "fingerprint": fingerprint(analysis), "compilation": self.record_compilation(report)}
             self.summary["cases"].append(row)
             if category in SHRINKABLE or category == "adapter-error":
                 finding = self.retain_finding(index, folder, case, report, analysis)

@@ -3113,6 +3113,60 @@ class InputSelectionTests(unittest.TestCase):
             self.assertEqual(instance.summary['generation']['inputSelections'], [self.BOUNDARY, self.SEEDED])
 
 
+class CompilationReuseTests(unittest.TestCase):
+    """Which executions may share compilations; the sharing itself is a runner test."""
+    def test_campaign_cases_share_compilations_but_reductions_compile_alone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = options(directory)
+            args.test_perturb_path = 'rustEvm'
+            args.upstream, args.target_dir = Path('/unused/upstream'), Path('/unused/target')
+            instance = campaign.Campaign(args)
+            self.assertEqual(instance.compilations.directory, instance.work / 'compilations')
+            original = {'source': 'policy original', 'program': {'body': {'tag': 'word', 'value': '7'}}}
+            candidate = {'source': 'policy reduced', 'program': {'body': {'tag': 'word', 'value': '0'}}}
+            caches = []
+
+            def execute(adapter_args, report):
+                caches.append(adapter_args.compile_cache)
+                report.update(matched(), backend=adapter_args.backend)
+                campaign.save_json(adapter_args.output / 'case.json', json.loads(adapter_args.case.read_text()))
+
+            with patch.object(campaign.m2, 'execute', side_effect=execute):
+                folder, report, analysis = instance.execute_case(original)
+                finding = instance.retain_finding(0, folder, original, report, analysis)
+                instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': [candidate]}
+                instance.shrink(original, finding)
+            self.assertEqual(len(caches), 2)
+            self.assertIs(caches[0], instance.compilations)
+            self.assertIsNone(caches[1])
+
+    def test_summary_counts_compiled_reused_and_distinct_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = 'runtime-functions', 4, 0
+            config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+            instance = campaign.Campaign(config)
+            instance.tool = lambda *_: {'schema': 'solcore-lean.semantic-corpus.v1', 'requested': 4, 'attempted': 2,
+                                        'status': 'complete', 'excluded': [], 'cases': [function_case(1)] * 4}
+            # Two sources, the second reused once; the last case reached no compiler.
+            compilations = iter([{'key': 'a', 'reused': False}, {'key': 'b', 'reused': False},
+                                 {'key': 'b', 'reused': True}, None])
+
+            def execute(adapter_args, report):
+                report.update(matched(), backend=adapter_args.backend)
+                compilation = next(compilations)
+                if compilation is not None:
+                    report['compilation'] = compilation
+
+            with patch.object(campaign.m2, 'execute', side_effect=execute), redirect_stdout(io.StringIO()):
+                instance.run()
+            summary = json.loads((Path(directory) / 'summary.json').read_text())
+            self.assertEqual({key: summary['compilation'][key] for key in ('distinctSources', 'compiled', 'reused')},
+                             {'distinctSources': 2, 'compiled': 2, 'reused': 1})
+            self.assertEqual([row['compilation'] for row in summary['cases']], ['compiled', 'compiled', 'reused', None])
+            self.assertEqual(summary['counts']['matched'], 4)
+
+
 class CancellationTests(unittest.TestCase):
     def test_sigterm_stops_owned_process_and_saves_summary(self):
         with tempfile.TemporaryDirectory() as directory:
