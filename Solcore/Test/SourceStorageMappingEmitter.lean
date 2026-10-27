@@ -200,7 +200,7 @@ private def observerChecks : IO Unit := do
     (exhausted.getObjVal? "finalStorage").toOption == (exhausted.getObjVal? "initialStorage").toOption)
     "mapping observer conflated fuel exhaustion with completion"
   let complete := StorageMappingExecution.observe plan calls StorageExecution.fixtureBindings 1000000
-  ensure ((complete.getObjValAs? String "schema").toOption == some "solcore-lean.mapping-history.v1" &&
+  ensure ((complete.getObjValAs? String "schema").toOption == some "solcore-lean.mapping-history.v2" &&
     (complete.getObjValAs? String "status").toOption == some "complete")
     "history did not declare its schema or complete"
 

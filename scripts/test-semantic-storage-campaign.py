@@ -1367,5 +1367,98 @@ class NestedArrayCampaignTests(unittest.TestCase):
             self.assertEqual(tool.call_args.args[0][2], 32)
 
 
+class StrayWriteAdapterTests(unittest.TestCase):
+    """The `stray` adapter adds one undeclared nonzero slot to a copied whole
+    storage after actual agreement; the comparison must classify it as such."""
+
+    def test_stray_write_is_detected_and_fingerprinted_by_account_and_absent_paths(self):
+        value, raw = case(), report()
+        original = copy.deepcopy(raw)
+        for path in campaign.PATHS:
+            analysis = campaign.analyze(raw, value, path, "tx-1", "stray")
+            others = [other for other in campaign.PATHS if other != path]
+            with self.subTest(path=path):
+                self.assertTrue(analysis["synthetic"])
+                self.assertEqual(analysis["actualComparison"]["category"], "matched")
+                self.assertEqual((analysis["comparison"]["category"], analysis["comparison"]["transactionId"],
+                                  analysis["comparison"]["fields"]), ("semantic-mismatch", "tx-1", ["accountStorage"]))
+                observed = campaign.fingerprint(analysis)
+                self.assertEqual(observed["accountStorageDifferences"],
+                                 [{"account": "contract", "slot": "undeclared", "zeroPaths": others}])
+                self.assertEqual(observed["accountStorageRollbackPaths"], [])
+                self.assertEqual(observed["fields"], ["accountStorage"])
+                self.assertEqual(observed["storageSlots"], [])
+                stored = analysis["histories"][path]["transactions"][1]["accountStorage"][0]["storage"]
+                self.assertIn({"slot": campaign.STRAY_SLOT, "value": "1"}, stored)
+        self.assertEqual(raw, original)
+
+    def test_reduction_keeps_the_stray_fingerprint_and_removal_cannot_fake_it(self):
+        value = case()
+        first = campaign.analyze(report(value), value, "importedHull", "tx-1", "stray")
+        reduced = copy.deepcopy(value)
+        reduced["transactions"] = reduced["transactions"][1:2]
+        second = campaign.analyze(report(reduced), reduced, "importedHull", "tx-1", "stray")
+        self.assertEqual(second["comparison"]["index"], 0)
+        self.assertTrue(campaign.same_failure(campaign.fingerprint(first), second))
+        self.assertEqual(second["histories"]["importedHull"]["finalAccountStorage"],
+                         second["histories"]["importedHull"]["transactions"][0]["accountStorage"])
+        removed = copy.deepcopy(value)
+        removed["transactions"] = removed["transactions"][:1]
+        self.assertFalse(campaign.analyze(report(removed), removed, "importedHull", "tx-1", "stray")["synthetic"])
+        for other in ("output", "storage:0"):
+            self.assertFalse(campaign.same_failure(campaign.fingerprint(first),
+                                                   campaign.analyze(report(value), value, "importedHull", "tx-1", other)))
+        self.assertFalse(campaign.same_failure(campaign.fingerprint(first),
+                                               campaign.analyze(report(value), value, "rustEvm", "tx-1", "stray")))
+
+    def test_a_declared_or_already_held_slot_cannot_carry_a_stray_write(self):
+        declared = fixtures.keyed_case(((2**256 - 3, 2), (0, 4)))
+        self.assertIn(campaign.STRAY_SLOT, declared["observedSlots"])
+        raw = {"schema": campaign.adapter.REPORT_SCHEMA, "histories": fixtures.keyed_histories(declared)}
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], declared)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        self.assertFalse(campaign.analyze(raw, declared, "rustEvm", "tx-0", "stray")["synthetic"])
+        value, held = case(), report()
+        for history in held["histories"].values():
+            for row in history["transactions"]:
+                row["accountStorage"][0]["storage"].append({"slot": campaign.STRAY_SLOT, "value": "5"})
+            history["finalAccountStorage"] = copy.deepcopy(history["transactions"][-1]["accountStorage"])
+        held["comparison"] = campaign.adapter.compare(held["histories"], value)
+        self.assertEqual(held["comparison"]["category"], "matched")
+        self.assertFalse(campaign.analyze(held, value, "rustEvm", "tx-1", "stray")["synthetic"])
+
+    def test_every_fingerprint_carries_the_whole_storage_classification(self):
+        value = case()
+        plain = campaign.fingerprint(campaign.analyze(report(), value))
+        self.assertEqual((plain["accountStorageDifferences"], plain["accountStorageRollbackPaths"]), ([], []))
+        output = campaign.fingerprint(campaign.analyze(report(), value, "rustEvm", "tx-1", "output"))
+        self.assertEqual((output["accountStorageDifferences"], output["accountStorageRollbackPaths"]), ([], []))
+
+    def test_a_declared_stray_slot_is_rejected_before_execution(self):
+        declared, template = fixtures.keyed_case(((2**256 - 3, 2), (0, 4))), case()
+        declared["keyedStoragePlan"]["stepProgram"] = template["storagePlan"]["stepProgram"]
+        declared["provenance"] = template["provenance"]
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-keyed-storage", test_perturb_path="rustEvm",
+                                                 test_transaction_id="tx-0", test_field="stray"))
+            with patch.object(instance, "prepare_cases", side_effect=lambda: instance.add_case(declared, "policy")), \
+                 patch.object(instance, "execute_case") as execute, self.assertRaisesRegex(ValueError, "stray slot is declared"):
+                instance.run()
+            execute.assert_not_called()
+
+    def test_cli_admits_the_stray_field_on_every_profile(self):
+        # A zero time limit stops after field validation, so the error names the limit, not the field.
+        for profile, field, message in (("stateful-storage", "stray", "seconds must be between"),
+                                        ("stateful-keyed-storage", "stray", "seconds must be between"),
+                                        ("stateful-storage", "stray:1", "test field must be")):
+            with tempfile.TemporaryDirectory() as directory, patch.object(sys, "argv", [
+                    "campaign", "--output", str(Path(directory) / "out"), "--profile", profile, "--seconds", "0",
+                    "--test-perturb-path", "importedHull", "--test-field", field]), \
+                    redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
+                campaign.main()
+            with self.subTest(profile=profile, field=field):
+                self.assertIn(message, errors.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

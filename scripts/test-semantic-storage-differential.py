@@ -7,6 +7,7 @@ Python subprocess. Compiler/Core/EVM agreement is tested by the actual adapter.
 """
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 import copy
+import gzip
 import importlib.util
 import io
 import json
@@ -42,25 +43,53 @@ def case(count=3):
             "calldata": "0xa444f5e9" + f"{index:064x}"} for index in range(count)]}
 
 
+# The fixtures' bound contract address on every path.
+ADDRESS = "4096"
+
+
+def whole(*declared, address=ADDRESS):
+    """Fixture whole storage: the nonzero entries of declared and undeclared slot rows."""
+    entries = {entry["slot"]: entry["value"] for rows in declared for entry in rows or [] if entry["value"] != "0"}
+    return [{"role": "contract", "address": address,
+             "storage": [{"slot": slot, "value": entries[slot]} for slot in sorted(entries, key=int)]}]
+
+
+def with_whole(value, address=ADDRESS):
+    """Add the whole committed storage that a fixture's slot rows imply."""
+    value["initialAccountStorage"] = whole(value["initialStorage"], value.get("initialUndeclaredStorage"), address=address)
+    for entry in value["transactions"]:
+        entry["accountStorage"] = whole(entry["committedStorage"], entry.get("undeclaredStorage"), address=address)
+    rows = value["transactions"]
+    value["finalAccountStorage"] = None if value.get("finalStorage") is None else copy.deepcopy(
+        rows[-1]["accountStorage"] if rows else value["initialAccountStorage"])
+    return value
+
+
 def slots(first=0, second=0):
     return [{"slot": "0", "value": str(first)}, {"slot": "1", "value": str(second)}]
 
 
 def row(index, value=7, first=3, second=4, status="returned"):
     result = {"stage": "execution", "id": f"tx-{index}", "index": index,
-        "status": status, "committedStorage": slots(first, second)}
+        "status": status, "committedStorage": slots(first, second), "accountStorage": whole(slots(first, second))}
     result.update({"output": "0x" + f"{value:064x}"} if status in ("returned", "reverted") else {"detail": "test resource"})
     return result
+
+
+def state_dump(accounts):
+    """An uncompressed Anvil state dump: lowercase hexadecimal address to a storage map."""
+    return "0x" + json.dumps({"accounts": {address.lower(): {"storage": {hex(int(slot)): hex(int(value)) for slot, value in values.items()}}
+                                           for address, values in accounts.items()}}).encode().hex()
 
 
 def history(value=None, rows=None):
     value = case() if value is None else value
     rows = [row(index) for index in range(len(value["transactions"]))] if rows is None else rows
     complete = len(rows) == len(value["transactions"]) and all(r["status"] in ("returned", "reverted") for r in rows)
-    return {"schema": runner.HISTORY_SCHEMA, "initialStorage": slots(), "transactions": rows,
+    return with_whole({"schema": runner.HISTORY_SCHEMA, "initialStorage": slots(), "transactions": rows,
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"] if rows else slots()),
         "status": "complete" if complete else "incomplete",
-        "unexecuted": [tx["id"] for tx in value["transactions"][len(rows):]]}
+        "unexecuted": [tx["id"] for tx in value["transactions"][len(rows):]]})
 
 
 def histories(value=None):
@@ -153,6 +182,7 @@ class RollbackTests(unittest.TestCase):
             for record in observed["transactions"]:
                 record.update(status="reverted", committedStorage=slots())
             observed["finalStorage"] = slots()
+            with_whole(observed)
         self.assertEqual(runner.compare(self.histories, self.case)["category"], "matched")
         for observed in self.histories.values():
             observed["transactions"][0]["committedStorage"] = slots(1, 0)
@@ -240,7 +270,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_unknown_completion_is_distinct_from_transactions_never_submitted(self):
         value = history(rows=[row(0)])
-        value.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None)
+        value.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None, finalAccountStorage=None)
         normalized = runner.normalize_history(value, case())
         self.assertEqual((normalized["unobserved"], normalized["unexecuted"], normalized["finalStorage"]),
                          (["tx-1"], ["tx-2"], None))
@@ -255,14 +285,14 @@ class HistoryTests(unittest.TestCase):
 
     def test_no_later_submission_after_an_incomplete_transaction(self):
         stopped = history(rows=[row(0, status="out-of-fuel")])
-        stopped.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None)
+        stopped.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None, finalAccountStorage=None)
         with self.assertRaisesRegex(ValueError, "submission continued"):
             runner.normalize_history(stopped, case())
 
     def test_prefix_difference_survives_unknown_later_completion(self):
         actual = histories()
         value = history(rows=[row(0, value=8)])
-        value.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None)
+        value.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None, finalAccountStorage=None)
         actual["rustEvm"] = value
         result = runner.compare(actual, case())
         self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
@@ -297,7 +327,7 @@ class HullProtocolTests(unittest.TestCase):
         return "\n".join(json.dumps(value) for value in values)
 
     def test_completed_and_incomplete_committed_prefixes(self):
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots()}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "accountStorage": whole()}
         complete = runner.hull_history(self.lines(deployment, row(0), row(1), row(2)), 0, case())
         self.assertEqual(complete["status"], "complete")
         partial = runner.hull_history(self.lines(deployment, row(0), row(1, status="out-of-fuel")), 1, case())
@@ -305,7 +335,7 @@ class HullProtocolTests(unittest.TestCase):
         self.assertEqual(partial["finalStorage"], row(1)["committedStorage"])
 
     def test_unexplained_exit_and_corrupt_output_do_not_become_histories(self):
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots()}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "accountStorage": whole()}
         for text, code in (("", 0), ("[]", 0), ("garbage", 0),
                            (self.lines(deployment, row(0), row(1), row(2)), 1),
                            (self.lines(deployment, row(0), row(1), row(2), row(3)), 0),
@@ -464,7 +494,7 @@ class ReplayTests(unittest.TestCase):
             failure = {"category": "inconclusive-resource", "stage": "evm-submission", "detail": "unknown", "pairs": {}}
             observed = histories()
             observed["rustEvm"] = history(rows=[row(0)])
-            observed["rustEvm"].update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None)
+            observed["rustEvm"].update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None, finalAccountStorage=None)
             report = {"histories": observed}
             self.assertEqual(runner.interrupted_comparison(arguments, report, failure), failure)
             observed["rustEvm"]["transactions"][0]["output"] = "0x" + f"{8:064x}"
@@ -527,7 +557,7 @@ class InterruptedExecutionPolicyTests(unittest.TestCase):
         sender, address = "0x" + "01" * 20, "0x" + "02" * 20
         deployment_hash, first_hash = "0x" + "10" * 32, "0x" + "20" * 32
         bindings = {"schema": "solcore-lean.storage-bindings.v1", "caller": str(int(sender, 16)), "address": str(int(address, 16))}
-        direct = {**history(original), "bindings": bindings, "fuelPerTransaction": 1000}
+        direct = {**with_whole(history(original), bindings["address"]), "bindings": bindings, "fuelPerTransaction": 1000}
         fake_runner = Mock()
         fake_runner.identity.return_value = {"sha256": "0" * 64}
         fake_runner.args = arguments
@@ -536,8 +566,8 @@ class InterruptedExecutionPolicyTests(unittest.TestCase):
         def process(stage, *_args):
             events.append(stage)
             if stage == "imported-hull":
-                observations = [{"stage": "deployment", "status": "returned", "committedStorage": slots()},
-                                *direct["transactions"]]
+                observations = [{"stage": "deployment", "status": "returned", "committedStorage": slots(),
+                                 "accountStorage": whole(address=bindings["address"])}, *direct["transactions"]]
                 return {"returncode": 0, "stdout": "\n".join(json.dumps(item) for item in observations)}
             return {"returncode": 0, "stdout": "revision"}
 
@@ -579,10 +609,15 @@ class InterruptedExecutionPolicyTests(unittest.TestCase):
                 slot, block = params[1:]
                 value = 0 if block == "0x1" else 3 if slot == "0x0" else 4
                 return "0x" + f"{value:064x}"
+            if method == "debug_traceTransaction" and params[1] == runner.PRESTATE_DIFF:
+                written = {"0x0": f"0x{3:064x}", "0x1": f"0x{4:064x}"} if params[0] == first_hash else {}
+                return {"pre": {}, "post": {address: {"storage": written}} if written else {}}
             if method == "debug_traceTransaction":
                 # An intentional prior output difference; the final failure
                 # must not erase this already completed observation.
                 return {"failed": False, "returnValue": f"{8:064x}"}
+            if method == "anvil_dumpState":
+                return state_dump({address: {"0": "3", "1": "4"} if len(submitted) > 1 else {}})
             self.fail(f"unexpected RPC method: {method}")
 
         rpc.call.side_effect = rpc_call
@@ -603,7 +638,8 @@ class InterruptedExecutionPolicyTests(unittest.TestCase):
         self.assertEqual(len(submitted), 3, "unknown/rejected transaction was retried")
         self.assertEqual(submitted[2]["data"], original["transactions"][1]["calldata"])
         self.assertTrue(all(request.get("data") != original["transactions"][2]["calldata"] for request in submitted))
-        self.assertLess(events.index("imported-hull"), events.index("debug_traceTransaction"))
+        # Hull runs before any transaction is sent; only the deployment's diff precedes it.
+        self.assertLess(events.index("imported-hull"), [index for index, event in enumerate(events) if event == "eth_sendTransaction"][1])
         value = report["histories"]["rustEvm"]
         runner.normalize_history(value, original)
         self.assertEqual([item["id"] for item in value["transactions"]], ["tx-0"])
@@ -847,7 +883,7 @@ def keyed_history(value, path):
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def keyed_histories(value=None):
@@ -982,7 +1018,7 @@ class KeyedStorageTests(unittest.TestCase):
 
     def test_keyed_hull_history_carries_declared_and_undeclared_rows(self):
         value = keyed_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": keyed_slots(value), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": keyed_slots(value), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in keyed_history(value, "importedHull")["transactions"]]
         stdout = "\n".join(json.dumps(row) for row in [deployment, *calls])
         history = runner.hull_history(stdout, 0, value)
@@ -1003,7 +1039,8 @@ class KeyedStorageTests(unittest.TestCase):
         observed["importedHull"]["transactions"][0]["undeclaredStorage"] = []
         self.assertEqual(runner.compare(observed, value)["category"], "matched")
         self.assertEqual(runner.scope(value),
-                         "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence")
+                         "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence; "
+                         "the contract's whole committed storage on all paths after deployment and every transaction")
 
 
 def array_calldata(flags, values):
@@ -1028,7 +1065,7 @@ def array_history(value, path):
     """Committed count rows; odd flags revert and keep the prior snapshot."""
     result = keyed_history({**value, "transactions": [{**tx, "input": tx["flags"]} for tx in value["transactions"]]}, path)
     result["schema"] = runner.ARRAY_HISTORY_SCHEMA
-    return result
+    return with_whole(result)
 
 
 def array_histories(value=None):
@@ -1082,7 +1119,7 @@ class DynamicArrayTests(unittest.TestCase):
 
     def test_array_hull_history_uses_the_declared_slot_runner_rows(self):
         value = array_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": keyed_slots(value), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": keyed_slots(value), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in array_history(value, "importedHull")["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["observedSlots"]), (runner.ARRAY_HISTORY_SCHEMA, list(runner.ARRAY_SLOTS)))
@@ -1135,7 +1172,7 @@ def log_history(value, path, address="101"):
         result["bindings"] = {"schema": "solcore-lean.storage-bindings.v1", "caller": "17", "address": address}
     if path == "rustEvm":
         result["chainLogs"] = [copy.deepcopy(log) for row in rows for log in row["logs"]]
-    return result
+    return with_whole(result, address)
 
 
 def log_histories(value=None):
@@ -1273,8 +1310,10 @@ class EventLogTests(unittest.TestCase):
         stopped = log_histories(value)
         history = stopped["directCore"]
         history["transactions"] = history["transactions"][:2]
-        history["transactions"][1] = {"id": "tx-1", "index": 1, "status": "out-of-fuel", "committedStorage": slots(0, 1), "logs": None}
-        history.update(status="incomplete", unexecuted=["tx-2"], finalStorage=slots(0, 1))
+        history["transactions"][1] = {"id": "tx-1", "index": 1, "status": "out-of-fuel", "committedStorage": slots(0, 1), "logs": None,
+                                      "accountStorage": whole(slots(0, 1), address="101")}
+        history.update(status="incomplete", unexecuted=["tx-2"], finalStorage=slots(0, 1),
+                       finalAccountStorage=whole(slots(0, 1), address="101"))
         normalized = runner.normalize_history(history, value, "directCore")
         self.assertIsNone(normalized["transactions"][1]["logs"])
         self.assertEqual(runner.compare(stopped, value)["category"], "inconclusive-resource")
@@ -1315,7 +1354,7 @@ class EventLogTests(unittest.TestCase):
     def test_log_hull_history_reads_deployment_and_receipt_logs(self):
         value = log_case()
         expected = log_history(value, "importedHull")
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "undeclaredStorage": [], "logs": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "accountStorage": whole(), "undeclaredStorage": [], "logs": []}
         calls = [{"stage": "execution", **row} for row in expected["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["initialLogs"], history["observedSlots"]), (runner.LOG_HISTORY_SCHEMA, [], ["0", "1"]))
@@ -1374,7 +1413,7 @@ def value_history(value, path):
         "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def value_histories(value=None):
@@ -1469,8 +1508,10 @@ class CallValueTests(unittest.TestCase):
         stopped = value_histories(value)
         history = stopped["directCore"]
         history["transactions"] = history["transactions"][:2]
-        history["transactions"][1] = {"id": "tx-1", "index": 1, "status": "out-of-fuel", "committedStorage": slots(0, 7), "committedBalance": "12"}
-        history.update(status="incomplete", unexecuted=["tx-2"], finalStorage=slots(0, 7), finalBalance="12")
+        history["transactions"][1] = {"id": "tx-1", "index": 1, "status": "out-of-fuel", "committedStorage": slots(0, 7), "committedBalance": "12",
+                                      "accountStorage": whole(slots(0, 7))}
+        history.update(status="incomplete", unexecuted=["tx-2"], finalStorage=slots(0, 7), finalBalance="12",
+                       finalAccountStorage=whole(slots(0, 7)))
         self.assertEqual(runner.normalize_history(history, value, "directCore")["finalBalance"], "12")
         self.assertEqual(runner.compare(stopped, value)["category"], "inconclusive-resource")
 
@@ -1488,7 +1529,7 @@ class CallValueTests(unittest.TestCase):
     def test_value_hull_history_reads_balances_and_deployment_logs(self):
         value = value_case()
         expected = value_history(value, "importedHull")
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "undeclaredStorage": [],
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": slots(), "accountStorage": whole(), "undeclaredStorage": [],
                       "committedBalance": "5", "logs": []}
         calls = [{"stage": "execution", **row} for row in expected["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
@@ -1552,7 +1593,7 @@ def bytes_history(value, path):
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def bytes_histories(value=None):
@@ -1656,7 +1697,7 @@ class BytesTests(unittest.TestCase):
 
     def test_bytes_hull_history_uses_the_declared_slot_runner_rows(self):
         value = bytes_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": bytes_slots(), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": bytes_slots(), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in bytes_history(value, "importedHull")["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["observedSlots"]), (runner.BYTES_HISTORY_SCHEMA, list(runner.BYTES_SLOTS)))
@@ -1722,7 +1763,7 @@ def mapping_history(value, path):
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def mapping_histories(value=None):
@@ -1825,7 +1866,7 @@ class MappingTests(unittest.TestCase):
 
     def test_mapping_hull_history_uses_the_declared_slot_runner_rows(self):
         value = mapping_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": mapping_slots(value), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": mapping_slots(value), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in mapping_history(value, "importedHull")["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["observedSlots"], history["initialUndeclaredStorage"]),
@@ -1905,7 +1946,7 @@ def ledger_history(value, path):
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def ledger_histories(value=None):
@@ -2032,7 +2073,7 @@ class LedgerTests(unittest.TestCase):
 
     def test_ledger_hull_history_uses_the_ledger_runner_rows(self):
         value = ledger_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": ledger_slots(value), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": ledger_slots(value), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in ledger_history(value, "importedHull")["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["observedSlots"], history["initialUndeclaredStorage"]),
@@ -2063,7 +2104,7 @@ class LedgerTests(unittest.TestCase):
             if stage == "imported-hull":
                 scenarios.append(json.loads(Path(command[1]).read_text()))
                 hull = ledger_history(original, "importedHull")
-                observations = [{"stage": "deployment", "status": "returned", "committedStorage": ledger_slots(original),
+                observations = [{"stage": "deployment", "status": "returned", "committedStorage": ledger_slots(original), "accountStorage": whole(),
                                  "undeclaredStorage": []}, *[{"stage": "execution", **row} for row in hull["transactions"]]]
                 return {"returncode": 0, "stdout": "\n".join(json.dumps(item) for item in observations)}
             return {"returncode": 0, "stdout": "revision"}
@@ -2100,6 +2141,8 @@ class LedgerTests(unittest.TestCase):
                 if params[1] == runner.PRESTATE_DIFF:
                     return {"pre": {}, "post": {}}
                 return {"failed": False, "returnValue": f"{0:064x}"}
+            if method == "anvil_dumpState":
+                return state_dump({address: {}})
             self.fail(f"unexpected RPC method: {method}")
 
         rpc.call.side_effect = rpc_call
@@ -2176,7 +2219,7 @@ def long_bytes_history(value, path):
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def long_bytes_histories(value=None):
@@ -2249,7 +2292,7 @@ class LongBytesTests(unittest.TestCase):
 
     def test_long_bytes_hull_history_uses_the_declared_slot_runner_rows(self):
         value = long_bytes_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": long_bytes_slots(), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": long_bytes_slots(), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in long_bytes_history(value, "importedHull")["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["observedSlots"]), (runner.LONG_BYTES_HISTORY_SCHEMA, [str(slot) for slot in range(11)]))
@@ -2305,7 +2348,7 @@ def nested_history(value, path):
         "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
     if path != "directCore":
         result["initialUndeclaredStorage"] = []
-    return result
+    return with_whole(result)
 
 
 def nested_histories(value=None):
@@ -2377,11 +2420,179 @@ class NestedArrayTests(unittest.TestCase):
 
     def test_nested_hull_history_uses_the_declared_slot_runner_rows(self):
         value = nested_case()
-        deployment = {"stage": "deployment", "status": "returned", "committedStorage": nested_slots(), "undeclaredStorage": []}
+        deployment = {"stage": "deployment", "status": "returned", "committedStorage": nested_slots(), "accountStorage": whole(), "undeclaredStorage": []}
         calls = [{"stage": "execution", **row} for row in nested_history(value, "importedHull")["transactions"]]
         history = runner.hull_history("\n".join(json.dumps(row) for row in [deployment, *calls]), 0, value)
         self.assertEqual((history["schema"], history["observedSlots"]), (runner.NESTED_HISTORY_SCHEMA, [str(slot) for slot in range(9)]))
         self.assertEqual(runner.compare({**nested_histories(value), "importedHull": history}, value)["category"], "matched")
+
+
+def stray(history, index, slot="12345", value="9"):
+    """Add one nonzero entry to a fixture row's whole storage, as a stray write would."""
+    entries = history["transactions"][index]["accountStorage"][0]["storage"]
+    entries.append({"slot": slot, "value": value})
+    entries.sort(key=lambda entry: int(entry["slot"]))
+    if index == len(history["transactions"]) - 1 and history.get("finalAccountStorage") is not None:
+        history["finalAccountStorage"] = copy.deepcopy(history["transactions"][index]["accountStorage"])
+
+
+class WholeStorageTests(unittest.TestCase):
+    """The whole committed storage is compared on all three paths after deployment
+    and every transaction; zero and absent are the same observation."""
+
+    def test_agreeing_whole_storage_matches_and_names_one_bound_contract(self):
+        self.assertEqual(runner.compare(histories(), case())["category"], "matched")
+        moved = histories()
+        moved["rustEvm"] = with_whole(moved["rustEvm"], "4097")
+        self.assertEqual(runner.compare(moved, case())["category"], "adapter-error")
+        bound = histories()
+        bound["directCore"]["bindings"] = {"schema": "solcore-lean.storage-bindings.v1", "caller": "17", "address": "4097"}
+        self.assertEqual(runner.compare(bound, case())["category"], "adapter-error")
+        bound["directCore"]["bindings"]["address"] = ADDRESS
+        self.assertEqual(runner.compare(bound, case())["category"], "matched")
+
+    def test_stray_write_outside_the_declaration_is_a_difference_on_its_own_path(self):
+        for path in runner.PATHS:
+            observed = histories()
+            stray(observed[path], 1)
+            result = runner.compare(observed, case())
+            others = [other for other in runner.PATHS if other != path]
+            with self.subTest(path=path):
+                self.assertEqual((result["category"], result["stage"], result["transactionId"]), ("semantic-mismatch", "transaction", "tx-1"))
+                self.assertEqual(result["fields"], ["accountStorage"])
+                self.assertEqual(result["accountStorageDifferences"], [{"account": "contract", "slot": "undeclared", "zeroPaths": others}])
+                self.assertEqual(sorted(pair for pair, same in result["pairs"].items() if not same),
+                                 sorted(pair for pair in result["pairs"] if path in pair.split("/")))
+                self.assertNotIn("accountStorageRollbackPaths", result)
+
+    def test_declared_and_missing_writes_keep_their_slot_and_absent_paths(self):
+        observed = histories()
+        observed["importedHull"]["transactions"][0]["accountStorage"][0]["storage"][1]["value"] = "5"
+        result = runner.compare(observed, case())
+        self.assertEqual((result["transactionId"], result["accountStorageDifferences"]),
+                         ("tx-0", [{"account": "contract", "slot": "1", "zeroPaths": []}]))
+        missing = histories()
+        for path in ("importedHull", "rustEvm"):
+            del missing[path]["transactions"][0]["accountStorage"][0]["storage"][0]
+        result = runner.compare(missing, case())
+        self.assertEqual(result["accountStorageDifferences"], [{"account": "contract", "slot": "0", "zeroPaths": ["importedHull", "rustEvm"]}])
+        # Both kinds in one row: declared slots first, then the undeclared class.
+        stray(missing["directCore"], 0)
+        self.assertEqual(runner.compare(missing, case())["accountStorageDifferences"],
+                         [{"account": "contract", "slot": "0", "zeroPaths": ["importedHull", "rustEvm"]},
+                          {"account": "contract", "slot": "undeclared", "zeroPaths": ["importedHull", "rustEvm"]}])
+
+    def test_entries_are_canonical_nonzero_and_strictly_ordered(self):
+        for name, entries in (("zero", [{"slot": "0", "value": "0"}]), ("duplicate", [{"slot": "2", "value": "1"}] * 2),
+                              ("unordered", [{"slot": "3", "value": "1"}, {"slot": "2", "value": "1"}]),
+                              ("noncanonical", [{"slot": "02", "value": "1"}]), ("wide", [{"slot": str(2**256), "value": "1"}]),
+                              ("extra", [{"slot": "2", "value": "1", "path": "x"}])):
+            observed = histories()
+            observed["rustEvm"]["transactions"][0]["accountStorage"][0]["storage"] = entries
+            with self.subTest(name=name):
+                self.assertEqual(runner.compare(observed, case())["category"], "adapter-error")
+        for name, change in (("missing", lambda h: h["transactions"][0].pop("accountStorage")),
+                             ("role", lambda h: h["transactions"][0]["accountStorage"][0].update(role="parent")),
+                             ("accounts", lambda h: h["transactions"][0]["accountStorage"].append(copy.deepcopy(h["transactions"][0]["accountStorage"][0]))),
+                             ("initial", lambda h: h.pop("initialAccountStorage")),
+                             ("final", lambda h: h.update(finalAccountStorage=[])),
+                             ("address", lambda h: h["transactions"][0]["accountStorage"][0].update(address=str(2**160)))):
+            observed = histories()
+            change(observed["importedHull"])
+            with self.subTest(name=name):
+                self.assertEqual(runner.compare(observed, case())["category"], "adapter-error")
+        stopped = history(rows=[row(0)])
+        stopped.update(unobserved=["tx-1"], unexecuted=["tx-2"], finalStorage=None, finalAccountStorage=row(0)["accountStorage"])
+        with self.assertRaisesRegex(ValueError, "final whole storage"):
+            runner.normalize_history(stopped, case())
+
+    def test_a_revert_keeps_the_whole_storage_even_if_all_paths_agree(self):
+        value = case()
+        value["schema"] = runner.ROLLBACK_CASE_SCHEMA
+        value["storagePlan"]["schema"] = "solcore-lean.storage-rollback-plan.v1"
+        value["contract"].update(name="SynthesizedRollback", deployPath=["SynthesizedRollbackDeploy"],
+                                 runtimePath=["SynthesizedRollbackDeploy", "SynthesizedRollback"])
+        observed = histories(value)
+        for history_value in observed.values():
+            history_value["transactions"][1]["status"] = "reverted"
+        self.assertEqual(runner.compare(observed, value)["category"], "matched")
+        for history_value in observed.values():
+            stray(history_value, 1)
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]), ("semantic-mismatch", "tx-1", ["accountStorage"]))
+        self.assertEqual(result["accountStorageRollbackPaths"], list(runner.PATHS))
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertNotIn("accountStorageDifferences", result)
+
+    def test_deployment_whole_storage_must_be_empty_on_every_path(self):
+        observed = histories()
+        observed["rustEvm"]["initialAccountStorage"][0]["storage"] = [{"slot": "7", "value": "1"}]
+        result = runner.compare(observed, case())
+        self.assertEqual((result["category"], result["stage"], result["fields"]), ("semantic-mismatch", "initial-storage", ["accountStorage"]))
+        self.assertEqual(result["accountStorageDifferences"], [{"account": "contract", "slot": "undeclared", "zeroPaths": ["directCore", "importedHull"]}])
+        agreed = histories()
+        for history_value in agreed.values():
+            history_value["initialAccountStorage"][0]["storage"] = [{"slot": "1", "value": "2"}]
+        result = runner.compare(agreed, case())
+        self.assertEqual((result["stage"], result["accountStorageDifferences"]),
+                         ("initial-storage", [{"account": "contract", "slot": "1", "zeroPaths": []}]))
+        self.assertTrue(all(result["pairs"].values()))
+
+    def test_containment_and_whole_storage_report_one_stray_write_together(self):
+        value = keyed_case()
+        observed = keyed_histories(value)
+        observed["importedHull"]["transactions"][1]["undeclaredStorage"] = [{"slot": "9", "value": "1"}]
+        observed["importedHull"] = with_whole(observed["importedHull"])
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"], result["undeclaredPaths"]),
+                         ("semantic-mismatch", "tx-1", ["undeclaredStorage", "accountStorage"], ["importedHull"]))
+        self.assertEqual(result["accountStorageDifferences"], [{"account": "contract", "slot": "undeclared", "zeroPaths": ["directCore", "rustEvm"]}])
+        # A declared slot of this case is classified by number, not as undeclared.
+        observed = keyed_histories(value)
+        stray(observed["rustEvm"], 1, slot="6")
+        result = runner.compare(observed, value)
+        self.assertEqual(result["accountStorageDifferences"], [{"account": "contract", "slot": "6", "zeroPaths": ["directCore", "importedHull"]}])
+
+    def test_prestate_diffs_name_every_observed_account_and_fail_closed_elsewhere(self):
+        parent, child, other = "0x" + "ab" * 20, "0x" + "cd" * 20, "0x" + "ef" * 20
+        diff = {"pre": {parent: {"storage": {"0x09": "0x" + "00" * 31 + "05"}}, other: {"balance": "0x1"}},
+                "post": {child.upper().replace("0X", "0x"): {"storage": {"0x01": "0x02"}}, other: {"balance": "0x0"}}}
+        self.assertEqual(runner.changed_storage(diff, [parent, child]), {parent: {"9"}, child: {"1"}})
+        self.assertEqual(runner.changed_storage({"pre": {}, "post": {}}, [parent]), {parent: set()})
+        with self.assertRaisesRegex(ValueError, "outside the deployed contract"):
+            runner.changed_storage(diff, [parent])
+
+    def test_evm_whole_storage_rereads_reported_slots_and_must_equal_the_state_dump(self):
+        address = "0x" + "ab" * 20
+        calls = []
+        values = {"0": 3, "9": 0, "12": 2**256 - 1}
+        class Rpc:
+            def __init__(self, dumped):
+                self.dumped = dumped
+            def call(self, method, params):
+                calls.append((method, params))
+                if method == "anvil_dumpState":
+                    return self.dumped
+                return "0x" + f"{values[str(int(params[1], 16))]:064x}"
+        accounts = [("contract", str(int(address, 16)))]
+        expected = [{"role": "contract", "address": accounts[0][1],
+                     "storage": [{"slot": "0", "value": "3"}, {"slot": "12", "value": str(2**256 - 1)}]}]
+        touched = {address: {"12", "0", "9"}}
+        self.assertEqual(runner.evm_account_storage(Rpc(None), accounts, touched, "0x4"), expected)
+        self.assertEqual([params[1:] for method, params in calls], [[hex(0), "0x4"], [hex(9), "0x4"], [hex(12), "0x4"]])
+        dumped = state_dump({address: {"0": "3", "12": str(2**256 - 1), "5": "0"}})
+        record = {}
+        self.assertEqual(runner.evm_whole_storage(Rpc(dumped), accounts, touched, "0x4", record), expected)
+        self.assertEqual(set(record["stateDump"]), {"sha256", "bytes"})
+        compressed = "0x" + gzip.compress(bytes.fromhex(dumped[2:])).hex()
+        self.assertEqual(runner.evm_dumped_storage(Rpc(compressed), accounts)[0], expected)
+        for name, bad in (("missing", state_dump({})), ("disagreeing", state_dump({address: {"0": "3"}}))):
+            with self.subTest(name=name), self.assertRaises((runner.Finding, ValueError)) as caught:
+                runner.evm_whole_storage(Rpc(bad), accounts, touched, "0x4", {})
+            if name == "disagreeing":
+                self.assertEqual((caught.exception.category, caught.exception.stage), ("adapter-error", "evm-storage-enumeration"))
+        with self.assertRaises(ValueError):
+            runner.evm_dumped_storage(Rpc("0x" + gzip.compress(b"{" * 10)[:12].hex()), accounts)
 
 
 if __name__ == "__main__":

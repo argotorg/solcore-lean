@@ -5,11 +5,18 @@ set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
 
-/-- Account code and sparse storage whose lookup never returns a stored zero. -/
+/-- Account code and sparse storage whose lookup never returns a stored zero.
+The present slots are also kept in strictly increasing numeric order, so the
+complete storage can be enumerated exactly. -/
 structure Account where private mk ::
   private storage : Core.Word → Option Core.Word
   private storage_nonzero :
     ∀ slot value, storage slot = some value → value ≠ Core.Word.zero
+  private presentSlots : List Core.Word
+  private presentSlots_sorted :
+    presentSlots.Pairwise (fun left right => left.val < right.val)
+  private presentSlots_exact :
+    ∀ slot, slot ∈ presentSlots ↔ (storage slot).isSome
   private code : Option CheckedHostCoreProgram
   private balanceValue : Core.Word
   private nonceValue : Core.Word
@@ -20,9 +27,119 @@ structure WorldState where private mk ::
 
 namespace Account
 
+/-- Insert a slot into a strictly increasing slot list. -/
+private def insertSlot (slot : Core.Word) : List Core.Word → List Core.Word
+  | [] => [slot]
+  | head :: tail =>
+      if slot.val < head.val then slot :: head :: tail
+      else if slot.val = head.val then head :: tail
+      else head :: insertSlot slot tail
+
+private theorem mem_insertSlot (slot other : Core.Word) :
+    ∀ slots : List Core.Word,
+      other ∈ insertSlot slot slots ↔ other = slot ∨ other ∈ slots
+  | [] => by simp [insertSlot]
+  | head :: tail => by
+      unfold insertSlot
+      by_cases lower : slot.val < head.val
+      · rw [if_pos lower]
+        simp
+      · rw [if_neg lower]
+        by_cases same : slot.val = head.val
+        · rw [if_pos same]
+          have equal : slot = head := Fin.ext same
+          subst equal
+          simp only [List.mem_cons]
+          constructor
+          · intro member
+            exact Or.inr member
+          · rintro (selected | member)
+            · exact Or.inl selected
+            · exact member
+        · rw [if_neg same]
+          simp only [List.mem_cons, mem_insertSlot slot other tail]
+          constructor
+          · rintro (atHead | selected | member)
+            · exact Or.inr (Or.inl atHead)
+            · exact Or.inl selected
+            · exact Or.inr (Or.inr member)
+          · rintro (selected | atHead | member)
+            · exact Or.inr (Or.inl selected)
+            · exact Or.inl atHead
+            · exact Or.inr (Or.inr member)
+
+private theorem insertSlot_sorted (slot : Core.Word) :
+    ∀ slots : List Core.Word,
+      slots.Pairwise (fun left right => left.val < right.val) →
+        (insertSlot slot slots).Pairwise (fun left right => left.val < right.val)
+  | [], _ => by simp [insertSlot]
+  | head :: tail, sorted => by
+      rw [List.pairwise_cons] at sorted
+      unfold insertSlot
+      by_cases lower : slot.val < head.val
+      · rw [if_pos lower]
+        refine List.Pairwise.cons ?_ (List.Pairwise.cons sorted.1 sorted.2)
+        intro other member
+        rcases List.mem_cons.mp member with atHead | member
+        · rw [atHead]
+          exact lower
+        · exact Nat.lt_trans lower (sorted.1 other member)
+      · rw [if_neg lower]
+        by_cases same : slot.val = head.val
+        · rw [if_pos same]
+          exact List.Pairwise.cons sorted.1 sorted.2
+        · rw [if_neg same]
+          refine List.Pairwise.cons ?_ (insertSlot_sorted slot tail sorted.2)
+          intro other member
+          rcases (mem_insertSlot slot other tail).mp member with selected | member
+          · rw [selected]
+            omega
+          · exact sorted.1 other member
+
+/-- Strictly increasing slot lists with the same members are equal. -/
+private theorem presentSlots_unique :
+    ∀ left right : List Core.Word,
+      left.Pairwise (fun first second => first.val < second.val) →
+      right.Pairwise (fun first second => first.val < second.val) →
+      (∀ slot, slot ∈ left ↔ slot ∈ right) → left = right
+  | [], [], _, _, _ => rfl
+  | [], head :: _, _, _, same => by
+      have member := (same head).2 (by simp)
+      simp at member
+  | head :: _, [], _, _, same => by
+      have member := (same head).1 (by simp)
+      simp at member
+  | first :: rest, second :: others, sortedLeft, sortedRight, same => by
+      rw [List.pairwise_cons] at sortedLeft sortedRight
+      have heads : first = second := by
+        rcases List.mem_cons.mp ((same first).1 (by simp)) with equal | inRight
+        · exact equal
+        · rcases List.mem_cons.mp ((same second).2 (by simp)) with equal | inLeft
+          · exact equal.symm
+          · have below := sortedRight.1 first inRight
+            have above := sortedLeft.1 second inLeft
+            omega
+      subst heads
+      congr 1
+      apply presentSlots_unique rest others sortedLeft.2 sortedRight.2
+      intro slot
+      constructor
+      · intro member
+        rcases List.mem_cons.mp ((same slot).1 (List.mem_cons_of_mem _ member)) with equal | inRight
+        · have above := sortedLeft.1 slot member
+          rw [equal] at above
+          omega
+        · exact inRight
+      · intro member
+        rcases List.mem_cons.mp ((same slot).2 (List.mem_cons_of_mem _ member)) with equal | inLeft
+        · have above := sortedRight.1 slot member
+          rw [equal] at above
+          omega
+        · exact inLeft
+
 /-- The present account with neither code nor stored values. -/
 def empty : Account :=
-  ⟨fun _ => none, by simp, none, Core.Word.zero, Core.Word.zero⟩
+  ⟨fun _ => none, by simp, [], List.Pairwise.nil, by simp, none, Core.Word.zero, Core.Word.zero⟩
 
 /-- Observe the account's exact unsigned 256-bit balance. -/
 def balance (account : Account) : Core.Word :=
@@ -36,14 +153,16 @@ def nonce (account : Account) : Core.Word :=
 def withBalance
     (account : Account)
     (balance : Core.Word) : Account :=
-  ⟨account.storage, account.storage_nonzero, account.code, balance,
+  ⟨account.storage, account.storage_nonzero, account.presentSlots,
+    account.presentSlots_sorted, account.presentSlots_exact, account.code, balance,
     account.nonceValue⟩
 
 /-- Replace the creation nonce while preserving storage, code, and balance. -/
 def withNonce
     (account : Account)
     (nonce : Core.Word) : Account :=
-  ⟨account.storage, account.storage_nonzero, account.code,
+  ⟨account.storage, account.storage_nonzero, account.presentSlots,
+    account.presentSlots_sorted, account.presentSlots_exact, account.code,
     account.balanceValue, nonce⟩
 
 /-- Observe the host-checker-accepted code associated with this Account. -/
@@ -54,7 +173,8 @@ def code? (account : Account) : Option CheckedHostCoreProgram :=
 def withCode
     (account : Account)
     (code : CheckedHostCoreProgram) : Account :=
-  ⟨account.storage, account.storage_nonzero, some code,
+  ⟨account.storage, account.storage_nonzero, account.presentSlots,
+    account.presentSlots_sorted, account.presentSlots_exact, some code,
     account.balanceValue, account.nonceValue⟩
 
 /-- Observe whether a semantic nonzero storage value exists. -/
@@ -67,6 +187,14 @@ def storageValue?
 def storageRead (account : Account) (slot : Core.Word) : Core.Word :=
   (account.storageValue? slot).getD Core.Word.zero
 
+/-- Every present storage slot, in strictly increasing numeric order. -/
+def storageSlots (account : Account) : List Core.Word :=
+  account.presentSlots
+
+/-- The complete nonzero storage as entries in strictly increasing slot order. -/
+def storageEntries (account : Account) : List (Core.Word × Core.Word) :=
+  account.storageSlots.map fun slot => (slot, account.storageRead slot)
+
 /-- Store nonzero values and delete the selected value when writing zero. -/
 def storageWrite
     (account : Account)
@@ -78,6 +206,13 @@ def storageWrite
         split at present
         · contradiction
         · exact account.storage_nonzero current stored present,
+      account.presentSlots.filter (fun current => current != slot),
+      account.presentSlots_sorted.filter _,
+      by
+        intro current
+        by_cases selected : current = slot
+        · simp [selected]
+        · simp [selected, account.presentSlots_exact current],
       account.code,
       account.balanceValue,
       account.nonceValue⟩
@@ -89,6 +224,14 @@ def storageWrite
         · intro stored_zero
           exact zero ((Option.some.inj present).trans stored_zero)
         · exact account.storage_nonzero current stored present,
+      insertSlot slot account.presentSlots,
+      insertSlot_sorted slot account.presentSlots account.presentSlots_sorted,
+      by
+        intro current
+        rw [mem_insertSlot]
+        by_cases selected : current = slot
+        · simp [selected]
+        · simp [selected, account.presentSlots_exact current],
       account.code,
       account.balanceValue,
       account.nonceValue⟩
@@ -197,6 +340,55 @@ theorem Account.storageValue?_empty (slot : Core.Word) :
     Account.empty.storageValue? slot = none := by
   rfl
 
+@[simp] theorem Account.storageSlots_empty : Account.empty.storageSlots = [] := by
+  rfl
+
+@[simp] theorem Account.storageEntries_empty : Account.empty.storageEntries = [] := by
+  rfl
+
+/-- The slot list is exact: a slot is listed precisely when a value is present. -/
+theorem Account.mem_storageSlots_iff (account : Account) (slot : Core.Word) :
+    slot ∈ account.storageSlots ↔ (account.storageValue? slot).isSome :=
+  account.presentSlots_exact slot
+
+theorem Account.storageSlots_sorted (account : Account) :
+    account.storageSlots.Pairwise (fun left right => left.val < right.val) :=
+  account.presentSlots_sorted
+
+/-- The enumeration is exact: an entry is listed precisely when lookup returns it. -/
+theorem Account.mem_storageEntries_iff (account : Account) (slot value : Core.Word) :
+    (slot, value) ∈ account.storageEntries ↔ account.storageValue? slot = some value := by
+  simp only [Account.storageEntries, List.mem_map, Prod.mk.injEq]
+  constructor
+  · rintro ⟨current, member, selected, read⟩
+    subst selected
+    have present := (account.mem_storageSlots_iff current).1 member
+    cases stored : account.storageValue? current with
+    | none => simp [stored] at present
+    | some found =>
+        simp only [Account.storageRead, stored, Option.getD_some] at read
+        rw [read]
+  · intro present
+    refine ⟨slot, (account.mem_storageSlots_iff slot).2 (by simp [present]), rfl, ?_⟩
+    simp [Account.storageRead, present]
+
+/-- Every enumerated value is nonzero. -/
+theorem Account.storageEntries_nonzero (account : Account) (slot value : Core.Word)
+    (member : (slot, value) ∈ account.storageEntries) : value ≠ Core.Word.zero :=
+  account.storage_nonzero slot value ((account.mem_storageEntries_iff slot value).1 member)
+
+@[simp] theorem Account.storageSlots_withBalance (account : Account) (balance : Core.Word) :
+    (account.withBalance balance).storageSlots = account.storageSlots := by
+  rfl
+
+@[simp] theorem Account.storageSlots_withNonce (account : Account) (nonce : Core.Word) :
+    (account.withNonce nonce).storageSlots = account.storageSlots := by
+  rfl
+
+@[simp] theorem Account.storageSlots_withCode (account : Account) (code : CheckedHostCoreProgram) :
+    (account.withCode code).storageSlots = account.storageSlots := by
+  rfl
+
 theorem Account.storageRead_empty (slot : Core.Word) :
     Account.empty.storageRead slot = Core.Word.zero := by
   rfl
@@ -292,8 +484,13 @@ namespace Solcore.ContractRuntime
     (sameBalance : left.balance = right.balance)
     (sameNonce : left.nonce = right.nonce) :
     left = right := by
+  have sameSlots : left.storageSlots = right.storageSlots :=
+    Account.presentSlots_unique _ _ left.presentSlots_sorted right.presentSlots_sorted
+      (fun slot => by
+        rw [left.mem_storageSlots_iff slot, right.mem_storageSlots_iff slot, sameStorage slot])
   cases left
   cases right
+  simp only [Account.storageSlots] at sameSlots
   simp only [Account.storageValue?] at sameStorage
   simp only [Account.code?] at sameCode
   simp only [Account.balance] at sameBalance

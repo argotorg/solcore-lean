@@ -226,7 +226,7 @@ private def observerChecks : IO Unit := do
     (exhausted.getObjVal? "finalAccounts").toOption == (exhausted.getObjVal? "initialAccounts").toOption)
     "forwarded-value observer conflated fuel exhaustion with completion or committed its value"
   let complete := ForwardedCallExecution.observe plan calls NestedCallExecution.fixtureBindings 100000
-  ensure ((complete.getObjValAs? String "schema").toOption == some "solcore-lean.forward-history.v1" &&
+  ensure ((complete.getObjValAs? String "schema").toOption == some "solcore-lean.forward-history.v2" &&
     (complete.getObjValAs? String "status").toOption == some "complete")
     "history did not declare its schema or complete"
 

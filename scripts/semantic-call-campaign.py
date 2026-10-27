@@ -37,7 +37,7 @@ PATHS = adapter.PATHS
 SCHEMA = "solcore-lean.semantic-call-campaign.v1"
 MANIFEST_SCHEMA = "solcore-lean.semantic-call-corpus-manifest.v1"
 CORPUS_SCHEMA = "solcore-lean.semantic-call-corpus.v1"
-ANALYSIS_SCHEMA = "solcore-lean.semantic-call-analysis.v1"
+ANALYSIS_SCHEMA = "solcore-lean.semantic-call-analysis.v2"
 TEST_ADAPTER = "xor-one-history-word-after-matched-execution-v1"
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = legacy.SHRINKABLE
@@ -49,15 +49,19 @@ DIMENSIONS = ("Features", "Inputs", "HelperCounts", "TransactionCounts", "Templa
 VALUE_DIMENSIONS = ("Values", "ForwardedValues", "RefundedForwards", "RevertedValues")
 FORWARD_DIMENSIONS = DIMENSIONS[:-1] + VALUE_DIMENSIONS
 NUMERIC_DIMENSIONS = ("Inputs",) + VALUE_DIMENSIONS
-TEST_FIELDS = ("output", "parent:balance", "child:balance", "parent:storage:0", "parent:storage:1", "child:storage:0", "child:storage:1", "logs:data")
+TEST_FIELDS = ("output", "parent:balance", "child:balance", "parent:storage:0", "parent:storage:1", "child:storage:0", "child:storage:1", "logs:data",
+               "parent:stray", "child:stray")
+# A `ROLE:stray` field XORs one into the implicit zero Word of this undeclared
+# slot in one path's whole committed storage of that contract.
+STRAY_SLOT = str(2**256 - 2)
 LOG_PATTERNS = ("", "parent:1,parent:3", "parent:1,child:2,parent:3")
 FORWARD_CORPUS_SCHEMA = "solcore-lean.semantic-forward-corpus.v1"
 # Profile rules; the adapter selects schemas, programs and protocols by case schema.
 PROFILES = {
     "stateful-calls": {"dimensions": DIMENSIONS, "modeMask": 7, "corpusSchema": CORPUS_SCHEMA, "originKind": "call-generated",
-        "scope": "one child call; fixed parent8/child0; committed slots0/1, contract balances and ordered logs; zero root value; no gas/nonce or arbitrary-world equivalence"},
+        "scope": "one child call; fixed parent8/child0; committed slots0/1, both contracts' whole committed storage, contract balances and ordered logs; zero root value; no gas/nonce or arbitrary-world equivalence"},
     "stateful-forwarded-value": {"dimensions": FORWARD_DIMENSIONS, "modeMask": 3, "corpusSchema": FORWARD_CORPUS_SCHEMA, "originKind": "forward-generated",
-        "scope": "one value-forwarding child call; parent endowment 2^72/child0; committed slots0/1, contract balances and empty logs; payable root values; no sender-balance, gas/nonce or arbitrary-world equivalence"},
+        "scope": "one value-forwarding child call; parent endowment 2^72/child0; committed slots0/1, both contracts' whole committed storage, contract balances and empty logs; payable root values; no sender-balance, gas/nonce or arbitrary-world equivalence"},
 }
 
 
@@ -195,7 +199,16 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                 raise ValueError("matched report has inconsistent actual histories")
             rows = histories[path]["transactions"]
             row = next((row for row in rows if row["id"] == selected), None)
-            if row is not None and (field != "logs:data" or row["logs"]):
+            if row is not None and field.endswith(":stray"):
+                entries = next(account for account in row["accountStorage"] if account["role"] == field.split(":")[0])["storage"]
+                # A path that already holds the slot cannot keep a synthetic stray write.
+                if all(entry["slot"] != STRAY_SLOT for entry in entries):
+                    entries.append({"slot": STRAY_SLOT, "value": "1"})
+                    entries.sort(key=lambda entry: int(entry["slot"]))
+                    if rows[-1]["id"] == selected:
+                        histories[path]["finalAccountStorage"] = copy.deepcopy(row["accountStorage"])
+                    synthetic = True
+            elif row is not None and (field != "logs:data" or row["logs"]):
                 if field == "output" or field == "logs:data":
                     container, key = (row, "output") if field == "output" else (row["logs"][0], "data")
                     value = common.hex_bytes(container[key], "test payload")
@@ -301,6 +314,8 @@ def fingerprint(analysis):
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "fields": sorted(comparison.get("fields", [])), "accountFields": sorted(differences),
             "logFields": log_differences, "logShapes": {path: log_shape(events[path], bindings) for path in PATHS},
+            "accountStorageDifferences": copy.deepcopy(comparison.get("accountStorageDifferences", [])),
+            "accountStorageRollbackPaths": sorted(comparison.get("accountStorageRollbackPaths", [])),
             "pathShapes": shapes, "synthetic": analysis["synthetic"]}
 
 
@@ -327,6 +342,8 @@ def transaction_counts(histories, case, bindings):
             prefix_case = {**case, "transactions": case["transactions"][:index + 1]}
             prefix_histories = {path: {"schema": adapter.profile(case)["historySchema"], "initialAccounts": value["initialAccounts"],
                 "transactions": value["transactions"][:index + 1], "finalAccounts": value["transactions"][index]["committedAccounts"],
+                "initialAccountStorage": value["initialAccountStorage"],
+                "finalAccountStorage": value["transactions"][index]["accountStorage"],
                 "status": "complete", "unexecuted": []} for path, value in values.items()}
             prefix = adapter.compare(prefix_histories, prefix_case, bindings)["category"] == "matched"
         result["matched"] += prefix

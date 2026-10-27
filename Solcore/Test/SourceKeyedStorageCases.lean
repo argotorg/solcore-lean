@@ -61,7 +61,9 @@ private def referenceChecks : IO Json := do
     ((← rows observed).map fun row => (row.getObjValAs? String "status").toOption) ==
       #[some "returned", some "returned", some "reverted"])
     "keyed scenario did not follow its input parities"
-  ensure ((← rows (KeyedStorage.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)) == (← rows observed))
+  let rebound ← rows (KeyedStorage.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent keyed profile changed with bindings"
   -- The maximum key's wrapping successor is both the counter and another key.
   ensure (KeyedStorage.aliases value.transactions == ["key-counter", "successor-counter", "successor-key"] &&

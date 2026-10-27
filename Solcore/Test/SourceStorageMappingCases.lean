@@ -65,7 +65,9 @@ private def referenceChecks : IO Json := do
     "mapping scenario did not follow its flags parities"
   ensure ((← get (StorageMapping.checkProtocol value observed)) == ["returned", "reverted", "returned"])
     "mapping history broke its counter or sum protocol"
-  ensure ((← rows (StorageMapping.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)) == (← rows observed))
+  let rebound ← rows (StorageMapping.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent mapping profile changed with bindings"
   ensure (StorageMapping.aliases (transactions [(0, 6, 0), (0, 7, 0), (0, 6, 0)]) == ["repeated-key", "successor-key"] &&
     StorageMapping.aliases (transactions [(0, maximum, 0)]) == ["wrapped-successor"] &&

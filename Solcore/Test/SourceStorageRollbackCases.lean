@@ -90,7 +90,8 @@ private def referenceChecks : IO Json := do
   checkHistory mutableCase ([("returned", 2, 1, 1), ("reverted", 5, 1, 1), ("returned", 6, 4, 2)].map fun (status, out, a, b) =>
     (status, Word.ofNatModulo out, Word.ofNatModulo a, Word.ofNatModulo b))
   let fresh := Solcore.Synthesis.Source.StorageRollback.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000
-  ensure ((← rows fresh) == (← rows (Solcore.Synthesis.Source.StorageRollback.observe value bindings 10000)))
+  ensure ((← rows fresh).map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows (Solcore.Synthesis.Source.StorageRollback.observe value bindings 10000)).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      (← rows fresh).all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent rollback profile changed with bindings"
   ensure (identity.program.check && identity.program.toCore.checkHost &&
     identity.program.resultType == .sum .word (.sum .word .word))

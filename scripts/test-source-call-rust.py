@@ -101,7 +101,7 @@ def word_bytes(output) -> str:
 
 
 def normalized_history(history: dict, case: dict, bindings: dict) -> dict:
-    if history.get("schema") != "solcore-lean.call-history.v1":
+    if history.get("schema") != "solcore-lean.call-history.v2":
         raise ValueError("unexpected call history schema")
     initial = normalized_accounts(history.get("initialAccounts"), bindings)
     if ([row["balance"] for row in initial] != ["8", "0"]

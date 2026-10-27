@@ -1,6 +1,7 @@
 import Solcore.Synthesis.Core.CallValue
 import Solcore.Synthesis.Stateful.KeyedStorageExecution
 import Solcore.ContractRuntime.BalancedTopLevelExecution
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute the original checked call-value contract over a persistent account
 world with the public balanced runtime. Each invocation transfers its value from
@@ -16,7 +17,7 @@ namespace Solcore.Synthesis.Stateful.CallValueExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core.CallValue (CheckedPlan)
 
-def historySchema : String := "solcore-lean.call-value-history.v1"
+def historySchema : String := "solcore-lean.call-value-history.v2"
 
 /-- One caller and one installed contract, as for the storage profiles. -/
 abbrev Bindings := StorageExecution.Bindings
@@ -62,7 +63,8 @@ private def worldBalance (world : WorldState) (bindings : Bindings) : Json :=
   | none => Json.null
 
 private def committed (world : WorldState) (bindings : Bindings) : List (String × Json) :=
-  [("committedStorage", worldStorage world bindings), ("committedBalance", worldBalance world bindings)]
+  [("committedStorage", worldStorage world bindings), ("committedBalance", worldBalance world bindings),
+   ("accountStorage", AccountStorage.contractJson world bindings.address)]
 
 private def outcomeFields : FrameOutcome Word → List (String × Json)
   | .returned bytes => [("status", toJson "returned"), ("output", toJson (encodeBytesText bytes))]
@@ -112,9 +114,13 @@ def observeContract (contract : CheckedCoreContract) (deploymentValue : Word)
     ("schema", toJson historySchema), ("bindings", StorageExecution.bindingsJson bindings),
     ("fuelPerTransaction", toJson fuel), ("observedSlots", KeyedStorageExecution.slotsJson observedSlots),
     ("deploymentValue", toJson (toString deploymentValue.val)),
-    ("initialStorage", worldStorage initial bindings), ("initialBalance", worldBalance initial bindings),
+    ("initialStorage", worldStorage initial bindings),
+    ("initialAccountStorage", AccountStorage.contractJson initial bindings.address),
+    ("initialBalance", worldBalance initial bindings),
     ("initialLogs", toJson ([] : List Json)), ("transactions", .arr rows),
-    ("finalStorage", worldStorage world bindings), ("finalBalance", worldBalance world bindings),
+    ("finalStorage", worldStorage world bindings),
+    ("finalAccountStorage", AccountStorage.contractJson world bindings.address),
+    ("finalBalance", worldBalance world bindings),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

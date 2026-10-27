@@ -1631,6 +1631,97 @@ more than three rows or two elements per row, non-canonical offsets, truncated
 input or the decoder's revert paths, multi-word return values, gas, balances,
 nonces, code or memory. Agreement is test evidence, not a preservation proof.
 
+**Whole committed storage.** The comparisons above observe declared slots on
+all three paths, and seven profiles add Hull/EVM containment of undeclared
+slots. A miscompiled write outside the declaration, or a stray write by the
+original Core contract itself, was therefore invisible on at least one path.
+All thirteen stateful profiles now also compare the observed accounts' whole
+committed storage after every transaction. The definitions were fixed before
+execution:
+
+- Observed accounts: every contract the profile deploys. That is the one
+  contract of the eleven storage-family profiles (role `contract`) and the
+  parent and child of `stateful-calls` and `stateful-forwarded-value`.
+  Senders, precompiles and other accounts are not observed. On the EVM path a
+  storage change at any other account fails closed as an adapter error, as
+  the declared-slot profiles already did.
+- Enumeration on original Core: the committed world after deployment (the
+  declared post-deployment world) and after every transaction (the terminal
+  `finalWorld`, or the prior world when a transaction is incomplete). Core's
+  function-valued account storage could not be enumerated, so `Account` now
+  also keeps the strictly increasing list of exactly its present slots, which
+  every storage write maintains. `Account.storageEntries` lists each present
+  slot with its value. A theorem states that an entry is listed exactly when
+  `storageValue?` returns it, and `Account.ext` still holds. All existing
+  storage laws are unchanged.
+- Enumeration on imported Hull: each observed account's committed storage
+  entries after deployment and after every call. A revert or an incomplete
+  call keeps the prior entries. The runner canonicalizes them: every distinct
+  key with the value the entries' lookup selects, zero values dropped, in
+  increasing slot order.
+- Enumeration on the EVM: the union of the observed accounts' storage keys
+  that `debug_traceTransaction` with `prestateTracer` in diff mode reports for
+  the deployment transactions and every mined transaction so far. Every key is
+  reread with `eth_getStorageAt` at each receipt block. A new contract starts
+  with empty storage, so a slot is nonzero after a block only if some
+  transaction up to it changed that slot. A probe on Anvil 1.5.1 found that
+  the diff reports exactly the slots whose committed value a transaction
+  changes. It covered constructor writes, fresh, changed and cleared slots,
+  slots 0, 2^255 and 2^256 - 1, values restored by a later transaction,
+  reverted transactions, and child calls that returned or reverted under a
+  returned or reverted parent. Writes that leave a value unchanged inside one
+  transaction are not reported: 0 to 5 to 0, 3 to 4 to 3, same-value writes,
+  and writes rolled back with a frame. The opcode trace shows that those
+  writes ran, but committed storage cannot observe them. As a second exact
+  method, `anvil_dumpState` after deployment and after every mined
+  transaction must give the same nonzero storage for every observed account.
+  A disagreement or an unreadable dump fails closed as an adapter error.
+  Anvil 1.5.1 lacks `debug_storageRangeAt`.
+- Zero and absent are equal. Observations list only nonzero values, and
+  writing zero removes an entry on every path, so no observation distinguishes
+  a cleared slot from one never written.
+- Comparison and classification: after deployment, every path's observed
+  storage must be empty, because every profile has an empty constructor.
+  After every transaction the three observations must be equal. A difference
+  is a `semantic-mismatch` at the existing stage (`initial-storage` or
+  `initial-accounts` for deployment, else the transaction) with the field
+  `accountStorage`. It is classified by `accountStorageDifferences`: sorted,
+  unique records of the account role, the slot and the paths at which the slot
+  is zero. The slot is its decimal Word if the case declares it (its observed
+  slots) and `undeclared` otherwise. The declared-slot, containment, balance
+  and log comparisons are unchanged and still reported.
+- Fingerprints: the storage and call campaigns copy `accountStorageDifferences`
+  and `accountStorageRollbackPaths` from the comparison into the fingerprint.
+  A reduction may move a stray write to another undeclared slot. It cannot
+  turn it into a declared-slot difference, or change its account or the paths
+  that lack it. Declared slots keep their numbers, as before.
+- Rollback and reverts: on every path, a reverted transaction must leave the
+  whole observed storage equal to the prior committed observation. In the call
+  profiles, a child revert (odd input) under a returned root must leave the
+  child's whole storage unchanged. A path that breaks either rule adds
+  `accountStorage` and is listed in `accountStorageRollbackPaths`. An
+  incomplete transaction reports the prior committed storage, and comparison
+  stops there as before.
+- Reduction and replay: candidates run with the same observation, and
+  `same_failure` requires the whole fingerprint, so reduction preserves the
+  new classification. Exact replay recomputes all three observations from a
+  fresh deployment. The copied-observation test adapter gains a stray field
+  (`stray` for storage profiles, `parent:stray` and `child:stray` for call
+  profiles). After actual agreement, it adds value one at the undeclared slot
+  2^256 - 2 to one path's observation of the selected transaction. A candidate
+  that removes the transaction, or declares or already holds that slot,
+  cannot keep the synthetic finding.
+- Schemas and versions: the thirteen history schemas move from `.v1` to `.v2`.
+  They now require `initialAccountStorage`, `accountStorage` on every row and
+  `finalAccountStorage`. The storage and call report schemas
+  (`semantic-storage-differential`, `semantic-call-differential`) and analysis
+  schemas move to `.v2`. Case, plan, corpus, Hull scenario and campaign
+  summary schemas are unchanged, so saved cases and fixed corpora stay valid.
+  Every native tool and Hull runner is rebuilt, because the Core account
+  representation changed and the observers and runners emit the new fields.
+  Older archives therefore cannot be replayed exactly; rerun their saved
+  cases with `--case`.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

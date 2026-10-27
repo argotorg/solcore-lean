@@ -83,7 +83,8 @@ private def referenceChecks : IO Json := do
   checkHistory mutableCase ([(3, 2, 1), (7, 5, 2), (12, 9, 3)].map fun (out, a, b) =>
     (Word.ofNatModulo out, Word.ofNatModulo a, Word.ofNatModulo b))
   let fresh := Storage.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000
-  ensure ((← rows fresh) == (← rows (Storage.observe value bindings 10000)))
+  ensure ((← rows fresh).map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows (Storage.observe value bindings 10000)).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      (← rows fresh).all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent profile observed a different bound target"
   ensure (identity.program.check && identity.program.toCore.checkHost)
     "canonical storage code lost frozen Wire host admission"

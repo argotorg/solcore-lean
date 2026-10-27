@@ -198,7 +198,9 @@ private def observerChecks : IO Unit := do
   -- The deployer in the bindings never acts; each transaction's sender does.
   let first := StorageLedgerExecution.observe plan calls StorageExecution.fixtureBindings 1000000
   let other := StorageLedgerExecution.observe plan calls ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000
-  ensure ((first.getObjVal? "transactions").toOption == (other.getObjVal? "transactions").toOption &&
+  let unbound := fun (history : Json) => ((history.getObjValAs? (List Json) "transactions").toOption.getD []).map
+    Solcore.Synthesis.Stateful.AccountStorage.unbound
+  ensure (unbound first == unbound other && !(unbound first).isEmpty &&
     (first.getObjValAs? String "status").toOption == some "complete")
     "ledger rows depended on the deployer instead of the senders"
   let moved ← transactions [(s2, 0, s1, 1, 7), (s1, 0, 0, 1, 3), (s0, 1, s0, 0, 0)]
@@ -212,7 +214,7 @@ private def observerChecks : IO Unit := do
     (rows[0]!.getObjValAs? String "status").toOption == some "out-of-fuel" &&
     (exhausted.getObjVal? "finalStorage").toOption == (exhausted.getObjVal? "initialStorage").toOption)
     "ledger observer conflated fuel exhaustion with completion"
-  ensure ((first.getObjValAs? String "schema").toOption == some "solcore-lean.ledger-history.v1")
+  ensure ((first.getObjValAs? String "schema").toOption == some "solcore-lean.ledger-history.v2")
     "history did not declare its schema"
 
 def testSourceStorageLedgerEmitter : IO Unit := do

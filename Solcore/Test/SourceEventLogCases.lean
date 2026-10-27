@@ -48,7 +48,7 @@ private def imported (value : EventLog.CheckedScenario) (fuel : Nat := 10000) : 
 private def withoutAddresses (history : Json) : IO (Array Json) := do
   (← rows history).mapM fun row => do
     let logs ← get (row.getObjValAs? (Array Json) "logs")
-    return row.setObjVal! "logs" (toJson (logs.map fun log => log.setObjVal! "address" Json.null))
+    return Solcore.Synthesis.Stateful.AccountStorage.unbound (row.setObjVal! "logs" (toJson (logs.map fun log => log.setObjVal! "address" Json.null)))
 
 private def referenceChecks : IO Json := do
   let identity ← makePlan (.var 0) [⟨1, 2, 1⟩, ⟨3, 4, 0⟩]

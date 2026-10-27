@@ -37,7 +37,7 @@ PATHS = adapter.PATHS
 SCHEMA = "solcore-lean.semantic-storage-campaign.v1"
 MANIFEST_SCHEMA = "solcore-lean.semantic-storage-corpus-manifest.v1"
 CORPUS_SCHEMA = "solcore-lean.semantic-storage-corpus.v1"
-ANALYSIS_SCHEMA = "solcore-lean.semantic-storage-analysis.v1"
+ANALYSIS_SCHEMA = "solcore-lean.semantic-storage-analysis.v2"
 TEST_ADAPTER = "xor-one-history-word-after-matched-execution-v1"
 RESOURCE = "inconclusive-resource"
 SHRINKABLE = legacy.SHRINKABLE
@@ -74,7 +74,10 @@ ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
 MAPPING_ALIASES = ("repeated-key", "successor-key", "wrapped-successor")
 # Static ledger aliasing: a self-transfer, a sender an earlier transaction paid, a repeated sender.
 LEDGER_ALIASES = ("self-transfer", "received-then-sent", "repeated-sender")
-TEST_FIELD = re.compile(r"output|log|balance|storage:(?:0|[1-9][0-9]{0,77})")
+TEST_FIELD = re.compile(r"output|log|balance|stray|storage:(?:0|[1-9][0-9]{0,77})")
+# The `stray` adapter XORs one into the implicit zero Word of this undeclared
+# slot in one path's whole committed storage: a stray write no other path made.
+STRAY_SLOT = str(2**256 - 2)
 
 
 def dimensions(profile_name):
@@ -355,7 +358,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
     selected = transaction_id or case["transactions"][0]["id"]
     if path is not None:
         if path not in PATHS or not TEST_FIELD.fullmatch(field) or (
-                not adapter.profile(case)["declared"] and field not in ("output", "storage:0", "storage:1")) or (
+                not adapter.profile(case)["declared"] and field not in ("output", "stray", "storage:0", "storage:1")) or (
                 field == "log" and not adapter.has_logs(case)) or (field == "balance" and not adapter.has_balances(case)):
             raise ValueError("unknown synthetic history adapter")
         if actual.get("category") == "matched":
@@ -366,6 +369,11 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
             # Like a removed transaction, a candidate whose keys no longer
             # declare the selected slot cannot preserve the synthetic finding.
             declared = field in ("output", "log", "balance") or field[len("storage:"):] in adapter.observed_slots(case)
+            if field == "stray":
+                # A candidate that declares the slot, or already holds it on
+                # this path, cannot keep a synthetic stray write.
+                held = row is not None and any(entry["slot"] == STRAY_SLOT for account in row["accountStorage"] for entry in account["storage"])
+                declared = STRAY_SLOT not in adapter.observed_slots(case) and not held
             if row is not None and declared:
                 if field == "output":
                     value = common.hex_bytes(row["output"], "test output")
@@ -376,6 +384,12 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                     row["committedBalance"] = str(int(common.word(row["committedBalance"], "test balance")) ^ 1)
                     if rows[-1]["id"] == selected:
                         histories[path]["finalBalance"] = row["committedBalance"]
+                elif field == "stray":
+                    entries = row["accountStorage"][0]["storage"]
+                    entries.append({"slot": STRAY_SLOT, "value": "1"})
+                    entries.sort(key=lambda entry: int(entry["slot"]))
+                    if rows[-1]["id"] == selected:
+                        histories[path]["finalAccountStorage"] = copy.deepcopy(row["accountStorage"])
                 elif field == "log":
                     # The first committed log's first topic, else its last data
                     # byte. A transaction without such a log cannot keep it.
@@ -441,6 +455,10 @@ def fingerprint(analysis):
             "pathShapes": shapes, "synthetic": analysis["synthetic"]}
     if keyed:
         result["undeclaredPaths"] = sorted(comparison.get("undeclaredPaths", []))
+    # Whole-storage differences: account, declared slot or `undeclared`, and the
+    # paths lacking the slot; and the paths whose revert changed the whole storage.
+    result["accountStorageDifferences"] = copy.deepcopy(comparison.get("accountStorageDifferences", []))
+    result["accountStorageRollbackPaths"] = sorted(comparison.get("accountStorageRollbackPaths", []))
     if log_analysis(analysis):
         result["logPaths"] = sorted(comparison.get("logPaths", []))
     return result
@@ -475,6 +493,7 @@ def transaction_counts(histories, case):
     except (ValueError, TypeError, KeyError):
         return result
     prefix = len(values) == 3 and all(all(row["value"] == "0" for row in value["initialStorage"]) and
+                                      not any(account["storage"] for account in value["initialAccountStorage"]) and
                                       not value.get("initialUndeclaredStorage") and not value.get("initialLogs") and
                                       value.get("initialBalance", "0") == str(adapter.deployment_value(case)) for value in values.values())
     for index, tx in enumerate(case["transactions"]):
@@ -485,7 +504,8 @@ def transaction_counts(histories, case):
         prefix = prefix and complete and all(adapter.without_containment(row) == adapter.without_containment(rows[0]) for row in rows) and not any(
             row.get("undeclaredStorage") for row in rows) and all(adapter.conforms(case, tx, row,
                 value["transactions"][index - 1]["committedStorage"] if index else value["initialStorage"], address,
-                (value["transactions"][index - 1].get("committedBalance") if index else value.get("initialBalance")))
+                (value["transactions"][index - 1].get("committedBalance") if index else value.get("initialBalance")),
+                value["transactions"][index - 1]["accountStorage"] if index else value["initialAccountStorage"])
                 for value in values.values() for row in value["transactions"][index:index + 1])
         result["matched"] += prefix
     return result
@@ -697,7 +717,9 @@ class Campaign:
         args = self.case_args(input_path, folder)
         report = {"schema": adapter.REPORT_SCHEMA, "backend": self.backend, "processes": [], "histories": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
-            "scope": adapter.scope(case) if self.specification["declared"] else "initially empty committed slots0/1; ordered zero-value run(uint256); no gas/balance/nonce equivalence"}
+            "scope": adapter.scope(case) if self.specification["declared"] else
+                "initially empty committed slots0/1; ordered zero-value run(uint256); the contract's whole committed storage; "
+                "no gas/balance/nonce equivalence"}
         interrupted = False
         try:
             adapter.execute(args, report)
@@ -823,6 +845,8 @@ class Campaign:
                 raise ValueError("selected synthetic transaction ID is absent from the original scenario")
             if self.args.test_perturb_path and self.args.test_field.startswith("storage:") and self.args.test_field[len("storage:"):] not in adapter.observed_slots(case):
                 raise ValueError("selected synthetic slot is absent from the original scenario")
+            if self.args.test_perturb_path and self.args.test_field == "stray" and STRAY_SLOT in adapter.observed_slots(case):
+                raise ValueError("the synthetic stray slot is declared by the original scenario")
             folder, report, analysis = self.execute_case(case)
             category = analysis["comparison"]["category"]
             count_outcome(self.summary["counts"], analysis, case)
@@ -878,7 +902,8 @@ def main():
     parser.add_argument("--test-perturb-path", choices=PATHS)
     parser.add_argument("--test-transaction-id")
     parser.add_argument("--test-field", default="output",
-                        help="output, storage:SLOT for an observed decimal slot, log (log profile) or balance (call-value profile)")
+                        help="output, storage:SLOT for an observed decimal slot, stray (whole storage), log (log profile) "
+                             "or balance (call-value profile)")
     args = parser.parse_args()
     try:
         selected_profile = args.profile
@@ -909,10 +934,10 @@ def main():
         parser.error("test transaction ID requires the explicit adapter and a valid ID")
     if args.test_field != "output" and not args.test_perturb_path:
         parser.error("test field requires the explicit synthetic adapter")
-    if not TEST_FIELD.fullmatch(args.test_field) or (not adapter.PROFILES[args.profile]["declared"] and args.test_field not in ("output", "storage:0", "storage:1")) or (
+    if not TEST_FIELD.fullmatch(args.test_field) or (not adapter.PROFILES[args.profile]["declared"] and args.test_field not in ("output", "stray", "storage:0", "storage:1")) or (
             args.test_field == "log" and not adapter.PROFILES[args.profile].get("logs")) or (
             args.test_field == "balance" and not adapter.PROFILES[args.profile].get("balances")):
-        parser.error("test field must be output, storage:SLOT for an observed slot, log for the log profile or balance for the call-value profile")
+        parser.error("test field must be output, storage:SLOT for an observed slot, stray, log for the log profile or balance for the call-value profile")
     limits = {"seed": (0, 2**64 - 1), "nodes": (1, 512), "cases": (1, 1024), "attempts": (0, 10000),
         "seconds": (.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10), "shrink_attempts": (0, 10000),
         "shrink_candidates": (1, 4096), "case_timeout": (.001, 3600), "direct_fuel": (1, 10000000),

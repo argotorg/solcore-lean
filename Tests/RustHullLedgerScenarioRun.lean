@@ -1,5 +1,6 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute a bounded sequence of persistent, zero-value calls from declared
 senders on one linked Hull contract with declared observed slots. The keyed
@@ -10,7 +11,7 @@ values of the observed slots and, separately, every nonzero committed slot
 outside the declaration, including after a reverted call. Receipt worlds on
 failure are not committed snapshots. -/
 set_option autoImplicit false
-open Lean Solcore Solcore.Frontend.RustHull
+open Lean Solcore Solcore.Frontend.RustHull Solcore.Synthesis.Stateful
 
 private def get {α : Type} (result : Except String α) : IO α :=
   match result with
@@ -172,6 +173,10 @@ private def observedSlots (config : Json) : Except String (List Core.Word) := do
     throw "observed slots must be strictly increasing"
   pure slots
 
+/-- The contract's whole committed storage, canonicalized from its entries. -/
+private def accountStorage (address : Core.Word) (storage : Core.WordMapping.Entries) : String × Json :=
+  ("accountStorage", toJson [AccountStorage.hullAccountJson AccountStorage.contractRole address storage])
+
 private def report (stage : String) (data : List (String × Json)) : IO Unit :=
   IO.println ((Json.mkObj (("stage", toJson stage) :: data)).compress)
 
@@ -202,13 +207,16 @@ private def execute (config : Json) : IO UInt32 := do
   let compiled ← lower (LinkedContract.compileObject program.program runtimePath images)
   let receipt := Contract.runWithReceipt prepared fuel
   let .returned deployed initialStorage := receipt.outcome | do
-    report "deployment" (committedStorage slots [] :: undeclaredStorage slots [] :: receiptFields receipt)
+    report "deployment" (committedStorage slots [] ::
+      accountStorage constructor.address [] :: undeclaredStorage slots [] :: receiptFields receipt)
     return 1
   unless deployed == runtimeImage.bytes do
-    report "deployment" [committedStorage slots [], undeclaredStorage slots [], ("status", "code-mismatch"),
+    report "deployment" [committedStorage slots [],
+      accountStorage constructor.address [], undeclaredStorage slots [], ("status", "code-mismatch"),
       ("output", toJson (hex deployed))]
     return 1
-  report "deployment" (committedStorage slots initialStorage :: undeclaredStorage slots initialStorage ::
+  report "deployment" (committedStorage slots initialStorage ::
+    accountStorage constructor.address initialStorage :: undeclaredStorage slots initialStorage ::
     ("codeBytes", toJson deployed.length) :: receiptFields receipt)
   let mut storage := initialStorage
   let mut balances := receipt.balances
@@ -226,7 +234,8 @@ private def execute (config : Json) : IO UInt32 := do
         world := receipt.world
     | _ => pure ()
     report "execution" (("index", toJson index) :: ("id", toJson call.id) ::
-      committedStorage slots storage :: undeclaredStorage slots storage :: receiptFields receipt)
+      committedStorage slots storage ::
+        accountStorage constructor.address storage :: undeclaredStorage slots storage :: receiptFields receipt)
     match receipt.outcome with
     | .returned _ _ | .reverted _ => pure ()
     | _ => return 1

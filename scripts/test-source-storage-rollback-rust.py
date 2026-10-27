@@ -65,7 +65,7 @@ def native_case(plan: dict, txs: list[dict], directory: Path, args: argparse.Nam
 
 
 def normalized_history(history: dict, case: dict) -> dict:
-    if history.get("schema") != "solcore-lean.storage-history.v1" or history.get("initialStorage") != storage.ZERO_STORAGE:
+    if history.get("schema") != "solcore-lean.storage-history.v2" or history.get("initialStorage") != storage.ZERO_STORAGE:
         raise ValueError("rollback history must begin with two zero slots")
     rows = history.get("transactions")
     if (not isinstance(rows, list) or len(rows) != len(case["transactions"])

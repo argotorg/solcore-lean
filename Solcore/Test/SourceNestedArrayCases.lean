@@ -69,7 +69,9 @@ private def referenceChecks : IO Json := do
     "nested-array scenario did not follow its flags parities"
   ensure ((← get (NestedArray.checkProtocol value observed)) == ["returned", "reverted", "returned"])
     "nested-array history broke its row count, element count or sum protocol"
-  ensure ((← rows (NestedArray.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)) == (← rows observed))
+  let rebound ← rows (NestedArray.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent nested-array profile changed with bindings"
   rejected (NestedArray.checkedScenario identity (transactions [(0, [[], [], [], []])])) "four rows accepted"
   rejected (NestedArray.checkedScenario identity (transactions [(0, [[1, 2, 3]])])) "three elements in a row accepted"

@@ -8,8 +8,8 @@ set_option autoImplicit false
 namespace Solcore.ContractRuntime
 
 /--
-An exact single-Account storage delta. The current function-valued WorldState
-cannot enumerate changed slots, so callers query individual slots.
+An exact single-Account storage delta. The delta is queried slot by slot;
+`Account.storageEntries` enumerates either endpoint account's whole storage.
 -/
 structure TopLevelStorageDelta
     (initialWorld finalWorld : WorldState)

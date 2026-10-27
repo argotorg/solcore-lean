@@ -221,7 +221,7 @@ private def observerChecks : IO Unit := do
   let complete := LongBytesExecution.observe plan calls StorageExecution.fixtureBindings 100000
   ensure ((complete.getObjVal? "observedSlots").toOption ==
       some (toJson ((List.range 11).map toString)) &&
-    (complete.getObjValAs? String "schema").toOption == some "solcore-lean.long-bytes-history.v1" &&
+    (complete.getObjValAs? String "schema").toOption == some "solcore-lean.long-bytes-history.v2" &&
     (complete.getObjValAs? String "status").toOption == some "complete")
     "history did not declare its slots or schema"
 

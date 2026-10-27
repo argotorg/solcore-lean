@@ -17,7 +17,7 @@ namespace Solcore.Synthesis.Stateful.ForwardedCallExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core.ForwardedCall (CheckedPlan)
 
-def historySchema : String := "solcore-lean.forward-history.v1"
+def historySchema : String := "solcore-lean.forward-history.v2"
 
 /-- One caller, the parent and the child, as for the parent/child call profile. -/
 abbrev Bindings := NestedCallExecution.Bindings
@@ -69,6 +69,7 @@ def observe (plan : CheckedPlan) (transactions : List Transaction) (bindings : B
       else if target = bindings.child then some plan.childContract else none }
   let mut world := initialWorld plan bindings
   let initial := NestedCallExecution.accountsJson world bindings
+  let initialWhole := NestedCallExecution.wholeStorageJson world bindings
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
   for (transaction, index) in transactions.zipIdx do
@@ -78,7 +79,8 @@ def observe (plan : CheckedPlan) (transactions : List Transaction) (bindings : B
         target := bindings.parent, caller := bindings.caller, callValue := transaction.value,
         inputData := inputData bindings transaction.input transaction.amount }
       let common := [("id", toJson transaction.id), ("index", toJson index)]
-      let unknown := [("committedAccounts", NestedCallExecution.accountsJson prior bindings), ("logs", Json.null)]
+      let unknown := [("committedAccounts", NestedCallExecution.accountsJson prior bindings),
+        ("accountStorage", NestedCallExecution.wholeStorageJson prior bindings), ("logs", Json.null)]
       match registry.resolve? prior bindings.parent with
       | none =>
           rows := rows.push (Json.mkObj (common ++ [("status", toJson "resolution-failure")] ++ unknown))
@@ -95,6 +97,7 @@ def observe (plan : CheckedPlan) (transactions : List Transaction) (bindings : B
                   world := terminal.finalWorld
                   rows := rows.push (Json.mkObj (common ++ outcomeFields terminal.outcome ++ [
                     ("committedAccounts", NestedCallExecution.accountsJson world bindings),
+                    ("accountStorage", NestedCallExecution.wholeStorageJson world bindings),
                     ("logs", NestedCallExecution.logsJson terminal.committedJournal)]))
                   match terminal.outcome with
                   | .trapped _ => stopped := some transaction.id
@@ -103,8 +106,9 @@ def observe (plan : CheckedPlan) (transactions : List Transaction) (bindings : B
                   rows := rows.push (Json.mkObj (common ++ [("status", toJson "out-of-fuel")] ++ unknown))
                   stopped := some transaction.id
   return Json.mkObj [("schema", toJson historySchema), ("bindings", NestedCallExecution.bindingsJson bindings),
-    ("fuelPerTransaction", toJson fuel), ("initialAccounts", initial),
+    ("fuelPerTransaction", toJson fuel), ("initialAccounts", initial), ("initialAccountStorage", initialWhole),
     ("transactions", .arr rows), ("finalAccounts", NestedCallExecution.accountsJson world bindings),
+    ("finalAccountStorage", NestedCallExecution.wholeStorageJson world bindings),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

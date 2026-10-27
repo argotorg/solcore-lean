@@ -45,6 +45,21 @@ def account_rows(parent_balance, parent_slots, child_balance, child_slots):
         for role, balance, slots in (("parent", parent_balance, parent_slots), ("child", child_balance, child_slots))]
 
 
+def whole(accounts):
+    """Fixture whole storage: both contracts' nonzero slot rows."""
+    return [{"role": account["role"], "address": account["address"],
+             "storage": [copy.deepcopy(entry) for entry in account["storage"] if entry["value"] != "0"]} for account in accounts]
+
+
+def with_whole(value):
+    """Add the whole committed storage that a fixture's account rows imply."""
+    value["initialAccountStorage"] = whole(value["initialAccounts"])
+    for row in value["transactions"]:
+        row["accountStorage"] = whole(row["committedAccounts"])
+    value["finalAccountStorage"] = None if value.get("finalAccounts") is None else whole(value["finalAccounts"])
+    return value
+
+
 def event(role, topic, payload):
     return {"address": BINDINGS[role], "topics": [str(topic)], "data": word(payload)}
 
@@ -52,14 +67,14 @@ def event(role, topic, payload):
 def history():
     after_first = account_rows(7, (4, 4), 1, (4, 1))
     after_second = account_rows(7, (9, 10), 1, (4, 1))
-    return {"schema": adapter.HISTORY_SCHEMA, "initialAccounts": adapter.initial_accounts(BINDINGS),
+    return with_whole({"schema": adapter.HISTORY_SCHEMA, "initialAccounts": adapter.initial_accounts(BINDINGS),
         "transactions": [
             {"id": "tx-0", "index": 0, "status": "returned", "output": word(8), "committedAccounts": after_first,
                 "logs": [event("parent", 1, 4), event("child", 2, 4), event("parent", 3, 4)]},
             {"id": "tx-1", "index": 1, "status": "returned", "output": word(19), "committedAccounts": after_second,
                 "logs": [event("parent", 1, 9), event("parent", 3, 10)]},
             {"id": "tx-2", "index": 2, "status": "reverted", "output": word(25), "committedAccounts": copy.deepcopy(after_second), "logs": []}],
-        "finalAccounts": copy.deepcopy(after_second), "status": "complete", "unexecuted": []}
+        "finalAccounts": copy.deepcopy(after_second), "status": "complete", "unexecuted": []})
 
 
 def histories():
@@ -141,7 +156,7 @@ class ComparisonTests(unittest.TestCase):
         data = histories()
         evm = data["rustEvm"]
         evm["transactions"] = evm["transactions"][:1]
-        evm.update(status="incomplete", finalAccounts=None, unobserved=["tx-1"], unexecuted=["tx-2"])
+        evm.update(status="incomplete", finalAccounts=None, finalAccountStorage=None, unobserved=["tx-1"], unexecuted=["tx-2"])
         self.assertEqual(adapter.compare(data, case(), BINDINGS)["category"], "inconclusive-resource")
         evm["transactions"][0]["output"] = word(9)
         self.assertEqual(adapter.compare(data, case(), BINDINGS)["transactionId"], "tx-0")
@@ -169,7 +184,8 @@ class ReceiptTests(unittest.TestCase):
         runtimes = {"parent": b"\x60\x01", "child": b"\x60\x02"}
         rows = [{"stage": "deployment-" + role, "status": "returned", "output": "0x" + runtimes[role].hex(),
                  "imageVerified": True, "codeBytes": 2} for role in ("child", "parent")]
-        rows += [{"stage": "initialization", "committedAccounts": adapter.initial_accounts(BINDINGS)}]
+        rows += [{"stage": "initialization", "committedAccounts": adapter.initial_accounts(BINDINGS),
+                  "accountStorage": whole(adapter.initial_accounts(BINDINGS))}]
         rows += [{**row, "stage": "execution"} for row in history()["transactions"]]
         encode = lambda values: "\n".join(json.dumps(row) for row in values)
         self.assertEqual(adapter.hull_history(encode(rows), 0, case(), BINDINGS, runtimes)["status"], "complete")
@@ -336,8 +352,8 @@ def forward_history(value):
                 child = [child[0] + amount, index + 30, child[2] + amount]
         rows.append({"id": tx["id"], "index": index, "status": "reverted" if given & 2 else "returned", "output": word(index + 3),
                      "committedAccounts": account_rows(parent[0], parent[1:], child[0], child[1:]), "logs": []})
-    return {"schema": adapter.FORWARD_HISTORY_SCHEMA, "initialAccounts": adapter.initial_accounts(BINDINGS, True),
-        "transactions": rows, "finalAccounts": copy.deepcopy(rows[-1]["committedAccounts"]), "status": "complete", "unexecuted": []}
+    return with_whole({"schema": adapter.FORWARD_HISTORY_SCHEMA, "initialAccounts": adapter.initial_accounts(BINDINGS, True),
+        "transactions": rows, "finalAccounts": copy.deepcopy(rows[-1]["committedAccounts"]), "status": "complete", "unexecuted": []})
 
 
 def forward_histories(value=None):
@@ -435,18 +451,84 @@ class ForwardedValueTests(unittest.TestCase):
         runtimes = {"parent": b"\x60\x01", "child": b"\x60\x02"}
         rows = [{"stage": "deployment-" + role, "status": "returned", "output": "0x" + runtimes[role].hex(),
                  "imageVerified": True, "codeBytes": 2} for role in ("child", "parent")]
-        rows += [{"stage": "initialization", "committedAccounts": adapter.initial_accounts(BINDINGS, True)}]
+        rows += [{"stage": "initialization", "committedAccounts": adapter.initial_accounts(BINDINGS, True),
+                  "accountStorage": whole(adapter.initial_accounts(BINDINGS, True))}]
         rows += [{**row, "stage": "execution"} for row in forward_history(value)["transactions"]]
         encode = lambda values: "\n".join(json.dumps(row) for row in values)
         history = adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
         self.assertEqual((history["schema"], history["status"]), (adapter.FORWARD_HISTORY_SCHEMA, "complete"))
         self.assertEqual(adapter.compare({**forward_histories(value), "importedHull": history}, value, BINDINGS)["category"], "matched")
         rejected = rows[:4] + [{"stage": "execution", "id": "tx-1", "index": 1, "status": "transfer-rejected",
-                                "committedAccounts": rows[3]["committedAccounts"], "logs": None}]
+                                "committedAccounts": rows[3]["committedAccounts"], "accountStorage": rows[3]["accountStorage"], "logs": None}]
         observed = adapter.hull_history(encode(rejected), 1, value, BINDINGS, runtimes)
         self.assertEqual(observed["status"], "incomplete")
         self.assertEqual(adapter.compare({**forward_histories(value), "importedHull": observed}, value, BINDINGS)["category"],
                          "execution-error")
+
+
+def stray(value, index, role, slot="12345"):
+    """Add one nonzero entry to a contract's whole storage in one fixture row."""
+    row = value["transactions"][index]
+    entries = next(account for account in row["accountStorage"] if account["role"] == role)["storage"]
+    entries.append({"slot": slot, "value": "9"})
+    entries.sort(key=lambda entry: int(entry["slot"]))
+    if index == len(value["transactions"]) - 1:
+        value["finalAccountStorage"] = copy.deepcopy(row["accountStorage"])
+
+
+class WholeStorageTests(unittest.TestCase):
+    """Both contracts' whole committed storage is compared after deployment and
+    every transaction; root and child reverts keep the storage they roll back."""
+
+    def test_stray_writes_are_classified_by_contract_and_absent_paths(self):
+        for role in adapter.ROLES:
+            for path in adapter.PATHS:
+                data = histories()
+                stray(data[path], 0, role)
+                result = adapter.compare(data, case(), BINDINGS)
+                with self.subTest(role=role, path=path):
+                    self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                     ("semantic-mismatch", "tx-0", ["accountStorage"]))
+                    self.assertEqual(result["accountStorageDifferences"],
+                                     [{"account": role, "slot": "undeclared", "zeroPaths": [other for other in adapter.PATHS if other != path]}])
+        data = histories()
+        next(account for account in data["importedHull"]["transactions"][0]["accountStorage"] if account["role"] == "child")["storage"][0]["value"] = "7"
+        self.assertEqual(adapter.compare(data, case(), BINDINGS)["accountStorageDifferences"],
+                         [{"account": "child", "slot": "0", "zeroPaths": []}])
+
+    def test_child_and_root_reverts_keep_the_whole_storage_they_roll_back(self):
+        # tx-1 has an odd input, so its child reverts under a returned root; tx-2's root reverts.
+        for index, role in ((1, "child"), (2, "parent"), (2, "child")):
+            data = histories()
+            for observed in data.values():
+                stray(observed, index, role)
+            result = adapter.compare(data, case(), BINDINGS)
+            with self.subTest(index=index, role=role):
+                self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                                 ("semantic-mismatch", f"tx-{index}", ["accountStorage"]))
+                self.assertEqual(result["accountStorageRollbackPaths"], list(adapter.PATHS))
+                self.assertTrue(all(result["pairs"].values()))
+        # A returned root keeps the parent's writes beside a child revert.
+        data = histories()
+        for observed in data.values():
+            stray(observed, 1, "parent")
+            for later in observed["transactions"][2:]:
+                later["accountStorage"] = copy.deepcopy(observed["transactions"][1]["accountStorage"])
+            observed["finalAccountStorage"] = copy.deepcopy(observed["transactions"][2]["accountStorage"])
+        self.assertEqual(adapter.compare(data, case(), BINDINGS)["category"], "matched")
+
+    def test_deployment_storage_is_empty_and_bound_to_both_contracts(self):
+        data = histories()
+        data["rustEvm"]["initialAccountStorage"][1]["storage"] = [{"slot": "3", "value": "1"}]
+        result = adapter.compare(data, case(), BINDINGS)
+        self.assertEqual((result["category"], result["stage"], result["fields"]), ("semantic-mismatch", "initial-accounts", ["accountStorage"]))
+        self.assertEqual(result["accountStorageDifferences"], [{"account": "child", "slot": "undeclared", "zeroPaths": ["directCore", "importedHull"]}])
+        for change in (lambda h: h["transactions"][0]["accountStorage"][0].update(address="999"),
+                       lambda h: h["transactions"][0]["accountStorage"].reverse(),
+                       lambda h: h.update(finalAccountStorage=None)):
+            data = histories()
+            change(data["importedHull"])
+            self.assertEqual(adapter.compare(data, case(), BINDINGS)["category"], "adapter-error")
 
 
 if __name__ == "__main__":

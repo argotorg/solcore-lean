@@ -1,6 +1,7 @@
 import Solcore.Synthesis.Core.StorageMapping
 import Solcore.Synthesis.Stateful.KeyedStorageExecution
 import Solcore.Abi.Keccak256
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute the original checked Keccak-mapping contract over a persistent
 account world. Each invocation starts a fresh Core heap and only the public
@@ -9,14 +10,14 @@ exactly the declared slots: the counter and the entry slots of every
 transaction key and wrapping successor. The observer derives those slots with
 the separate `Solcore.Abi.V1.Keccak256`, not with the Core builders the
 contract runs, so a contract that hashed differently would write outside the
-declaration. The Core account world is not enumerated. -/
+declaration. The contract's whole committed storage is reported as well. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Stateful.StorageMappingExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core.StorageMapping (CheckedPlan)
 
-def historySchema : String := "solcore-lean.mapping-history.v1"
+def historySchema : String := "solcore-lean.mapping-history.v2"
 
 /-- One caller and one installed contract, exactly as for the storage profiles. -/
 abbrev Bindings := StorageExecution.Bindings
@@ -84,6 +85,7 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
     lookup := fun target => if target = bindings.address then some contract else none }
   let mut world := StorageExecution.initialWorldForContract contract bindings
   let initial := worldStorage world bindings slots
+  let initialWhole := AccountStorage.contractJson world bindings.address
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
   for (transaction, index) in transactions.zipIdx do
@@ -97,24 +99,28 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
       | none =>
           rows := rows.push (Json.mkObj (common ++ [
             ("status", toJson "resolution-failure"),
-            ("committedStorage", worldStorage prior bindings slots)]))
+            ("committedStorage", worldStorage prior bindings slots),
+            ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
           stopped := some transaction.id
       | some ⟨resolved, installed⟩ =>
           match TopLevelExecution.run resolved invocation installed fuel with
           | .completed terminal =>
               world := terminal.finalWorld
               rows := rows.push (Json.mkObj (common ++ outcomeFields terminal.outcome ++ [
-                ("committedStorage", worldStorage world bindings slots)]))
+                ("committedStorage", worldStorage world bindings slots),
+                ("accountStorage", AccountStorage.contractJson world bindings.address)]))
           | .outOfFuel _ _ _ _ _ _ =>
               rows := rows.push (Json.mkObj (common ++ [
                 ("status", toJson "out-of-fuel"),
-                ("committedStorage", worldStorage prior bindings slots)]))
+                ("committedStorage", worldStorage prior bindings slots),
+                ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
               stopped := some transaction.id
   return Json.mkObj [
     ("schema", toJson historySchema), ("bindings", StorageExecution.bindingsJson bindings),
     ("fuelPerTransaction", toJson fuel), ("observedSlots", KeyedStorageExecution.slotsJson slots),
-    ("initialStorage", initial), ("transactions", .arr rows),
+    ("initialStorage", initial), ("initialAccountStorage", initialWhole), ("transactions", .arr rows),
     ("finalStorage", worldStorage world bindings slots),
+    ("finalAccountStorage", AccountStorage.contractJson world bindings.address),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

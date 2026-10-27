@@ -1,5 +1,6 @@
 import Solcore.Synthesis.Core.NestedArray
 import Solcore.Synthesis.Stateful.StorageExecution
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute the original checked nested-array contract over a persistent
 account world. Each invocation starts a fresh Core heap and only the public
@@ -7,14 +8,14 @@ terminal `finalWorld` becomes the next transaction's world. Calldata is the
 canonical ABI encoding of `(flags, values)` for `uint256[][]`: the static head,
 the outer offset 64, the outer length, one offset per row measured from the
 start of that offset table, then each row's length and elements. Observations
-report the nine declared slots; the Core account world is not enumerated. -/
+report the nine declared slots and the contract's whole committed storage. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Stateful.NestedArrayExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core.NestedArray (CheckedPlan)
 
-def historySchema : String := "solcore-lean.nested-array-history.v1"
+def historySchema : String := "solcore-lean.nested-array-history.v2"
 
 /-- One caller and one installed contract, exactly as for the storage profiles. -/
 abbrev Bindings := StorageExecution.Bindings
@@ -81,6 +82,7 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
     lookup := fun target => if target = bindings.address then some contract else none }
   let mut world := StorageExecution.initialWorldForContract contract bindings
   let initial := worldStorage world bindings
+  let initialWhole := AccountStorage.contractJson world bindings.address
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
   for (transaction, index) in transactions.zipIdx do
@@ -90,11 +92,13 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
       match inputData? transaction.flags transaction.values, registry.resolve? prior bindings.address with
       | none, _ =>
           rows := rows.push (Json.mkObj (common ++ [
-            ("status", toJson "input-limit"), ("committedStorage", worldStorage prior bindings)]))
+            ("status", toJson "input-limit"), ("committedStorage", worldStorage prior bindings),
+            ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
           stopped := some transaction.id
       | _, none =>
           rows := rows.push (Json.mkObj (common ++ [
-            ("status", toJson "resolution-failure"), ("committedStorage", worldStorage prior bindings)]))
+            ("status", toJson "resolution-failure"), ("committedStorage", worldStorage prior bindings),
+            ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
           stopped := some transaction.id
       | some input, some ⟨resolved, installed⟩ =>
           let invocation : TopLevelInvocation := {
@@ -104,16 +108,19 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
           | .completed terminal =>
               world := terminal.finalWorld
               rows := rows.push (Json.mkObj (common ++ outcomeFields terminal.outcome ++ [
-                ("committedStorage", worldStorage world bindings)]))
+                ("committedStorage", worldStorage world bindings),
+                ("accountStorage", AccountStorage.contractJson world bindings.address)]))
           | .outOfFuel _ _ _ _ _ _ =>
               rows := rows.push (Json.mkObj (common ++ [
-                ("status", toJson "out-of-fuel"), ("committedStorage", worldStorage prior bindings)]))
+                ("status", toJson "out-of-fuel"), ("committedStorage", worldStorage prior bindings),
+                ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
               stopped := some transaction.id
   return Json.mkObj [
     ("schema", toJson historySchema), ("bindings", StorageExecution.bindingsJson bindings),
     ("fuelPerTransaction", toJson fuel), ("observedSlots", slotsJson),
-    ("initialStorage", initial), ("transactions", .arr rows),
+    ("initialStorage", initial), ("initialAccountStorage", initialWhole), ("transactions", .arr rows),
     ("finalStorage", worldStorage world bindings),
+    ("finalAccountStorage", AccountStorage.contractJson world bindings.address),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

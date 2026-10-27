@@ -61,7 +61,9 @@ private def referenceChecks : IO Json := do
     ((← rows observed).map fun row => (row.getObjValAs? String "status").toOption) ==
       #[some "returned", some "reverted", some "returned"])
     "array scenario did not follow its flags parities"
-  ensure ((← rows (DynamicArray.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)) == (← rows observed))
+  let rebound ← rows (DynamicArray.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent array profile changed with bindings"
   rejected (DynamicArray.checkedScenario identity (transactions [(0, [1, 2, 3, 4])])) "four-element array accepted"
   return saved

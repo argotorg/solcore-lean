@@ -1,5 +1,6 @@
 import Solcore.Synthesis.Core.EventLog
 import Solcore.Synthesis.Stateful.KeyedStorageExecution
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute the original checked event-log contract over a persistent account
 world. Each invocation starts a fresh Core heap and an empty transaction
@@ -16,7 +17,7 @@ namespace Solcore.Synthesis.Stateful.EventLogExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core.EventLog (CheckedPlan headerTag dataTag topicTag maxTopics maxDataWords)
 
-def historySchema : String := "solcore-lean.log-history.v1"
+def historySchema : String := "solcore-lean.log-history.v2"
 
 /-- One caller and one installed contract, as for the storage profiles. -/
 abbrev Bindings := StorageExecution.Bindings
@@ -113,6 +114,7 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
     lookup := fun target => if target = bindings.address then some contract else none }
   let mut world := StorageExecution.initialWorldForContract contract bindings
   let initial := worldStorage world bindings
+  let initialWhole := AccountStorage.contractJson world bindings.address
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
   for (transaction, index) in transactions.zipIdx do
@@ -126,7 +128,8 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
       | none =>
           rows := rows.push (Json.mkObj (common ++ [
             ("status", toJson "resolution-failure"),
-            ("committedStorage", worldStorage prior bindings), ("logs", Json.null)]))
+            ("committedStorage", worldStorage prior bindings),
+            ("accountStorage", AccountStorage.contractJson prior bindings.address), ("logs", Json.null)]))
           stopped := some transaction.id
       | some ⟨resolved, installed⟩ =>
           match TopLevelExecution.run resolved invocation installed fuel with
@@ -135,26 +138,31 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
               match decodeJournal terminal.committedJournal.logList with
               | .ok events =>
                   rows := rows.push (Json.mkObj (common ++ outcomeFields terminal.outcome ++ [
-                    ("committedStorage", worldStorage world bindings), ("logs", eventsJson events)]))
+                    ("committedStorage", worldStorage world bindings),
+                    ("accountStorage", AccountStorage.contractJson world bindings.address), ("logs", eventsJson events)]))
                   match terminal.outcome with
                   | .trapped _ => stopped := some transaction.id
                   | _ => pure ()
               | .error error =>
                   rows := rows.push (Json.mkObj (common ++ [
                     ("status", toJson "observer-error"), ("detail", toJson error),
-                    ("committedStorage", worldStorage world bindings), ("logs", Json.null)]))
+                    ("committedStorage", worldStorage world bindings),
+                    ("accountStorage", AccountStorage.contractJson world bindings.address), ("logs", Json.null)]))
                   stopped := some transaction.id
           | .outOfFuel _ _ _ _ _ _ =>
               rows := rows.push (Json.mkObj (common ++ [
                 ("status", toJson "out-of-fuel"),
-                ("committedStorage", worldStorage prior bindings), ("logs", Json.null)]))
+                ("committedStorage", worldStorage prior bindings),
+                ("accountStorage", AccountStorage.contractJson prior bindings.address), ("logs", Json.null)]))
               stopped := some transaction.id
   return Json.mkObj [
     ("schema", toJson historySchema), ("bindings", StorageExecution.bindingsJson bindings),
     ("fuelPerTransaction", toJson fuel), ("observedSlots", KeyedStorageExecution.slotsJson observedSlots),
     ("framing", toJson Solcore.Synthesis.Core.EventLog.framingVersion),
-    ("initialStorage", initial), ("initialLogs", toJson ([] : List Json)), ("transactions", .arr rows),
+    ("initialStorage", initial), ("initialAccountStorage", initialWhole), ("initialLogs", toJson ([] : List Json)),
+    ("transactions", .arr rows),
     ("finalStorage", worldStorage world bindings),
+    ("finalAccountStorage", AccountStorage.contractJson world bindings.address),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

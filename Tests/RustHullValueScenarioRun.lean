@@ -1,5 +1,6 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute a bounded sequence of persistent, value-bearing calls on one linked
 Hull contract with declared observed slots. As for ordinary Hull top-level
@@ -10,7 +11,7 @@ the declared slots, every nonzero committed slot outside them and the
 contract's committed balance. A failed call commits neither its transfer nor
 its receipt world; a rejected transfer is reported, never executed. -/
 set_option autoImplicit false
-open Lean Solcore Solcore.Frontend.RustHull
+open Lean Solcore Solcore.Frontend.RustHull Solcore.Synthesis.Stateful
 
 private def get {α : Type} (result : Except String α) : IO α :=
   match result with
@@ -158,6 +159,10 @@ private def observedSlots (config : Json) : Except String (List Core.Word) := do
     throw "observed slots must be strictly increasing"
   pure slots
 
+/-- The contract's whole committed storage, canonicalized from its entries. -/
+private def accountStorage (address : Core.Word) (storage : Core.WordMapping.Entries) : String × Json :=
+  ("accountStorage", toJson [AccountStorage.hullAccountJson AccountStorage.contractRole address storage])
+
 private def report (stage : String) (data : List (String × Json)) : IO Unit :=
   IO.println ((Json.mkObj (("stage", toJson stage) :: data)).compress)
 
@@ -207,14 +212,15 @@ private def execute (config : Json) : IO UInt32 := do
   let compiled ← lower (LinkedContract.compileObject program.program runtimePath images)
   let receipt := Contract.runWithReceipt prepared fuel
   let .returned deployed initialStorage := receipt.outcome | do
-    report "deployment" (committedStorage slots [] :: undeclaredStorage slots [] ::
+    report "deployment" (committedStorage slots [] :: accountStorage constructor.address [] :: undeclaredStorage slots [] ::
       committedBalance constructor.address ledger :: receiptFields receipt)
     return 1
   unless deployed == runtimeImage.bytes do
-    report "deployment" [committedStorage slots [], undeclaredStorage slots [],
+    report "deployment" [committedStorage slots [], accountStorage constructor.address [], undeclaredStorage slots [],
       committedBalance constructor.address ledger, ("status", "code-mismatch"), ("output", toJson (hex deployed))]
     return 1
-  report "deployment" (committedStorage slots initialStorage :: undeclaredStorage slots initialStorage ::
+  report "deployment" (committedStorage slots initialStorage ::
+    accountStorage constructor.address initialStorage :: undeclaredStorage slots initialStorage ::
     committedBalance constructor.address receipt.balances :: ("codeBytes", toJson deployed.length) :: receiptFields receipt)
   let mut storage := initialStorage
   let mut balances := receipt.balances
@@ -224,7 +230,8 @@ private def execute (config : Json) : IO UInt32 := do
     let identity := [("index", toJson index), ("id", toJson call.id)]
     let .ok transferred := transfer balances context.caller context.address context.value | do
       report "execution" (identity ++ [("status", toJson "transfer-rejected"), ("detail", toJson "the ledger rejected the call value"),
-        committedStorage slots storage, undeclaredStorage slots storage, committedBalance context.address balances])
+        committedStorage slots storage, accountStorage constructor.address storage, undeclaredStorage slots storage,
+        committedBalance context.address balances])
       return 1
     let nonce := (world.find? (·.address == context.address)).map (·.nonce) |>.getD context.nonce
     let receipt := Contract.runWithReceipt (compiled.instantiate {context with
@@ -236,7 +243,8 @@ private def execute (config : Json) : IO UInt32 := do
         balances := receipt.balances
         world := receipt.world
     | _ => pure ()
-    report "execution" (identity ++ committedStorage slots storage :: undeclaredStorage slots storage ::
+    report "execution" (identity ++ committedStorage slots storage ::
+      accountStorage constructor.address storage :: undeclaredStorage slots storage ::
       committedBalance context.address balances :: receiptFields receipt)
     match receipt.outcome with
     | .returned _ _ | .reverted _ => pure ()

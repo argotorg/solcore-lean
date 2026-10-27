@@ -220,7 +220,7 @@ private def observerChecks : IO Unit := do
   let complete := NestedArrayExecution.observe plan calls StorageExecution.fixtureBindings 100000
   ensure ((complete.getObjVal? "observedSlots").toOption ==
       some (toJson ((List.range 9).map toString)) &&
-    (complete.getObjValAs? String "schema").toOption == some "solcore-lean.nested-array-history.v1" &&
+    (complete.getObjValAs? String "schema").toOption == some "solcore-lean.nested-array-history.v2" &&
     (complete.getObjValAs? String "status").toOption == some "complete")
     "history did not declare its slots or schema"
 

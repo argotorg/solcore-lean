@@ -68,7 +68,9 @@ private def referenceChecks : IO Json := do
     "committed balances did not accept, refund and accept zero"
   ensure ((← get (CallValue.checkBalances value observed)) == ["returned", "reverted", "returned"])
     "the balance self-check rejected a correct history"
-  ensure ((← rows (CallValue.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)) == (← rows observed))
+  let rebound ← rows (CallValue.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent call-value profile changed with bindings"
   let forged := observed.setObjVal! "transactions" (toJson ((← rows observed).set! 1
     ((← rows observed)[1]!.setObjVal! "committedBalance" (toJson (toString (2 ^ 64 + 12))))))

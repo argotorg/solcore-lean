@@ -72,7 +72,9 @@ private def referenceChecks : IO Json := do
     "long-bytes scenario did not follow its flags parities"
   ensure ((← get (LongBytes.checkProtocol value observed)) == ["returned", "reverted", "returned"])
     "long-bytes history broke its length, last-byte or sum protocol"
-  ensure ((← rows (LongBytes.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)) == (← rows observed))
+  let rebound ← rows (LongBytes.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent long-bytes profile changed with bindings"
   rejected (LongBytes.checkedScenario identity (transactions [(0, List.replicate 257 1)])) "257-byte payload accepted"
   ensure (LongBytes.tailByte [] == 0 && LongBytes.tailByte [1, 2, 0x80] == 0x80 &&

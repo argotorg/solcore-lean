@@ -64,9 +64,13 @@ def report(value=None, *, path=None, transaction_id=None, field="output"):
             row["index"] = index
             if row["status"] == "reverted":
                 row["committedAccounts"] = copy.deepcopy(previous)
+            elif int(tx["input"]) & 1:
+                # A child revert under a returned root keeps the child's account.
+                row["committedAccounts"][1] = copy.deepcopy(previous[1])
             previous = row["committedAccounts"]
             rows.append(row)
         history.update(transactions=rows, finalAccounts=copy.deepcopy(previous))
+        fixtures.with_whole(history)
     raw = {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
            "bindings": copy.deepcopy(fixtures.BINDINGS),
            "comparison": campaign.adapter.compare(histories, value, fixtures.BINDINGS)}
@@ -85,6 +89,7 @@ def incomplete(raw, value, path="rustEvm", at=1):
                  "logs": None, "committedAccounts": previous})
     history.update(transactions=rows, finalAccounts=previous, status="incomplete",
                    unexecuted=[tx["id"] for tx in value["transactions"][at + 1:]])
+    fixtures.with_whole(history)
     raw["comparison"] = campaign.adapter.compare(raw["histories"], value, fixtures.BINDINGS)
     return raw
 
@@ -356,7 +361,7 @@ class CountsAndCoverageTests(unittest.TestCase):
         value, raw = case(), report()
         for history in raw["histories"].values():
             history.update(transactions=history["transactions"][:1], status="incomplete", finalAccounts=None,
-                           unobserved=["tx-1"], unexecuted=["tx-2"])
+                           finalAccountStorage=None, unobserved=["tx-1"], unexecuted=["tx-2"])
         self.assertEqual(campaign.transaction_counts(raw["histories"], value, raw["bindings"]),
                          {"executed": 1, "completed": 1, "matched": 1})
 
@@ -661,6 +666,40 @@ class ForwardedValueCampaignTests(unittest.TestCase):
         generated["provenance"]["origin"] = {"kind": "forward-generated", "stepOrigin": {"kind": "aggregate-generated", "helpers": [{"template": 2}]}}
         self.assertEqual(campaign.recipes(generated), {2})
         self.assertNotEqual(campaign.case_hash(value), campaign.case_hash(forward_case(rows=((0, 7, 6), (1, 0, 2**70), (2, 1, 1)))))
+
+
+class StrayWriteAdapterTests(unittest.TestCase):
+    """`ROLE:stray` adds one undeclared nonzero slot to a contract's copied whole storage."""
+
+    def test_stray_write_is_detected_per_contract_and_kept_by_reduction(self):
+        value = case()
+        for role in ("parent", "child"):
+            for path in campaign.PATHS:
+                analysis = campaign.analyze(report(value), value, path, "tx-0", role + ":stray")
+                with self.subTest(role=role, path=path):
+                    self.assertTrue(analysis["synthetic"])
+                    self.assertEqual((analysis["comparison"]["category"], analysis["comparison"]["transactionId"],
+                                      analysis["comparison"]["fields"]), ("semantic-mismatch", "tx-0", ["accountStorage"]))
+                    observed = campaign.fingerprint(analysis)
+                    self.assertEqual(observed["accountStorageDifferences"],
+                                     [{"account": role, "slot": "undeclared", "zeroPaths": [other for other in campaign.PATHS if other != path]}])
+                    self.assertEqual(observed["accountFields"], [])
+        first = campaign.analyze(report(value), value, "importedHull", "tx-1", "child:stray")
+        reduced = copy.deepcopy(value)
+        reduced["transactions"] = reduced["transactions"][1:2]
+        second = campaign.analyze(report(reduced), reduced, "importedHull", "tx-1", "child:stray")
+        self.assertEqual(second["comparison"]["index"], 0)
+        self.assertTrue(campaign.same_failure(campaign.fingerprint(first), second))
+        self.assertFalse(campaign.same_failure(campaign.fingerprint(first),
+                                               campaign.analyze(report(value), value, "importedHull", "tx-1", "parent:stray")))
+        removed = copy.deepcopy(value)
+        removed["transactions"] = removed["transactions"][:1]
+        self.assertFalse(campaign.analyze(report(removed), removed, "importedHull", "tx-1", "child:stray")["synthetic"])
+
+    def test_every_fingerprint_carries_the_whole_storage_classification(self):
+        value = case()
+        plain = campaign.fingerprint(campaign.analyze(report(), value))
+        self.assertEqual((plain["accountStorageDifferences"], plain["accountStorageRollbackPaths"]), ([], []))
 
 
 if __name__ == "__main__":

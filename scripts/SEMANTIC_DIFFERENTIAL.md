@@ -1493,7 +1493,7 @@ commands as the other storage tools. Plans use `solcore-lean.log-plan.v1`
 under the case field `logPlan`, with the step program and its `sites`; cases
 use `solcore-lean.semantic-log-case.v1` and record `framingVersion` in their
 provenance. Transactions are `{id, flags, input, calldata, value}`.
-Histories use `solcore-lean.log-history.v1`: the storage history fields plus
+Histories use `solcore-lean.log-history.v2`: the storage history fields plus
 `initialLogs`, the per-transaction `logs` (`null` when unknown) and, on the
 EVM path only, `chainLogs`. The declared-slot Hull runner
 `rust-hull-keyed-storage-scenario` already exported every receipt's logs, so
@@ -1655,7 +1655,7 @@ commands as the other storage tools. Plans use `solcore-lean.call-value-plan.v1`
 under the case field `callValuePlan`, with the step program and the
 `deploymentValue`; cases use `solcore-lean.semantic-call-value-case.v1`.
 Transactions are `{id, flags, input, value, calldata}`, where `value` is the
-call value. Histories use `solcore-lean.call-value-history.v1`: the storage
+call value. Histories use `solcore-lean.call-value-history.v2`: the storage
 history fields plus `initialBalance`, the per-transaction `committedBalance`,
 `finalBalance` and the deployment `initialLogs`. The keyed-storage runner
 rejects nonzero value, so the new runner `rust-hull-value-scenario` accepts
@@ -1813,7 +1813,7 @@ spelling and calldata that is not the canonical zero-padded encoding of the
 saved flags and payload. The calldata of 26 generated transactions covering
 every bank length matched `cast calldata "run(uint256,bytes)"` from the pinned
 Foundry release byte for byte; the Lean tests retain two such vectors.
-Histories use `solcore-lean.bytes-history.v1` with the dynamic-array history
+Histories use `solcore-lean.bytes-history.v2` with the dynamic-array history
 fields, and the declared-slot Hull runner `rust-hull-keyed-storage-scenario`
 serves the profile unchanged.
 
@@ -1958,7 +1958,7 @@ commands as `semantic-call-tool`, with the same call bindings. Plans use
 `solcore-lean.semantic-forward-case.v1`. Transactions are
 `{id, input, value, amount, target, callee}`: `value` is the call value the
 sender pays and `amount` the value the parent forwards, both at most 2^70.
-Histories use `solcore-lean.forward-history.v1` with the call history's
+Histories use `solcore-lean.forward-history.v2` with the call history's
 fields. The call runner fixes the eight-unit endowment and zero top-level
 value, so the new runner `rust-hull-forward-scenario` accepts `callerFunds`,
 the fixed 2^72 endowment and per-call values and amounts in its
@@ -2124,7 +2124,7 @@ with `Solcore.Abi.V1.Keccak256` and the adapter with its own Keccak-256, which
 the Python tests check against `cast keccak`. The calldata of all 33 fixed and
 48 random transactions matched `cast calldata "run(uint256,uint256,uint256)"`
 from the pinned Foundry release byte for byte; the Lean tests retain one such
-vector. Histories use `solcore-lean.mapping-history.v1` with the keyed history
+vector. Histories use `solcore-lean.mapping-history.v2` with the keyed history
 fields, and the declared-slot Hull runner `rust-hull-keyed-storage-scenario`
 serves the profile unchanged.
 
@@ -2298,7 +2298,7 @@ equal the slots derived from its senders and recipients. The calldata of all
 32 fixed and 48 random transactions matched `cast calldata
 "run(uint256,uint256,uint256,uint256)"` from the pinned Foundry release byte
 for byte; the Lean tests retain one such vector. Histories use
-`solcore-lean.ledger-history.v1` with the keyed history fields.
+`solcore-lean.ledger-history.v2` with the keyed history fields.
 
 The new Hull runner `rust-hull-ledger-scenario` takes
 `solcore-lean.ledger-contract-scenario.v1` scenarios: the keyed scenario
@@ -2488,7 +2488,7 @@ bound, observed slots and count and last-byte slots (`maxPayload`, `slots`,
 64-byte bound and slots 0 to 4. The calldata of all 33 fixed and 48 random
 transactions matched `cast calldata "run(uint256,bytes)"` from the pinned
 Foundry release byte for byte; the Lean tests retain a 65-byte vector.
-Histories use `solcore-lean.long-bytes-history.v1` with the bytes history
+Histories use `solcore-lean.long-bytes-history.v2` with the bytes history
 fields, and the declared-slot Hull runner `rust-hull-keyed-storage-scenario`
 serves the profile unchanged.
 
@@ -2642,7 +2642,7 @@ all 33 fixed and 48 random transactions matched `cast calldata
 "run(uint256,uint256[][])"` from the pinned Foundry release byte for byte. The
 Lean tests retain four of its vectors, among them an empty outer array, an
 empty first row and three full rows, and the Python tests three. Histories use
-`solcore-lean.nested-array-history.v1`, and the declared-slot Hull runner
+`solcore-lean.nested-array-history.v2`, and the declared-slot Hull runner
 `rust-hull-keyed-storage-scenario` serves the profile unchanged.
 
 The three row guards and their six element guards take 270 Core nodes. They

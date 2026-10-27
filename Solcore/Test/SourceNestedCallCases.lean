@@ -118,7 +118,8 @@ private def referenceChecks : IO Json := do
     ensure ((← string originalRows[index]! "output") == (← string relocatedRows[index]! "output"))
       "call payload depended on fixture addresses"
     let accountRows ← rows relocatedRows[index]! "committedAccounts"
-    ensure ((← string accountRows[0]! "address") == "201" && (← string accountRows[1]! "address") == "202")
+    ensure ((← string accountRows[0]! "address") == "201" && (← string accountRows[1]! "address") == "202" &&
+        Solcore.Synthesis.Stateful.AccountStorage.boundTo relocatedRows[index]! [201, 202])
       "observer did not use actual role bindings"
   let input := Solcore.Synthesis.Stateful.NestedCallExecution.inputData bindings (w 4)
   ensure (input.bytes.size == 68 && input.wordBE? (w 4) == some (w 102) &&

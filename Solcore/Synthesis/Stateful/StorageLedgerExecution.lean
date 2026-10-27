@@ -1,5 +1,6 @@
 import Solcore.Synthesis.Core.StorageLedger
 import Solcore.Synthesis.Stateful.StorageMappingExecution
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute the original checked sender-keyed ledger over a persistent account
 world. Unlike the other storage profiles, each transaction names its own
@@ -15,7 +16,7 @@ namespace Solcore.Synthesis.Stateful.StorageLedgerExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core.StorageLedger (CheckedPlan)
 
-def historySchema : String := "solcore-lean.ledger-history.v1"
+def historySchema : String := "solcore-lean.ledger-history.v2"
 
 /-- The deployer and the contract address, exactly as for the storage profiles. -/
 abbrev Bindings := StorageExecution.Bindings
@@ -96,6 +97,7 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
     lookup := fun target => if target = bindings.address then some contract else none }
   let mut world := initialWorld contract bindings
   let initial := worldStorage world bindings slots
+  let initialWhole := AccountStorage.contractJson world bindings.address
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
   for (transaction, index) in transactions.zipIdx do
@@ -109,24 +111,28 @@ def observeContract (contract : CheckedCoreContract) (transactions : List Transa
       | none =>
           rows := rows.push (Json.mkObj (common ++ [
             ("status", toJson "resolution-failure"),
-            ("committedStorage", worldStorage prior bindings slots)]))
+            ("committedStorage", worldStorage prior bindings slots),
+            ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
           stopped := some transaction.id
       | some ⟨resolved, installed⟩ =>
           match TopLevelExecution.run resolved invocation installed fuel with
           | .completed terminal =>
               world := terminal.finalWorld
               rows := rows.push (Json.mkObj (common ++ outcomeFields terminal.outcome ++ [
-                ("committedStorage", worldStorage world bindings slots)]))
+                ("committedStorage", worldStorage world bindings slots),
+                ("accountStorage", AccountStorage.contractJson world bindings.address)]))
           | .outOfFuel _ _ _ _ _ _ =>
               rows := rows.push (Json.mkObj (common ++ [
                 ("status", toJson "out-of-fuel"),
-                ("committedStorage", worldStorage prior bindings slots)]))
+                ("committedStorage", worldStorage prior bindings slots),
+                ("accountStorage", AccountStorage.contractJson prior bindings.address)]))
               stopped := some transaction.id
   return Json.mkObj [
     ("schema", toJson historySchema), ("bindings", StorageExecution.bindingsJson bindings),
     ("fuelPerTransaction", toJson fuel), ("observedSlots", KeyedStorageExecution.slotsJson slots),
-    ("initialStorage", initial), ("transactions", .arr rows),
+    ("initialStorage", initial), ("initialAccountStorage", initialWhole), ("transactions", .arr rows),
     ("finalStorage", worldStorage world bindings slots),
+    ("finalAccountStorage", AccountStorage.contractJson world bindings.address),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

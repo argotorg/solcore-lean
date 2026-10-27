@@ -7,7 +7,8 @@ whose parent forwards bank amounts to the child). The original checked Core
 contracts execute through the public nested runtime.
 Rust supplies independently compiled Hull and linked EVM images. Every EVM
 observation belongs to an actual mined transaction; no Python transition model
-or saved expected output supplies the reference result.
+or saved expected output supplies the reference result. Both contracts' whole
+committed storage is also compared after deployment and every transaction.
 """
 from __future__ import annotations
 
@@ -31,13 +32,13 @@ common = storage.common
 Finding, RpcError = common.Finding, common.RpcError
 PATHS, SLOTS = storage.PATHS, storage.SLOTS
 CASE_SCHEMA = "solcore-lean.semantic-call-case.v1"
-REPORT_SCHEMA = "solcore-lean.semantic-call-differential.v1"
-HISTORY_SCHEMA = "solcore-lean.call-history.v1"
+REPORT_SCHEMA = "solcore-lean.semantic-call-differential.v2"
+HISTORY_SCHEMA = "solcore-lean.call-history.v2"
 BINDINGS_SCHEMA = "solcore-lean.call-bindings.v1"
 SELECTOR = "0x7357f5d2"
 ROLES = ("parent", "child")
 FORWARD_CASE_SCHEMA = "solcore-lean.semantic-forward-case.v1"
-FORWARD_HISTORY_SCHEMA = "solcore-lean.forward-history.v1"
+FORWARD_HISTORY_SCHEMA = "solcore-lean.forward-history.v2"
 FORWARD_SELECTOR = "0x24b912e5"
 # The forwarding parent's endowment covers three forwards of the largest bank
 # value; original Core and Hull fund the caller with 2^80.
@@ -46,11 +47,11 @@ PROFILES = {
     "stateful-calls": {"caseSchema": CASE_SCHEMA, "historySchema": HISTORY_SCHEMA, "planKey": "callPlan",
         "planSchema": "solcore-lean.call-plan.v1", "caseTool": "semantic-call-tool", "coreRunner": "rust-hull-call-scenario",
         "scenarioSchema": "solcore-lean.call-contract-scenario.v1", "forwarding": False,
-        "scope": "depth-one fixed Word calls; funded parent8/child0; both accounts' slots0/1, balances, root outcome and ordered committed logs; no gas/nonce equivalence"},
+        "scope": "depth-one fixed Word calls; funded parent8/child0; both accounts' slots0/1, balances, root outcome and ordered committed logs; both accounts' whole committed storage; no gas/nonce equivalence"},
     "stateful-forwarded-value": {"caseSchema": FORWARD_CASE_SCHEMA, "historySchema": FORWARD_HISTORY_SCHEMA, "planKey": "forwardPlan",
         "planSchema": "solcore-lean.forward-plan.v1", "caseTool": "semantic-forward-tool", "coreRunner": "rust-hull-forward-scenario",
         "scenarioSchema": "solcore-lean.forward-contract-scenario.v1", "forwarding": True,
-        "scope": "depth-one Word calls forwarding bank amounts; payable root values; parent endowment 2^72/child0; both accounts' slots0/1, balances, root outcome and empty logs; no sender-balance, gas or nonce equivalence"},
+        "scope": "depth-one Word calls forwarding bank amounts; payable root values; parent endowment 2^72/child0; both accounts' slots0/1, balances, root outcome and empty logs; both accounts' whole committed storage; no sender-balance, gas or nonce equivalence"},
 }
 
 
@@ -189,10 +190,19 @@ def logs(rows):
     return result
 
 
+def whole_storage(rows, bindings, label="account storage"):
+    """Both contracts' whole committed storage, bound to their actual addresses."""
+    result = storage.account_storage(rows, ROLES, label)
+    if any(account["address"] != bindings[account["role"]] for account in result):
+        raise ValueError(f"{label} account identity changed")
+    return result
+
+
 def normalize_history(history, case, bindings):
     if not isinstance(history, dict) or history.get("schema") != profile(case)["historySchema"]:
         raise ValueError("unsupported call history")
     initial = accounts(history.get("initialAccounts"), bindings)
+    initial_whole = whole_storage(history.get("initialAccountStorage"), bindings, "initial account storage")
     rows = history.get("transactions")
     if not isinstance(rows, list) or len(rows) > len(case["transactions"]):
         raise ValueError("invalid call history length")
@@ -204,7 +214,8 @@ def normalize_history(history, case, bindings):
         if not isinstance(status, str):
             raise ValueError("missing call status")
         normalized = {"id": row["id"], "index": index, "status": status,
-                      "committedAccounts": accounts(row.get("committedAccounts"), bindings)}
+                      "committedAccounts": accounts(row.get("committedAccounts"), bindings),
+                      "accountStorage": whole_storage(row.get("accountStorage"), bindings)}
         if status in ("returned", "reverted"):
             normalized.update(output="0x" + common.hex_bytes(row.get("output"), "call output").hex(), logs=logs(row.get("logs")))
         else:
@@ -226,8 +237,13 @@ def normalize_history(history, case, bindings):
         raise ValueError("unknown completion cannot claim a final committed world")
     if not unobserved and final != (result[-1]["committedAccounts"] if result else initial):
         raise ValueError("final accounts differ from the last committed snapshot")
-    return {"initialAccounts": initial, "transactions": result, "finalAccounts": final,
-        "status": history["status"], "unexecuted": history["unexecuted"], "unobserved": unobserved}
+    final_whole = None if unobserved else whole_storage(history.get("finalAccountStorage"), bindings, "final account storage")
+    if unobserved and history.get("finalAccountStorage") is not None:
+        raise ValueError("unknown completion cannot claim a final whole storage")
+    if not unobserved and final_whole != (result[-1]["accountStorage"] if result else initial_whole):
+        raise ValueError("final whole storage differs from the last committed observation")
+    return {"initialAccounts": initial, "initialAccountStorage": initial_whole, "transactions": result, "finalAccounts": final,
+        "finalAccountStorage": final_whole, "status": history["status"], "unexecuted": history["unexecuted"], "unobserved": unobserved}
 
 
 def expected_status(tx):
@@ -263,6 +279,16 @@ def forwarding_fields(case, rows, values, index):
     return sorted(fields)
 
 
+def rolled_back(tx, row, prior):
+    """Whether a completed row keeps the whole storage its outcome requires: a
+    root revert keeps both contracts, a child revert (odd input) under a
+    returned root keeps the child."""
+    if row["status"] == "reverted":
+        return row["accountStorage"] == prior
+    child = ROLES.index("child")
+    return not int(tx["input"]) & 1 or row["accountStorage"][child] == prior[child]
+
+
 def compare(histories, case, bindings):
     if set(histories) != set(PATHS):
         return {"category": "adapter-error", "stage": "comparison", "detail": "three histories required", "pairs": {}}
@@ -272,9 +298,18 @@ def compare(histories, case, bindings):
     except (ValueError, KeyError, TypeError) as error:
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
     initial = {path: values[path]["initialAccounts"] for path in PATHS}
+    whole = {path: values[path]["initialAccountStorage"] for path in PATHS}
     pairs = storage.pairwise(initial)
-    if not all(pairs.values()) or any(state != initial_accounts(bindings, forwarding(case)) for state in initial.values()):
-        return {"category": "semantic-mismatch", "stage": "initial-accounts", "fields": ["committedAccounts"], "pairs": pairs}
+    changed = not all(pairs.values()) or any(state != initial_accounts(bindings, forwarding(case)) for state in initial.values())
+    # Both empty constructors leave the whole storage of both contracts empty.
+    differences = storage.account_storage_differences(whole, SLOTS, deployment=True)
+    if changed or differences:
+        mismatch = {"category": "semantic-mismatch", "stage": "initial-accounts",
+                    "fields": (["committedAccounts"] if changed else []) + (["accountStorage"] if differences else []),
+                    "pairs": storage.pairwise({path: [initial[path], whole[path]] for path in PATHS})}
+        if differences:
+            mismatch["accountStorageDifferences"] = differences
+        return mismatch
     for index, tx in enumerate(case["transactions"]):
         where = {"stage": "transaction", "index": index, "transactionId": tx["id"]}
         rows = {path: values[path]["transactions"][index] for path in PATHS if index < len(values[path]["transactions"])}
@@ -294,8 +329,20 @@ def compare(histories, case, bindings):
                         fields.append(field)
         if forwarding(case):
             fields += [field for field in forwarding_fields(case, rows, values, index) if field not in fields]
+        # The whole storage agrees across paths; a root revert keeps both prior
+        # contracts' whole storage and a child revert under a returned root the child's.
+        differences = storage.account_storage_differences({path: row["accountStorage"] for path, row in rows.items()}, SLOTS)
+        rolled = sorted(path for path, row in rows.items() if not rolled_back(tx, row,
+            values[path]["transactions"][index - 1]["accountStorage"] if index else values[path]["initialAccountStorage"]))
+        if (differences or rolled) and "accountStorage" not in fields:
+            fields.append("accountStorage")
         if not all(pairs.values()) or not normal or fields:
-            return {"category": "semantic-mismatch", **where, "pairs": pairs, "fields": fields or ["status", "output", "logs"]}
+            mismatch = {"category": "semantic-mismatch", **where, "pairs": pairs, "fields": fields or ["status", "output", "logs"]}
+            if differences:
+                mismatch["accountStorageDifferences"] = differences
+            if rolled:
+                mismatch["accountStorageRollbackPaths"] = rolled
+            return mismatch
     return {"category": "matched", "stage": "completed-history", "pairs": storage.pairwise(values)}
 
 
@@ -362,6 +409,7 @@ def hull_history(stdout, exit_code, case, bindings, runtimes):
     if len(rows) < 3 or rows[2].get("stage") != "initialization":
         raise ValueError("missing initialized Hull account world")
     initial = accounts(rows[2].get("committedAccounts"), bindings)
+    initial_whole = rows[2].get("accountStorage")
     calls = rows[3:]
     if any(row.get("stage") != "execution" for row in calls):
         raise ValueError("unexpected linked call output stage")
@@ -370,6 +418,7 @@ def hull_history(stdout, exit_code, case, bindings, runtimes):
         raise ValueError("unexplained Hull failure after complete call history")
     history = {"schema": profile(case)["historySchema"], "initialAccounts": initial, "transactions": calls,
         "finalAccounts": calls[-1].get("committedAccounts") if calls else initial,
+        "initialAccountStorage": initial_whole, "finalAccountStorage": calls[-1].get("accountStorage") if calls else initial_whole,
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
     normalize_history(history, case, bindings)
     return history
@@ -442,6 +491,8 @@ def execute(args, report):
         bindings = {"schema": BINDINGS_SCHEMA, "caller": str(int(sender, 16))}
         report["evmDeployments"] = {}
         initial_block = None
+        # Every slot a prestate diff reports for either contract from its creation on.
+        touched = {}
         for role in ("child", "parent"):
             contract = case["contracts"][role]
             init = common.image_bytes(images, contract["deployPath"])
@@ -461,6 +512,11 @@ def execute(args, report):
                 raise Finding("adapter-error", "evm-deployment-" + role, "installed runtime differs from exported image")
             if evm_logs(deployed):
                 raise Finding("semantic-mismatch", "evm-deployment-" + role, "fixed empty constructor emitted logs")
+            diff = rpc.call("debug_traceTransaction", [tx_hash, storage.PRESTATE_DIFF])
+            record["storageDiff"] = diff
+            created = [target] + [f"0x{int(bindings[known]):040x}" for known in ROLES if known in bindings]
+            for account, slots in storage.changed_storage(diff, created).items():
+                touched.setdefault(account, set()).update(slots)
             bindings[role] = str(int(target, 16))
             initial_block = deployed["blockNumber"]
         validate_bindings(bindings)
@@ -490,6 +546,9 @@ def execute(args, report):
         imported = runner.process("imported-hull", [str(args.core_runner), str(scenario_path)])
         report["histories"]["importedHull"] = hull_history(imported["stdout"], imported["returncode"], case, bindings, runtimes)
         initial = evm_accounts(rpc, bindings, initial_block)
+        observed_accounts = [(role, bindings[role]) for role in ROLES]
+        report["evmInitialStorage"] = {}
+        initial_whole = storage.evm_whole_storage(rpc, observed_accounts, touched, initial_block, report["evmInitialStorage"])
         report["initialBlock"] = initial_block
         evm_rows, records = [], []
         report["evmTransactions"] = records
@@ -498,6 +557,8 @@ def execute(args, report):
             remaining = [tx["id"] for tx in case["transactions"][len(evm_rows):]]
             report["histories"]["rustEvm"] = {"schema": selected["historySchema"], "initialAccounts": initial,
                 "transactions": list(evm_rows), "finalAccounts": None if pending else evm_rows[-1]["committedAccounts"] if evm_rows else initial,
+                "initialAccountStorage": initial_whole,
+                "finalAccountStorage": None if pending else evm_rows[-1]["accountStorage"] if evm_rows else initial_whole,
                 "status": "complete" if complete else "incomplete", "unobserved": [pending] if pending else [],
                 "unexecuted": remaining[1:] if pending else remaining}
         checkpoint()
@@ -519,7 +580,13 @@ def execute(args, report):
             outcome = trace_result(mined, trace)
             state = evm_accounts(rpc, bindings, mined["blockNumber"])
             committed_logs = evm_logs(mined) if outcome["status"] in ("returned", "reverted") else None
-            evm_rows.append({"id": tx["id"], "index": index, **outcome, "committedAccounts": state, "logs": committed_logs})
+            diff = rpc.call("debug_traceTransaction", [tx_hash, storage.PRESTATE_DIFF])
+            record["storageDiff"] = diff
+            for account, slots in storage.changed_storage(diff, [f"0x{int(address):040x}" for _, address in observed_accounts]).items():
+                touched.setdefault(account, set()).update(slots)
+            whole = storage.evm_whole_storage(rpc, observed_accounts, touched, mined["blockNumber"], record)
+            evm_rows.append({"id": tx["id"], "index": index, **outcome, "committedAccounts": state, "logs": committed_logs,
+                             "accountStorage": whole})
             checkpoint()
             if outcome["status"] not in ("returned", "reverted"):
                 break

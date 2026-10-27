@@ -1,6 +1,7 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.ContractRuntime.RuntimeScalars
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Execute the fixed two-contract value-forwarding protocol from actual linked
 Hull. Both constructors must return their exact runtime images, and the parent's
@@ -11,7 +12,7 @@ use the complete shared world and ledger on success and the prior ones on root
 revert, which refunds the call value; failed receipts never supply invented
 committed balances or account snapshots. -/
 set_option autoImplicit false
-open Lean Solcore Solcore.Frontend.RustHull
+open Lean Solcore Solcore.Frontend.RustHull Solcore.Synthesis.Stateful
 
 private def get {α : Type} (result : Except String α) : IO α :=
   match result with
@@ -172,6 +173,14 @@ private def snapshot (bindings : Bindings) (world : List AccountState.Account)
   unless (balances.map Prod.fst).eraseDups.length == balances.length do throw "duplicate committed ledger entry"
   pure (toJson [accountJson "parent" parent balances, accountJson "child" child balances])
 
+/-- Both contracts' whole committed storage, canonicalized from their entries. -/
+private def wholeStorage (bindings : Bindings) (world : List AccountState.Account) : Json :=
+  let roles : List (String × Core.Word) := [("parent", bindings.parent), ("child", bindings.child)]
+  toJson (roles.map fun (role, address) =>
+    match world.find? (fun (account : AccountState.Account) => account.address == address) with
+    | some account => AccountStorage.hullAccountJson role address account.storage
+    | none => Json.null)
+
 private def logsJson (logs : List Logs.Event) : Json :=
   toJson (logs.map fun event => Json.mkObj [("address", toJson (toString event.address.val)),
     ("topics", toJson (event.topics.map (fun value => toString value.val))), ("data", toJson (hex event.data))])
@@ -246,14 +255,16 @@ private def execute (json : Json) : IO UInt32 := do
   let mut world := deployedWorld
   let mut balances := deployedLedger
   let mut committed ← get (snapshot config.bindings world balances)
-  report "initialization" [("committedAccounts", committed)]
+  let mut whole := wholeStorage config.bindings world
+  report "initialization" [("committedAccounts", committed), ("accountStorage", whole)]
   for (call, index) in config.calls.zipIdx do
     let some current := world.find? (·.address == config.bindings.parent) |
       throw (IO.userError "committed parent account missing before call")
     let identity := [("id", toJson call.id), ("index", toJson index)]
     let .ok transferred := transfer balances config.bindings.caller config.bindings.parent call.value | do
       report "execution" (identity ++ [("status", toJson "transfer-rejected"),
-        ("detail", toJson "the caller cannot pay the call value"), ("committedAccounts", committed), ("logs", Json.null)])
+        ("detail", toJson "the caller cannot pay the call value"), ("committedAccounts", committed),
+        ("accountStorage", whole), ("logs", Json.null)])
       return 1
     let receipt := Contract.runWithReceipt (parentCompiled.instantiate {
       (initialContext config.bindings.parent) with
@@ -265,20 +276,21 @@ private def execute (json : Json) : IO UInt32 := do
         match snapshot config.bindings receipt.world receipt.balances with
         | .error error =>
             report "execution" (identity ++ [("status", toJson "export-error"), ("detail", toJson error),
-              ("committedAccounts", committed), ("logs", Json.null)])
+              ("committedAccounts", committed), ("accountStorage", whole), ("logs", Json.null)])
             return 1
         | .ok next =>
             world := receipt.world
             balances := receipt.balances
             committed := next
+            whole := wholeStorage config.bindings receipt.world
             report "execution" (identity ++ outcomeFields receipt.outcome ++
-              [("committedAccounts", committed), ("logs", logsJson receipt.logs)])
+              [("committedAccounts", committed), ("accountStorage", whole), ("logs", logsJson receipt.logs)])
     | .reverted _ =>
         report "execution" (identity ++ outcomeFields receipt.outcome ++
-          [("committedAccounts", committed), ("logs", toJson ([] : List Json))])
+          [("committedAccounts", committed), ("accountStorage", whole), ("logs", toJson ([] : List Json))])
     | _ =>
         report "execution" (identity ++ outcomeFields receipt.outcome ++
-          [("committedAccounts", committed), ("logs", Json.null)])
+          [("committedAccounts", committed), ("accountStorage", whole), ("logs", Json.null)])
         return 1
   return 0
 

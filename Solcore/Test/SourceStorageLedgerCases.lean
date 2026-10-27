@@ -73,7 +73,9 @@ private def referenceChecks : IO Json := do
     "ledger scenario did not follow its balances and flags"
   ensure ((← get (StorageLedger.checkProtocol value observed)) == ["returned", "reverted", "reverted"])
     "ledger history broke its protocol"
-  ensure ((← rows (StorageLedger.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)) == (← rows observed))
+  let rebound ← rows (StorageLedger.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 1000000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "ledger rows changed with the deployer binding"
   -- A forged history that pays more than the amount, wraps the sender or
   -- reports a sufficient balance as insufficient breaks the protocol.

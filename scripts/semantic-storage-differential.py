@@ -11,10 +11,15 @@ committed logs of every transaction: decoded original-Core journals, Hull
 receipt logs and mined receipt logs, plus the EVM chain's complete log list.
 The call-value profile sends value with each transaction and also compares the
 contract's committed balance; the sender's balance is never observed.
+Every profile also compares the contract's whole committed storage after
+deployment and after every transaction: original Core enumerates its account,
+Hull canonicalizes its committed entries, and the EVM rereads every slot the
+prestate diffs reported, cross-checked against Anvil's own state dump.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import math
@@ -26,6 +31,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import zlib
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,24 +41,24 @@ spec.loader.exec_module(common)
 CASE_SCHEMA = "solcore-lean.semantic-storage-case.v1"
 ROLLBACK_CASE_SCHEMA = "solcore-lean.semantic-storage-rollback-case.v1"
 KEYED_CASE_SCHEMA = "solcore-lean.semantic-keyed-storage-case.v1"
-HISTORY_SCHEMA = "solcore-lean.storage-history.v1"
-KEYED_HISTORY_SCHEMA = "solcore-lean.keyed-storage-history.v1"
+HISTORY_SCHEMA = "solcore-lean.storage-history.v2"
+KEYED_HISTORY_SCHEMA = "solcore-lean.keyed-storage-history.v2"
 ARRAY_CASE_SCHEMA = "solcore-lean.semantic-dynamic-array-case.v1"
-ARRAY_HISTORY_SCHEMA = "solcore-lean.dynamic-array-history.v1"
+ARRAY_HISTORY_SCHEMA = "solcore-lean.dynamic-array-history.v2"
 LOG_CASE_SCHEMA = "solcore-lean.semantic-log-case.v1"
-LOG_HISTORY_SCHEMA = "solcore-lean.log-history.v1"
+LOG_HISTORY_SCHEMA = "solcore-lean.log-history.v2"
 VALUE_CASE_SCHEMA = "solcore-lean.semantic-call-value-case.v1"
-VALUE_HISTORY_SCHEMA = "solcore-lean.call-value-history.v1"
+VALUE_HISTORY_SCHEMA = "solcore-lean.call-value-history.v2"
 BYTES_CASE_SCHEMA = "solcore-lean.semantic-bytes-case.v1"
-BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v1"
+BYTES_HISTORY_SCHEMA = "solcore-lean.bytes-history.v2"
 LONG_BYTES_CASE_SCHEMA = "solcore-lean.semantic-long-bytes-case.v1"
-LONG_BYTES_HISTORY_SCHEMA = "solcore-lean.long-bytes-history.v1"
+LONG_BYTES_HISTORY_SCHEMA = "solcore-lean.long-bytes-history.v2"
 NESTED_CASE_SCHEMA = "solcore-lean.semantic-nested-array-case.v1"
-NESTED_HISTORY_SCHEMA = "solcore-lean.nested-array-history.v1"
+NESTED_HISTORY_SCHEMA = "solcore-lean.nested-array-history.v2"
 MAPPING_CASE_SCHEMA = "solcore-lean.semantic-mapping-case.v1"
-MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v1"
+MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v2"
 LEDGER_CASE_SCHEMA = "solcore-lean.semantic-ledger-case.v1"
-LEDGER_HISTORY_SCHEMA = "solcore-lean.ledger-history.v1"
+LEDGER_HISTORY_SCHEMA = "solcore-lean.ledger-history.v2"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -144,12 +150,17 @@ PROFILES = {
         "declared": True, "abi": "nested", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
-REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v1"
+REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
 PATHS = ("directCore", "importedHull", "rustEvm")
 CONTAINMENT_PATHS = ("importedHull", "rustEvm")
 SLOTS = ("0", "1")
 COUNTER_SLOT = "0"
 MAX_UNDECLARED_SLOTS = 256
+# Whole committed storage: the observed contract's role, a bound on listed
+# entries per account, and a bound on Anvil's decompressed state dump.
+CONTRACT_ROLE = "contract"
+MAX_ACCOUNT_SLOTS = 1024
+MAX_STATE_DUMP = 64 * 1024 * 1024
 ARRAY_SLOTS = ["0", "1", "2", "3", "4"]
 MAX_ELEMENTS = 3
 # Nested values have at most three rows of at most two elements. Slot 1 + 2i + j
@@ -469,6 +480,10 @@ def logs(rows, label="committed logs") -> list[dict]:
 
 
 def scope(case: dict) -> str:
+    return declared_scope(case) + "; the contract's whole committed storage on all paths after deployment and every transaction"
+
+
+def declared_scope(case: dict) -> str:
     if profile(case)["abi"] == "keyed":
         return ("ordered zero-value run(uint256,uint256) transactions; initially empty storage; committed values at the "
                 "declared counter/key/successor slots on all paths and no nonzero undeclared slot on Hull/EVM; "
@@ -663,6 +678,60 @@ def containment(row: dict, value: dict, path, slots, key="undeclaredStorage") ->
         raise ValueError("original Core cannot claim storage outside the declared slots")
 
 
+def account_storage(rows, roles, label="account storage") -> list[dict]:
+    """Every observed account's whole committed storage, in role order: its
+    bound address and strictly ordered nonzero entries. Zero is never listed,
+    so a cleared slot and one never written are the same observation."""
+    if not isinstance(rows, list) or len(rows) != len(roles):
+        raise ValueError(f"{label} must list every observed account")
+    result = []
+    for role, row in zip(roles, rows):
+        if not isinstance(row, dict) or set(row) != {"role", "address", "storage"} or row["role"] != role:
+            raise ValueError(f"{label} must name each observed account's role, address and storage")
+        address = common.word(row["address"], "observed account address")
+        entries = row["storage"]
+        if int(address) >= 2**160 or not isinstance(entries, list) or len(entries) > MAX_ACCOUNT_SLOTS:
+            raise ValueError(f"{label} needs a 160-bit address and a bounded entry list")
+        normalized = []
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != {"slot", "value"}:
+                raise ValueError(f"{label} entries require exactly slot and value")
+            slot, value = common.word(entry["slot"], "storage slot"), common.word(entry["value"], "storage value")
+            if value == "0" or (normalized and int(normalized[-1]["slot"]) >= int(slot)):
+                raise ValueError(f"{label} must contain strictly ordered nonzero entries")
+            normalized.append({"slot": slot, "value": value})
+        result.append({"role": role, "address": address, "storage": normalized})
+    return result
+
+
+def account_storage_differences(observations: dict, declared, deployment=False) -> list[dict]:
+    """Classify the slots whose whole committed values differ across the paths:
+    the account role, the slot if the case declares it (else `undeclared`) and
+    the paths at which it is zero. After deployment the expected storage is
+    empty, so every nonzero slot is a difference even if all paths agree."""
+    first = observations[PATHS[0]]
+    found = set()
+    for position, account in enumerate(first):
+        values = {path: {entry["slot"]: entry["value"] for entry in observations[path][position]["storage"]} for path in PATHS}
+        for slot in set().union(*values.values()):
+            if deployment or len({values[path].get(slot, "0") for path in PATHS}) > 1:
+                found.add((position, slot if slot in declared else "undeclared",
+                           tuple(path for path in PATHS if slot not in values[path])))
+    order = lambda item: (item[0], item[1] == "undeclared", int(item[1]) if item[1] != "undeclared" else 0, item[2])
+    return [{"account": first[position]["role"], "slot": slot, "zeroPaths": list(zero)}
+            for position, slot, zero in sorted(found, key=order)]
+
+
+def account_identities(values: dict, initial_key="initialAccountStorage", rows_key="transactions") -> list:
+    """The observed accounts every path names: the same roles and bound addresses."""
+    identities = {json.dumps([[account["role"], account["address"]] for account in observation])
+                  for history in values.values()
+                  for observation in [history[initial_key]] + [row["accountStorage"] for row in history[rows_key]]}
+    if len(identities) != 1:
+        raise ValueError("paths observed different accounts")
+    return json.loads(identities.pop())
+
+
 def normalize_history(history, case: dict, path=None) -> dict:
     selected = profile(case)
     slots = observed_slots(case)
@@ -671,7 +740,8 @@ def normalize_history(history, case: dict, path=None) -> dict:
     if selected["declared"] and history.get("observedSlots") != list(slots):
         raise ValueError("history observed slots differ from the case declaration")
     initial = storage(history.get("initialStorage"), slots)
-    extra = {}
+    extra = {"initialAccountStorage": account_storage(history.get("initialAccountStorage"), (CONTRACT_ROLE,),
+                                                      "initial account storage")}
     if selected["declared"]:
         containment(history, extra, path, slots, "initialUndeclaredStorage")
     if selected.get("balances"):
@@ -695,7 +765,8 @@ def normalize_history(history, case: dict, path=None) -> dict:
         if not isinstance(status, str):
             raise ValueError("missing transaction status")
         value = {"id": row["id"], "index": index, "status": status,
-                 "committedStorage": storage(row.get("committedStorage"), slots)}
+                 "committedStorage": storage(row.get("committedStorage"), slots),
+                 "accountStorage": account_storage(row.get("accountStorage"), (CONTRACT_ROLE,))}
         if selected.get("balances"):
             value["committedBalance"] = common.word(row.get("committedBalance"), "committed balance")
         if selected["declared"]:
@@ -727,6 +798,12 @@ def normalize_history(history, case: dict, path=None) -> dict:
         raise ValueError("an unobserved transaction cannot claim a final committed snapshot")
     if not unobserved and final != (result[-1]["committedStorage"] if result else initial):
         raise ValueError("final committed storage differs from the last observation")
+    whole = None if unobserved else account_storage(history.get("finalAccountStorage"), (CONTRACT_ROLE,), "final account storage")
+    if unobserved and history.get("finalAccountStorage") is not None:
+        raise ValueError("an unobserved transaction cannot claim a final whole storage")
+    if not unobserved and whole != (result[-1]["accountStorage"] if result else extra["initialAccountStorage"]):
+        raise ValueError("final whole storage differs from the last observation")
+    extra["finalAccountStorage"] = whole
     if unobserved and extra.get("chainLogs") is not None:
         raise ValueError("an unobserved transaction cannot claim a chain-wide log list")
     if selected.get("balances"):
@@ -744,7 +821,7 @@ def without_containment(row: dict) -> dict:
     return {key: value for key, value in row.items() if key != "undeclaredStorage"}
 
 
-def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, prior_balance=None) -> bool:
+def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, prior_balance=None, prior_whole=None) -> bool:
     """The fixed protocol of a completed row: polarity, a one-Word payload,
     rollback of the committed slots and, for logs, the static log shapes from
     the contract address; a reverted row commits no logs. For call value, the
@@ -756,7 +833,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
             len(common.hex_bytes(row["output"], "output")) != 32:
         return False
-    if row["status"] == "reverted" and row["committedStorage"] != prior:
+    if row["status"] == "reverted" and (row["committedStorage"] != prior or
+                                        (prior_whole is not None and row["accountStorage"] != prior_whole)):
         return False
     if has_bytes(case) and bytes_fields(tx, row, prior, *bytes_layout(profile(case))[2:]):
         return False
@@ -798,10 +876,17 @@ def compare(histories: dict, case: dict) -> dict:
     try:
         keyed = profile(case)["declared"]
         values = {name: normalize_history(histories[name], case, name) for name in PATHS}
-        address = log_address(histories) if has_logs(case) else None
+        bound = log_address(histories)
+        address = bound if has_logs(case) else None
+        # Every path observes the same contract; original Core names its binding.
+        if account_identities(values) != [[CONTRACT_ROLE, bound]] and bound is not None:
+            raise ValueError("observed account differs from the bound contract")
     except (ValueError, KeyError, TypeError) as error:
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
     initial = {name: values[name]["initialStorage"] for name in PATHS}
+    whole = {name: values[name]["initialAccountStorage"] for name in PATHS}
+    # The empty constructor leaves the whole storage empty on every path.
+    differences = account_storage_differences(whole, observed_slots(case), deployment=True)
     pairs = pairwise(initial)
     outside = undeclared_paths(values) if keyed else []
     declared = not all(pairs.values()) or any(row["value"] != "0" for state in initial.values() for row in state)
@@ -809,14 +894,17 @@ def compare(histories: dict, case: dict) -> dict:
     deployed_logs = sorted(name for name in PATHS if values[name].get("initialLogs")) if deployment_logs(case) else []
     # The funded deployment holds exactly its recorded value on every path.
     funded = not has_balances(case) or all(values[name]["initialBalance"] == str(deployment_value(case)) for name in PATHS)
-    if declared or outside or deployed_logs or not funded:
+    if declared or outside or deployed_logs or not funded or differences:
         fields = (["committedStorage"] if declared else []) + (["undeclaredStorage"] if outside else []) + (
-            ["initialLogs"] if deployed_logs else []) + ([] if funded else ["committedBalance"])
+            ["initialLogs"] if deployed_logs else []) + ([] if funded else ["committedBalance"]) + (
+            ["accountStorage"] if differences else [])
         mismatch = {"category": "semantic-mismatch", "stage": "initial-storage", "fields": fields,
-            "pairs": pairwise({name: [initial[name], values[name].get("initialLogs"), values[name].get("initialBalance")]
-                               for name in PATHS}) if deployed_logs or not funded else pairs}
+            "pairs": pairwise({name: [initial[name], whole[name], values[name].get("initialLogs"), values[name].get("initialBalance")]
+                               for name in PATHS})}
         if outside:
             mismatch["undeclaredPaths"] = outside
+        if differences:
+            mismatch["accountStorageDifferences"] = differences
         if deployed_logs:
             mismatch["logPaths"] = deployed_logs
         return mismatch
@@ -882,10 +970,21 @@ def compare(histories: dict, case: dict) -> dict:
         outside = undeclared_paths(values, index) if keyed else []
         if outside:
             fields.append("undeclaredStorage")
-        if not all(pairs.values()) or not normal or not rollback or outside:
+        # The whole committed storage agrees across paths, and a revert keeps
+        # each path's prior whole storage.
+        differences = account_storage_differences({name: row["accountStorage"] for name, row in rows.items()}, observed_slots(case))
+        rolled = sorted(name for name, row in rows.items() if row["status"] == "reverted" and row["accountStorage"] !=
+                        (values[name]["transactions"][index - 1]["accountStorage"] if index else values[name]["initialAccountStorage"]))
+        if (differences or rolled) and "accountStorage" not in fields:
+            fields.append("accountStorage")
+        if not all(pairs.values()) or not normal or not rollback or outside or rolled:
             mismatch = {"category": "semantic-mismatch", **where, "pairs": pairs, "fields": fields or ["status", "output"]}
             if outside:
                 mismatch["undeclaredPaths"] = outside
+            if differences:
+                mismatch["accountStorageDifferences"] = differences
+            if rolled:
+                mismatch["accountStorageRollbackPaths"] = rolled
             return mismatch
     if has_logs(case):
         # Logs committed earlier stay: the chain's complete list for the contract
@@ -919,6 +1018,8 @@ def hull_history(stdout: str, exit_code: int, case: dict) -> dict:
     selected = profile(case)
     history = {"schema": selected["historySchema"], "initialStorage": deployment.get("committedStorage"),
         "transactions": calls, "finalStorage": calls[-1].get("committedStorage") if calls else deployment.get("committedStorage"),
+        "initialAccountStorage": deployment.get("accountStorage"),
+        "finalAccountStorage": calls[-1].get("accountStorage") if calls else deployment.get("accountStorage"),
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
     if selected["declared"]:
         history.update(observedSlots=list(observed_slots(case)), initialUndeclaredStorage=deployment.get("undeclaredStorage"))
@@ -990,15 +1091,17 @@ def evm_balance(rpc, address: str, block: str) -> str:
 PRESTATE_DIFF = {"tracer": "prestateTracer", "tracerConfig": {"diffMode": True}}
 
 
-def changed_slots(diff, address: str) -> set[str]:
-    """Storage keys changed by one mined transaction, from the client's own diff.
+def changed_storage(diff, addresses) -> dict[str, set[str]]:
+    """Storage keys of each observed account that one mined transaction changed,
+    from the client's own diff of its pre- and post-state.
 
-    Only the deployed contract may change storage in this profile; any other
+    Only the deployed contracts may change storage in these profiles; any other
     account's storage change is outside the comparison scope and fails closed.
     """
     if not isinstance(diff, dict) or set(diff) != {"pre", "post"} or not all(isinstance(diff[k], dict) for k in diff):
         raise ValueError("prestate diff lacks its pre/post account maps")
-    result = set()
+    observed = {address.lower() for address in addresses}
+    result = {address: set() for address in observed}
     for side in ("pre", "post"):
         for account, state in diff[side].items():
             if not isinstance(account, str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", account) or not isinstance(state, dict):
@@ -1006,13 +1109,83 @@ def changed_slots(diff, address: str) -> set[str]:
             values = state.get("storage", {})
             if not isinstance(values, dict):
                 raise ValueError("invalid prestate diff storage")
-            if values and account.lower() != address.lower():
+            if values and account.lower() not in observed:
                 raise ValueError("prestate diff changed storage outside the deployed contract")
             for key in values:
                 if not isinstance(key, str) or not re.fullmatch(r"0x[0-9a-fA-F]{1,64}", key):
                     raise ValueError("invalid prestate diff storage key")
-                result.add(str(int(key, 16)))
+                result[account.lower()].add(str(int(key, 16)))
     return result
+
+
+def changed_slots(diff, address: str) -> set[str]:
+    """Storage keys of the one deployed contract that a mined transaction changed."""
+    return changed_storage(diff, [address])[address.lower()]
+
+
+def evm_account_storage(rpc, accounts, touched: dict, block: str) -> list[dict]:
+    """Each observed account's whole committed storage at one receipt block.
+
+    `accounts` are (role, decimal address) pairs and `touched` maps each
+    lowercase hexadecimal address to every slot a prestate diff has reported
+    since its creation. A new contract starts empty and the diff reports every
+    slot whose committed value a transaction changes, so rereading those slots
+    and dropping zero values enumerates the whole storage exactly.
+    """
+    result = []
+    for role, address in accounts:
+        target = f"0x{int(address):040x}"
+        rows = evm_storage(rpc, target, block, sorted(touched.get(target, set()), key=int))
+        if len(rows) > MAX_ACCOUNT_SLOTS:
+            raise ValueError("EVM account storage exceeds its bound")
+        result.append({"role": role, "address": address, "storage": [row for row in rows if row["value"] != "0"]})
+    return result
+
+
+def evm_dumped_storage(rpc, accounts) -> tuple[list[dict], dict]:
+    """The same observation from Anvil's own dump of the latest state. The
+    adapter calls it right after a receipt and before the next submission, so
+    the latest block is that receipt's block."""
+    dumped = common.hex_bytes(rpc.call("anvil_dumpState", []), "state dump")
+    if len(dumped) > MAX_STATE_DUMP:
+        raise ValueError("state dump exceeds its bound")
+    raw = dumped
+    if dumped[:2] == b"\x1f\x8b":
+        inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        raw = inflater.decompress(dumped, MAX_STATE_DUMP)
+        if inflater.unconsumed_tail or not inflater.eof:
+            raise ValueError("state dump exceeds its bound or is truncated")
+    state = json.loads(raw)
+    known = state.get("accounts") if isinstance(state, dict) else None
+    if not isinstance(known, dict):
+        raise ValueError("state dump lacks its account map")
+    known = {str(key).lower(): value for key, value in known.items()}
+    result = []
+    for role, address in accounts:
+        entry = known.get(f"0x{int(address):040x}")
+        values = entry.get("storage", {}) if isinstance(entry, dict) else None
+        if not isinstance(values, dict) or len(values) > MAX_ACCOUNT_SLOTS:
+            raise ValueError("state dump lacks an observed account's bounded storage")
+        rows = []
+        for key, value in values.items():
+            if not isinstance(key, str) or not re.fullmatch(r"0x[0-9a-fA-F]{1,64}", key) or \
+                    not isinstance(value, str) or not re.fullmatch(r"0x[0-9a-fA-F]{1,64}", value):
+                raise ValueError("invalid state dump storage entry")
+            if int(value, 16):
+                rows.append({"slot": str(int(key, 16)), "value": str(int(value, 16))})
+        result.append({"role": role, "address": address, "storage": sorted(rows, key=lambda row: int(row["slot"]))})
+    return result, {"sha256": hashlib.sha256(dumped).hexdigest(), "bytes": len(dumped)}
+
+
+def evm_whole_storage(rpc, accounts, touched: dict, block: str, record: dict) -> list[dict]:
+    """Whole storage from the prestate diffs, required to equal the state dump."""
+    whole = evm_account_storage(rpc, accounts, touched, block)
+    dumped, identity = evm_dumped_storage(rpc, accounts)
+    record["stateDump"] = identity
+    if dumped != whole:
+        record["stateDumpStorage"] = dumped
+        raise Finding("adapter-error", "evm-storage-enumeration", "prestate diffs and the state dump disagree on committed storage")
+    return whole
 
 
 def evm_undeclared(rpc, address: str, block: str, touched: set[str], slots) -> list[dict]:
@@ -1176,11 +1349,11 @@ def execute(args, report: dict) -> None:
             raise ValueError("invalid deployed contract address")
         if common.hex_bytes(rpc.call("eth_getCode", [address, deployed["blockNumber"]]), "deployed runtime") != runtime:
             raise Finding("adapter-error", "evm-deployment", "installed runtime differs from exported code image")
-        touched = set()
-        if selected["declared"]:
-            diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
-            report["evmDeployment"]["storageDiff"] = diff
-            touched |= changed_slots(diff, address)
+        # Every slot a prestate diff reports from the deployment on; the whole
+        # storage rereads them all at each receipt block.
+        diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
+        report["evmDeployment"]["storageDiff"] = diff
+        touched = changed_slots(diff, address)
         bindings = {"schema": "solcore-lean.storage-bindings.v1", "caller": str(int(sender, 16)), "address": str(int(address, 16))}
         if previous and previous.get("bindings") != bindings:
             raise Finding("adapter-error", "replay", "fresh deployment changed the retained address bindings")
@@ -1215,6 +1388,9 @@ def execute(args, report: dict) -> None:
         initial = evm_storage(rpc, address, deployed["blockNumber"], slots)
         keyed = {"observedSlots": list(slots), "initialUndeclaredStorage":
             evm_undeclared(rpc, address, deployed["blockNumber"], touched, slots)} if selected["declared"] else {}
+        observed_accounts = [(CONTRACT_ROLE, bindings["address"])]
+        keyed["initialAccountStorage"] = evm_whole_storage(rpc, observed_accounts, {address.lower(): touched},
+                                                           deployed["blockNumber"], report["evmDeployment"])
         if deployment_logs(case):
             keyed["initialLogs"] = evm_logs(deployed)
         if selected.get("logs"):
@@ -1230,6 +1406,7 @@ def execute(args, report: dict) -> None:
                 keyed["finalBalance"] = None if pending else evm_rows[-1]["committedBalance"] if evm_rows else keyed["initialBalance"]
             report["histories"]["rustEvm"] = {"schema": selected["historySchema"], **keyed, "initialStorage": initial,
                 "transactions": list(evm_rows), "finalStorage": None if pending else evm_rows[-1]["committedStorage"] if evm_rows else initial,
+                "finalAccountStorage": None if pending else evm_rows[-1]["accountStorage"] if evm_rows else keyed["initialAccountStorage"],
                 "status": "complete" if complete else "incomplete", "unobserved": [pending] if pending else [],
                 "unexecuted": remaining[1:] if pending else remaining}
         checkpoint()
@@ -1256,11 +1433,12 @@ def execute(args, report: dict) -> None:
                 row["logs"] = evm_logs(mined)
             if selected.get("balances"):
                 row["committedBalance"] = evm_balance(rpc, address, mined["blockNumber"])
+            diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
+            record["storageDiff"] = diff
+            touched |= changed_slots(diff, address)
             if selected["declared"]:
-                diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
-                record["storageDiff"] = diff
-                touched |= changed_slots(diff, address)
                 row["undeclaredStorage"] = evm_undeclared(rpc, address, mined["blockNumber"], touched, slots)
+            row["accountStorage"] = evm_whole_storage(rpc, observed_accounts, {address.lower(): touched}, mined["blockNumber"], record)
             evm_rows.append(row)
             checkpoint()
             if outcome["status"] not in {"returned", "reverted"}:

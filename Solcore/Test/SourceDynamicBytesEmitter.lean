@@ -213,7 +213,7 @@ private def observerChecks : IO Unit := do
     "bytes observer conflated fuel exhaustion with completion"
   let complete := DynamicBytesExecution.observe plan calls StorageExecution.fixtureBindings 10000
   ensure ((complete.getObjVal? "observedSlots").toOption == some (toJson (["0", "1", "2", "3", "4"] : List String)) &&
-    (complete.getObjValAs? String "schema").toOption == some "solcore-lean.bytes-history.v1" &&
+    (complete.getObjValAs? String "schema").toOption == some "solcore-lean.bytes-history.v2" &&
     (complete.getObjValAs? String "status").toOption == some "complete")
     "history did not declare its slots or schema"
 

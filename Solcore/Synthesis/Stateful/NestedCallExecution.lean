@@ -1,10 +1,12 @@
 import Solcore.Synthesis.Core.NestedCall
 import Solcore.Synthesis.Stateful.StorageExecution
 import Solcore.ContractRuntime.OneLevelNestedExecution
+import Solcore.Synthesis.Stateful.AccountStorage
 
 /-! Original checked-Core execution of a fixed parent/leaf protocol. Only the
 public scheduler's committed world and transaction journal leave an invocation.
-Exhausted working state and speculative logs are never reported as committed. -/
+Exhausted working state and speculative logs are never reported as committed.
+Both contracts' whole committed storage is reported with their slots zero and one. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Stateful.NestedCallExecution
@@ -13,7 +15,7 @@ open Solcore.Synthesis.Core.NestedCall (CheckedPlan)
 
 abbrev Transaction := StorageExecution.Transaction
 
-def historySchema : String := "solcore-lean.call-history.v1"
+def historySchema : String := "solcore-lean.call-history.v2"
 def bindingsSchema : String := "solcore-lean.call-bindings.v1"
 
 structure Bindings where
@@ -74,6 +76,10 @@ private def accountJson (world : WorldState) (role : String) (address : Address)
 def accountsJson (world : WorldState) (bindings : Bindings) : Json := toJson [
   accountJson world "parent" bindings.parent, accountJson world "child" bindings.child]
 
+/-- Both contracts' whole committed storage, in role order. -/
+def wholeStorageJson (world : WorldState) (bindings : Bindings) : Json :=
+  AccountStorage.worldJson world [("parent", bindings.parent), ("child", bindings.child)]
+
 def logsJson (journal : TransactionJournal) : Json := toJson (journal.logList.map fun entry => Json.mkObj [
   ("address", toJson (toString entry.emitter.val)),
   ("topics", toJson [toString entry.topic.val]),
@@ -93,6 +99,7 @@ def observe (plan : CheckedPlan) (transactions : List Transaction) (bindings : B
       else if target = bindings.child then some plan.childContract else none }
   let mut world := initialWorld plan bindings
   let initial := accountsJson world bindings
+  let initialWhole := wholeStorageJson world bindings
   let mut rows : Array Json := #[]
   let mut stopped : Option String := none
   for (transaction, index) in transactions.zipIdx do
@@ -105,24 +112,28 @@ def observe (plan : CheckedPlan) (transactions : List Transaction) (bindings : B
       match registry.resolve? prior bindings.parent with
       | none =>
           rows := rows.push (Json.mkObj (common ++ [("status", toJson "resolution-failure"),
-            ("committedAccounts", accountsJson prior bindings), ("logs", Json.null)]))
+            ("committedAccounts", accountsJson prior bindings), ("accountStorage", wholeStorageJson prior bindings),
+            ("logs", Json.null)]))
           stopped := some transaction.id
       | some ⟨resolved, installed⟩ =>
           match (OneLevelNestedExecution.run resolved invocation installed registry fuel).view with
           | .completed terminal =>
               world := terminal.finalWorld
               rows := rows.push (Json.mkObj (common ++ outcomeFields terminal.outcome ++ [
-                ("committedAccounts", accountsJson world bindings), ("logs", logsJson terminal.committedJournal)]))
+                ("committedAccounts", accountsJson world bindings), ("accountStorage", wholeStorageJson world bindings),
+                ("logs", logsJson terminal.committedJournal)]))
               match terminal.outcome with
               | .trapped _ => stopped := some transaction.id
               | _ => pure ()
           | .outOfFuel _ _ _ =>
               rows := rows.push (Json.mkObj (common ++ [("status", toJson "out-of-fuel"),
-                ("committedAccounts", accountsJson prior bindings), ("logs", Json.null)]))
+                ("committedAccounts", accountsJson prior bindings), ("accountStorage", wholeStorageJson prior bindings),
+            ("logs", Json.null)]))
               stopped := some transaction.id
   return Json.mkObj [("schema", toJson historySchema), ("bindings", bindingsJson bindings),
-    ("fuelPerTransaction", toJson fuel), ("initialAccounts", initial),
+    ("fuelPerTransaction", toJson fuel), ("initialAccounts", initial), ("initialAccountStorage", initialWhole),
     ("transactions", .arr rows), ("finalAccounts", accountsJson world bindings),
+    ("finalAccountStorage", wholeStorageJson world bindings),
     ("status", toJson (if stopped.isNone then "complete" else "incomplete")),
     ("stoppedAt", stopped.map toJson |>.getD Json.null),
     ("unexecuted", toJson ((transactions.drop rows.size).map (·.id)))]

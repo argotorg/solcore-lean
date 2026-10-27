@@ -67,7 +67,9 @@ private def referenceChecks : IO Json := do
     "bytes scenario did not follow its flags parities"
   ensure ((← get (DynamicBytes.checkProtocol value observed)) == ["returned", "reverted", "returned"])
     "bytes history broke its length, last-byte or sum protocol"
-  ensure ((← rows (DynamicBytes.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)) == (← rows observed))
+  let rebound ← rows (DynamicBytes.observe value ⟨⟨33, by decide⟩, ⟨202, by decide⟩⟩ 10000)
+  ensure (rebound.map Solcore.Synthesis.Stateful.AccountStorage.unbound == (← rows observed).map Solcore.Synthesis.Stateful.AccountStorage.unbound &&
+      rebound.all (Solcore.Synthesis.Stateful.AccountStorage.boundTo · [202]))
     "address-independent bytes profile changed with bindings"
   rejected (DynamicBytes.checkedScenario identity (transactions [(0, List.replicate 65 1)])) "65-byte payload accepted"
   ensure (DynamicBytes.tailByte [] == 0 && DynamicBytes.tailByte [1, 2, 0x80] == 0x80 &&

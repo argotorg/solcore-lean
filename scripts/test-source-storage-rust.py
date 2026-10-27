@@ -82,7 +82,7 @@ def native_case(plan: dict, txs: list[dict], directory: Path, args: argparse.Nam
 
 
 def normalized_history(history: dict, case: dict) -> dict:
-    if history.get("schema") != "solcore-lean.storage-history.v1":
+    if history.get("schema") != "solcore-lean.storage-history.v2":
         raise ValueError("unexpected storage history schema")
     if history.get("initialStorage") != ZERO_STORAGE:
         raise ValueError("storage history does not begin with both slots empty")
