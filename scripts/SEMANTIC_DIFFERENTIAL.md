@@ -891,8 +891,10 @@ including when a receipt has no world, and stops on incomplete execution.
 An uncertain transaction submission is never retried automatically.
 
 A pass requires agreement on empty initial storage and on status, return bytes
-and committed slots after every transaction, across all three path pairs. A
-later resource failure cannot erase an already observed prefix mismatch. Exact
+and committed slots after every transaction, across all three path pairs. The
+contract's [whole committed storage](#compare-whole-committed-storage) must
+agree too. A later resource failure cannot erase an already observed prefix
+mismatch. Exact
 replay checks archive members, tool identities and saved budgets, then starts a
 fresh deployment and recomputes all observations.
 
@@ -964,7 +966,8 @@ python3 scripts/semantic-storage-campaign.py \
 
 This changes a copied observation only after actual agreement. Raw reports
 remain unchanged, and the command exits nonzero for the synthetic mismatch.
-`--test-field` accepts `output`, `storage:0` or `storage:1`. A selected transaction
+`--test-field` accepts `output`, `storage:0`, `storage:1` or `stray` (see
+[whole committed storage](#compare-whole-committed-storage)). A selected transaction
 removed by a candidate cannot preserve that synthetic finding. The integrated
 check reduced three transactions to only `tx-1`, retained the same fingerprint,
 and passed both fresh actual archive replay and synthetic replay. Genuine
@@ -1124,10 +1127,12 @@ The Rust path mines transactions, reads their output from step-enabled traces,
 and obtains both accounts' slots zero/one and balances at each receipt block.
 Committed logs come from receipts. Imported Hull uses the same actual bindings
 and exact linked runtime images. A pass requires matching initial accounts and
-every completed prefix: root status/payload, both account snapshots and ordered
-logs. Root rollback must restore both prior snapshots and remove committed
-logs; child rollback can leave earlier parent effects intact. Unknown submission
-outcomes are not retried. Fuel, gas and process limits remain distinct.
+every completed prefix: root status/payload, both account snapshots, both
+contracts' [whole committed storage](#compare-whole-committed-storage) and
+ordered logs. Root rollback must restore both prior snapshots and remove
+committed logs; child rollback can leave earlier parent effects intact.
+Unknown submission outcomes are not retried. Fuel, gas and process limits
+remain distinct.
 
 Exact archive replay checks saved artifact and executable hashes before fresh
 execution. Rebuilding a native tool or changing an adapter invalidates an old
@@ -1201,15 +1206,17 @@ every transaction's key and wrapping successor. All three paths report status,
 payload and the committed value of every declared slot after every transaction.
 Original Core reads them from the public committed world; the Rust EVM path
 uses `eth_getStorageAt` at each receipt block; imported Hull reads its committed
-entries. Because Core's account storage is not enumerable, slots outside the
-declaration are checked only on the two executable paths: the Hull runner
-reports every nonzero committed slot outside it, and the EVM path asks Anvil's
-`prestateTracer` in diff mode for each mined transaction's (and the
-deployment's) changed slots, then rereads those outside the declaration at the
-receipt block. A nonzero undeclared slot on either path is a semantic mismatch
-(`undeclaredStorage`, with `undeclaredPaths`). A diff that changes another
-account's storage fails closed as an adapter error. The deployment must leave
-every declared slot zero and no undeclared nonzero slot.
+entries. Slots outside the declaration are also checked on the two executable
+paths alone: the Hull runner reports every nonzero committed slot outside it,
+and the EVM path asks Anvil's `prestateTracer` in diff mode for each mined
+transaction's (and the deployment's) changed slots, then rereads those outside
+the declaration at the receipt block. A nonzero undeclared slot on either path
+is a semantic mismatch (`undeclaredStorage`, with `undeclaredPaths`). A diff
+that changes another account's storage fails closed as an adapter error. The
+deployment must leave every declared slot zero and no undeclared nonzero slot.
+All three paths also compare the contract's
+[whole committed storage](#compare-whole-committed-storage), which original
+Core now enumerates as well.
 
 Build the native tools and generate a case:
 
@@ -2702,6 +2709,177 @@ nesting, static or multi-word elements, more than three rows or two elements
 per row, non-canonical offsets, truncated input and the decoder's revert
 paths, or return values longer than one Word. Agreement is test evidence, not
 a preservation proof.
+
+## Compare whole committed storage
+
+Every stateful profile compares the declared slots on all three paths. The nine
+declared-slot profiles also require the Hull and EVM paths to hold no nonzero
+slot outside the declaration. A stray write by original Core itself, or any
+stray write in the two-slot, rollback and two call profiles, was invisible. All
+thirteen stateful profiles now also compare the observed contracts' whole
+committed storage after deployment and after every transaction. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
+this section describes how the paths observe it.
+
+### Observation
+
+Each history carries `initialAccountStorage`, an `accountStorage` list on every
+row and `finalAccountStorage`. Each lists the observed accounts in role order:
+`contract` for the eleven storage-family profiles, `parent` and `child` for
+`stateful-calls` and `stateful-forwarded-value`. Every account names its role,
+its bound decimal address and its nonzero entries `{slot, value}` in strictly
+increasing slot order. Zero is never listed, so a cleared slot and a slot never
+written are the same observation. An incomplete transaction reports the prior
+committed storage, as its declared slots do.
+
+- Original Core reads the committed world through `Account.storageEntries`.
+  `ContractRuntime`'s account keeps the strictly increasing list of exactly
+  its present slots beside its storage function, and every write maintains it.
+  `Account.mem_storageEntries_iff` proves that an entry is listed exactly when
+  `storageValue?` returns it, and `Account.ext` still holds. The shared module
+  `Solcore.Synthesis.Stateful.AccountStorage` renders the observation for the
+  observers.
+- Imported Hull reports each observed account's committed entries, which a
+  revert or incomplete call leaves unchanged. `AccountStorage.canonicalEntries`
+  keeps every distinct key with the value its first entry gives, as
+  `WordMapping.lookupEntries` does, and drops zero values.
+  `mem_canonicalEntries_iff` and `canonicalEntries_sorted` prove that.
+- The EVM path calls `debug_traceTransaction` with `prestateTracer` in diff
+  mode for every deployment and mined transaction, in every profile. It
+  accumulates the observed accounts' reported storage keys and rereads them all
+  with `eth_getStorageAt` at each receipt block, dropping zero values. A
+  storage change at another account fails closed as an adapter error. The
+  report keeps every diff (`storageDiff`).
+
+The diff mode reports exactly the slots whose committed value a transaction
+changes. A hand-assembled probe on Anvil 1.5.1 checked this against
+`eth_getStorageAt` at the parent and receipt blocks for every slot its calldata
+could write, and against the opcode trace's `SSTORE`s. It covered:
+
+- constructor writes;
+- fresh, changed and cleared slots, and slots 0, 2^255 and 2^256 - 1;
+- a value restored by a later transaction;
+- a reverted transaction;
+- child calls that returned or reverted under a returned or reverted parent.
+
+A write that leaves a value unchanged inside one transaction is not reported: 0
+to 5 to 0, 3 to 4 to 3, a same-value write, or a write rolled back with its
+frame. The opcode trace shows that these writes ran, but committed storage
+cannot observe them. A contract starts empty, so a slot is nonzero after a
+block only if some transaction up to that block changed it, and the union of
+reported keys covers the whole storage. The final `anvil_dumpState` of the
+probe matched that union. Anvil 1.5.1 has no `debug_storageRangeAt`. A first
+matrix also required `anvil_dumpState` to agree after every mined transaction,
+but with `--steps-tracing` the dump embeds every step trace. On the
+nested-array corpus it outgrew its 64 MiB bound within two transactions, so
+that run-time cross-check was dropped. Rerun the probe after any Anvil change;
+it starts its own local Anvil with the adapters' flags and exits nonzero on any
+discrepancy:
+
+```sh
+python3 scripts/check-evm-storage-diff.py
+```
+
+### Comparison, rollback and fingerprints
+
+After deployment, every path's observed storage must be empty; every profile
+has an empty constructor. After every transaction the three observations must
+be equal. A difference is a `semantic-mismatch` at the existing stage with the
+field `accountStorage` and the classification `accountStorageDifferences`: the
+sorted, unique list of `{account, slot, zeroPaths}` records. They give the
+role, the slot as a decimal Word if the case declares it and `undeclared`
+otherwise, and the paths at which the slot is zero. A reverted transaction must
+leave each path's whole storage equal to its prior observation. In the call
+profiles, a child revert (odd input) under a returned root must leave the
+child's whole storage unchanged. A path that breaks either rule is listed in
+`accountStorageRollbackPaths`. The declared-slot, containment, balance and log
+comparisons are unchanged, so a stray Hull write in a declared-slot profile now
+reports both `undeclaredStorage` and `accountStorage`.
+
+The storage and call campaigns copy both lists into every fingerprint, empty
+when there is no difference. Undeclared slots are fingerprinted only as
+`undeclared`, so a reduction may move a stray write to another undeclared slot,
+but not to a declared slot, another account or another set of paths that lack
+it. Candidates are rerun on all three paths, and `same_failure` requires the
+whole fingerprint.
+
+Histories now use the `.v2` schemas of all thirteen profiles. Reports use
+`solcore-lean.semantic-storage-differential.v2` and
+`solcore-lean.semantic-call-differential.v2`, and campaign analyses use
+`solcore-lean.semantic-storage-analysis.v2` and
+`solcore-lean.semantic-call-analysis.v2`. Cases, plans, corpora, Hull scenario
+inputs and campaign summaries keep their schemas. The account representation
+changed, so every native tool was rebuilt and older archives cannot be replayed
+exactly; rerun their `case.json` with `--case`.
+
+### Running and validation
+
+Build and prepare the tools as usual, then run any stateful corpus or suite. To
+check detection, reduction and replay of a stray write, add a copied undeclared
+slot after actual agreement:
+
+```sh
+python3 scripts/semantic-storage-campaign.py \
+  --case .upstream/semantic-storage-cases/case.json \
+  --test-perturb-path importedHull --test-transaction-id tx-2 \
+  --test-field stray --shrink-attempts 24 \
+  --output .upstream/semantic-stray-reducer --seconds 900
+python3 scripts/semantic-call-campaign.py --profile stateful-calls \
+  --case .upstream/semantic-call-cases/case.json \
+  --test-perturb-path rustEvm --test-transaction-id tx-1 \
+  --test-field child:stray --shrink-attempts 24 \
+  --output .upstream/semantic-call-stray-reducer --seconds 900
+```
+
+`stray` (storage profiles) and `parent:stray` or `child:stray` (call profiles)
+XOR one into the implicit zero Word of slot 2^256 - 2 in one path's copied
+whole storage at the selected transaction. A scenario that declares that slot
+is rejected before execution. A candidate that removes the transaction,
+declares the slot or already holds it there cannot keep the synthetic finding.
+
+### Results
+
+The account change rebuilt every native tool; Core's semantics and every
+existing storage law are unchanged. Before each commit the full Lean build and
+tests, kernel policy and 572 Python policy tests passed, and the three corpus
+validators passed on the final code. With frozen scripts and native tools at
+the final commit, all thirteen stateful fixed corpora matched on Sonatina O0
+and O2: 167 scenarios and 460 prefixes on each level, in 1,004 and 1,011
+seconds, with no finding.
+
+| Profile | Scenarios | Prefixes | O0 seconds | O2 seconds |
+| --- | ---: | ---: | ---: | ---: |
+| `stateful-storage` | 12 | 33 | 62.2 | 62.2 |
+| `stateful-storage-rollback` | 14 | 39 | 72.9 | 73.2 |
+| `stateful-calls` | 16 | 44 | 92.3 | 101.2 |
+| `stateful-keyed-storage` | 14 | 39 | 76.5 | 76.3 |
+| `stateful-dynamic-array` | 15 | 42 | 101.1 | 99.0 |
+| `stateful-logs` | 12 | 33 | 66.6 | 66.2 |
+| `stateful-call-value` | 12 | 33 | 65.7 | 64.9 |
+| `stateful-bytes` | 12 | 33 | 73.5 | 73.3 |
+| `stateful-forwarded-value` | 12 | 33 | 71.0 | 76.9 |
+| `stateful-mapping` | 12 | 33 | 75.8 | 75.0 |
+| `stateful-ledger` | 12 | 32 | 75.7 | 74.6 |
+| `stateful-long-bytes` | 12 | 33 | 77.7 | 77.6 |
+| `stateful-nested-array` | 12 | 33 | 93.3 | 90.1 |
+
+The synthetic checks used the commands above with the fixed `generated-21`
+storage scenario and the `child-rollback-then-value` call scenario, at both
+levels. The stray Hull write at `tx-2`, which no earlier observation of the
+two-slot profile could see, was classified as an undeclared slot absent on Core
+and the EVM. It was reduced to `tx-2` alone with input zero and a smaller step:
+sixteen accepted reductions in sixteen candidate executions. The stray EVM
+child write at the child-reverting `tx-1` was classified as an undeclared child
+slot and as a child-rollback violation on the EVM path. It was reduced to
+`tx-1` alone with input one: four accepted reductions in seven executions. The
+rejected candidates removed `tx-1` or made the child return, which drops the
+rollback classification. Every candidate's actual comparison matched. The
+original and reduced archives replayed exactly with agreement (eight replays),
+and each replay reproduced the synthetic fingerprint.
+
+This observation does not cover accounts other than the deployed contracts,
+transient storage, gas, nonces or code. Agreement is test evidence, not a
+preservation proof.
 
 ## Compare generic selection
 

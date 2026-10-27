@@ -1728,6 +1728,38 @@ execution:
   Older archives therefore cannot be replayed exactly; rerun their saved
   cases with `--case`.
 
+Original Core enumerates each account through `Account.storageEntries`. Its
+private slot list is proved sorted and exact, the full build passed with only
+that runtime change, and every existing storage law and `Account.ext` are
+unchanged. `Solcore.Synthesis.Stateful.AccountStorage` renders the observation
+for the twelve observers and canonicalizes Hull entries, with exactness and
+order theorems. The six Hull runners and both adapters report and compare it,
+and the campaigns fingerprint it. Before each commit the full Lean build
+(10,132 jobs), registered tests, kernel policy, 572 Python policy tests and
+`git diff --check` passed; the three corpus validators passed on the final
+code.
+
+With frozen scripts and native tools at the final commit, the fixed corpora of
+all thirteen stateful profiles matched on Sonatina O0 and O2: 167 scenarios and
+460 prefixes on each level, in 1,004 and 1,011 seconds, with no finding. A
+synthetic stray Hull write at `tx-2` of the two-slot `generated-21` scenario,
+which no earlier observation could see, was classified as an undeclared slot
+absent on Core and the EVM. On each level it was reduced to that transaction
+with input zero and a smaller step: sixteen accepted reductions in sixteen
+candidate executions. A stray EVM child write at the child-reverting `tx-1` of
+`child-rollback-then-value` was classified as an undeclared child slot and a
+child-rollback violation on that path. On each level it was reduced to that
+transaction with input one: four accepted reductions in seven executions. The
+rejected candidates removed the transaction or made the child return, which
+drops the rollback classification. Every candidate's actual comparison
+matched. The original and reduced archives replayed exactly with agreement
+(eight replays), and each replay reproduced the synthetic fingerprint. Hosted
+CI has not been run.
+
+This observation does not cover accounts other than the deployed contracts,
+transient storage, gas, nonces or code. Agreement is test evidence, not a
+preservation proof.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
