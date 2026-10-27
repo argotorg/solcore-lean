@@ -44,6 +44,7 @@ TARGETS = {
     "semanticMalformedCalldataTool": "semantic-malformed-calldata-tool",
     "semanticMalformedNestedArrayTool": "semantic-malformed-nested-array-tool",
     "semanticMalformedBytesTool": "semantic-malformed-bytes-tool",
+    "semanticMethodsTool": "semantic-methods-tool",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",

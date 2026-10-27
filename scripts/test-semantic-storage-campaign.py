@@ -876,6 +876,90 @@ class MalformedBytesCampaignTests(unittest.TestCase):
             campaign.validate_manifest(array)
 
 
+def methods_case(rows=None):
+    value = fixtures.methods_case() if rows is None else fixtures.methods_case(rows=rows)
+    for method in value["methodsPlan"]["methods"]:
+        method["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def methods_report(value):
+    histories = fixtures.methods_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class MethodsCampaignTests(unittest.TestCase):
+    def test_coverage_names_method_counts_called_positions_selector_orders_arities_and_std_outcomes(self):
+        value = methods_case()
+        self.assertEqual(campaign.dimensions("stateful-methods"),
+                         campaign.DIMENSIONS + ("MethodCounts", "MethodPositions", "SelectorOrders", "Arities", "Rejections"))
+        self.assertEqual(campaign.methods_coverage(value),
+                         {"MethodCounts": {3}, "MethodPositions": {0, 1, 2}, "SelectorOrders": {"mixed"},
+                          "Arities": {0, 1, 2}, "Rejections": {"0x4924aef0", "accepted"}})
+        self.assertEqual(campaign.inputs(value), {"1", "2", "3", "4", "6"})
+        uncalled = methods_case(rows=(("m_00000002", ()), (None, (1,))))
+        self.assertEqual(campaign.methods_coverage(uncalled)["MethodPositions"], {1})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-methods"))
+            instance.summary["coverage"].update(requiredMethodCounts=[2, 3, 4], requiredMethodPositions=[0, 1, 2, 3],
+                                                requiredSelectorOrders=["ascending", "mixed"])
+            instance.record_coverage(value, "matched", methods_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedMethodPositions"], coverage["matchedSelectorOrders"]), ([0, 1, 2], ["mixed"]))
+            self.assertEqual((coverage["missingMethodCounts"], coverage["missingMethodPositions"], coverage["missingSelectorOrders"]),
+                             ([2, 4], [3], ["ascending"]))
+
+    def test_helper_counts_and_templates_cover_every_method_step(self):
+        value = methods_case()
+        value["methodsPlan"]["methods"][1]["stepProgram"] = case(helpers=3)["storagePlan"]["stepProgram"]
+        self.assertEqual(campaign.helper_counts(value), {1, 3})
+        value["provenance"]["origin"] = {"kind": "methods-generated", "stepOrigins": [
+            {"kind": "aggregate-generated", "helpers": [{"template": 0}]},
+            {"kind": "aggregate-generated", "helpers": [{"template": 2}, {"template": 3}]},
+            {"kind": "aggregate-generated", "helpers": [{"template": 2}]}]}
+        self.assertEqual(campaign.recipes(value), {0, 2, 3})
+        for change in (lambda origin: origin.pop("stepOrigins"), lambda origin: origin.update(stepOrigins=[]),
+                       lambda origin: origin["stepOrigins"][1].update(kind="storage-generated"),
+                       lambda origin: origin["stepOrigins"][2]["helpers"][0].update(template=4)):
+            invalid = copy.deepcopy(value)
+            change(invalid["provenance"]["origin"])
+            with self.assertRaises(ValueError):
+                campaign.recipes(invalid)
+
+    def test_a_missing_selector_counts_as_a_matched_prefix_and_its_analysis_names_the_selector(self):
+        value = methods_case()
+        raw = methods_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 5, "completed": 5, "matched": 5})
+        self.assertEqual(campaign.analyze(raw, value)["selectorRows"], [{"id": "tx-2", "index": 2, "selector": "0x4924aef0"}])
+        changed = copy.deepcopy(raw)
+        changed["histories"]["importedHull"]["transactions"][2]["output"] = fixtures.selector_word("0x4924aef0")
+        self.assertEqual(campaign.transaction_counts(changed["histories"], value)["matched"], 2)
+
+    def test_the_manifest_requires_method_coverage_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-methods-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        for change in (lambda m: m.pop("requiredMethodCounts"), lambda m: m.update(requiredMethodCounts=[5]),
+                       lambda m: m.update(requiredMethodPositions=[4]), lambda m: m.update(requiredSelectorOrders=["random"]),
+                       lambda m: m.update(requiredArities=[True]), lambda m: m.update(requiredArities=[3]),
+                       lambda m: m.update(requiredRejections=["0x08638556"]), lambda m: m.update(requiredRejections=[]),
+                       lambda m: m.update(requiredMalformations=["none"])):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        storage = json.loads((ROOT / "scripts/semantic-storage-corpus.json").read_text())
+        storage["requiredMethodCounts"] = [2]
+        nested = json.loads((ROOT / "scripts/semantic-malformed-nested-array-corpus.json").read_text())
+        nested["requiredSelectorOrders"] = ["mixed"]
+        for invalid in (storage, nested):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+
 def log_case(sites=((1, 2, 1), (3, 0, 2)), rows=((2, 5), (11, 1), (8, fixtures.HIGH_WORD))):
     value = fixtures.log_case(sites, rows)
     value["logPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]

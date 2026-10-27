@@ -63,6 +63,8 @@ MALFORMED_NESTED_CASE_SCHEMA = "solcore-lean.semantic-malformed-nested-array-cas
 MALFORMED_NESTED_HISTORY_SCHEMA = "solcore-lean.malformed-nested-array-history.v1"
 MALFORMED_BYTES_CASE_SCHEMA = "solcore-lean.semantic-malformed-bytes-case.v1"
 MALFORMED_BYTES_HISTORY_SCHEMA = "solcore-lean.malformed-bytes-history.v1"
+METHODS_CASE_SCHEMA = "solcore-lean.semantic-methods-case.v1"
+METHODS_HISTORY_SCHEMA = "solcore-lean.methods-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -183,6 +185,15 @@ PROFILES = {
         "signature": "run(uint256,bytes)", "selector": "0x220eb9b6", "rollback": True, "keyed": False,
         "declared": True, "abi": "malformed", "encoding": "bytes", "maxPayload": 256,
         "slots": [str(slot) for slot in range(11)], "countSlot": "9", "tailSlot": "10", "shrinkBatch": 16},
+    # One contract with two to four external methods over shared slots. Each
+    # case records its methods; a missing selector is compared by std's selector.
+    "stateful-methods": {"caseSchema": METHODS_CASE_SCHEMA, "planSchema": "solcore-lean.methods-plan.v1",
+        "planKey": "methodsPlan", "corpusSchema": "solcore-lean.semantic-methods-corpus.v1",
+        "originKind": "methods-generated", "contract": "SynthesizedMethods",
+        "caseTool": "semantic-methods-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": METHODS_HISTORY_SCHEMA,
+        "signature": None, "selector": None, "rollback": True, "keyed": False,
+        "declared": True, "abi": "methods", "shrinkBatch": 16},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -240,6 +251,13 @@ TABLE_START = 100
 BYTES_MALFORMATION_KINDS = MALFORMATION_KINDS + ("padding",)
 PADDING_PATTERNS = ("ones", "ramp", "last-byte")
 MAX_BYTES_LENGTH = 2**256 - 64
+# The several-methods profile: slot 0 the shared accumulator, slot 1 the shared
+# call count, slot 2 + i method i's accumulator; methods `m_` and eight hex
+# digits with at most two uint256 parameters.
+METHODS_SLOTS = [str(slot) for slot in range(6)]
+MIN_METHODS, MAX_METHODS, MAX_METHOD_ARITY = 2, 4, 2
+METHOD_NAME = re.compile(r"m_[0-9a-f]{8}")
+SELECTOR_ORDERS = ("ascending", "descending", "mixed")
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -274,8 +292,11 @@ def expected_status(case: dict, transaction: dict) -> str | None:
     A ledger's even flags may still revert for an insufficient balance, so only
     its odd flags fix a status; `ledger_fields` checks the rest. A std rejection
     of malformed calldata reverts whatever the flags."""
-    if profile(case)["abi"] == "malformed" and transaction.get("stdRejection") is not None:
+    if profile(case)["abi"] in ("malformed", "methods") and transaction.get("stdRejection") is not None:
         return "reverted"
+    if profile(case)["abi"] == "methods":
+        # A call's odd input sum reverts.
+        return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
                                                              "malformed") else "input"]
     odd = int(common.word(parity)) % 2
@@ -555,6 +576,12 @@ def declared_scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if has_methods(case):
+        return ("ordered zero-value calls of one contract's two to four external methods (at most two uint256 parameters "
+                "each, over shared slots) in canonical calldata, or of a missing selector with one Word; initially empty "
+                "storage; committed values at slots 0..5 on all paths and no nonzero undeclared slot on Hull/EVM; a missing "
+                "selector compared by std's error selector (original Core's selector Word for std's four revert bytes) when "
+                "original Core reverts with it and std prescribes it; no gas/balance/nonce or memory equivalence")
     if has_malformed_bytes(case):
         return ("ordered zero-value run(uint256,bytes) transactions with canonical 0..256-byte payloads and one "
                 "malformation of at most 1 KiB of calldata each; initially empty storage; committed values at slots "
@@ -848,6 +875,125 @@ def malformed_nested_fields(case: dict, transaction: dict, row: dict, prior: lis
     return fields
 
 
+def has_methods(case: dict) -> bool:
+    return profile(case)["abi"] == "methods"
+
+
+def method_signature(name: str, arity: int) -> str:
+    return f"{name}({','.join(['uint256'] * arity)})"
+
+
+def method_selector(signature: str) -> str:
+    """The first four bytes of the signature's Keccak-256, as std computes them."""
+    return "0x" + keccak256(signature.encode())[:4].hex()
+
+
+def selector_order(selectors: list[str]) -> str:
+    """Whether selectors read in declaration order ascend, descend or neither."""
+    values = [int(selector, 16) for selector in selectors]
+    pairs = list(zip(values, values[1:]))
+    if all(left < right for left, right in pairs):
+        return "ascending"
+    if all(left > right for left, right in pairs):
+        return "descending"
+    return "mixed"
+
+
+def contract_methods(case: dict) -> tuple[list[dict], str]:
+    """A several-methods case's methods in declaration order and its missing
+    selector, checked against the plan and the contract metadata: two to four
+    distinct `m_` names with at most two uint256 parameters, Keccak selectors
+    that neither collide nor equal the missing one, and their selector order."""
+    plan, contract = case.get("methodsPlan"), case.get("contract")
+    rows = plan.get("methods") if isinstance(plan, dict) else None
+    if not isinstance(rows, list) or not MIN_METHODS <= len(rows) <= MAX_METHODS:
+        raise ValueError("a methods plan has two to four methods")
+    methods = []
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"name", "arity", "stepProgram"} or not isinstance(row["stepProgram"], dict):
+            raise ValueError("a planned method has exactly a name, an arity and a step program")
+        name, arity = row["name"], row["arity"]
+        if not isinstance(name, str) or not METHOD_NAME.fullmatch(name) or type(arity) is not int or not 0 <= arity <= MAX_METHOD_ARITY:
+            raise ValueError("a method is named m_ and eight hex digits and has at most two uint256 parameters")
+        signature = method_signature(name, arity)
+        methods.append({"name": name, "signature": signature, "selector": method_selector(signature), "arity": arity})
+    missing = plan.get("missingSelector")
+    selectors = [method["selector"] for method in methods]
+    if len({method["name"] for method in methods}) != len(methods) or len(set(selectors)) != len(selectors):
+        raise ValueError("method names and selectors must be distinct")
+    if not isinstance(missing, str) or not re.fullmatch(r"0x[0-9a-f]{8}", missing) or missing in selectors:
+        raise ValueError("the missing selector is four bytes no method has")
+    name = profile(case)["contract"]
+    expected = {"name": name, "methods": methods, "selectorOrder": selector_order(selectors),
+        "deployPath": [name + "Deploy"], "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x"}
+    if contract != expected:
+        raise Finding("unsupported-scope", "input", "several-methods contract metadata differs from its plan")
+    return methods, missing
+
+
+def methods_dispatch(methods: list[dict], data: bytes) -> tuple:
+    """The pinned std's dispatch over raw calldata: the rejecting selector or
+    None, and the position of the method that runs. Short calldata or no
+    matching selector reaches the default fallback; the first matching method
+    in declaration order runs once its arguments' head exists."""
+    if len(data) < 4:
+        return STD_NO_SELECTOR, None
+    selector = "0x" + data[:4].hex()
+    for position, method in enumerate(methods):
+        if method["selector"] == selector:
+            if len(data) < 4 + 32 * method["arity"]:
+                return STD_TRUNCATED, None
+            return None, position
+    return STD_NO_SELECTOR, None
+
+
+def methods_calldata(methods: list[dict], missing: str, tx: dict) -> bytes:
+    """A several-methods transaction's canonical calldata: its method's selector
+    and Word inputs, or the missing selector with one Word."""
+    inputs, name = tx.get("inputs"), tx.get("method")
+    if not isinstance(inputs, list):
+        raise ValueError("several-methods transactions carry a list of inputs")
+    words = [int(common.word(value, "method input")) for value in inputs]
+    if name is None:
+        selector, arity = missing, 1
+    else:
+        found = [method for method in methods if method["name"] == name]
+        if len(found) != 1:
+            raise ValueError("a transaction names one declared method")
+        selector, arity = found[0]["selector"], found[0]["arity"]
+    if len(words) != arity or tx.get("selector") != selector:
+        raise ValueError("a transaction carries its method's arguments and selector, or one Word with the missing selector")
+    return bytes.fromhex(selector[2:]) + b"".join(word.to_bytes(32, "big") for word in words)
+
+
+def methods_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned call that break the shared-slot protocol: slot one
+    counts the call, the called method's slot `2 + i` holds the new slot zero,
+    every other method's slot keeps its value, and the call returns the sum of
+    slots zero, one and `2 + i`. A rejection is checked by its payload and
+    every revert by rollback."""
+    if row["status"] != "returned" or transaction.get("stdRejection") is not None:
+        return []
+    methods, missing = contract_methods(case)
+    _, position = methods_dispatch(methods, methods_calldata(methods, missing, transaction))
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    own = str(2 + position)
+    fields = []
+    if after["1"] != (before["1"] + 1) % 2**256 or after[own] != after["0"] or \
+            any(after[slot] != before[slot] for slot in METHODS_SLOTS[2:] if slot != own):
+        fields.append("committedStorage")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after["1"] + after[own]) % 2**256:
+        fields.append("output")
+    return fields
+
+
+def uses_selector_rule(case: dict) -> bool:
+    """Profiles whose original Core contract reverts with std's error selectors as a Word."""
+    return isinstance(case, dict) and any(case.get("schema") == value["caseSchema"] and value["abi"] in ("malformed", "methods")
+                                          for value in PROFILES.values())
+
+
 def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
     """The std error selector a transaction's rows are compared by. It applies
     only when original Core reverted with exactly that selector as a Word and the
@@ -856,7 +1002,7 @@ def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
     prescribed outcome acceptance, so it is compared exactly too."""
     selector = tx.get("stdRejection")
     core = rows.get("directCore")
-    if profile(case)["abi"] != "malformed" or selector not in STD_ERRORS or not isinstance(core, dict):
+    if profile(case)["abi"] not in ("malformed", "methods") or selector not in STD_ERRORS or not isinstance(core, dict):
         return None
     if core.get("status") != "reverted" or core.get("output") != "0x" + int(selector, 16).to_bytes(32, "big").hex():
         return None
@@ -904,6 +1050,14 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 [int(common.word(tx.get("flags"), "transaction flags")), 64, len(words), *words])
             if tx.get("calldata") != expected or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
+            continue
+        if selected["abi"] == "methods":
+            methods, missing = contract_methods(case)
+            data = methods_calldata(methods, missing, tx)
+            if tx.get("calldata") != "0x" + data.hex() or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its method call")
+            if tx.get("stdRejection") != methods_dispatch(methods, data)[0]:
+                raise ValueError("transaction std outcome differs from std's dispatch of its calldata")
             continue
         if selected["abi"] == "malformed":
             data, rejection = malformed_input(selected, tx)
@@ -954,7 +1108,8 @@ def validate_transactions(case: dict, selected: dict) -> None:
 def validate_case(case) -> None:
     selected = profile(case)
     plan = case.get(selected["planKey"])
-    if not isinstance(plan, dict) or plan.get("schema") != selected["planSchema"] or not isinstance(plan.get("stepProgram"), dict):
+    if not isinstance(plan, dict) or plan.get("schema") != selected["planSchema"] or (
+            not isinstance(plan.get("methods"), list) if selected["abi"] == "methods" else not isinstance(plan.get("stepProgram"), dict)):
         raise ValueError("storage case requires its original checked step plan")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
@@ -965,6 +1120,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "methods":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != METHODS_SLOTS:
+            raise Finding("unsupported-scope", "input", "several-methods profile starts empty and observes slots zero through five")
     elif selected["abi"] == "malformed" and encoding(selected) == "bytes":
         slots = bytes_layout(selected)[1]
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
@@ -1005,7 +1163,9 @@ def validate_case(case) -> None:
     expected = {"name": name, "method": "run", "signature": selected["signature"],
         "selector": selected["selector"], "deployPath": [name + "Deploy"],
         "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x"}
-    if contract != expected:
+    if selected["abi"] == "methods":
+        contract_methods(case)
+    elif contract != expected:
         raise Finding("unsupported-scope", "input", "storage wrapper differs from the fixed profile")
     provenance = case.get("provenance")
     if not isinstance(provenance, dict) or any(not isinstance(provenance.get(key), str) or not provenance[key]
@@ -1201,7 +1361,7 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     `ledger_fields` fixes what the balance-dependent polarity leaves open."""
     expected = expected_status(case, tx)
     # A std rejection reverts with exactly its selector, after the selector rule.
-    rejection = tx.get("stdRejection") if profile(case)["abi"] == "malformed" else None
+    rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
     if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
             (row["output"] != rejection if rejection is not None else len(common.hex_bytes(row["output"], "output")) != 32):
         return False
@@ -1215,6 +1375,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if has_malformed_nested(case) and malformed_nested_fields(case, tx, row, prior):
         return False
     if has_malformed_bytes(case) and malformed_bytes_fields(case, tx, row, prior):
+        return False
+    if has_methods(case) and methods_fields(case, tx, row, prior):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -1251,7 +1413,7 @@ def compare(histories: dict, case: dict) -> dict:
     their std error selector, with the selector."""
     selector_rows = []
     result = compare_rows(histories, case, selector_rows)
-    if is_malformed(case):
+    if uses_selector_rule(case):
         result["selectorRows"] = selector_rows
     return result
 
@@ -1320,7 +1482,7 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         expected = expected_status(case, tx)
         # A prescribed std rejection reverts with exactly its selector on every
         # path; any other row carries one Word.
-        rejection = tx.get("stdRejection") if profile(case)["abi"] == "malformed" else None
+        rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
         normal = all((expected is None or row["status"] == expected) and (
             row["output"] == rejection if rejection is not None else len(common.hex_bytes(row["output"], "output")) == 32)
                      for row in rows.values())
@@ -1350,6 +1512,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
             # A returned row adds its row and element counts and returns the
             # committed sum; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in nested_fields(tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_methods(case):
+            # A returned call follows the shared-slot protocol of its method.
+            broken = sorted({field for name, row in rows.items() for field in methods_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken

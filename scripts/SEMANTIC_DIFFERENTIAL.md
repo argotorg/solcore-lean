@@ -3841,6 +3841,111 @@ compared by selector, 53 transactions were accepted, and no seed was
 excluded. A case took about 6.5
 seconds. Neither run produced a finding.
 
+## Compare several methods
+
+`stateful-methods` gives one contract, `SynthesizedMethods`, two to four
+external methods over shared declared slots and compares the three paths
+against the pinned std's dispatcher. Every other stateful contract has one
+method, `run(...)`. The compiler builds std's method tuple from the public
+functions in declaration order, std runs the first method whose selector
+matches, and a missing selector reaches the default fallback. A duplicate
+signature or a selector collision does not compile. The declared-slot Hull
+runner serves the contract unchanged, and the selector rule and `selectorRows`
+are exactly those of `stateful-malformed-calldata`.
+
+### Definitions
+
+Method `i` of `n` is named `m_` and eight hex digits drawn from the scenario
+seed, takes `k` uint256 arguments with `k` from 0 to 2 and returns one uint256.
+Its selector is the first four bytes of the Keccak-256 of
+`name(uint256,...)`. Names are distinct and selectors do not collide. Each
+case records the names, signatures, selectors, arities and the selector order
+in declaration order: `ascending`, `descending` or `mixed`, which needs three
+methods.
+
+The declared slots are 0 to 5: slot 0 is a shared accumulator, slot 1 a
+shared call count and slot `2 + i` method `i`'s last result. Each method has
+its own checked aggregate step. With input `x`, the wrapping sum of its
+arguments or 0 without arguments, method `i` sets slot 0 to
+`step_i(x + slot 0)`, adds one to slot 1 and copies the new slot 0 to slot
+`2 + i`. Its result is the sum of slots 0, 1 and `2 + i`. An odd `x` reverts
+with that Word; otherwise the method returns it.
+
+The original Core contract `core-methods-contract-v1` dispatches as std does,
+through `StdDispatch` and the input host functions:
+1. calldata shorter than 4 bytes reverts with `0x4924aef0`;
+2. the selector Word is compared with each method's selector in declaration
+   order, and no match reverts with `0x4924aef0`;
+3. the matched method checks its head size, reverting with `0x08638556`, then
+   reads its arguments and runs its protocol.
+
+Each transaction records `{id, method, selector, inputs, calldata,
+stdRejection, value}`. It calls one method with its arguments in canonical
+calldata, or it sends the missing selector, that of one more drawn name, with
+one Word. std rejects the missing selector with `0x4924aef0`. All
+transactions are zero-value. The adapter recomputes every selector with its
+own Keccak, checks the calldata with its own encoder and the outcome with a
+third model, `methods_dispatch`. A returned row must also follow the
+shared-slot protocol: slot one counts the call, the called method's slot holds
+the new slot zero, every other method's slot keeps its value and the output is
+the sum of slots 0, 1 and `2 + i`.
+
+Generation draws the method count, names, arities and the missing selector
+from one stream of the scenario seed. The steps share the step budget
+equally. Each method's step comes from the first of eight seeds of its own
+stream whose step fits its share, under the case's one swarm mask. Each
+transaction draws a target from another stream: a method, or about one time
+in `2n + 1` the missing selector. Inputs come from the boundary bank.
+Reductions remove transactions first, then each method that no remaining
+transaction calls, then reduce the steps method by method, and finally
+simplify inputs. Gas, value-bearing and payable methods, fallbacks, overloaded
+names, calldata that is neither canonical nor a missing selector, and return
+values other than one Word are out of scope.
+
+### Running and validation
+
+```sh
+lake build semanticMethodsTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-methods-corpus.json \
+  --output .upstream/semantic-methods-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-methods \
+  --cases 16 --output .upstream/semantic-methods-random
+```
+
+Plans use `solcore-lean.methods-plan.v1` under `methodsPlan`. Cases use
+`solcore-lean.semantic-methods-case.v1` and histories
+`solcore-lean.methods-history.v1`. The dispatch shell keeps 58 Core nodes
+inside the budget. Each method's selector comparison, head check and protocol,
+72 to 86 nodes by arity, lie outside it. The suite's default budget is 448
+nodes, which leaves 390 for the steps: 195 nodes per method with two methods
+and 97 with four.
+
+`Solcore/Test/SourceMethodsGolden.lean` checks the wrapper and `stdDispatch`
+against golden cases written out from the std reading. Eight contracts declare
+two, three and four methods with ascending, descending and mixed selectors.
+Their steps add a known constant, so every row follows by hand. The 110
+single calls cover:
+- each method with an even input and, if it takes arguments, an odd one;
+- each method with arguments, called without them;
+- each method with an extra Word, which std accepts;
+- a missing selector, short calldata and empty calldata.
+
+One five-transaction sequence on four methods checks that the slots are
+shared and that rejections and odd inputs commit nothing. The selectors match
+`cast sig`.
+
+The fixed corpus has twelve scenarios and 33 transactions: eight imported
+scenarios, which reuse six storage corpus steps as methods, and four
+generated seeds. Its expected histories were computed without the dispatch
+wrapper, from `stdDispatch`, each step run alone and the protocol's slot
+arithmetic. Required coverage:
+- two to four methods, calls at every method position, all three selector
+  orders, arities zero to two, the missing selector and acceptance;
+- the six boundary Words as inputs;
+- one to three helpers and transactions, all four templates, both outcomes
+  and nine completion patterns.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twelve

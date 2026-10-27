@@ -78,6 +78,11 @@ MALFORMED_NESTED_EXTRA = {"RowCounts": tuple(range(5)), "RowLengths": tuple(rang
 MALFORMED_NESTED_DIMENSIONS = DIMENSIONS + tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:]
 # Malformed bytes: the canonical payload lengths, malformation kinds and outcomes.
 MALFORMED_BYTES_DIMENSIONS = DIMENSIONS + ("PayloadLengths",) + MALFORMED_EXTRA[1:]
+# Several methods: method counts, the positions transactions call, selector
+# orders, arities and the prescribed outcomes, a missing selector or acceptance.
+METHODS_EXTRA = {"MethodCounts": (2, 3, 4), "MethodPositions": (0, 1, 2, 3), "SelectorOrders": adapter.SELECTOR_ORDERS,
+                 "Arities": (0, 1, 2), "Rejections": (adapter.STD_NO_SELECTOR, "accepted")}
+METHODS_DIMENSIONS = DIMENSIONS + tuple(METHODS_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -96,6 +101,8 @@ def dimensions(profile_name):
         return MALFORMED_NESTED_DIMENSIONS
     if adapter.encoding(adapter.PROFILES[profile_name]) == "bytes":
         return MALFORMED_BYTES_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "methods":
+        return METHODS_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -143,6 +150,17 @@ def malformed_coverage(case):
             "Rejections": {tx["stdRejection"] or "accepted" for tx in transactions}}
 
 
+def methods_coverage(case):
+    """Method counts, called positions, the selector order, arities and
+    prescribed outcomes of a several-methods case."""
+    methods, _ = adapter.contract_methods(case)
+    names = [method["name"] for method in methods]
+    return {"MethodCounts": {len(methods)},
+            "MethodPositions": {names.index(tx["method"]) for tx in case["transactions"] if tx["method"] is not None},
+            "SelectorOrders": {case["contract"]["selectorOrder"]}, "Arities": {method["arity"] for method in methods},
+            "Rejections": {tx["stdRejection"] or "accepted" for tx in case["transactions"]}}
+
+
 def nested_coverage(case):
     """Outer lengths, and the lengths of the rows present."""
     values = [adapter.nested_values(tx) for tx in case["transactions"]]
@@ -173,6 +191,8 @@ def inputs(case):
     arrays, or every zero-padded payload chunk the bytes step folds."""
     if adapter.has_malformed_nested(case):
         return {str(value) for tx in case["transactions"] for row in adapter.malformed_nested_values(tx) for value in row}
+    if adapter.has_methods(case):
+        return {value for tx in case["transactions"] for value in tx["inputs"]}
     if adapter.has_malformed_bytes(case):
         return {str(chunk) for tx in case["transactions"] for chunk in adapter.payload_chunks(tx)}
     if adapter.profile(case)["abi"] in ("array", "malformed"):
@@ -225,29 +245,45 @@ def case_hash(case):
     return common.digest(common.json_bytes(identity))
 
 
-def helper_count(case):
-    step = case[adapter.profile(case)["planKey"]]["stepProgram"]
+def steps(case):
+    """The case's step programs: one, or one per method of a several-methods case."""
+    plan = case[adapter.profile(case)["planKey"]]
+    return [method["stepProgram"] for method in plan["methods"]] if adapter.has_methods(case) else [plan["stepProgram"]]
+
+
+def step_helper_count(step):
     if step.get("resultType") != {"tag": "function", "parameter": "word", "result": "word"} or step.get("dataDefinitions") != []:
         raise ValueError("storage step must be a closed Word function graph")
     return legacy.bound_helper_count(step.get("body"))
+
+
+def helper_count(case):
+    return step_helper_count(case[adapter.profile(case)["planKey"]]["stepProgram"])
+
+
+def helper_counts(case):
+    return {step_helper_count(step) for step in steps(case)}
 
 
 def recipes(case):
     origin = case["provenance"].get("origin", {})
     if origin.get("kind") != adapter.profile(case)["originKind"]:
         return set()
-    step = origin.get("stepOrigin")
-    if not isinstance(step, dict) or step.get("kind") != "aggregate-generated":
+    origins = origin.get("stepOrigins") if adapter.has_methods(case) else [origin.get("stepOrigin")]
+    if not isinstance(origins, list) or not origins:
         raise ValueError("generated storage case lacks its aggregate step recipe")
-    helpers = step.get("helpers")
-    if not isinstance(helpers, list) or not 1 <= len(helpers) <= 3:
-        raise ValueError("invalid storage helper recipe count")
     result = set()
-    for helper in helpers:
-        value = helper.get("template") if isinstance(helper, dict) else None
-        if type(value) is not int or value not in range(4):
-            raise ValueError("invalid aggregate template recipe")
-        result.add(value)
+    for step in origins:
+        if not isinstance(step, dict) or step.get("kind") != "aggregate-generated":
+            raise ValueError("generated storage case lacks its aggregate step recipe")
+        helpers = step.get("helpers")
+        if not isinstance(helpers, list) or not 1 <= len(helpers) <= 3:
+            raise ValueError("invalid storage helper recipe count")
+        for helper in helpers:
+            value = helper.get("template") if isinstance(helper, dict) else None
+            if type(value) is not int or value not in range(4):
+                raise ValueError("invalid aggregate template recipe")
+            result.add(value)
     return result
 
 
@@ -332,8 +368,17 @@ def validate_manifest(manifest):
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(v not in allowed for v in values) or len(set(values)) != len(values):
                 raise ValueError(f"malformed-calldata coverage requires unique required{dimension} from {list(allowed)}")
+    elif selected["abi"] == "methods":
+        for dimension, allowed in METHODS_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"several-methods coverage requires unique required{dimension} from {list(allowed)}")
+        if "requiredMalformations" in manifest:
+            raise ValueError("malformation coverage belongs to the malformed-calldata profiles")
     elif "requiredMalformations" in manifest or "requiredRejections" in manifest:
         raise ValueError("malformation coverage belongs to the malformed-calldata profile")
+    if selected["abi"] != "methods" and any("required" + dimension in manifest for dimension in METHODS_EXTRA if dimension != "Rejections"):
+        raise ValueError("method coverage belongs to the several-methods profile")
     if selected.get("logs"):
         for dimension, allowed in LOG_EXTRA.items():
             values = manifest.get("required" + dimension)
@@ -469,7 +514,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
     analysis = {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_sonatina_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": path, "transactionId": selected, "field": field} if path else None,
             "actualComparison": actual, "comparison": result, "histories": histories}
-    if adapter.is_malformed(case):
+    if adapter.uses_selector_rule(case):
         # The rows compared by their std error selector, with the selector.
         analysis["selectorRows"] = copy.deepcopy(result.get("selectorRows", []))
     return analysis
@@ -532,7 +577,8 @@ def keyed_analysis(analysis):
                                                 adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
                                                 adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
-                                                adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA)
+                                                adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA,
+                                                adapter.METHODS_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -670,7 +716,7 @@ class Campaign:
 
     def record_coverage(self, case, prefix, histories=None):
         values = {"Features": set(case["provenance"]["features"]), "Inputs": inputs(case),
-                  "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case)}
+                  "HelperCounts": helper_counts(case), "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case)}
         if prefix == "matched":
             if histories is None or adapter.compare(histories, case)["category"] != "matched":
                 raise ValueError("coverage requires actual matched histories")
@@ -696,6 +742,8 @@ class Campaign:
             values.update(nested_coverage(case))
         elif self.specification["abi"] == "malformed":
             values.update(malformed_coverage(case))
+        elif self.specification["abi"] == "methods":
+            values.update(methods_coverage(case))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -758,6 +806,7 @@ class Campaign:
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
+                          "methods": tuple(METHODS_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(

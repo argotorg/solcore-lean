@@ -1,0 +1,4446 @@
+{
+  "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
+  "profile": "stateful-methods",
+  "generatorVersion": "core-g0-v1/lcg64-v1",
+  "profileVersion": "stateful-methods-v1/methods-sequence-seed-v1",
+  "functionVersion": "core-methods-contract-v1",
+  "templateVersion": "std-dispatch-methods-shared-slots-revert-odd-input-v1",
+  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
+  "stepFunctionVersion": "core-aggregate-dag-v1",
+  "stepTemplateVersion": "word-aggregate-templates-v1",
+  "emitterVersion": "solcore-source-methods-v1",
+  "wrapperVersion": "solcore-word-methods-contract-v1",
+  "coverageKind": "step-core-ast-features",
+  "requiredFeatures": [
+    "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+    "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+    "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+    "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+    "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+    "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+    "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+    "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+    "boolLiteral",
+    "case",
+    "first",
+    "functionCall",
+    "if",
+    "inLeft",
+    "inRight",
+    "let",
+    "loadCell",
+    "local",
+    "newCell",
+    "pair",
+    "second",
+    "storeCell",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+    "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+    "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+    "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+    "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+    "wordLiteral"
+  ],
+  "requiredInputs": [
+    "0",
+    "1",
+    "3",
+    "7",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+  ],
+  "requiredHelperCounts": [
+    1,
+    2,
+    3
+  ],
+  "requiredTransactionCounts": [
+    1,
+    2,
+    3
+  ],
+  "generationRecipeRequirements": {
+    "templates": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "requiredOutcomes": [
+    "returned",
+    "reverted"
+  ],
+  "requiredCompletionPatterns": [
+    "returned,reverted,reverted",
+    "returned,returned,returned",
+    "reverted,returned,returned",
+    "returned,reverted",
+    "returned,returned,reverted",
+    "returned,reverted,returned",
+    "returned",
+    "reverted,reverted,returned",
+    "reverted,reverted,reverted"
+  ],
+  "requiredMethodCounts": [
+    2,
+    3,
+    4
+  ],
+  "requiredMethodPositions": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "requiredArities": [
+    0,
+    1,
+    2
+  ],
+  "requiredSelectorOrders": [
+    "ascending",
+    "descending",
+    "mixed"
+  ],
+  "requiredRejections": [
+    "0x4924aef0",
+    "accepted"
+  ],
+  "cases": [
+    {
+      "expectedFeatures": [
+        "local",
+        "functionCall",
+        "wordLiteral"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "6"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "6"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000000d",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "6"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "6"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "6"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "6"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        }
+      ],
+      "id": "two-ascending",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 1,
+            "name": "m_00000004",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "tag": "word",
+                    "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0x06d154aa0000000000000000000000000000000000000000000000000000000000000006",
+          "id": "tx-0",
+          "inputs": [
+            "6"
+          ],
+          "method": "m_00000004",
+          "selector": "0x06d154aa",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x935853e40000000000000000000000000000000000000000000000000000000000000007",
+          "id": "tx-1",
+          "inputs": [
+            "7"
+          ],
+          "method": "m_00000001",
+          "selector": "0x935853e4",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x43c9d5b50000000000000000000000000000000000000000000000000000000000000001",
+          "id": "tx-2",
+          "inputs": [
+            "1"
+          ],
+          "method": null,
+          "selector": "0x43c9d5b5",
+          "stdRejection": "0x4924aef0",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "newCell",
+        "wordLiteral",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "loadCell",
+        "local",
+        "pair",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "first",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inLeft",
+        "inRight",
+        "case"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "27"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "27"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000037",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "28"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "28"
+            },
+            {
+              "slot": "3",
+              "value": "27"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000003a",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "125"
+            },
+            {
+              "slot": "1",
+              "value": "3"
+            },
+            {
+              "slot": "2",
+              "value": "28"
+            },
+            {
+              "slot": "3",
+              "value": "125"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x00000000000000000000000000000000000000000000000000000000000000fd",
+          "status": "returned"
+        }
+      ],
+      "id": "two-descending",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "left": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "first"
+                      },
+                      "op": "wordSub",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      },
+                      "tag": "binary"
+                    },
+                    "initializer": {
+                      "left": {
+                        "argument": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "function": {
+                          "index": 1,
+                          "tag": "var"
+                        },
+                        "tag": "apply"
+                      },
+                      "right": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "tag": "pair"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "body": {
+                      "body": {
+                        "left": {
+                          "index": 2,
+                          "tag": "var"
+                        },
+                        "op": "wordAdd",
+                        "right": {
+                          "reference": {
+                            "index": 1,
+                            "tag": "var"
+                          },
+                          "tag": "loadCell"
+                        },
+                        "tag": "binary"
+                      },
+                      "initializer": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "storeCell",
+                        "value": {
+                          "left": {
+                            "reference": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "loadCell"
+                          },
+                          "op": "wordAdd",
+                          "right": {
+                            "tag": "word",
+                            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                          },
+                          "tag": "binary"
+                        }
+                      },
+                      "tag": "let"
+                    },
+                    "initializer": {
+                      "elementType": "word",
+                      "initializer": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      },
+                      "tag": "newCell"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 2,
+            "name": "m_00000003",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "argument": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "function": {
+                        "index": 1,
+                        "tag": "var"
+                      },
+                      "tag": "apply"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "initializer": {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "body": {
+                            "left": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "op": "wordAdd",
+                            "right": {
+                              "reference": {
+                                "index": 2,
+                                "tag": "var"
+                              },
+                              "tag": "loadCell"
+                            },
+                            "tag": "binary"
+                          },
+                          "initializer": {
+                            "leftBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x000000000000000000000000000000000000000000000000000000000000000a"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "leftType": "word",
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "tag": "inRight"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "rightBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x0000000000000000000000000000000000000000000000000000000000000014"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "rightType": "word",
+                                  "tag": "inLeft"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "scrutinee": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "case"
+                          },
+                          "tag": "let"
+                        },
+                        "initializer": {
+                          "condition": {
+                            "left": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "op": "wordGt",
+                            "right": {
+                              "tag": "word",
+                              "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                            },
+                            "tag": "binary"
+                          },
+                          "elseBranch": {
+                            "leftType": "word",
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "tag": "inRight"
+                          },
+                          "tag": "if",
+                          "thenBranch": {
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "rightType": "word",
+                            "tag": "inLeft"
+                          }
+                        },
+                        "tag": "let"
+                      },
+                      "initializer": {
+                        "elementType": "word",
+                        "initializer": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "newCell"
+                      },
+                      "tag": "let"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "tag": "let"
+                },
+                "initializer": {
+                  "body": {
+                    "left": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "op": "wordAdd",
+                    "right": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000005"
+                    },
+                    "tag": "binary"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0x336e1e0880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "id": "tx-0",
+          "inputs": [
+            "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+            "0"
+          ],
+          "method": "m_00000003",
+          "selector": "0x336e1e08",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0xf3cfdf58",
+          "id": "tx-1",
+          "inputs": [],
+          "method": "m_00000002",
+          "selector": "0xf3cfdf58",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x336e1e0800000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000007",
+          "id": "tx-2",
+          "inputs": [
+            "3",
+            "7"
+          ],
+          "method": "m_00000003",
+          "selector": "0x336e1e08",
+          "stdRejection": null,
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "local",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "wordLiteral",
+        "let",
+        "newCell",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inLeft",
+        "inRight",
+        "case",
+        "storeCell",
+        "loadCell"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000006f",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "status": "returned"
+        }
+      ],
+      "id": "three-ascending",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 2,
+            "name": "m_00000003",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "argument": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "function": {
+                        "index": 1,
+                        "tag": "var"
+                      },
+                      "tag": "apply"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "initializer": {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "body": {
+                            "left": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "op": "wordAdd",
+                            "right": {
+                              "reference": {
+                                "index": 2,
+                                "tag": "var"
+                              },
+                              "tag": "loadCell"
+                            },
+                            "tag": "binary"
+                          },
+                          "initializer": {
+                            "leftBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x000000000000000000000000000000000000000000000000000000000000000a"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "leftType": "word",
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "tag": "inRight"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "rightBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x0000000000000000000000000000000000000000000000000000000000000014"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "rightType": "word",
+                                  "tag": "inLeft"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "scrutinee": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "case"
+                          },
+                          "tag": "let"
+                        },
+                        "initializer": {
+                          "condition": {
+                            "left": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "op": "wordGt",
+                            "right": {
+                              "tag": "word",
+                              "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                            },
+                            "tag": "binary"
+                          },
+                          "elseBranch": {
+                            "leftType": "word",
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "tag": "inRight"
+                          },
+                          "tag": "if",
+                          "thenBranch": {
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "rightType": "word",
+                            "tag": "inLeft"
+                          }
+                        },
+                        "tag": "let"
+                      },
+                      "initializer": {
+                        "elementType": "word",
+                        "initializer": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "newCell"
+                      },
+                      "tag": "let"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "tag": "let"
+                },
+                "initializer": {
+                  "body": {
+                    "left": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "op": "wordAdd",
+                    "right": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000005"
+                    },
+                    "tag": "binary"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0x935853e40000000000000000000000000000000000000000000000000000000000000003",
+          "id": "tx-0",
+          "inputs": [
+            "3"
+          ],
+          "method": "m_00000001",
+          "selector": "0x935853e4",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0xf3cfdf58",
+          "id": "tx-1",
+          "inputs": [],
+          "method": "m_00000002",
+          "selector": "0xf3cfdf58",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x336e1e08ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001",
+          "id": "tx-2",
+          "inputs": [
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "1"
+          ],
+          "method": "m_00000003",
+          "selector": "0x336e1e08",
+          "stdRejection": null,
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "wordLiteral",
+        "functionCall",
+        "local",
+        "let",
+        "newCell",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "loadCell",
+        "pair",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "first"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        }
+      ],
+      "id": "three-descending",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "tag": "word",
+                    "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "left": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "first"
+                      },
+                      "op": "wordSub",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      },
+                      "tag": "binary"
+                    },
+                    "initializer": {
+                      "left": {
+                        "argument": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "function": {
+                          "index": 1,
+                          "tag": "var"
+                        },
+                        "tag": "apply"
+                      },
+                      "right": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "tag": "pair"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "body": {
+                      "body": {
+                        "left": {
+                          "index": 2,
+                          "tag": "var"
+                        },
+                        "op": "wordAdd",
+                        "right": {
+                          "reference": {
+                            "index": 1,
+                            "tag": "var"
+                          },
+                          "tag": "loadCell"
+                        },
+                        "tag": "binary"
+                      },
+                      "initializer": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "storeCell",
+                        "value": {
+                          "left": {
+                            "reference": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "loadCell"
+                          },
+                          "op": "wordAdd",
+                          "right": {
+                            "tag": "word",
+                            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                          },
+                          "tag": "binary"
+                        }
+                      },
+                      "tag": "let"
+                    },
+                    "initializer": {
+                      "elementType": "word",
+                      "initializer": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      },
+                      "tag": "newCell"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000004",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0x06d154aa0000000000000000000000000000000000000000000000000000000000000000",
+          "id": "tx-0",
+          "inputs": [
+            "0"
+          ],
+          "method": "m_00000004",
+          "selector": "0x06d154aa",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x43c9d5b50000000000000000000000000000000000000000000000000000000000000007",
+          "id": "tx-1",
+          "inputs": [
+            "7"
+          ],
+          "method": null,
+          "selector": "0x43c9d5b5",
+          "stdRejection": "0x4924aef0",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "local",
+        "wordLiteral",
+        "let",
+        "newCell",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inLeft",
+        "inRight",
+        "case",
+        "storeCell",
+        "loadCell",
+        "functionCall",
+        "pair",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "first"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "1"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "1"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819969"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819969"
+            },
+            {
+              "slot": "4",
+              "value": "1"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819969"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564819969"
+            },
+            {
+              "slot": "4",
+              "value": "1"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000041",
+          "status": "reverted"
+        }
+      ],
+      "id": "three-mixed",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "argument": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "function": {
+                        "index": 1,
+                        "tag": "var"
+                      },
+                      "tag": "apply"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "initializer": {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "body": {
+                            "left": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "op": "wordAdd",
+                            "right": {
+                              "reference": {
+                                "index": 2,
+                                "tag": "var"
+                              },
+                              "tag": "loadCell"
+                            },
+                            "tag": "binary"
+                          },
+                          "initializer": {
+                            "leftBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x000000000000000000000000000000000000000000000000000000000000000a"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "leftType": "word",
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "tag": "inRight"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "rightBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x0000000000000000000000000000000000000000000000000000000000000014"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "rightType": "word",
+                                  "tag": "inLeft"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "scrutinee": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "case"
+                          },
+                          "tag": "let"
+                        },
+                        "initializer": {
+                          "condition": {
+                            "left": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "op": "wordGt",
+                            "right": {
+                              "tag": "word",
+                              "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                            },
+                            "tag": "binary"
+                          },
+                          "elseBranch": {
+                            "leftType": "word",
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "tag": "inRight"
+                          },
+                          "tag": "if",
+                          "thenBranch": {
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "rightType": "word",
+                            "tag": "inLeft"
+                          }
+                        },
+                        "tag": "let"
+                      },
+                      "initializer": {
+                        "elementType": "word",
+                        "initializer": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "newCell"
+                      },
+                      "tag": "let"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "tag": "let"
+                },
+                "initializer": {
+                  "body": {
+                    "left": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "op": "wordAdd",
+                    "right": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000005"
+                    },
+                    "tag": "binary"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000004",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "left": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "first"
+                      },
+                      "op": "wordSub",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      },
+                      "tag": "binary"
+                    },
+                    "initializer": {
+                      "left": {
+                        "argument": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "function": {
+                          "index": 1,
+                          "tag": "var"
+                        },
+                        "tag": "apply"
+                      },
+                      "right": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "tag": "pair"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "body": {
+                      "body": {
+                        "left": {
+                          "index": 2,
+                          "tag": "var"
+                        },
+                        "op": "wordAdd",
+                        "right": {
+                          "reference": {
+                            "index": 1,
+                            "tag": "var"
+                          },
+                          "tag": "loadCell"
+                        },
+                        "tag": "binary"
+                      },
+                      "initializer": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "storeCell",
+                        "value": {
+                          "left": {
+                            "reference": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "loadCell"
+                          },
+                          "op": "wordAdd",
+                          "right": {
+                            "tag": "word",
+                            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                          },
+                          "tag": "binary"
+                        }
+                      },
+                      "tag": "let"
+                    },
+                    "initializer": {
+                      "elementType": "word",
+                      "initializer": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      },
+                      "tag": "newCell"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0xf3cfdf58",
+          "id": "tx-0",
+          "inputs": [],
+          "method": "m_00000002",
+          "selector": "0xf3cfdf58",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x06d154aa8000000000000000000000000000000000000000000000000000000000000000",
+          "id": "tx-1",
+          "inputs": [
+            "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+          ],
+          "method": "m_00000004",
+          "selector": "0x06d154aa",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x935853e40000000000000000000000000000000000000000000000000000000000000001",
+          "id": "tx-2",
+          "inputs": [
+            "1"
+          ],
+          "method": "m_00000001",
+          "selector": "0x935853e4",
+          "stdRejection": null,
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "local",
+        "functionCall",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "let",
+        "newCell",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inLeft",
+        "inRight",
+        "case",
+        "storeCell",
+        "loadCell"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "49"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "49"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000063",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "49"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "49"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000062",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "49"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "status": "returned"
+        }
+      ],
+      "id": "four-ascending",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 1,
+            "name": "m_00000004",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 2,
+            "name": "m_00000003",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "tag": "word",
+                    "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "argument": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "function": {
+                        "index": 1,
+                        "tag": "var"
+                      },
+                      "tag": "apply"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "initializer": {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "body": {
+                            "left": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "op": "wordAdd",
+                            "right": {
+                              "reference": {
+                                "index": 2,
+                                "tag": "var"
+                              },
+                              "tag": "loadCell"
+                            },
+                            "tag": "binary"
+                          },
+                          "initializer": {
+                            "leftBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x000000000000000000000000000000000000000000000000000000000000000a"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "leftType": "word",
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "tag": "inRight"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "rightBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x0000000000000000000000000000000000000000000000000000000000000014"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "rightType": "word",
+                                  "tag": "inLeft"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "scrutinee": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "case"
+                          },
+                          "tag": "let"
+                        },
+                        "initializer": {
+                          "condition": {
+                            "left": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "op": "wordGt",
+                            "right": {
+                              "tag": "word",
+                              "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                            },
+                            "tag": "binary"
+                          },
+                          "elseBranch": {
+                            "leftType": "word",
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "tag": "inRight"
+                          },
+                          "tag": "if",
+                          "thenBranch": {
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "rightType": "word",
+                            "tag": "inLeft"
+                          }
+                        },
+                        "tag": "let"
+                      },
+                      "initializer": {
+                        "elementType": "word",
+                        "initializer": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "newCell"
+                      },
+                      "tag": "let"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "tag": "let"
+                },
+                "initializer": {
+                  "body": {
+                    "left": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "op": "wordAdd",
+                    "right": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000005"
+                    },
+                    "tag": "binary"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0xf3cfdf58",
+          "id": "tx-0",
+          "inputs": [],
+          "method": "m_00000002",
+          "selector": "0xf3cfdf58",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x935853e4ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "id": "tx-1",
+          "inputs": [
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          ],
+          "method": "m_00000001",
+          "selector": "0x935853e4",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x336e1e0800000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000007",
+          "id": "tx-2",
+          "inputs": [
+            "7",
+            "7"
+          ],
+          "method": "m_00000003",
+          "selector": "0x336e1e08",
+          "stdRejection": null,
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "local",
+        "functionCall",
+        "let",
+        "newCell",
+        "wordLiteral",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "loadCell",
+        "pair",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "first"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "status": "returned"
+        }
+      ],
+      "id": "four-descending",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "left": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "first"
+                      },
+                      "op": "wordSub",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      },
+                      "tag": "binary"
+                    },
+                    "initializer": {
+                      "left": {
+                        "argument": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "function": {
+                          "index": 1,
+                          "tag": "var"
+                        },
+                        "tag": "apply"
+                      },
+                      "right": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "tag": "pair"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "body": {
+                      "body": {
+                        "left": {
+                          "index": 2,
+                          "tag": "var"
+                        },
+                        "op": "wordAdd",
+                        "right": {
+                          "reference": {
+                            "index": 1,
+                            "tag": "var"
+                          },
+                          "tag": "loadCell"
+                        },
+                        "tag": "binary"
+                      },
+                      "initializer": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "storeCell",
+                        "value": {
+                          "left": {
+                            "reference": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "loadCell"
+                          },
+                          "op": "wordAdd",
+                          "right": {
+                            "tag": "word",
+                            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                          },
+                          "tag": "binary"
+                        }
+                      },
+                      "tag": "let"
+                    },
+                    "initializer": {
+                      "elementType": "word",
+                      "initializer": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      },
+                      "tag": "newCell"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 2,
+            "name": "m_00000003",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000004",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "tag": "word",
+                    "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0x06d154aa8000000000000000000000000000000000000000000000000000000000000000",
+          "id": "tx-0",
+          "inputs": [
+            "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+          ],
+          "method": "m_00000004",
+          "selector": "0x06d154aa",
+          "stdRejection": null,
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "local",
+        "functionCall",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "let",
+        "newCell",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inLeft",
+        "inRight",
+        "case",
+        "storeCell",
+        "loadCell",
+        "pair",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "first"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "61"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "61"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000007b",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "61"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "61"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "61"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000000000007c",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "61"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "61"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "61"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        }
+      ],
+      "id": "four-mixed",
+      "methodsPlan": {
+        "methods": [
+          {
+            "arity": 1,
+            "name": "m_00000001",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "index": 0,
+                    "tag": "var"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 0,
+            "name": "m_00000002",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "argument": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "function": {
+                      "index": 1,
+                      "tag": "var"
+                    },
+                    "tag": "apply"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "tag": "word",
+                    "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 2,
+            "name": "m_00000003",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "argument": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "function": {
+                        "index": 1,
+                        "tag": "var"
+                      },
+                      "tag": "apply"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "initializer": {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "body": {
+                            "left": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "op": "wordAdd",
+                            "right": {
+                              "reference": {
+                                "index": 2,
+                                "tag": "var"
+                              },
+                              "tag": "loadCell"
+                            },
+                            "tag": "binary"
+                          },
+                          "initializer": {
+                            "leftBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x000000000000000000000000000000000000000000000000000000000000000a"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "leftType": "word",
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "tag": "inRight"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "rightBranch": {
+                              "body": {
+                                "leftBranch": {
+                                  "body": {
+                                    "argument": {
+                                      "reference": {
+                                        "index": 5,
+                                        "tag": "var"
+                                      },
+                                      "tag": "loadCell"
+                                    },
+                                    "function": {
+                                      "index": 7,
+                                      "tag": "var"
+                                    },
+                                    "tag": "apply"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "left": {
+                                        "index": 0,
+                                        "tag": "var"
+                                      },
+                                      "op": "wordAdd",
+                                      "right": {
+                                        "tag": "word",
+                                        "value": "0x0000000000000000000000000000000000000000000000000000000000000014"
+                                      },
+                                      "tag": "binary"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "rightBranch": {
+                                  "body": {
+                                    "tag": "word",
+                                    "value": "0x00000000000000000000000000000000000000000000000000000000000003e7"
+                                  },
+                                  "initializer": {
+                                    "reference": {
+                                      "index": 4,
+                                      "tag": "var"
+                                    },
+                                    "tag": "storeCell",
+                                    "value": {
+                                      "tag": "word",
+                                      "value": "0x00000000000000000000000000000000000000000000000000000000000002bc"
+                                    }
+                                  },
+                                  "tag": "let"
+                                },
+                                "scrutinee": {
+                                  "payload": {
+                                    "reference": {
+                                      "index": 3,
+                                      "tag": "var"
+                                    },
+                                    "tag": "loadCell"
+                                  },
+                                  "rightType": "word",
+                                  "tag": "inLeft"
+                                },
+                                "tag": "case"
+                              },
+                              "initializer": {
+                                "reference": {
+                                  "index": 2,
+                                  "tag": "var"
+                                },
+                                "tag": "storeCell",
+                                "value": {
+                                  "left": {
+                                    "index": 0,
+                                    "tag": "var"
+                                  },
+                                  "op": "wordAdd",
+                                  "right": {
+                                    "tag": "word",
+                                    "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                                  },
+                                  "tag": "binary"
+                                }
+                              },
+                              "tag": "let"
+                            },
+                            "scrutinee": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "case"
+                          },
+                          "tag": "let"
+                        },
+                        "initializer": {
+                          "condition": {
+                            "left": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "op": "wordGt",
+                            "right": {
+                              "tag": "word",
+                              "value": "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                            },
+                            "tag": "binary"
+                          },
+                          "elseBranch": {
+                            "leftType": "word",
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "tag": "inRight"
+                          },
+                          "tag": "if",
+                          "thenBranch": {
+                            "payload": {
+                              "index": 1,
+                              "tag": "var"
+                            },
+                            "rightType": "word",
+                            "tag": "inLeft"
+                          }
+                        },
+                        "tag": "let"
+                      },
+                      "initializer": {
+                        "elementType": "word",
+                        "initializer": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "newCell"
+                      },
+                      "tag": "let"
+                    },
+                    "parameterType": "word",
+                    "resultType": "word",
+                    "tag": "lambda"
+                  },
+                  "tag": "let"
+                },
+                "initializer": {
+                  "body": {
+                    "left": {
+                      "index": 0,
+                      "tag": "var"
+                    },
+                    "op": "wordAdd",
+                    "right": {
+                      "tag": "word",
+                      "value": "0x0000000000000000000000000000000000000000000000000000000000000005"
+                    },
+                    "tag": "binary"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          },
+          {
+            "arity": 1,
+            "name": "m_00000004",
+            "stepProgram": {
+              "body": {
+                "body": {
+                  "body": {
+                    "body": {
+                      "left": {
+                        "operand": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "first"
+                      },
+                      "op": "wordSub",
+                      "right": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000001"
+                      },
+                      "tag": "binary"
+                    },
+                    "initializer": {
+                      "left": {
+                        "argument": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "function": {
+                          "index": 1,
+                          "tag": "var"
+                        },
+                        "tag": "apply"
+                      },
+                      "right": {
+                        "index": 0,
+                        "tag": "var"
+                      },
+                      "tag": "pair"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "initializer": {
+                  "body": {
+                    "body": {
+                      "body": {
+                        "left": {
+                          "index": 2,
+                          "tag": "var"
+                        },
+                        "op": "wordAdd",
+                        "right": {
+                          "reference": {
+                            "index": 1,
+                            "tag": "var"
+                          },
+                          "tag": "loadCell"
+                        },
+                        "tag": "binary"
+                      },
+                      "initializer": {
+                        "reference": {
+                          "index": 0,
+                          "tag": "var"
+                        },
+                        "tag": "storeCell",
+                        "value": {
+                          "left": {
+                            "reference": {
+                              "index": 0,
+                              "tag": "var"
+                            },
+                            "tag": "loadCell"
+                          },
+                          "op": "wordAdd",
+                          "right": {
+                            "tag": "word",
+                            "value": "0x0000000000000000000000000000000000000000000000000000000000000002"
+                          },
+                          "tag": "binary"
+                        }
+                      },
+                      "tag": "let"
+                    },
+                    "initializer": {
+                      "elementType": "word",
+                      "initializer": {
+                        "tag": "word",
+                        "value": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      },
+                      "tag": "newCell"
+                    },
+                    "tag": "let"
+                  },
+                  "parameterType": "word",
+                  "resultType": "word",
+                  "tag": "lambda"
+                },
+                "tag": "let"
+              },
+              "dataDefinitions": [],
+              "resultType": {
+                "parameter": "word",
+                "result": "word",
+                "tag": "function"
+              },
+              "schema": "solcore-semantic-core"
+            }
+          }
+        ],
+        "missingSelector": "0x43c9d5b5",
+        "schema": "solcore-lean.methods-plan.v1"
+      },
+      "transactions": [
+        {
+          "calldata": "0x336e1e0800000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000004",
+          "id": "tx-0",
+          "inputs": [
+            "2",
+            "4"
+          ],
+          "method": "m_00000003",
+          "selector": "0x336e1e08",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x935853e40000000000000000000000000000000000000000000000000000000000000000",
+          "id": "tx-1",
+          "inputs": [
+            "0"
+          ],
+          "method": "m_00000001",
+          "selector": "0x935853e4",
+          "stdRejection": null,
+          "value": "0"
+        },
+        {
+          "calldata": "0x43c9d5b50000000000000000000000000000000000000000000000000000000000000003",
+          "id": "tx-2",
+          "inputs": [
+            "3"
+          ],
+          "method": null,
+          "selector": "0x43c9d5b5",
+          "stdRejection": "0x4924aef0",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "if",
+        "boolLiteral",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "local",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "newCell",
+        "pair",
+        "loadCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "first",
+        "inRight",
+        "second",
+        "inLeft",
+        "case",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000007",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffef",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639932"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "115792089237316195423570985008687907853269984665640564039457584007913129639932"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9",
+          "status": "returned"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "0"
+      },
+      "id": "generated-0"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "wordLiteral",
+        "local",
+        "newCell",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inRight",
+        "loadCell",
+        "inLeft",
+        "case",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "boolLiteral",
+        "pair",
+        "first",
+        "second",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564820010"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "57896044618658097711785492504343953926634992332820282019728792003956564820010"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000055",
+          "status": "returned"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "1"
+      },
+      "id": "generated-1"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "if",
+        "boolLiteral",
+        "wordLiteral",
+        "newCell",
+        "local",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inRight",
+        "loadCell",
+        "inLeft",
+        "case",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "pair",
+        "first",
+        "second"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "1"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "97656798849037471316802301454718392569044345583574899437876498467693965354445"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "97656798849037471316802301454718392569044345583574899437876498467693965354445"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0xafcf942af2254ca51ea64a0cafca2d9bb05a7ffd57f432d64089c8fc56404b9c",
+          "status": "returned"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "97656798849037471316802301454718392569044345583574899437876498467693965354445"
+            },
+            {
+              "slot": "1",
+              "value": "2"
+            },
+            {
+              "slot": "2",
+              "value": "97656798849037471316802301454718392569044345583574899437876498467693965354445"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0xe80f10e78fd12e28cbc46afa4c285d9e5e6c53e368e3a1dfab34e5d937a7adb3",
+          "status": "reverted"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "2"
+      },
+      "id": "generated-2"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "wordLiteral",
+        "newCell",
+        "local",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
+        "inRight",
+        "loadCell",
+        "inLeft",
+        "case",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordXor",
+        "functionCall",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "boolLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "pair",
+        "first",
+        "second"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x33f8d24d89a363dd4c9c41519e1db44af9d501995d8a69a1fdf0ee6604a9f3cb",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0xcc072db2765c9c22b363beae61e24bb5062afe66a275965e020f1199fb560c3f",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            },
+            {
+              "slot": "5",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "36"
+      },
+      "id": "generated-36"
+    }
+  ]
+}

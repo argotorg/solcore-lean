@@ -72,6 +72,10 @@ lean_exe semanticMalformedBytesTool where
   root := `Tests.SemanticMalformedBytesTool
   exeName := "semantic-malformed-bytes-tool"
 
+lean_exe semanticMethodsTool where
+  root := `Tests.SemanticMethodsTool
+  exeName := "semantic-methods-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

@@ -3025,5 +3025,155 @@ class MalformedBytesTests(unittest.TestCase):
         self.assertFalse(runner.conforms(value, value["transactions"][1], changed["directCore"]["transactions"][1], prior))
         self.assertNotEqual(runner.compare(changed, value)["category"], "matched")
 
+
+METHODS_MISSING = "0x43c9d5b5"
+METHOD_FIXTURES = (("m_00000001", 1), ("m_00000002", 0), ("m_00000003", 2))
+
+
+def methods_case(methods=METHOD_FIXTURES, rows=(("m_00000001", (6,)), ("m_00000002", ()), (None, (1,)),
+                                                 ("m_00000003", (2, 3)), ("m_00000003", (2, 4)))):
+    """Envelope fixture only: native replay checks the actual several-methods program."""
+    table = [{"name": name, "signature": runner.method_signature(name, arity),
+              "selector": runner.method_selector(runner.method_signature(name, arity)), "arity": arity} for name, arity in methods]
+    transactions = []
+    for index, (name, inputs) in enumerate(rows):
+        selector = METHODS_MISSING if name is None else next(method["selector"] for method in table if method["name"] == name)
+        calldata = selector + "".join(f"{value:064x}" for value in inputs)
+        rejection = runner.STD_NO_SELECTOR if name is None else None
+        transactions.append({"id": f"tx-{index}", "method": name, "selector": selector, "inputs": [str(value) for value in inputs],
+                             "calldata": calldata, "stdRejection": rejection, "value": "0"})
+    return {"schema": runner.METHODS_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "methodsPlan": {"schema": "solcore-lean.methods-plan.v1", "missingSelector": METHODS_MISSING,
+                        "methods": [{"name": name, "arity": arity, "stepProgram": {}} for name, arity in methods]},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(6)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedMethods", "methods": table,
+            "selectorOrder": runner.selector_order([method["selector"] for method in table]),
+            "deployPath": ["SynthesizedMethodsDeploy"], "runtimePath": ["SynthesizedMethodsDeploy", "SynthesizedMethods"],
+            "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def methods_slots(values):
+    return [{"slot": str(index), "value": str(value)} for index, value in enumerate(values)]
+
+
+def methods_history(value, path):
+    """Rows that follow the shared-slot protocol: a call sets slot zero to its
+    input plus slot zero plus one, counts itself in slot one, copies slot zero
+    to its own slot and returns the sum; an odd input reverts and the missing
+    selector reverts with std's selector, a Word on original Core and four
+    bytes on Hull and EVM."""
+    names = [method["name"] for method in value["contract"]["methods"]]
+    rows, prior = [], [0] * 6
+    for index, tx in enumerate(value["transactions"]):
+        x = sum(int(item) for item in tx["inputs"])
+        if tx["stdRejection"] is not None:
+            committed, output = list(prior), selector_word(tx["stdRejection"]) if path == "directCore" else tx["stdRejection"]
+            status = "reverted"
+        else:
+            own = 2 + names.index(tx["method"])
+            after = list(prior)
+            after[0] = prior[0] + x + 1
+            after[1] = prior[1] + 1
+            after[own] = after[0]
+            result = after[0] + after[1] + after[own]
+            status = "reverted" if x % 2 else "returned"
+            committed = list(prior) if x % 2 else after
+            output = "0x" + f"{result:064x}"
+        row = {"id": tx["id"], "index": index, "status": status, "output": output, "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.METHODS_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0] * 6), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def methods_histories(value=None):
+    value = methods_case() if value is None else value
+    return {path: methods_history(value, path) for path in runner.PATHS}
+
+
+class MethodsTests(unittest.TestCase):
+    def test_a_methods_case_records_its_methods_selectors_and_calls(self):
+        value = methods_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["shrinkBatch"]),
+                         ("semantic-methods-tool", "rust-hull-keyed-storage-scenario", True, "methods", 16))
+        self.assertTrue(runner.has_methods(value) and runner.uses_selector_rule(value))
+        self.assertFalse(runner.has_methods(malformed_case()) or runner.uses_selector_rule(nested_case()))
+        self.assertEqual([method["selector"] for method in value["contract"]["methods"]], ["0x935853e4", "0xf3cfdf58", "0x336e1e08"])
+        self.assertEqual(value["contract"]["selectorOrder"], "mixed")
+        self.assertEqual(runner.selector_order(["0x06d154aa", "0x336e1e08"]), "ascending")
+        self.assertEqual(runner.selector_order(["0xf3cfdf58", "0x336e1e08"]), "descending")
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [None, None, runner.STD_NO_SELECTOR, None, None])
+        self.assertIn("missing selector compared by std's error selector", runner.scope(value))
+        changed_contract = lambda key, item: {**value["contract"], key: item}
+        for key, changed in (("contract", changed_contract("selectorOrder", "ascending")),
+                             ("contract", changed_contract("methods", value["contract"]["methods"][:2]))):
+            invalid = copy.deepcopy(value)
+            invalid[key] = changed
+            with self.subTest(key=key), self.assertRaises(Exception):
+                runner.validate_case(invalid)
+        for methods in ((("m_00000001", 1),), (("m_0000000G", 1), ("m_00000002", 0)), (("m_00000001", 1), ("m_00000001", 0)),
+                        (("m_00000001", 3), ("m_00000002", 0)), (("m_00000001", 1), ("m_00000002", 0)) * 3):
+            with self.subTest(methods=methods), self.assertRaises(Exception):
+                runner.validate_case(methods_case(methods, rows=(("m_00000002", ()),)))
+        colliding = methods_case()
+        colliding["methodsPlan"]["missingSelector"] = "0x935853e4"
+        with self.assertRaises(Exception):
+            runner.validate_case(colliding)
+        for key, changed in (("method", "m_0000000f"), ("selector", METHODS_MISSING), ("inputs", ["6", "7"]),
+                             ("calldata", "0x935853e4"), ("stdRejection", runner.STD_NO_SELECTOR), ("value", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+
+    def test_the_dispatch_model_follows_std(self):
+        """The golden decisions of the Lean model, from the pinned dispatch.sol."""
+        methods, missing = runner.contract_methods(methods_case())
+        word = lambda value: value.to_bytes(32, "big")
+        selector = lambda position: bytes.fromhex(methods[position]["selector"][2:])
+        cases = [(selector(0) + word(6), (None, 0)), (selector(1), (None, 1)), (selector(2) + word(2) + word(4), (None, 2)),
+                 (bytes.fromhex(missing[2:]) + word(1), (runner.STD_NO_SELECTOR, None)), (selector(0)[:3], (runner.STD_NO_SELECTOR, None)),
+                 (b"", (runner.STD_NO_SELECTOR, None)), (selector(0), (runner.STD_TRUNCATED, None)),
+                 (selector(2) + word(2), (runner.STD_TRUNCATED, None)), (selector(1) + word(9), (None, 1))]
+        for data, expected in cases:
+            with self.subTest(data=data.hex()):
+                self.assertEqual(runner.methods_dispatch(methods, data), expected)
+
+    def test_the_selector_rule_applies_to_the_missing_selector(self):
+        value = methods_case()
+        result = runner.compare(methods_histories(value), value)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["selectorRows"], [{"id": "tx-2", "index": 2, "selector": runner.STD_NO_SELECTOR}])
+        observed = methods_histories(value)
+        observed["rustEvm"]["transactions"][2]["output"] = selector_word(runner.STD_NO_SELECTOR)
+        self.assertEqual((runner.compare(observed, value)["category"], runner.compare(observed, value)["transactionId"]),
+                         ("semantic-mismatch", "tx-2"))
+
+    def test_a_returned_call_follows_the_shared_slot_protocol(self):
+        value = methods_case()
+        histories = methods_histories(value)
+        rows = histories["directCore"]["transactions"]
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, {**rows[index], "output": tx["stdRejection"] or rows[index]["output"]}, prior))
+        # A call that writes another method's slot breaks the protocol on every path.
+        changed = methods_histories(value)
+        for path in runner.PATHS:
+            row = changed[path]["transactions"][1]
+            row["committedStorage"][4]["value"] = "5"
+        prior = changed["directCore"]["transactions"][0]["committedStorage"]
+        self.assertFalse(runner.conforms(value, value["transactions"][1], changed["directCore"]["transactions"][1], prior))
+        self.assertNotEqual(runner.compare(changed, value)["category"], "matched")
+
 if __name__ == "__main__":
     unittest.main()

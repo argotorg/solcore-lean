@@ -142,9 +142,10 @@ private def appliedNodes (helpers : List Wire.Expr) : Nat := Wire.programNodes {
   body := .apply (functionDAGExpression helpers (.apply (.var 1) (.var 0))) (word 0) }
 
 /-- Budget from the actual full applied skeleton, with one scalar placeholder
-per helper. The final measured program is checked again after generation. -/
-def generatedFunction (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1) :
-    Except String (Aggregates.CheckedDAG × Json) := do
+per helper. The final measured program is checked again after generation. A
+caller generating several steps for one case supplies that case's mask. -/
+def generatedFunction (seed : Seed) (nodes : Nat) (revision : GeneratorRevision := .v1)
+    (mask? : Option FeatureMask := none) : Except String (Aggregates.CheckedDAG × Json) := do
   let count := 1 + seed.toNat % 3
   let skeleton := (List.range count).map fun index =>
     let helperSeed := Seed.ofNat (seed.toNat + index)
@@ -157,7 +158,7 @@ def generatedFunction (seed : Seed) (nodes : Nat) (revision : GeneratorRevision 
   let mut metadata : Array Json := #[]
   let mut finalSeed := seed
   -- One mask for every helper of the case.
-  let mask := revision.caseMask seed featureSupport
+  let mask := mask?.getD (revision.caseMask seed featureSupport)
   for index in List.range count do
     let helperSeed := Seed.ofNat (seed.toNat + index)
     let generated ←

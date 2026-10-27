@@ -2693,6 +2693,98 @@ and native tools frozen on `0276e84a9`:
   - all twelve bank payload lengths were sent and no seed was excluded.
 - A case took about 6.5 seconds. There was no finding.
 
+**Several methods.** Every other stateful contract has exactly one method,
+`run(...)`, so std's dispatcher compares one selector and every transaction
+runs the same body. The `stateful-methods` profile gives one contract two to
+four external methods over shared storage. The definitions were fixed before
+execution.
+
+What std and the compiler do with several methods, from `dispatch.sol`,
+`hir-ty/src/prepare.rs` and `hir-ty/src/contract/dispatch.rs`:
+1. The compiler collects the contract's public functions in declaration
+   order and builds std's method tuple in that order.
+2. `RunDispatch` compares the calldata selector, `shr(224, calldataload(0))`,
+   with each method's selector in that order and runs the first that matches.
+3. Calldata shorter than 4 bytes, or with no matching selector, reaches the
+   default non-payable fallback, which reverts with `0x4924aef0` and commits
+   nothing.
+4. The matched method's `do_exec` requires `calldatasize >= 4 + headSize`,
+   else it reverts with `0x08638556`. It then decodes the arguments, runs the
+   method, encodes its result and returns.
+5. A duplicate public signature (`SC0230`) or a selector collision is a
+   compile error.
+
+A probe compiled a three-method contract (arities one, zero and two) over
+shared slots at O0 and O2. Imported Hull and the EVM agreed on every call,
+including an odd-input revert, a missing selector (`0x4924aef0`), a method
+called without its arguments (`0x08638556`) and one called with an extra
+Word. The method parity gate already imports the multi-method upstream
+fixtures. Original Core reads calldata through its host functions and can
+dispatch itself, and the declared-slot Hull runner takes each call's calldata
+as given. So neither the shared runtime nor its proofs change.
+
+- Contract: `SynthesizedMethods` declares methods `0..n-1`, with `n` from 2
+  to 4 drawn per scenario. For method `i`:
+  - its name is `m_` and eight hex digits drawn from the scenario seed;
+  - it has `k` uint256 parameters, `k` from 0 to 2;
+  - it returns one uint256;
+  - its signature is `name(uint256,...)`, and its selector is the first four
+    bytes of the signature's Keccak-256.
+  Names are distinct. A scenario whose selectors collide is excluded, as the
+  compiler would reject it. Each case records the names, signatures,
+  selectors and arities.
+- Shared storage, the declared slots 0 to 5: slot 0 is a shared accumulator,
+  slot 1 a shared call count, and slot `2 + i` method `i`'s last result.
+- Method `i` has its own checked aggregate step. Its input is the wrapping sum
+  of its arguments, or 0 without arguments. It does the following:
+  - sets slot 0 to `step_i(input + slot 0)`;
+  - adds one to slot 1;
+  - writes the new accumulator to slot `2 + i`;
+  - takes the sum of slots 0, 1 and `2 + i` as its result.
+  An odd input reverts with that Word; otherwise the method returns it.
+  The steps share the step budget equally. Each method's step comes from the
+  first of eight seeds of its own stream whose step fits its share, under the
+  case's one swarm mask.
+- Original Core, `core-methods-contract-v1`:
+  - it binds the steps and reads the size;
+  - calldata shorter than 4 bytes reverts with `0x4924aef0`;
+  - otherwise it compares the selector Word with each method's selector in
+    declaration order, through `StdDispatch`;
+  - no match reverts with `0x4924aef0`;
+  - the match checks its head size (`0x08638556`), reads its arguments and
+    runs its protocol.
+- Transactions: each transaction either calls one recorded method by name
+  with recorded inputs in canonical calldata, or sends a recorded missing
+  selector with one Word. The missing selector is that of one more drawn
+  name, distinct from every method's. std rejects it with `0x4924aef0`, which
+  the existing selector rule and `selectorRows` compare. All transactions are
+  zero-value.
+- Selector order: the method selectors, read in declaration order, are
+  ascending, descending or mixed. Only three or more methods can be mixed.
+  Each case records its order.
+- Golden dispatch cases come before any random run. They use contracts of two,
+  three and four methods whose selectors are ascending, descending or mixed,
+  with steps that add a known constant. They call each method, a missing
+  selector, short calldata and a method without its arguments, and one
+  sequence checks that the methods share storage. Expectations are written
+  out by hand.
+- Observations: status, output, slots 0 to 5 and the whole committed storage,
+  compared per prefix. A rejection keeps the prior slots and whole storage.
+- Generation: the method count, names and arities, and the missing selector,
+  come from one stream of the scenario seed. Each transaction draws a target
+  from another stream: a method, or about one time in `2n + 1` the missing
+  selector. Inputs come from the boundary bank.
+- Reduction:
+  - one-transaction removals come first;
+  - then the removal of each method that no remaining transaction calls;
+  - then step reductions, method by method;
+  - then simpler inputs.
+  The order counts transactions, then methods, then program size, then
+  inputs.
+- Exclusions: gas, value-bearing and payable methods, fallbacks, overloaded
+  names, calldata that is neither canonical nor a missing selector, and return
+  values other than one Word.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
