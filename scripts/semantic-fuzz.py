@@ -52,6 +52,8 @@ RECENT = 20
 MISSING_SUMMARY_LIMIT = 3
 # Campaign generation fields besides the seed that decide what a random case regenerates.
 REPLAY_FIELDS = ("generatorVersions", "inputSelections", "transactions")
+# A pure campaign's shared-compilation counts, kept per profile beside them.
+COMPILATION_FIELDS = ("distinctSources", "compiled", "reused")
 CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backend": list(BACKENDS), "profile": None,
                    "cases": 16, "attempts": 2048, "nodes": None, "size_cycle": [1.0, 2.0], "seconds": 14400.0,
                    "profile_seconds": 900.0,
@@ -559,6 +561,12 @@ def replay_fields(row):
     return {key: generation[key] for key in REPLAY_FIELDS if key in generation}
 
 
+def compilation_counts(row):
+    """A pure campaign's shared-compilation counts; distinct sources measure its program diversity."""
+    compilation = (row.get("campaign") or {}).get("compilation") or {}
+    return {key: compilation[key] for key in COMPILATION_FIELDS if type(compilation.get(key)) is int}
+
+
 def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started, elapsed, keep, sites=None):
     occurrences = register(state, config, epoch, iteration, backend, run_dir, summary, sites)
     row = {"schema": SCHEMA + "/run", "iteration": iteration, "backend": backend,
@@ -568,7 +576,7 @@ def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_
            "elapsedSeconds": elapsed, "exitCode": exit_code, "suiteStatus": summary.get("status", "missing-summary"),
            "stop": summary.get("stop"), "counts": summary.get("counts", {}),
            "profiles": [{"profile": row.get("profile"), "status": row.get("status"), "seed": row.get("seed"),
-                         "generation": replay_fields(row),
+                         "generation": replay_fields(row), "compilation": compilation_counts(row),
                          "findings": len(row.get("findings") or []),
                          "secondaryFindings": len(row.get("secondaryFindings") or [])}
                         for row in summary.get("profiles", [])],

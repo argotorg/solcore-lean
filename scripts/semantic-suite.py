@@ -362,7 +362,7 @@ class Suite:
                 row["summaryError"] = str(error)
             row["status"] = classify(summary, profile, count, exit_code, stopped, args.backend)
             if isinstance(summary, dict):
-                row["campaign"] = {key: summary[key] for key in ("backend", "status", "counts", "transactionCounts", "stop", "generation") if key in summary}
+                row["campaign"] = {key: summary[key] for key in ("backend", "status", "counts", "transactionCounts", "stop", "generation", "compilation") if key in summary}
                 row["missingCoverage"] = missing_coverage(summary)
                 row["summary"] = str(summary_path.relative_to(args.output))
                 row["summarySha256"] = digest(summary_path)

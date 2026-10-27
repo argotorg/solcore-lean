@@ -357,6 +357,8 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(row['manifestSha256'], suite.digest(suite.manifest(profile)))
         self.assertEqual(row['command'][row['command'].index('--corpus') + 1], str(suite.manifest(profile)))
         self.assertEqual(row['campaign']['counts']['matched'], count)
+        self.assertEqual(row['campaign']['compilation'],
+                         {'policy': 'policy fixture', 'distinctSources': 1, 'compiled': 1, 'reused': count - 1})
         sampled = suite.parse_args(['--output', str(self.directory / 'sampled'), '--mode', 'random', '--profile', profile])
         sampled.output.mkdir()
         with patch.object(suite, 'run_process', side_effect=self.mock_campaign({})), contextlib.redirect_stdout(io.StringIO()):
@@ -583,6 +585,9 @@ class SuiteTests(unittest.TestCase):
             folder = Path(command[command.index("--output") + 1])
             folder.mkdir()
             summary = completed(profile, suite.requested(args, profile))
+            if suite.PROFILES[profile][1] == "pure":
+                summary["compilation"] = {"policy": "policy fixture", "distinctSources": 1, "compiled": 1,
+                                          "reused": summary["counts"]["executed"] - 1}
             category = statuses.get(profile, "passed")
             if category == "failed":
                 summary["counts"].update(matched=0, errors=1)
