@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs and can request whole functions; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the eleven G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the ten profiles whose functions can be identities, exclude functions that return every boundary input unchanged; pure campaigns compile each distinct source once per backend; an O2 random comptime run has a recorded compiler crash; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]` and malformed-calldata extensions validated locally, the last for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector; all sixteen stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions; multi-word return values need a contract runtime change; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -745,6 +745,40 @@ crashed on the recorded comptime plan; revision four's sixteen cases end before
 that plan, which still crashes when generated under revision four. With
 sixteen whole functions per profile, revision four found 14 distinct
 `runtime-word` sources against 3.
+
+**Boundary identities.** Random campaigns of the ten runtime-input profiles
+whose generated functions can be identities now apply the acceptance filter
+`exclude-boundary-identity-v1`: after the profile's own filters, it excludes a
+function that returns each of its boundary inputs unchanged, under its own
+reason and the code `boundary-identity`. The ten are `runtime-word`,
+`runtime-primitives`, `runtime-functions`, `runtime-mutation`,
+`runtime-aggregates`, `runtime-closures`, `runtime-comptime`,
+`runtime-modules`, `runtime-call-graphs` and `runtime-aggregate-call-graphs`.
+The two loop profiles already require a changed positive-trip boundary input,
+and a generic function returns for input 0 the result of input 1 or its
+successor, so neither can be an identity; those three profiles are unchanged.
+The filter is versioned in the generated origin's `acceptance` field rather
+than as a G0 revision: acceptance belongs to each profile's case module, two of
+the ten profiles do not use G0, and only generated cases pass filters, while a
+G0 revision is copied into every reduction. Replay applies the recorded filter
+again and refuses a saved identity that claims it; an origin without the field,
+as in every fixed corpus, applied the profile's own filters. The stateful
+profiles and every request without the filter are unchanged.
+
+Over the first 256 functions accepted from seed 1 under revision four, the
+filter removed every function that returned all of its recorded inputs:
+82 in `runtime-word`, 103 in `runtime-primitives`, 72 in
+`runtime-aggregate-call-graphs`, 46 in `runtime-call-graphs`, 36 in
+`runtime-functions`, 24 in `runtime-aggregates`, 4 in `runtime-comptime` and 3
+in `runtime-mutation`. Distinct `runtime-word` sources rose from 188 to 240 and
+`runtime-primitives` sources from 150 to 226, at 2.15 and 3.98 attempts per
+accepted function instead of 1.54 and 2.29. No other trivial class forms a
+majority; the largest is `runtime-mutation`, which adds a constant to its
+input in 112 of 256 functions. The registered tests check that the filter
+keeps exactly the functions that change a boundary input, records itself,
+replays, refuses a saved identity, composes with seeded inputs and leaves
+reductions unfiltered; 666 generation runs and 3,996 replays, observations and
+reductions without the filter matched the previous build byte for byte.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

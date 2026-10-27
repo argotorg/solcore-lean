@@ -333,6 +333,103 @@ the full random input in 900 to 1,148 cases (1,024 expected), widths from at
 most eight bits to more than 248, more than 400 distinct small values with some
 below 32 and some from 256, and a negative fourth input in at least 2,000.
 
+## Boundary identities
+
+Random campaigns of the runtime-input profiles whose generated functions can be
+identities apply the acceptance filter `exclude-boundary-identity-v1`. After the
+profile's own filters, it excludes a function that returns each of its boundary
+inputs unchanged, with the reason `every boundary input returned itself` and
+the code `boundary-identity`. Such a function exercises only each path's ABI
+decoding and return, yet costs a compilation and every input's deployment and
+execution. The filter decides on the boundary results the profile already
+computes; seeded inputs never take part, so a function the filter keeps can
+still return some seeded input unchanged.
+
+| Profiles | Identity filter |
+| --- | --- |
+| `runtime-word`, `runtime-primitives`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
+| `runtime-loops`, `runtime-call-graph-loops` | not needed: a loop must already change a positive-trip boundary input |
+| `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
+
+A closure returns `5 * step(x) + 4 * x + 4` (snapshot) or `+ 5`
+(independent), and a module combines its constant with step results, so both
+are identities only for steps that hit specific Words at every boundary input.
+None occurred in the measurements below, but the generators allow them, so
+both profiles apply the filter. `closed-g0` has no runtime input.
+
+The filter is versioned on its own rather than as a G0 revision. Acceptance
+belongs to each profile's case module, not to the G0 expression generator, and
+two of the ten profiles do not use G0. Only generated cases pass filters:
+imported cases and reductions never did, and a reduction may itself be an
+identity. So the filter lives in the generated origin next to
+`inputSelection`, while a G0 revision is copied into every reduction. It
+composes with every G0 revision and input selection, and the stateful profiles,
+whose steps are not runtime-input functions, are untouched.
+
+A filtered origin records `"acceptance": "exclude-boundary-identity-v1"`; an
+origin without the field, as in every fixed corpus, applied the profile's own
+filters only. Replay applies the recorded filter again: a saved identity that
+claims it is refused with the exclusion reason, and an unknown value with
+`unsupported acceptance filter`. Without the field, a filtered case is also a
+valid case of the profile's own filters, since the filter only narrows
+acceptance. Reductions record no filter. The generation commands of the ten
+profiles take the filter after `FUEL`, in any order with a G0 version and an
+input selection; the others refuse it:
+
+```text
+semantic-case-tool input-generate SEED NODES COUNT ATTEMPTS FUEL [VERSION] [seeded-inputs-v1/splitmix64] [exclude-boundary-identity-v1]
+```
+
+`scripts/semantic-campaign.py` passes the filter in random mode, and
+`--acceptance profile` returns to the profile's own filters. A corpus refuses
+the filter and `--case` keeps the saved case's. The summary records
+`configuration.acceptance` and the generated cases' filters in
+`generation.acceptances`; both are null for the other profiles. With the
+filter, every generation request without the option is byte for byte the same
+as before: 666 generation runs of all fourteen commands under every G0
+revision and input selection, and replay, observation and reduction of 1,332
+of their cases, matched the tool before the filter.
+
+Over the first 256 functions accepted from seed 1 at the campaign's default
+budgets with seeded inputs, under v4 and then also under the filter, no
+accepted function returned all of its eight to twelve recorded inputs
+unchanged:
+
+| Profile | Distinct sources | Identity | Attempts per function | Identity exclusions | Other exclusions |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `runtime-word` | 188 → 240 | 82 → 0 | 1.54 → 2.15 | 116 | 137 → 179 equal boundary outputs |
+| `runtime-primitives` | 150 → 226 | 103 → 0 | 2.29 → 3.98 | 189 | 331 → 575 equal boundary outputs |
+| `runtime-functions` | 220 → 243 | 36 → 0 | 1.89 → 2.21 | 40 | 161 → 189 template budget, 67 → 82 equal boundary outputs |
+| `runtime-mutation` | 256 | 3 → 0 | 1.04 → 1.05 | 3 | 10 template budget |
+| `runtime-aggregates` | 256 | 24 → 0 | 1.00 → 1.11 | 28 | none |
+| `runtime-closures` | 256 | 0 | 1.00 | 0 | none |
+| `runtime-comptime` | 256 | 4 → 0 | 1.48 → 1.50 | 4 | 120 → 121 constants without an operation, 2 equal boundary outputs |
+| `runtime-modules` | 256 | 0 | 1.57 | 0 | 113 constants without an operation, 33 template budget |
+| `runtime-call-graphs` | 256 | 46 → 0 | 3.41 → 4.07 | 57 | 322 → 377 entries without a call, 294 → 353 equal boundary outputs |
+| `runtime-aggregate-call-graphs` | 256 | 72 → 0 | 4.87 → 6.81 | 99 | 567 → 814 entries without a call, 309 → 418 equal boundary outputs, 115 → 156 without an aggregate call composition |
+
+The unchanged profiles had no identity: `runtime-loops` (1.13 attempts per
+function), `runtime-call-graph-loops` (4.28) and `runtime-generics` (1.00).
+Distinct behaviours on the boundary inputs, which every function of a profile
+shares, rose from 159 to 228 in `runtime-word`, 135 to 218 in
+`runtime-primitives`, 190 to 221 in `runtime-functions`, 216 to 235 in
+`runtime-aggregates`, 190 to 231 in `runtime-call-graphs` and 150 to 205 in
+`runtime-aggregate-call-graphs`.
+
+No other trivial class forms a majority of a profile under the filter. On the
+recorded inputs, `runtime-mutation` adds a constant to its input in 112 of 256
+functions (44 %), unchanged by the filter, since its templates fold a closed
+scalar into the input. `runtime-comptime` adds a constant in 49 and
+`runtime-aggregates` in 37. In `runtime-word`, 45 functions XOR a constant, 23
+add one and 20 subtract the input from one, 88 of 256 (34 %); in
+`runtime-functions` 58 (23 %) and `runtime-primitives` 33 (13 %) fall in these
+classes. Closures and modules have none. The filter excludes none of them.
+
+The filter raises the attempts per function. From seed 1, the campaign's
+default of 256 attempts covers about 119 whole `runtime-word` functions,
+below its bound of 128, and about 37 `runtime-aggregate-call-graphs`
+functions; 512 attempts cover about 75 of the latter, below their bound of 85.
+
 ## Validate the emitter against Rust
 
 Prepare the checked Hull exporter as described in
