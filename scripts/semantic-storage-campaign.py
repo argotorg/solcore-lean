@@ -67,6 +67,11 @@ LEDGER_CAUSES = ("odd-flags", "insufficient-balance")
 # Outer lengths of nested values and the lengths of their present rows.
 NESTED_EXTRA = {"RowCounts": tuple(range(4)), "RowLengths": tuple(range(3))}
 NESTED_DIMENSIONS = DIMENSIONS + tuple(NESTED_EXTRA)
+# The canonical lengths, malformation kinds and prescribed std outcomes of
+# malformed calldata: a rejecting error selector, or acceptance.
+MALFORMED_EXTRA = ("Lengths", "Malformations", "Rejections")
+MALFORMED_DIMENSIONS = DIMENSIONS + MALFORMED_EXTRA
+MALFORMED_OUTCOMES = adapter.STD_ERRORS + ("accepted",)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -82,7 +87,8 @@ STRAY_SLOT = str(2**256 - 2)
 
 def dimensions(profile_name):
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
-            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS}.get(
+            "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
+            "malformed": MALFORMED_DIMENSIONS}.get(
         adapter.PROFILES[profile_name]["abi"], DIMENSIONS)
 
 
@@ -108,6 +114,14 @@ def bytes_coverage(case, statuses):
     lengths = [len(adapter.payload(tx)) for tx in case["transactions"]]
     return {"PayloadLengths": set(lengths),
             "RevertedPayloadLengths": {length for length, status in zip(lengths, statuses) if status == "reverted"}}
+
+
+def malformed_coverage(case):
+    """Canonical lengths, malformation kinds and prescribed std outcomes."""
+    transactions = case["transactions"]
+    return {"Lengths": {len(tx["values"]) for tx in transactions},
+            "Malformations": {tx["malformation"]["kind"] for tx in transactions},
+            "Rejections": {tx["stdRejection"] or "accepted" for tx in transactions}}
 
 
 def nested_coverage(case):
@@ -138,7 +152,7 @@ def log_coverage(case, statuses, rows=None):
 def inputs(case):
     """Runtime Words: the ABI input, every element of the dynamic or nested
     arrays, or every zero-padded payload chunk the bytes step folds."""
-    if adapter.profile(case)["abi"] == "array":
+    if adapter.profile(case)["abi"] in ("array", "malformed"):
         return {value for tx in case["transactions"] for value in tx["values"]}
     if adapter.has_nested(case):
         return {str(value) for tx in case["transactions"] for row in adapter.nested_values(tx) for value in row}
@@ -280,12 +294,19 @@ def validate_manifest(manifest):
         raise ValueError("key coverage belongs to the keyed storage and mapping profiles")
     if selected["abi"] != "ledger" and any("required" + dimension in manifest for dimension in LEDGER_EXTRA):
         raise ValueError("sender coverage belongs to the ledger profile")
-    if selected["abi"] == "array":
+    if selected["abi"] in ("array", "malformed"):
         lengths = manifest.get("requiredLengths")
         if not isinstance(lengths, list) or not lengths or any(type(v) is not int or v not in ARRAY_LENGTHS for v in lengths) or len(set(lengths)) != len(lengths):
             raise ValueError("dynamic-array coverage requires unique lengths from zero to three")
     elif "requiredLengths" in manifest:
-        raise ValueError("length coverage belongs to the dynamic-array profile")
+        raise ValueError("length coverage belongs to the dynamic-array profiles")
+    if selected["abi"] == "malformed":
+        for dimension, allowed in (("Malformations", adapter.MALFORMATION_KINDS), ("Rejections", MALFORMED_OUTCOMES)):
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"malformed-calldata coverage requires unique required{dimension} from {list(allowed)}")
+    elif "requiredMalformations" in manifest or "requiredRejections" in manifest:
+        raise ValueError("malformation coverage belongs to the malformed-calldata profile")
     if selected.get("logs"):
         for dimension, allowed in LOG_EXTRA.items():
             values = manifest.get("required" + dimension)
@@ -409,9 +430,13 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                         histories[path]["finalStorage"] = copy.deepcopy(row["committedStorage"])
                 synthetic = row is not None
     result = adapter.compare(histories, case) if synthetic else actual
-    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_sonatina_backend(None, report), "synthetic": synthetic,
+    analysis = {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_sonatina_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": path, "transactionId": selected, "field": field} if path else None,
             "actualComparison": actual, "comparison": result, "histories": histories}
+    if adapter.is_malformed(case):
+        # The rows compared by their std error selector, with the selector.
+        analysis["selectorRows"] = copy.deepcopy(result.get("selectorRows", []))
+    return analysis
 
 
 def fingerprint(analysis):
@@ -470,7 +495,7 @@ def keyed_analysis(analysis):
                                                (adapter.KEYED_HISTORY_SCHEMA, adapter.ARRAY_HISTORY_SCHEMA, adapter.LOG_HISTORY_SCHEMA,
                                                 adapter.VALUE_HISTORY_SCHEMA, adapter.BYTES_HISTORY_SCHEMA, adapter.MAPPING_HISTORY_SCHEMA,
                                                 adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
-                                                adapter.NESTED_HISTORY_SCHEMA)
+                                                adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -497,16 +522,20 @@ def transaction_counts(histories, case):
                                       not value.get("initialUndeclaredStorage") and not value.get("initialLogs") and
                                       value.get("initialBalance", "0") == str(adapter.deployment_value(case)) for value in values.values())
     for index, tx in enumerate(case["transactions"]):
-        rows = [value["transactions"][index] for value in values.values() if index < len(value["transactions"])]
+        by_path = {path: value["transactions"][index] for path, value in values.items() if index < len(value["transactions"])}
+        rows = list(by_path.values())
         result["executed"] += bool(rows)
         complete = len(rows) == 3 and all(row["status"] in ("returned", "reverted") for row in rows)
         result["completed"] += complete
+        # Malformed calldata: a std rejection is compared by its selector.
+        by_path = adapter.comparable(case, tx, by_path) if complete else by_path
+        rows = list(by_path.values())
         prefix = prefix and complete and all(adapter.without_containment(row) == adapter.without_containment(rows[0]) for row in rows) and not any(
-            row.get("undeclaredStorage") for row in rows) and all(adapter.conforms(case, tx, row,
+            row.get("undeclaredStorage") for row in rows) and all(adapter.conforms(case, tx, by_path[path],
                 value["transactions"][index - 1]["committedStorage"] if index else value["initialStorage"], address,
                 (value["transactions"][index - 1].get("committedBalance") if index else value.get("initialBalance")),
                 value["transactions"][index - 1]["accountStorage"] if index else value["initialAccountStorage"])
-                for value in values.values() for row in value["transactions"][index:index + 1])
+                for path, value in values.items() if path in by_path)
         result["matched"] += prefix
     return result
 
@@ -628,6 +657,8 @@ class Campaign:
             values.update(ledger_coverage(case, statuses), Aliases=aliases(case))
         elif self.specification["abi"] == "nested":
             values.update(nested_coverage(case))
+        elif self.specification["abi"] == "malformed":
+            values.update(malformed_coverage(case))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -689,7 +720,8 @@ class Campaign:
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
-                          "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA)}.get(self.specification["abi"], ()):
+                          "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
+                          "malformed": MALFORMED_EXTRA}.get(self.specification["abi"], ()):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []

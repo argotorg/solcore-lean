@@ -57,6 +57,8 @@ MAPPING_CASE_SCHEMA = "solcore-lean.semantic-mapping-case.v1"
 MAPPING_HISTORY_SCHEMA = "solcore-lean.mapping-history.v2"
 LEDGER_CASE_SCHEMA = "solcore-lean.semantic-ledger-case.v1"
 LEDGER_HISTORY_SCHEMA = "solcore-lean.ledger-history.v2"
+MALFORMED_CASE_SCHEMA = "solcore-lean.semantic-malformed-calldata-case.v1"
+MALFORMED_HISTORY_SCHEMA = "solcore-lean.malformed-calldata-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -146,6 +148,15 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": NESTED_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256[][])", "selector": "0x7095aff8", "rollback": True, "keyed": False,
         "declared": True, "abi": "nested", "shrinkBatch": 16},
+    # The dynamic-array contract under malformed calldata. Original Core models
+    # std's dispatcher and decoder; a std rejection is compared by its selector.
+    "stateful-malformed-calldata": {"caseSchema": MALFORMED_CASE_SCHEMA, "planSchema": "solcore-lean.malformed-calldata-plan.v1",
+        "planKey": "malformedCalldataPlan", "corpusSchema": "solcore-lean.semantic-malformed-calldata-corpus.v1",
+        "originKind": "malformed-calldata-generated", "contract": "SynthesizedDynamicArray",
+        "caseTool": "semantic-malformed-calldata-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": MALFORMED_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256[])", "selector": "0x9a94c44b", "rollback": True, "keyed": False,
+        "declared": True, "abi": "malformed"},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -181,6 +192,17 @@ MAX_PAYLOAD = 64
 MAX_PAYLOAD_BOUND = 256
 # The mapping profile's counter slot and the mapping field's base slot.
 MAPPING_COUNTER, MAPPING_BASE = 0, 1
+# The malformed-calldata profile. Its original Core contract reverts with one of
+# std's error selectors as a Word exactly where the pinned std's dispatcher or
+# decoder rejects: `NoSelectorMatchedWithoutFallback()` and `ABIInputTruncated()`.
+# `ArrayOutOfBounds()` and `NonPayableReceivedValue()` cannot arise there.
+STD_NO_SELECTOR, STD_TRUNCATED = "0x4924aef0", "0x08638556"
+STD_ERRORS = (STD_NO_SELECTOR, STD_TRUNCATED)
+MAX_CALLDATA = 1024
+MALFORMATION_KINDS = ("none", "short", "selector", "truncate", "trailing", "offset", "length")
+TRAILING_PATTERNS = ("zeros", "ones", "ramp")
+# std's bound on a 32-byte-element length, ~0 / 32.
+MAX_ARRAY_LENGTH = 2**251 - 1
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -213,8 +235,12 @@ def profile(case: dict) -> dict:
 def expected_status(case: dict, transaction: dict) -> str | None:
     """The profile fixes completion polarity, not the returned value or world.
     A ledger's even flags may still revert for an insufficient balance, so only
-    its odd flags fix a status; `ledger_fields` checks the rest."""
-    parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger") else "input"]
+    its odd flags fix a status; `ledger_fields` checks the rest. A std rejection
+    of malformed calldata reverts whatever the flags."""
+    if profile(case)["abi"] == "malformed" and transaction.get("stdRejection") is not None:
+        return "reverted"
+    parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
+                                                             "malformed") else "input"]
     odd = int(common.word(parity)) % 2
     if has_senders(case) and not odd:
         return None
@@ -492,6 +518,11 @@ def declared_scope(case: dict) -> str:
         return ("ordered zero-value run(uint256,uint256[]) transactions with canonical 0..3-element arrays; initially "
                 "empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; "
                 "no gas/balance/nonce equivalence")
+    if profile(case)["abi"] == "malformed":
+        return ("ordered zero-value run(uint256,uint256[]) transactions with one malformation of at most 1 KiB of calldata "
+                "each; initially empty storage; committed values at slots 0..4 on all paths and no nonzero undeclared slot "
+                "on Hull/EVM; a std rejection compared by its error selector (original Core's selector Word for std's four "
+                "revert bytes) when original Core reverts with it and std prescribes it; no gas/balance/nonce equivalence")
     if has_nested(case):
         return ("ordered zero-value run(uint256,uint256[][]) transactions with canonical nested values of at most three "
                 "rows of at most two elements; initially empty storage; committed values at slots 0..8 on all paths and "
@@ -519,6 +550,93 @@ def declared_scope(case: dict) -> str:
                 "committed slots 0/1 and ordered committed logs (address, topics, data) on all paths, the EVM chain's "
                 "complete log list, and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce equivalence")
     return "ordered zero-value run(uint256) transactions; initially empty committed slots 0/1; no gas/balance/nonce equivalence"
+
+
+def malformed_calldata(selector: str, tx: dict) -> bytes:
+    """The calldata a malformed-calldata transaction sends: the canonical
+    `run(uint256,uint256[])` encoding of its flags and values, changed by its one
+    malformation. An invalid malformation is rejected."""
+    values = tx.get("values")
+    if not isinstance(values, list) or len(values) > MAX_ELEMENTS:
+        raise ValueError("malformed-calldata transactions carry zero to three elements")
+    words = [int(common.word(tx.get("flags"), "transaction flags")), 64, len(values),
+             *(int(common.word(value, "array element")) for value in values)]
+    canonical = bytes.fromhex(selector[2:]) + b"".join(word.to_bytes(32, "big") for word in words)
+    malformation = tx.get("malformation")
+    if not isinstance(malformation, dict) or malformation.get("kind") not in MALFORMATION_KINDS:
+        raise ValueError("unknown malformation")
+    kind = malformation["kind"]
+    fields = {"none": set(), "short": {"bytes"}, "selector": {"mask"}, "truncate": {"kept"}, "trailing": {"count", "pattern"},
+              "offset": {"value"}, "length": {"value"}}[kind]
+    if set(malformation) != {"kind"} | fields:
+        raise ValueError("malformation fields differ from its kind")
+    if kind == "none":
+        return canonical
+    if kind == "short":
+        count = malformation["bytes"]
+        if type(count) is not int or not 0 <= count < 4:
+            raise ValueError("short calldata keeps zero to three selector bytes")
+        return canonical[:count]
+    if kind == "selector":
+        mask = int(common.word(malformation["mask"], "selector mask"))
+        if not 0 < mask < 2**32:
+            raise ValueError("a selector mask is a nonzero 32-bit value")
+        return (int.from_bytes(canonical[:4], "big") ^ mask).to_bytes(4, "big") + canonical[4:]
+    if kind == "truncate":
+        kept = malformation["kept"]
+        if type(kept) is not int or not 4 <= kept < len(canonical):
+            raise ValueError("truncation keeps the selector and drops at least one byte")
+        return canonical[:kept]
+    if kind == "trailing":
+        count, pattern = malformation["count"], malformation["pattern"]
+        if type(count) is not int or not 1 <= count <= 64 or pattern not in TRAILING_PATTERNS:
+            raise ValueError("trailing bytes are 1 to 64 bytes of zeros, ones or a ramp")
+        tail = {"zeros": bytes(count), "ones": b"\xff" * count, "ramp": bytes((index + 1) % 256 for index in range(count))}[pattern]
+        return canonical + tail
+    position = 36 if kind == "offset" else 68
+    value = int(common.word(malformation["value"], "malformation value"))
+    return canonical[:position] + value.to_bytes(32, "big") + canonical[position + 32:]
+
+
+def std_rejection(data: bytes, selector: str) -> str | None:
+    """The pinned std's dispatcher and decoder for `run(uint256,uint256[])`: the
+    error selector it reverts with, or None when the method body runs."""
+    size = len(data)
+    if size < 4 or data[:4] != bytes.fromhex(selector[2:]):
+        return STD_NO_SELECTOR
+    if size < 68:
+        return STD_TRUNCATED
+    offset = int.from_bytes(data[36:68], "big")
+    if offset > size - 4 or size - (4 + offset) < 32:
+        return STD_TRUNCATED
+    length = int.from_bytes(data[4 + offset:36 + offset], "big")
+    if length > MAX_ARRAY_LENGTH or 32 * length > size - (36 + offset):
+        return STD_TRUNCATED
+    return None
+
+
+def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
+    """The std error selector a transaction's rows are compared by. It applies
+    only when original Core reverted with exactly that selector as a Word and the
+    transaction's prescribed std outcome is that rejection; every other row is
+    compared exactly. A body revert whose Word equals a selector has the
+    prescribed outcome acceptance, so it is compared exactly too."""
+    selector = tx.get("stdRejection")
+    core = rows.get("directCore")
+    if profile(case)["abi"] != "malformed" or selector not in STD_ERRORS or not isinstance(core, dict):
+        return None
+    if core.get("status") != "reverted" or core.get("output") != "0x" + int(selector, 16).to_bytes(32, "big").hex():
+        return None
+    return selector
+
+
+def comparable(case: dict, tx: dict, rows: dict) -> dict:
+    """The rows as compared: under the selector rule, original Core's selector
+    Word stands for std's four revert bytes. Hull and EVM are never changed."""
+    selector = selector_rule(case, tx, rows)
+    if selector is None:
+        return rows
+    return {name: {**row, "output": selector} if name == "directCore" else row for name, row in rows.items()}
 
 
 def keyed_slots(transactions) -> list[str]:
@@ -553,6 +671,15 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 [int(common.word(tx.get("flags"), "transaction flags")), 64, len(words), *words])
             if tx.get("calldata") != expected or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its canonical ABI encoding")
+            continue
+        if selected["abi"] == "malformed":
+            data = malformed_calldata(selected["selector"], tx)
+            if len(data) > MAX_CALLDATA:
+                raise ValueError("malformed calldata exceeds 1 KiB")
+            if tx.get("calldata") != "0x" + data.hex() or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its malformation")
+            if tx.get("stdRejection") != std_rejection(data, selected["selector"]):
+                raise ValueError("transaction std outcome differs from std's decision on its calldata")
             continue
         if selected["abi"] == "nested":
             expected = nested_calldata(selected["selector"], int(common.word(tx.get("flags"), "transaction flags")), nested_values(tx))
@@ -605,6 +732,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
             raise Finding("unsupported-scope", "input", "dynamic-array profile starts empty and observes slots zero through four")
+    elif selected["abi"] == "malformed":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_SLOTS:
+            raise Finding("unsupported-scope", "input", "malformed-calldata profile starts empty and observes slots zero through four")
     elif selected["abi"] == "nested":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != NESTED_SLOTS:
             raise Finding("unsupported-scope", "input", "nested-array profile starts empty and observes slots zero through eight")
@@ -830,8 +960,10 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     nested arrays its row and element counts and sum. For the ledger,
     `ledger_fields` fixes what the balance-dependent polarity leaves open."""
     expected = expected_status(case, tx)
+    # A std rejection reverts with exactly its selector, after the selector rule.
+    rejection = tx.get("stdRejection") if profile(case)["abi"] == "malformed" else None
     if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
-            len(common.hex_bytes(row["output"], "output")) != 32:
+            (row["output"] != rejection if rejection is not None else len(common.hex_bytes(row["output"], "output")) != 32):
         return False
     if row["status"] == "reverted" and (row["committedStorage"] != prior or
                                         (prior_whole is not None and row["accountStorage"] != prior_whole)):
@@ -870,7 +1002,22 @@ def pairwise(values: dict) -> dict:
 
 
 def compare(histories: dict, case: dict) -> dict:
-    """Compare every completed prefix; a later budget failure cannot erase a difference."""
+    """Compare every completed prefix; a later budget failure cannot erase a
+    difference. For malformed calldata the result lists the rows compared by
+    their std error selector, with the selector."""
+    selector_rows = []
+    result = compare_rows(histories, case, selector_rows)
+    if is_malformed(case):
+        result["selectorRows"] = selector_rows
+    return result
+
+
+def is_malformed(case: dict) -> bool:
+    return isinstance(case, dict) and any(case.get("schema") == value["caseSchema"] and value["abi"] == "malformed"
+                                          for value in PROFILES.values())
+
+
+def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
     if set(histories) != set(PATHS):
         return {"category": "adapter-error", "stage": "comparison", "detail": "three histories required", "pairs": {}}
     try:
@@ -919,11 +1066,19 @@ def compare(histories: dict, case: dict) -> dict:
             return {"category": "inconclusive-resource", **where, "pairs": {}}
         if any(row["status"] not in {"returned", "reverted"} for row in rows.values()):
             return {"category": "execution-error", **where, "pairs": {}}
+        selector = selector_rule(case, tx, rows)
+        if selector is not None:
+            selector_rows.append({"id": tx["id"], "index": index, "selector": selector})
+        rows = comparable(case, tx, rows)
         compared = {name: without_containment(row) for name, row in rows.items()}
         pairs = pairwise(compared)
         fields = [key for key in observed if len({json.dumps(row[key], sort_keys=True) for row in rows.values()}) != 1]
         expected = expected_status(case, tx)
-        normal = all((expected is None or row["status"] == expected) and len(common.hex_bytes(row["output"], "output")) == 32
+        # A prescribed std rejection reverts with exactly its selector on every
+        # path; any other row carries one Word.
+        rejection = tx.get("stdRejection") if profile(case)["abi"] == "malformed" else None
+        normal = all((expected is None or row["status"] == expected) and (
+            row["output"] == rejection if rejection is not None else len(common.hex_bytes(row["output"], "output")) == 32)
                      for row in rows.values())
         rollback = all(row["status"] != "reverted" or row["committedStorage"] ==
             (values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])

@@ -60,6 +60,10 @@ lean_exe semanticDynamicArrayTool where
   root := `Tests.SemanticDynamicArrayTool
   exeName := "semantic-dynamic-array-tool"
 
+lean_exe semanticMalformedCalldataTool where
+  root := `Tests.SemanticMalformedCalldataTool
+  exeName := "semantic-malformed-calldata-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

@@ -1999,6 +1999,103 @@ its seed's mask, the slowest profile took 9.1 seconds per case, and there
 was no finding. The one excluded seed, in dynamic-array, left too few nodes
 for its step template.
 
+**Malformed calldata.** Every other profile sends canonical calldata only. The
+`stateful-malformed-calldata` profile sends malformed calldata to the
+dynamic-array contract and compares the three paths against the pinned std's
+dispatcher and decoder. The definitions were fixed before execution:
+
+- Contract: the dynamic-array step, emitted source and Hull runner are
+  reused, so the compiled contract is the dynamic-array one. Its original
+  Core contract is a new wrapper, `core-malformed-calldata-contract-v1`. The
+  wrapper first evaluates std's checks for `run(uint256,uint256[])` on the
+  actual calldata, in std's order, through Core's input host functions:
+  `inputDataSize`, `inputDataByte?`, and `inputDataWordBE?`, which yields a
+  Word only when all 32 bytes exist. It then runs the dynamic-array protocol
+  on the decoded flags, length and elements. The existing profiles, wrappers
+  and corpora do not change.
+- Reference semantics, from `dispatch.sol` and `std.sol` (`RunContract`,
+  `do_exec`, `CalldataWordReader`, `checkArrayHead`, `abiArrayGet`):
+  1. Calldata shorter than 4 bytes, or a selector other than `0x9a94c44b`,
+     reaches the default fallback, which reverts with `0x4924aef0`.
+  2. Calldata shorter than 68 bytes reverts with `0x08638556`
+     (`ABIInputTruncated`).
+  3. With head offset `o` at byte 36, the call also reverts with
+     `0x08638556` when any of these holds:
+     - `o > size - 4`;
+     - fewer than 32 bytes remain at `4 + o`;
+     - the length exceeds `2^251 - 1`, which is `~0 / 32`;
+     - `32 * length > size - (36 + o)`.
+  4. Otherwise the body runs. Flags are the Word at 4, the length the Word at
+     `4 + o`, and element `i` the Word at `36 + o + 32i`. Overlaps are not
+     checked and trailing bytes are ignored.
+  A std rejection reverts with exactly its four selector bytes and commits
+  nothing. Two std errors cannot arise here: `0x7f52b2bf`, because the body
+  guards every index by the length, and `0xb5988ea3`, because no transaction
+  carries value.
+- Malformations, at most 1 KiB of calldata in all:
+  - none (the canonical encoding);
+  - short calldata: 0 to 3 selector bytes;
+  - a wrong selector: xor `1`, `2^31` or `2^32 - 1`;
+  - truncation inside the head or inside the tail;
+  - trailing bytes: 1, 31, 32, 33 or 64 bytes of `0x00`, `0xff` or a ramp;
+  - a head offset:
+    - out of range: size − 3, size − 35 and 2^255;
+    - wrapping near 2^256: 2^256 − 4, 2^256 − 2 and 2^256 − 1, for which
+      `4 + o` wraps to 0, 2 and 3;
+    - overlapping the head: 0 and 32;
+  - a length:
+    - one too long;
+    - 2^251, and 2^251 + 1, whose 32-fold product wraps to 32;
+    - 2^256 − 1;
+    - one shorter, and zero.
+  A transaction records its malformation, the resulting calldata, and its
+  prescribed std outcome: the rejecting selector, or acceptance. The case
+  module computes that prescription with a second std model written directly
+  over the calldata bytes. Generation and replay require original Core to
+  agree with it.
+- Selector rule. When original Core reverts with exactly one of std's error
+  selectors as a Word, and the transaction's prescribed outcome is that
+  rejection, Rust EVM and imported Hull must each revert with exactly those
+  four bytes. The row's Core output is then compared as that selector.
+  Everything else is compared exactly: every return, every other revert, and
+  every row whose prescription is acceptance, including a body revert whose
+  32-byte result happens to equal a selector. Hull against EVM stays byte
+  for byte in every row. Each analysis lists the rows compared by selector,
+  with their selectors.
+  A false agreement remains possible in theory: the Core wrapper's std branch
+  and the prescription would both have to reject a transaction that std
+  accepts, while both compiled paths also reject it with the same selector.
+  Golden cases guard against that.
+- Golden cases, before any random run: one per malformation kind, with the
+  outcome and selector expected from the reading above. They cover short
+  calldata, a wrong selector, a truncated head and tail, trailing bytes,
+  out-of-range and wrapping offsets, over-long and wrapping lengths, overlap
+  and a shorter length. The decode order is checked too: a wrong selector
+  on short or truncated calldata, and truncation beside a bad offset or
+  length.
+- Observations: as for dynamic-array — status, output, slots 0 to 4 and the
+  whole committed storage — compared per prefix. A rejection must keep the
+  prior slots and whole storage on every path.
+- Generation: the dynamic-array canonical `(flags, values)` blocks. Each
+  transaction draws its malformation from the bank above, from a separate
+  high-bit stream. Generation validates every prescribed outcome against
+  original Core.
+- Reduction:
+  - one-transaction removals come first, then step reductions;
+  - then, for each transaction: replacing its malformation with none, then
+    simpler parameters of the same kind;
+  - then the dynamic-array element and flags reductions.
+  The order counts transactions, then program size, then a malformation
+  weight, then elements and values.
+- Exclusions:
+  - gas;
+  - value-bearing transactions, with the non-payable fallback's `0xb5988ea3`
+    ordering;
+  - calldata over 1 KiB;
+  - malformed constructor calldata.
+  Every length is checked against the calldata size before any loop or copy,
+  so a huge length reverts instead of running out of gas.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

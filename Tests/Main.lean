@@ -2161,6 +2161,9 @@ import Solcore.Test.SourceKeyedStorageCorpus
 import Solcore.Test.SourceDynamicArrayEmitter
 import Solcore.Test.SourceDynamicArrayCases
 import Solcore.Test.SourceDynamicArrayCorpus
+import Solcore.Test.SourceMalformedCalldataGolden
+import Solcore.Test.SourceMalformedCalldataCases
+import Solcore.Test.SourceMalformedCalldataCorpus
 import Solcore.Test.SourceAggregatePrimitives
 import Solcore.Test.SourceAggregateMeaning
 import Solcore.Test.SourceEventLogEmitter
@@ -4160,6 +4163,9 @@ def main : IO UInt32 := do
   Tests.SourceDynamicArrayEmitter.testSourceDynamicArrayEmitter
   Tests.SourceDynamicArrayCases.testSourceDynamicArrayCases
   Tests.SourceDynamicArrayCorpus.testSourceDynamicArrayCorpus
+  Tests.SourceMalformedCalldataGolden.testSourceMalformedCalldataGolden
+  Tests.SourceMalformedCalldataCases.testSourceMalformedCalldataCases
+  Tests.SourceMalformedCalldataCorpus.testSourceMalformedCalldataCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   Tests.SourceAggregateMeaning.testSourceAggregateMeaning
   Tests.SourceEventLogEmitter.testSourceEventLogEmitter

@@ -705,6 +705,63 @@ class DynamicArrayCampaignTests(unittest.TestCase):
 
 
 
+def malformed_case(rows=None):
+    value = fixtures.malformed_case() if rows is None else fixtures.malformed_case(rows)
+    value["malformedCalldataPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+def malformed_report(value):
+    histories = fixtures.malformed_histories(value)
+    return {"schema": campaign.adapter.REPORT_SCHEMA, "histories": histories,
+            "comparison": campaign.adapter.compare(histories, value)}
+
+
+class MalformedCalldataCampaignTests(unittest.TestCase):
+    def test_coverage_names_lengths_malformations_and_std_outcomes(self):
+        value = malformed_case()
+        self.assertEqual(campaign.inputs(value), {"1", "3", "5", "7"})
+        self.assertEqual(campaign.dimensions("stateful-malformed-calldata"),
+                         campaign.DIMENSIONS + ("Lengths", "Malformations", "Rejections"))
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-malformed-calldata"))
+            instance.summary["coverage"].update(requiredMalformations=["none", "selector", "offset"],
+                                                requiredRejections=["0x4924aef0", "0x08638556", "accepted"])
+            instance.record_coverage(value, "matched", malformed_report(value)["histories"])
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedMalformations"], ["none", "selector", "trailing"])
+            self.assertEqual((coverage["missingMalformations"], coverage["missingRejections"]), (["offset"], ["0x08638556"]))
+
+    def test_a_std_rejection_counts_as_a_matched_prefix_and_its_analysis_names_the_selector(self):
+        value = malformed_case()
+        raw = malformed_report(value)
+        self.assertEqual(campaign.transaction_counts(raw["histories"], value), {"executed": 3, "completed": 3, "matched": 3})
+        analysis = campaign.analyze(raw, value)
+        self.assertEqual(analysis["selectorRows"], [{"id": "tx-1", "index": 1, "selector": "0x4924aef0"}])
+        changed = copy.deepcopy(raw)
+        changed["histories"]["rustEvm"]["transactions"][1]["output"] = fixtures.selector_word("0x4924aef0")
+        self.assertEqual(campaign.transaction_counts(changed["histories"], value)["matched"], 1)
+        self.assertNotIn("selectorRows", campaign.analyze(array_report(array_case()), array_case()))
+
+    def test_the_manifest_requires_malformations_only_for_its_profile(self):
+        manifest = json.loads((ROOT / "scripts/semantic-malformed-calldata-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        for change in (lambda m: m.pop("requiredMalformations"), lambda m: m.update(requiredMalformations=["reorder"]),
+                       lambda m: m.update(requiredRejections=["0x7f52b2bf"]), lambda m: m.update(requiredRejections=[]),
+                       lambda m: m.pop("requiredLengths")):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+        array = json.loads((ROOT / "scripts/semantic-dynamic-array-corpus.json").read_text())
+        array["requiredMalformations"] = ["none"]
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(array)
+
+
 def log_case(sites=((1, 2, 1), (3, 0, 2)), rows=((2, 5), (11, 1), (8, fixtures.HIGH_WORD))):
     value = fixtures.log_case(sites, rows)
     value["logPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]

@@ -2931,6 +2931,107 @@ per row, non-canonical offsets, truncated input and the decoder's revert
 paths, or return values longer than one Word. Agreement is test evidence, not
 a preservation proof.
 
+## Compare malformed calldata
+
+Every other profile sends canonical calldata. `stateful-malformed-calldata`
+sends the dynamic-array contract, `run(uint256 flags, uint256[] values)`,
+calldata with one malformation per transaction and compares the three paths
+against the pinned std's dispatcher (`std/dispatch.sol`) and decoder
+(`std/std.sol`). The compiled contract is the dynamic-array one, emitted from
+the same step, and the declared-slot Hull runner serves it unchanged.
+
+### Definitions
+
+The original Core contract `core-malformed-calldata-contract-v1` evaluates
+std's checks on the actual calldata, in std's order, through `inputDataSize`,
+`inputDataByte?` and `inputDataWordBE?`:
+
+1. Fewer than 4 bytes, or a selector other than `0x9a94c44b`, reaches the
+   default fallback, which reverts with `0x4924aef0`
+   (`NoSelectorMatchedWithoutFallback()`).
+2. Fewer than 68 bytes reverts with `0x08638556` (`ABIInputTruncated()`,
+   `do_exec`'s head check).
+3. With head offset `o` at byte 36: `o > size - 4`, fewer than 32 bytes at
+   `4 + o`, a length above `2^251 - 1` or `32 * length > size - (36 + o)`
+   reverts with `0x08638556` (`CalldataWordReader`, `checkArrayHead`).
+4. Otherwise the dynamic-array protocol runs on the Word at 4 (flags), the Word
+   at `4 + o` (length) and the Word at `36 + o + 32i` (element `i`). Overlaps
+   are not checked and trailing bytes are ignored.
+
+A std rejection reverts with exactly its four selector bytes and keeps every
+slot. `ArrayOutOfBounds()` cannot arise, since the protocol guards every index
+by the length, nor can `NonPayableReceivedValue()`, since no transaction
+carries value. Core contracts return or revert one Word, so the wrapper
+reverts with the selector as its Word payload.
+
+Each transaction records `{id, flags, values, malformation, calldata,
+stdRejection, value}`. The malformation is one of `none`, `short` (0 to 3
+selector bytes), `selector` (xor 1, 2^31 or 2^32 − 1), `truncate` (inside the
+head or the tail), `trailing` (1, 31, 32, 33 or 64 bytes of zeros, ones or a
+ramp), `offset` (out of range: size − 3, size − 35, 2^255; wrapping: 2^256 − 4,
+2^256 − 2, 2^256 − 1; overlapping: 0 and 32) or `length` (one too long, 2^251,
+2^251 + 1, 2^256 − 1, one shorter, zero). Calldata is at most 1 KiB.
+`stdRejection` is the rejecting selector or `null`, from a second std model
+written over the bytes (`stdRejection?`); generation and replay require
+original Core to give that outcome, and the adapter checks calldata and
+outcome with its own encoder and model.
+
+The selector rule: when original Core reverts with exactly one of std's error
+selectors as a Word and the transaction's `stdRejection` is that selector, Rust
+EVM and imported Hull must each revert with exactly those four bytes, and the
+row's Core output is compared as the selector. Every other row is compared
+exactly, including a body revert whose 32-byte result equals a selector, and
+Hull against EVM is byte-for-byte in every row. Each comparison and analysis
+lists the rows compared by selector in `selectorRows`. A false agreement would
+need the wrapper's std branch and `stdRejection?` to both reject a transaction
+std accepts while both compiled paths reject it with the same selector; the
+golden cases guard against that.
+
+Reductions remove transactions first, then reduce the step, then for each
+transaction replace its malformation with `none`, try simpler malformations of
+its kind, and finally reduce elements and flags. The order counts
+transactions, program size, a malformation weight, elements and values.
+Gas, value-bearing malformations, malformed constructor calldata and calldata
+over 1 KiB are out of scope; every length is checked against the calldata size
+before any loop or copy, so a huge length reverts instead of running out of
+gas.
+
+### Running and validation
+
+```sh
+lake build semanticMalformedCalldataTool rustHullKeyedStorageScenario
+mkdir -p .upstream/semantic-malformed-calldata-cases
+.lake/build/bin/semantic-malformed-calldata-tool generate 1 448 4 64 1000000 core-g0-v3/lcg64-v1 8 \
+  > .upstream/semantic-malformed-calldata-cases/corpus.json
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-malformed-calldata-corpus.json \
+  --output .upstream/semantic-malformed-calldata-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-malformed-calldata \
+  --cases 16 --output .upstream/semantic-malformed-calldata-random
+```
+
+Plans use `solcore-lean.malformed-calldata-plan.v1` under
+`malformedCalldataPlan`; cases use
+`solcore-lean.semantic-malformed-calldata-case.v1` and histories
+`solcore-lean.malformed-calldata-history.v1`. The std checks take 273 Core
+nodes against the dynamic-array wrapper's 162, so the suite's default budget
+for this profile is 448 nodes, leaving 175 for the step.
+`Solcore/Test/SourceMalformedCalldataGolden.lean` checks the wrapper and
+`stdRejection?` against 35 golden cases written out from the std reading: every
+malformation kind, wrapping offsets and lengths, overlap, and the decode order
+(a wrong selector on short or truncated calldata, a truncated head with a bad
+offset, a wrapping offset with a wrapping length). Each accepted case must
+behave exactly like the canonical dynamic-array contract on the decoded words.
+
+The fixed corpus has thirteen scenarios and 36 transactions: eight imported
+plans, which reuse the dynamic-array corpus steps with malformed transactions,
+and five generated seeds. Its expected histories were computed without the
+std wrapper: a prescribed rejection reverts with its selector Word and keeps the
+slots, and an accepted transaction is the canonical dynamic-array contract on
+the words std decodes. Required coverage is every malformation kind, both std
+selectors and acceptance, lengths 0 to 3, one to three helpers and
+transactions, all four templates, both outcomes and eight completion patterns.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The nine

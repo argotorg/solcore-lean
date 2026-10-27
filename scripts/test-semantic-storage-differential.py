@@ -2570,5 +2570,154 @@ class WholeStorageTests(unittest.TestCase):
         self.assertEqual(runner.evm_account_storage(Rpc(), accounts, {}, "0x4")[0]["storage"], [])
         self.assertEqual(len(calls), 3)
 
+
+MALFORMED_SELECTOR = "0x9a94c44b"
+
+
+def malformed_tx(index, flags, values, malformation):
+    tx = {"id": f"tx-{index}", "flags": str(flags), "values": [str(value) for value in values], "malformation": malformation,
+          "value": "0"}
+    data = runner.malformed_calldata(MALFORMED_SELECTOR, tx)
+    return {**tx, "calldata": "0x" + data.hex(), "stdRejection": runner.std_rejection(data, MALFORMED_SELECTOR)}
+
+
+def malformed_case(rows=((0, (1, 3, 7), {"kind": "none"}), (2, (5,), {"kind": "selector", "mask": "1"}),
+                         (1, (3, 7), {"kind": "trailing", "count": 2, "pattern": "ones"}))):
+    """Envelope fixture only: native replay checks the actual std-modeling program."""
+    return {"schema": runner.MALFORMED_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "malformedCalldataPlan": {"schema": "solcore-lean.malformed-calldata-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": list(runner.ARRAY_SLOTS),
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedDynamicArray", "method": "run", "signature": "run(uint256,uint256[])",
+            "selector": MALFORMED_SELECTOR, "deployPath": ["SynthesizedDynamicArrayDeploy"],
+            "runtimePath": ["SynthesizedDynamicArrayDeploy", "SynthesizedDynamicArray"], "constructorCalldata": "0x"},
+        "transactions": [malformed_tx(index, *row) for index, row in enumerate(rows)]}
+
+
+def selector_word(selector):
+    return "0x" + int(selector, 16).to_bytes(32, "big").hex()
+
+
+def malformed_history(value, path):
+    """Counter rows: a std rejection reverts with its selector, as a Word on
+    original Core and as four bytes on Hull and EVM; odd flags revert."""
+    rows, counter = [], 0
+    for index, tx in enumerate(value["transactions"]):
+        rejection = tx["stdRejection"]
+        reverted = rejection is not None or int(tx["flags"]) % 2 == 1
+        counter += 0 if reverted else 1
+        output = "0x" + f"{index + 3:064x}" if rejection is None else selector_word(rejection) if path == "directCore" else rejection
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned", "output": output,
+               "committedStorage": keyed_slots(value, counter)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.MALFORMED_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": keyed_slots(value), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def malformed_histories(value=None):
+    value = malformed_case() if value is None else value
+    return {path: malformed_history(value, path) for path in runner.PATHS}
+
+
+class MalformedCalldataTests(unittest.TestCase):
+    def test_a_case_records_its_malformation_calldata_and_std_outcome(self):
+        value = malformed_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"]),
+                         ("semantic-malformed-calldata-tool", "rust-hull-keyed-storage-scenario", True, "malformed"))
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [None, runner.STD_NO_SELECTOR, None])
+        self.assertTrue(value["transactions"][2]["calldata"].endswith("ffff"))
+        self.assertIn("compared by its error selector", runner.scope(value))
+        for key, changed in (("calldata", array_calldata(0, (1, 3, 7)) + "00"), ("stdRejection", runner.STD_TRUNCATED),
+                             ("stdRejection", None), ("value", "1"), ("values", ["1", "2", "3", "4"]),
+                             ("malformation", {"kind": "short", "bytes": 4}), ("malformation", {"kind": "selector", "mask": "0"}),
+                             ("malformation", {"kind": "truncate", "kept": 196}), ("malformation", {"kind": "trailing", "count": 65, "pattern": "ones"}),
+                             ("malformation", {"kind": "trailing", "count": 1, "pattern": "twos"}), ("malformation", {"kind": "none", "bytes": 1}),
+                             ("malformation", {"kind": "reorder"})):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][1][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+
+    def test_the_byte_model_follows_std_dispatch_and_decoding(self):
+        """The golden decisions of the Lean model, from the pinned dispatch.sol and std.sol."""
+        canonical = (2, (5, 7))
+        size = 164
+        cases = [({"kind": "none"}, None), ({"kind": "short", "bytes": 0}, runner.STD_NO_SELECTOR),
+                 ({"kind": "short", "bytes": 3}, runner.STD_NO_SELECTOR), ({"kind": "selector", "mask": str(2**31)}, runner.STD_NO_SELECTOR),
+                 ({"kind": "truncate", "kept": 4}, runner.STD_TRUNCATED), ({"kind": "truncate", "kept": 67}, runner.STD_TRUNCATED),
+                 ({"kind": "truncate", "kept": 99}, runner.STD_TRUNCATED), ({"kind": "truncate", "kept": size - 1}, runner.STD_TRUNCATED),
+                 ({"kind": "trailing", "count": 64, "pattern": "ramp"}, None),
+                 ({"kind": "offset", "value": str(size - 3)}, runner.STD_TRUNCATED), ({"kind": "offset", "value": str(size - 35)}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": str(2**255)}, runner.STD_TRUNCATED), ({"kind": "offset", "value": str(2**256 - 4)}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": "0"}, None), ({"kind": "offset", "value": "32"}, runner.STD_TRUNCATED),
+                 ({"kind": "length", "value": "3"}, runner.STD_TRUNCATED), ({"kind": "length", "value": str(2**251)}, runner.STD_TRUNCATED),
+                 ({"kind": "length", "value": str(2**251 + 1)}, runner.STD_TRUNCATED), ({"kind": "length", "value": "1"}, None),
+                 ({"kind": "length", "value": "0"}, None)]
+        for malformation, expected in cases:
+            with self.subTest(malformation=malformation):
+                self.assertEqual(malformed_tx(0, *canonical, malformation)["stdRejection"], expected)
+        head = bytes.fromhex(MALFORMED_SELECTOR[2:])
+        word = lambda value: value.to_bytes(32, "big")
+        # Decode order: dispatch before the head check, the head check before the offset.
+        self.assertEqual(runner.std_rejection((int.from_bytes(head, "big") ^ 1).to_bytes(4, "big") + word(2), MALFORMED_SELECTOR),
+                         runner.STD_NO_SELECTOR)
+        self.assertEqual(runner.std_rejection(head + word(2) + word(2**256 - 4)[:31], MALFORMED_SELECTOR), runner.STD_TRUNCATED)
+        self.assertEqual(runner.std_rejection(head + word(2) + word(64) + word(0), MALFORMED_SELECTOR), None)
+
+    def test_the_selector_rule_compares_a_std_rejection_by_its_selector_only(self):
+        value = malformed_case()
+        result = runner.compare(malformed_histories(value), value)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["selectorRows"], [{"id": "tx-1", "index": 1, "selector": runner.STD_NO_SELECTOR}])
+        # EVM and Hull must revert with exactly the four bytes.
+        for path, output in (("rustEvm", selector_word(runner.STD_NO_SELECTOR)), ("rustEvm", runner.STD_TRUNCATED),
+                             ("importedHull", selector_word(runner.STD_NO_SELECTOR))):
+            observed = malformed_histories(value)
+            observed[path]["transactions"][1]["output"] = output
+            result = runner.compare(observed, value)
+            with self.subTest(path=path, output=output):
+                self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+                self.assertIn("output", result["fields"])
+        # Hull against EVM stays exact even when both differ from original Core alike.
+        observed = malformed_histories(value)
+        for path in ("rustEvm", "importedHull"):
+            observed[path]["transactions"][1]["output"] = runner.STD_TRUNCATED
+        self.assertEqual(runner.compare(observed, value)["category"], "semantic-mismatch")
+        # A prescribed rejection that original Core returns from is compared exactly.
+        observed = malformed_histories(value)
+        observed["directCore"]["transactions"][1]["output"] = "0x" + f"{4:064x}"
+        result = runner.compare(observed, value)
+        self.assertEqual((result["category"], result["selectorRows"]), ("semantic-mismatch", []))
+        # A body revert whose Word equals a selector is accepted by std, so it is
+        # compared exactly: four EVM bytes do not match original Core's Word.
+        body = malformed_case(((1, (3,), {"kind": "none"}),))
+        observed = malformed_histories(body)
+        for path in runner.PATHS:
+            observed[path]["transactions"][0]["output"] = selector_word(runner.STD_TRUNCATED)
+        self.assertEqual(runner.compare(observed, body)["selectorRows"], [])
+        self.assertEqual(runner.compare(observed, body)["category"], "matched")
+        observed["rustEvm"]["transactions"][0]["output"] = runner.STD_TRUNCATED
+        self.assertEqual(runner.compare(observed, body)["category"], "semantic-mismatch")
+        # Other profiles report no selector rows.
+        self.assertNotIn("selectorRows", runner.compare(array_histories(), array_case()))
+
+    def test_a_std_rejection_conforms_only_with_its_exact_selector(self):
+        value = malformed_case()
+        tx = value["transactions"][1]
+        prior = keyed_slots(value, 1)
+        row = {"status": "reverted", "output": runner.STD_NO_SELECTOR, "committedStorage": prior}
+        self.assertTrue(runner.conforms(value, tx, row, prior))
+        self.assertFalse(runner.conforms(value, tx, {**row, "output": selector_word(runner.STD_NO_SELECTOR)}, prior))
+        self.assertFalse(runner.conforms(value, tx, {**row, "status": "returned"}, prior))
+        self.assertFalse(runner.conforms(value, tx, {**row, "committedStorage": keyed_slots(value, 2)}, prior))
+
 if __name__ == "__main__":
     unittest.main()
