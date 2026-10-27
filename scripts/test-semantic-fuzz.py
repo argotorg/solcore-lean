@@ -95,6 +95,7 @@ class FakeSuite:
                                  "seed": str(seed), "findings": entries, "secondaryFindings": [], "command": ["campaign"],
                                  "campaign": {"counts": {"executed": 4, "matched": 4 - len(findings), "errors": len(findings)},
                                               "generation": {"requested": 4, "generatorVersions": [f"{profile}-v2"],
+                                                             "acceptances": ["exclude-boundary-identity-v1"],
                                                              "transactions": 8},
                                               "compilation": {"policy": "fixture", "distinctSources": 2, "compiled": 2,
                                                               "reused": 2}}})
@@ -188,8 +189,9 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual([(call["backend"], call["seed"]) for call in fake.calls], [("sonatina-o0", 102), ("sonatina-o2", 102)])
         self.assertEqual([row["rootSeed"] for row in self.ledger()], ["100", "100", "101", "101", "102", "102"])
         # Seeds replay with the generation fields each profile recorded.
-        self.assertEqual({json.dumps(entry["generation"]) for row in self.ledger() for entry in row["profiles"]},
-                         {json.dumps({"generatorVersions": ["closed-g0-v2"], "transactions": 8})})
+        self.assertEqual({json.dumps(entry["generation"], sort_keys=True) for row in self.ledger() for entry in row["profiles"]},
+                         {json.dumps({"acceptances": ["exclude-boundary-identity-v1"], "generatorVersions": ["closed-g0-v2"],
+                                      "transactions": 8}, sort_keys=True)})
         # So do their shared-compilation counts, without the policy text.
         self.assertEqual({json.dumps(entry["compilation"], sort_keys=True) for row in self.ledger() for entry in row["profiles"]},
                          {json.dumps({"compiled": 2, "distinctSources": 2, "reused": 2}, sort_keys=True)})

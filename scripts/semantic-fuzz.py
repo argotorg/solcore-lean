@@ -51,7 +51,7 @@ PROGRAM_KEYS = ("finalCaseSha256", "finalProgramSha256", "caseSha256", "programS
 RECENT = 20
 MISSING_SUMMARY_LIMIT = 3
 # Campaign generation fields besides the seed that decide what a random case regenerates.
-REPLAY_FIELDS = ("generatorVersions", "inputSelections", "transactions")
+REPLAY_FIELDS = ("generatorVersions", "inputSelections", "acceptances", "transactions")
 # A pure campaign's shared-compilation counts, kept per profile beside them.
 COMPILATION_FIELDS = ("distinctSources", "compiled", "reused")
 CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backend": list(BACKENDS), "profile": None,
