@@ -652,7 +652,7 @@ DELEGATECALL are covered by the same finite nested-child connection.
 | Order | Connection | Required public evidence |
 | --- | --- | --- |
 | 1 | Contract calls | Connect ECRECOVER (1) and P256VERIFY (0x100) through independent affine elliptic-curve semantics, with field arithmetic, Jacobian-formula identities and ladder correctness. Reuse the connected dispatch, Keccak, checkpoint restoration and public resumptions. |
-| 2 | Contract creation | Connect init frames: nonempty init code at the next depth in a deployment context, runtime-code validation, installation of the exact image and failure rollback. Their source rule needs an init-template catalog, which changes the public theorem statements. Also connect existing empty accounts at the address. Refusals, collisions, empty init code, unknown targets and endowment overflow are connected. |
+| 2 | Contract creation | Connect init frames: nonempty init code at the next depth in a deployment context, runtime-code validation, installation of the exact image and failure rollback. The public statements carry the init-template catalog and its connection premise; the init-frame source rule and its proof remain. Also connect public deployment through `finishDeployment` and existing empty accounts at the address. Refusals, collisions, empty init code, unknown targets and endowment overflow are connected. |
 | 3 | Assembly and source revert | Extend the connected Yul fragment (statement lists with `let`, assignment, nested blocks, `if` and `switch`, Yul and Hull word locals and nested calls of `mload`, `msize`, `mstore`, `mstore8`, `return`, `revert`, `add`, `sub`, `lt`, `gt`, `eq` and `iszero`, in Yul's argument order) to `for` with `break` and `continue`, local functions and `leave`, multi-name `let` and assignment, string literals and the other builtins. Hull's string revert is connected through its memory write and termination. |
 | 4 | Object linking | Prove the `datasize` / `dataoffset` substitutions and connect `LinkedContract` preparation to execution. The current code-image theorem starts with supplied images. |
 
@@ -664,29 +664,85 @@ the returned runtime code (24,576 bytes and no 0xef prefix) and install the
 exact image; and roll back accounts, balances and logs to the post-nonce
 checkpoint when the init frame fails, with its revert bytes as return data.
 
-The proof must connect the actual `runInit` and the identification step of
-`CreationImplementation.installWith`, which `HandlerClosure` keeps abstract:
-init-template selection by image comparison over the catalog's init entries,
-the child init frame through the finite-height catalog induction with a
-deployment-context allocation, the child result conversion, and runtime-image
-identification. The checkpoint's restoration is evaluated for the faults after
-the nonce advance (`CreationCorrespondence.restoreCode_evaluates`,
-`protect_failed`, `attempt_restored`), so init-frame failures can reuse it.
-Public deployment also needs the theorems' `deploying = false` premise lifted
-through `finishDeployment`. Creation over an existing empty account needs
-catalog links for empty bytes excluded at the address, or installation to keep
-their identity.
+The proof must connect the actual `runInit`, which is a local definition of
+`AccountRuntime.objectHandlers`, and the identification step of
+`CreationImplementation.installWith`; `HandlerClosure` keeps both abstract.
+The pieces, in the order the dispatcher runs them:
 
-Init frames cannot be connected under the current public theorem statements.
-The call-mode and root-reentry theorems fix the source effects to
+- init-template selection: `runInit` compares the init bytes with each
+  definition of `initDefinitions catalog` through
+  `ImageComparison.compareBytes` with a suffix allowed, takes identity
+  `index + 2` for the first match, and fails with 16 when no template or a
+  second template matches. `compareBytes` is a one-pass bitmap comparison over
+  the packed memory mapping with no evaluation lemma yet;
+- the child init frame: the selected compiled closure runs through `invoke` at
+  the next depth with the packet `[target, creator, value, false, depth, gas,
+  empty calldata, 0]` and the init code as code. The existing
+  `ModeChildCatalogExecutionCorrespondence.FrameExecution` already concludes
+  with exactly this `invoke` shape, so the init frame can reuse the
+  finite-height catalog induction once the creation cases of
+  `external_preserves` take an init-frame callback, as CALL takes
+  `callbacks`. `invoke` receives the copied init entries, while
+  `FrameExecution` expects `Memory.packBytes` of the code bytes, so the two
+  representations need a bridge;
+- the child result: `AccountRuntime.childResult` converts the init frame's
+  exit, and `FrameExecution` already relates it to the source response;
+- validation: the deployment reads the returned size and the first byte of the
+  returned memory snapshot (24,576 bytes and no 0xef prefix); oversized or
+  0xef-prefixed code and a reverting init frame roll back through `restore`
+  without the fault path of `protect`;
+- installation: `installWith` identifies the returned bytes by an exact
+  `compareBytes` against the root and non-init images, takes the first match,
+  and fails with 16 for bytes that are not an image; the source rule therefore
+  installs only bytes in the catalog's `runtimes`.
+
+The checkpoint's restoration is evaluated for the faults after the nonce
+advance (`CreationCorrespondence.restoreCode_evaluates`, `protect_failed`,
+`attempt_restored`), so init-frame failures can reuse it, with the init frame's
+revert bytes published as return data instead of the empty data that
+`invoke_admitted` fixes today. Nested init frames run through `invoke`, not
+through `objectFrame`, so `finishDeployment` is not on their path: lifting the
+theorems' `deploying = false` premise through `finishDeployment` concerns
+public deployment transactions, whose root frame runs init code, and is a
+separate piece. Creation over an existing empty account needs catalog links
+for empty bytes excluded at the address, or installation to keep their
+identity.
+
+The public theorems carry an init-template catalog. The call-mode and
+root-reentry theorems fixed the source effects to
 `ChildFrameModeSemantics.effectsAt sourceCatalog (height + 1) image`, whose
-catalog is keyed by account address, and their catalog connections relate its
-entries only to the root code or to compiled runtime definitions with code
-anchors. The actual `runInit` selects an init template by comparing the init
-bytes with the catalog's `isInit` definitions, which no source entry or
-premise describes. The source rule therefore needs an init-template catalog
-keyed by init bytes, and the public theorems need a premise connecting its
-entries to the compiled `isInit` definitions.
+catalog is keyed by account address, while the actual `runInit` selects an init
+template by comparing the init bytes with the catalog's `isInit` definitions,
+which no source entry or premise described. `ChildFrameSemantics.InitCatalog`
+now holds init templates, source codes keyed by the bytes that begin an init
+code, and the runtime images a deployment may install, and `effectsAt` takes it
+as its second argument. Exactly these changes were made to the public
+statements, the same in `compileObject_preserves` and
+`compileObject_resumes_exact` of `ContractCallModeCorrespondence` and of
+`ContractRootCallCorrespondence`:
+
+- a new implicit argument `initCatalog : ChildFrameSemantics.InitCatalog`;
+- in the premise `evaluated`, the source effects
+  `ChildFrameModeSemantics.effectsAt sourceCatalog initCatalog (height + 1) image`
+  (root reentry: `(some rootBytes)` for `image`) in place of
+  `ChildFrameModeSemantics.effectsAt sourceCatalog (height + 1) image`;
+- a new explicit premise after `connection`:
+  `initConnection : InitCatalogCorrespondence.InitCatalogConnection initCatalog image catalog`
+  (root reentry: `(some rootBytes)` for `image`).
+
+`InitCatalogConnection` states that the templates are the compiled init
+definitions in catalog order (`initDefinitions catalog`, the list that the
+actual `runInit` filters), each with the same program, object and init bytes
+and with executable functions; that every runtime image is one the actual
+installation identifies (`runtimeImages image catalog`: the root image and the
+catalog entries that are not init definitions); and that
+`catalog.length + 2 < wordModulus`, so the entry identities `index + 2` are
+distinct words. No other premise, argument or conclusion changed. No source
+rule reads the catalog yet, so the theorems still say nothing about a run that
+reaches an init frame. Every existing consumer passes the empty catalog `{}`,
+discharges the new premise with `InitCatalogConnection.empty` (its catalog has
+no init definitions and is small), and builds its source derivation against
+`effectsAt sourceCatalog {} height image`; none was removed or weakened.
 
 Larger Yul fragments keep the same public statements and the same assembly
 obligation, and the public `YulLowering` builders admit the same induction.
