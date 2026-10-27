@@ -122,7 +122,7 @@ inductive Builtin (children : State → AccountCallSemantics.Children) (image : 
 def effectsWith (children : State → AccountCallSemantics.Children) (image : Option (List UInt8)) :
     Semantics.ExternalSemantics State where
   builtin := Builtin children image
-  assembly := YulSemantics.Assembled YulSemantics.Executed
+  assembly := YulSemantics.Assembled
   revert := RevertSemantics.Reverted
 
 def effects (image : Option (List UInt8)) : Semantics.ExternalSemantics State :=

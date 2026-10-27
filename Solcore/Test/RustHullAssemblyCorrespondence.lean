@@ -67,27 +67,35 @@ private theorem write_source (object : Contract.CompiledObject) (scenario : Scen
     Semantics.EvalStmt (functions scenario) effects [] (writing scenario) (initial object) .fallthrough
       (written object scenario) := by
   cases scenario
-  · exact .assembly rfl ⟨_, .call (firstWord := w 0) (secondWord := w 42) (result := .value .unit)
-      (by decide +kernel) (by decide +kernel) .mstore, rfl⟩
-  · exact .assembly rfl ⟨_, .call (firstWord := w 31) (secondWord := w 255) (result := .value .unit)
-      (by decide +kernel) (by decide +kernel) .mstore8, rfl⟩
-  · exact .assembly rfl ⟨_, .call (firstWord := w 0) (secondWord := w 7) (result := .value .unit)
-      (by decide +kernel) (by decide +kernel) .mstore, rfl⟩
-  · exact .assembly rfl ⟨_, .call (firstWord := w 0) (secondWord := w 1) (result := .value .unit)
-      (by decide +kernel) (by decide +kernel) .mstore, rfl⟩
+  · exact .assembly rfl (YulSemantics.Run.expression (YulSemantics.Eval.call
+      (.cons (.literal (word := w 42) (by decide +kernel)) (.cons (.literal (word := w 0) (by decide +kernel)) .nil))
+      .mstore) .nil)
+  · exact .assembly rfl (YulSemantics.Run.expression (YulSemantics.Eval.call
+      (.cons (.literal (word := w 255) (by decide +kernel)) (.cons (.literal (word := w 31) (by decide +kernel)) .nil))
+      .mstore8) .nil)
+  · exact .assembly rfl (YulSemantics.Run.expression (YulSemantics.Eval.call
+      (.cons (.literal (word := w 7) (by decide +kernel)) (.cons (.literal (word := w 0) (by decide +kernel)) .nil))
+      .mstore) .nil)
+  · exact .assembly rfl (YulSemantics.Run.expression (YulSemantics.Eval.call
+      (.cons (.literal (word := w 1) (by decide +kernel)) (.cons (.literal (word := w 0) (by decide +kernel)) .nil))
+      .mstore) .nil)
 
 private theorem exit_source (object : Contract.CompiledObject) (scenario : Scenario) :
     Semantics.EvalStmt (functions scenario) effects [] (ending scenario) (written object scenario)
       (.fault (.language Core.Word.maximum)) (finalState object scenario) := by
   cases scenario
-  · exact .assembly rfl ⟨_, .call (firstWord := w 0) (secondWord := w 32)
-      (result := .fault (.language Core.Word.maximum)) (by decide +kernel) (by decide +kernel) .returned, rfl⟩
-  · exact .assembly rfl ⟨_, .call (firstWord := w 0) (secondWord := w 32)
-      (result := .fault (.language Core.Word.maximum)) (by decide +kernel) (by decide +kernel) .returned, rfl⟩
-  · exact .assembly rfl ⟨_, .call (firstWord := w 31) (secondWord := w 1)
-      (result := .fault (.language Core.Word.maximum)) (by decide +kernel) (by decide +kernel) .reverted, rfl⟩
-  · exact .assembly rfl ⟨_, .call (firstWord := w 31) (secondWord := w 1)
-      (result := .fault (.language Core.Word.maximum)) (by decide +kernel) (by decide +kernel) .returned, rfl⟩
+  · exact .assembly rfl (YulSemantics.Run.expressionFault (YulSemantics.Eval.call
+      (.cons (.literal (word := w 32) (by decide +kernel)) (.cons (.literal (word := w 0) (by decide +kernel)) .nil))
+      .returned))
+  · exact .assembly rfl (YulSemantics.Run.expressionFault (YulSemantics.Eval.call
+      (.cons (.literal (word := w 32) (by decide +kernel)) (.cons (.literal (word := w 0) (by decide +kernel)) .nil))
+      .returned))
+  · exact .assembly rfl (YulSemantics.Run.expressionFault (YulSemantics.Eval.call
+      (.cons (.literal (word := w 1) (by decide +kernel)) (.cons (.literal (word := w 31) (by decide +kernel)) .nil))
+      .reverted))
+  · exact .assembly rfl (YulSemantics.Run.expressionFault (YulSemantics.Eval.call
+      (.cons (.literal (word := w 1) (by decide +kernel)) (.cons (.literal (word := w 31) (by decide +kernel)) .nil))
+      .returned))
 
 theorem source (object : Contract.CompiledObject) (scenario : Scenario) :
     Semantics.EvalFunction (functions scenario) effects (AccountRuntime.frameFunction (code scenario)) []
@@ -112,8 +120,12 @@ theorem eligible (scenario : Scenario) {supported : String → Prop}
   all_goals
     cases scenario
     all_goals
-      simp only [writing, ending, block, ExecutableStatement, YulFragment.Eligible]
-      exact available _ (by simp [usedNames])
+      simp only [writing, ending, block, number, ExecutableStatement]
+      refine ⟨⟨"mstore", available "mstore" (by simp [usedNames])⟩, ?_⟩
+      intro statement member
+      simp only [List.mem_singleton] at member
+      subst member
+      exact .expression (.call (available _ (by simp [usedNames])) (.cons .literal (.cons .literal .nil)))
 
 private theorem names_supported : ∀ name ∈ usedNames, ContractCallModeCorrespondence.supported true name := by
   intro name member

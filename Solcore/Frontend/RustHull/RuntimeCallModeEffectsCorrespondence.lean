@@ -179,19 +179,9 @@ theorem assembly_preserves (layout : Layout) (baseline : Nat → Option Core.Val
     (anchors : Anchors) (context : Context layout)
     (children : RuntimeCallEffectsSemantics.State → AccountCallSemantics.Children) :
     AssemblyPreservation (supported slots withCode) (model layout baseline slots image handlers anchors context) slots
-      (RuntimeCallModeSemantics.effectsWith children image) := by
-  intro functions sourceEnvironment body initial control final _ assembled signatures codes locations captured span
-  intro fuel scope result loops expression compiled covered world mapping environment store _ _ runtime heap installed
-  obtain ⟨external, executed, rfl⟩ := assembled
-  cases fuel with
-  | zero => simp [lowerStatement, fail] at compiled
-  | succ fuel =>
-      simp only [lowerStatement] at compiled
-      obtain ⟨target, finalStore, related, evaluated, finalRelated, closures⟩ :=
-        YulBuiltinCorrespondence.preserves passive memoryMember memorySizeMember exitMember offsetMember sizeMember
-          executed compiled runtime heap
-      exact ⟨[], target, finalStore, related, evaluated, by rw [List.append_nil]; exact finalRelated,
-        installed.preserved closures, closures⟩
+      (RuntimeCallModeSemantics.effectsWith children image) :=
+  YulBlockCorrespondence.assembly_preserves (fun executed => executed)
+    (YulBuiltinCorrespondence.step passive memoryMember memorySizeMember exitMember offsetMember sizeMember)
 
 theorem assemble_program (layout : Layout) (baseline : Nat → Option Core.Value)
     (slots : List EffectSlot) (image : Option (List UInt8)) (withCode : Bool) (handlers : ModeHandlers layout)
