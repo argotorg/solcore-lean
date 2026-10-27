@@ -2785,6 +2785,34 @@ as given. So neither the shared runtime nor its proofs change.
   names, calldata that is neither canonical nor a missing selector, and return
   values other than one Word.
 
+Before any random run, the golden dispatch cases passed on both models. The
+first frozen matrices, on `8afe68715`, all matched. Their coverage counts
+showed that the generator bounded each target choice to nine values before
+reducing it mod `2n + 1`. With two or three methods the missing selector came
+one time in nine, and with three the third method was called two thirds as
+often as the others. `1e4786c79` draws the choice below `2n + 1`, as defined.
+With scripts and native tools frozen on `1e4786c79`:
+- Fixed corpora on O0 and O2: the sixteen other stateful ones still pass with
+  206 scenarios and 568 prefixes per level. The new one matched its 12
+  scenarios and 33 prefixes with complete coverage:
+  - three contracts of two methods, five of three and four of four, four in
+    each selector order, with calls at every method position;
+  - its 5 missing-selector transactions reverted on Hull and EVM with exactly
+    `0x4924aef0`;
+  - its 28 method calls, 11 of them reverting on an odd input, matched
+    exactly.
+- Random suites of sixteen eight-transaction cases (seed 20261031) at 448 and
+  512 nodes matched 16 scenarios and 128 prefixes on each level, every case
+  on revision three with its mask:
+  - two contracts of two methods, seven of three and seven of four, twelve of
+    them with mixed selectors;
+  - the two budgets draw the same contracts and transactions, and a step
+    differs in all 16 cases, 47 of the 53 method steps;
+  - 19 rows were compared by selector, and 109 method calls were accepted,
+    43 of them reverting on an odd input;
+  - no seed was excluded.
+- A case took about seven seconds. There was no finding.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

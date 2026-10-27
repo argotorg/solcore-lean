@@ -3946,6 +3946,20 @@ arithmetic. Required coverage:
 - one to three helpers and transactions, all four templates, both outcomes
   and ten completion patterns.
 
+Local validation used committed code with frozen scripts and native tools. The
+fixed suite matched all twelve scenarios and 33 prefixes on Sonatina O0 and
+O2 with complete coverage. Its five missing-selector transactions reverted on
+Hull and EVM with exactly `0x4924aef0`, and its 28 method calls, eleven of
+them reverting on an odd input, matched exactly. The sixteen other stateful
+corpora kept their 206 scenarios and 568 prefixes. Random suites of sixteen
+eight-transaction cases (seed `20261031`) matched all 16 scenarios and 128
+prefixes on both levels, at 448 nodes and at 512. They drew two methods in two
+cases, three in seven and four in seven, and twelve contracts had mixed
+selectors. Both budgets draw the same contracts and transactions, and a step
+differs in every case. 19 rows were compared by selector, 109 method calls
+were accepted, and no seed was excluded. A case took about seven seconds.
+Neither run produced a finding.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twelve
