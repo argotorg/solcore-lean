@@ -74,6 +74,8 @@ KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-keccak-loop-case.v1"
 KECCAK_LOOP_HISTORY_SCHEMA = "solcore-lean.keccak-loop-history.v1"
 ASSEMBLY_LOOP_CASE_SCHEMA = "solcore-lean.semantic-assembly-storage-loop-case.v1"
 ASSEMBLY_KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-assembly-keccak-loop-case.v1"
+ADT_CASE_SCHEMA = "solcore-lean.semantic-adt-storage-case.v1"
+ADT_HISTORY_SCHEMA = "solcore-lean.adt-storage-history.v1"
 TUPLE_CASE_SCHEMA = "solcore-lean.semantic-tuple-return-case.v1"
 TUPLE_HISTORY_SCHEMA = "solcore-lean.tuple-return-history.v1"
 BYTES_RETURN_CASE_SCHEMA = "solcore-lean.semantic-bytes-return-case.v1"
@@ -251,6 +253,17 @@ PROFILES = {
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "keccak-loops", "logs": True, "forms": ("split", "carried", "pipelined"),
         "shrinkBatch": 16},
+    # User-defined enum and struct values in contract fields and behind mapping
+    # keys through std.StorageGeneric. Each case records its type shape, methods
+    # and keys, and its observed slots follow from the layout. A case reaches
+    # about 200 KB, so a native shrink response carries at most 16 candidates.
+    "stateful-adt-storage": {"caseSchema": ADT_CASE_SCHEMA, "planSchema": "solcore-lean.adt-storage-plan.v1",
+        "planKey": "adtStoragePlan", "corpusSchema": "solcore-lean.semantic-adt-storage-corpus.v1",
+        "originKind": "adt-storage-generated", "contract": "SynthesizedAdtStorage",
+        "caseTool": "semantic-adt-storage-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ADT_HISTORY_SCHEMA,
+        "signature": None, "selector": None, "rollback": True, "keyed": False,
+        "declared": True, "abi": "adts", "shrinkBatch": 16},
     # One method that returns a static tuple of two to four Words; every path's
     # whole return data is compared. A case reaches about 60 KB, so a native
     # shrink response carries at most 32 candidates.
@@ -339,6 +352,23 @@ SELECTOR_ORDERS = ("ascending", "descending", "mixed")
 # iteration total, slot 2 + i iteration i's result; plans admit these masks.
 LOOP_SLOTS = [str(slot) for slot in range(9)]
 LOOP_MASKS = (0, 1, 3, 7)
+# The enum and struct storage profile: an enum of two to four variants, each
+# with zero to three Words or one two-Word struct, in at most four slots; a
+# record of two Words and the enum at a drawn position; the methods in
+# declaration order with their parameters; the odd multiplier of written Words
+# and digests; the key bases generation draws, the last wrapping to zero.
+ADT_PAYLOAD_WIDTHS = {"words0": 0, "words1": 1, "words2": 2, "words3": 3, "pair": 2}
+ADT_MIN_VARIANTS, ADT_MAX_VARIANTS, ADT_MAX_CHOICE_SLOTS, ADT_RECORD_FIELDS = 2, 4, 4, 3
+ADT_WORD_TYPES = ("word", "uint256")
+ADT_METHODS = {
+    "putChoice": ("flags", "variant", "input"), "putChoiceAt": ("flags", "key", "variant", "input"),
+    "clearChoice": ("flags", "input"), "clearChoiceAt": ("flags", "key", "input"),
+    "getChoice": ("flags",), "getChoiceAt": ("flags", "key"),
+    "putRecord": ("flags", "variant", "input"), "putRecordAt": ("flags", "key", "variant", "input"),
+    "setRecord": ("flags", "field", "variant", "input"), "setRecordAt": ("flags", "key", "field", "variant", "input"),
+    "getRecord": ("flags",), "getRecordAt": ("flags", "key")}
+ADT_MULTIPLIER = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95
+ADT_KEY_BASES = (0, 1, 3, 2**255, 2**256 - 1)
 # The tuple-return profile: slot 0 the accumulator, slot 1 the committed call
 # count, slot 2 the last committed input; plans return two to four Words.
 TUPLE_SLOTS = [str(slot) for slot in range(3)]
@@ -390,6 +420,9 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
     if profile(case)["abi"] == "keccak-loops":
         # Odd flags revert after every logged iteration.
+        return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
+    if profile(case)["abi"] == "adts":
+        # Odd flags revert after the writes.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     if profile(case)["abi"] == "bytes-returns":
         # Odd flags revert after the writes.
@@ -458,6 +491,200 @@ def keccak_loop_fields(case: dict, transaction: dict, row: dict, prior: list[dic
         if after != expected:
             fields.append("committedStorage")
     if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + len(keys)) % 2**256:
+        fields.append("output")
+    return fields
+
+
+def has_adts(case: dict) -> bool:
+    return profile(case)["abi"] == "adts"
+
+
+def adt_choice_size(widths: list[int]) -> int:
+    """A right-nested sum's slots: one tag and the larger of its first variant
+    and the sum of the rest; a single variant has no tag."""
+    if len(widths) == 1:
+        return widths[0]
+    return 1 + max(widths[0], adt_choice_size(widths[1:]))
+
+
+def adt_shape(case: dict) -> dict:
+    """The plan's validated shape: payload widths, the clear variant, the enum
+    and record sizes, the record's field offsets and the field slots."""
+    shape = case.get("adtStoragePlan", {}).get("shape")
+    if not isinstance(shape, dict) or set(shape) != {"variants", "position", "wordType"} or \
+            not isinstance(shape["variants"], list) or any(name not in ADT_PAYLOAD_WIDTHS for name in shape["variants"]):
+        raise ValueError("an enum and struct storage plan records its variants, enum position and Word type")
+    widths = [ADT_PAYLOAD_WIDTHS[name] for name in shape["variants"]]
+    if not ADT_MIN_VARIANTS <= len(widths) <= ADT_MAX_VARIANTS or "words0" not in shape["variants"] or \
+            adt_choice_size(widths) > ADT_MAX_CHOICE_SLOTS or type(shape["position"]) is not int or \
+            shape["position"] not in range(ADT_RECORD_FIELDS) or shape["wordType"] not in ADT_WORD_TYPES:
+        raise ValueError("a shape has two to four variants, one payload-free, at most four enum slots, the enum at "
+                         "record position 0, 1 or 2 and a Word type")
+    choice = adt_choice_size(widths)
+    sizes = [choice if field == shape["position"] else 1 for field in range(ADT_RECORD_FIELDS)]
+    offsets = [sum(sizes[:field]) for field in range(ADT_RECORD_FIELDS)]
+    record = sum(sizes)
+    return {"widths": widths, "position": shape["position"], "clear": shape["variants"].index("words0"),
+            "choiceSlots": choice, "recordSlots": record, "fieldOffsets": offsets,
+            "choiceSlot": 1, "recordSlot": 1 + choice, "choicesSlot": 1 + choice + record, "recordsSlot": 2 + choice + record}
+
+
+def adt_layout(case: dict) -> dict:
+    """The layout a case's contract metadata records, recomputed from its shape."""
+    shape = adt_shape(case)
+    return {"accumulatorSlot": 0, "choiceSlot": shape["choiceSlot"], "choiceSlots": shape["choiceSlots"],
+            "recordSlot": shape["recordSlot"], "recordSlots": shape["recordSlots"], "fieldOffsets": shape["fieldOffsets"],
+            "choicesSlot": shape["choicesSlot"], "recordsSlot": shape["recordsSlot"], "clearVariant": shape["clear"]}
+
+
+def adt_entry(base: int, key: int) -> int:
+    """The pinned std's first slot of `m[key]` for a mapping at slot `base`."""
+    return int.from_bytes(keccak256(base.to_bytes(32, "big") + (key % 2**256).to_bytes(32, "big")), "big")
+
+
+def adt_keys(case: dict) -> list[int]:
+    base = int(common.word(case.get("adtStoragePlan", {}).get("keyBase"), "key base"))
+    return [base, (base + 1) % 2**256]
+
+
+def adt_slots(case: dict) -> list[str]:
+    """Every slot the protocol writes, stale payload slots included: the
+    accumulator, the enum and record fields' slots, and at both keys the entry
+    slots of both mappings, in increasing numeric order."""
+    shape = adt_shape(case)
+    values = {0} | {shape["choiceSlot"] + offset for offset in range(shape["choiceSlots"])} | \
+        {shape["recordSlot"] + offset for offset in range(shape["recordSlots"])}
+    for key in adt_keys(case):
+        values |= {(adt_entry(shape["choicesSlot"], key) + offset) % 2**256 for offset in range(shape["choiceSlots"])}
+        values |= {(adt_entry(shape["recordsSlot"], key) + offset) % 2**256 for offset in range(shape["recordSlots"])}
+    return [str(value) for value in sorted(values)]
+
+
+def adt_contract(case: dict) -> None:
+    """The contract metadata: the plan's methods in declaration order with their
+    signatures, selectors and parameters, and the layout of its shape."""
+    plan, name = case.get("adtStoragePlan"), profile(case)["contract"]
+    methods = plan.get("methods") if isinstance(plan, dict) else None
+    if not isinstance(methods, list) or not methods or methods != [method for method in ADT_METHODS if method in methods]:
+        raise ValueError("an enum and struct storage plan declares one to twelve methods in declaration order")
+    rows = [{"name": method, "signature": method_signature(method, len(ADT_METHODS[method])),
+             "selector": method_selector(method_signature(method, len(ADT_METHODS[method]))),
+             "parameters": list(ADT_METHODS[method])} for method in methods]
+    expected = {"name": name, "methods": rows, "layout": adt_layout(case), "deployPath": [name + "Deploy"],
+                "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x"}
+    if case.get("contract") != expected:
+        raise Finding("unsupported-scope", "input", "enum and struct storage contract metadata differs from its plan")
+
+
+def adt_arguments(case: dict, tx: dict) -> list[int]:
+    """A transaction's argument Words in its method's parameter order, each
+    within the case: a key of the two, a field below three, a variant of the
+    shape; it carries exactly its method's parameters."""
+    method = tx.get("method")
+    if method not in case["adtStoragePlan"]["methods"]:
+        raise ValueError("an enum and struct storage transaction calls a declared method")
+    parameters = ADT_METHODS[method]
+    if set(tx) != {"id", "method", "calldata", "value", *parameters}:
+        raise ValueError("an enum and struct storage transaction carries exactly its method's arguments")
+    words = []
+    for parameter in parameters:
+        if parameter in ("field", "variant"):
+            value = tx[parameter]
+            bound = ADT_RECORD_FIELDS if parameter == "field" else len(adt_shape(case)["widths"])
+            if type(value) is not int or not 0 <= value < bound:
+                raise ValueError(f"transaction {parameter} lies outside the case")
+        else:
+            value = int(common.word(tx[parameter], "transaction " + parameter))
+            if parameter == "key" and value not in adt_keys(case):
+                raise ValueError("transaction key is not one of the case's two keys")
+        words.append(value)
+    return words
+
+
+def adt_write_choice(state: dict, shape: dict, first: int, origin: int, variant: int, result: int) -> None:
+    """Variant `variant` written at `first`: tag one at its outer levels, zero
+    at its own unless it is the last, then each payload Word at offset `o` from
+    the written value's first slot `origin` slots before as `result + o·K`."""
+    count = len(shape["widths"])
+    for level in range(min(variant, count - 1)):
+        state[(first + level) % 2**256] = 1
+    if variant + 1 < count:
+        state[(first + variant) % 2**256] = 0
+    payload = variant + 1 if variant + 1 < count else count - 1
+    for index in range(shape["widths"][variant]):
+        state[(first + payload + index) % 2**256] = (result + (origin + payload + index) * ADT_MULTIPLIER) % 2**256
+
+
+def adt_read_choice(state: dict, shape: dict, first: int) -> list[int]:
+    """The decoded variant index and payload Words: the outermost zero tag
+    selects its level's variant, past every level the last."""
+    count = len(shape["widths"])
+    for level in range(count - 1):
+        if state.get((first + level) % 2**256, 0) == 0:
+            return [level] + [state.get((first + level + 1 + index) % 2**256, 0) for index in range(shape["widths"][level])]
+    return [count - 1] + [state.get((first + count - 1 + index) % 2**256, 0) for index in range(shape["widths"][count - 1])]
+
+
+def adt_digest(tokens: list[int]) -> int:
+    value = 0
+    for token in tokens:
+        value = (value * ADT_MULTIPLIER + token) % 2**256
+    return value
+
+
+def adt_effect(case: dict, tx: dict, state: dict, result: int | None) -> int:
+    """Apply one returned transaction to `state`, a map from observed slot to
+    Word: a write stores its value with the step result `result` (the row's
+    output), a read decodes. Returns the result the protocol fixes; a write's
+    is the output itself."""
+    shape = adt_shape(case)
+    method = tx["method"]
+    keyed, record = method.endswith("At"), "Record" in method
+    if keyed:
+        first = adt_entry(shape["recordsSlot" if record else "choicesSlot"], int(common.word(tx["key"], "transaction key")))
+    else:
+        first = shape["recordSlot" if record else "choiceSlot"]
+    if method.startswith("get"):
+        if record:
+            tokens = []
+            for field, offset in enumerate(shape["fieldOffsets"]):
+                slot = (first + offset) % 2**256
+                tokens += adt_read_choice(state, shape, slot) if field == shape["position"] else [state.get(slot, 0)]
+        else:
+            tokens = adt_read_choice(state, shape, first)
+        result = adt_digest(tokens)
+    elif method.startswith("clear"):
+        adt_write_choice(state, shape, first, 0, shape["clear"], result)
+    elif not record:
+        adt_write_choice(state, shape, first, 0, tx["variant"], result)
+    else:
+        fields = [tx["field"]] if method.startswith("set") else range(ADT_RECORD_FIELDS)
+        for field in fields:
+            offset = shape["fieldOffsets"][field]
+            if field == shape["position"]:
+                adt_write_choice(state, shape, (first + offset) % 2**256, offset, tx["variant"], result)
+            else:
+                state[(first + offset) % 2**256] = (result + offset * ADT_MULTIPLIER) % 2**256
+    state[0] = result
+    return result
+
+
+def adt_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the layout protocol, from an
+    independent model of the layout over the prior observed slots: a write's
+    tags and payload Words `r + o·K` with `r` its output, a read's digest of the
+    decoded Words as its output, the accumulator, and every other observed
+    slot unchanged. A revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    output = int.from_bytes(common.hex_bytes(row["output"], "output"), "big")
+    state = {int(entry["slot"]): int(entry["value"]) for entry in prior}
+    expected = adt_effect(case, transaction, state, output)
+    after = {int(entry["slot"]): int(entry["value"]) for entry in row["committedStorage"]}
+    fields = []
+    if after != {slot: state[slot] for slot in after} or set(state) != set(after):
+        fields.append("committedStorage")
+    if output != expected:
         fields.append("output")
     return fields
 
@@ -819,6 +1046,12 @@ def declared_scope(case: dict) -> str:
                 "addressed key's keccak256(1 ++ key) slot and ordered committed logs (address, topics, data) on all "
                 "paths, the EVM chain's complete log list, and no nonzero undeclared slot on Hull/EVM; no "
                 "gas/balance/nonce or memory equivalence")
+    if has_adts(case):
+        return ("ordered zero-value calls of one contract's declared methods that write, clear, read and update one "
+                "field of user-defined enum and struct values in contract fields and behind two keys of two mappings, "
+                "through std.StorageGeneric; initially empty storage; committed values at the accumulator, the enum and "
+                "record fields' slots and both keys' entry slots of both mappings, stale payload slots included, on all "
+                "paths and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
     if has_bytes_returns(case):
         return ("ordered zero-value run(uint256,uint256,uint256) transactions that return a bytes value of the "
                 "transaction's zero to 64 bytes of two Words, the step result and slot 1 after its write times an odd "
@@ -1365,6 +1598,13 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its three original Words")
             continue
+        if selected["abi"] == "adts":
+            parameters = ADT_METHODS.get(tx.get("method"), ())
+            calldata = method_selector(method_signature(tx.get("method"), len(parameters))) + \
+                "".join(f"{word:064x}" for word in adt_arguments(case, tx))
+            if tx.get("calldata") != calldata or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its method call")
+            continue
         if selected["abi"] == "keccak-loops":
             if type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx):
                 raise ValueError("transaction iterations differ from its input under the loop mask")
@@ -1422,6 +1662,11 @@ def validate_case(case) -> None:
         validate_transactions(case, selected)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != keccak_loop_slots(case):
             raise Finding("unsupported-scope", "input", "Keccak-loop profile starts empty and observes slot zero and every addressed entry slot")
+    elif selected["abi"] == "adts":
+        validate_transactions(case, selected)
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != adt_slots(case):
+            raise Finding("unsupported-scope", "input", "enum and struct storage profile starts empty and observes "
+                          "the accumulator, the enum and record fields and both keys' entry slots of both mappings")
     elif selected["abi"] == "tuples":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != TUPLE_SLOTS:
             raise Finding("unsupported-scope", "input", "tuple-return profile starts empty and observes slots zero through two")
@@ -1470,6 +1715,8 @@ def validate_case(case) -> None:
         "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x"}
     if selected["abi"] == "methods":
         contract_methods(case)
+    elif selected["abi"] == "adts":
+        adt_contract(case)
     elif contract != expected:
         raise Finding("unsupported-scope", "input", "storage wrapper differs from the fixed profile")
     provenance = case.get("provenance")
@@ -1691,6 +1938,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
         return False
     if has_keccak_loops(case) and keccak_loop_fields(case, tx, row, prior):
         return False
+    if has_adts(case) and adt_fields(case, tx, row, prior):
+        return False
     if has_tuples(case) and tuple_fields(case, tx, row, prior):
         return False
     if has_bytes_returns(case) and bytes_return_fields(case, tx, row, prior):
@@ -1849,6 +2098,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
             # A returned row follows the Keccak-loop protocol, its logs included;
             # a revert is already covered by rollback and the log shapes.
             broken = sorted({field for name, row in rows.items() for field in keccak_loop_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_adts(case):
+            # A returned row follows the layout protocol; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in adt_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken

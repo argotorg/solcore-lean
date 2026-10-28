@@ -4963,6 +4963,125 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare enum and struct values in storage
+
+Every other stateful program stores Words, std pairs and std sums. The
+`stateful-adt-storage` profile stores user-defined `enum` and `struct` values
+in contract fields and behind mapping keys, laid out by `std.StorageGeneric`,
+and reads them back with `match`. Its original Core reference computes the
+layout itself, as slot arithmetic over the declared base slots and the
+mapping's Keccak closure with tags and payloads as Words, independent of
+std's layout code. The [roadmap](../docs/design/next-implementation-roadmap.md)
+fixes the definitions.
+
+### Definitions
+
+- **Types:** each case declares `enum ScChoice` with two to four variants,
+  each with zero to three Word fields or one `struct ScPair { a; b; }`, at
+  least one payload-free and in at most four slots, and
+  `struct ScRecord { f0; f1; f2; }` with the enum at a drawn position and
+  Words elsewhere. One Word type, `word` or `uint256`, serves every Word
+  field.
+- **Layout:** a sum takes one tag slot and the larger of its first variant and
+  the sum of the rest, so variant `i` of `n` writes tag one at its `i` outer
+  levels, tag zero at its own level unless it is the last, and its payload
+  after them. A record's fields follow each other. A payload-free write leaves
+  every payload slot as it was.
+- **Contract:** `SynthesizedAdtStorage` has `acc: word` at slot 0,
+  `choice: ScChoice`, `record: ScRecord`,
+  `choices: mapping(word => ScChoice)` and
+  `records: mapping(word => ScRecord)`, and declares the methods its
+  transactions call, in this order: `putChoice`, `putChoiceAt`, `clearChoice`,
+  `clearChoiceAt`, `getChoice`, `getChoiceAt`, `putRecord`, `putRecordAt`,
+  `setRecord`, `setRecordAt`, `getRecord` and `getRecordAt`. The keyed ones
+  take one of the case's two keys, `B` and `B + 1`.
+- **Protocol:**
+  - a write computes `r = step(input + acc)` and writes its value, each
+    payload Word at offset `o` from the written value's first slot holding
+    `r + o·K`;
+  - a clear writes the first payload-free variant;
+  - `record.f = v` updates one field, and a mapping entry's update matches the
+    entry and writes a whole record, since the pinned front end rejects
+    `records[k].f = v` (`SC0201`);
+  - a read returns the digest of the decoded variant index and payload Words,
+    with the record's other fields in field order, by Horner's rule with `K`;
+  - every method keeps its result in `acc`, and odd flags revert after the
+    writes.
+- **Original Core** (`core-adt-storage-contract-v1`): std's dispatch and head
+  checks as in `stateful-methods`, the mapping profile's Keccak closure, and
+  two closures that store and load an enum value at a base slot.
+- **Budget:** the 52-node shell lies inside the default 384 nodes; the
+  Keccak closure, the enum closures and the methods lie outside it, and
+  contracts are bounded by 4,429 nodes.
+- **Observations:** status, output, and the observed slots: the accumulator,
+  the enum and record fields' slots and, at both keys, the entry slots of
+  both mappings. That is at most 31 slots, stale payload slots included,
+  within the declared-slot runner's 32. The whole committed storage is
+  compared on every path.
+- **Protocol check:** an independent Python model of the layout predicts
+  every observed slot of each returned row from the prior row and its output.
+- **Reductions:** transactions, then uncalled methods, then the shape
+  (removing an unnamed variant, narrowing a payload, `uint256` to `word`),
+  then the step, then argument values.
+
+### Running and validation
+
+```sh
+lake build semanticAdtStorageTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-adt-storage-corpus.json \
+  --output .upstream/semantic-adt-storage-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-adt-storage \
+  --cases 16 --output .upstream/semantic-adt-storage-random
+```
+
+Plans use `solcore-lean.adt-storage-plan.v1` under `adtStoragePlan`, with the
+shape, the declared methods, the key base and the step. Cases use
+`solcore-lean.semantic-adt-storage-case.v1`, and each records the contract's
+methods with their signatures, selectors and parameters and the layout, which
+the adapter recomputes. Histories use `solcore-lean.adt-storage-history.v1`.
+A case reaches about 200 KB, so a native shrink response carries at most 16
+candidates.
+
+Three Lean tests check the profile:
+- `Solcore/Test/SourceAdtStorageGolden.lean` compares the emitted contracts
+  of two shapes, which together use every method, with text written out by
+  hand. It also checks 24 rows of three shapes, written out by hand from the
+  layout, against original Core and the slot-map model; a changed expectation
+  fails.
+- `Solcore/Test/SourceAdtStorageCases.lean` requires original Core to equal
+  the slot-map model on generated scenarios under G0 revisions three and one,
+  and requires every case and the reductions of two cases to replay. It also
+  checks the node counts and that every variant count, enum position, Word
+  type and method is drawn. Keys, fields, variants and methods outside the
+  case, changed observed slots, excluded shapes and methods out of order are
+  refused.
+- `Solcore/Test/SourceAdtStorageCorpus.lean` requires every original Core
+  history of the fixed corpus to equal the model's expected history, and
+  recomputes its coverage.
+
+The fixed corpus `scripts/semantic-adt-storage-corpus.json` has 22 imported
+scenarios of one to three transactions over five shapes, with steps from the
+storage corpus, and four generated seeds: 26 scenarios and 75 transactions.
+It covers:
+- every variant count, payload kind, payload-free position, enum position and
+  Word type, the wrapping key base and every method;
+- for each variant count, every ordered pair of distinct variants written at
+  one location one after the other (20 pairs);
+- updates of a Word and of the enum field in the record and in an entry;
+- a read of each read method that decodes a value whose slots keep a stale
+  Word;
+- both keys of each mapping, across the wrap for the enums;
+- a reverted transaction of every writing method.
+
+The coverage dimensions are `AdtVariantCounts`, `AdtPayloads`,
+`AdtClearPositions`, `AdtChoicePositions`, `AdtWordTypes`, `AdtMethods`,
+`AdtOverwrites`, `AdtFieldUpdates`, `AdtStaleReads`, `AdtNeighbourKeys` and
+`AdtRevertedWrites`.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs
+it as for the other storage-family profiles.
+
 ## Compare ABI-encoded tuple returns
 
 Every other stateful profile returns one Word. The `stateful-tuple-returns`

@@ -89,6 +89,9 @@ PROFILES = {
     # The inline Yul forms of the two loop plans keep their parents' budgets.
     "stateful-assembly-storage-loops": ("semantic-assembly-storage-loop", "storage", 384),
     "stateful-assembly-keccak-loops": ("semantic-assembly-keccak-loop", "storage", 384),
+    # The enum and struct storage shell takes 52 nodes of 384; the Keccak
+    # closure, the enum closures and the methods lie outside the budget.
+    "stateful-adt-storage": ("semantic-adt-storage", "storage", 384),
     # The tuple-return shell takes 79, 85 or 91 nodes of 384, by arity.
     "stateful-tuple-returns": ("semantic-tuple-return", "storage", 384),
     # The bytes-return shell takes 125 nodes of 384.
@@ -99,6 +102,7 @@ DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "s
                           "stateful-long-bytes", "stateful-nested-array", "stateful-malformed-calldata",
                           "stateful-malformed-nested-array", "stateful-malformed-bytes", "stateful-methods",
                           "stateful-assembly-storage-loops", "stateful-assembly-keccak-loops",
+                          "stateful-adt-storage",
                           "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns",
                           "stateful-bytes-returns")
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
@@ -200,6 +204,7 @@ def command(args, profile, output, seconds, disk_bytes):
                      "stateful-keccak-loops": args.keccak_loop_case_tool,
                      "stateful-assembly-storage-loops": args.assembly_storage_loop_case_tool,
                      "stateful-assembly-keccak-loops": args.assembly_keccak_loop_case_tool,
+                     "stateful-adt-storage": args.adt_storage_case_tool,
                      "stateful-tuple-returns": args.tuple_return_case_tool,
                      "stateful-bytes-returns": args.bytes_return_case_tool}
     forwarded = profile == "stateful-forwarded-value"
@@ -502,6 +507,7 @@ def parse_args(argv=None):
                 "keccak_loop_case_tool": "semantic-keccak-loop-tool",
                 "assembly_storage_loop_case_tool": "semantic-assembly-storage-loop-tool",
                 "assembly_keccak_loop_case_tool": "semantic-assembly-keccak-loop-tool",
+                "adt_storage_case_tool": "semantic-adt-storage-tool",
                 "tuple_return_case_tool": "semantic-tuple-return-tool",
                 "bytes_return_case_tool": "semantic-bytes-return-tool"}
     for key in binaries:

@@ -102,6 +102,22 @@ KECCAK_LOOP_DIMENSIONS = DIMENSIONS + tuple(KECCAK_LOOP_EXTRA)
 # `form:count` and carries as `form:carry`, beside the dimensions of the loop
 # profile whose plan the form renders.
 FORM_EXTRA = ("Forms", "FormIterations", "FormCarries")
+# Enum and struct storage: the shape's variant count, payload kinds, the
+# payload-free variant's position, the enum's record position and Word type;
+# the methods called; overwrites `count:old>new` of one committed variant by
+# another at one location; committed field updates `target:kind`; reads whose
+# decoded value's slots keep a stale payload or tag Word; both keys written in
+# one mapping, or across the wrap; and the writing methods of reverts.
+ADT_EXTRA = {"AdtVariantCounts": (2, 3, 4), "AdtPayloads": tuple(adapter.ADT_PAYLOAD_WIDTHS),
+             "AdtClearPositions": ("first", "middle", "last"), "AdtChoicePositions": (0, 1, 2),
+             "AdtWordTypes": adapter.ADT_WORD_TYPES, "AdtMethods": tuple(adapter.ADT_METHODS),
+             "AdtOverwrites": tuple(f"{count}:{old}>{new}" for count in (2, 3, 4) for old in range(count)
+                                    for new in range(count) if old != new),
+             "AdtFieldUpdates": ("record:word", "record:choice", "entry:word", "entry:choice"),
+             "AdtStaleReads": ("getChoice", "getChoiceAt", "getRecord", "getRecordAt"),
+             "AdtNeighbourKeys": ("choices", "records", "wrap"),
+             "AdtRevertedWrites": tuple(method for method in adapter.ADT_METHODS if not method.startswith("get"))}
+ADT_DIMENSIONS = DIMENSIONS + tuple(ADT_EXTRA)
 # Tuple returns: plan arities, each arity's outcomes as `arity:status`, the
 # carries `committed` (a returned tuple's prior slots came from an earlier
 # committed transaction) and `rollback` (a returned tuple follows a revert whose
@@ -145,6 +161,8 @@ def dimensions(profile_name):
         return LOOP_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "keccak-loops":
         return KECCAK_LOOP_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "adts":
+        return ADT_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "tuples":
         return TUPLE_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "bytes-returns":
@@ -251,6 +269,60 @@ def forms_coverage(case, values):
             "FormCarries": {f"{form}:{carry}" for carry in values["IterationCarries"]}}
 
 
+def adt_variant_slots(widths, variant):
+    """The enum offsets variant `variant` occupies: the tags its decoding reads
+    and its payload."""
+    count = len(widths)
+    tags = set(range(variant + 1)) if variant + 1 < count else set(range(count - 1))
+    payload = variant + 1 if variant + 1 < count else count - 1
+    return tags | set(range(payload, payload + widths[variant]))
+
+
+def adt_coverage(case, statuses):
+    """The shape's classes, the called methods, and, over the committed
+    transactions in order, the overwrites at each enum location, the field
+    updates, the reads of an enum whose slots keep a Word an earlier committed
+    write left outside the decoded variant, both keys written in one mapping,
+    and the writing methods that reverted."""
+    plan = case["adtStoragePlan"]
+    shape = adapter.adt_shape(case)
+    widths, position, count = shape["widths"], shape["position"], len(shape["widths"])
+    clear = shape["clear"]
+    variants, written, overwrites, updates, stale, keyed = {}, {}, set(), set(), set(), {"choices": set(), "records": set()}
+    for tx, status in zip(case["transactions"], statuses):
+        method = tx["method"]
+        if status != "returned":
+            continue
+        record, target = "Record" in method, method.endswith("At")
+        location = ("records" if record else "choices", tx["key"]) if target else ("record" if record else "choice", None)
+        if method.startswith("get"):
+            if location in variants and written[location] - adt_variant_slots(widths, variants[location]):
+                stale.add(method)
+            continue
+        if target:
+            keyed[location[0]].add(tx["key"])
+        if method.startswith("set"):
+            updates.add(("entry" if target else "record") + ":" + ("choice" if tx["field"] == position else "word"))
+            if tx["field"] != position:
+                continue
+        variant = clear if method.startswith("clear") else tx["variant"]
+        if location in variants and variants[location] != variant:
+            overwrites.add(f"{count}:{variants[location]}>{variant}")
+        variants[location] = variant
+        written[location] = written.get(location, set()) | adt_variant_slots(widths, variant)
+    keys = {str(key) for key in adapter.adt_keys(case)}
+    neighbours = {name for name, values in keyed.items() if values == keys}
+    if neighbours and int(plan["keyBase"]) == 2**256 - 1:
+        neighbours.add("wrap")
+    return {"AdtVariantCounts": {count}, "AdtPayloads": set(plan["shape"]["variants"]),
+            "AdtClearPositions": {"first" if clear == 0 else "last" if clear == count - 1 else "middle"},
+            "AdtChoicePositions": {position}, "AdtWordTypes": {plan["shape"]["wordType"]},
+            "AdtMethods": {tx["method"] for tx in case["transactions"]}, "AdtOverwrites": overwrites,
+            "AdtFieldUpdates": updates, "AdtStaleReads": stale, "AdtNeighbourKeys": neighbours,
+            "AdtRevertedWrites": {tx["method"] for tx, status in zip(case["transactions"], statuses)
+                                  if status == "reverted" and not tx["method"].startswith("get")}}
+
+
 def tuples_coverage(case, statuses):
     """The plan's arity and its outcomes, the carries into a returned tuple
     from an earlier committed transaction and past an earlier revert, and a
@@ -316,6 +388,8 @@ def inputs(case):
         return {str(value) for tx in case["transactions"] for row in adapter.malformed_nested_values(tx) for value in row}
     if adapter.has_methods(case):
         return {value for tx in case["transactions"] for value in tx["inputs"]}
+    if adapter.has_adts(case):
+        return {tx["input"] for tx in case["transactions"] if "input" in tx}
     if adapter.has_malformed_bytes(case):
         return {str(chunk) for tx in case["transactions"] for chunk in adapter.payload_chunks(tx)}
     if adapter.profile(case)["abi"] in ("array", "malformed"):
@@ -516,6 +590,13 @@ def validate_manifest(manifest):
             raise ValueError("carried-slot coverage belongs to the storage-loop profile")
     elif any("required" + dimension in manifest for dimension in LOOP_EXTRA):
         raise ValueError("loop coverage belongs to the storage-loop profile")
+    if selected["abi"] == "adts":
+        for dimension, allowed in ADT_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"enum and struct storage coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in ADT_EXTRA):
+        raise ValueError("enum and struct coverage belongs to the enum and struct storage profile")
     if selected["abi"] == "tuples":
         for dimension, allowed in TUPLE_EXTRA.items():
             values = manifest.get("required" + dimension)
@@ -744,6 +825,7 @@ def keyed_analysis(analysis):
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
                                                 adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA,
                                                 adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA,
+                                                adapter.ADT_HISTORY_SCHEMA,
                                                 adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA,
                                                 adapter.BYTES_RETURN_HISTORY_SCHEMA)
                                                for history in histories.values())
@@ -919,6 +1001,8 @@ class Campaign:
             values.update(loops_coverage(case, statuses))
         elif self.specification["abi"] == "keccak-loops":
             values.update(keccak_loops_coverage(case, statuses))
+        elif self.specification["abi"] == "adts":
+            values.update(adt_coverage(case, statuses))
         elif self.specification["abi"] == "tuples":
             values.update(tuples_coverage(case, statuses))
         elif self.specification["abi"] == "bytes-returns":
@@ -989,6 +1073,7 @@ class Campaign:
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
                           "methods": tuple(METHODS_EXTRA), "loops": tuple(LOOP_EXTRA), "tuples": tuple(TUPLE_EXTRA),
                           "keccak-loops": tuple(KECCAK_LOOP_EXTRA),
+                          "adts": tuple(ADT_EXTRA),
                           "bytes-returns": tuple(BYTES_RETURN_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(

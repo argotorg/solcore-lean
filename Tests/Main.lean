@@ -2199,6 +2199,9 @@ import Solcore.Test.SourceAssemblyStorageLoopCorpus
 import Solcore.Test.SourceAssemblyKeccakLoopGolden
 import Solcore.Test.SourceAssemblyKeccakLoopCases
 import Solcore.Test.SourceAssemblyKeccakLoopCorpus
+import Solcore.Test.SourceAdtStorageGolden
+import Solcore.Test.SourceAdtStorageCases
+import Solcore.Test.SourceAdtStorageCorpus
 import Solcore.Test.SourceTupleReturnGolden
 import Solcore.Test.SourceTupleReturnCases
 import Solcore.Test.SourceTupleReturnCorpus
@@ -4242,6 +4245,9 @@ def main : IO UInt32 := do
   Tests.SourceAssemblyKeccakLoopGolden.testSourceAssemblyKeccakLoopGolden
   Tests.SourceAssemblyKeccakLoopCases.testSourceAssemblyKeccakLoopCases
   Tests.SourceAssemblyKeccakLoopCorpus.testSourceAssemblyKeccakLoopCorpus
+  Tests.SourceAdtStorageGolden.testSourceAdtStorageGolden
+  Tests.SourceAdtStorageCases.testSourceAdtStorageCases
+  Tests.SourceAdtStorageCorpus.testSourceAdtStorageCorpus
   Tests.SourceTupleReturnGolden.testSourceTupleReturnGolden
   Tests.SourceTupleReturnCases.testSourceTupleReturnCases
   Tests.SourceTupleReturnCorpus.testSourceTupleReturnCorpus

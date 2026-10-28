@@ -2054,6 +2054,69 @@ def tuple_case(arity=4, rows=((0, 5), (1, 9), (2, 7)), origin=None):
     return value
 
 
+class AdtStorageCampaignTests(unittest.TestCase):
+    def test_coverage_records_shape_classes_overwrites_updates_stale_reads_keys_and_reverts(self):
+        self.assertEqual(campaign.dimensions("stateful-adt-storage"), campaign.DIMENSIONS + tuple(campaign.ADT_EXTRA))
+        self.assertEqual(campaign.versions("stateful-adt-storage"), campaign.VERSIONS)
+        value = fixtures.adt_case()
+        shape = {"AdtVariantCounts": {2}, "AdtPayloads": {"words2", "words0"}, "AdtClearPositions": {"last"},
+                 "AdtChoicePositions": {0}, "AdtWordTypes": {"word"},
+                 "AdtMethods": {"putChoice", "clearChoice", "getChoice", "putRecordAt", "setRecordAt", "getRecordAt"}}
+        # The clear overwrites `V0` with `V1`; key 0's Word field is updated, so
+        # both keys of `records` are written across the wrap; the reverted read
+        # records nothing, and the record read decodes the variant it wrote.
+        statuses = ["returned", "returned", "reverted", "returned", "returned", "returned"]
+        self.assertEqual(campaign.adt_coverage(value, statuses), {**shape, "AdtOverwrites": {"2:0>1"},
+            "AdtFieldUpdates": {"entry:word"}, "AdtStaleReads": set(), "AdtNeighbourKeys": {"records", "wrap"},
+            "AdtRevertedWrites": set()})
+        # Returned, the read after the clear decodes `V1` over the stale pair.
+        returned = campaign.adt_coverage(value, ["returned"] * 6)
+        self.assertEqual(returned["AdtStaleReads"], {"getChoice"})
+        # A reverted write commits no variant, so the clear overwrites nothing,
+        # and without the update only one key of `records` is written.
+        reverted = campaign.adt_coverage(value, ["reverted", "returned", "returned", "returned", "reverted", "returned"])
+        self.assertEqual((reverted["AdtOverwrites"], reverted["AdtRevertedWrites"], reverted["AdtNeighbourKeys"],
+                          reverted["AdtFieldUpdates"]), (set(), {"putChoice", "setRecordAt"}, set(), set()))
+        self.assertEqual(campaign.inputs(value), {"2", "1", "0", "3"})
+        value["adtStoragePlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+        value["provenance"].update(features=["local"], origin={"kind": "imported"})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-adt-storage"))
+            instance.summary["coverage"].update(requiredAdtOverwrites=["2:0>1", "2:1>0"], requiredAdtStaleReads=["getRecord"])
+            instance.record_coverage(value, "matched", fixtures.adt_histories(value))
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedAdtOverwrites"], coverage["matchedAdtNeighbourKeys"]),
+                             (["2:0>1"], ["records", "wrap"]))
+            self.assertEqual((coverage["missingAdtOverwrites"], coverage["missingAdtStaleReads"]), (["2:1>0"], ["getRecord"]))
+
+    def test_the_fixed_corpus_validates_and_its_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-adt-storage-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-adt-storage")
+        for dimension, allowed in campaign.ADT_EXTRA.items():
+            self.assertEqual(sorted(manifest["required" + dimension], key=str), sorted(allowed, key=str))
+        self.assertEqual(len(manifest["requiredAdtOverwrites"]), 20)
+        for key, changed in (("requiredAdtOverwrites", ["2:0>2"]), ("requiredAdtOverwrites", []),
+                             ("requiredAdtOverwrites", ["2:0>1", "2:0>1"]), ("requiredAdtVariantCounts", [5]),
+                             ("requiredAdtVariantCounts", [True]), ("requiredAdtPayloads", ["words4"]),
+                             ("requiredAdtStaleReads", ["putChoice"]), ("requiredAdtNeighbourKeys", "wrap"),
+                             ("requiredAdtRevertedWrites", ["getChoice"])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        for dimension in campaign.ADT_EXTRA:
+            with self.subTest(dimension=dimension), self.assertRaises(ValueError):
+                campaign.validate_manifest({name: value for name, value in manifest.items() if name != "required" + dimension})
+        # Imported entries keep one to three transactions, as every fixed corpus does.
+        entry = next(entry for entry in manifest["cases"] if "transactions" in entry)
+        longer = {**entry, "transactions": entry["transactions"] * 2}
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**manifest, "cases": [longer]})
+        # The enum and struct dimensions belong to this profile alone.
+        tuple_manifest = json.loads((ROOT / "scripts/semantic-tuple-return-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "enum and struct coverage belongs to the enum and struct storage profile"):
+            campaign.validate_manifest({**tuple_manifest, "requiredAdtOverwrites": ["2:0>1"]})
+
+
 class TupleCampaignTests(unittest.TestCase):
     def test_coverage_names_arities_their_outcomes_carries_and_node_budgets(self):
         value = tuple_case()

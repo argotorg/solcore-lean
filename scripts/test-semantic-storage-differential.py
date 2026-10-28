@@ -3659,6 +3659,202 @@ class AssemblyLoopTests(unittest.TestCase):
         self.assertNotIn("forms", runner.profile(keccak_loop_case()))
 
 
+# Entry slots keccak256(base ++ key) from Foundry's `cast keccak`, for the enum
+# and struct fixture's mapping bases 9 and 10 and its keys 2^256 - 1 and 0, and
+# its methods' selectors from `cast sig`, all independent of the adapter's Keccak.
+CAST_ADT_ENTRIES = {
+    (9, MAX_WORD): 4951835114823754866708375840211612671190448154855786638499095948215603667702,
+    (9, 0): 22756765779589845761170775236260874230900367805402455632653690919156678150133,
+    (10, MAX_WORD): 92386539972242642649209974360938212169604720364531104164352636696906078334069,
+    (10, 0): 28316780231992663356899387360795050299752000032466988729594309499906746629572}
+CAST_ADT_SELECTORS = {"putChoice": "0x1f7e5b11", "clearChoice": "0xa1c23d7b", "getChoice": "0xd149174a",
+                      "putRecordAt": "0x1e56f3c9", "setRecordAt": "0x7d3a712d", "getRecordAt": "0xbb468a61"}
+ADT_K = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95
+ADT_PARAMETERS = {"putChoice": ("flags", "variant", "input"), "clearChoice": ("flags", "input"), "getChoice": ("flags",),
+                  "putRecordAt": ("flags", "key", "variant", "input"),
+                  "setRecordAt": ("flags", "key", "field", "variant", "input"), "getRecordAt": ("flags", "key")}
+ADT_ROWS = (("putChoice", {"flags": 0, "variant": 0, "input": 2}), ("clearChoice", {"flags": 0, "input": 1}),
+            ("getChoice", {"flags": 1}), ("putRecordAt", {"flags": 0, "key": MAX_WORD, "variant": 0, "input": 0}),
+            ("setRecordAt", {"flags": 0, "key": 0, "field": 1, "variant": 0, "input": 3}),
+            ("getRecordAt", {"flags": 0, "key": MAX_WORD}))
+
+
+def adt_slots():
+    """The fixture's observed slots: the accumulator, the enum at 1 to 3, the
+    record at 4 to 8, and at both keys three enum and five record entry slots."""
+    values = {0} | set(range(1, 9))
+    for (base, _), first in CAST_ADT_ENTRIES.items():
+        values |= {first + offset for offset in range(3 if base == 9 else 5)}
+    return [str(value) for value in sorted(values)]
+
+
+def adt_case(rows=ADT_ROWS):
+    """Envelope fixture only: native replay checks the actual contract. The
+    shape `V0(word, word) | V1` puts the enum at slots 1 to 3, the record (its
+    enum first) at 4 to 8, `choices` at 9 and `records` at 10; keys 2^256 - 1
+    and 0."""
+    methods = [name for name in ("putChoice", "clearChoice", "getChoice", "putRecordAt", "setRecordAt", "getRecordAt")
+               if any(row[0] == name for row in rows)]
+    transactions = []
+    for index, (method, args) in enumerate(rows):
+        words = [args[parameter] for parameter in ADT_PARAMETERS[method]]
+        transaction = {"id": f"tx-{index}", "method": method,
+                       **{parameter: args[parameter] if parameter in ("field", "variant") else str(args[parameter])
+                          for parameter in ADT_PARAMETERS[method]},
+                       "calldata": CAST_ADT_SELECTORS[method] + "".join(f"{word:064x}" for word in words), "value": "0"}
+        transactions.append(transaction)
+    return {"schema": runner.ADT_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "adtStoragePlan": {"schema": "solcore-lean.adt-storage-plan.v1", "stepProgram": {}, "keyBase": str(MAX_WORD),
+                           "methods": methods, "shape": {"variants": ["words2", "words0"], "position": 0, "wordType": "word"}},
+        "initialState": {"storage": []}, "observedSlots": adt_slots(),
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedAdtStorage",
+            "methods": [{"name": name, "signature": name + "(" + ",".join(["uint256"] * len(ADT_PARAMETERS[name])) + ")",
+                         "selector": CAST_ADT_SELECTORS[name], "parameters": list(ADT_PARAMETERS[name])} for name in methods],
+            "layout": {"accumulatorSlot": 0, "choiceSlot": 1, "choiceSlots": 3, "recordSlot": 4, "recordSlots": 5,
+                       "fieldOffsets": [0, 3, 4], "choicesSlot": 9, "recordsSlot": 10, "clearVariant": 1},
+            "deployPath": ["SynthesizedAdtStorageDeploy"],
+            "runtimePath": ["SynthesizedAdtStorageDeploy", "SynthesizedAdtStorage"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def adt_expected():
+    """Each fixture row written out by hand with the step `x + 5`: status,
+    output and every nonzero observed slot."""
+    top, zero = CAST_ADT_ENTRIES[(10, MAX_WORD)], CAST_ADT_ENTRIES[(10, 0)]
+    kv = lambda r, o: (r + o * ADT_K) % 2**256
+    digest = 0
+    for token in (0, kv(18, 1), kv(18, 2), kv(18, 3), kv(18, 4)):
+        digest = (digest * ADT_K + token) % 2**256
+    # r = 2 + 0 + 5: tag zero at slot 1, the payload at offsets 1 and 2.
+    first = {0: 7, 2: kv(7, 1), 3: kv(7, 2)}
+    # r = 1 + 7 + 5: tag one; slots 2 and 3 keep their stale payload.
+    cleared = {0: 13, 1: 1, 2: kv(7, 1), 3: kv(7, 2)}
+    # r = 0 + 13 + 5 at the top key: the enum's tag zero and pair of Words, then the record's Words.
+    record = {**cleared, 0: 18, top + 1: kv(18, 1), top + 2: kv(18, 2), top + 3: kv(18, 3), top + 4: kv(18, 4)}
+    # r = 3 + 18 + 5: key 0's middle Word, at offset 3.
+    updated = {**record, 0: 26, zero + 3: kv(26, 3)}
+    return [("returned", 7, first), ("returned", 13, cleared), ("reverted", 1, cleared), ("returned", 18, record),
+            ("returned", 26, updated), ("returned", digest, {**updated, 0: digest})]
+
+
+def adt_history(value, path, expected=None):
+    slots = [int(slot) for slot in value["observedSlots"]]
+    storage = lambda values: [{"slot": str(slot), "value": str(values.get(slot, 0))} for slot in slots]
+    rows = []
+    for index, (tx, (status, output, values)) in enumerate(zip(value["transactions"], expected or adt_expected())):
+        row = {"id": tx["id"], "index": index, "status": status, "output": "0x" + f"{output:064x}",
+               "committedStorage": storage(values)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+    result = {"schema": runner.ADT_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": storage({}), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def adt_histories(value=None, **options):
+    value = adt_case() if value is None else value
+    return {path: adt_history(value, path, **options) for path in runner.PATHS}
+
+
+class AdtStorageTests(unittest.TestCase):
+    def test_an_adt_storage_case_records_its_shape_methods_keys_and_layout(self):
+        value = adt_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
+                          selected["selector"], selected["shrinkBatch"], selected["contract"]),
+                         ("semantic-adt-storage-tool", "rust-hull-keyed-storage-scenario", True, "adts", None, 16,
+                          "SynthesizedAdtStorage"))
+        self.assertTrue(runner.has_adts(value))
+        self.assertFalse(runner.has_adts(keccak_loop_case()) or runner.has_methods(value))
+        self.assertEqual(runner.adt_layout(value), value["contract"]["layout"])
+        self.assertEqual(runner.adt_slots(value), adt_slots())
+        self.assertEqual(len(runner.observed_slots(value)), 25)
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                         ["returned", "returned", "reverted", "returned", "returned", "returned"])
+        self.assertIn("std.StorageGeneric", runner.scope(value))
+        # The enum's size follows the nested sums: one tag and the larger branch.
+        self.assertEqual([runner.adt_choice_size(widths) for widths in ([0, 0], [2, 0], [0, 1, 1, 1], [3, 0, 1, 0], [2, 0, 1])],
+                         [1, 3, 4, 4, 3])
+        shapes = ({"variants": ["words1", "words1"], "position": 0, "wordType": "word"},
+                  {"variants": ["words0", "words1", "words3"], "position": 0, "wordType": "word"},
+                  {"variants": ["words0", "words0", "words0", "words0", "words0"], "position": 0, "wordType": "word"},
+                  {"variants": ["words2", "words0"], "position": 3, "wordType": "word"},
+                  {"variants": ["words2", "words0"], "position": 0, "wordType": "bytes32"},
+                  {"variants": ["words2", "words4"], "position": 0, "wordType": "word"},
+                  {"variants": ["words2", "words0"], "position": True, "wordType": "word"})
+        for shape in shapes:
+            invalid = copy.deepcopy(value)
+            invalid["adtStoragePlan"]["shape"] = shape
+            with self.subTest(shape=shape), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for methods in ([], ["clearChoice", "putChoice", "getChoice", "putRecordAt", "setRecordAt", "getRecordAt"],
+                        ["putChoice", "putChoice", "clearChoice", "getChoice", "putRecordAt", "setRecordAt", "getRecordAt"]):
+            invalid = copy.deepcopy(value)
+            invalid["adtStoragePlan"]["methods"] = methods
+            with self.subTest(methods=methods), self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(invalid)
+        for index, key, changed in ((3, "key", "5"), (0, "variant", 2), (4, "field", 3), (4, "field", True),
+                                    (0, "input", None), (2, "input", "1"), (0, "calldata", "0x1f7e5b11" + "00" * 96),
+                                    (0, "value", "1"), (0, "method", "getRecord")):
+            invalid = copy.deepcopy(value)
+            if changed is None:
+                del invalid["transactions"][index][key]
+            else:
+                invalid["transactions"][index][key] = changed
+            with self.subTest(index=index, key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # The observed slots and the recorded layout follow the shape and the key base.
+        for change in (lambda case: case["observedSlots"].pop(), lambda case: case["observedSlots"].reverse(),
+                       lambda case: case["adtStoragePlan"].update(keyBase="5"),
+                       lambda case: case["contract"]["layout"].update(recordSlot=5),
+                       lambda case: case["contract"]["methods"][0].update(selector="0x00000000")):
+            invalid = copy.deepcopy(value)
+            change(invalid)
+            with self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(invalid)
+
+    def test_a_returned_row_follows_the_layout_protocol(self):
+        value = adt_case()
+        histories = adt_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+            self.assertEqual(runner.adt_fields(value, tx, rows[index], prior), [])
+        # Every observed slot of a write, an update and a read is checked, stale ones included.
+        for index in (0, 1, 3, 4, 5):
+            prior, tx = (rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"],
+                         value["transactions"][index])
+            for slot in value["observedSlots"]:
+                changed = copy.deepcopy(rows[index])
+                entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+                entry["value"] = str((int(entry["value"]) + 1) % 2**256)
+                with self.subTest(index=index, slot=slot):
+                    self.assertIn("committedStorage", runner.adt_fields(value, tx, changed, prior))
+                    self.assertFalse(runner.conforms(value, tx, changed, prior))
+        # A read's output is its digest; a write's output is the r its Words carry.
+        for index in (0, 5):
+            prior, tx = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"], \
+                value["transactions"][index]
+            changed = copy.deepcopy(rows[index])
+            changed["output"] = "0x" + f"{int(changed['output'], 16) ^ 1:064x}"
+            with self.subTest(index=index):
+                self.assertTrue(runner.adt_fields(value, tx, changed, prior))
+        # A path that decodes the stale payload of the cleared enum differs.
+        stale = adt_expected()
+        stale[2] = ("reverted", (1 * ADT_K + (7 + ADT_K)) % 2**256, stale[2][2])
+        changed = adt_histories(value)
+        changed["importedHull"] = adt_history(value, "importedHull", stale)
+        self.assertEqual(runner.compare(changed, value)["category"], "semantic-mismatch")
+
+
 def tuple_case(arity=4, rows=((0, 5), (1, 9), (2, 7))):
     """Envelope fixture only: native replay checks the actual tuple-return program."""
     transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value),
