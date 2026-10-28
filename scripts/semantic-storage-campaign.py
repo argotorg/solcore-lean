@@ -426,26 +426,33 @@ def validate_manifest(manifest):
         raise ValueError("malformation coverage belongs to the malformed-calldata profile")
     if selected["abi"] != "methods" and any("required" + dimension in manifest for dimension in METHODS_EXTRA if dimension != "Rejections"):
         raise ValueError("method coverage belongs to the several-methods profile")
-    loop_dimensions = {**LOOP_EXTRA, **KECCAK_LOOP_EXTRA}
-    if selected["abi"] in ("loops", "keccak-loops"):
-        extra, name = (LOOP_EXTRA, "storage-loop") if selected["abi"] == "loops" else (KECCAK_LOOP_EXTRA, "Keccak-loop")
-        for dimension, allowed in extra.items():
+    if selected["abi"] == "loops":
+        for dimension, allowed in LOOP_EXTRA.items():
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
-                raise ValueError(f"{name} coverage requires unique required{dimension} from {list(allowed)}")
-        if any("required" + dimension in manifest for dimension in loop_dimensions if dimension not in extra):
-            raise ValueError(f"{name} coverage has no other loop dimension")
-    elif any("required" + dimension in manifest for dimension in loop_dimensions):
-        raise ValueError("loop coverage belongs to the storage-loop and Keccak-loop profiles")
-    # Every log profile records the log framing; the static site shapes belong
-    # to the log profile, whose plan fixes them.
-    if selected["abi"] == "flags":
+                raise ValueError(f"storage-loop coverage requires unique required{dimension} from {list(allowed)}")
+    elif selected["abi"] == "keccak-loops":
+        for dimension, allowed in KECCAK_LOOP_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"Keccak-loop coverage requires unique required{dimension} from {list(allowed)}")
+        if "requiredCarriedSlots" in manifest:
+            raise ValueError("carried-slot coverage belongs to the storage-loop profile")
+    elif any("required" + dimension in manifest for dimension in LOOP_EXTRA):
+        raise ValueError("loop coverage belongs to the storage-loop profile")
+    if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
+        raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
+    # The Keccak-loop profile records the log framing, but its log shapes follow
+    # from the iteration counts, not from the log profile's static sites.
+    if selected["abi"] == "keccak-loops":
+        if any("required" + dimension in manifest for dimension in LOG_EXTRA):
+            raise ValueError("log coverage belongs to the log profile")
+    elif selected.get("logs"):
         for dimension, allowed in LOG_EXTRA.items():
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
                 raise ValueError(f"log coverage requires unique required{dimension} from {list(allowed)}")
-    elif any("required" + dimension in manifest for dimension in LOG_EXTRA) or (
-            "framingVersion" in manifest and not selected.get("logs")):
+    elif any("required" + dimension in manifest for dimension in LOG_EXTRA) or "framingVersion" in manifest:
         raise ValueError("log coverage belongs to the log profile")
     if selected.get("balances"):
         for dimension in VALUE_EXTRA:

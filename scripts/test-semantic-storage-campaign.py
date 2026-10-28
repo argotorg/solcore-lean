@@ -1913,7 +1913,7 @@ class LoopCampaignTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredCarriedSlots"})
         other = json.loads((ROOT / "scripts/semantic-methods-corpus.json").read_text())
-        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop and Keccak-loop profiles"):
+        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop profile"):
             campaign.validate_manifest({**other, "requiredMasks": [0, 1, 3, 7]})
 
 
@@ -1973,13 +1973,14 @@ class KeccakLoopCampaignTests(unittest.TestCase):
         for key in ("requiredKeyMasks", "requiredIterationCarries", "framingVersion"):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 campaign.validate_manifest({name: value for name, value in manifest.items() if name != key})
-        # The storage-loop profile has no key masks, and other profiles no loop coverage.
+        # Key masks belong to this profile alone, and loop coverage to the loop profiles.
         loops = json.loads((ROOT / "scripts/semantic-storage-loop-corpus.json").read_text())
-        with self.assertRaisesRegex(ValueError, "storage-loop coverage has no other loop dimension"):
-            campaign.validate_manifest({**loops, "requiredKeyMasks": [0, 1, 3, 7]})
         other = json.loads((ROOT / "scripts/semantic-mapping-corpus.json").read_text())
-        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop and Keccak-loop profiles"):
-            campaign.validate_manifest({**other, "requiredKeyMasks": [0, 1, 3, 7]})
+        for value in (loops, other):
+            with self.assertRaisesRegex(ValueError, "key-mask coverage belongs to the Keccak-loop profile"):
+                campaign.validate_manifest({**value, "requiredKeyMasks": [0, 1, 3, 7]})
+        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop profile"):
+            campaign.validate_manifest({**other, "requiredIterationCounts": list(range(8))})
         with self.assertRaisesRegex(ValueError, "log coverage belongs to the log profile"):
             campaign.validate_manifest({**other, "framingVersion": manifest["framingVersion"]})
 

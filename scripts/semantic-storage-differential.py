@@ -328,8 +328,11 @@ def expected_status(case: dict, transaction: dict) -> str | None:
     if profile(case)["abi"] == "methods":
         # A call's odd input sum reverts.
         return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
+    if profile(case)["abi"] == "keccak-loops":
+        # Odd flags revert after every logged iteration.
+        return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
-                                                             "malformed", "loops", "keccak-loops") else "input"]
+                                                             "malformed", "loops") else "input"]
     odd = int(common.word(parity)) % 2
     if has_senders(case) and not odd:
         return None
@@ -642,12 +645,12 @@ def guarded_sites(case: dict, transaction: dict) -> list[dict]:
 
 
 def expected_log_shapes(case: dict, transaction: dict) -> list[tuple[int, int]]:
-    """Topic count and data bytes of each committed log: one per guarded site,
-    or two topics and one data Word per loop iteration, on return, none on
-    revert. Topic and data values are never predicted here."""
+    """Topic count and data bytes of each committed log: one per guarded site
+    on return, none on revert. Topic and data values are never predicted."""
     if expected_status(case, transaction) == "reverted":
         return []
     if has_keccak_loops(case):
+        # Two topics and one data Word per loop iteration.
         return [(2, 32)] * loop_iterations(case, transaction)
     return [(site["topics"], 32 * site["dataWords"]) for site in guarded_sites(case, transaction)]
 
@@ -1213,11 +1216,17 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
+        if selected["abi"] == "keccak-loops":
+            if type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx):
+                raise ValueError("transaction iterations differ from its input under the loop mask")
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "input")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its original Word input")
+            continue
         value = int(common.word(tx.get("input"), "transaction input"))
-        if selected["abi"] in ("loops", "keccak-loops") and (
-                type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx)):
+        if selected["abi"] == "loops" and (type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx)):
             raise ValueError("transaction iterations differ from its input under the loop mask")
-        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags", "keccak-loops": "flags"}.get(selected["abi"])
+        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
         sent = "0"
         if selected.get("balances"):
