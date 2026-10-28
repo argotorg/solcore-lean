@@ -6620,6 +6620,16 @@ directive tools, solc, Anvil and cast frozen.
 - The O2 crash went to `questions.md` only. The roadmap records the first
   mutation attempt, which gave each fixture one Lean invocation, and the
   per-entry limits that replaced it.
+- **Fuzz driver** (`a88836cb6`, frozen): the `fixtures` run kind of
+  [continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing) ran a smoke
+  iteration (base seed `20261111`, 51 seconds) and two iterations (base seed
+  `20261112`, 201 seconds), 8 fixtures each.
+  - Their 141, 245 and 290 entries agreed on every admitted path, except 7
+    observed by no path: Lean Core's fuel against the EVM's gas. There was no
+    finding.
+  - The smoke iteration's entries had the same mutants and observations as
+    the mutation run from the same root seed.
+  - The mutant budget sampled six fixtures down to 32 mutants each.
 
 ## Compare generic selection
 

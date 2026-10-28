@@ -6578,6 +6578,72 @@ before execution:
   - a two-iteration run with base seed `20261112`.
 - A suite job is not part of this unit.
 
+**Results.** The checks before the runs:
+- The tests passed:
+  - 30 harness tests, now also covering the budgets, the mutant sample, the
+    `budget` status, the EVM-first order, deadlines on a stalling and a
+    buffering Lean runner, the export lock, the run budget, a stop signal and
+    `--check`;
+  - 28 driver tests, now also covering selection and its cycles, the
+    command, registration with the known crash, duplicates and a language
+    failure's exact Core value, pruning, the epoch with and without fixtures,
+    readiness and interruption;
+  - 30 preparation tests, now also covering the directive receipts, their
+    offline builds and a checkout without the directive crates;
+  - all 860 Python tests in the 30 `scripts/test-*.py` files.
+- `prepare-semantic-tools.py --prepare` ran offline, and the receipt now
+  records both directive tools.
+  - They are now built in the preparation's own environment, so their
+    binaries changed once and the fixture export cache was remade.
+  - With both directive crates removed, `--verify` refused. An offline
+    `--prepare` then recreated them with the same locks and the same
+    binaries.
+- The real crash finding of the mutation run above maps to the driver's known
+  signature.
+- An unfrozen check of the budgets ran `concat` and `loop-value-copies` with 8
+  mutants and 90 seconds per fixture. `loop-value-copies` stopped at its
+  budget:
+  - every EVM path ran its 24 entries;
+  - Hull ran five entries and was stopped on the sixth, a mutant on which
+    every EVM path ran out of gas, so its 19 entries from there on are
+    `budget`;
+  - the EVM paths still compared those entries: 17 incomplete and 2
+    unobserved, with no finding.
+
+The runs used `a88836cb6` with 105 digests frozen: the 35 native tools, every
+`scripts/*.py` and `*.rs`, both parity manifests, solc, Anvil, cast, the Rust
+driver, the code-image tool and both directive tools. None changed, and both
+states kept one epoch, `0ad56937aac4`.
+- **Smoke iteration** (base seed `20261111`):
+  - The first attempt was stopped by SIGTERM after 45 seconds, so that the
+    rerun could keep its records (`--keep-runs`) for a comparison. The harness
+    stopped at its next entry and wrote its report. The driver set the run
+    aside to rerun, and no process was left behind.
+  - The rerun took 51 seconds: 8 fixtures (`037dwarves`, `126nanoerc20`,
+    `127microerc20`, `abi-tuple-array`, `mini-erc20`, `ownable`,
+    `payable-ctor` and `storage`) and 141 entries, 36 recorded steps and 105
+    mutants. No fixture drew more than 32 mutants.
+  - 134 entries agreed, and 7 were observed by no path: Lean Core's fuel
+    against the EVM's gas in `126nanoerc20`. There was no finding.
+  - Every entry had the same mutant and the same observations as in the
+    mutation run above, from the same root seed.
+- **Two iterations** (base seed `20261112`, root seeds `20261112` and
+  `20261113`, 201 seconds):
+  - Each ran 8 fixtures: 245 and 290 entries (111 and 119 recorded steps, 134
+    and 171 mutants), all agreeing on every admitted path.
+  - There was no finding, exclusion, budget stop or problem, and both runs
+    were pruned to their ledger rows.
+  - The mutant budget sampled 32 mutants each from six fixtures: `basic` (165
+    drawn), `slices` (136), `storage-adt-bool` (84), `storage-adt-mapping`
+    (80), `mutable-pattern-bindings` (76) and `storage-dynamic-field` (69).
+- Neither run drew `ignored-builtin-effects`, so the known O2 crash did not
+  recur there; the driver's tests register it as known.
+
+No compiled path disagreed with another. This is agreement among compiled
+paths and with upstream's recorded expectations; no original Core reference
+exists for these fixtures. Derived ADT arguments stay unclassified, and their
+classification from std's structural signatures is left for a later unit.
+
 **Mixed sequence seeds for the tuple and bytes returns.** The block choices
 of `stateful-tuple-returns` and `stateful-bytes-returns` came from a raw
 lcg64-v1 stream started at the block seed xor a domain. Consecutive seeds then
