@@ -6534,6 +6534,230 @@ tracked difference.
 
 There was no finding.
 
+**Arrays of enum arguments.** `stateful-enum-arguments` decodes one enum
+value at the head of the arguments. The pinned fixture `abi-batch-adt` decodes
+a calldata dynamic array whose element is a nested user ADT, element by
+element through std's `abiArrayGet`. The `stateful-enum-array-arguments`
+profile takes such an array of a generated enum and two indices. The pinned
+std's array decoder was read before any code (`std.sol`, `dispatch.sol`):
+- **Signature:** `SigString` of `calldata<array<t>>` is `typeStr(t)` then
+  `[]`, and a user enum's `typeStr` is its structural `sum(...)`. So
+  `run(uint256 flags, E[] items, uint256 first, uint256 second)` has the
+  selector of `run(uint256,S[],uint256,uint256)`, where `S` is the enum's
+  signature, as for one enum argument.
+- **Dispatch:** the head is the flags, the array's offset and both indices,
+  128 bytes. The lazy calldata-array decoder follows the offset `o` relative to
+  the arguments at 4, reads the length `L` there and runs `checkArrayHead`:
+  `L <= ~0 / s` and `L s` bytes after the length Word, for the element's
+  `ABIAttribs.headSize` `s`. `s` is the body head of a static enum (its tag and
+  widest fields) and 32 for a dynamic one. Elements are not decoded there.
+- **Element reads:** `items[i]` is `abiArrayGet`. It requires `i < L`, else
+  it reverts with `ArrayOutOfBounds()`, `0x7f52b2bf`; it checks the array's
+  head again, then runs the derived decoder relative to the element region
+  `R`, which follows the length Word.
+  - A static element's body lies inline at `R + i s`.
+  - A dynamic element's offset Word at `R + 32 i` points relative to `R`, and
+    the body is decoded there as for one dynamic enum argument.
+  - Unread elements are never checked.
+- **Checks:** every read and advance is std's bounded calldata reader, so no
+  check wraps.
+
+A probe compiled eight hand-written shapes, four static and four dynamic, two
+with the struct. Its method decodes both indexed elements and writes the length
+and their decoded Words. 328 transactions ran in groups of up to eight on
+imported Hull with the O0 and O2 images and on O0, O2 and Yul on Anvil:
+- canonical arrays of one to four elements read at every position;
+- empty arrays and indices out of bounds;
+- array offsets past the end, into the head and wrapping;
+- lengths of zero, past the calldata, at the overflow boundary and the maximum;
+- unknown, retagged and unread tags;
+- element offsets past the end, into the offset table, shared by two elements
+  and unread;
+- a table entry that holds a constructor's tag and is aliased by another
+  element's offset;
+- `bytes` tails and lengths, cut padding, cut fields, dirty unread head Words
+  and trailing bytes.
+
+All 1,640 path rows were equal to each other and to an independent model of
+std's decisions: 130 returned, 8 reverted in the body, 48 with `0x7f52b2bf`,
+16 with `0x4924aef0`, 110 with `0x08638556` and 16 with empty data. A
+prototype of the original Core contract passed the full Core checker for all
+eight shapes and gave the model's 328 rows.
+
+Feasibility needs no shared change. `Solcore/ContractRuntime/` and its proofs,
+the Hull importer, Core's semantics and host requests, every backend,
+`semantic-fuzz.py` and `export-rust-yul.py` stay as they are. The storage
+adapter's selector rule extends to this profile with `0x7f52b2bf` beside std's
+other error selectors, and the empty-revert rule extends to it unchanged.
+
+The definitions were fixed before execution:
+- **Contract:** `SynthesizedEnumArrays` with `run(uint256 flags,
+  SynthesizedEnum[] items, uint256 first, uint256 second) returns (uint256)`,
+  the source type `calldata<array<SynthesizedEnum>>`, the selector of the
+  structural signature above, zero value, and calldata of at most 1 KiB.
+- **Shape:** as for `stateful-enum-arguments`: two to four constructors named
+  from the bank, each with no fields, one or two Words, the struct `ScPair` of
+  two Words or `bytes`, at most two with `bytes`. The element type is static
+  exactly when no constructor carries `bytes`.
+- **Declared slots 0 to 9:**
+  - slot 0, the step result `r`;
+  - slot 1, the length `L`;
+  - slots 2 to 5, the element at `first`: its one-based constructor index and
+    its Words `w0, w1, w2` as for one enum argument: `(a, 0, 0)` for one Word,
+    `(a, b, 0)` for two Words or the struct, and `(Lb, chunk0, chunk1)` for
+    `bytes`;
+  - slots 6 to 9, the element at `second`, the same way.
+- **Transaction:** std checks the head and the array; the body reads
+  `items.length()`, then `items[first]` and `items[second]`, each matched with
+  one arm per constructor.
+  - It computes `r = step(prior + L + the index and three Words of both
+    elements)`, where the sum wraps, and writes the ten slots.
+  - Odd decoded flags revert with `r`; even flags return `r`.
+  - A rejection reverts before any write.
+- **std's decisions, in order:**
+  1. fewer than 4 bytes or another selector: `0x4924aef0`;
+  2. fewer than `4 + 128` bytes: `0x08638556`;
+  3. the array's offset `o` at 36 with `o > size - 4`: `0x08638556`;
+  4. fewer than 32 bytes at `p = 4 + o`: `0x08638556`;
+  5. the length `L` at `p` with `L > ~0 / s` or `L s > size - (p + 32)`:
+     `0x08638556`;
+  6. for `first`, then `second`, at 68 and 100, an index `i >= L`:
+     `0x7f52b2bf`;
+  7. a dynamic element's offset `e` at `R + 32 i`, with `R = p + 32`, when
+     `e > size - R`, or fewer than 32 bytes at `R + e`: `0x08638556`;
+  8. the tag at the element's body against each constructor's tag in
+     declaration order, with no match: empty revert data;
+  9. the fields relative to the body, as for one enum argument: a static
+     element's lie inside the checked array; a dynamic element's Words must
+     exist, and a `bytes` field's tail, length Word and length must fit:
+     `0x08638556`.
+- **Original Core** (`core-enum-array-argument-contract-v1`, entry
+  `wordOutcomeV1`): one host contract that reads the calldata through
+  `inputDataSize`, `inputDataByte?` and `inputDataWordBE?`.
+  - It takes std's decisions above in std's order, with the selector and tags
+    computed by Lean's Keccak-256 and no std code.
+  - The element decoder is one Core function, applied to `first` and then to
+    `second`.
+  - A rejection reverts with its error selector as the Word payload, and an
+    unknown tag with the Word zero.
+  - One protocol completion follows both elements.
+- **Node budget:**
+  - The step's budget is the node budget minus 168 nodes, the reservation of
+    `stateful-enum-arguments`' wrapper, so that both profiles give the step
+    one budget.
+  - The array wrapper takes 358 nodes for a static element type and 397 for
+    a dynamic one; it lies outside the budget beyond the reservation, with the
+    shape's decoder of 26 to 108 nodes static and 197 to 452 dynamic.
+  - The suite's default is 384 nodes, and the doubled budget is capped at
+    512.
+  - Contracts are bounded by 512 plus their nodes outside the budget, at most
+    1,193.
+- **Step:** one checked aggregate step with one to three helpers, generated as
+  for the other storage-family profiles; it must not give equal outputs at all
+  boundary inputs.
+- **Shape generation:** `stateful-enum-arguments`' shape draws, from this
+  profile's own stream at SplitMix64's finalizer of the seed xor its domain.
+- **Transactions:** `{id, flags, elements, first, second, malformation,
+  calldata, stdRejection, value}`, one to eight per scenario in blocks of
+  three. Each block draws from a stream that starts at SplitMix64's finalizer
+  of the block seed xor its domain:
+  - three flags from the boundary bank, each with the parity of one of the
+    four completion patterns;
+  - per transaction an element count from 0 to 3;
+  - per element `{choice, a, b, length}`: a constructor, two bank Words and a
+    `bytes` length from the length bank 0, 1, 31, 32, 33, 63 and 64 with
+    probability one half, otherwise uniformly from 0 to 64; only a `bytes`
+    element keeps its length, and its payload is the first `length` bytes of
+    `a·K ‖ b·K`;
+  - `first` and `second`: each a position below the count, uniformly, with
+    probability 7/8, otherwise out of bounds, the count or `2^256 - 1` with
+    equal probability; with no element always out of bounds;
+  - canonical with probability one third; otherwise a target element, then a
+    kind uniformly from those that apply, then an entry of its bank.
+
+  Random runs generate the step with G0 revision three.
+- **Canonical encoding:** the selector, the flags, the offset 128, `first`,
+  `second`, the length, then the elements:
+  - a static array's bodies inline;
+  - a dynamic array's offset table of one Word per element, relative to the
+    region, then the bodies in order.
+
+  A body is the tag, the fields zero-padded to the body head, then a `bytes`
+  field's length Word and zero-padded payload behind its tail offset, the body
+  head.
+- **Malformations,** each structurally valid where it applies, and their
+  generation banks, for a canonical size `n` and target element `k` with body
+  start `b`:
+  - `short` (0 to 3 bytes), `selector` (masks `1`, `2^31` and `2^32 - 1`) and
+    `trailing` (as for the malformed-calldata profiles);
+  - `truncate`: cuts at 4, 36, 68, 100, 131, 132, 163 and 164, after each
+    element's tag, and at `n - 1`;
+  - `offset`, the array's offset: `n - 3`, `n - 4`, `n - 35`, `2^255`,
+    `2^256 - 4`, 0, 32, 64 and 96;
+  - `count`, the length Word: the count plus and minus one, 0, the first
+    length that does not fit, `⌊(2^256 - 1) / s⌋ + 1` and `2^256 - 1`;
+  - `tag`, element `k`'s tag: 0, the tag plus one, the tag xor `2^255` and
+    `2^256 - 1`;
+  - `retag`, element `k`'s tag: each other constructor's;
+  - `entry`, element `k`'s table Word of a dynamic array: `n - R + 1`,
+    `n - R`, `2^256 - 32`, 0 and 32;
+  - `share`, element `k`'s table Word: each other element's offset;
+  - `unused`, element `k`'s first head Word that a narrower constructor leaves
+    unread: 1 and `2^256 - 1`;
+  - `tail`, element `k`'s `bytes` tail offset: `n - b + 1`, 0, 32 and
+    `2^256 - 1`;
+  - `length`, its `bytes` length Word: the length plus one, the longest that
+    fits, one more, `2^256 - 1`, the length minus one and 0;
+  - `padding`, its nonzero padding: three patterns.
+- **Prescribed outcome:** each transaction records `stdRejection`:
+  `0x4924aef0`, `0x08638556`, `0x7f52b2bf`, `0x` or null. It comes from a Lean
+  byte-level model of std's decoder, and the adapter recomputes it with its
+  own Python model.
+- **Observations:** status, the whole return or revert data, slots 0 to 9 and
+  the whole committed storage, per prefix.
+  - The selector rule maps original Core's selector Word to std's four bytes,
+    and the empty-revert rule its Word zero to `0x`; each applies only when the
+    transaction's `stdRejection` prescribes it.
+  - Hull against the EVM stays exact.
+  - A returned row must hold the length and both decoded elements in slots 1
+    to 9, and return the committed slot 0.
+- **Exclusions, in order:** a node budget too small for the reservation or
+  above 512; the step's own exclusions; a step whose boundary outputs agree;
+  Core fuel exhaustion (resource); a history that does not follow its
+  prescribed outcomes.
+- **Reductions,** each sealed and strictly smaller in transactions, then
+  elements, the shape, the malformations' bank positions, lengths, program
+  size and the Words, indices and flags:
+  - one-transaction removals;
+  - simpler malformations: none, or an earlier entry of the bank;
+  - the last element dropped;
+  - shorter `bytes` lengths;
+  - unused constructors dropped, the indices above them moving down;
+  - narrower fields: the struct to two Words, two Words to one, one to none,
+    and `bytes` to none;
+  - step reductions, zero element Words and the flags' parity bit.
+- **Fixed corpus:** imported entries over `stateful-enum-arguments`' imported
+  steps, and generated seeds at both budgets. It must cover:
+  - element counts 0 to 3, and both indices reading every position;
+  - every field kind, static and dynamic, decoded;
+  - `bytes` lengths 0, 1, 31, 32, 33 and 64, and one and two `bytes`
+    constructors;
+  - every malformation kind, all five rejections and acceptance, and
+    malformations std accepted;
+  - carries into a decoded element from an earlier committed, reverted and
+    rejected transaction;
+  - both node budgets.
+- **Golden cases:** rows for five shapes, written out as hexadecimal text that
+  the probe's independent model computes outside Lean. They include the order
+  of std's checks, empty arrays, both bounds, offsets into the head and the
+  table, a table entry aliased by another element, shared bodies and unread
+  malformed elements. Core under both rules and the Lean model must give them
+  exactly.
+
+Out of scope: nested arrays of enums, enums with array fields, more than two
+reads per call, arrays beyond three elements, calldata beyond 1 KiB,
+value-bearing calls and other methods.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
