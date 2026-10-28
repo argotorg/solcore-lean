@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete; the twenty-one storage-family profiles also run on Yul when selected and are validated locally; the two call profiles stay on Sonatina | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the twelve profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop and inline Yul memory profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the thirteen profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory and user-defined enum profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]`, malformed-calldata, several-methods, storage-loop, Keccak-loop, tuple-return, inline Yul storage-loop and Keccak-loop, and bounded `bytes`-return extensions validated locally, malformed calldata for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector, two to four external methods on one contract dispatched as std does, a bounded source loop whose iterations read and write declared slots, a bounded source loop whose iterations read and write Keccak-addressed mapping entries and emit one log each, static ABI tuple returns of two to four Words through the `wordTupleOutcomeV1` contract entry convention, both loop plans with every storage access, entry hash and log in inline Yul blocks around the Solcore step call, and `bytes` returns of up to 64 bytes through the `boundedBytesOutcomeV1` convention; all twenty-three stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions; `bytes` returns beyond 64 bytes and other dynamic return values are not built; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -1867,6 +1867,48 @@ before execution:
   corpus is generated with the default budget: from seed 1 upwards, every seed
   whose plan is accepted and covers a missing value is taken, until nothing is
   missing, each plan at all eight inputs.
+
+The profile was implemented at `9400b4e08` with the definitions above:
+- `Solcore.Synthesis.Core.EnumData` (declarations, closed instances, values,
+  builders and the stream, written to be shared with a trait profile),
+  `EnumMatch` (patterns, views, the pattern-matrix check, the Core compilation
+  and the shapes) and `EnumShrink` (reductions); `EnumEmitter` and `EnumCases`;
+  the case-tool commands `enum-generate` and `enum-emit`; and campaign and
+  suite registration. The profile is not G0-based; it joins the acceptance
+  registry as the thirteenth identity-filter profile, with no identity seed.
+  The case tool, the campaign's `maximum_nodes` and the suite's budget cap
+  take its budget up to 4,096 nodes; every other profile keeps 512.
+- A registered Lean test checks:
+  - a fixture's source against a golden text, and its results on the Core
+    reference and on a direct interpreter of the plan against golden values
+    from a separate Python model;
+  - that admission refuses an arm after `default`, an unreachable arm, a
+    non-exhaustive match, a constructor out of range, a misplaced same-name
+    pattern, a nested dot value, a name bound twice in a row, a body naming a
+    non-Word, a nested match on a Word, a generic view inspecting `a`, a
+    forward declaration reference and a nullary same-name constructor;
+  - the reference against the interpreter on the plans of 240 seeds at twelve
+    inputs.
+
+  Generation is deterministic, draws every shape value within 600 seeds and
+  replays exactly, also with seeded inputs and the identity filter; constant
+  plans are excluded, and a 256-node budget drops views. Tampering is refused,
+  and every kind of reduction applies, is strictly smaller and replays.
+- A fixed corpus of 56 cases from seven seeds between 1 and 58, covering every
+  shape value; of the first 58 seeds, 3 were excluded.
+
+Frozen matrices at `9400b4e08` (the freeze digest did not change):
+- The fixed corpus matched all 56 cases on O0, O2 and Yul with complete shape
+  and input coverage, compiling 7 sources, in 167, 193 and 207 seconds, under
+  load averages of 43 to 70 from other work on the machine.
+- Random suites from root seed 1 with eight whole functions took eight
+  attempts without an exclusion and drew 96 cases from 8 sources in one
+  generation request. They drew all three constructor counts, view kinds and
+  depths, every declaration kind and instance argument, every wildcard
+  position, every field count and field kind but a plain enum, and every
+  pattern form but `default`, `rebound` and the same-name pattern. All 96
+  matched on O0, O2 and Yul, in 179, 220 and 325 seconds, so no finding was
+  recorded.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source

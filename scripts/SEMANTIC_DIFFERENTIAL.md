@@ -274,7 +274,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the twenty runtime-input pure profiles, every pure
+Random campaigns of the twenty-one runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -298,7 +298,8 @@ the two loop profiles, `runtime-assembly-loops`, `runtime-nested-loops`,
 `runtime-recursive-loops` and `runtime-loop-closures`, eleven in
 `runtime-recursion` and twelve in
 `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`,
-`runtime-call-graphs` and `runtime-aggregate-call-graphs`. `--cases` still
+`runtime-call-graphs`, `runtime-aggregate-call-graphs` and `runtime-enums`.
+`--cases` still
 counts inputs, so a sixteen-case run of a four-input profile covers two
 functions rather than four. The admission filters still use the boundary
 inputs only.
@@ -313,7 +314,7 @@ N:
 | --- | ---: | ---: |
 | `runtime-word`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-generics`, `runtime-closures`, `runtime-comptime`, `runtime-modules` | 8 (4) | 128 (256) |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-nested-loops`, `runtime-recursive-loops`, `runtime-loop-closures` | 10 (6) | 102 (170) |
-| `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | 12 (8) | 85 (128) |
+| `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums` | 12 (8) | 85 (128) |
 | `runtime-recursion` | 11 (7) | 93 (146) |
 
 The summary records `configuration.functions`,
@@ -389,7 +390,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
@@ -397,11 +398,13 @@ A closure returns `5 * step(x) + 4 * x + 4` (snapshot) or `+ 5`
 (independent), and a module combines its constant with step results, so both
 are identities only for steps that hit specific Words at every boundary input.
 None occurred in the measurements below, but the generators allow them, so
-both profiles apply the filter. `closed-g0` has no runtime input.
+both profiles apply the filter. An enum arm can return a leaf whose constant
+cancels the arm's own, so `runtime-enums` applies it too. `closed-g0` has no
+runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-two of the twelve profiles do not use G0. Only generated cases pass filters:
+three of the thirteen profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -414,7 +417,7 @@ filters only. Replay applies the recorded filter again: a saved identity that
 claims it is refused with the exclusion reason, and an unknown value with
 `unsupported acceptance filter`. Without the field, a filtered case is also a
 valid case of the profile's own filters, since the filter only narrows
-acceptance. Reductions record no filter. The generation commands of the twelve
+acceptance. Reductions record no filter. The generation commands of the thirteen
 profiles take the filter after `FUEL`, in any order with a G0 version and an
 input selection; the others refuse it:
 
@@ -576,7 +579,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the twenty-one pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the twenty-two pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -1976,6 +1979,136 @@ Frozen matrices at `1d2ea9cef`:
   the fingerprint with one aligned stage, no hash and a step that shifts by
   `signextend` of two literals. The crash is retained as a finding and
   recorded locally without investigation, so the O2 random gate did not pass.
+
+## Compare user-defined enums and match
+
+Every other generated program uses Words, std pairs and std sums. The
+pinned checkout's own end-to-end fixtures place its recent defects in
+user-defined enums and `match`: substitution in a specialized trait impl's
+match, pattern binding order, the scopes of folded matches and repeated
+pattern bindings. A defect the front end shares with every backend is visible
+only to original Core, so `runtime-enums` keeps a Core reference built from the
+plan alone.
+
+A plan declares one to three top-level enums `Sc_T0` to `Sc_T2`, each plain or
+generic in one parameter `a`, with two to four constructors of zero to two
+fields. A field is a Word, `a`, a tuple of two components, or an earlier enum,
+a generic one at an argument; no declaration refers to itself or a later one.
+Constructor `k` of `Sc_Ti` is `Sc_Ti_k`, and with the same-name option
+constructor 0 is `Sc_Ti`. The compiler rejects every other unqualified
+constructor (`SC0106`), so constructors are written qualified, in the dot form
+(`.Sc_Ti_k`, in patterns and returned values) or by that same-name constructor.
+
+One to three views each match their scrutinees in one function with a Word
+parameter `sc_w`:
+- `single` matches one value of an enum or of a generic enum's instance;
+- `pair` matches two values as two columns;
+- `generic` is a function over `Sc_Ti<a>` called at two distinct instances,
+  whose patterns bind values of type `a` but never inspect them.
+
+Arms are random rows of constructor, tuple, variable and wildcard patterns,
+nested up to three levels, each kept only when it is useful after the earlier
+rows. At random every remaining first-column constructor then gets a row, and
+a catch-all (`default`, wildcards or a variable) ends a match that is still not
+exhaustive. Pattern variables are `sc_a` to `sc_d` or `sc_w`, which shadows the
+parameter; names repeat freely across arms. A body returns a fold of every
+Word its row binds and possibly one more term, by drawn `+`, `-`, `^` and `*`,
+plus a 64-bit arm constant. A quarter of the arms that bind an enum or tuple
+value match it again, and their arms may rebind the enclosing arm's names. A
+name means its innermost binding. Builder functions build each scrutinee from
+the input: the residue `(sc_x + offset) & 3` selects one of one to four
+constructor trees with leaves `sc_x`, `(sc_x + c)`, `(sc_x ^ c)` or
+`(sc_x * c)`. Each tree is the first of four random candidates that selects an
+arm no earlier tree selects, or, for a pair view, a new top-level constructor.
+`run(uint256)` of `SynthesizedEnums` combines the views' results as
+`r_0 + 3 r_1 + 5 r_2 + …`, a generic view counting at both instances.
+
+The Core reference has no data definitions and never reads the source. An
+enum is the right-nested Core sum of its constructors' payloads (Unit, the
+field, or the product of two fields), substituted at its instance, and a value
+is its chain of `inLeft` and `inRight`. A builder is a closure from Words and a
+view a closure per instance. Each match is compiled arm by arm: every arm but
+the last runs with the let-bound thunk of the remaining arms as its failure, a
+constructor pattern unwraps the sum chain with nested `caseE`, a tuple or
+two-field payload pattern projects and let-binds what it tests, and a variable
+names the matched value. Admission checks pattern types, distinct names in a
+row, scoping, the usefulness of every arm and the exhaustiveness of every match
+by the pattern-matrix algorithm, computed without the compiler, since an
+unreachable arm is a compiler warning and a non-exhaustive match an error. A
+registered Lean test compares the reference with a direct interpreter of the
+plan's first-match semantics on over 200 generated plans at twelve inputs, and
+checks a fixture's source and results against golden values from a separate
+Python model.
+
+Before the profile was written, a probe compiled eight hand-written sources
+with plain and generic enums, nested constructor and tuple patterns,
+wildcards, matches of two and three columns, nested matches, shadowing and
+rebinding, the dot and same-name forms, and traits with constrained generic
+impls at Words, tuples, std sums and enums. Checked Hull export, Sonatina O0
+and O2, Yul, Anvil and the Lean Hull runner matched a Python model at twelve
+inputs on every path, without a change to shared code.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-enums --functions 8 --output .upstream/semantic-enums
+python3 Tests/scripts/test-semantic-enum-corpus.py
+```
+
+Native commands are `enum-generate SEED NODES COUNT ATTEMPTS FUEL
+[seeded-inputs-v1/splitmix64] [exclude-boundary-identity-v1]` and
+`enum-emit PLAN.json INPUT [FUEL]`. Saved cases contain `enumPlan` and the
+whole Core reference, whose exact correspondence native admission checks for
+every origin, and `enumShapes`, which replay recomputes. Replay requires a
+generated plan to be its seed's.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profile records no G0 step features.
+- The node budget bounds the applied reference: default 2,048, minimum 256,
+  at most 4,096, the case limit and the only budget above 512 in the case
+  tool, campaign and suite. Views are dropped from the end while a reference
+  exceeds it.
+- Exclusions, under `enum-profile`, are a single view over the budget, then a
+  plan that returns one Word for all eight boundary inputs or exhausts fuel.
+  An arm can return a leaf whose constant cancels its own, so random
+  campaigns apply the identity filter.
+- Reductions remove a view, a constructor of a declaration with three or more,
+  a field, an arm, a builder value, a body term or an unused declaration;
+  flatten a field to a Word; end a match at an arm with `default`; replace a
+  subpattern by `_` or a nested match by its first inner body; replace a leaf
+  by `sc_x`; then reduce the input. Each is followed by pruning arms that
+  became unreachable and turning names that no longer mean a Word into 0, and
+  each is strictly smaller in plan size, then input. A shrink response stops
+  before its cases would exceed 1.5 MB.
+- `enumRequirements` declares `constructors`, `fields`, `declarations`,
+  `views`, `patterns`, `wildcards` and `depths`, all specified by the plan:
+  constructor counts, field counts and kinds, plain, generic and same-name
+  declarations with each instance argument's kind, the view kinds, pattern
+  forms (`qualified`, `dot`, `same-name`, `nullary`, `tuple`, `variable`,
+  `wildcard`, `default`, `nested`, `shadow`, `repeated`, `rebound`,
+  `exhaustive`), wildcard positions (`field`, `component`, `column`, `arm`,
+  `deep`) and pattern depths 1 to 3. `enumCoverage` counts only three-way
+  matches.
+
+The fixed corpus takes, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing required value, until nothing is missing,
+each at the eight boundary inputs. Seven seeds from 1 to 58 cover every value:
+56 cases from 7 sources. `Tests/scripts/test-semantic-enum-corpus.py` rebuilds
+that selection, recomputes every shape from the plan in Python, checks the
+source's declarations, views and builders, materializes every case twice and
+checks replay, reductions and tampering natively.
+
+The gate passed before the profile was committed: the kernel check, 762
+Python tests, `lake build` (10,250 jobs), 32 native tools, `lake test`,
+eighteen corpus validators and the chunked-generation check over the
+twenty-two pure profiles. Frozen matrices at `9400b4e08`, with the freeze
+digest unchanged, under load averages of 43 to 115 from other work:
+- The fixed corpus matched all 56 cases on O0, O2 and Yul with complete shape
+  and input coverage, compiling 7 sources, in 167, 193 and 207 seconds.
+- Random suites from root seed 1 with eight whole functions took eight
+  attempts without an exclusion and drew 96 cases from 8 sources in one
+  generation request. They drew every shape value except a plain-enum field,
+  `default`, `rebound` and the same-name pattern. All 96 matched on O0, O2 and
+  Yul, in 179, 220 and 325 seconds.
 
 ## Compare aggregate compositions with call graphs
 
@@ -5312,7 +5445,7 @@ boundary; this section describes how to run it.
 - **No layout dependence:** the wrappers' runtime code reads no code, and
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the twenty-one pure and the
+- **Admission:** `export-rust-yul.py` admits the twenty-two pure and the
   eighteen storage-family wrappers, taken from the adapters' profile tables; the
   three malformed profiles reuse wrappers. Each must compile to one creation
   object with one runtime sub-object and no link or immutable references.
@@ -5341,7 +5474,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the twenty-one pure profiles. `--backend yul`
+Its default Yul selection stays the twenty-two pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 
