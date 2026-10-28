@@ -4075,6 +4075,91 @@ differs in every case. 19 rows were compared by selector, 109 method calls
 were accepted, and no seed was excluded. A case took about seven seconds.
 Neither run produced a finding.
 
+## Compare storage-writing loops
+
+Every other stateful step is straight-line code over storage. The
+`stateful-storage-loops` profile runs a bounded source `while` loop whose
+iterations read and write declared slots, where store forwarding,
+loop-invariant motion and O2's memory and storage passes act. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions.
+
+### Definitions
+
+- **Contract:** `SynthesizedStorageLoops` with `run(uint256 flags, uint256
+  input)`, selector `0x7357f5d2`, zero value. Slot 0 is an accumulator, slot 1
+  the committed iteration total and slots 2 to 8 one per iteration.
+- **Loop:** `limit = input & M`, with the plan's mask `M` in {0, 1, 3, 7}, and a
+  counter `i` while `limit > i`. Iteration `i`:
+  - reads slots 0 and 1, then `1 + i` (the previous iteration's slot, or slot
+    1 when `i = 0`) and `2 + i`;
+  - writes the step of their wrapping sum plus the input to slot `2 + i` and
+    then to slot 0.
+- **After the loop:** slot 1 grows by `limit`. Odd flags revert with slot 0
+  plus slot 1; even flags return it.
+- **Source:** the counter, slot and value locals are declared before the loop
+  and assigned inside it, and the slots are computed from the counter.
+- **Original Core:** `M` ordinal guards with literal slots; guard `i` runs
+  iteration `i` exactly when `limit > i`. There is no counter cell.
+- **Transactions:** each records `iterations`, the input's bits under the
+  mask, which replay recomputes. Generation draws `M` from {1, 3, 7}; plans
+  also admit 0.
+
+### Running and validation
+
+```sh
+lake build semanticStorageLoopTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-storage-loop-corpus.json \
+  --output .upstream/semantic-storage-loop-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-storage-loops \
+  --cases 16 --output .upstream/semantic-storage-loop-random
+```
+
+Plans use `solcore-lean.storage-loop-plan.v1` under `storageLoopPlan`. Cases
+use `solcore-lean.semantic-storage-loop-case.v1` and histories
+`solcore-lean.storage-loop-history.v1`. The 57-node shell lies inside the
+node budget; each guard, 45 nodes, lies outside it. The suite's default of 384
+nodes leaves 327 for the step, whatever the mask. A case reaches about 70 KB,
+so a native shrink response carries at most 32 candidates.
+
+Returned rows must follow the loop protocol on every path:
+- slot 1 grows by the iteration count;
+- slot 0 equals the last iteration's slot, or is unchanged without
+  iterations;
+- the slots above the last iteration are unchanged;
+- the output is slot 0 plus slot 1.
+
+A revert is checked by rollback.
+
+Three Lean tests check the profile:
+- `Solcore/Test/SourceStorageLoopGolden.lean` checks the guarded contract and
+  a model of the source loop, a counter over a slot map, against expectations
+  written out by hand. Its steps add a known constant, over masks 0, 1, 3 and
+  7. The rows cover zero, one, two, three and seven iterations, a revert after
+  seven, carries within and across transactions, and wrapping sums.
+- `Solcore/Test/SourceStorageLoopCases.lean` requires the guarded contract to
+  equal the model on 64 generated scenarios, 392 transactions in all. Every
+  case and reduction must replay, and the shell and guard sizes must be those
+  above.
+- `Solcore/Test/SourceStorageLoopCorpus.lean` checks the fixed corpus against
+  expected histories that the model computed.
+
+The fixed corpus has twelve scenarios and 31 transactions: eight imported
+scenarios, which reuse the storage corpus's six imported steps, and four
+generated seeds. Required coverage:
+- masks 0, 1, 3 and 7, and iteration counts 0 to 7;
+- an iteration that reads what the previous one wrote, and a revert that
+  discards loop writes;
+- each slot 2 to 8 read by a later transaction after an earlier committed one
+  wrote it;
+- the six boundary Words as inputs;
+- one to three helpers and transactions, all four templates, both outcomes
+  and seven completion patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The thirteen

@@ -1860,5 +1860,62 @@ class TransactionCountTests(unittest.TestCase):
             self.assertIn(message, errors.getvalue())
 
 
+def loop_case(mask=7, rows=((0, 7), (1, 6), (0, 3), (0, 0))):
+    value = fixtures.loop_case(mask, rows)
+    value["storageLoopPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+class LoopCampaignTests(unittest.TestCase):
+    def test_coverage_names_masks_iteration_counts_carries_and_carried_slots(self):
+        value = loop_case()
+        self.assertEqual(campaign.dimensions("stateful-storage-loops"),
+                         campaign.DIMENSIONS + ("Masks", "IterationCounts", "IterationCarries", "CarriedSlots"))
+        statuses = ["returned", "reverted", "returned", "returned"]
+        # The reverted six iterations and the later three read what the first
+        # committed seven wrote; the revert discards its own writes.
+        self.assertEqual(campaign.loops_coverage(value, statuses),
+                         {"Masks": {7}, "IterationCounts": {0, 3, 6, 7}, "IterationCarries": {"iteration", "rollback"},
+                          "CarriedSlots": {2, 3, 4, 5, 6, 7}})
+        self.assertEqual(campaign.inputs(value), {"0", "3", "6", "7"})
+        # Nothing is carried from a reverted transaction, and one iteration carries nothing within its transaction.
+        first_reverted = loop_case(rows=((1, 7), (0, 1)))
+        self.assertEqual(campaign.loops_coverage(first_reverted, ["reverted", "returned"]),
+                         {"Masks": {7}, "IterationCounts": {7, 1}, "IterationCarries": {"iteration", "rollback"},
+                          "CarriedSlots": set()})
+        self.assertEqual(campaign.loops_coverage(loop_case(1, rows=((0, 1), (0, 3))), ["returned", "returned"]),
+                         {"Masks": {1}, "IterationCounts": {1}, "IterationCarries": set(), "CarriedSlots": {2}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-storage-loops"))
+            instance.summary["coverage"].update(requiredMasks=[0, 7], requiredIterationCounts=list(range(8)),
+                                                requiredCarriedSlots=list(range(2, 9)))
+            histories = fixtures.loop_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedMasks"], coverage["matchedIterationCounts"], coverage["matchedCarriedSlots"]),
+                             ([7], [0, 3, 6, 7], [2, 3, 4, 5, 6, 7]))
+            self.assertEqual((coverage["missingMasks"], coverage["missingIterationCounts"], coverage["missingCarriedSlots"]),
+                             ([0], [1, 2, 4, 5], [8]))
+
+    def test_the_fixed_corpus_validates_and_its_loop_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-storage-loop-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-storage-loops")
+        self.assertEqual((manifest["requiredMasks"], manifest["requiredIterationCounts"], manifest["requiredCarriedSlots"]),
+                         ([0, 1, 3, 7], list(range(8)), list(range(2, 9))))
+        for key, changed in (("requiredMasks", [2]), ("requiredMasks", []), ("requiredMasks", [True]),
+                             ("requiredIterationCounts", [8]), ("requiredIterationCarries", ["other"]),
+                             ("requiredCarriedSlots", [1]), ("requiredCarriedSlots", [2, 2])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredCarriedSlots"})
+        other = json.loads((ROOT / "scripts/semantic-methods-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop profile"):
+            campaign.validate_manifest({**other, "requiredMasks": [0, 1, 3, 7]})
+
+
 if __name__ == "__main__":
     unittest.main()

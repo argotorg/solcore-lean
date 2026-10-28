@@ -2180,6 +2180,9 @@ import Solcore.Test.SourceMalformedBytesCorpus
 import Solcore.Test.SourceMethodsGolden
 import Solcore.Test.SourceMethodsCases
 import Solcore.Test.SourceMethodsCorpus
+import Solcore.Test.SourceStorageLoopGolden
+import Solcore.Test.SourceStorageLoopCases
+import Solcore.Test.SourceStorageLoopCorpus
 import Solcore.Test.SourceAggregatePrimitives
 import Solcore.Test.SourceAggregateMeaning
 import Solcore.Test.SourceEventLogEmitter
@@ -4198,6 +4201,9 @@ def main : IO UInt32 := do
   Tests.SourceMethodsGolden.testSourceMethodsGolden
   Tests.SourceMethodsCases.testSourceMethodsCases
   Tests.SourceMethodsCorpus.testSourceMethodsCorpus
+  Tests.SourceStorageLoopGolden.testSourceStorageLoopGolden
+  Tests.SourceStorageLoopCases.testSourceStorageLoopCases
+  Tests.SourceStorageLoopCorpus.testSourceStorageLoopCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   Tests.SourceAggregateMeaning.testSourceAggregateMeaning
   Tests.SourceEventLogEmitter.testSourceEventLogEmitter

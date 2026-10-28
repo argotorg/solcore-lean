@@ -40,8 +40,8 @@ def hull_output(contract=CONTRACT):
 class YulProtocolTests(unittest.TestCase):
     def test_pure_and_storage_family_wrappers_are_admitted_but_call_wrappers_are_not(self):
         self.assertEqual(len(exporter.PURE_CONTRACTS), 17)
-        self.assertEqual(len(exporter.STORAGE_CONTRACTS), 12)
-        self.assertEqual(len(set(exporter.CONTRACTS)), 29)
+        self.assertEqual(len(exporter.STORAGE_CONTRACTS), 13)
+        self.assertEqual(len(set(exporter.CONTRACTS)), 30)
         self.assertEqual(exporter.CONTRACTS, exporter.PURE_CONTRACTS + exporter.STORAGE_CONTRACTS)
         self.assertIn("SynthesizedAssembly", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedRecursion", exporter.CONTRACTS)
@@ -52,12 +52,13 @@ class YulProtocolTests(unittest.TestCase):
         self.assertIn("SynthesizedAggregateCallGraphs", exporter.CONTRACTS)
         # Both allow-lists are derived from the case profiles, not maintained separately.
         self.assertEqual(exporter.PURE_CONTRACTS, tuple(exporter.common.CASE_CONTRACTS.values()))
-        self.assertEqual(len(exporter.storage.PROFILES), 15)
+        self.assertEqual(len(exporter.storage.PROFILES), 16)
         self.assertEqual(set(exporter.STORAGE_CONTRACTS), {value["contract"] for value in exporter.storage.PROFILES.values()})
         # The three malformed-calldata profiles reuse the dynamic-array, nested-array and long-bytes wrappers.
         self.assertEqual({value["contract"] for name, value in exporter.storage.PROFILES.items() if "malformed" in name},
                          {"SynthesizedDynamicArray", "SynthesizedNestedArray", "SynthesizedLongBytes"})
-        for contract in ("SynthesizedStorage", "SynthesizedRollback", "SynthesizedLedger", "SynthesizedMethods"):
+        for contract in ("SynthesizedStorage", "SynthesizedRollback", "SynthesizedLedger", "SynthesizedMethods",
+                         "SynthesizedStorageLoops"):
             self.assertIn(contract, exporter.STORAGE_CONTRACTS)
         for contract in exporter.CONTRACTS:
             exporter.validate_contract(contract)

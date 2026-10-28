@@ -3275,5 +3275,138 @@ class MethodsTests(unittest.TestCase):
         self.assertFalse(runner.conforms(value, value["transactions"][1], changed["directCore"]["transactions"][1], prior))
         self.assertNotEqual(runner.compare(changed, value)["category"], "matched")
 
+
+def loop_case(mask=7, rows=((0, 7), (1, 3), (2, 2**255 + 1))):
+    """Envelope fixture only: native replay checks the actual storage-loop program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "iterations": value & mask,
+                     "calldata": "0x7357f5d2" + f"{flags:064x}" + f"{value:064x}", "value": "0"}
+                    for index, (flags, value) in enumerate(rows)]
+    return {"schema": runner.LOOP_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "storageLoopPlan": {"schema": "solcore-lean.storage-loop-plan.v1", "stepProgram": {}, "mask": mask},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(9)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedStorageLoops", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": "0x7357f5d2", "deployPath": ["SynthesizedStorageLoopsDeploy"],
+            "runtimePath": ["SynthesizedStorageLoopsDeploy", "SynthesizedStorageLoops"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def loop_history(value, path, step=lambda x: x + 1, copy_last=True):
+    """Rows of the loop protocol with a known step: iteration i writes
+    step(slot 0 + slot 1 + slot (1 + i) + slot (2 + i) + input) to slot 2 + i
+    and slot 0, slot one then grows by the count, and odd flags revert with
+    slot 0 + slot 1. Without `copy_last` the last iteration skips slot 0."""
+    mask = value["storageLoopPlan"]["mask"]
+    rows, prior = [], [0] * 9
+    for index, tx in enumerate(value["transactions"]):
+        after, x = list(prior), int(tx["input"])
+        count = x & mask
+        for i in range(count):
+            written = step((after[0] + after[1] + after[1 + i] + after[2 + i] + x) % 2**256) % 2**256
+            after[2 + i] = written
+            if copy_last or i + 1 < count:
+                after[0] = written
+        after[1] = (after[1] + count) % 2**256
+        result = (after[0] + after[1]) % 2**256
+        reverted = int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else after
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{result:064x}", "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.LOOP_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0] * 9), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def loop_histories(value=None, **options):
+    value = loop_case() if value is None else value
+    return {path: loop_history(value, path, **options) for path in runner.PATHS}
+
+
+class LoopTests(unittest.TestCase):
+    def test_a_loop_case_records_its_mask_and_each_transactions_iterations(self):
+        value = loop_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["selector"]),
+                         ("semantic-storage-loop-tool", "rust-hull-keyed-storage-scenario", True, "loops", "0x7357f5d2"))
+        self.assertTrue(runner.has_loops(value))
+        self.assertFalse(runner.has_loops(methods_case()) or runner.uses_selector_rule(value))
+        self.assertEqual([runner.loop_iterations(value, tx) for tx in value["transactions"]], [7, 3, 1])
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(9)))
+        self.assertIn("source while loop", runner.scope(value))
+        for mask in (0, 1, 3):
+            runner.validate_case(loop_case(mask))
+        for mask in (2, 5, 8, True, "7", None):
+            invalid = loop_case()
+            invalid["storageLoopPlan"]["mask"] = mask
+            with self.subTest(mask=mask), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for key, changed in (("iterations", 6), ("iterations", "7"), ("iterations", None),
+                             ("calldata", "0x7357f5d2" + "00" * 64), ("value", "1"), ("flags", "2")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # A recorded count follows the plan's mask, so another mask needs other counts.
+        invalid = copy.deepcopy(value)
+        invalid["storageLoopPlan"]["mask"] = 3
+        with self.assertRaises(ValueError):
+            runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = invalid["observedSlots"][:5]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_a_returned_row_follows_the_loop_protocol(self):
+        value = loop_case()
+        histories = loop_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+            self.assertEqual(runner.loop_fields(value, tx, rows[index], prior), [])
+        # tx-2 runs one iteration: slot one grows by one, slot zero equals slot
+        # two, slots three to eight keep their values and the output is their sum.
+        prior, tx = rows[1]["committedStorage"], value["transactions"][2]
+        for slot in ("0", "1", "8"):
+            changed = copy.deepcopy(rows[2])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertIn("committedStorage", runner.loop_fields(value, tx, changed, prior))
+        changed = copy.deepcopy(rows[2])
+        changed["output"] = "0x" + f"{int(changed['output'], 16) + 1:064x}"
+        self.assertEqual(runner.loop_fields(value, tx, changed, prior), ["output"])
+        # A revert is checked by rollback, not by the protocol.
+        self.assertEqual(runner.loop_fields(value, value["transactions"][1], {**rows[1], "output": "0x" + "00" * 32},
+                                            rows[0]["committedStorage"]), [])
+        # Zero iterations leave slot zero and every iteration slot unchanged.
+        zero = loop_case(rows=((0, 7), (0, 8)))
+        prior, row = loop_histories(zero)["directCore"]["transactions"]
+        self.assertEqual(runner.loop_fields(zero, zero["transactions"][1], row, prior["committedStorage"]), [])
+
+    def test_a_protocol_break_on_every_path_is_a_mismatch_although_the_paths_agree(self):
+        value = loop_case()
+        broken = loop_histories(value, copy_last=False)
+        result = runner.compare(broken, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertIn("committedStorage", result["fields"])
+        # A different step on one path is an ordinary difference.
+        changed = loop_histories(value)
+        changed["importedHull"] = loop_history(value, "importedHull", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/importedHull"])
+
 if __name__ == "__main__":
     unittest.main()

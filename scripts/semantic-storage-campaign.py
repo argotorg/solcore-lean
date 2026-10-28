@@ -83,6 +83,13 @@ MALFORMED_BYTES_DIMENSIONS = DIMENSIONS + ("PayloadLengths",) + MALFORMED_EXTRA[
 METHODS_EXTRA = {"MethodCounts": (2, 3, 4), "MethodPositions": (0, 1, 2, 3), "SelectorOrders": adapter.SELECTOR_ORDERS,
                  "Arities": (0, 1, 2), "Rejections": (adapter.STD_NO_SELECTOR, "accepted")}
 METHODS_DIMENSIONS = DIMENSIONS + tuple(METHODS_EXTRA)
+# Storage loops: plan masks, transactions' iteration counts, the carries
+# `iteration` (an iteration read what the previous wrote) and `rollback` (a
+# revert discarded loop writes), and the iteration slots a later transaction
+# read after an earlier committed one wrote them.
+LOOP_EXTRA = {"Masks": adapter.LOOP_MASKS, "IterationCounts": tuple(range(8)), "IterationCarries": ("iteration", "rollback"),
+              "CarriedSlots": tuple(range(2, 9))}
+LOOP_DIMENSIONS = DIMENSIONS + tuple(LOOP_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -103,6 +110,8 @@ def dimensions(profile_name):
         return MALFORMED_BYTES_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "methods":
         return METHODS_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "loops":
+        return LOOP_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -159,6 +168,19 @@ def methods_coverage(case):
             "MethodPositions": {names.index(tx["method"]) for tx in case["transactions"] if tx["method"] is not None},
             "SelectorOrders": {case["contract"]["selectorOrder"]}, "Arities": {method["arity"] for method in methods},
             "Rejections": {tx["stdRejection"] or "accepted" for tx in case["transactions"]}}
+
+
+def loops_coverage(case, statuses):
+    """The plan's mask, iteration counts, the in-transaction and rollback
+    carries, and the iteration slots that a transaction read after an earlier
+    committed transaction of the scenario wrote them."""
+    counts = [adapter.loop_iterations(case, tx) for tx in case["transactions"]]
+    carries = ({"iteration"} if any(count >= 2 for count in counts) else set()) | (
+        {"rollback"} if any(count >= 1 and status == "reverted" for count, status in zip(counts, statuses)) else set())
+    carried = {2 + iteration for index, count in enumerate(counts) for iteration in range(count)
+               if any(statuses[earlier] == "returned" and counts[earlier] > iteration for earlier in range(index))}
+    return {"Masks": {case[adapter.profile(case)["planKey"]]["mask"]}, "IterationCounts": set(counts),
+            "IterationCarries": carries, "CarriedSlots": carried}
 
 
 def nested_coverage(case):
@@ -379,6 +401,13 @@ def validate_manifest(manifest):
         raise ValueError("malformation coverage belongs to the malformed-calldata profile")
     if selected["abi"] != "methods" and any("required" + dimension in manifest for dimension in METHODS_EXTRA if dimension != "Rejections"):
         raise ValueError("method coverage belongs to the several-methods profile")
+    if selected["abi"] == "loops":
+        for dimension, allowed in LOOP_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"storage-loop coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in LOOP_EXTRA):
+        raise ValueError("loop coverage belongs to the storage-loop profile")
     if selected.get("logs"):
         for dimension, allowed in LOG_EXTRA.items():
             values = manifest.get("required" + dimension)
@@ -578,7 +607,7 @@ def keyed_analysis(analysis):
                                                 adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
                                                 adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA,
-                                                adapter.METHODS_HISTORY_SCHEMA)
+                                                adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -747,6 +776,8 @@ class Campaign:
             values.update(malformed_coverage(case))
         elif self.specification["abi"] == "methods":
             values.update(methods_coverage(case))
+        elif self.specification["abi"] == "loops":
+            values.update(loops_coverage(case, statuses))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -809,7 +840,7 @@ class Campaign:
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
-                          "methods": tuple(METHODS_EXTRA),
+                          "methods": tuple(METHODS_EXTRA), "loops": tuple(LOOP_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(

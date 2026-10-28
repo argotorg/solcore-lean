@@ -76,6 +76,10 @@ lean_exe semanticMethodsTool where
   root := `Tests.SemanticMethodsTool
   exeName := "semantic-methods-tool"
 
+lean_exe semanticStorageLoopTool where
+  root := `Tests.SemanticStorageLoopTool
+  exeName := "semantic-storage-loop-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

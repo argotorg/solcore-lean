@@ -68,6 +68,8 @@ MALFORMED_BYTES_CASE_SCHEMA = "solcore-lean.semantic-malformed-bytes-case.v1"
 MALFORMED_BYTES_HISTORY_SCHEMA = "solcore-lean.malformed-bytes-history.v1"
 METHODS_CASE_SCHEMA = "solcore-lean.semantic-methods-case.v1"
 METHODS_HISTORY_SCHEMA = "solcore-lean.methods-history.v1"
+LOOP_CASE_SCHEMA = "solcore-lean.semantic-storage-loop-case.v1"
+LOOP_HISTORY_SCHEMA = "solcore-lean.storage-loop-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -197,6 +199,16 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": METHODS_HISTORY_SCHEMA,
         "signature": None, "selector": None, "rollback": True, "keyed": False,
         "declared": True, "abi": "methods", "shrinkBatch": 16},
+    # A bounded source while loop whose iterations read and write declared slots;
+    # each transaction runs its input's bits under the plan's mask. A case reaches
+    # about 70 KB, so a native shrink response carries at most 32 candidates.
+    "stateful-storage-loops": {"caseSchema": LOOP_CASE_SCHEMA, "planSchema": "solcore-lean.storage-loop-plan.v1",
+        "planKey": "storageLoopPlan", "corpusSchema": "solcore-lean.semantic-storage-loop-corpus.v1",
+        "originKind": "storage-loop-generated", "contract": "SynthesizedStorageLoops",
+        "caseTool": "semantic-storage-loop-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LOOP_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "loops", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -261,6 +273,10 @@ METHODS_SLOTS = [str(slot) for slot in range(6)]
 MIN_METHODS, MAX_METHODS, MAX_METHOD_ARITY = 2, 4, 2
 METHOD_NAME = re.compile(r"m_[0-9a-f]{8}")
 SELECTOR_ORDERS = ("ascending", "descending", "mixed")
+# The storage-loop profile: slot 0 the accumulator, slot 1 the committed
+# iteration total, slot 2 + i iteration i's result; plans admit these masks.
+LOOP_SLOTS = [str(slot) for slot in range(9)]
+LOOP_MASKS = (0, 1, 3, 7)
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -301,7 +317,7 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         # A call's odd input sum reverts.
         return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
-                                                             "malformed") else "input"]
+                                                             "malformed", "loops") else "input"]
     odd = int(common.word(parity)) % 2
     if has_senders(case) and not odd:
         return None
@@ -310,6 +326,34 @@ def expected_status(case: dict, transaction: dict) -> str | None:
 
 def has_senders(case: dict) -> bool:
     return profile(case).get("senders", False)
+
+
+def has_loops(case: dict) -> bool:
+    return profile(case)["abi"] == "loops"
+
+
+def loop_iterations(case: dict, transaction: dict) -> int:
+    """The iterations a transaction runs: its input's bits under the plan's mask."""
+    return int(common.word(transaction.get("input"), "transaction input")) & case[profile(case)["planKey"]]["mask"]
+
+
+def loop_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the loop protocol: slot one grows by
+    the iteration count, slot zero is the last iteration's slot (unchanged
+    without iterations), the slots above the last iteration are unchanged, and
+    the output is slot zero plus slot one. A revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    count = loop_iterations(case, transaction)
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after["1"] != (before["1"] + count) % 2**256 or after["0"] != (after[str(1 + count)] if count else before["0"]) or \
+            any(after[slot] != before[slot] for slot in LOOP_SLOTS[2 + count:]):
+        fields.append("committedStorage")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after["1"]) % 2**256:
+        fields.append("output")
+    return fields
 
 
 def has_logs(case: dict) -> bool:
@@ -571,6 +615,11 @@ def scope(case: dict) -> str:
 
 
 def declared_scope(case: dict) -> str:
+    if has_loops(case):
+        return ("ordered zero-value run(uint256,uint256) transactions, each running its input's bits under the plan's "
+                "mask (at most seven) iterations of a source while loop that reads slots 0, 1, 1 + i and 2 + i and writes "
+                "slot 2 + i and slot 0; initially empty storage; committed values at slots 0..8 on all paths and no "
+                "nonzero undeclared slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
     if profile(case)["abi"] == "keyed":
         return ("ordered zero-value run(uint256,uint256) transactions; initially empty storage; committed values at the "
                 "declared counter/key/successor slots on all paths and no nonzero undeclared slot on Hull/EVM; "
@@ -1095,7 +1144,9 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
         value = int(common.word(tx.get("input"), "transaction input"))
-        prefix = {"keyed": "key", "flags": "flags", "value": "flags"}.get(selected["abi"])
+        if selected["abi"] == "loops" and (type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx)):
+            raise ValueError("transaction iterations differ from its input under the loop mask")
+        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
         sent = "0"
         if selected.get("balances"):
@@ -1114,6 +1165,8 @@ def validate_case(case) -> None:
     if not isinstance(plan, dict) or plan.get("schema") != selected["planSchema"] or (
             not isinstance(plan.get("methods"), list) if selected["abi"] == "methods" else not isinstance(plan.get("stepProgram"), dict)):
         raise ValueError("storage case requires its original checked step plan")
+    if selected["abi"] == "loops" and (type(plan.get("mask")) is not int or plan["mask"] not in LOOP_MASKS):
+        raise ValueError("storage-loop plan requires a mask of 0, 1, 3 or 7")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
     if selected["abi"] == "keyed":
@@ -1126,6 +1179,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "methods":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != METHODS_SLOTS:
             raise Finding("unsupported-scope", "input", "several-methods profile starts empty and observes slots zero through five")
+    elif selected["abi"] == "loops":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != LOOP_SLOTS:
+            raise Finding("unsupported-scope", "input", "storage-loop profile starts empty and observes slots zero through eight")
     elif selected["abi"] == "malformed" and encoding(selected) == "bytes":
         slots = bytes_layout(selected)[1]
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
@@ -1381,6 +1437,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
         return False
     if has_methods(case) and methods_fields(case, tx, row, prior):
         return False
+    if has_loops(case) and loop_fields(case, tx, row, prior):
+        return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
     if has_balances(case) and (row["committedBalance"] != expected_balance(case, row) or
@@ -1521,6 +1579,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if has_methods(case):
             # A returned call follows the shared-slot protocol of its method.
             broken = sorted({field for name, row in rows.items() for field in methods_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_loops(case):
+            # A returned row follows the loop protocol; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in loop_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
