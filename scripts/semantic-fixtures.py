@@ -70,7 +70,9 @@ DEFAULT_FUEL = 10_000_000
 ENVIRONMENT = {"hardfork": "osaka", "chainId": 31337, "timestamp": 1700000000, "blockGasLimit": BLOCK_GAS,
                "baseFeePerGas": 0, "gasPrice": 0, "rawGas": RAW_GAS, "methodGas": METHOD_GAS}
 COMPLETED = ("returned", "reverted", "exceptional")
-RESOURCE = ("out-of-fuel", "out-of-gas", "resource-limit", "timeout", "output-limit")
+RESOURCE = ("out-of-fuel", "out-of-gas", "resource-limit", "timeout", "output-limit", "memory-range")
+# Solcore.Frontend.RustHull.Memory.overflowReason as the Lean runner prints a language failure's reason.
+MEMORY_RANGE = "Solcore.Core.Value.word 6"
 COMPARED = ("status", "output", "logs", "storage", "balances")
 U256 = 2**256
 MASK64 = 2**64 - 1
@@ -942,6 +944,19 @@ def comparable(observation: dict | None, deploy: bool) -> dict | None:
     return {key: observation.get(key) for key in keys}
 
 
+def memory_range(observations: dict[str, dict]) -> dict[str, dict]:
+    """Hull memory fails with Memory.overflowReason, before changing memory or its size, for a nonzero-length
+    range ending beyond 2^256 - 32, which no EVM transaction can pay to expand. That failure is the Hull path's
+    resource limit `memory-range` when every EVM path observed the entry stop at a resource limit; when one
+    returned, reverted or halted otherwise, the EVM did not reach that access and the failure stays."""
+    hull_observation = observations.get("hull") or {}
+    evm = [observation.get("status") for path, observation in observations.items() if path != "hull"]
+    if hull_observation.get("status") == "language-failure" and hull_observation.get("detail") == MEMORY_RANGE and \
+            evm and all(status in RESOURCE for status in evm):
+        return {**observations, "hull": {**hull_observation, "status": "memory-range"}}
+    return observations
+
+
 def agreement(observations: dict[str, dict], deploy: bool) -> dict:
     """Whether every completed path observed the same; resource limits are inconclusive."""
     values = {path: comparable(observation, deploy) for path, observation in observations.items()}
@@ -1047,7 +1062,7 @@ class FixtureRun:
         self.raw = fixture["mode"] == "raw"
         self.record = {"schema": FIXTURE_SCHEMA, "id": fixture["id"], "mode": fixture["mode"],
                        "contract": fixture["contract"], "source": fixture["source"], "sha256": fixture["sha256"],
-                       "exclusions": [], "findings": [], "admitted": []}
+                       "exclusions": [], "findings": [], "admitted": [], "statuses": {}}
 
     def exclude(self, error: Excluded) -> None:
         self.record["exclusions"].append({"paths": list(error.paths), "stage": error.stage, "reason": error.reason,
@@ -1136,7 +1151,8 @@ class FixtureRun:
         return result
 
     def observe(self, deploy: dict, entries: list[dict]) -> dict[str, list[dict]]:
-        """Run a deployment and its entries on every admitted path."""
+        """Run a deployment and its entries on every admitted path; a Hull memory-range failure is
+        classified against the EVM paths' observations of the same entry."""
         observed = {}
         for path in self.admitted:
             if path == "hull":
@@ -1144,6 +1160,10 @@ class FixtureRun:
             else:
                 init, runtime = self.bytecode[path]
                 observed[path] = run_evm(self.evm, path, init, runtime, deploy, entries)
+        for number in range(1 + len(entries)):
+            classified = memory_range({path: rows[number] for path, rows in observed.items()})
+            for path, rows in observed.items():
+                rows[number] = classified[path]
         return observed
 
     def compare(self, entries: list[dict], observed: dict[str, list[dict]]) -> None:
@@ -1152,6 +1172,7 @@ class FixtureRun:
         deploy = {**self.steps[0], "id": "0", "step": 0}
         for number, entry in enumerate([deploy] + entries):
             observations = {path: observed[path][number] for path in self.admitted}
+            self.tally(observations)
             result = agreement(observations, entry["kind"] == "deploy")
             counts[result["status"]] += 1
             row = {"id": entry["id"], "step": entry["step"], "agreement": result}
@@ -1171,6 +1192,12 @@ class FixtureRun:
         self.record["counts"] = {**counts, "recorded": len(self.steps), "mutants": len(entries) + 1 - len(self.steps)}
         self.record["expectations"] = expectations
 
+    def tally(self, observations: dict[str, dict]) -> None:
+        """Count each path's observed statuses, so that every resource limit stays visible."""
+        for path, observation in observations.items():
+            seen = self.record["statuses"].setdefault(path, {})
+            seen[observation["status"]] = seen.get(observation["status"], 0) + 1
+
     def deploy_mutants(self) -> None:
         """Each mutant of a deployment with constructor bytes or value is its own fresh deployment."""
         rows = []
@@ -1178,6 +1205,7 @@ class FixtureRun:
             entry = {**apply(self.steps[0], mutant), "id": f"0.{number}", "step": 0, "mutant": mutant}
             observed = self.observe(entry, [])
             observations = {path: observed[path][0] for path in self.admitted}
+            self.tally(observations)
             result = agreement(observations, True)
             self.record["counts"][result["status"]] += 1
             self.record["counts"]["mutants"] += 1
@@ -1269,7 +1297,8 @@ def check_tools(args) -> dict:
 
 def summarize(records: list[dict]) -> dict:
     totals = {"fixtures": len(records), "admitted": {path: 0 for path in PATHS}, "agree": 0, "disagree": 0,
-              "incomplete": 0, "unobserved": 0, "recorded": 0, "mutants": 0, "findings": {}, "exclusions": {}}
+              "incomplete": 0, "unobserved": 0, "recorded": 0, "mutants": 0, "findings": {}, "exclusions": {},
+              "statuses": {}}
     expectations = {path: {"match": 0, "mismatch": 0, "inconclusive": 0, "not-executed": 0} for path in PATHS}
     for record in records:
         for path in record.get("admitted") or []:
@@ -1279,6 +1308,10 @@ def summarize(records: list[dict]) -> dict:
         for path, verdicts in (record.get("expectations") or {}).items():
             for verdict, count in verdicts.items():
                 expectations[path][verdict] += count
+        for path, seen in (record.get("statuses") or {}).items():
+            merged = totals["statuses"].setdefault(path, {})
+            for status, count in seen.items():
+                merged[status] = merged.get(status, 0) + count
         for finding in record["findings"]:
             totals["findings"][finding["category"]] = totals["findings"].get(finding["category"], 0) + 1
         for exclusion in record["exclusions"]:
@@ -1361,7 +1394,8 @@ def main(argv=None) -> int:
                   f"disagree {counts.get('disagree', 0)}, incomplete {counts.get('incomplete', 0)}; "
                   f"findings {len(record['findings'])}; {record['seconds']} s", flush=True)
         return {key: record.get(key) for key in ("id", "mode", "contract", "admitted", "exclusions", "findings", "counts",
-                                                 "expectations", "errors", "seconds", "exportSeconds", "exportsReused")}
+                                                 "expectations", "statuses", "errors", "seconds", "exportSeconds",
+                                                 "exportsReused")}
 
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         records = list(pool.map(one, fixtures))

@@ -229,6 +229,37 @@ class ObservationTests(unittest.TestCase):
         mutant = {**entry, "id": "1.1", "mutant": {"operator": "value", "value": 1}}
         self.assertNotIn("expectation-mismatch", [item["category"] for item in fixtures.entry_findings(fixture, mutant, observed)])
 
+    def test_a_hull_memory_range_failure_is_a_resource_limit_only_where_no_evm_path_completed(self):
+        failure = {"status": "language-failure", "detail": fixtures.MEMORY_RANGE}
+        gas = {"status": "out-of-gas", "detail": "out of gas"}
+        limited = {"hull": failure, "sonatina-o0": gas, "sonatina-o2": gas, "yul": {"status": "resource-limit", "detail": "x"}}
+        fixture = {"id": "f", "mode": "methods"}
+        entry = {**step(kind="call"), "id": "1.1", "step": 1, "mutant": {"operator": "word"}}
+        classified = fixtures.memory_range(limited)
+        self.assertEqual(classified["hull"], {"status": "memory-range", "detail": fixtures.MEMORY_RANGE})
+        self.assertEqual(fixtures.agreement(classified, False)["status"], "unobserved")
+        self.assertEqual(fixtures.entry_findings(fixture, entry, classified), [])
+        # An EVM path that returned, reverted or halted otherwise did not reach the access.
+        for other in (observation(), observation("reverted", "0x01"), {"status": "exceptional", "output": "0x", "logs": []}):
+            kept = fixtures.memory_range(dict(limited, yul=other))
+            self.assertEqual(kept["hull"], failure)
+            self.assertEqual([(item["category"], item["path"]) for item in fixtures.entry_findings(fixture, entry, kept)],
+                             [("path-failure", "hull")])
+        # Another failure reason, no EVM path, or one that never ran the entry keeps the failure as well.
+        for observations in (dict(limited, hull={"status": "language-failure", "detail": "Solcore.Core.Value.word 7"}),
+                             {"hull": failure}, dict(limited, yul={"status": "not-executed", "detail": "no deployment"})):
+            self.assertEqual(fixtures.memory_range(observations), observations)
+
+    def test_observing_classifies_each_entry_against_the_evm_paths_of_that_entry(self):
+        run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+        run.args, run.fixture, run.prepared, run.chain, run.evm = None, {}, {}, {}, None
+        run.admitted, run.bytecode = ["hull", "yul"], {"yul": (b"", b"")}
+        failure = {"status": "language-failure", "detail": fixtures.MEMORY_RANGE}
+        with patch.object(fixtures, "run_hull", return_value=[observation(), failure, failure]), \
+                patch.object(fixtures, "run_evm", return_value=[observation(), {"status": "out-of-gas"}, observation()]):
+            observed = run.observe(step(kind="deploy", index=0), [step(), step(index=2)])
+        self.assertEqual([row["status"] for row in observed["hull"]], ["returned", "memory-range", "language-failure"])
+
 
 class HullRunnerTests(unittest.TestCase):
     chain = {"address": "0x" + "00" * 19 + "0a", "accounts": []}
@@ -348,7 +379,10 @@ class SummaryTests(unittest.TestCase):
         crashed = {"id": "y", "admitted": ["hull", "yul"], "findings": [{"category": "compiler-crash"}],
                    "counts": {"agree": 3, "disagree": 0, "incomplete": 1, "unobserved": 0, "recorded": 2, "mutants": 2},
                    "expectations": {"hull": {"match": 2, "mismatch": 0, "inconclusive": 0, "not-executed": 0}},
+                   "statuses": {"hull": {"returned": 3, "memory-range": 1}, "yul": {"returned": 3, "out-of-gas": 1}},
                    "exclusions": [{"paths": ["sonatina-o2"], "stage": "rust-code-images-O2", "reason": "compiler-crash"}]}
+        totals = fixtures.summarize([excluded, crashed, dict(crashed, exclusions=[], findings=[])])
+        self.assertEqual(totals["statuses"], {"hull": {"returned": 6, "memory-range": 2}, "yul": {"returned": 6, "out-of-gas": 2}})
         totals = fixtures.summarize([excluded, crashed])
         self.assertEqual((totals["fixtures"], totals["admitted"]["hull"], totals["admitted"]["sonatina-o0"]), (2, 1, 0))
         self.assertEqual((totals["agree"], totals["incomplete"], totals["mutants"]), (3, 1, 2))
