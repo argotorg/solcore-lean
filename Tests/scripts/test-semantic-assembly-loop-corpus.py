@@ -3,10 +3,10 @@
 
 The corpus is the first generated plan of each of the fifteen shapes (mask and
 form) from seed 1 upwards at the default budget, each at the six loop boundary
-inputs, skipping steps that shift by a count that is constant within its
-function and at least 2^64: such counts crash Sonatina code-image export
-(recorded locally), so the corpus does not track that known upstream defect;
-random campaigns still generate them. This test rebuilds that selection, reads
+inputs, skipping steps that shift by a count that may fold to a constant of at
+least 2^64, through lets, conditionals or calls: such counts crash Sonatina
+code-image export (recorded locally), so the corpus does not track that known
+upstream defect; random campaigns still generate them. This test rebuilds that selection, reads
 features, helper counts and call shapes independently from the original AST,
 recomputes each prescribed iteration count `input & mask`, and replays,
 observes and shrinks natively. It neither compiles Rust nor executes an EVM and
@@ -59,41 +59,60 @@ CHILDREN = {"word": (), "bool": (), "var": (), "let": ("initializer", "body"),
             "ternary": ("first", "second", "third"), "apply": ("argument",)}
 
 
-def reads(expression, scope, helpers):
-    """Whether an expression reads its function's parameter, through lets or
-    calls; `scope` says so for each Word local and `helpers` for each earlier
-    helper's result, both nearest first."""
+def constant(expression, scope, helpers):
+    """Whether an expression may fold to a compile-time constant: a literal, a
+    local bound to one, an operation on such values, a conditional whose
+    branches may both fold or whose condition and either branch may fold, or a
+    call to a helper whose result may fold for such an argument. `scope` gives
+    each Word local's answer, nearest first, and `helpers` the facts of each
+    earlier helper, nearest first."""
     tag = expression["tag"]
+    if tag in ("word", "bool"):
+        return True
     if tag == "var":
         return scope[expression["index"]]
     if tag == "let":
-        return reads(expression["body"], [reads(expression["initializer"], scope, helpers), *scope], helpers)
+        return constant(expression["body"], [constant(expression["initializer"], scope, helpers), *scope], helpers)
+    if tag == "if":
+        condition, yes, no = (constant(expression[key], scope, helpers) for key in CHILDREN["if"])
+        return (yes and no) or (condition and (yes or no))
     if tag == "apply":
-        return helpers[expression["function"]["index"] - len(scope)] and reads(expression["argument"], scope, helpers)
-    return any(reads(expression[key], scope, helpers) for key in CHILDREN[tag])
+        callee = helpers[expression["function"]["index"] - len(scope)]
+        return callee["folds"] or (callee["foldsFromConstant"] and constant(expression["argument"], scope, helpers))
+    return all(constant(expression[key], scope, helpers) for key in CHILDREN[tag])
 
 
 def constant_shift(expression, scope, helpers):
-    """Whether some shift's count neither reads the parameter nor is a literal
-    below 2^64. Core `wordShl(v, n)` shifts `v` by `n`."""
+    """Whether some shift's count may fold to a constant other than a literal
+    below 2^64, here or in a helper this expression calls with an argument that
+    may fold. Core `wordShl(v, n)` shifts `v` by `n`."""
     tag = expression["tag"]
     if tag == "binary" and expression["op"] in SHIFTS:
         count = expression["right"]
-        if not reads(count, scope, helpers) and not (count["tag"] == "word" and int(count["value"], 16) < 1 << 64):
+        if constant(count, scope, helpers) and not (count["tag"] == "word" and int(count["value"], 16) < 1 << 64):
+            return True
+    if tag == "apply":
+        callee = helpers[expression["function"]["index"] - len(scope)]
+        if callee["shiftsFromConstant"] and constant(expression["argument"], scope, helpers):
             return True
     if tag == "let":
         return (constant_shift(expression["initializer"], scope, helpers)
-                or constant_shift(expression["body"], [reads(expression["initializer"], scope, helpers), *scope], helpers))
+                or constant_shift(expression["body"], [constant(expression["initializer"], scope, helpers), *scope], helpers))
     return any(constant_shift(expression[key], scope, helpers) for key in CHILDREN[tag])
 
 
-def safe(helpers, entry):
-    results = []
-    for body in helpers:
-        if constant_shift(body, [True], results):
+def safe(bodies, entry):
+    """No helper shifts by a count that may fold as compiled on its own, no
+    call passes a helper an argument that makes one fold, and neither does the
+    entry, whose argument is the loop-carried accumulator."""
+    helpers = []
+    for body in bodies:
+        facts = {"folds": constant(body, [False], helpers), "foldsFromConstant": constant(body, [True], helpers),
+                 "shiftsFromConstant": constant_shift(body, [True], helpers)}
+        if constant_shift(body, [False], helpers):
             return False
-        results = [reads(body, [True], results), *results]
-    return not constant_shift(entry, [True], results)
+        helpers = [facts, *helpers]
+    return not constant_shift(entry, [False], helpers)
 
 
 def check_plan(plan):
@@ -201,7 +220,8 @@ def generated_plan(tool, seed, fuel):
 
 def selection(tool, fuel, last):
     """The roadmap's construction: from seed 1 upwards, the first seed of each
-    shape whose step has no constant shift count of at least 2^64."""
+    shape whose step shifts by no count that may fold to a constant of at
+    least 2^64."""
     chosen = {}
     for seed in range(1, last + 1):
         result = generated_plan(tool, seed, fuel)
@@ -335,7 +355,7 @@ def validate(manifest, tool, fuel):
             for version in VERSIONS:
                 require(case["provenance"][version] == manifest[version], f"{version} changed")
             helpers, body = check_case(case, fuel)
-            require(safe(helpers, body), "a fixed step shifts by a constant count of at least 2^64")
+            require(safe(helpers, body), "a fixed step shifts by a count that may fold to a constant of at least 2^64")
             actual, _ = pure.ast_coverage(helpers + [body], function_calls=True)
             require(actual == set(case["provenance"]["features"]) == set(entry["expectedFeatures"]),
                     "declared features differ from the step AST")

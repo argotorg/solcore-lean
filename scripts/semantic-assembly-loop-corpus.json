@@ -1357,262 +1357,154 @@
       "expectedHelperCount": 2
     },
     {
-      "id": "continue-1-61-0",
+      "id": "continue-1-206-0",
       "generation": {
-        "seed": "61",
+        "seed": "206",
         "maxProgramNodes": 256
       },
       "input": "0",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
         "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
-        "skipped-helper",
-        "multiple-callees",
-        "shared-callee",
-        "nested-call",
-        "branch-call",
-        "predicate-call",
+        "local-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 2
+      "expectedHelperCount": 3
     },
     {
-      "id": "continue-1-61-1",
+      "id": "continue-1-206-1",
       "generation": {
-        "seed": "61",
+        "seed": "206",
         "maxProgramNodes": 256
       },
       "input": "1",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
         "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
-        "skipped-helper",
-        "multiple-callees",
-        "shared-callee",
-        "nested-call",
-        "branch-call",
-        "predicate-call",
+        "local-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 2
+      "expectedHelperCount": 3
     },
     {
-      "id": "continue-1-61-2",
+      "id": "continue-1-206-2",
       "generation": {
-        "seed": "61",
+        "seed": "206",
         "maxProgramNodes": 256
       },
       "input": "3",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
         "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
-        "skipped-helper",
-        "multiple-callees",
-        "shared-callee",
-        "nested-call",
-        "branch-call",
-        "predicate-call",
+        "local-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 2
+      "expectedHelperCount": 3
     },
     {
-      "id": "continue-1-61-3",
+      "id": "continue-1-206-3",
       "generation": {
-        "seed": "61",
+        "seed": "206",
         "maxProgramNodes": 256
       },
       "input": "7",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
         "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
-        "skipped-helper",
-        "multiple-callees",
-        "shared-callee",
-        "nested-call",
-        "branch-call",
-        "predicate-call",
+        "local-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 2
+      "expectedHelperCount": 3
     },
     {
-      "id": "continue-1-61-4",
+      "id": "continue-1-206-4",
       "generation": {
-        "seed": "61",
+        "seed": "206",
         "maxProgramNodes": 256
       },
       "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
         "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
-        "skipped-helper",
-        "multiple-callees",
-        "shared-callee",
-        "nested-call",
-        "branch-call",
-        "predicate-call",
+        "local-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 2
+      "expectedHelperCount": 3
     },
     {
-      "id": "continue-1-61-5",
+      "id": "continue-1-206-5",
       "generation": {
-        "seed": "61",
+        "seed": "206",
         "maxProgramNodes": 256
       },
       "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
         "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
-        "skipped-helper",
-        "multiple-callees",
-        "shared-callee",
-        "nested-call",
-        "branch-call",
-        "predicate-call",
+        "local-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 2
+      "expectedHelperCount": 3
     },
     {
       "id": "continue-3-33-0",
@@ -2647,235 +2539,187 @@
       "expectedHelperCount": 1
     },
     {
-      "id": "pair-1-15-0",
+      "id": "pair-1-52-0",
       "generation": {
-        "seed": "15",
+        "seed": "52",
         "maxProgramNodes": 256
       },
       "input": "0",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "binary:Solcore.Core.Wire.BinaryOp.wordXor",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
         "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
+        "shared-callee",
         "nested-call",
         "branch-call",
-        "local-call",
-        "predicate-call",
         "primitive-operand-call"
       ],
       "expectedHelperCount": 2
     },
     {
-      "id": "pair-1-15-1",
+      "id": "pair-1-52-1",
       "generation": {
-        "seed": "15",
+        "seed": "52",
         "maxProgramNodes": 256
       },
       "input": "1",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "binary:Solcore.Core.Wire.BinaryOp.wordXor",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
         "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
+        "shared-callee",
         "nested-call",
         "branch-call",
-        "local-call",
-        "predicate-call",
         "primitive-operand-call"
       ],
       "expectedHelperCount": 2
     },
     {
-      "id": "pair-1-15-2",
+      "id": "pair-1-52-2",
       "generation": {
-        "seed": "15",
+        "seed": "52",
         "maxProgramNodes": 256
       },
       "input": "3",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "binary:Solcore.Core.Wire.BinaryOp.wordXor",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
         "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
+        "shared-callee",
         "nested-call",
         "branch-call",
-        "local-call",
-        "predicate-call",
         "primitive-operand-call"
       ],
       "expectedHelperCount": 2
     },
     {
-      "id": "pair-1-15-3",
+      "id": "pair-1-52-3",
       "generation": {
-        "seed": "15",
+        "seed": "52",
         "maxProgramNodes": 256
       },
       "input": "7",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "binary:Solcore.Core.Wire.BinaryOp.wordXor",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
         "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
+        "shared-callee",
         "nested-call",
         "branch-call",
-        "local-call",
-        "predicate-call",
         "primitive-operand-call"
       ],
       "expectedHelperCount": 2
     },
     {
-      "id": "pair-1-15-4",
+      "id": "pair-1-52-4",
       "generation": {
-        "seed": "15",
+        "seed": "52",
         "maxProgramNodes": 256
       },
       "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "binary:Solcore.Core.Wire.BinaryOp.wordXor",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
         "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
+        "shared-callee",
         "nested-call",
         "branch-call",
-        "local-call",
-        "predicate-call",
         "primitive-operand-call"
       ],
       "expectedHelperCount": 2
     },
     {
-      "id": "pair-1-15-5",
+      "id": "pair-1-52-5",
       "generation": {
-        "seed": "15",
+        "seed": "52",
         "maxProgramNodes": 256
       },
       "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
         "binary:Solcore.Core.Wire.BinaryOp.wordXor",
         "boolLiteral",
         "functionCall",
         "if",
         "let",
         "local",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
         "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
         "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
+        "shared-callee",
         "nested-call",
         "branch-call",
-        "local-call",
-        "predicate-call",
         "primitive-operand-call"
       ],
       "expectedHelperCount": 2
@@ -3031,22 +2875,20 @@
       "expectedHelperCount": 2
     },
     {
-      "id": "pair-7-11-0",
+      "id": "pair-7-60-0",
       "generation": {
-        "seed": "11",
+        "seed": "60",
         "maxProgramNodes": 256
       },
       "input": "0",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
         "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "boolLiteral",
         "functionCall",
         "if",
@@ -3060,31 +2902,31 @@
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
         "nested-call",
         "branch-call",
         "local-call",
         "predicate-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 1
+      "expectedHelperCount": 2
     },
     {
-      "id": "pair-7-11-1",
+      "id": "pair-7-60-1",
       "generation": {
-        "seed": "11",
+        "seed": "60",
         "maxProgramNodes": 256
       },
       "input": "1",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
         "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "boolLiteral",
         "functionCall",
         "if",
@@ -3098,31 +2940,31 @@
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
         "nested-call",
         "branch-call",
         "local-call",
         "predicate-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 1
+      "expectedHelperCount": 2
     },
     {
-      "id": "pair-7-11-2",
+      "id": "pair-7-60-2",
       "generation": {
-        "seed": "11",
+        "seed": "60",
         "maxProgramNodes": 256
       },
       "input": "3",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
         "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "boolLiteral",
         "functionCall",
         "if",
@@ -3136,31 +2978,31 @@
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
         "nested-call",
         "branch-call",
         "local-call",
         "predicate-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 1
+      "expectedHelperCount": 2
     },
     {
-      "id": "pair-7-11-3",
+      "id": "pair-7-60-3",
       "generation": {
-        "seed": "11",
+        "seed": "60",
         "maxProgramNodes": 256
       },
       "input": "7",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
         "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "boolLiteral",
         "functionCall",
         "if",
@@ -3174,31 +3016,31 @@
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
         "nested-call",
         "branch-call",
         "local-call",
         "predicate-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 1
+      "expectedHelperCount": 2
     },
     {
-      "id": "pair-7-11-4",
+      "id": "pair-7-60-4",
       "generation": {
-        "seed": "11",
+        "seed": "60",
         "maxProgramNodes": 256
       },
       "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
         "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "boolLiteral",
         "functionCall",
         "if",
@@ -3212,31 +3054,31 @@
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
         "nested-call",
         "branch-call",
         "local-call",
         "predicate-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 1
+      "expectedHelperCount": 2
     },
     {
-      "id": "pair-7-11-5",
+      "id": "pair-7-60-5",
       "generation": {
-        "seed": "11",
+        "seed": "60",
         "maxProgramNodes": 256
       },
       "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordDiv",
-        "binary:Solcore.Core.Wire.BinaryOp.wordGt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "binary:Solcore.Core.Wire.BinaryOp.wordPow",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "binary:Solcore.Core.Wire.BinaryOp.wordByte",
+        "binary:Solcore.Core.Wire.BinaryOp.wordEq",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSdiv",
         "binary:Solcore.Core.Wire.BinaryOp.wordSgt",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSub",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShl",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSignExtend",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod",
         "boolLiteral",
         "functionCall",
         "if",
@@ -3250,13 +3092,15 @@
         "wordLiteral"
       ],
       "expectedCallShapes": [
+        "skipped-helper",
+        "multiple-callees",
         "nested-call",
         "branch-call",
         "local-call",
         "predicate-call",
         "primitive-operand-call"
       ],
-      "expectedHelperCount": 1
+      "expectedHelperCount": 2
     }
   ]
 }
