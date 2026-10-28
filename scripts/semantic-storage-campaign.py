@@ -135,6 +135,21 @@ BYTES_RETURN_EXTRA = {"ReturnedLengths": tuple(range(adapter.MAX_RETURN_LENGTH +
                                               for status in ("returned", "reverted")),
                       "ReturnCarries": ("committed", "rollback"), "ReturnNodeBudgets": (384, 512)}
 BYTES_RETURN_DIMENSIONS = DIMENSIONS + tuple(BYTES_RETURN_EXTRA)
+# Enum returns: the returned constructors as `count:position`, their fields as
+# `static:kind` or `dynamic:kind`, padded (narrower than the widest
+# constructor) and full-width returns of both kinds, the lengths of returned
+# `bytes` fields, the shapes' counts of `bytes` constructors, the carries
+# `committed` and `rollback` into a returned value, and the node budgets of
+# generated cases.
+ENUM_RETURN_EXTRA = {"EnumPositions": tuple(f"{count}:{position}" for count in (2, 3, 4) for position in range(count)),
+                     "EnumFields": ("static:none", "static:one", "static:two", "dynamic:none", "dynamic:one",
+                                    "dynamic:two", "dynamic:bytes"),
+                     "EnumPadding": ("static:padded", "static:full", "dynamic:padded", "dynamic:full"),
+                     "EnumBytesLengths": tuple(range(adapter.MAX_RETURN_LENGTH + 1)),
+                     "EnumBytesConstructors": (0, 1, 2),
+                     "EnumCarries": ("committed", "rollback"), "EnumNodeBudgets": (384, 512)}
+ENUM_RETURN_DIMENSIONS = DIMENSIONS + tuple(ENUM_RETURN_EXTRA)
+ENUM_FIELD_KINDS = {"": "none", "uint256": "one", "uint256,uint256": "two", "bytes": "bytes"}
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -167,6 +182,8 @@ def dimensions(profile_name):
         return TUPLE_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "bytes-returns":
         return BYTES_RETURN_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "enum-returns":
+        return ENUM_RETURN_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -354,6 +371,30 @@ def bytes_returns_coverage(case, statuses):
     return {"ReturnedLengths": {lengths[index] for index in returned},
             "LengthOutcomes": {f"{length_class(length)}:{status}" for length, status in zip(lengths, statuses)},
             "ReturnCarries": carries, "ReturnNodeBudgets": budgets}
+
+
+def enum_returns_coverage(case, statuses):
+    """The returned constructors' positions and fields, padded and full-width
+    returns, returned `bytes` lengths, the shape's `bytes` constructor count, the
+    carries into a returned value from an earlier committed transaction and past
+    an earlier revert, and a generated case's node budget."""
+    constructors = adapter.enum_constructors(case)
+    static, head = adapter.enum_layout(case)
+    kind = "static" if static else "dynamic"
+    returned = [index for index, status in enumerate(statuses) if status == "returned"]
+    chosen = [int(common.word(case["transactions"][index]["choice"])) % len(constructors) for index in returned]
+    carries = ({"committed"} if any("returned" in statuses[:index] for index in returned) else set()) | (
+        {"rollback"} if any("reverted" in statuses[:index] for index in returned) else set())
+    origin = case["provenance"]["origin"]
+    budgets = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
+    return {"EnumPositions": {f"{len(constructors)}:{choice}" for choice in chosen},
+            "EnumFields": {f"{kind}:{ENUM_FIELD_KINDS[constructors[choice][1]]}" for choice in chosen},
+            "EnumPadding": {f"{kind}:{'padded' if 32 + adapter.ENUM_FIELD_HEADS[constructors[choice][1]] < head else 'full'}"
+                            for choice in chosen},
+            "EnumBytesLengths": {adapter.return_length(case["transactions"][index])
+                                 for index, choice in zip(returned, chosen) if constructors[choice][1] == "bytes"},
+            "EnumBytesConstructors": {[fields for _, fields in constructors].count("bytes")},
+            "EnumCarries": carries, "EnumNodeBudgets": budgets}
 
 
 def nested_coverage(case):
@@ -611,6 +652,13 @@ def validate_manifest(manifest):
                 raise ValueError(f"bytes-return coverage requires unique required{dimension} from {list(allowed)}")
     elif any("required" + dimension in manifest for dimension in BYTES_RETURN_EXTRA):
         raise ValueError("bytes-return coverage belongs to the bytes-return profile")
+    if selected["abi"] == "enum-returns":
+        for dimension, allowed in ENUM_RETURN_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"enum-return coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in ENUM_RETURN_EXTRA):
+        raise ValueError("enum-return coverage belongs to the enum-return profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
     if selected.get("forms"):
@@ -724,10 +772,12 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                 declared = STRAY_SLOT not in adapter.observed_slots(case) and not held
             if row is not None and declared:
                 if field == "output":
+                    # The low bit of the last Word of an output of whole Words:
+                    # a one-Word output changes as it always did.
                     value = common.hex_bytes(row["output"], "test output")
-                    if len(value) != 32:
-                        raise ValueError("test adapter requires a returned Word")
-                    row["output"] = "0x" + f"{int.from_bytes(value, 'big') ^ 1:064x}"
+                    if not value or len(value) % 32:
+                        raise ValueError("test adapter requires returned Words")
+                    row["output"] = "0x" + (value[:-1] + bytes([value[-1] ^ 1])).hex()
                 elif field == "balance":
                     row["committedBalance"] = str(int(common.word(row["committedBalance"], "test balance")) ^ 1)
                     if rows[-1]["id"] == selected:
@@ -827,7 +877,7 @@ def keyed_analysis(analysis):
                                                 adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA,
                                                 adapter.ADT_HISTORY_SCHEMA,
                                                 adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA,
-                                                adapter.BYTES_RETURN_HISTORY_SCHEMA)
+                                                adapter.BYTES_RETURN_HISTORY_SCHEMA, adapter.ENUM_RETURN_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -1007,6 +1057,8 @@ class Campaign:
             values.update(tuples_coverage(case, statuses))
         elif self.specification["abi"] == "bytes-returns":
             values.update(bytes_returns_coverage(case, statuses))
+        elif self.specification["abi"] == "enum-returns":
+            values.update(enum_returns_coverage(case, statuses))
         if self.specification.get("forms"):
             values.update(forms_coverage(case, values))
         for dimension, observed in values.items():
@@ -1075,6 +1127,7 @@ class Campaign:
                           "keccak-loops": tuple(KECCAK_LOOP_EXTRA),
                           "adts": tuple(ADT_EXTRA),
                           "bytes-returns": tuple(BYTES_RETURN_EXTRA),
+                          "enum-returns": tuple(ENUM_RETURN_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(

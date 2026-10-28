@@ -5377,6 +5377,155 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+Returned user-defined enums, whose `bytes` fields use this profile's bounded
+value, came later; see [Compare returned enums](#compare-returned-enums).
+
+## Compare returned enums
+
+The `stateful-enum-returns` profile returns a value of a user-defined enum of
+two to four constructors through `std.ABIGeneric` and compares the whole
+return data on all three paths. Original Core gained an entry convention for
+it, `enumOutcomeV1`. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions and the runtime design, including why the tags are carried by the
+value and not recorded in the convention.
+
+### Definitions
+
+- **Convention:** `CoreContractEntryProfile.enumOutcomeV1 first second rest`
+  records the constructors' fields in declaration order, each an
+  `EnumPayload`: `noWords`, `oneWord`, `twoWords` or `boundedBytes`.
+  - Each constructor's value is its tag Word paired with its fields: `(tag,
+    ())`, `(tag, w)`, `(tag, (w0, w1))` or `(tag, b)`, where `b` is the bounded
+    `bytes` value of `boundedBytesOutcomeV1`. The returned value is the
+    right-nested sum of these.
+  - A returned value decodes to std's encoding: the tag, the fields' head, zero
+    Words up to the body's head (the tag and the widest constructor's fields),
+    then a `bytes` field's length Word and zero-padded data. A dynamic enum,
+    one with a `bytes` constructor, gets the offset Word 32 first, and its
+    `bytes` field's head is the field's offset from the body's start.
+  - Revert and trap carry one Word, as for `wordOutcomeV1`. Every annotation is
+    strict and every typed value decodes; the top-level runner decodes it
+    unchanged.
+- **Nested boundary:** as for tuples and `bytes`, a registered enum contract is
+  `unavailable` to a word call, and a template with an enum initializer is
+  `unavailable` to creation, even for an enum of field-less constructors.
+- **Contract:** `SynthesizedEnumReturns` with `run(uint256 flags, uint256
+  input, uint256 choice, uint256 length)`, selector `0x15509d2b`, zero value,
+  returning `SynthesizedEnum`. Slots 0 to 2 are the `bytes` profile's.
+- **Shape:** two to four constructors named from the bank `Idle`, `Ready`,
+  `Pair`, `Blob`, `Settled`, `Q`, `Rejected` and `OverflowedAccumulator`
+  without repetition, each with no fields, one `uint256`, two `uint256`s or one
+  `memory<bytes>`; at most two carry `bytes`. Each tag is
+  `keccak256("Name(fields)")`.
+- **Transaction:** as for `bytes`, `r = step(prior + input)` and the three
+  writes; odd flags revert with the one Word `r`. Even flags return
+  constructor `c`, the choice Word modulo the constructor count, with no
+  fields, `d0`, `(d0, d1)` or the first `L` bytes of `d0` and `d1`, where `L`
+  is the length Word modulo 65 and `d0` and `d1` are the `bytes` profile's
+  data Words.
+- **Source:** the method declares the enum, computes `d0` and `d1` after the
+  writes, tests the choice against each constructor index but the last and
+  returns that constructor. A `bytes` constructor allocates 96 bytes with
+  `allocate_memory`, stores `L`, `d0` and `d1` and passes the pointer as a
+  `memory<bytes>` local. std derives the enum's instances, and its dispatcher
+  encodes the value with `abi_encode` through `encodeVariant`.
+- **Original Core:** one host contract whose result is `inLeft v` for
+  constructor `c`'s value `v`, built by one test of `c` per constructor, or
+  `inRight (inLeft r)`. Lean's Keccak-256 computes the tags.
+- **Transactions:** `{id, flags, input, choice, length, calldata, value}`,
+  with a choice below the constructor count and a length from 0 to 64 only for
+  a `bytes` constructor. Generation draws each choice uniformly and each
+  `bytes` length from the bank 0, 1, 31, 32, 33, 63 and 64 with probability
+  one half, otherwise uniformly from 0 to 64. The shape and the transactions
+  come from two streams that start at SplitMix64's finalizer of the seed, so
+  consecutive seeds draw unrelated shapes.
+
+### Running and validation
+
+```sh
+lake build semanticEnumReturnTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-enum-return-corpus.json \
+  --output .upstream/semantic-enum-return-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-enum-returns \
+  --cases 16 --output .upstream/semantic-enum-return-random
+```
+
+Plans use `solcore-lean.enum-return-plan.v1` under `enumReturnPlan`, with the
+constructors as `{name, fields}` and `fields` std's signature of the fields.
+Cases use `solcore-lean.semantic-enum-return-case.v1` and histories
+`solcore-lean.enum-return-history.v1`. The shell takes 130 to 291 nodes by
+shape, inside the node budget. The suite's default of 384 nodes leaves 93 to
+254 for the step, and `--nodes-scale 2` caps the doubled budget at 512.
+Contracts are bounded by 512 nodes. A case reaches about 60 KB, so a native
+shrink response carries at most 32 candidates.
+
+The adapter's output rule for this profile: with `w` the widest constructor's
+field head (0, 32 or 64 bytes, `bytes` counting 32), a static enum returns
+`32 + w` bytes and a dynamic one `64 + w`, plus `32 + 32⌈L/32⌉` for a `bytes`
+constructor; a revert returns 32. Every other profile keeps its own rule. A
+returned row must also follow the protocol on every path:
+- the chosen constructor's tag, computed by the adapter's Keccak-256;
+- its fields from the committed slots 0 and 1 and the prior slot 2;
+- zero bytes up to the body's head, the `bytes` tail, and the offset Word
+  first for a dynamic enum;
+- the committed slot 1 is the prior slot 1 plus one, and the committed slot 2
+  is the input.
+
+A revert is checked by rollback and its one-Word length. Reductions remove
+transactions, shorten lengths to zero or half, drop a constructor no
+transaction chooses while more than two remain, narrow fields (two Words to
+one, one Word to none, `bytes` to none), reduce the step, then clear flags to
+their parity bit and inputs to their low byte.
+
+The campaign's synthetic output adapter, `--test-field output`, flips the low
+bit of a returned output's last Word for any output of whole Words, so the
+tuple, `bytes` and enum returns can be reduced from a synthetic output
+difference. A one-Word output changes exactly as before.
+
+Four Lean tests check the convention and the profile:
+- `Solcore/Test/ContractEnumEntryProfile.lean` checks the convention's exact
+  bytes against hexadecimal text for every field kind in static and dynamic
+  shapes, the padding Words, and `bytes` lengths 0, 1, 31, 32, 33 and 64
+  behind body heads of two and three Words and in first position. It checks
+  the revert and trap branches, that wrong annotations and fields do not
+  decode, that a word call to a registered enum contract and a creation from
+  an enum initializer are unavailable, and that an enum root returns its whole
+  encoding through the nested executor.
+- `Solcore/Test/SourceEnumReturnGolden.lean` checks the Core contract and a
+  model of the source against rows written out as hexadecimal text, with the
+  tags from `cast keccak`. The model is a slot map and std's `abi_encode` of
+  the enum over a byte memory. Its steps add a known constant. The rows cover
+  static and dynamic shapes, every field kind, padding, the bank's seven
+  lengths, both outcomes, carries across a revert and wrapping sums.
+- `Solcore/Test/SourceEnumReturnCases.lean` requires the Core contract to equal
+  the model on the generated scenarios. Every case and reduction must replay,
+  generation must draw every constructor count, field kind, position and bank
+  length and two `bytes` constructors, and the shells must be the sizes above.
+- `Solcore/Test/SourceEnumReturnCorpus.lean` checks the fixed corpus against
+  expected histories that the model computed.
+
+The fixed corpus has fifteen scenarios and 38 transactions: nine imported
+scenarios, which reuse the `bytes` corpus's six imported steps with shapes and
+transactions chosen for coverage, and six generated seeds, three at 384 nodes
+and three at 512. Required coverage:
+- constructor counts 2, 3 and 4, with every position of each returned;
+- static enums returning no fields, one Word and two Words, and dynamic enums
+  returning each of the four field kinds;
+- padded and full-width returns, in static and in dynamic enums;
+- the returned `bytes` lengths 0, 1, 31, 32, 33, 63 and 64;
+- shapes with zero, one and two `bytes` constructors;
+- both node budgets;
+- a returned value after an earlier committed transaction, and one that
+  follows a revert whose writes it must not see;
+- the six boundary Words as inputs;
+- one to three helpers and transactions, all four templates, both outcomes
+  and seven completion patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The nineteen

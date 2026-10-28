@@ -104,6 +104,10 @@ lean_exe semanticAdtStorageTool where
   root := `Tests.SemanticAdtStorageTool
   exeName := "semantic-adt-storage-tool"
 
+lean_exe semanticEnumReturnTool where
+  root := `Tests.SemanticEnumReturnTool
+  exeName := "semantic-enum-return-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

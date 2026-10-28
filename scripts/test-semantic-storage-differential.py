@@ -4160,5 +4160,212 @@ class BytesReturnTests(unittest.TestCase):
         self.assertIn("committedStorage", result["fields"])
 
 
+ENUM_SHAPE = (("Pair", "uint256,uint256"), ("Idle", ""), ("Blob", "bytes"), ("Q", "uint256"))
+
+
+def enum_return_case(rows=((0, 5, 0, 0), (1, 9, 2, 31), (2, 7, 2, 33), (0, 3, 1, 0), (0, 4, 3, 0)), shape=ENUM_SHAPE):
+    """Envelope fixture only: native replay checks the actual enum-return program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "choice": str(choice),
+                     "length": str(length), "calldata": "0x15509d2b" + f"{flags:064x}" + f"{value:064x}" +
+                     f"{choice:064x}" + f"{length:064x}", "value": "0"}
+                    for index, (flags, value, choice, length) in enumerate(rows)]
+    return {"schema": runner.ENUM_RETURN_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "enumReturnPlan": {"schema": "solcore-lean.enum-return-plan.v1", "stepProgram": {},
+            "constructors": [{"name": name, "fields": fields} for name, fields in shape]},
+        "initialState": {"storage": []}, "observedSlots": ["0", "1", "2"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedEnumReturns", "method": "run",
+            "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b",
+            "deployPath": ["SynthesizedEnumReturnsDeploy"],
+            "runtimePath": ["SynthesizedEnumReturnsDeploy", "SynthesizedEnumReturns"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+ENUM_TAGS = {"Pair(uint256,uint256)": "2d3b57dedfada8371bdae932a6881ace0dec34c90dd19fd49b2164124e699e2d",
+             "Idle()": "ae897c555b7596dee56949d599aa959af71416324ac27ef76dd898923ab34d4f",
+             "Blob(bytes)": "d05ce3dc4caf4a4b252e3323bde615dc3b9d54623e1859c892f0b4ecf5e45164",
+             "Q(uint256)": "5dcad53f88dc9d20c351c1bb58593dde38a673b5308c8751aaeb91edd8c97952"}
+
+
+def enum_return_history(value, path, step=lambda x: x + 1, padding=0, tags=ENUM_TAGS):
+    """Rows of the enum-return protocol with a known step: r = step(slot 0 +
+    input) goes to slot 0, slot one grows by one and the input goes to slot two.
+    A return encodes the chosen constructor, its tag from `tags` (written out from
+    `cast keccak`), its fields from r * K and (slot 1 * K) xor (prior slot 2), and
+    `padding` bytes in the head Words a narrower constructor leaves; odd flags
+    revert with r."""
+    shape = [(item["name"], item["fields"]) for item in value["enumReturnPlan"]["constructors"]]
+    heads = {"": 0, "uint256": 32, "uint256,uint256": 64, "bytes": 32}
+    static, head = "bytes" not in [fields for _, fields in shape], 32 + max(heads[fields] for _, fields in shape)
+    rows, prior = [], [0, 0, 0]
+    for index, tx in enumerate(value["transactions"]):
+        x, length = int(tx["input"]), int(tx["length"]) % 65
+        name, fields = shape[int(tx["choice"]) % len(shape)]
+        result = step((prior[0] + x) % 2**256) % 2**256
+        after = [result, (prior[1] + 1) % 2**256, x]
+        reverted = int(tx["flags"]) % 2 == 1
+        if reverted:
+            output = result.to_bytes(32, "big")
+        else:
+            first = (result * MULTIPLIER % 2**256).to_bytes(32, "big")
+            second = ((after[1] * MULTIPLIER % 2**256) ^ prior[2]).to_bytes(32, "big")
+            field_head = {"": b"", "uint256": first, "uint256,uint256": first + second,
+                          "bytes": head.to_bytes(32, "big")}[fields]
+            tail = (length.to_bytes(32, "big") + (first + second)[:length] + bytes(-length % 32)
+                    if fields == "bytes" else b"")
+            body = bytes.fromhex(tags[f"{name}({fields})"]) + field_head + bytes([padding]) * (head - 32 - len(field_head)) + tail
+            output = body if static else (32).to_bytes(32, "big") + body
+        committed = list(prior) if reverted else after
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + output.hex(), "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.ENUM_RETURN_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0, 0, 0]), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def enum_return_histories(value=None, **options):
+    value = enum_return_case() if value is None else value
+    return {path: enum_return_history(value, path, **options) for path in runner.PATHS}
+
+
+class EnumReturnTests(unittest.TestCase):
+    def test_an_enum_return_case_records_its_constructors_choices_and_lengths(self):
+        value = enum_return_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["selector"]),
+                         ("semantic-enum-return-tool", "rust-hull-keyed-storage-scenario", True, "enum-returns", "0x15509d2b"))
+        self.assertTrue(runner.has_enum_returns(value))
+        self.assertFalse(runner.has_enum_returns(bytes_return_case()) or runner.has_bytes_returns(value)
+                         or runner.has_tuples(value) or runner.uses_selector_rule(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                         ["returned", "reverted", "returned", "returned", "returned"])
+        self.assertEqual([runner.enum_choice(value, tx)[0] for tx in value["transactions"]],
+                         ["Pair", "Blob", "Blob", "Idle", "Q"])
+        self.assertEqual(runner.enum_layout(value), (False, 96))
+        self.assertEqual(runner.enum_layout(enum_return_case(rows=((0, 1, 0, 0),), shape=(("Idle", ""), ("Q", "uint256")))),
+                         (True, 64))
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2"))
+        self.assertIn("user enum", runner.scope(value))
+        # A choice beyond the constructors, a length for a constructor without
+        # bytes, and a length above 64 are refused even with their own calldata.
+        for rows in (((0, 5, 4, 0),), ((0, 5, 0, 1),), ((0, 5, 2, 65),)):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                runner.validate_case(enum_return_case(rows=rows))
+        for key, changed in (("calldata", "0x15509d2b" + "00" * 128), ("value", "1"), ("flags", "2"), ("input", "6"),
+                             ("choice", "1"), ("length", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # The plan's constructors: two to four distinct bank names with known
+        # fields, at most two with bytes.
+        for shape in ((("Idle", ""),), (("Idle", ""), ("Idle", "uint256")), (("Idle", ""), ("Other", "uint256")),
+                      (("Idle", ""), ("Q", "uint256,uint256,uint256")),
+                      (("Idle", "bytes"), ("Q", "bytes"), ("Pair", "bytes")),
+                      (("Idle", ""), ("Q", ""), ("Pair", ""), ("Blob", ""), ("Ready", ""))):
+            with self.subTest(shape=shape), self.assertRaises(ValueError):
+                runner.validate_case(enum_return_case(rows=((0, 5, 0, 0),), shape=shape))
+        invalid = copy.deepcopy(value)
+        invalid["enumReturnPlan"]["constructors"][0]["arity"] = 2
+        with self.assertRaises(ValueError):
+            runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = ["0", "1"]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_a_returned_value_carries_its_encoding_and_a_revert_one_word(self):
+        value = enum_return_case()
+        histories = enum_return_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        # Pair: the offset, the body head of three Words; Blob(33 bytes): the
+        # head and a tail of three Words; Idle and Q: the head alone.
+        self.assertEqual([len(runner.common.hex_bytes(row["output"], "output")) for row in rows], [128, 32, 224, 128, 128])
+        self.assertEqual([runner.output_words(value, row) for row in rows], [4, 1, 7, 4, 4])
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+            self.assertEqual(runner.enum_return_fields(value, tx, rows[index], prior), [])
+        # The adapter's own Keccak gives the tags written out from cast.
+        for text, digest in ENUM_TAGS.items():
+            self.assertEqual(runner.keccak256(text.encode()).hex(), digest)
+        # tx-2 returns Blob with 33 bytes past the revert of tx-1: the offset 32,
+        # the tag, the field's offset 0x60, a zero head Word, then the tail.
+        output = runner.common.hex_bytes(rows[2]["output"], "output")
+        self.assertEqual(output[:128], (32).to_bytes(32, "big") + bytes.fromhex(ENUM_TAGS["Blob(bytes)"]) +
+                         (96).to_bytes(32, "big") + bytes(32))
+        self.assertEqual(output[128:160], (33).to_bytes(32, "big"))
+        self.assertEqual(output[160:193], (14 * MULTIPLIER % 2**256).to_bytes(32, "big") +
+                         ((2 * MULTIPLIER % 2**256) ^ 5).to_bytes(32, "big")[:1])
+        self.assertEqual(output[193:], bytes(31))
+        prior, tx = rows[1]["committedStorage"], value["transactions"][2]
+        for slot in ("1", "2"):
+            changed = copy.deepcopy(rows[2])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertIn("committedStorage", runner.enum_return_fields(value, tx, changed, prior))
+        # The offset, the tag, the field offset, the zero head Word, the length, a
+        # data byte and a padding byte are each checked.
+        for position in (31, 32, 63, 95, 96, 127, 159, 160, 193, 223):
+            changed = copy.deepcopy(rows[2])
+            broken = bytearray(output)
+            broken[position] ^= 1
+            changed["output"] = "0x" + broken.hex()
+            with self.subTest(position=position):
+                self.assertEqual(runner.enum_return_fields(value, tx, changed, prior), ["output"])
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+        # A truncated or extended value breaks the length rule and the protocol.
+        for changed_output in (rows[2]["output"][:-64], rows[2]["output"] + "00" * 32, rows[2]["output"] + "00"):
+            changed = {**rows[2], "output": changed_output}
+            with self.subTest(length=len(changed_output)):
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+                self.assertEqual(runner.enum_return_fields(value, tx, changed, prior), ["output"])
+        # A static enum is inline: the tag and the fields, without an offset.
+        static = enum_return_case(rows=((0, 1, 0, 0), (0, 2, 1, 0)), shape=(("Idle", ""), ("Q", "uint256")))
+        static_rows = enum_return_histories(static)["directCore"]["transactions"]
+        self.assertEqual([runner.common.hex_bytes(row["output"], "output") for row in static_rows],
+                         [bytes.fromhex(ENUM_TAGS["Idle()"]) + bytes(32),
+                          bytes.fromhex(ENUM_TAGS["Q(uint256)"]) + (5 * MULTIPLIER % 2**256).to_bytes(32, "big")])
+        self.assertEqual(runner.compare(enum_return_histories(static), static)["category"], "matched")
+        # A revert is checked by rollback and its one-Word length, not by the protocol.
+        self.assertEqual(runner.enum_return_fields(value, value["transactions"][1], {**rows[1], "output": "0x" + "00" * 32},
+                                                   rows[0]["committedStorage"]), [])
+        self.assertFalse(runner.conforms(value, value["transactions"][1], {**rows[1], "output": rows[1]["output"] + "00" * 32},
+                                         rows[0]["committedStorage"]))
+
+    def test_a_protocol_break_on_every_path_is_a_mismatch_although_the_paths_agree(self):
+        value = enum_return_case()
+        wrong = {**ENUM_TAGS, "Q(uint256)": ENUM_TAGS["Idle()"]}
+        for options in ({"padding": 1}, {"tags": wrong}):
+            broken = enum_return_histories(value, **options)
+            result = runner.compare(broken, value)
+            with self.subTest(options=sorted(options)):
+                self.assertEqual(result["category"], "semantic-mismatch")
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertIn("output", result["fields"])
+        # Another constructor on every path of the case is a mismatch too.
+        other = enum_return_histories(enum_return_case(rows=((0, 5, 0, 0), (1, 9, 2, 31), (2, 7, 2, 33), (0, 3, 3, 0),
+                                                             (0, 4, 3, 0))))
+        result = runner.compare(other, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-3"))
+        self.assertTrue(all(result["pairs"].values()))
+        # A different step on one path is an ordinary difference.
+        changed = enum_return_histories(value)
+        changed["rustEvm"] = enum_return_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+        self.assertIn("committedStorage", result["fields"])
+
 if __name__ == "__main__":
     unittest.main()

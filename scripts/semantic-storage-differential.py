@@ -80,6 +80,8 @@ TUPLE_CASE_SCHEMA = "solcore-lean.semantic-tuple-return-case.v1"
 TUPLE_HISTORY_SCHEMA = "solcore-lean.tuple-return-history.v1"
 BYTES_RETURN_CASE_SCHEMA = "solcore-lean.semantic-bytes-return-case.v1"
 BYTES_RETURN_HISTORY_SCHEMA = "solcore-lean.bytes-return-history.v1"
+ENUM_RETURN_CASE_SCHEMA = "solcore-lean.semantic-enum-return-case.v1"
+ENUM_RETURN_HISTORY_SCHEMA = "solcore-lean.enum-return-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -284,6 +286,16 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": BYTES_RETURN_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256,uint256)", "selector": "0x24b912e5", "rollback": True, "keyed": False,
         "declared": True, "abi": "bytes-returns", "shrinkBatch": 32},
+    # One method that returns a value of a user enum of two to four
+    # constructors; every path's whole return data is compared. A case reaches
+    # about 60 KB, so a native shrink response carries at most 32 candidates.
+    "stateful-enum-returns": {"caseSchema": ENUM_RETURN_CASE_SCHEMA, "planSchema": "solcore-lean.enum-return-plan.v1",
+        "planKey": "enumReturnPlan", "corpusSchema": "solcore-lean.semantic-enum-return-corpus.v1",
+        "originKind": "enum-return-generated", "contract": "SynthesizedEnumReturns",
+        "caseTool": "semantic-enum-return-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ENUM_RETURN_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b", "rollback": True, "keyed": False,
+        "declared": True, "abi": "enum-returns", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -379,6 +391,13 @@ TUPLE_ARITIES = (2, 3, 4)
 BYTES_RETURN_SLOTS = [str(slot) for slot in range(3)]
 MAX_RETURN_LENGTH = 64
 RETURN_MULTIPLIER = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95
+# The enum-return profile: the tuple profile's slots; a plan declares two to
+# four constructors named from this bank without repetition, each with the
+# fields of one of these ABI signatures, whose head takes these bytes; at most
+# two carry `bytes`. The returned data Words are the bytes-return profile's.
+ENUM_RETURN_SLOTS = [str(slot) for slot in range(3)]
+ENUM_NAMES = ("Idle", "Ready", "Pair", "Blob", "Settled", "Q", "Rejected", "OverflowedAccumulator")
+ENUM_FIELD_HEADS = {"": 0, "uint256": 32, "uint256,uint256": 64, "bytes": 32}
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -425,6 +444,9 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         # Odd flags revert after the writes.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     if profile(case)["abi"] == "bytes-returns":
+        # Odd flags revert after the writes.
+        return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
+    if profile(case)["abi"] == "enum-returns":
         # Odd flags revert after the writes.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
@@ -719,7 +741,10 @@ def tuple_arity(case: dict) -> int:
 def output_words(case: dict, row: dict) -> int:
     """The Words a completed row's output carries: a returned tuple its arity,
     a returned `bytes` value its offset, its length and its data padded to
-    whole Words, every other row one."""
+    whole Words, a returned enum value its encoding's Words (`enum_words`),
+    every other row one."""
+    if has_enum_returns(case) and row["status"] == "returned":
+        return enum_words(case, case["transactions"][row["index"]])
     if has_bytes_returns(case) and row["status"] == "returned":
         return 2 + (return_length(case["transactions"][row["index"]]) + 31) // 32
     return tuple_arity(case) if has_tuples(case) and row["status"] == "returned" else 1
@@ -772,6 +797,77 @@ def bytes_return_fields(case: dict, transaction: dict, row: dict, prior: list[di
         (after["1"] * RETURN_MULTIPLIER % 2**256) ^ before["2"]).to_bytes(32, "big")
     expected = (32).to_bytes(32, "big") + length.to_bytes(32, "big") + data[:length] + bytes(-length % 32)
     if common.hex_bytes(row["output"], "output") != expected:
+        fields.append("output")
+    return fields
+
+
+def has_enum_returns(case: dict) -> bool:
+    return profile(case)["abi"] == "enum-returns"
+
+
+def valid_enum_plan(plan: dict) -> bool:
+    """Two to four constructors with distinct names from the bank and known
+    fields, at most two with `bytes`."""
+    constructors = plan.get("constructors")
+    if not isinstance(constructors, list) or not 2 <= len(constructors) <= 4 or any(
+            not isinstance(constructor, dict) or set(constructor) != {"name", "fields"} or
+            constructor["name"] not in ENUM_NAMES or constructor["fields"] not in ENUM_FIELD_HEADS
+            for constructor in constructors):
+        return False
+    names = [constructor["name"] for constructor in constructors]
+    return len(set(names)) == len(names) and [constructor["fields"] for constructor in constructors].count("bytes") <= 2
+
+
+def enum_constructors(case: dict) -> list[tuple[str, str]]:
+    return [(constructor["name"], constructor["fields"]) for constructor in case[profile(case)["planKey"]]["constructors"]]
+
+
+def enum_choice(case: dict, transaction: dict) -> tuple[str, str]:
+    """The constructor a transaction chooses, as the contract reads its choice."""
+    constructors = enum_constructors(case)
+    return constructors[int(common.word(transaction.get("choice"), "transaction choice")) % len(constructors)]
+
+
+def enum_layout(case: dict) -> tuple[bool, int]:
+    """Whether the enum is static, and its body's head: the tag Word and the
+    widest constructor's fields, a `bytes` field counting its offset Word."""
+    fields = [fields for _, fields in enum_constructors(case)]
+    return "bytes" not in fields, 32 + max(ENUM_FIELD_HEADS[field] for field in fields)
+
+
+def enum_words(case: dict, transaction: dict) -> int:
+    """A static enum returns its body's head; a dynamic one the offset Word and
+    the head, then a `bytes` field's length Word and padded data."""
+    static, head = enum_layout(case)
+    if static:
+        return head // 32
+    tail = 1 + (return_length(transaction) + 31) // 32 if enum_choice(case, transaction)[1] == "bytes" else 0
+    return 1 + head // 32 + tail
+
+
+def enum_return_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the enum-return protocol: slot one
+    grows by one, slot two is the input, and the output is std's encoding of the
+    chosen constructor: its tag `keccak256("Name(fields)")`, its fields built from
+    the committed slots and the prior slot two as for bytes returns, zeros up to
+    the body's head and a `bytes` field's tail, after the offset 32 for a dynamic
+    enum. A revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after["1"] != (before["1"] + 1) % 2**256 or after["2"] != int(common.word(transaction.get("input"), "transaction input")):
+        fields.append("committedStorage")
+    static, head = enum_layout(case)
+    name, kind = enum_choice(case, transaction)
+    first = (after["0"] * RETURN_MULTIPLIER % 2**256).to_bytes(32, "big")
+    second = ((after["1"] * RETURN_MULTIPLIER % 2**256) ^ before["2"]).to_bytes(32, "big")
+    length = return_length(transaction)
+    heads = {"": b"", "uint256": first, "uint256,uint256": first + second, "bytes": head.to_bytes(32, "big")}
+    tail = length.to_bytes(32, "big") + (first + second)[:length] + bytes(-length % 32) if kind == "bytes" else b""
+    body = keccak256(f"{name}({kind})".encode()) + heads[kind] + bytes(head - 32 - len(heads[kind])) + tail
+    if common.hex_bytes(row["output"], "output") != (body if static else (32).to_bytes(32, "big") + body):
         fields.append("output")
     return fields
 
@@ -1052,6 +1148,13 @@ def declared_scope(case: dict) -> str:
                 "through std.StorageGeneric; initially empty storage; committed values at the accumulator, the enum and "
                 "record fields' slots and both keys' entry slots of both mappings, stale payload slots included, on all "
                 "paths and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
+    if has_enum_returns(case):
+        return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions that return the chosen "
+                "constructor of a user enum of two to four constructors with no fields, one or two Words or a bytes "
+                "value of zero to 64 bytes, built from the step result and slot 1 after its write times an odd "
+                "constant, the latter xor slot 2 before its write, in std's ABI encoding; initially empty storage; "
+                "the whole return data and committed values at slots 0..2 on all paths and no nonzero undeclared slot "
+                "on Hull/EVM; no gas/balance/nonce or memory equivalence")
     if has_bytes_returns(case):
         return ("ordered zero-value run(uint256,uint256,uint256) transactions that return a bytes value of the "
                 "transaction's zero to 64 bytes of two Words, the step result and slot 1 after its write times an odd "
@@ -1591,6 +1694,17 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
+        if selected["abi"] == "enum-returns":
+            constructors = enum_constructors(case)
+            choice = int(common.word(tx.get("choice"), "transaction choice"))
+            length = int(common.word(tx.get("length"), "transaction length"))
+            if choice >= len(constructors) or length > MAX_RETURN_LENGTH or (length and constructors[choice][1] != "bytes"):
+                raise ValueError("an enum-return transaction chooses a constructor, and only a bytes constructor's "
+                                 "transaction requests up to 64 bytes")
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "input", "choice", "length")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its four original Words")
+            continue
         if selected["abi"] == "bytes-returns":
             if int(common.word(tx.get("length"), "transaction length")) > MAX_RETURN_LENGTH:
                 raise ValueError("a bytes-return transaction requests at most 64 bytes")
@@ -1643,6 +1757,9 @@ def validate_case(case) -> None:
         raise ValueError("inline Yul loop plan requires a form of split, carried or pipelined")
     if selected["abi"] == "tuples" and (type(plan.get("arity")) is not int or plan["arity"] not in TUPLE_ARITIES):
         raise ValueError("tuple-return plan requires an arity of 2, 3 or 4")
+    if selected["abi"] == "enum-returns" and not valid_enum_plan(plan):
+        raise ValueError("enum-return plan requires two to four constructors with distinct bank names and known fields, "
+                         "at most two with bytes")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
     if selected["abi"] == "keyed":
@@ -1673,6 +1790,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "bytes-returns":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_RETURN_SLOTS:
             raise Finding("unsupported-scope", "input", "bytes-return profile starts empty and observes slots zero through two")
+    elif selected["abi"] == "enum-returns":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ENUM_RETURN_SLOTS:
+            raise Finding("unsupported-scope", "input", "enum-return profile starts empty and observes slots zero through two")
     elif selected["abi"] == "malformed" and encoding(selected) == "bytes":
         slots = bytes_layout(selected)[1]
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
@@ -1913,7 +2033,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     `ledger_fields` fixes what the balance-dependent polarity leaves open. A
     returned tuple carries its arity's Words and follows `tuple_fields`. A
     returned `bytes` value carries its padded length and follows
-    `bytes_return_fields`."""
+    `bytes_return_fields`, and a returned enum value its encoding's Words and
+    `enum_return_fields`."""
     expected = expected_status(case, tx)
     # A std rejection reverts with exactly its selector, after the selector rule.
     rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
@@ -1943,6 +2064,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if has_tuples(case) and tuple_fields(case, tx, row, prior):
         return False
     if has_bytes_returns(case) and bytes_return_fields(case, tx, row, prior):
+        return False
+    if has_enum_returns(case) and enum_return_fields(case, tx, row, prior):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -2116,6 +2239,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if has_bytes_returns(case):
             # A returned value follows the protocol byte by byte; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in bytes_return_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_enum_returns(case):
+            # A returned enum value follows the protocol byte by byte; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in enum_return_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken

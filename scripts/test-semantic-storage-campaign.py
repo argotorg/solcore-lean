@@ -2225,5 +2225,86 @@ class BytesReturnCampaignTests(unittest.TestCase):
             campaign.validate_manifest({**other, "requiredReturnedLengths": [0]})
 
 
+def enum_return_case(rows=((0, 5, 0, 0), (1, 9, 2, 31), (2, 7, 2, 33)), origin=None, shape=fixtures.ENUM_SHAPE):
+    value = fixtures.enum_return_case(rows, shape)
+    value["enumReturnPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class EnumReturnCampaignTests(unittest.TestCase):
+    def test_coverage_names_positions_fields_padding_lengths_bytes_constructors_carries_and_budgets(self):
+        value = enum_return_case()
+        self.assertEqual(campaign.dimensions("stateful-enum-returns"),
+                         campaign.DIMENSIONS + ("EnumPositions", "EnumFields", "EnumPadding", "EnumBytesLengths",
+                                                "EnumBytesConstructors", "EnumCarries", "EnumNodeBudgets"))
+        # tx-0 returns Pair, as wide as the widest constructor; tx-2 returns Blob
+        # with 33 bytes after the committed tx-0 and past the revert of tx-1,
+        # narrower than Pair; an imported case has no node budget.
+        self.assertEqual(campaign.enum_returns_coverage(value, ["returned", "reverted", "returned"]),
+                         {"EnumPositions": {"4:0", "4:2"}, "EnumFields": {"dynamic:two", "dynamic:bytes"},
+                          "EnumPadding": {"dynamic:full", "dynamic:padded"}, "EnumBytesLengths": {33},
+                          "EnumBytesConstructors": {1}, "EnumCarries": {"committed", "rollback"},
+                          "EnumNodeBudgets": set()})
+        self.assertEqual(campaign.inputs(value), {"5", "7", "9"})
+        # A static enum's widest constructor returns full width; a first revert
+        # carries nothing committed.
+        static = enum_return_case(rows=((1, 1, 0, 0), (0, 2, 1, 0)), shape=(("Idle", ""), ("Q", "uint256")),
+                                  origin={"kind": "enum-return-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.enum_returns_coverage(static, ["reverted", "returned"]),
+                         {"EnumPositions": {"2:1"}, "EnumFields": {"static:one"}, "EnumPadding": {"static:full"},
+                          "EnumBytesLengths": set(), "EnumBytesConstructors": {0}, "EnumCarries": {"rollback"},
+                          "EnumNodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-enum-returns"))
+            instance.summary["coverage"].update(requiredEnumBytesLengths=[0, 1, 31, 32, 33, 63, 64],
+                                                requiredEnumNodeBudgets=[384, 512],
+                                                requiredEnumPadding=list(campaign.ENUM_RETURN_EXTRA["EnumPadding"]))
+            histories = fixtures.enum_return_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedEnumPositions"], coverage["matchedEnumBytesLengths"], coverage["matchedEnumCarries"]),
+                             (["4:0", "4:2"], [33], ["committed", "rollback"]))
+            self.assertEqual((coverage["missingEnumBytesLengths"], coverage["missingEnumNodeBudgets"], coverage["missingEnumPadding"]),
+                             ([0, 1, 31, 32, 63, 64], [384, 512], ["static:full", "static:padded"]))
+
+    def test_the_fixed_corpus_validates_and_its_enum_return_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-enum-return-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-enum-returns")
+        self.assertEqual((manifest["requiredEnumBytesLengths"], manifest["requiredEnumNodeBudgets"], manifest["requiredEnumCarries"]),
+                         ([0, 1, 31, 32, 33, 63, 64], [384, 512], ["committed", "rollback"]))
+        for dimension in ("EnumPositions", "EnumFields", "EnumPadding", "EnumBytesConstructors"):
+            self.assertEqual(manifest["required" + dimension], list(campaign.ENUM_RETURN_EXTRA[dimension]))
+        for key, changed in (("requiredEnumPositions", ["5:0"]), ("requiredEnumFields", ["static:bytes"]),
+                             ("requiredEnumPadding", []), ("requiredEnumBytesLengths", [65]),
+                             ("requiredEnumBytesLengths", [True]), ("requiredEnumBytesConstructors", [3]),
+                             ("requiredEnumCarries", ["other"]), ("requiredEnumNodeBudgets", [448]),
+                             ("requiredEnumNodeBudgets", [384, 384])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredEnumNodeBudgets"})
+        other = json.loads((ROOT / "scripts/semantic-bytes-return-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "enum-return coverage belongs to the enum-return profile"):
+            campaign.validate_manifest({**other, "requiredEnumPositions": ["2:0"]})
+
+    def test_the_synthetic_output_adapter_flips_the_last_word_of_a_multi_word_output(self):
+        value = enum_return_case()
+        histories = fixtures.enum_return_histories(value)
+        report = {"comparison": campaign.adapter.compare(histories, value), "histories": histories}
+        analysis = campaign.analyze(report, value, "rustEvm", "tx-2", "output")
+        self.assertTrue(analysis["synthetic"])
+        self.assertEqual(analysis["comparison"]["category"], "semantic-mismatch")
+        self.assertEqual(analysis["comparison"]["transactionId"], "tx-2")
+        original = bytes.fromhex(histories["rustEvm"]["transactions"][2]["output"][2:])
+        flipped = bytes.fromhex(analysis["histories"]["rustEvm"]["transactions"][2]["output"][2:])
+        self.assertEqual((len(flipped), flipped[:-1], flipped[-1]), (len(original), original[:-1], original[-1] ^ 1))
+        # A reverted transaction's one Word changes as it always did.
+        reverted = campaign.analyze(report, value, "rustEvm", "tx-1", "output")
+        self.assertEqual(reverted["histories"]["rustEvm"]["transactions"][1]["output"],
+                         "0x" + f"{int(histories['rustEvm']['transactions'][1]['output'], 16) ^ 1:064x}")
+
 if __name__ == "__main__":
     unittest.main()
