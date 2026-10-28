@@ -4613,5 +4613,255 @@ class EnumArgumentTests(unittest.TestCase):
         self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
         self.assertFalse(result["pairs"]["directCore/rustEvm"])
 
+
+def enum_array_case(rows=((0, ((1, 3, 0, 0), (2, 3, 5, 0)), 0, 1, None), (1, ((0, 1, 2, 33),), 0, 0, None),
+                          (0, ((1, 7, 0, 0), (3, 0, 0, 0)), 1, 0, {"kind": "share", "element": 1, "source": 0})),
+                    shape=ARGUMENT_SHAPE):
+    """Envelope fixture only: native replay checks the actual enum-array program."""
+    value = {"schema": runner.ENUM_ARRAY_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "enumArrayPlan": {"schema": "solcore-lean.enum-array-plan.v1", "stepProgram": {},
+            "constructors": [{"name": name, "fields": fields} for name, fields in shape]},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(10)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "transactions": []}
+    signature = runner.enum_array_signature(value)
+    value["contract"] = {"name": "SynthesizedEnumArrays", "method": "run", "signature": signature,
+        "selector": runner.method_selector(signature), "deployPath": ["SynthesizedEnumArraysDeploy"],
+        "runtimePath": ["SynthesizedEnumArraysDeploy", "SynthesizedEnumArrays"], "constructorCalldata": "0x"}
+    for index, (flags, elements, first, second, malformation) in enumerate(rows):
+        tx = {"id": f"tx-{index}", "flags": str(flags),
+              "elements": [{"choice": choice, "a": str(a), "b": str(b), "length": length} for choice, a, b, length in elements],
+              "first": str(first), "second": str(second), "malformation": malformation or {"kind": "none"}, "value": "0"}
+        data = runner.enum_array_input(value, tx)
+        tx.update(calldata="0x" + data.hex(), stdRejection=runner.enum_array_decode(value, data)[0])
+        value["transactions"].append(tx)
+    return value
+
+
+def enum_array_history(value, path, step=lambda x: x + 1):
+    """Rows of the enum-array protocol with a known step: std's decision on the
+    calldata, then r = step(slot 0 + L + both elements' index and Words) to slot
+    0, the length to slot 1 and both elements to slots 2 to 9; odd decoded flags
+    revert with r. A rejection reverts with std's data on Hull and the EVM and
+    with the selector Word or the Word zero in original Core."""
+    rows, prior = [], [0] * 10
+    for index, tx in enumerate(value["transactions"]):
+        rejection, decoded = runner.enum_array_decode(value, runner.common.hex_bytes(tx["calldata"], "calldata"))
+        if rejection is not None:
+            output = bytes.fromhex(rejection[2:])
+            if path == "directCore":
+                output = int.from_bytes(output, "big").to_bytes(32, "big")
+            status, committed = "reverted", list(prior)
+        else:
+            flags, *words = decoded
+            result = step((prior[0] + sum(words)) % 2**256) % 2**256
+            output = result.to_bytes(32, "big")
+            status, committed = ("reverted", list(prior)) if flags % 2 else ("returned", [result, *words])
+        row = {"id": tx["id"], "index": index, "status": status, "output": "0x" + output.hex(),
+               "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.ENUM_ARRAY_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0] * 10), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def enum_array_histories(value=None, **options):
+    value = enum_array_case() if value is None else value
+    return {path: enum_array_history(value, path, **options) for path in runner.PATHS}
+
+
+class EnumArrayTests(unittest.TestCase):
+    def test_an_enum_array_case_records_its_elements_indices_and_malformations(self):
+        value = enum_array_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"]),
+                         ("semantic-enum-array-tool", "rust-hull-keyed-storage-scenario", True, "enum-arrays"))
+        self.assertTrue(runner.has_enum_arrays(value) and runner.uses_selector_rule(value))
+        self.assertFalse(runner.has_enum_arguments(value) or runner.has_enum_arrays(enum_argument_case()))
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(10)))
+        self.assertIn("calldata array", runner.scope(value))
+        # std's structural signature with `[]`, and its selector as `cast keccak` writes it.
+        self.assertEqual(runner.enum_array_signature(value),
+                         "run(uint256,sum(bytes,sum(uint256,sum(uint256,uint256,)))[],uint256,uint256)")
+        self.assertEqual(runner.method_selector(runner.enum_array_signature(value)), "0x6c89cba6")
+        self.assertEqual(runner.enum_array_layout(value), (False, 96, 32))
+        # Ready() then Idle() in a static array of two field-less constructors:
+        # the selector, the flags, the offset 128, both indices, the length and
+        # the tags inline.
+        static = enum_array_case(rows=((0, ((1, 0, 0, 0), (0, 0, 0, 0)), 1, 0, None),), shape=(("Idle", ""), ("Ready", "")))
+        self.assertEqual(static["transactions"][0]["calldata"],
+                         "0x" + runner.method_selector("run(uint256,sum(,)[],uint256,uint256)")[2:] + "00" * 32 +
+                         f"{128:064x}" + f"{1:064x}" + "00" * 32 + f"{2:064x}" + ARGUMENT_TAGS["Ready()"] + ARGUMENT_TAGS["Idle()"])
+        self.assertEqual(runner.enum_array_layout(static), (True, 32, 32))
+        # The shared body decodes element 0 twice; odd flags revert after decoding.
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [None, None, None])
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                         ["returned", "reverted", "returned"])
+        shared = runner.enum_array_decode(value, runner.enum_array_input(value, value["transactions"][2]))[1]
+        self.assertEqual(shared, (0, 2, 2, 7, 0, 0, 2, 7, 0, 0))
+        # Refusals: a constructor beyond the shape, a length without bytes, a
+        # length above 64, four elements, malformations that do not apply, and
+        # metadata that differs from the calldata or std's decision.
+        for rows in (((0, ((4, 0, 0, 0),), 0, 0, None),), ((0, ((1, 0, 0, 1),), 0, 0, None),),
+                     ((0, ((0, 0, 0, 65),), 0, 0, None),), ((0, ((3, 0, 0, 0),) * 4, 0, 0, None),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "tail", "element": 0, "value": "3"}),),
+                     ((0, ((0, 0, 0, 32),), 0, 0, {"kind": "padding", "element": 0, "pattern": "ones"}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "retag", "element": 0, "constructor": 1}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "tag", "element": 1, "value": "0"}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "share", "element": 0, "source": 0}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "entry", "element": 0, "value": "32"}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "count", "value": "1"}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "offset", "value": "128"}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "tag", "element": 0,
+                                                  "value": str(int(ARGUMENT_TAGS["Blob(bytes)"], 16))}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "truncate", "kept": 3}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "trailing", "count": 65, "pattern": "zeros"}),),
+                     ((0, ((1, 0, 0, 0),), 0, 0, {"kind": "unknown"}),)):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                enum_array_case(rows=rows)
+        with self.assertRaises(ValueError):
+            enum_array_case(rows=((0, ((0, 0, 0, 0),), 0, 0, {"kind": "entry", "element": 0, "value": "0"}),),
+                            shape=(("Idle", ""), ("Ready", "")))
+        for key, changed in (("calldata", value["transactions"][0]["calldata"] + "00"), ("value", "1"), ("flags", "2"),
+                             ("first", "1"), ("elements", [{"choice": 2, "a": "3", "b": "5", "length": 0}]),
+                             ("stdRejection", runner.STD_OUT_OF_BOUNDS), ("malformation", {"kind": "short", "bytes": 2})):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["contract"]["selector"] = runner.method_selector(runner.enum_argument_signature(value))
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = ["0", "1", "2", "3", "4"]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_std_decisions_of_each_malformation_follow_the_pinned_array_decoder(self):
+        # [Ready(3), Settled(3, 5)] of the dynamic shape read at 0 and 1: the
+        # region at 164, the table entries 64 and 160, the bodies at 228 and 324,
+        # 420 bytes in all.
+        def decision(malformation, elements=((1, 3, 0, 0), (2, 3, 5, 0)), first=0, second=1):
+            value = enum_array_case(rows=((0, elements, first, second, malformation),))
+            return value["transactions"][0]["stdRejection"]
+        size = 420
+        cases = [({"kind": "short", "bytes": 3}, runner.STD_NO_SELECTOR), ({"kind": "selector", "mask": "1"}, runner.STD_NO_SELECTOR),
+                 ({"kind": "truncate", "kept": 131}, runner.STD_TRUNCATED), ({"kind": "truncate", "kept": 163}, runner.STD_TRUNCATED),
+                 ({"kind": "truncate", "kept": 260}, runner.STD_TRUNCATED), ({"kind": "trailing", "count": 7, "pattern": "ones"}, None),
+                 ({"kind": "offset", "value": str(size - 4)}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": str(2**256 - 4)}, runner.STD_TRUNCATED),
+                 ({"kind": "count", "value": "3"}, None), ({"kind": "count", "value": "1"}, runner.STD_OUT_OF_BOUNDS),
+                 ({"kind": "count", "value": str(2**256 - 1)}, runner.STD_TRUNCATED),
+                 ({"kind": "count", "value": str((2**256 - 1) // 32 + 1)}, runner.STD_TRUNCATED),
+                 ({"kind": "tag", "element": 1, "value": "0"}, runner.STD_EMPTY_REVERT),
+                 ({"kind": "retag", "element": 0, "constructor": 3}, None),
+                 ({"kind": "entry", "element": 1, "value": "0"}, runner.STD_EMPTY_REVERT),
+                 ({"kind": "entry", "element": 1, "value": str(size - 164)}, runner.STD_TRUNCATED),
+                 ({"kind": "entry", "element": 1, "value": str(size - 164 + 1)}, runner.STD_TRUNCATED),
+                 ({"kind": "share", "element": 1, "source": 0}, None), ({"kind": "unused", "element": 0, "value": "1"}, None)]
+        for malformation, expected in cases:
+            with self.subTest(malformation=malformation):
+                self.assertEqual(decision(malformation), expected)
+        # Indices: the length itself and 2^256 - 1 are past the end; an empty
+        # array has no element; an unread element's changes are never checked.
+        self.assertEqual(decision(None, first=2), runner.STD_OUT_OF_BOUNDS)
+        self.assertEqual(decision(None, second=2**256 - 1), runner.STD_OUT_OF_BOUNDS)
+        self.assertEqual(decision(None, elements=(), first=0, second=0), runner.STD_OUT_OF_BOUNDS)
+        self.assertIsNone(decision({"kind": "tag", "element": 1, "value": "0"}, second=0))
+        self.assertIsNone(decision({"kind": "entry", "element": 1, "value": str(2**256 - 32)}, second=0))
+        # The first index is decided before the second element.
+        self.assertEqual(decision({"kind": "tag", "element": 1, "value": "0"}, first=2), runner.STD_OUT_OF_BOUNDS)
+        # Blob of 17 bytes alone: the body at 196, its length Word at 292, the
+        # payload at 324, 356 bytes in all.
+        for malformation, expected in [({"kind": "tail", "element": 0, "value": "0"}, runner.STD_TRUNCATED),
+                                       ({"kind": "tail", "element": 0, "value": str(356 - 196 + 1)}, runner.STD_TRUNCATED),
+                                       ({"kind": "length", "element": 0, "value": "32"}, None),
+                                       ({"kind": "length", "element": 0, "value": "33"}, runner.STD_TRUNCATED),
+                                       ({"kind": "padding", "element": 0, "pattern": "ramp"}, None),
+                                       ({"kind": "truncate", "kept": 341}, None), ({"kind": "truncate", "kept": 340}, runner.STD_TRUNCATED)]:
+            with self.subTest(malformation=malformation):
+                self.assertEqual(decision(malformation, elements=((0, 3, 5, 17),), first=0, second=0), expected)
+        # A static array's elements lie inside the checked region: a length past
+        # the region is truncated, and a cut region too.
+        static = (("Pair", "uint256,uint256"), ("Idle", ""), ("Q", "uint256"))
+        value = enum_array_case(rows=((0, ((0, 1, 2, 0), (2, 3, 0, 0)), 1, 0, {"kind": "count", "value": "3"}),
+                                      (0, ((0, 1, 2, 0),), 0, 0, {"kind": "truncate", "kept": 164 + 95}),
+                                      (0, ((2, 1, 0, 0), (1, 0, 0, 0)), 0, 1, {"kind": "unused", "element": 0, "value": "5"})),
+                                shape=static)
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [runner.STD_TRUNCATED, runner.STD_TRUNCATED, None])
+
+    def test_rejections_compare_by_selector_and_empty_revert_data(self):
+        rows = ((0, ((1, 7, 0, 0),), 0, 0, None), (0, ((1, 7, 0, 0), (3, 0, 0, 0)), 0, 1, {"kind": "tag", "element": 1, "value": "0"}),
+                (0, ((1, 1, 0, 0),), 1, 0, None), (0, ((2, 3, 5, 0),), 0, 0, {"kind": "truncate", "kept": 131}),
+                (0, ((1, 1, 0, 0),), 0, 0, {"kind": "short", "bytes": 2}), (0, ((1, 2, 0, 0),), 0, 0, None))
+        value = enum_array_case(rows=rows)
+        histories = enum_array_histories(value)
+        result = runner.compare(histories, value)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual([(row["index"], row["selector"]) for row in result["selectorRows"]],
+                         [(1, runner.STD_EMPTY_REVERT), (2, runner.STD_OUT_OF_BOUNDS), (3, runner.STD_TRUNCATED),
+                          (4, runner.STD_NO_SELECTOR)])
+        core = histories["directCore"]["transactions"]
+        self.assertEqual([core[index]["output"] for index in (1, 2)], ["0x" + "00" * 32, "0x" + "00" * 28 + "7f52b2bf"])
+        self.assertEqual(histories["rustEvm"]["transactions"][2]["output"], "0x7f52b2bf")
+        for index, tx in enumerate(value["transactions"]):
+            rows_by_path = runner.comparable(value, tx, {name: histories[name]["transactions"][index] for name in runner.PATHS})
+            prior = histories["rustEvm"]["transactions"][index - 1]["committedStorage"] if index else histories["rustEvm"]["initialStorage"]
+            self.assertTrue(all(runner.conforms(value, tx, row, prior) for row in rows_by_path.values()))
+        # The rules apply only to the prescribed outcome.
+        for index, path, output in ((2, "directCore", "0x" + "00" * 32), (1, "rustEvm", "0x" + "00" * 32),
+                                    (2, "importedHull", "0x08638556"), (3, "rustEvm", "0x")):
+            changed = copy.deepcopy(histories)
+            changed[path]["transactions"][index]["output"] = output
+            result = runner.compare(changed, value)
+            with self.subTest(index=index, path=path):
+                self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", f"tx-{index}"))
+                self.assertIn("output", result["fields"])
+        # Another profile's Core never maps ArrayOutOfBounds().
+        self.assertNotIn(runner.STD_OUT_OF_BOUNDS, runner.STD_ERRORS)
+
+    def test_decoded_elements_follow_the_protocol_on_every_path(self):
+        value = enum_array_case()
+        histories = enum_array_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        after = {entry["slot"]: int(entry["value"]) for entry in rows[0]["committedStorage"]}
+        self.assertEqual([after[str(slot)] for slot in range(1, 10)], [2, 2, 3, 0, 0, 3, 3, 5, 0])
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertEqual(runner.enum_array_fields(value, tx, rows[index], prior), [])
+        tx, prior = value["transactions"][0], histories["directCore"]["initialStorage"]
+        for slot in [str(slot) for slot in range(1, 10)]:
+            changed = copy.deepcopy(rows[0])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertEqual(runner.enum_array_fields(value, tx, changed, prior), ["committedStorage"])
+        changed = {**rows[0], "output": "0x" + (int(rows[0]["output"], 16) ^ 1).to_bytes(32, "big").hex()}
+        self.assertEqual(runner.enum_array_fields(value, tx, changed, prior), ["output"])
+        self.assertFalse(runner.conforms(value, tx, {**rows[0], "output": rows[0]["output"] + "00"}, prior))
+        # Another decoded Word on every path breaks the protocol although the paths agree.
+        broken = enum_array_histories(value)
+        for path in runner.PATHS:
+            entry = next(item for item in broken[path]["transactions"][0]["committedStorage"] if item["slot"] == "7")
+            entry["value"] = "8"
+        result = runner.compare(broken, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertTrue(all(result["pairs"].values()))
+        # A different step on one path is an ordinary difference.
+        changed = enum_array_histories(value)
+        changed["rustEvm"] = enum_array_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -2385,5 +2385,85 @@ class EnumArgumentCampaignTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "enum-argument coverage belongs to the enum-argument profile"):
             campaign.validate_manifest({**other, "requiredArgumentPositions": ["2:0"]})
 
+def enum_array_case(rows=None, origin=None, shape=fixtures.ARGUMENT_SHAPE):
+    value = fixtures.enum_array_case(shape=shape) if rows is None else fixtures.enum_array_case(rows=rows, shape=shape)
+    value["enumArrayPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class EnumArrayCampaignTests(unittest.TestCase):
+    def test_coverage_names_counts_positions_fields_lengths_decisions_accepted_kinds_carries_and_budgets(self):
+        value = enum_array_case()
+        self.assertEqual(campaign.dimensions("stateful-enum-array-arguments"),
+                         campaign.DIMENSIONS + ("ArrayElementCounts", "ArrayPositions", "ArrayFields", "ArrayBytesLengths",
+                                                "ArrayBytesConstructors", "ArrayMalformations", "ArrayRejections",
+                                                "ArrayAccepted", "ArrayCarries", "ArrayNodeBudgets"))
+        # tx-0 decodes Ready and Settled and commits; tx-1 decodes Blob of 33
+        # bytes and reverts in the body; tx-2 reads a body that both table
+        # entries share, after both. An imported case has no node budget.
+        self.assertEqual(campaign.enum_arrays_coverage(value),
+                         {"ArrayElementCounts": {1, 2}, "ArrayPositions": {"2:0", "2:1", "1:0"},
+                          "ArrayFields": {"dynamic:one", "dynamic:two", "dynamic:bytes"}, "ArrayBytesLengths": {33},
+                          "ArrayBytesConstructors": {1}, "ArrayMalformations": {"none", "share"},
+                          "ArrayRejections": {"accepted"}, "ArrayAccepted": {"share"},
+                          "ArrayCarries": {"committed", "rollback"}, "ArrayNodeBudgets": set()})
+        # The inputs are the Word fields of Word elements.
+        self.assertEqual(campaign.inputs(value), {"3", "5", "7"})
+        # A static array: an index past the length, an unread unknown tag, and
+        # a generated budget.
+        static = enum_array_case(rows=((0, ((0, 1, 2, 0),), 1, 0, None), (0, ((0, 1, 2, 0), (1, 0, 0, 0)), 0, 0,
+                                       {"kind": "tag", "element": 1, "value": "0"})),
+                                 shape=(("Ready", "ScPair"), ("Idle", "")),
+                                 origin={"kind": "enum-array-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.enum_arrays_coverage(static),
+                         {"ArrayElementCounts": {1, 2}, "ArrayPositions": {"2:0"}, "ArrayFields": {"static:pair"},
+                          "ArrayBytesLengths": set(), "ArrayBytesConstructors": {0},
+                          "ArrayMalformations": {"none", "tag"}, "ArrayRejections": {"0x7f52b2bf", "accepted"},
+                          "ArrayAccepted": {"tag"}, "ArrayCarries": {"rejection"}, "ArrayNodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-enum-array-arguments"))
+            instance.summary["coverage"].update(requiredArrayBytesLengths=[0, 1, 31, 32, 33, 63, 64],
+                                                requiredArrayNodeBudgets=[384, 512],
+                                                requiredArrayRejections=["0x4924aef0", "0x08638556", "0x7f52b2bf", "0x"])
+            histories = fixtures.enum_array_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedArrayPositions"], coverage["matchedArrayRejections"],
+                              coverage["matchedArrayCarries"]),
+                             (["1:0", "2:0", "2:1"], ["accepted"], ["committed", "rollback"]))
+            self.assertEqual((coverage["missingArrayBytesLengths"], coverage["missingArrayNodeBudgets"],
+                              coverage["missingArrayRejections"]),
+                             ([0, 1, 31, 32, 63, 64], [384, 512], ["0x", "0x08638556", "0x4924aef0", "0x7f52b2bf"]))
+            # The selector rows are recorded in the analysis: here none.
+            report = {"comparison": campaign.adapter.compare(histories, value), "histories": histories}
+            self.assertEqual(report["comparison"]["selectorRows"], [])
+
+    def test_the_fixed_corpus_validates_and_its_enum_array_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-enum-array-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-enum-array-arguments")
+        self.assertEqual((manifest["requiredArrayBytesLengths"], manifest["requiredArrayNodeBudgets"],
+                          manifest["requiredArrayCarries"]),
+                         ([0, 1, 31, 32, 33, 63, 64], [384, 512], ["committed", "rollback", "rejection"]))
+        for dimension in ("ArrayElementCounts", "ArrayPositions", "ArrayFields", "ArrayBytesConstructors",
+                          "ArrayMalformations"):
+            self.assertEqual(manifest["required" + dimension], list(campaign.ENUM_ARRAY_EXTRA[dimension]))
+        self.assertEqual(manifest["requiredArrayRejections"], ["0x4924aef0", "0x08638556", "0x7f52b2bf", "0x"])
+        for key, changed in (("requiredArrayElementCounts", [4]), ("requiredArrayPositions", ["3:3"]),
+                             ("requiredArrayFields", ["static:bytes"]), ("requiredArrayBytesLengths", [1025]),
+                             ("requiredArrayBytesLengths", [True]), ("requiredArrayBytesConstructors", [3]),
+                             ("requiredArrayMalformations", ["aliased"]), ("requiredArrayRejections", ["0x00"]),
+                             ("requiredArrayAccepted", ["none"]), ("requiredArrayCarries", ["other"]),
+                             ("requiredArrayNodeBudgets", [448]), ("requiredArrayNodeBudgets", [384, 384])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredArrayCarries"})
+        other = json.loads((ROOT / "scripts/semantic-enum-argument-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "enum-array coverage belongs to the enum-array profile"):
+            campaign.validate_manifest({**other, "requiredArrayPositions": ["1:0"]})
+
 if __name__ == "__main__":
     unittest.main()

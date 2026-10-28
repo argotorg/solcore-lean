@@ -112,6 +112,10 @@ lean_exe semanticEnumArgumentTool where
   root := `Tests.SemanticEnumArgumentTool
   exeName := "semantic-enum-argument-tool"
 
+lean_exe semanticEnumArrayTool where
+  root := `Tests.SemanticEnumArrayTool
+  exeName := "semantic-enum-array-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

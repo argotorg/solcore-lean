@@ -6015,6 +6015,142 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+Calldata arrays of enum values came later; see
+[Compare enum arrays](#compare-enum-arrays).
+
+## Compare enum arrays
+
+The `stateful-enum-array-arguments` profile sends a calldata array of up to
+three values of a user-defined enum and two indices, canonically or with one
+malformation of its calldata. std's dispatcher checks the array's head, and
+the body reads both indexed elements through std's `abiArrayGet`, each decoded
+by the derived decoder. It compares the whole outcome on all three paths.
+Original Core decodes the calldata itself, without std's decoder code, under
+the existing `wordOutcomeV1` convention. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions and records std's array decoder as the probe found it.
+
+### Definitions
+
+- **Contract:** `SynthesizedEnumArrays` with `run(uint256 flags,
+  SynthesizedEnum[] items, uint256 first, uint256 second) returns (uint256)`,
+  the source type `calldata<array<SynthesizedEnum>>`, zero value. The selector
+  is std's structural signature with `[]`: `Nil | Single(uint256)` gives
+  `run(uint256,sum(,uint256)[],uint256,uint256)`.
+- **Shape:** the enum-argument shapes. An element's stride is its body head,
+  the tag and the widest fields, for a static enum, and one offset Word for a
+  dynamic one.
+- **std's decision** on the calldata, in std's order:
+  - shorter than four bytes or another selector: `0x4924aef0`;
+  - shorter than the 128-byte head of the flags, the array's offset and both
+    indices: `0x08638556`;
+  - the array's offset `o` above `size - 4`, fewer than 32 bytes at
+    `p = 4 + o`, a length `L > ~0 / s` or `L s` bytes missing after the length
+    Word, for the stride `s`: `0x08638556`;
+  - for `first`, then `second`, an index of at least `L`: `0x7f52b2bf`,
+    `ArrayOutOfBounds()`;
+  - a dynamic element's offset Word `e` at `R + 32 i`, relative to the region
+    `R = p + 32`, above `size - R`, or fewer than 32 bytes at `R + e`:
+    `0x08638556`;
+  - then the element's tag and fields as for one enum argument; a static
+    element lies inside the checked region.
+
+  Unread elements, trailing bytes, gaps and overlapping bodies are ignored.
+- **Transaction:** once std accepts,
+  `r = step(prior + L + both elements' index and Words)` goes to slot 0, the
+  length to slot 1, and each element's one-based index and Words, as for one
+  enum argument, to slots 2 to 5 and 6 to 9. Odd decoded flags revert with
+  the one Word `r`; even flags return `r`.
+- **Original Core:** one host contract that reads the calldata through
+  `inputDataSize`, `inputDataByte?` and `inputDataWordBE?` and makes std's
+  decisions above; the element decoder is one Core function, applied to
+  `first` and then to `second`. A rejection reverts with its error selector as
+  the Word, and an unknown tag with the Word zero.
+- **Comparison:** the selector rule, with `0x7f52b2bf` beside std's other
+  error selectors, and the empty-revert rule, each only when that is the
+  transaction's prescribed `stdRejection`. Hull against the EVM stays exact.
+- **Transactions:** `{id, flags, elements, first, second, malformation,
+  calldata, stdRejection, value}`, with up to three elements `{choice, a, b,
+  length}`. A `bytes` payload is the first `length` bytes of `a · K` and
+  `b · K`. Each index lies below the element count with probability 7/8, and
+  otherwise is the count or `2^256 - 1`. A third of the generated transactions
+  are canonical; the others draw a target element, then a kind uniformly from
+  those that apply, then an entry of its bank. The kinds are `short`,
+  `selector`, `truncate` and `trailing` as for malformed calldata, `offset`
+  and `count` (the array's offset and length Words), and for the target
+  element `tag`, `retag`, `entry` and `share` (its offset Word in a dynamic
+  array's table, or another element's), `unused`, and `tail`, `length` and
+  `padding` for `bytes`.
+
+### Running and validation
+
+```sh
+lake build semanticEnumArrayTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-enum-array-corpus.json \
+  --output .upstream/semantic-enum-array-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-enum-array-arguments \
+  --cases 16 --output .upstream/semantic-enum-array-random
+```
+
+Plans use `solcore-lean.enum-array-plan.v1` under `enumArrayPlan`, with the
+constructors as for the enum arguments. Cases use
+`solcore-lean.semantic-enum-array-case.v1` and histories
+`solcore-lean.enum-array-history.v1`. The wrapper reserves the enum
+arguments' 168 nodes inside the node budget, so the suite's 384-node default
+leaves 216 for the step, and `--nodes-scale 2` caps the doubled budget at 512.
+The rest of the array wrapper, 190 nodes for a static enum and 229 for a
+dynamic one, and the shape's decoder, 26 to 108 and 197 to 452 nodes, lie
+outside it, so contracts are bounded by 512 nodes plus those, at most 1,193.
+A case reaches about 100 KB, so a native shrink response carries at most 16
+candidates.
+
+The adapter validates each transaction against its own Python model: the
+canonical encoding and the malformation must give the recorded calldata, and
+std's decision on it the recorded `stdRejection`. A rejection reverts with
+exactly std's data on every path after the two rules, and a returned row must
+commit the length and both decoded elements and return slot 0. A body revert
+and a rejection are checked by rollback. Reductions remove transactions, set
+a malformation to none or to an earlier entry of its bank, drop an
+element, shorten lengths to zero or half, drop a constructor no element or
+retag names, narrow fields, reduce the step, then zero the element Words and
+clear flags to their parity bit.
+
+Three Lean tests check the profile:
+- `Solcore/Test/SourceEnumArrayGolden.lean` checks the Core contract and the
+  Lean model against rows written out as hexadecimal text, computed outside
+  Lean by the probe's independent model, with tags and selectors from `cast
+  keccak`, over five shapes, and raw calldata for the order of std's checks
+  and an aliased table entry.
+- `Solcore/Test/SourceEnumArrayCases.lean` requires the Core contract to equal
+  the model on the generated scenarios under the two rules, every case and
+  reduction to replay, the node counts above for every shape class, and
+  generation to draw every constructor count, field kind, element count, read
+  position, bank length, malformation kind and std outcome.
+- `Solcore/Test/SourceEnumArrayCorpus.lean` checks the fixed corpus against
+  expected histories that the model computed.
+
+The fixed corpus has 17 scenarios and 48 transactions: eleven imported
+scenarios, which reuse the enum-argument corpus's four imported steps with
+shapes and transactions chosen for coverage, and six generated seeds, three
+at 384 nodes and three at 512. Required coverage:
+- element counts 0 to 3, both indices reading every position of one to three
+  elements, and every field kind decoded in static and dynamic arrays;
+- decoded `bytes` lengths 0, 1, 31, 32, 33, 63 and 64, and zero, one and two
+  `bytes` constructors;
+- every malformation kind, the four rejections, and accepted trailing bytes,
+  a longer array length, unread tags and table entries, a decoding retag, a
+  shared body, an unread head Word, a `bytes` length into the padding and
+  nonzero padding;
+- decoded elements after an earlier committed transaction, body revert and
+  rejection, and both node budgets;
+- the six boundary Words as element Words, one to three helpers and
+  transactions, all four templates, both outcomes and eight completion
+  patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-two

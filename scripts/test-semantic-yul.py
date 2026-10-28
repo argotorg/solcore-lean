@@ -239,7 +239,7 @@ class YulEvidenceTests(unittest.TestCase):
         self.assertEqual(report['yulExportProvenance'], record)
 
     def test_storage_family_cases_are_validated_by_the_storage_adapter_with_its_failures(self):
-        self.assertEqual(len(yul.STORAGE_SCHEMAS), 24)
+        self.assertEqual(len(yul.STORAGE_SCHEMAS), 25)
         self.assertEqual(yul.STORAGE_SCHEMAS, {value['caseSchema'] for value in yul.exporter.storage.PROFILES.values()})
         for value in (storage_case(), storage_case('SynthesizedMethods'), policy_case(), None, {'schema': 'unknown'}):
             with self.subTest(case=value), patch.object(yul.exporter.storage, 'validate_case') as storage, \
