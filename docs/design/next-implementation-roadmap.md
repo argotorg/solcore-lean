@@ -3600,6 +3600,44 @@ needs both.
   other than `base | (i & S)`, logs other than one `log2` per iteration,
   `for` loops, and `break` or `continue`.
 
+**Results.** The checks before any random run:
+- The golden cases passed on both the guarded contract and the source-loop
+  model; a flipped log value, entry or status fails.
+- The model equalled the guarded contract on 240 transactions of 40 generated
+  scenarios, on status, output, the observed slots and every log. Every case
+  and the reductions of four cases replayed.
+- The gate passed on the final tree before `46335fa59`: the full Lean build
+  and tests, the kernel check, 752 Python tests, every corpus check and the
+  diff check.
+
+The matrices ran on `46335fa59` with 91 digests frozen: scripts, the 28 native
+tools, solc, Anvil, and the Rust driver and code-image exporter. None changed
+during any run.
+- **Fixed corpora:**
+  - O0: all nineteen stateful corpora matched, 243 scenarios and 665
+    prefixes; the eighteen earlier ones kept 230 and 632.
+  - The new corpus matched its 13 scenarios and 33 prefixes with complete
+    coverage on O0, O2 and Yul, in 103, 111 and 137 seconds:
+    - loop masks and key masks 0, 1, 3 and 7, and iteration counts 0 to 7;
+    - 77 committed logs and six reverts after logged iterations;
+    - all four carries.
+- **Random suites:** root seed `20261029`, sixteen eight-transaction
+  scenarios with G0 revision three, at 384 and 512 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes:
+  - loop masks 1, 3 and 7 drawn 5, 3 and 8 times, and key masks 0, 1, 3 and 7
+    drawn 3, 3, 6 and 4 times;
+  - iteration counts 0 to 7 drawn 33, 33, 20, 11, 12, 6, 6 and 7 times;
+  - 191 committed logs and 26 reverts after logged iterations;
+  - by case: an iteration reading the previous one's `acc` in 11, a repeated
+    entry within a transaction in 7, an entry carried across committed
+    transactions in 15 and a rollback after logs in 13;
+  - 16 attempts and no exclusion;
+  - the two budgets draw the same masks and transactions, and the step
+    differs in 14 of the 16 cases.
+
+A random run took 128 to 178 seconds on Sonatina and 221 to 222 on Yul. There
+was no finding. Hosted CI has not run the profile.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

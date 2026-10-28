@@ -4505,7 +4505,8 @@ framing `core-word-log-framing-v1`. The 38-node shell lies inside the node
 budget. The 2,654-node Keccak closure and the guards, 69 nodes each and 483
 for seven, lie outside it. The suite's default of 384 nodes leaves 346 for the
 step, and a contract has at most 512 + 2,654 + 483 nodes. A case reaches about
-165 KB, so a native shrink response carries at most 16 candidates.
+210 KB, so a native shrink response carries at most 16 candidates, within the
+campaign's 4 MiB bound on a tool response.
 
 Every path's ordered committed logs are compared, together with the EVM
 chain's complete log list. A returned row commits two topics and 32 data bytes
@@ -4552,6 +4553,31 @@ four generated seeds. Required coverage:
 
 The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
 as for the other storage-family profiles.
+
+### Results
+
+The matrices ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen.
+- **Fixed corpus:** matched all 13 scenarios and 33 prefixes with complete
+  coverage on Sonatina O0 and O2 and on Yul, in 103, 111 and 137 seconds. The
+  eighteen other stateful corpora still matched on O0, 230 scenarios and 632
+  prefixes.
+- **Random suites:** root seed `20261029`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  Each matched 16 scenarios and 128 prefixes, in 128 to 178 seconds on
+  Sonatina and 221 to 222 on Yul:
+  - loop masks 1, 3 and 7 came 5, 3 and 8 times, and key masks 0, 1, 3 and 7
+    came 3, 3, 6 and 4 times;
+  - every iteration count from 0 to 7 occurred;
+  - 191 logs were committed, and 26 transactions reverted after logged
+    iterations;
+  - two iterations of one transaction shared an entry in 7 cases, and a later
+    transaction reread an entry an earlier committed one wrote in 15;
+  - no seed was excluded;
+  - both budgets drew the same masks and transactions, and a step differs in
+    14 of the 16 cases.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
 
 ## Compare whole committed storage
 
