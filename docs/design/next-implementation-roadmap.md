@@ -3638,11 +3638,158 @@ during any run.
 A random run took 128 to 178 seconds on Sonatina and 221 to 222 on Yul. There
 was no finding. Hosted CI has not run the profile.
 
+**Multi-word return values.** Every other stateful profile returns one Word.
+Both contract entry conventions of original Core, `returnWord` and
+`wordOutcomeV1`, decode a result into exactly one Word of return data (see the
+ninth extension above). The `stateful-tuple-returns` profile returns a static
+ABI tuple of two to four Words and compares the whole return data on all three
+paths. The user approved a new entry convention in the shared contract
+runtime, on one condition: every existing consumer still goes through.
+
+A probe came first. Three hand-written contracts, one per arity, ran
+`run(uint256 flags, uint256 input)` with the return types `(uint256, uint256)`,
+`(uint256, uint256, uint256)` and `(uint256, uint256, uint256, uint256)`, over
+three transactions, one of them reverting. Their tuples mixed a computed Word
+with slots read before and after writes. The results:
+- The pinned compiler accepted the three return types and their tuple
+  expressions. std's `do_exec` encodes the returned value, nested pairs, with
+  `abi_encode`, whose static pair encoding concatenates the heads.
+- Checked Hull export, Sonatina O0 and O2 images, and Yul through the pinned
+  solc all compiled.
+- On Anvil, O0, O2 and Yul returned exactly 64, 96 and 128 bytes, the static
+  tuple encoding, and reverted with one Word. Imported Hull with O0 and O2
+  images gave the same bytes, reverts and slots.
+- The storage adapter's EVM path reads the trace's whole `returnValue`, and
+  the declared-slot Hull runner prints the whole return data. Neither changes.
+
+So the profile is feasible. The runtime gains one convention and no other
+interface:
+- **Convention:** `CoreContractEntryProfile.wordTupleOutcomeV1 extraWords`, a
+  static tuple of `extraWords + 2` Words.
+  - Its result type is `.sum T (.sum .word .word)`, where `T` is the
+    right-nested product of the Words. `ofResultType?` recognizes exactly
+    these types, and `resultType` stays injective.
+  - A returned tuple decodes to the concatenated big-endian bytes of its
+    Words. Revert and trap decode as for `wordOutcomeV1`.
+  - `CheckedCoreContract.wordTupleOutcomeV1` binds checked code to it.
+  - The top-level runner already decodes through `decode?` into bytes, so it
+    runs tuple contracts unchanged.
+- **One-Word premise:** `CoreContractEntryProfile.returnsOneWord` holds for
+  `returnWord` and `wordOutcomeV1`.
+  - The Word view, `decodeWordOutcome?` and its lemmas, takes it as a premise.
+    A tuple has no one-Word view, and `decodeWordOutcome?` returns `none` for
+    it.
+  - Those statements gain only that premise. Every statement about
+    `returnWord` and `wordOutcomeV1` stays as it is.
+- **Nested boundary:** the one-level nested executor resolves a child, or a
+  creation template's initializer, only when its convention returns one Word,
+  because a nested word call carries exactly one Word of child return data.
+  - A registered tuple contract is `unavailable` to a word call, and a
+    template with a tuple initializer is `unavailable` to creation. The
+    parent's context stays unchanged, as for an unregistered target or
+    template.
+  - Child and initializer frames carry that evidence, and `startChild` and
+    `startInitializer` take it as a premise.
+  - No existing environment registers a tuple contract, so no existing
+    execution changes.
+- The Hull importer, Core's semantics and host requests, and every backend
+  stay as they are.
+
+The profile's definitions were fixed before execution:
+- **Contract:** `SynthesizedTupleReturns` with
+  `run(uint256 flags, uint256 input)`, selector `0x7357f5d2`. It returns `n`
+  uint256 Words, with `n` in {2, 3, 4}, and every transaction is zero-value.
+- **Arity:** generation draws `n` per scenario by a SplitMix64 hash of the
+  seed, and the plan records it.
+- **Declared slots 0 to 2:**
+  - slot 0, an accumulator;
+  - slot 1, the committed call count;
+  - slot 2, the last committed input.
+- **Transaction:**
+  - it reads `prior = slot 0` and `last = slot 2`;
+  - it computes `r = step(prior + input)`, where the sum wraps;
+  - it writes `r` to slot 0, slot 1 plus one to slot 1, and the input to
+    slot 2.
+
+  Odd flags then revert with the one Word `r`. Even flags return the first
+  `n` of these Words:
+  1. `r`, the computed step result;
+  2. slot 1, read back after its write;
+  3. `prior`, slot 0 read before its write;
+  4. `last`, slot 2 read before its write: the input of the last committed
+     transaction.
+- **Source** (`solcore-source-tuple-returns-v1`):
+  - the step is `sc_step`, rendered by the aggregate renderer;
+  - the method's return type is the tuple of `n` uint256;
+  - it returns a tuple expression of `uint256(...)` conversions, and Word 2
+    is `sload(1)` in that expression.
+- **Original Core** (`core-tuple-return-contract-v1`, entry
+  `wordTupleOutcomeV1 (n - 2)`): one host contract whose result is `inLeft`
+  of the right-nested pairs of the `n` Words, or `inRight (inLeft r)`.
+- **Node budget:**
+  - the shell, everything but the step, lies inside the budget;
+  - the suite's default is 384 nodes, and the doubled budget is capped at
+    512;
+  - contracts are bounded by 512 nodes.
+- **Step:** one checked aggregate step with one to three helpers, generated
+  as for the other storage-family profiles. The step must not give equal
+  outputs at all boundary inputs.
+- **Transactions:** `{id, flags, input, calldata, value}`, one to eight per
+  scenario, drawn in blocks of three from a separate stream. Each block
+  draws:
+  - three flags from the boundary bank, each with the parity of one of the
+    four completion patterns;
+  - three inputs from the bank.
+
+  Random runs generate the step with G0 revision three.
+- **Observations:** status, the whole return data, slots 0 to 2 and the whole
+  committed storage, per prefix.
+  - The adapter's output rule for this profile is `32n` bytes on return and
+    32 on revert. The rule for every other profile stays one Word.
+  - Each returned row must follow the protocol: Word 1 is the committed slot
+    0, Word 2 the committed slot 1 and the prior slot 1 plus one, Word 3 the
+    prior slot 0, Word 4 the prior slot 2, and the committed slot 2 is the
+    input.
+  - A revert keeps the prior slots and the whole storage.
+- **Exclusions, in order:**
+  - a node budget too small for the shell or above 512;
+  - the step's own exclusions;
+  - a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed parities.
+- **Reductions,** each sealed and strictly smaller in transactions, then
+  arity, then program size, then transaction values:
+  - one-transaction removals;
+  - a lower arity (3, then 2), which drops trailing Words and keeps the
+    effects;
+  - step reductions;
+  - simpler transactions: flags to their parity bit, then the input to its
+    low byte.
+- **Fixed corpus coverage:**
+  - arities 2, 3 and 4, each with both outcomes;
+  - generated entries at both node budgets, 384 and 512;
+  - Words 3 and 4 carrying values that an earlier committed transaction
+    wrote, and a revert whose writes a later transaction must not see;
+  - one to three helpers and one to three transactions;
+  - the six boundary inputs, and the step features, templates and completion
+    patterns of its steps.
+- **Golden cases** come before any random run:
+  - The steps add a constant, and the expected rows, the whole return data
+    and the slots, are written out by hand. They cover each arity, both
+    outcomes, carries across transactions and wrapping sums.
+  - A Lean model of the source, a slot map, must equal the Core contract on
+    generated cases.
+  - Runtime golden tests check the exact bytes of the convention for two,
+    three and four Words, and its revert and trap branches.
+- **Out of scope:** dynamic return values (`bytes`, `uint256[]`), tuples with
+  dynamic or nested elements, gas, value, other methods and malformed
+  calldata.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
-(`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
-return values, which first need a contract entry convention for more than one
-Word, or callers beyond the three fixed senders, needs its own observation,
-rollback, deployment and reduction definitions first.
+(`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
+dynamic ABI-encoded return values, or callers beyond the three fixed senders,
+needs its own observation, rollback, deployment and reduction definitions
+first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
