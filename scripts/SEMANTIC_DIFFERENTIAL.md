@@ -582,7 +582,7 @@ enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
 separately validated Sonatina O0 images, recorded explicitly in `pathBackends`.
 This compares the same pure result without claiming Yul-linked Hull execution.
-The storage adapter and campaign accept Yul for the eighteen storage-family
+The storage adapter and campaign accept Yul for the twenty-one storage-family
 profiles ([storage-family contracts on Yul](#compare-storage-family-contracts-on-yul));
 the call adapter rejects it. No backend silently falls back to another.
 
@@ -5103,11 +5103,11 @@ There was no finding. Agreement is test evidence, not a preservation proof.
 
 ## Compare whole committed storage
 
-Every stateful profile compares the declared slots on all three paths. The sixteen
+Every stateful profile compares the declared slots on all three paths. The nineteen
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-twenty stateful profiles now also compare the observed contracts' whole
+twenty-three stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -5116,7 +5116,7 @@ this section describes how the paths observe it.
 
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
-`contract` for the eighteen storage-family profiles, `parent` and `child` for
+`contract` for the twenty-one storage-family profiles, `parent` and `child` for
 `stateful-calls` and `stateful-forwarded-value`. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
@@ -5201,8 +5201,10 @@ then; the later profiles start at
 `solcore-lean.malformed-bytes-history.v1`,
 `solcore-lean.methods-history.v1`,
 `solcore-lean.storage-loop-history.v1`,
-`solcore-lean.keccak-loop-history.v1` and
-`solcore-lean.tuple-return-history.v1`, whole storage included. Reports use
+`solcore-lean.keccak-loop-history.v1`,
+`solcore-lean.tuple-return-history.v1` and
+`solcore-lean.bytes-return-history.v1`, whole storage included; the two inline
+Yul loop profiles reuse their parents' history schemas. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
 `solcore-lean.semantic-storage-analysis.v2` and
@@ -5282,7 +5284,7 @@ preservation proof.
 
 ## Compare storage-family contracts on Yul
 
-The eighteen storage-family profiles also run with `--backend yul --solc PATH`.
+The twenty-one storage-family profiles also run with `--backend yul --solc PATH`.
 They compile as the pure profiles do: the checked Rust driver's Yul goes
 through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The two
 call profiles stay on Sonatina, because each of their sources compiles a parent
@@ -5310,10 +5312,10 @@ boundary; this section describes how to run it.
 - **No layout dependence:** the wrappers' runtime code reads no code, and
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the twenty-one pure and the fifteen
-  storage-family wrappers, taken from the adapters' profile tables; the three
-  malformed profiles reuse wrappers. Each must compile to one creation object
-  with one runtime sub-object and no link or immutable references.
+- **Admission:** `export-rust-yul.py` admits the twenty-one pure and the
+  eighteen storage-family wrappers, taken from the adapters' profile tables; the
+  three malformed profiles reuse wrappers. Each must compile to one creation
+  object with one runtime sub-object and no link or immutable references.
 
 ### Running and validation
 
@@ -5345,9 +5347,9 @@ execution.
 
 ### Results
 
-These results cover the fifteen profiles admitted first. The storage-loop
-profile, added later under the same boundary, reports its Yul runs in its own
-section.
+These results cover the fifteen profiles admitted first. The storage-loop,
+Keccak-loop, tuple-return, inline Yul loop and bytes-return profiles, added
+later under the same boundary, report their Yul runs in their own sections.
 
 A feasibility probe preceded the code. It ran the unchanged storage adapter on
 the first four scenarios of each fixed corpus, with the EVM deploying solc's
