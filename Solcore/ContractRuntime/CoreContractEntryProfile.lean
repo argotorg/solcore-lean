@@ -15,6 +15,9 @@ inductive CoreContractEntryProfile where
   /-- A returned static tuple of `extraWords + 2` Words, or a reverted Word, or
   a trap reason. -/
   | wordTupleOutcomeV1 (extraWords : Nat)
+  /-- A returned `bytes` value of at most 64 bytes, or a reverted Word, or a
+  trap reason. -/
+  | boundedBytesOutcomeV1
   deriving Repr, BEq, DecidableEq
 
 namespace CoreContractEntryProfile
@@ -45,12 +48,31 @@ def ofWordTupleType? : Core.Ty → Option Nat
   · intro equal
     rw [equal]
 
+/-- The longest returned `bytes` value of the bounded convention: two Words. -/
+def boundedBytesLimit : Nat := 64
+
+/-- The returned side of the bounded `bytes` convention: the empty value, or a
+length tag and two data Words. -/
+def boundedBytesType : Core.Ty := .sum .unit (.product .word (.product .word .word))
+
+/-- The length a non-empty value's tag names, `tag mod 64 + 1`: every Word
+names one of the lengths 1 to 64. -/
+def boundedBytesLength (tag : Core.Word) : Nat := tag.val % boundedBytesLimit + 1
+
+/-- std's ABI encoding of one returned `bytes` value made of the first `length`
+bytes of `data`: the offset Word 32, the length Word, those bytes, then zero
+bytes up to a whole number of Words. -/
+def encodeBoundedBytes (length : Nat) (data : Bytes) : Bytes :=
+  encodeWordBytesBE (Core.Word.ofNatModulo 32) ++ encodeWordBytesBE (Core.Word.ofNatModulo length) ++
+    data.extract 0 length ++ ⟨Array.replicate ((32 - length % 32) % 32) 0⟩
+
 /-- The Core result type required by one entry convention. -/
 def resultType : CoreContractEntryProfile → Core.Ty
   | .returnWord => .word
   | .wordOutcomeV1 => .sum .word (.sum .word .word)
   | .wordTupleOutcomeV1 extraWords =>
       .sum (wordTupleType (extraWords + 1)) (.sum .word .word)
+  | .boundedBytesOutcomeV1 => .sum boundedBytesType (.sum .word .word)
 
 /-- Recognize exactly the result types supported by the contract ABI. -/
 def ofResultType? : Core.Ty → Option CoreContractEntryProfile
@@ -59,7 +81,7 @@ def ofResultType? : Core.Ty → Option CoreContractEntryProfile
       match ofWordTupleType? returned with
       | some 0 => some .wordOutcomeV1
       | some (extraWords + 1) => some (.wordTupleOutcomeV1 extraWords)
-      | none => none
+      | none => if returned = boundedBytesType then some .boundedBytesOutcomeV1 else none
   | _ => none
 
 /--
@@ -70,6 +92,7 @@ def returnsOneWord : CoreContractEntryProfile → Bool
   | .returnWord => true
   | .wordOutcomeV1 => true
   | .wordTupleOutcomeV1 _ => false
+  | .boundedBytesOutcomeV1 => false
 
 /-- The concatenated big-endian Words of a right-nested tuple of `count + 1`
 Words: the static ABI encoding of the tuple. -/
@@ -78,6 +101,17 @@ def decodeWordTuple? : Nat → Core.Value → Option Bytes
   | count + 1, .pair (.word word) rest =>
       (decodeWordTuple? count rest).map (encodeWordBytesBE word ++ ·)
   | _, _ => none
+
+/-- The returned bytes of the bounded convention: the empty value, or the first
+`boundedBytesLength tag` bytes of two big-endian data Words. Both carry std's
+canonical encoding, so the data bytes after the length are zeroed. -/
+def decodeBoundedBytes? : Core.Value → Option Bytes
+  | .inLeft (.product .word (.product .word .word)) .unit =>
+      some (encodeBoundedBytes 0 ByteArray.empty)
+  | .inRight .unit (.pair (.word tag) (.pair (.word first) (.word second))) =>
+      some (encodeBoundedBytes (boundedBytesLength tag)
+        (encodeWordBytesBE first ++ encodeWordBytesBE second))
+  | _ => none
 
 /-- Decode one runtime value according to its contract-owned entry convention. -/
 def decode?
@@ -102,6 +136,16 @@ def decode?
   | .wordTupleOutcomeV1 extraWords,
       .inRight returned (.inRight .word (.word reason)) =>
       if returned = wordTupleType (extraWords + 1) then
+        some (.trapped reason)
+      else none
+  | .boundedBytesOutcomeV1, .inLeft (.sum .word .word) payload =>
+      (decodeBoundedBytes? payload).map .returned
+  | .boundedBytesOutcomeV1, .inRight returned (.inLeft .word (.word word)) =>
+      if returned = boundedBytesType then
+        some (.reverted (encodeWordBytesBE word))
+      else none
+  | .boundedBytesOutcomeV1, .inRight returned (.inRight .word (.word reason)) =>
+      if returned = boundedBytesType then
         some (.trapped reason)
       else none
   | _, _ => none
@@ -164,6 +208,30 @@ theorem decode?_ne_none_of_hasType
             decodeWordTuple?_ne_none_of_hasType (extraWords + 1) payloadTyping
           simp only [decode?, ne_eq, Option.map_eq_none_iff]
           exact tuple
+      | inRight payloadTyping =>
+          cases payloadTyping with
+          | inLeft innerTyping =>
+              cases innerTyping with
+              | word => simp [decode?]
+          | inRight innerTyping =>
+              cases innerTyping with
+              | word => simp [decode?]
+  | boundedBytesOutcomeV1 =>
+      cases typing with
+      | inLeft payloadTyping =>
+          cases payloadTyping with
+          | inLeft emptyTyping =>
+              cases emptyTyping
+              simp [decode?, decodeBoundedBytes?]
+          | inRight dataTyping =>
+              cases dataTyping with
+              | pair tagTyping wordsTyping =>
+                  cases tagTyping
+                  cases wordsTyping with
+                  | pair firstTyping secondTyping =>
+                      cases firstTyping
+                      cases secondTyping
+                      simp [decode?, decodeBoundedBytes?]
       | inRight payloadTyping =>
           cases payloadTyping with
           | inLeft innerTyping =>

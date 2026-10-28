@@ -57,6 +57,7 @@ theorem decodeWordOutcome?_ne_none_of_hasType
     profile.decodeWordOutcome? value ≠ none := by
   cases profile with
   | wordTupleOutcomeV1 _ => cases oneWord
+  | boundedBytesOutcomeV1 => cases oneWord
   | returnWord =>
       cases typing with
       | word => simp [decodeWordOutcome?]
@@ -195,6 +196,7 @@ theorem decode?_eq_map_decodeWordOutcome?
         CheckedCoreWordOutcome.toFrameOutcome := by
   cases profile with
   | wordTupleOutcomeV1 _ => cases oneWord
+  | boundedBytesOutcomeV1 => cases oneWord
   | returnWord =>
       simp only [CoreContractEntryProfile.decode?, decodeWordOutcome?]
       split <;> simp_all [CheckedCoreWordOutcome.toFrameOutcome]
@@ -215,6 +217,7 @@ theorem decodeTyped_eq_toFrameOutcome_decodeWordOutcome
       (profile.decodeWordOutcome oneWord typing).toFrameOutcome := by
   cases profile with
   | wordTupleOutcomeV1 _ => cases oneWord
+  | boundedBytesOutcomeV1 => cases oneWord
   | returnWord =>
       cases typing with
       | word => rfl

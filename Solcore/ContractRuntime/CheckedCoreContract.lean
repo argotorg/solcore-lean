@@ -42,6 +42,15 @@ def wordTupleOutcomeV1
     CheckedCoreContract :=
   ⟨code, .wordTupleOutcomeV1 extraWords, resultType_eq⟩
 
+/-- Bind checked code with the bounded `bytes` convention of at most 64 bytes. -/
+def boundedBytesOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (resultType_eq :
+      code.program.resultType =
+        CoreContractEntryProfile.boundedBytesOutcomeV1.resultType) :
+    CheckedCoreContract :=
+  ⟨code, .boundedBytesOutcomeV1, resultType_eq⟩
+
 /-- Admit checked code only when its result type has a supported entry profile. -/
 def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType
@@ -129,7 +138,8 @@ theorem CoreContractEntryProfile.eq_of_resultType_eq
     (equal : left.resultType = right.resultType) : left = right := by
   cases left <;> cases right <;>
     simp_all [CoreContractEntryProfile.resultType,
-      CoreContractEntryProfile.wordTupleType]
+      CoreContractEntryProfile.wordTupleType,
+      CoreContractEntryProfile.boundedBytesType]
 
 @[ext] theorem CheckedCoreContract.ext
     {left right : CheckedCoreContract}
