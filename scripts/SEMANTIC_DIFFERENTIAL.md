@@ -73,13 +73,14 @@ and the plain revision in `baseGeneratorVersion`.
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
 | v2 | `core-g0-v2/lcg64-v1` | `--g0-version` for the pure and stateful profiles |
 | v3 | `core-g0-v3/lcg64-v1` | random generation of every stateful step; `--g0-version` for the pure profiles |
-| v4 | `core-g0-v4/lcg64-v1` | random generation of the fourteen G0-based pure profiles |
+| v4 | `core-g0-v4/lcg64-v1` | random generation of the sixteen G0-based pure profiles |
 
-The fourteen are `closed-g0`, `runtime-word`, `runtime-primitives`,
+The sixteen are `closed-g0`, `runtime-word`, `runtime-primitives`,
 `runtime-assembly`, `runtime-functions`, `runtime-mutation`,
 `runtime-aggregates`, `runtime-loops`, `runtime-nested-loops`,
-`runtime-recursion`, `runtime-generics`, `runtime-closures`,
-`runtime-comptime` and `runtime-modules`. The three call-graph profiles use their own grammars.
+`runtime-recursion`, `runtime-recursive-loops`, `runtime-loop-closures`,
+`runtime-generics`, `runtime-closures`, `runtime-comptime` and
+`runtime-modules`. The three call-graph profiles use their own grammars.
 
 v1 takes each choice as the raw LCG state modulo its bound. Bit 0 of that state
 alternates on every draw, and the other low bits have short periods. A v1
@@ -273,7 +274,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the sixteen runtime-input pure profiles, every pure
+Random campaigns of the eighteen runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -293,7 +294,9 @@ reduced case. An origin without the field, as in every fixed corpus, means the
 boundary inputs alone.
 
 One function now gives eight random cases in the four-input profiles, ten in
-the two loop profiles and twelve in `runtime-primitives`, `runtime-assembly`,
+the two loop profiles, `runtime-nested-loops`, `runtime-recursive-loops` and
+`runtime-loop-closures`, eleven in `runtime-recursion` and twelve in
+`runtime-primitives`, `runtime-assembly`,
 `runtime-call-graphs` and `runtime-aggregate-call-graphs`. `--cases` still
 counts inputs, so a sixteen-case run of a four-input profile covers two
 functions rather than four. The admission filters still use the boundary
@@ -386,7 +389,7 @@ still return some seeded input unchanged.
 | Profiles | Identity filter |
 | --- | --- |
 | `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
-| `runtime-loops`, `runtime-call-graph-loops`, `runtime-nested-loops`, `runtime-recursion` | not needed: a loop must already change a positive-trip boundary input, and a nested loop or a recursion some boundary input |
+| `runtime-loops`, `runtime-call-graph-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
 A closure returns `5 * step(x) + 4 * x + 4` (snapshot) or `+ 5`
@@ -572,7 +575,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the seventeen pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the nineteen pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -1605,6 +1608,143 @@ on O2 and 144 on Yul. Random suites from root seed 1 with four whole
 functions matched all 44 cases on each backend in 61, 59 and 77 seconds, with
 four distinct sources, shapes `1:nontail`, `3:tail` and `7:mutual`, and depths
 0 to 4, 6 and 7, in four generation attempts.
+
+## Compare composed control flow
+
+Each pure profile above exercises one control construct in isolation. Two
+profiles compose them over an aggregate step, so that compiler lowering meets
+the constructs together. Both steps are generated as for `runtime-loops`,
+so the profiles are G0-based and revision four equals revision three for them.
+The default budget is 384 nodes, and the complete applied program is checked
+against the 512-node limit. Neither emitter has a proof.
+
+Before the profiles were written, a probe compiled six sources with the pinned
+compiler and std and ran them on every path: checked Hull export, Sonatina O0
+and O2, Yul, Anvil and the Lean Hull runner. The sources were three loops that
+create closures in their bodies and tail, non-tail and mutual recursion with a
+loop in every frame. All matched a model of the source at ten inputs on every
+path, without a change to shared code.
+
+### Closures created in loop bodies
+
+`runtime-loop-closures` runs the loop of `runtime-loops`: with input `x` and
+mask `m`, it sets `acc = x` and runs `x & m` iterations with a counter `c`.
+Every iteration creates a fresh closure with `let`, capturing a loop-carried
+Word local, changes that local and then applies the closure. A plan has schema
+`solcore-lean.loop-closure-plan.v1`, a checked aggregate `stepProgram`, a
+`mask` in zero, one, three or seven and a `capture`:
+
+- `accumulator`: `f(a) = step(acc + a)`; the body then sets `acc = acc + 1`
+  and `acc = f(c) + acc`, so the closure must hold the snapshot taken before
+  the change;
+- `counter`: `f(a) = step(a) + c`; the body then increments `c` and sets
+  `acc = sc_apply(f, acc)` through the generic apply function of
+  `runtime-closures`, so the closure must hold the counter before its
+  increment.
+
+The original Core reference unrolls literal ordinal guards over one
+accumulator cell, as for loops, with no counter cell. Each run guard builds a
+Core lambda over an immutable Word snapshot (the loaded accumulator or the
+ordinal itself) and applies it, directly or through the Core instantiation of
+the generic apply function at Word. The ABI is
+`SynthesizedLoopClosures.run(uint256)`.
+
+### Loops inside recursive frames
+
+`runtime-recursive-loops` calls the forms of `runtime-recursion` to the depth
+`d = x & D`, and every frame of depth `e > 0` runs a while loop of `e & I`
+iterations, with its trip count, counter and value declared in the frame:
+
+- `tail`: the loop applies the step to `acc`, then the frame calls depth
+  `e - 1` with the result;
+- `nontail`: the frame first calls depth `e - 1`, then loops the step over
+  the result and adds `e`;
+- `mutual`: `sc_even` loops the step before calling `sc_odd`, and `sc_odd`
+  loops `v = v + e` before calling `sc_even`.
+
+A plan has schema `solcore-lean.recursive-loop-plan.v1`, a checked aggregate
+`stepProgram`, a `depthMask` and an `innerMask` in zero, one or three, and a
+`form`. A call has at most three frames, three iterations in a frame and six
+in all. The original Core reference unrolls the frames into ordinal guards
+over one accumulator cell, as for recursion, and every run frame binds its trip
+count and unrolls inner ordinal guards, as for nested loops; it has no
+recursion, loop or counter cell. With depth mask one, and with inner mask zero,
+the `mutual` reference equals the `tail` one, since no `sc_odd` frame runs an
+iteration. The ABI is `SynthesizedRecursiveLoops.run(uint256)`.
+
+### Generation, reduction and corpora
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-loop-closures --functions 4 --output .upstream/semantic-loop-closures
+python3 scripts/semantic-campaign.py \
+  --profile runtime-recursive-loops --functions 4 --output .upstream/semantic-recursive-loops
+python3 Tests/scripts/test-semantic-loop-closure-corpus.py
+python3 Tests/scripts/test-semantic-recursive-loop-corpus.py
+```
+
+Native commands are `loop-closure-generate` and `recursive-loop-generate`,
+`SEED NODES COUNT ATTEMPTS FUEL [VERSION] [seeded-inputs-v1/splitmix64]`, and
+`loop-closure-emit` and `recursive-loop-emit` `PLAN.json INPUT [FUEL]`. Saved
+cases contain `loopClosurePlan` or `recursiveLoopPlan` and the applied
+original Core `program`, whose exact correspondence native admission checks
+for every origin.
+
+- Each case draws its shape from a SplitMix64 hash of the seed: the six
+  combinations of capture and mask 1, 3 or 7, or the twelve of form, depth
+  mask 1 or 3 and inner mask 1 or 3.
+- Boundary inputs are 0, 1, 3, 7, `2^256 - 1` and `2^255` for loop closures
+  (zero to seven iterations), and 0, 1, 2, 3, `2^256 - 1` and `2^255` for
+  recursive loops (depths zero to three); random campaigns add four seeded
+  inputs.
+- Exclusions, in order: a node budget too small for the shape, the step's own
+  exclusions, a step whose boundary inputs agree, fuel exhaustion; then a loop
+  closure whose positive-trip boundary inputs all return themselves, or a
+  recursive loop that returns every boundary input unchanged
+  (`boundary-identity`). Neither profile takes the identity filter.
+- Reductions keep the step's helper count and binders and may shrink the
+  step, lower a mask, replace `nontail` or `mutual` by `tail`, or move the
+  input to a boundary input; every reduction keeps the capture, and each is
+  sealed by the full checker and strictly smaller.
+- `loopClosureRequirements` declares `shapes` and `iterations`, and
+  `recursiveLoopRequirements` `shapes`, `depths` and `iterations` (the sum of
+  `e & I` over the frames). Both are prescribed by the plan and the input, and
+  `loopClosureCoverage` and `recursiveLoopCoverage` count only three-way
+  matches.
+
+The Lean tests compare each unrolled reference with a model of the emitted
+source, iteration by iteration or frame by frame over the step's original Core,
+for 1,020 generated cases of each profile.
+
+The fixed corpora are generated from G0 revision one at 384 nodes. For each
+shape they take the first accepted seed, then add the seeds that cover the most
+missing step features, helper counts and aggregate templates, each function at
+all six inputs:
+
+- loop closures: eight functions, 48 cases, with all six shapes and iteration
+  counts 0, 1, 3 and 7;
+- recursive loops: thirteen functions, 78 cases, with all twelve shapes,
+  depths 0 to 3 and total iterations 0, 1, 2, 3 and 6.
+
+Both require all 39 step AST features their cases use (the 37 of the loop
+corpus with `and` and `==`), one to three helpers and all four aggregate
+templates. Their validators materialize each case twice, recompute the
+prescribed counts and check replay, reductions and tampering natively.
+
+Frozen matrices at `479eba68b` matched every case on all three paths:
+- The fixed corpora matched with complete shape, iteration, depth, feature,
+  input, helper and template coverage. Loop closures: 48 cases from 8 sources
+  in 92 seconds on O0, 85 on O2 and 118 on Yul. Recursive loops: 78 cases from
+  13 sources in 146, 142 and 197 seconds.
+- Random suites from root seed 1 with eight whole functions per profile
+  matched 80 cases each. Loop closures took 120, 114 and 152 seconds, from 8
+  sources in ten attempts; two steps were excluded as too large for the
+  shape's budget. Recursive loops took 120, 115 and 154 seconds, from 8
+  sources in eight attempts.
+- Each random generation needed two case-tool requests, one of them an
+  output-limit retry. The suites drew five shapes of each profile, and
+  iteration counts 0, 1, 2, 3, 6 and 7 for loop closures and 0, 1, 3 and 6
+  for recursive loops.
 
 ## Compare aggregate compositions with call graphs
 

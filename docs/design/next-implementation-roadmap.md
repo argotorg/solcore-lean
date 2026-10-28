@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete; the fifteen storage-family profiles also run on Yul when selected and are validated locally; the two call profiles stay on Sonatina | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the fourteen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eleven profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion and inline Yul profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run and the O0 and Yul random inline Yul runs have recorded compiler crashes; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the sixteen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eleven profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure and recursive-loop profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run and the O0 and Yul random inline Yul runs have recorded compiler crashes; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]`, malformed-calldata and several-methods extensions validated locally, malformed calldata for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector, and two to four external methods on one contract dispatched as std does; all seventeen stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions; multi-word return values need a contract runtime change; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -1303,6 +1303,29 @@ yet. The definitions were fixed before execution:
   aggregate templates, all six boundary inputs and every generation shape.
   Loop closures also need iteration counts 0, 1, 3 and 7; recursive loops
   need depths 0 to 3 and total iterations 0, 1, 2, 3 and 6.
+
+Both profiles were implemented at `479eba68b`, with the definitions above:
+- `LoopClosure` and `RecursiveLoop` Core plans, emitters and cases modules,
+  four case-tool commands, and campaign and suite registration;
+- registered Lean tests that compare each unrolled reference with a model of
+  the emitted source, over the step's original Core, for 1,020 generated cases
+  of each profile;
+- fixed corpora of eight loop-closure functions (48 cases) and thirteen
+  recursive-loop functions (78 cases) from G0 revision one, chosen as the
+  first seed of each shape and then the seeds covering the most missing step
+  features, helper counts and templates.
+
+The `mutual` reference equals the `tail` one when no `sc_odd` frame runs an
+iteration (depth mask one, or inner mask zero), so a `tail` reduction there is
+not strictly smaller.
+
+Frozen matrices at `479eba68b` matched every case on O0, O2 and Yul:
+- the fixed corpora with complete coverage: loop closures in 92, 85 and 118
+  seconds and recursive loops in 146, 142 and 197 seconds;
+- random suites from root seed 1 with eight whole functions per profile, 80
+  cases each: loop closures in 120, 114 and 152 seconds and recursive loops in
+  120, 115 and 154 seconds, each generated in two case-tool requests after an
+  output-limit retry.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
