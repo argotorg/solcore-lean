@@ -4725,6 +4725,231 @@ record that revision with no tracked difference.
 A random run of a profile took 102 to 149 seconds on Sonatina and 157 to 194
 on Yul. There was no finding. Hosted CI has not run the profiles.
 
+**Enum and struct values in storage.** Every other stateful program stores
+Words, std pairs and std sums. User-defined `enum` and `struct` types, `match`
+over values loaded from storage, field assignment and the layout that
+`std.StorageGeneric` derives for them are untested, and the pinned checkout's
+own end-to-end fixtures place several of its defects there (`storage-adt-*`,
+`struct-*`, `specialise-sum-of-product`). The `stateful-adt-storage` profile
+generates contracts whose methods write, clear, read and update one field of
+enum and struct values in contract fields and behind mapping keys, across
+transactions, over an original Core reference that computes the layout itself.
+
+The layout std derives, from `std/StorageGeneric.sol`, `std/std.sol` and the
+compiler's Generic derivation (`hir-ty/src/solver/derived_generic.rs`):
+- A constructor's fields form a right-nested product, one field is the field
+  itself and none is the unit; the constructors of an enum form a
+  right-nested sum, and a single constructor is no sum.
+- A product occupies its fields' slots in order. A sum occupies one tag slot
+  and the larger of its first constructor and the sum of the rest, so variant
+  `i` of `n` writes tag one at its `i` outer levels, tag zero at its own level
+  unless it is the last, and its payload after them. Unit occupies nothing.
+- A store writes exactly those slots: a payload-free variant writes its tags
+  alone and leaves every payload slot as it was. A load reads the tags from
+  the outermost level and the selected variant's payload.
+- Contract fields take consecutive slots by these sizes; a mapping field takes
+  one, and `m[k]` of a mapping at slot `b` starts at `keccak256(b ++ k)`.
+- `s.f = v` on a contract struct field is a read-modify-write of the whole
+  struct through a generated setter.
+
+A probe preceded the definitions. It wrote three contracts by hand, each with
+the record and enum below and the twelve methods: variants
+`(ScPair, (), word, word)` with the enum at record position 1, `(word ×3, ())`
+at position 0 with `uint256` Word fields, and `((), word ×2, word)` at position
+2. Each ran six scenarios of up to eight transactions: overwrites in several
+orders, clears over payload variants, updates of every record field, reads
+after each, both keys of a pair including `2^256 - 1` and its wrap to 0,
+reverts after writes, and inputs `2^256 - 1` and `2^255 + 5`. The results:
+- The pinned compiler accepted module-level `struct` and `enum` declarations
+  with payloads of zero to three Words or one struct, contract fields of both
+  types, mappings from a Word to each, whole-value writes of constructors
+  nested in a struct constructor, `match` with nested constructor patterns on
+  a field and on a mapping entry, `record.f = v` of a Word field and of the
+  enum field, and the write of a payload-free variant.
+- It rejected a field assignment through a mapping index, `records[k].f = v`,
+  with `SC0201` ("expected struct field of a contract storage variable"). So
+  a mapping entry's update is an explicit read-modify-write in the source: it
+  matches the entry and writes a whole record with that field replaced.
+- Imported Hull on the declared-slot runner with O0 and O2 images, and the EVM
+  on O0, O2 and Yul, all matched an independent Python model of the layout on
+  status, output, every observed slot and the EVM's whole storage, with no
+  stray slot: 141 transactions and 705 path rows.
+- `export-rust-yul.py`, run under an admitted wrapper name, compiled each
+  source to one creation/runtime pair. The runtime hashes with `keccak256` and
+  reads no code.
+- The declared-slot runner accepts at most 32 observed slots, which bounds the
+  enum at four slots with two keys.
+- The Core contract below passed `Program.check` for those shapes with every
+  method, at 4,057 to 4,163 nodes. It ran through `TopLevelExecution.run` in
+  the unchanged runtime and equalled an independent Lean slot-map model on
+  eight transactions per shape, each within 100,000 fuel.
+
+So neither Core, the shared runtime, its proofs, the Hull importer, the
+declared-slot runner, a backend, `export-rust-yul.py` nor `semantic-fuzz.py`
+changes. The definitions were fixed before execution:
+
+- **Contract:** `SynthesizedAdtStorage` declares, in order, `acc: word` at
+  slot 0, `choice: ScChoice` at slot 1, `record: ScRecord`, then
+  `choices: mapping(word => ScChoice)` and `records: mapping(word => ScRecord)`.
+  It declares the methods its transactions call, in the order below. Each
+  method takes `uint256` parameters and returns one `uint256`, and every
+  transaction is zero-value.
+- **Type shapes:** the module declares `ScPair { a: T; b: T; }` when a variant
+  carries it, `enum ScChoice { V0, ..., V<n-1> }` and
+  `ScRecord { f0; f1; f2; }`.
+  - `ScChoice` has two to four variants. Each variant's payload is zero to
+    three `T` fields or one `ScPair`, at least one variant has no payload, and
+    the enum occupies at most four slots.
+  - `ScRecord` has the enum at position 0, 1 or 2 and `T` fields elsewhere.
+  - `T` is `word` or `uint256`, one per case, for every Word field of the
+    three types.
+  - There are 121 variant lists (9, 44 and 68 of two, three and four
+    variants), 363 shapes with the enum's position, and 726 with the type.
+- **Layout,** computed in Lean from the shape alone:
+  - the enum's size as above, the record's two more;
+  - the record at slot `1 + |ScChoice|`, `choices` after the record and
+    `records` after that;
+  - the tag and payload slots of each variant and the record's field offsets.
+- **Plan:** the shape, the declared methods, a key base `B`, whose keys are
+  `B` and `B + 1` modulo `2^256`, and a step. The plan schema
+  `solcore-lean.adt-storage-plan.v1` sits under `adtStoragePlan`.
+- **Methods,** in declaration and dispatch order, each with `flags` first:
+  - `putChoice(flags, variant, input)` writes
+    `choice = ScChoice.V<variant>(...)` and
+    `putChoiceAt(flags, key, variant, input)` writes `choices[key]`;
+  - `clearChoice(flags, input)` and `clearChoiceAt(flags, key, input)` write
+    the first payload-free variant;
+  - `getChoice(flags)` and `getChoiceAt(flags, key)` match the value, one arm
+    per variant with nested `ScPair` patterns;
+  - `putRecord(flags, variant, input)` and `putRecordAt(flags, key, variant,
+    input)` write a whole `ScRecord` whose enum field has variant `variant`;
+  - `setRecord(flags, field, variant, input)` writes `record.f<field>`: a `T`
+    field's new Word, or the enum field's variant `variant`;
+  - `setRecordAt(flags, key, field, variant, input)` matches `records[key]` and
+    writes a whole record with that field replaced;
+  - `getRecord(flags)` and `getRecordAt(flags, key)` match the record, one arm
+    per variant of its enum field.
+
+  Variants and fields are compared in order in nested `if`/`else`, the last
+  branch taking any other Word; canonical calldata carries only declared ones.
+- **Protocol:**
+  - A writing method computes `r = step(input + acc)`, writes its value and
+    sets `acc = r`; its result is `r`.
+  - Every written payload Word at offset `o` from the first slot of the
+    written value holds `r + o·K`, with the odd
+    `K = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95`.
+    The written value is the enum for an enum write, and the record for a
+    record write or update. Tags are 0 and 1, and an update writes only its
+    field.
+  - A read's result is the digest of the decoded Words by Horner's rule with
+    `K`: for the enum, the variant index and its payload; for the record, its
+    fields in order with the enum's index and payload in its place. It sets
+    `acc` to the digest.
+  - Odd flags revert with the result after the writes.
+- **Original Core** (`core-adt-storage-contract-v1`, `wordOutcomeV1`):
+  - It binds the mapping profile's Keccak closure, the step, a store closure
+    `(base, (variant, value))` and a load closure
+    `base ↦ (digest, K^(1 + width))`.
+  - It then dispatches as std does, comparing the selector Word with each
+    declared method in order: calldata shorter than four bytes or with no
+    matching selector reverts with `0x4924aef0`, and the matched method checks
+    its head (`0x08638556`) and reads its arguments.
+  - The method then runs its protocol, with every slot as arithmetic over the
+    declared base slots or a hashed entry. It uses no Core data types: tags
+    and payloads are Words.
+- **Source** (`solcore-source-adt-storage-v1`):
+  - it imports `std`, `std.dispatch`, `std.Generic` and `std.StorageGeneric`,
+    and `mstore`, `revert_` and the step's opcode aliases from `std.opcodes`;
+  - the step renders as in the other profiles, as `sc_fn<k>` and `sc_step`;
+  - each method converts its parameters with `Typedef.rep`, computes the
+    step, and branches on the variant and field;
+  - its values are constructor applications of `sc_r` plus literal offsets,
+    wrapped in `uint256(...)` when `T` is `uint256`;
+  - it ends with `acc = result`, the odd-flags `mstore(0, result)` and
+    `revert_(0, 32)`, and `return uint256(result)`.
+- **Bounds and node budget:**
+  - one to eight transactions, and a default budget of 384 nodes, at most 512;
+  - the 52-node shell lies inside the budget, and the 2,654-node Keccak
+    closure, the enum closures (59 to 255 nodes) and the methods (at most
+    1,008) lie outside it;
+  - contracts are bounded by 512 + 2,654 + 1,263 = 4,429 nodes.
+- **Transactions:** `{id, method, flags, key, field, variant, input, calldata,
+  value}`, where only the method's own parameters appear. They are drawn in
+  blocks of three from the scenario seed. Each draws:
+  - its method uniformly from the twelve;
+  - a variant below the variant count, a field below three and one of the two
+    keys;
+  - an input from the boundary bank;
+  - flags from that bank with the parity of one of the four completion
+    patterns of the Keccak-loop profile.
+- **Generation:** each of the following comes from a SplitMix64 hash of the
+  seed in its own domain:
+  - the variant count, uniform in 2 to 4, then a variant list uniform among
+    that count's lists;
+  - the enum's position and `T`, each uniform;
+  - the key base, from {0, 1, 3, `2^255`, `2^256 - 1`}.
+
+  The step is G0's under the case's swarm mask, with the budget less the
+  shell. The declared methods are those the transactions call.
+- **Observations:**
+  - status and output;
+  - the observed slots: slot 0, the enum field's slots, the record's, and at
+    both keys the entry slots of both mappings. They are derived from the
+    layout with the independent `Solcore.Abi.V1.Keccak256`: at most 31 slots,
+    stale payload slots included;
+  - the whole committed storage on every path, with no nonzero undeclared slot
+    on Hull and the EVM.
+
+  The history schema is `solcore-lean.adt-storage-history.v1`.
+- **Protocol check** of each returned row: an independent Python model of the
+  layout predicts every observed slot from the prior row and the row's
+  output. It checks a write's tags and `r + o·K` payload with `r` the output,
+  a read's digest from the prior slots, `acc`, and every other slot unchanged.
+- **Exclusions,** at the stage `adt-storage-profile`: the budget, the step's
+  own exclusions, fuel (resource) and parity.
+- **Reductions,** in order:
+  - one-transaction removals;
+  - the removal of each declared method that no transaction calls;
+  - shape reductions:
+    - removing a variant that no transaction names, keeping a payload-free
+      one, with later variants renumbered;
+    - narrowing a payload, `ScPair` to two Words and `k` Words to `k - 1`;
+    - `uint256` to `word`;
+  - the step;
+  - flags to their parity bit, inputs to smaller bank values, and variant,
+    field and key arguments to smaller ones.
+
+  The strict order counts transactions, then methods, then the shape weight
+  (variants, payload Words, `ScPair` payloads and `uint256`), then program
+  size, then argument values.
+- **Fixed corpus** (`scripts/semantic-adt-storage-corpus.json`): imported
+  scenarios with steps from the storage corpus, plus generated seeds. It covers
+  every shape class rather than every shape:
+  - variant counts 2, 3 and 4, every payload kind, the payload-free variant
+    first, between others and last, enum positions 0, 1 and 2, both types, the
+    wrapping key base and every method;
+  - for each variant count, every ordered pair of distinct variants written at
+    one location one after the other and committed (20 pairs);
+  - updates of a `T` field and of the enum field, in the record and in an
+    entry;
+  - a read of each read method whose value's slots keep a stale payload Word;
+  - both keys of a mapping written in one scenario, for both mappings and
+    across the wrap;
+  - a reverted transaction of every writing method.
+
+  These are the campaign dimensions `AdtVariantCounts`, `AdtPayloads`,
+  `AdtClearPositions`, `AdtChoicePositions`, `AdtWordTypes`, `AdtMethods`,
+  `AdtOverwrites`, `AdtFieldUpdates`, `AdtStaleReads`, `AdtNeighbourKeys` and
+  `AdtRevertedWrites`, recorded for matched cases.
+- **Golden tests:**
+  - the emitted contracts of two shapes, written out by hand;
+  - hand-written rows for three shapes, computed independently in Python and
+    reproduced by original Core and the Lean model;
+  - a changed expectation fails.
+- **Out of scope:** generic and recursive types, `bytes` and `string` fields,
+  arrays of enums or structs, nested mappings, contract-local types, the ABI
+  encoding of enum or struct values, gas, value and malformed calldata.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 `bytes` return values beyond 64 bytes and other dynamic return values, or
