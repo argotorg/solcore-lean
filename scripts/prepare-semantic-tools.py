@@ -4,7 +4,10 @@
 System prerequisites are installed separately: Python >=3.11, Git, rustup with
 Rust 1.97.0, elan with Lean 4.33.1, and Anvil 1.5.1. Nothing here installs
 system tools. Network access is enabled only by --prepare --allow-network.
-The exporter-owned crate and Cargo target live under this checkout's .upstream.
+The exporter-owned crates and Cargo target live under this checkout's .upstream.
+The receipts also cover the directive extractor and resolver, which are built
+offline from the fetched upstream lock because their manifests embed this
+checkout's paths.
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,6 +76,11 @@ PATCHES = {
     "crates/driver/src/emit.rs": ("&hull::pretty_program(db, &program)", "&crate::lean_export::export(db, &program)"),
 }
 SERIALIZER = "crates/driver/src/lean_export.rs"
+# The directive tools: package, receipt, build script and source.
+DIRECTIVE_TOOLS = (("solcore-directive-export", "directive-export-build.json", "export-rust-directives.py",
+                    "rust-directive-export.rs"),
+                   ("solcore-directive-resolve", "directive-resolve-build.json", "build-rust-directive-resolver.py",
+                    "rust-directive-resolve.rs"))
 
 
 class NotReady(ValueError):
@@ -114,6 +123,31 @@ def load_exporter(root: Path):
     if module.hull.COMMIT != COMMIT:
         raise NotReady("bootstrap/exporter revision mismatch")
     return module
+
+
+def load_directives(root: Path):
+    """The directive extractor and resolver: each crate and the identity its receipt must record."""
+    spec = importlib.util.spec_from_file_location("semantic_prepare_resolver", root / "scripts/build-rust-directive-resolver.py")
+    resolver = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(resolver)
+    extractor = resolver.export
+    if extractor.hull.COMMIT != COMMIT:
+        raise NotReady("bootstrap/directive tool revision mismatch")
+
+    def identities(upstream: Path, target: Path) -> dict:
+        if extractor.pins(extractor.TOOL / "Cargo.lock") - extractor.pins(upstream / "Cargo.lock"):
+            raise NotReady("directive extractor dependencies differ from pinned upstream")
+        extract = {"upstreamCommit": COMMIT, "sourceSha256": digest(extractor.SOURCE),
+                   "manifestSha256": bytes_digest(extractor.manifest(upstream).encode()),
+                   "lockSha256": digest(extractor.TOOL / "Cargo.lock"),
+                   "binarySha256": digest(target / "debug/solcore-directive-export")}
+        try:
+            resolve = resolver.identity(upstream, target)
+        except ValueError as error:
+            raise NotReady(str(error)) from error
+        return {"directive-export-build.json": extract, "directive-resolve-build.json": resolve}
+    return types.SimpleNamespace(identities=identities, crates={"solcore-directive-export": extractor.TOOL,
+                                                                 "solcore-directive-resolve": resolver.TOOL})
 
 
 def cleanup_process_group(process: subprocess.Popen) -> None:
@@ -298,7 +332,7 @@ def native_input_hash(root: Path) -> str:
     return value.hexdigest()
 
 
-def inventory(root: Path, upstream: Path, target: Path, versions: dict, patches: dict, exporter) -> dict:
+def inventory(root: Path, upstream: Path, target: Path, versions: dict, patches: dict, exporter, directives) -> dict:
     cargo_cache_empty(target)
     driver = json.loads((target / "lean-export-build.json").read_text())
     if driver != {"upstreamCommit": COMMIT, "patches": patches,
@@ -312,26 +346,33 @@ def inventory(root: Path, upstream: Path, target: Path, versions: dict, patches:
                 **exporter.tool_hashes(), "binarySha256": digest(target / "debug/solcore-code-image-export")}
     if image != expected:
         raise NotReady("code-image build receipt is stale")
+    directive_builds = directives.identities(upstream, target)
+    for receipt, identity in directive_builds.items():
+        if json.loads((target / receipt).read_text()) != identity:
+            raise NotReady(f"directive tool build receipt is stale: {receipt}")
     binaries = {name: digest(root / ".lake/build/bin" / binary) for name, binary in TARGETS.items()}
     scripts = {name: digest(root / "scripts" / name) for name in (
         "prepare-semantic-tools.py", "export-rust-hull.py", "rust-hull-export.rs",
-        "export-rust-code-image.py", "rust-code-image-export.rs")}
+        "export-rust-code-image.py", "rust-code-image-export.rs",
+        *(name for tool in DIRECTIVE_TOOLS for name in tool[2:]))}
     return {"schema": SCHEMA, "upstreamCommit": COMMIT, "backendRevision": exporter.BACKEND,
             "upstreamLockSha256": digest(upstream / "Cargo.lock"), "hardfork": "osaka",
             "tools": versions, "exporterInputs": scripts, "driverBuild": driver,
-            "imageBuild": image, "nativeInputsSha256": native_input_hash(root), "nativeBinaries": binaries}
+            "imageBuild": image, "directiveBuilds": directive_builds,
+            "nativeInputsSha256": native_input_hash(root), "nativeBinaries": binaries}
 
 
-def verify(runner: Runner, root: Path, upstream: Path, target: Path, versions: dict, exporter) -> dict:
+def verify(runner: Runner, root: Path, upstream: Path, target: Path, versions: dict, exporter, directives) -> dict:
     patches = inspect_checkout(runner, root, upstream, patched=True)
-    actual = inventory(root, upstream, target, versions, patches, exporter)
+    actual = inventory(root, upstream, target, versions, patches, exporter, directives)
     recorded = json.loads((target / "semantic-tools-build.json").read_text())
     if recorded != actual:
         raise NotReady("semantic tools cache receipt is stale; run --prepare to rebuild authorized outputs")
     return actual
 
 
-def build(runner: Runner, root: Path, upstream: Path, target: Path, versions: dict, exporter, network: bool) -> dict:
+def build(runner: Runner, root: Path, upstream: Path, target: Path, versions: dict, exporter, directives,
+          network: bool) -> dict:
     checkout(runner, upstream, network)
     try:
         previous = json.loads((target / "lean-export-build.json").read_text())
@@ -359,9 +400,12 @@ def build(runner: Runner, root: Path, upstream: Path, target: Path, versions: di
     # Cargo may otherwise reuse a modified binary whose fingerprint is fresh.
     # Invalidate only our two executable packages when their old receipt cannot
     # authenticate them; never clean all dependencies or an upstream checkout.
-    for package, receipt, package_manifest in (
-            ("solcore-driver", "lean-export-build.json", upstream / "Cargo.toml"),
-            ("solcore-code-image-export", "code-image-export-build.json", manifest)):
+    # A directive crate that does not exist yet has nothing to clean.
+    owned = [("solcore-driver", "lean-export-build.json", upstream / "Cargo.toml"),
+             ("solcore-code-image-export", "code-image-export-build.json", manifest)]
+    owned += [(package, receipt, directives.crates[package] / "Cargo.toml") for package, receipt, *_ in DIRECTIVE_TOOLS
+              if (directives.crates[package] / "Cargo.toml").is_file()]
+    for package, receipt, package_manifest in owned:
         try:
             recorded = json.loads((target / receipt).read_text())
             valid = isinstance(recorded, dict) and recorded.get("binarySha256") == digest(target / "debug" / package)
@@ -373,9 +417,14 @@ def build(runner: Runner, root: Path, upstream: Path, target: Path, versions: di
     for script in ("export-rust-hull.py", "export-rust-code-image.py"):
         runner.run([sys.executable, root / "scripts" / script, "--build", "--upstream", upstream,
                     "--target-dir", target], root, capture=False)
+    # Both directive builds stay offline; the upstream lock fetched above holds every dependency.
+    runner.run([sys.executable, root / "scripts/export-rust-directives.py", "--build", "--upstream", upstream,
+                "--target-dir", target], root, capture=False)
+    runner.run([sys.executable, root / "scripts/build-rust-directive-resolver.py", "--upstream", upstream,
+                "--target-dir", target], root, capture=False)
     runner.run(["lake", "--no-cache", "--rehash", "build", *TARGETS], root, capture=False)
     actual = inventory(root, upstream, target, versions,
-                       inspect_checkout(runner, root, upstream, patched=True), exporter)
+                       inspect_checkout(runner, root, upstream, patched=True), exporter, directives)
     receipt = target / "semantic-tools-build.json"
     no_symlinks(receipt)
     with tempfile.NamedTemporaryFile(mode="w", dir=target, prefix="semantic-tools-", suffix=".tmp", delete=False) as stream:
@@ -389,17 +438,21 @@ def build(runner: Runner, root: Path, upstream: Path, target: Path, versions: di
     return actual
 
 
-def configuration(args, root: Path, exporter):
+def configuration(args, root: Path, exporter, directives):
     upstream, target = managed(args.upstream, root), managed(args.target_dir, root)
-    tool = managed(exporter.TOOL, root)
-    for first, second in ((upstream, target), (upstream, tool), (target, tool)):
-        if first.is_relative_to(second) or second.is_relative_to(first):
-            raise NotReady("upstream checkout, Cargo target and generated crate must be separate directories")
+    tools = [managed(exporter.TOOL, root), *(managed(crate, root) for crate in directives.crates.values())]
+    directories = [upstream, target, *tools]
+    for index, first in enumerate(directories):
+        for second in directories[index + 1:]:
+            if first.is_relative_to(second) or second.is_relative_to(first):
+                raise NotReady("upstream checkout, Cargo target and generated crates must be separate directories")
     for name in ("debug", "debug/solcore-driver", "debug/solcore-code-image-export",
-                 "lean-export-build.json", "code-image-export-build.json", "semantic-tools-build.json"):
+                 "lean-export-build.json", "code-image-export-build.json", "semantic-tools-build.json",
+                 *(f"debug/{package}" for package, *_ in DIRECTIVE_TOOLS), *(receipt for _, receipt, *_ in DIRECTIVE_TOOLS)):
         no_symlinks(target / name)
-    for name in ("Cargo.toml", "Cargo.lock", "src/main.rs"):
-        no_symlinks(tool / name)
+    for tool in tools:
+        for name in ("Cargo.toml", "Cargo.lock", "src/main.rs"):
+            no_symlinks(tool / name)
     return upstream, target
 
 
@@ -423,27 +476,31 @@ def main(argv=None) -> int:
     signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     try:
         exporter = load_exporter(ROOT)
-        upstream, target = configuration(args, ROOT, exporter)
+        directives = load_directives(ROOT)
+        upstream, target = configuration(args, ROOT, exporter, directives)
         if args.plan:
             print(json.dumps({"schema": SCHEMA, "mode": "plan", "network": False,
                 "required": {"rust": RUST, "lean": LEAN, "anvil": "1.5.1", "hardfork": "osaka"},
                 "upstream": str(upstream), "commit": COMMIT, "target": str(target),
-                "generatedCrate": str(exporter.TOOL), "lakeTargets": list(TARGETS),
+                "generatedCrate": str(exporter.TOOL),
+                "directiveCrates": {package: str(crate) for package, crate in directives.crates.items()},
+                "lakeTargets": list(TARGETS),
                 "operations": ["validate installed tools", "fetch exact commit into empty destination when explicitly enabled",
                     "cargo fetch --locked (upstream)", "materialize generated exporter crate",
                     "cargo metadata --offline (normalize generated lock)", "check all dependency pins against upstream",
-                    "cargo fetch --locked (generated crate)", "offline exporter builds", "one Lake build", "hash readiness receipt"]}, indent=2))
+                    "cargo fetch --locked (generated crate)", "offline exporter builds",
+                    "offline directive extractor and resolver builds", "one Lake build", "hash readiness receipt"]}, indent=2))
             return 0
         runner = Runner(args.timeout)
         versions = tool_versions(runner, ROOT, args.anvil)
         cache_hit = True
         try:
-            verify(runner, ROOT, upstream, target, versions, exporter)
+            verify(runner, ROOT, upstream, target, versions, exporter, directives)
         except (ValueError, OSError, subprocess.SubprocessError) as error:
             if not args.prepare:
                 raise NotReady(str(error)) from error
             cache_hit = False
-            build(runner, ROOT, upstream, target, versions, exporter, args.allow_network)
+            build(runner, ROOT, upstream, target, versions, exporter, directives, args.allow_network)
         print(json.dumps({"schema": SCHEMA, "status": "ready", "cacheHit": cache_hit,
                           "receipt": str(target / "semantic-tools-build.json"), "nativeTools": len(TARGETS)}))
         return 0

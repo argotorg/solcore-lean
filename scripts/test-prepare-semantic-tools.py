@@ -7,6 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
 import sys
@@ -76,7 +77,8 @@ class Fixture:
         (root / "lakefile.lean").write_text("-- test configuration\n")
         (root / "lake-manifest.json").write_text('{}')
         (root / "Solcore/A.lean").write_text("-- test source\n")
-        for name in ("prepare-semantic-tools.py", "export-rust-hull.py", "rust-hull-export.rs", "export-rust-code-image.py", "rust-code-image-export.rs"):
+        for name in ("prepare-semantic-tools.py", "export-rust-hull.py", "rust-hull-export.rs", "export-rust-code-image.py", "rust-code-image-export.rs",
+                     *(name for tool in prep.DIRECTIVE_TOOLS for name in tool[2:])):
             (root / "scripts" / name).write_text("fixture " + name)
         for name, (old, new) in prep.PATCHES.items():
             path = self.upstream / name
@@ -90,8 +92,17 @@ class Fixture:
         (self.tool / "src/main.rs").write_bytes((root / "scripts/rust-code-image-export.rs").read_bytes())
         for binary in prep.TARGETS.values():
             (root / ".lake/build/bin" / binary).write_text("fixture native " + binary)
-        for binary in ("solcore-driver", "solcore-code-image-export"):
+        for binary in ("solcore-driver", "solcore-code-image-export", *(tool[0] for tool in prep.DIRECTIVE_TOOLS)):
             (self.target / "debug" / binary).write_text("fixture exporter " + binary)
+        crates = {"solcore-directive-export": root / ".upstream/rust-directive-tool",
+                  "solcore-directive-resolve": root / ".upstream/rust-directive-resolve-tool"}
+        for crate in crates.values():
+            (crate / "src").mkdir(parents=True)
+            (crate / "Cargo.toml").write_text("test directive manifest")
+        # The real identities also hash each manifest and lock; this stand-in hashes the source and binary.
+        self.directives = types.SimpleNamespace(crates=crates, identities=lambda upstream, target: {
+            receipt: {"sourceSha256": prep.digest(root / "scripts" / source), "binarySha256": prep.digest(target / "debug" / package)}
+            for package, receipt, _, source in prep.DIRECTIVE_TOOLS})
         self.exporter = types.SimpleNamespace(TOOL=self.tool, SOURCE=root / "scripts/rust-code-image-export.rs",
             MANIFEST="test generated manifest", BACKEND="test backend", check_pins=lambda upstream: None)
         self.exporter.tool_hashes = lambda: {"sourceSha256": prep.digest(self.exporter.SOURCE),
@@ -100,7 +111,7 @@ class Fixture:
         self.versions = prep.tool_versions(self.runner, root, root / "installed/anvil")
         self.patches = prep.inspect_checkout(self.runner, root, self.upstream, patched=True)
         self.write_exporter_receipts()
-        self.record = prep.inventory(root, self.upstream, self.target, self.versions, self.patches, self.exporter)
+        self.record = prep.inventory(root, self.upstream, self.target, self.versions, self.patches, self.exporter, self.directives)
         (self.target / "semantic-tools-build.json").write_text(json.dumps(self.record))
         self.runner.calls.clear()
 
@@ -110,9 +121,11 @@ class Fixture:
         (self.target / "code-image-export-build.json").write_text(json.dumps({"upstreamCommit": prep.COMMIT,
             "backendRevision": self.exporter.BACKEND, **self.exporter.tool_hashes(),
             "binarySha256": prep.digest(self.target / "debug/solcore-code-image-export")}))
+        for receipt, identity in self.directives.identities(self.upstream, self.target).items():
+            (self.target / receipt).write_text(json.dumps(identity))
 
     def verify(self):
-        return prep.verify(self.runner, self.root, self.upstream, self.target, self.versions, self.exporter)
+        return prep.verify(self.runner, self.root, self.upstream, self.target, self.versions, self.exporter, self.directives)
 
 
 class BootstrapTests(unittest.TestCase):
@@ -202,10 +215,10 @@ class BootstrapTests(unittest.TestCase):
 
     def test_paths_must_be_separate_inside_upstream_and_not_symlinked(self):
         for upstream, target in [(self.root / 'outside', self.f.target), (self.f.upstream, self.f.upstream / 'target'), (self.f.upstream, self.f.tool)]:
-            with self.assertRaises(prep.NotReady): prep.configuration(types.SimpleNamespace(upstream=upstream, target_dir=target), self.root, self.f.exporter)
+            with self.assertRaises(prep.NotReady): prep.configuration(types.SimpleNamespace(upstream=upstream, target_dir=target), self.root, self.f.exporter, self.f.directives)
         (self.f.target / 'semantic-tools-build.json').unlink()
         (self.f.target / 'semantic-tools-build.json').symlink_to(self.root / 'foreign.json')
-        with self.assertRaises(prep.NotReady): prep.configuration(types.SimpleNamespace(upstream=self.f.upstream, target_dir=self.f.target), self.root, self.f.exporter)
+        with self.assertRaises(prep.NotReady): prep.configuration(types.SimpleNamespace(upstream=self.f.upstream, target_dir=self.f.target), self.root, self.f.exporter, self.f.directives)
 
     def test_generated_crate_only_replaces_owned_files(self):
         path = self.f.tool / 'notes.txt'; path.write_text('keep')
@@ -225,7 +238,7 @@ class BootstrapTests(unittest.TestCase):
         self.f.exporter.check_pins = lambda upstream: events.append(('pins',))
         # This tests orchestration only. Inventory is a fixture, not a compiler success claim.
         with patch.object(prep, 'inventory', return_value=self.f.record):
-            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, True)
+            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, True)
         metadata = next(i for i,e in enumerate(events) if len(e)>1 and e[1][:2]==['cargo','metadata'])
         self.assertIn('--offline', events[metadata][1])
         pins = next(i for i,e in enumerate(events) if e[0]=='pins')
@@ -234,49 +247,78 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(len(fetch),2)
         self.assertTrue(all('--locked' in e[1] and e[2]['network'] for e in fetch))
         self.assertLess(pins, next(i for i,e in enumerate(events) if e is fetch[1]))
-        builders = [e for e in events if len(e)>1 and '--build' in e[1]]
-        self.assertEqual(len(builders),2)
+        builders = [e for e in events if len(e)>1 and ('--build' in e[1] or e[1][1].endswith('build-rust-directive-resolver.py'))]
+        self.assertEqual([Path(e[1][1]).name for e in builders], ['export-rust-hull.py', 'export-rust-code-image.py',
+                                                                  'export-rust-directives.py', 'build-rust-directive-resolver.py'])
         self.assertTrue(all('--allow-network' not in e[1] and not e[2].get('network') for e in builders))
         lakes = [e[1] for e in events if len(e)>1 and e[1][0]=='lake']
         self.assertEqual(lakes, [['lake','--no-cache','--rehash','build',*prep.TARGETS]])
 
     def test_offline_prepare_never_fetches_network(self):
         with patch.object(prep, 'inventory', return_value=self.f.record):
-            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, False)
+            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, False)
         self.assertFalse(any(c[2].get('network') for c in self.f.runner.calls))
         self.assertTrue(all('--offline' in c[0] for c in self.f.runner.calls if c[0][:2]==['cargo','fetch']))
 
     def test_corrupt_root_binary_cleans_only_its_owned_package(self):
         (self.f.target / 'debug/solcore-driver').write_text('corrupted')
         with patch.object(prep, 'inventory', return_value=self.f.record):
-            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, False)
+            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, False)
         cleaned = [c[0] for c in self.f.runner.calls if c[0][:2]==['cargo','clean']]
         self.assertEqual(len(cleaned),1)
         self.assertEqual(cleaned[0][-2:], ['-p','solcore-driver'])
         self.assertIn('--frozen',cleaned[0])
         self.assertTrue((self.root / 'Solcore/A.lean').exists())
 
+    def directive_builds(self):
+        names = ('export-rust-directives.py', 'build-rust-directive-resolver.py')
+        return [c for c in self.f.runner.calls if len(c[0]) > 1 and Path(c[0][1]).name in names]
+
+    def test_directive_tool_receipts_are_verified_and_rebuilt_offline(self):
+        self.assertEqual(self.f.verify()['directiveBuilds'], self.f.directives.identities(self.f.upstream, self.f.target))
+        (self.f.target / 'debug/solcore-directive-resolve').write_text('tampered')
+        with self.assertRaisesRegex(prep.NotReady, 'directive-resolve-build.json'):
+            self.f.verify()
+        self.f.runner.calls.clear()
+        with patch.object(prep, 'inventory', return_value=self.f.record):
+            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, False)
+        cleaned = [c[0] for c in self.f.runner.calls if c[0][:2] == ['cargo', 'clean']]
+        self.assertEqual([c[-1] for c in cleaned], ['solcore-directive-resolve'])
+        self.assertIn(str(self.f.directives.crates['solcore-directive-resolve'] / 'Cargo.toml'), cleaned[0])
+        builds = self.directive_builds()
+        self.assertEqual([Path(c[0][1]).name for c in builds], ['export-rust-directives.py', 'build-rust-directive-resolver.py'])
+        self.assertTrue(all('--allow-network' not in c[0] and not c[2].get('network') for c in builds))
+
+    def test_a_fresh_checkout_builds_the_directive_crates_without_cleaning(self):
+        for crate in self.f.directives.crates.values():
+            shutil.rmtree(crate)
+        (self.f.target / 'directive-export-build.json').unlink()
+        with patch.object(prep, 'inventory', return_value=self.f.record):
+            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, False)
+        self.assertFalse(any(c[0][:2] == ['cargo', 'clean'] for c in self.f.runner.calls))
+        self.assertEqual(len(self.directive_builds()), 2)
+
     def test_pin_mismatch_aborts_before_exporter_build(self):
         def mismatch(_): raise prep.NotReady('dependency pin changed')
         self.f.exporter.check_pins = mismatch
         with self.assertRaisesRegex(prep.NotReady,'pin changed'):
-            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, True)
+            prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, True)
         self.assertFalse(any('--build' in c[0] for c in self.f.runner.calls))
 
     def test_plan_performs_no_subprocess_and_network_requires_prepare(self):
-        with patch.object(prep, 'ROOT', self.root), patch.object(prep, 'load_exporter', return_value=self.f.exporter), patch.object(prep.Runner,'run',side_effect=AssertionError('unexpected tool execution')), contextlib.redirect_stdout(io.StringIO()) as output:
+        with patch.object(prep, 'ROOT', self.root), patch.object(prep, 'load_exporter', return_value=self.f.exporter), patch.object(prep, 'load_directives', return_value=self.f.directives), patch.object(prep.Runner,'run',side_effect=AssertionError('unexpected tool execution')), contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(prep.main(['--plan','--upstream',str(self.f.upstream),'--target-dir',str(self.f.target)]),0)
             self.assertEqual(json.loads(output.getvalue())['mode'],'plan')
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit): prep.main(['--allow-network','--verify'])
 
     def test_main_cache_hit_does_not_prepare_or_fetch(self):
-        with patch.object(prep, 'ROOT', self.root), patch.object(prep, 'load_exporter', return_value=self.f.exporter), patch.object(prep, 'tool_versions', return_value=self.f.versions), patch.object(prep, 'verify', return_value=self.f.record), patch.object(prep, 'build', side_effect=AssertionError('cache hit rebuilt')), contextlib.redirect_stdout(io.StringIO()) as output:
+        with patch.object(prep, 'ROOT', self.root), patch.object(prep, 'load_exporter', return_value=self.f.exporter), patch.object(prep, 'load_directives', return_value=self.f.directives), patch.object(prep, 'tool_versions', return_value=self.f.versions), patch.object(prep, 'verify', return_value=self.f.record), patch.object(prep, 'build', side_effect=AssertionError('cache hit rebuilt')), contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(prep.main(['--prepare','--allow-network','--upstream',str(self.f.upstream),'--target-dir',str(self.f.target)]),0)
             self.assertTrue(json.loads(output.getvalue())['cacheHit'])
 
     def test_main_stale_cache_rebuilds_only_with_explicit_prepare(self):
         args=['--upstream',str(self.f.upstream),'--target-dir',str(self.f.target)]
-        with patch.object(prep, 'ROOT', self.root), patch.object(prep, 'load_exporter', return_value=self.f.exporter), patch.object(prep, 'tool_versions', return_value=self.f.versions), patch.object(prep, 'verify', side_effect=prep.NotReady('stale')), patch.object(prep, 'build', return_value=self.f.record) as builder, contextlib.redirect_stdout(io.StringIO()) as output, contextlib.redirect_stderr(io.StringIO()) as errors:
+        with patch.object(prep, 'ROOT', self.root), patch.object(prep, 'load_exporter', return_value=self.f.exporter), patch.object(prep, 'load_directives', return_value=self.f.directives), patch.object(prep, 'tool_versions', return_value=self.f.versions), patch.object(prep, 'verify', side_effect=prep.NotReady('stale')), patch.object(prep, 'build', return_value=self.f.record) as builder, contextlib.redirect_stdout(io.StringIO()) as output, contextlib.redirect_stderr(io.StringIO()) as errors:
             self.assertEqual(prep.main(['--verify',*args]),2)
             builder.assert_not_called()
             self.assertEqual(json.loads(errors.getvalue())['status'],'not-ready')
@@ -290,14 +332,14 @@ class BootstrapTests(unittest.TestCase):
         original=receipt.read_bytes()
         with patch.object(prep,'inventory',side_effect=prep.NotReady('post-build verification failed')):
             with self.assertRaises(prep.NotReady):
-                prep.build(self.f.runner,self.root,self.f.upstream,self.f.target,self.f.versions,self.f.exporter,False)
+                prep.build(self.f.runner,self.root,self.f.upstream,self.f.target,self.f.versions,self.f.exporter,self.f.directives, False)
         self.assertEqual(receipt.read_bytes(),original)
         self.assertEqual(list(self.f.target.glob('semantic-tools-*.tmp')),[])
 
     def test_malformed_exporter_receipt_cleans_only_the_owned_binary_package(self):
         (self.f.target/'lean-export-build.json').write_text('[]')
         with patch.object(prep,'inventory',return_value=self.f.record):
-            prep.build(self.f.runner,self.root,self.f.upstream,self.f.target,self.f.versions,self.f.exporter,False)
+            prep.build(self.f.runner,self.root,self.f.upstream,self.f.target,self.f.versions,self.f.exporter,self.f.directives, False)
         clean=[c[0] for c in self.f.runner.calls if c[0][:2]==['cargo','clean']]
         self.assertEqual([c[-1] for c in clean],['solcore-driver'])
 
@@ -320,10 +362,10 @@ class BootstrapTests(unittest.TestCase):
                 return original_run(command,cwd,**options)
             runner.run=run
             with patch.object(prep,'inventory',return_value=self.f.record):
-                prep.build(runner,self.root,self.f.upstream,target,self.f.versions,self.f.exporter,False)
+                prep.build(runner,self.root,self.f.upstream,target,self.f.versions,self.f.exporter,self.f.directives, False)
             self.assertFalse(any(c[0][:2]==['cargo','clean'] for c in runner.calls))
             self.assertEqual((target/'CACHEDIR.TAG').read_text(),'created by simulated Cargo')
-            self.assertEqual(len(export_calls),2)
+            self.assertEqual(len(export_calls),3)
 
     def test_nonempty_target_requires_a_real_cargo_cache_marker(self):
         marker=self.f.target/'CACHEDIR.TAG'
@@ -332,7 +374,7 @@ class BootstrapTests(unittest.TestCase):
             else: marker.write_bytes(invalid)
             self.f.runner.calls.clear()
             with self.assertRaisesRegex(prep.NotReady,'cache marker'):
-                prep.build(self.f.runner,self.root,self.f.upstream,self.f.target,self.f.versions,self.f.exporter,False)
+                prep.build(self.f.runner,self.root,self.f.upstream,self.f.target,self.f.versions,self.f.exporter,self.f.directives, False)
             self.assertFalse(any(c[0][0]=='cargo' for c in self.f.runner.calls))
             self.assertTrue((self.f.target/'debug/solcore-driver').is_file())
 
@@ -399,7 +441,7 @@ class BootstrapTests(unittest.TestCase):
         harness.write_text('import importlib.util,sys\n' +
             'spec=importlib.util.spec_from_file_location("prep",'+repr(str(ROOT/'scripts/prepare-semantic-tools.py'))+')\n'+
             'p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)\n'+
-            'p.load_exporter=lambda _: object()\np.configuration=lambda *args:(p.ROOT,p.ROOT)\n'+
+            'p.load_exporter=lambda _: object()\np.load_directives=lambda _: object()\np.configuration=lambda *args:(p.ROOT,p.ROOT)\n'+
             'def active(runner,*args):\n'+
             ' runner.run([sys.executable,"-c",'+repr('import os,time;from pathlib import Path;Path('+repr(str(child_pid))+').write_text(str(os.getpid()));time.sleep(60)')+'],p.ROOT)\n'+
             'p.tool_versions=active\nraise SystemExit(p.main(["--verify"]))\n')
