@@ -6499,6 +6499,41 @@ The definitions, fixed before the matrices:
   must stay complete.
 - **Fuzz state:** an existing state needs `--accept-new-epoch`.
 
+**Results.** The checks before any matrix:
+- On the same three windows, every value of every first-block draw of four to
+  fourteen values came in every window. The most repeats fell from 51 and 54 to
+  19 and 18 of 63, and the first 16 seeds of each window kept five or six
+  (tuples) and four to six (`bytes`) of the six values of each flags and input
+  draw. The uniform lengths drew 37 to 46 distinct values of 65 in a window.
+- Both corpora kept their seeds and complete coverage: the corpus tests
+  replayed 12 scenarios and 32 transactions each with every original Core
+  history equal to the model's. The six generated entries of each corpus
+  changed their histories, and the `bytes` corpus returned ten distinct
+  lengths, the seven bank lengths among them.
+- The gate passed on `36de9fcfb`: the kernel check, `lake build` (10,277
+  jobs), 35 native tools prepared offline, `lake test`, 814 Python tests, the
+  corpus validators and the diff check.
+
+The matrices ran on `36de9fcfb` with 156 digests frozen: the 35 native tools,
+every script, solc, Anvil, and the Rust driver and code-image exporter. None
+changed during any run, and all 168 case results record that revision with no
+tracked difference.
+- **Fixed corpora:** both matched 12 scenarios and 32 prefixes with complete
+  coverage on O0, O2 and Yul, in 178, 149 and 224 seconds for both.
+- **Random suites:** root seed `20261036`, sixteen eight-transaction
+  scenarios per profile, G0 revision three, at 384 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes per profile, in 219, 206 and
+  315 seconds for both profiles:
+  - tuples: arities 2, 3 and 4 came 4, 5 and 7 times; 97 transactions
+    returned and 31 reverted;
+  - `bytes`: 96 returned and 32 reverted, with 42 distinct lengths;
+  - the first three transactions' inputs took five or six of the six bank
+    Words over the sixteen scenarios; the sixteen seeds of `v1`'s tuple
+    matrix had given the third transaction three;
+  - no seed was excluded, and the cases were identical on the three backends.
+
+There was no finding.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

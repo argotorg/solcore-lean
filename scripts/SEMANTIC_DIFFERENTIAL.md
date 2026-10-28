@@ -5512,6 +5512,18 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+The first block's draws then lost values over consecutive seeds, since their
+raw stream started at the block seed xor its domain; `tuple-sequence-seed-v2`
+starts it at SplitMix64's finalizer instead (see the
+[roadmap](../docs/design/next-implementation-roadmap.md)). The corpus kept its
+seeds and complete coverage, and its generated entries' histories were
+recomputed. On `36de9fcfb` with every script and tool frozen, the fixed corpus
+matched 12 scenarios and 32 prefixes with complete coverage on O0, O2 and Yul.
+A random suite from root seed `20261036`, sixteen eight-transaction scenarios
+at 384 nodes, matched 16 scenarios and 128 prefixes on each backend: arities
+2, 3 and 4 came 4, 5 and 7 times, and 97 transactions returned and 31
+reverted.
+
 A dynamic `bytes` return was probed and not built: every path returned the
 same canonical encoding, but original Core has no variable-length value. The
 [roadmap](../docs/design/next-implementation-roadmap.md) records the options.
@@ -5660,6 +5672,16 @@ Anvil, and the Rust driver and code-image exporter frozen.
     16 cases.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
+
+The first block's draws then lost values over consecutive seeds, as for the
+tuple returns; `bytes-sequence-seed-v2` starts their stream at SplitMix64's
+finalizer. The corpus kept its seeds and complete coverage, and its generated
+entries' histories were recomputed. On `36de9fcfb` with every script and tool
+frozen, the fixed corpus matched 12 scenarios and 32 prefixes with complete
+coverage on O0, O2 and Yul. A random suite from root seed `20261036`, sixteen
+eight-transaction scenarios at 384 nodes, matched 16 scenarios and 128
+prefixes on each backend: 96 transactions returned a value, of 42 distinct
+lengths, and 32 reverted.
 
 Returned user-defined enums, whose `bytes` fields use this profile's bounded
 value, came later; see [Compare returned enums](#compare-returned-enums).
