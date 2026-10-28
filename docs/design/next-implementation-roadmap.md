@@ -4737,6 +4737,88 @@ The profile's definitions were fixed before execution:
     std's `ecrecover` and EIP-712 helpers do. Those bytes would then fill the
     unwritten head Words.
 
+**Results.** The checks before any random run:
+- The runtime golden tests passed. They cover:
+  - the exact bytes of every field kind in static and dynamic shapes, the
+    padding Words, and `bytes` lengths 0, 1, 31, 32, 33 and 64 behind body
+    heads of two and three Words and in first position, against hexadecimal
+    text;
+  - the revert and trap branches, and wrong annotations and fields, which do
+    not decode;
+  - a word call to a registered enum contract and a creation from an enum
+    initializer, both unavailable;
+  - an enum root, which returns its whole encoding through the nested
+    executor.
+- The golden cases passed on both the Core contract and the source model, with
+  Lean's Keccak-256 tags equal to those of `cast keccak`; a changed tag is
+  detected.
+- The model equalled the Core contract on 440 transactions of 76 generated
+  scenarios. Every case and reduction replayed, and generation drew every
+  constructor count, field kind, position and bank length, and two `bytes`
+  constructors.
+  - 9 of 85 attempts were excluded at 384 nodes for a step budget too small
+    for the drawn template, and none at 512.
+  - The first run of this test caught a generator flaw: the draws are affine
+    in their start, so over consecutive seeds the raw shape stream alternated
+    between static shapes and one `bytes` constructor and never drew two. Both
+    streams now start at SplitMix64's finalizer of the seed xor their domain.
+- The shells take the 130 to 291 nodes defined above.
+- A synthetic output difference, the low bit of the last Word on imported Hull
+  at `tx-2` of `dynamic-four-words`, reduced in 12 attempts. Four constructors
+  and three transactions became `Blob(bytes) | Rejected` and that one
+  transaction with length 0. Narrowing `Blob` changes the finding's payload
+  shape, so the shrinker kept its field.
+- The fixed corpus has fifteen scenarios and 38 transactions: nine imported
+  scenarios over the `bytes` corpus's six imported steps, and six generated
+  seeds, three at each budget. The campaign admits imported entries of one to
+  three transactions, so a shape's coverage spans entries of one step.
+- The gate passed on `24ab8dd3f` alone and on `1dc56407d`: the full Lean build
+  and tests, the kernel check, 755 and then 762 Python tests, every corpus
+  check and the diff check, with 32 and then 33 native tools.
+
+The matrices ran on `1dc56407d` with 148 digests frozen: the files of
+`scripts/`, the 33 native tools, solc, Anvil, and the Rust driver and
+code-image exporter. None changed during any run, and all 443 case results
+record that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-four stateful corpora matched, 317 scenarios and 859
+    prefixes, in 3,249 seconds. The twenty-three earlier ones kept their 302
+    scenarios and 821 prefixes, both call profiles included.
+  - The new corpus matched its 15 scenarios and 38 prefixes with complete
+    coverage on O0, O2 and Yul, O2 in 226 seconds and Yul in 175:
+    - 32 returned and 6 reverted transactions;
+    - every position of two, three and four constructors, all seven field
+      kinds, and padded and full-width returns in static and dynamic enums;
+    - `bytes` returns of lengths 0, 1, 16, 18, 31, 32, 33, 50, 63 and 64,
+      from shapes with one and with two `bytes` constructors;
+    - a returned value after an earlier committed transaction in 12
+      scenarios, and after a revert in 5.
+- **Random suites:** root seed `20261031`, sixteen eight-transaction
+  scenarios with G0 revision three, at 384 and 512 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes:
+  - at 384 nodes, 19 attempts and 3 exclusions for a step budget too small
+    for the drawn template, all three-helper steps under three or four
+    constructors; at 512 nodes, 16 attempts and no exclusion;
+  - at each budget, 4 shapes of two constructors, 9 of three and 3 of four;
+    10 static and 6 dynamic, 3 of them with two `bytes` constructors;
+  - at 384 nodes, 96 returned values and 32 reverts. The returns covered all
+    nine positions and all seven field kinds: 59 from static enums, 26 of
+    them padded, and 37 from dynamic ones, 14 padded. 20 were `bytes`
+    returns of 14 distinct lengths: 2 empty, 17 partial and 1 whole;
+  - at 512 nodes, 95 returned values and 33 reverts, over all positions and
+    six field kinds; no field-less constructor of a dynamic enum returned.
+    57 came from static enums, 23 padded, and 38 from dynamic ones, 18
+    padded. 22 were `bytes` returns of 14 distinct lengths: 2 empty, 17
+    partial and 3 whole;
+  - every scenario returned a value after an earlier committed transaction
+    and after a revert, at both budgets;
+  - the cases were identical on the three backends at each budget. The 13
+    seeds both budgets accepted draw the same shapes and transactions, and
+    the step differs in 9 of them.
+
+A random run took 115 to 264 seconds on Sonatina and 211 to 220 on Yul. There
+was no finding. Hosted CI has not run the profile.
+
 **Storage and Keccak loops through inline Yul.** `stateful-storage-loops`
 and `stateful-keccak-loops` lower `sload`, `sstore`, the mapping's hash and
 `log2` through Solcore's own path: std's one-statement wrapper functions,
