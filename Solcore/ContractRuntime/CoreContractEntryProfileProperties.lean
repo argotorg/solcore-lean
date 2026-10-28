@@ -17,6 +17,8 @@ namespace CoreContractEntryProfile
   | wordTupleOutcomeV1 extraWords =>
       simp [resultType, ofResultType?]
   | boundedBytesOutcomeV1 => rfl
+  | enumOutcomeV1 first second rest =>
+      simp [resultType, ofResultType?, enumType, ofWordTupleType?, ofEnumType?, boundedBytesType]
 
 theorem resultType_injective :
     Function.Injective CoreContractEntryProfile.resultType := by
@@ -185,6 +187,170 @@ theorem decodeBoundedBytes?_size
       some (.trapped reason) := by
   simp [decode?]
 
+/-- The bounded encoding is the offset Word 32 before std's `bytes` tail. -/
+theorem encodeBoundedBytes_eq_encodeBytesTail (length : Nat) (data : Bytes) :
+    encodeBoundedBytes length data =
+      encodeWordBytesBE (Core.Word.ofNatModulo 32) ++ encodeBytesTail length data := by
+  simp only [encodeBoundedBytes, encodeBytesTail, ByteArray.append_assoc]
+
+/-- The tail is the length Word and the data padded to whole Words. -/
+theorem encodeBytesTail_size
+    (length : Nat) (data : Bytes) (fits : length ≤ data.size) :
+    (encodeBytesTail length data).size = 32 + 32 * ((length + 31) / 32) := by
+  have padding : (⟨Array.replicate ((32 - length % 32) % 32) 0⟩ : ByteArray).size =
+      (32 - length % 32) % 32 := by
+    simp [ByteArray.size]
+  simp only [encodeBytesTail, ByteArray.size_append, encodeWordBytesBE_size,
+    ByteArray.size_extract, padding]
+  omega
+
+/-- A bounded `bytes` value has at most 64 bytes of two data Words. -/
+theorem boundedBytesValue?_bounds
+    {value : Core.Value} {length : Nat} {data : Bytes}
+    (decoded : boundedBytesValue? value = some (length, data)) :
+    length ≤ boundedBytesLimit ∧ length ≤ data.size := by
+  match value, decoded with
+  | .inLeft (.product .word (.product .word .word)) .unit, decoded =>
+      cases decoded
+      exact ⟨by decide, by simp⟩
+  | .inRight .unit (.pair (.word tag) (.pair (.word first) (.word second))), decoded =>
+      cases decoded
+      have bounded := boundedBytesLength_le tag
+      refine ⟨bounded, ?_⟩
+      simp only [boundedBytesLimit] at bounded
+      simp only [ByteArray.size_append, encodeWordBytesBE_size]
+      omega
+
+/-- A constructor's fields fill exactly their head, and only a `bytes` field has
+a tail, of at most three Words. -/
+theorem decodeEnumFields?_size
+    {bodyHead : Nat} {payload : EnumPayload} {constructed : Core.Value}
+    {tag : Core.Word} {head tail : Bytes}
+    (decoded : decodeEnumFields? bodyHead payload constructed = some (tag, head, tail)) :
+    head.size = enumPayloadHeadSize payload ∧ ∃ tailWords, tailWords ≤ 3 ∧
+      (payload ≠ .boundedBytes → tailWords = 0) ∧ tail.size = 32 * tailWords := by
+  match payload, constructed, decoded with
+  | .noWords, .pair (.word _) .unit, decoded =>
+      cases decoded
+      exact ⟨rfl, 0, by decide, fun _ => rfl, rfl⟩
+  | .oneWord, .pair (.word _) (.word _), decoded =>
+      cases decoded
+      exact ⟨encodeWordBytesBE_size _, 0, by decide, fun _ => rfl, rfl⟩
+  | .twoWords, .pair (.word _) (.pair (.word _) (.word _)), decoded =>
+      cases decoded
+      refine ⟨?_, 0, by decide, fun _ => rfl, rfl⟩
+      simp [ByteArray.size_append, encodeWordBytesBE_size, enumPayloadHeadSize]
+  | .boundedBytes, .pair (.word _) bytes, decoded =>
+      simp only [decodeEnumFields?] at decoded
+      cases value : boundedBytesValue? bytes with
+      | none => simp [value] at decoded
+      | some pair =>
+          obtain ⟨length, data⟩ := pair
+          simp only [value, Option.map_some, Option.some.injEq, Prod.mk.injEq] at decoded
+          obtain ⟨_, rfl, rfl⟩ := decoded
+          obtain ⟨bounded, fits⟩ := boundedBytesValue?_bounds value
+          simp only [boundedBytesLimit] at bounded
+          refine ⟨encodeWordBytesBE_size _, 1 + (length + 31) / 32, by omega,
+            fun absurd => absurd rfl |>.elim, ?_⟩
+          rw [encodeBytesTail_size length data fits]
+          omega
+
+/-- The injected constructor is one of the enum's constructors. -/
+theorem selectEnumVariant?_mem
+    {first : EnumPayload} {rest : List EnumPayload} {value constructed : Core.Value}
+    {payload : EnumPayload}
+    (selected : selectEnumVariant? first rest value = some (payload, constructed)) :
+    payload ∈ first :: rest := by
+  induction rest generalizing first value with
+  | nil =>
+      simp only [selectEnumVariant?, Option.some.injEq, Prod.mk.injEq] at selected
+      simp [selected.1]
+  | cons next rest ih =>
+      match value, selected with
+      | .inLeft right value, selected =>
+          simp only [selectEnumVariant?] at selected
+          split at selected
+          · simp only [Option.some.injEq, Prod.mk.injEq] at selected
+            simp [selected.1]
+          · cases selected
+      | .inRight left value, selected =>
+          simp only [selectEnumVariant?] at selected
+          split at selected
+          · exact List.mem_cons_of_mem _ (ih selected)
+          · cases selected
+
+/-- Every constructor's fields fit in the body's head after the tag. -/
+theorem enumPayloadHeadSize_le
+    {payload : EnumPayload} {payloads : List EnumPayload} (member : payload ∈ payloads) :
+    enumPayloadHeadSize payload + 32 ≤ enumBodyHeadSize payloads := by
+  induction payloads with
+  | nil => cases member
+  | cons head rest ih =>
+      simp only [enumBodyHeadSize, List.foldr_cons] at ih ⊢
+      cases member with
+      | head => omega
+      | tail _ member =>
+          have := ih member
+          omega
+
+/-- A decoded enum value is the body's head and at most three tail Words, after
+the offset Word when the enum is dynamic; a static enum has no tail. -/
+theorem decodeEnum?_size
+    {first : EnumPayload} {rest : List EnumPayload} {value : Core.Value} {bytes : Bytes}
+    (decoded : decodeEnum? first rest value = some bytes) :
+    ∃ tailWords, tailWords ≤ 3 ∧ (enumIsStatic (first :: rest) = true → tailWords = 0) ∧
+      bytes.size = (if enumIsStatic (first :: rest) then 0 else 32) +
+        enumBodyHeadSize (first :: rest) + 32 * tailWords := by
+  cases selected : selectEnumVariant? first rest value with
+  | none => simp [decodeEnum?, selected] at decoded
+  | some pair =>
+      obtain ⟨payload, constructed⟩ := pair
+      cases fields : decodeEnumFields? (enumBodyHeadSize (first :: rest)) payload constructed with
+      | none => simp [decodeEnum?, selected, fields] at decoded
+      | some triple =>
+          obtain ⟨tag, head, tail⟩ := triple
+          simp only [decodeEnum?, selected, fields, Option.bind_eq_bind, Option.bind_some,
+            Option.pure_def, Option.some.injEq] at decoded
+          have member := selectEnumVariant?_mem selected
+          have fits := enumPayloadHeadSize_le member
+          obtain ⟨headSize, tailWords, bounded, onlyBytes, tailSize⟩ := decodeEnumFields?_size fields
+          have padding : (⟨Array.replicate (enumBodyHeadSize (first :: rest) - 32 -
+              enumPayloadHeadSize payload) 0⟩ : ByteArray).size =
+              enumBodyHeadSize (first :: rest) - 32 - enumPayloadHeadSize payload := by
+            simp [ByteArray.size]
+          have staticTail : enumIsStatic (first :: rest) = true → tailWords = 0 := by
+            intro static
+            apply onlyBytes
+            intro isBytes
+            subst isBytes
+            exact absurd (List.all_eq_true.mp static _ member) (by decide)
+          refine ⟨tailWords, bounded, staticTail, ?_⟩
+          subst decoded
+          split <;>
+            simp only [ByteArray.size_append, encodeWordBytesBE_size, headSize, padding,
+              tailSize] <;>
+            omega
+
+@[simp] theorem decode?_enumOutcomeV1_returned
+    (first second : EnumPayload) (rest : List EnumPayload) (payload : Core.Value) :
+    decode? (.enumOutcomeV1 first second rest) (.inLeft (.sum .word .word) payload) =
+      (decodeEnum? first (second :: rest) payload).map .returned := by
+  rfl
+
+@[simp] theorem decode?_enumOutcomeV1_reverted
+    (first second : EnumPayload) (rest : List EnumPayload) (word : Core.Word) :
+    decode? (.enumOutcomeV1 first second rest)
+        (.inRight (enumType first (second :: rest)) (.inLeft .word (.word word))) =
+      some (.reverted (encodeWordBytesBE word)) := by
+  simp [decode?]
+
+@[simp] theorem decode?_enumOutcomeV1_trapped
+    (first second : EnumPayload) (rest : List EnumPayload) (reason : Core.Word) :
+    decode? (.enumOutcomeV1 first second rest)
+        (.inRight (enumType first (second :: rest)) (.inRight .word (.word reason))) =
+      some (.trapped reason) := by
+  simp [decode?]
+
 @[simp] theorem returnsOneWord_returnWord :
     returnsOneWord .returnWord = true :=
   rfl
@@ -199,6 +365,11 @@ theorem decodeBoundedBytes?_size
 
 @[simp] theorem returnsOneWord_boundedBytesOutcomeV1 :
     returnsOneWord .boundedBytesOutcomeV1 = false :=
+  rfl
+
+@[simp] theorem returnsOneWord_enumOutcomeV1
+    (first second : EnumPayload) (rest : List EnumPayload) :
+    returnsOneWord (.enumOutcomeV1 first second rest) = false :=
   rfl
 
 end CoreContractEntryProfile

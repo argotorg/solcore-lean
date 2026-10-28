@@ -58,6 +58,7 @@ theorem decodeWordOutcome?_ne_none_of_hasType
   cases profile with
   | wordTupleOutcomeV1 _ => cases oneWord
   | boundedBytesOutcomeV1 => cases oneWord
+  | enumOutcomeV1 _ _ _ => cases oneWord
   | returnWord =>
       cases typing with
       | word => simp [decodeWordOutcome?]
@@ -197,6 +198,7 @@ theorem decode?_eq_map_decodeWordOutcome?
   cases profile with
   | wordTupleOutcomeV1 _ => cases oneWord
   | boundedBytesOutcomeV1 => cases oneWord
+  | enumOutcomeV1 _ _ _ => cases oneWord
   | returnWord =>
       simp only [CoreContractEntryProfile.decode?, decodeWordOutcome?]
       split <;> simp_all [CheckedCoreWordOutcome.toFrameOutcome]
@@ -218,6 +220,7 @@ theorem decodeTyped_eq_toFrameOutcome_decodeWordOutcome
   cases profile with
   | wordTupleOutcomeV1 _ => cases oneWord
   | boundedBytesOutcomeV1 => cases oneWord
+  | enumOutcomeV1 _ _ _ => cases oneWord
   | returnWord =>
       cases typing with
       | word => rfl

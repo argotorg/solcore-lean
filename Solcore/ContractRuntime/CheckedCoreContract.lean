@@ -51,6 +51,16 @@ def boundedBytesOutcomeV1
     CheckedCoreContract :=
   ⟨code, .boundedBytesOutcomeV1, resultType_eq⟩
 
+/-- Bind checked code with the enum convention of the given constructors' fields. -/
+def enumOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (first second : EnumPayload) (rest : List EnumPayload)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.enumOutcomeV1 first second rest).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .enumOutcomeV1 first second rest, resultType_eq⟩
+
 /-- Admit checked code only when its result type has a supported entry profile. -/
 def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType
@@ -139,7 +149,8 @@ theorem CoreContractEntryProfile.eq_of_resultType_eq
   cases left <;> cases right <;>
     simp_all [CoreContractEntryProfile.resultType,
       CoreContractEntryProfile.wordTupleType,
-      CoreContractEntryProfile.boundedBytesType]
+      CoreContractEntryProfile.boundedBytesType,
+      CoreContractEntryProfile.enumType]
 
 @[ext] theorem CheckedCoreContract.ext
     {left right : CheckedCoreContract}
