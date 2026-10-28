@@ -192,9 +192,9 @@ backends run by default. On Yul the driver runs the pure and the fifteen
 storage-family profiles, whether profiles are configured or not, and never the
 two call profiles. It selects the storage family explicitly, since the suite's
 own Yul default is the pure profiles. With the default sixteen cases, this adds
-240 eight-transaction scenarios to each Yul iteration, about 2,400 seconds at
-the default node budgets; no storage-family profile took more than 205 seconds
-of its 900. Machines that share
+240 eight-transaction scenarios to each Yul iteration: about 2,400 seconds at
+the default node budgets and 2,500 at doubled ones. No storage-family profile
+took more than 214 seconds of its 900. Machines that share
 a base seed use their own `--shard-index` of a common `--shard-count`. The
 first `run` fixes the configuration in `config.json`: backends, profiles,
 cases (default 16), whole functions (`--functions`, unset by default),

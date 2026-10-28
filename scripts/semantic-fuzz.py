@@ -855,7 +855,8 @@ def parse_args(argv=None):
     runner.add_argument("--shard-index", type=int)
     runner.add_argument("--shard-count", type=int)
     runner.add_argument("--backend", action="append", choices=BACKENDS, help="repeat; default all three")
-    runner.add_argument("--profile", action="append", choices=tuple(suite.PROFILES), help="repeat; default the suite's selection")
+    runner.add_argument("--profile", action="append", choices=tuple(suite.PROFILES), help="repeat; default the suite's selection, and on Yul also the storage-family profiles; "
+                             "the call profiles never run on Yul")
     runner.add_argument("--size-cycle", type=lambda text: [float(part) for part in text.split(",")],
                         help="comma-separated node-budget scales used by successive iterations (default 1,2)")
     for name, kind in (("cases", int), ("functions", int), ("attempts", int), ("nodes", int), ("seconds", float),
