@@ -4440,6 +4440,119 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare loops over Keccak-addressed entries and logs
+
+`stateful-storage-loops` uses a literal slot per iteration, and no other
+generated case hashes a slot or emits a log inside a loop. The
+`stateful-keccak-loops` profile does both in every iteration, so Keccak,
+memory, storage and log lowering meet inside a loop body. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions.
+
+### Definitions
+
+- **Contract:** `SynthesizedKeccakLoops` with `run(uint256 flags, uint256
+  input)`, selector `0x7357f5d2`, zero value. `acc: word` lies at slot 0 and
+  `entries: mapping(word => word)` at base slot 1, so the entry of `key` lies
+  at `keccak256(1 ++ key)`, std's layout as in `stateful-mapping`.
+- **Loop:** `limit = input & M` and `base = input & ~7`, with the plan's loop
+  mask `M` and key mask `S` each in {0, 1, 3, 7}, and a counter `i` while
+  `limit > i`. Iteration `i`:
+  - uses the key `base | (i & S)`;
+  - reads its entry and `acc`;
+  - writes `step(entry + acc + input)` to the entry and then to `acc`;
+  - emits `log2` with the written value as its one data Word and the topics
+    `i` and the key.
+- **After the loop:** the result is `acc + limit`. Odd flags revert with it
+  after all writes and logs, committing neither; even flags return it.
+- **Entries:** iterations `i` and `j` share an entry when `i & S = j & S`, so
+  `S = 0` gives one entry, `S = 1` two, `S = 3` four and `S = 7` one per
+  iteration. Transactions whose inputs share the high part share entries.
+- **Source:** the counter, key and value locals are declared before the loop.
+  `entries[sc_key]` does the hashing, and a 64-byte log buffer is reserved
+  from the free-memory pointer before the loop for
+  `sc_log2(sc_ptr, 32, sc_counter, sc_key)`.
+- **Original Core:** the mapping profile's Keccak closure and `M` ordinal
+  guards; guard `i` runs iteration `i` exactly when `limit > i`, with the
+  literal `i & S`. Each log is framed as in the event-log profile: a header
+  for two topics and one data Word, the data record, then the two topic
+  records. There is no counter cell.
+- **Transactions:** each records `iterations`, the input's bits under `M`,
+  which replay recomputes. Generation draws `M` from {1, 3, 7} and `S` from
+  {0, 1, 3, 7}, each by its own SplitMix64 hash of the seed; plans also admit
+  `M = 0`.
+- **Observed slots:** slot 0 and the entry slot of every key the
+  transactions address, in increasing order, derived with the independent
+  `Solcore.Abi.V1.Keccak256`. Whole storage is compared, and Hull and the EVM
+  must hold no nonzero undeclared slot. A reduction that changes a key changes
+  the case's observed slots with it.
+
+### Running and validation
+
+```sh
+lake build semanticKeccakLoopTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-keccak-loop-corpus.json \
+  --output .upstream/semantic-keccak-loop-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-keccak-loops \
+  --cases 16 --output .upstream/semantic-keccak-loop-random
+```
+
+Plans use `solcore-lean.keccak-loop-plan.v1` under `keccakLoopPlan`. Cases
+use `solcore-lean.semantic-keccak-loop-case.v1` and histories
+`solcore-lean.keccak-loop-history.v1`, and their provenance records the log
+framing `core-word-log-framing-v1`. The 38-node shell lies inside the node
+budget. The 2,654-node Keccak closure and the guards, 69 nodes each and 483
+for seven, lie outside it. The suite's default of 384 nodes leaves 346 for the
+step, and a contract has at most 512 + 2,654 + 483 nodes. A case reaches about
+165 KB, so a native shrink response carries at most 16 candidates.
+
+Every path's ordered committed logs are compared, together with the EVM
+chain's complete log list. A returned row commits two topics and 32 data bytes
+per iteration, and a reverted row commits none. Returned rows must also follow
+the loop protocol on every path:
+- log `i` has the topics `i` and its key;
+- slot 0 equals the last log's data, or is unchanged without iterations;
+- each addressed entry holds the data of the last log with its key, and every
+  other observed slot is unchanged;
+- the output is slot 0 plus the iteration count.
+
+A revert is checked by rollback and the log shapes.
+
+Three Lean tests check the profile:
+- `Solcore/Test/SourceKeccakLoopGolden.lean` checks the guarded contract and a
+  model of the source loop against expectations written out by hand. The
+  model is a counter over a slot map with Keccak slots from
+  `Solcore.Abi.V1.Keccak256` and a log list. Its steps add a known constant;
+  the five plans have key masks 0, 1, 3 and 7 and loop masks 0, 3 and 7. The
+  18 rows cover zero to three and five to seven iterations, reverts after one,
+  two, five and seven logged iterations, entries reused within and across
+  transactions, keys from the input's high part and wrapping sums. Every
+  expected slot 0 value, entry and log is written out.
+- `Solcore/Test/SourceKeccakLoopCases.lean` requires the guarded contract to
+  equal the model on 40 generated scenarios, 240 transactions in all, on
+  status, output, the observed slots and every log. Every case and the
+  reductions of four cases must replay, and the shell, closure and guard sizes
+  must be those above.
+- `Solcore/Test/SourceKeccakLoopCorpus.lean` checks the fixed corpus against
+  expected histories, logs included, that the model computed.
+
+The fixed corpus has 13 scenarios, 33 transactions and 77 committed logs: nine
+imported scenarios, which reuse the storage corpus's six imported steps, and
+four generated seeds. Required coverage:
+- loop masks 0, 1, 3 and 7, key masks 0, 1, 3 and 7, and iteration counts 0
+  to 7;
+- the carries `iteration` (an iteration reads the `acc` the previous one
+  wrote), `entry` (two iterations of a transaction address one entry),
+  `transaction` (an iteration reads an entry an earlier committed transaction
+  wrote) and `rollback` (a revert after logged iterations);
+- the six boundary Words as inputs;
+- one to three helpers and transactions, all four templates, both outcomes
+  and seven completion patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The fourteen

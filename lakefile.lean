@@ -80,6 +80,10 @@ lean_exe semanticStorageLoopTool where
   root := `Tests.SemanticStorageLoopTool
   exeName := "semantic-storage-loop-tool"
 
+lean_exe semanticKeccakLoopTool where
+  root := `Tests.SemanticKeccakLoopTool
+  exeName := "semantic-keccak-loop-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

@@ -46,6 +46,7 @@ TARGETS = {
     "semanticMalformedBytesTool": "semantic-malformed-bytes-tool",
     "semanticMethodsTool": "semantic-methods-tool",
     "semanticStorageLoopTool": "semantic-storage-loop-tool",
+    "semanticKeccakLoopTool": "semantic-keccak-loop-tool",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",

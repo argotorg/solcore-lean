@@ -3408,5 +3408,193 @@ class LoopTests(unittest.TestCase):
         self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
         self.assertFalse(result["pairs"]["directCore/importedHull"])
 
+
+def keccak_loop_case(mask=7, key_mask=1, rows=((0, 7), (1, 3), (2, 2))):
+    """Envelope fixture only: native replay checks the actual Keccak-loop program.
+    Its keys stay among the cast-derived entry slots, so the observed slots are
+    written independently of the adapter's Keccak."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "iterations": value & mask,
+                     "calldata": "0x7357f5d2" + f"{flags:064x}" + f"{value:064x}", "value": "0"}
+                    for index, (flags, value) in enumerate(rows)]
+    keys = {(value & (2**256 - 8)) | (i & key_mask) for _, value in rows for i in range(value & mask)}
+    return {"schema": runner.KECCAK_LOOP_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "keccakLoopPlan": {"schema": "solcore-lean.keccak-loop-plan.v1", "stepProgram": {}, "mask": mask, "keyMask": key_mask},
+        "initialState": {"storage": []},
+        "observedSlots": [str(slot) for slot in sorted({0} | {CAST_ENTRY_SLOTS[key] for key in keys})],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedKeccakLoops", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": "0x7357f5d2", "deployPath": ["SynthesizedKeccakLoopsDeploy"],
+            "runtimePath": ["SynthesizedKeccakLoopsDeploy", "SynthesizedKeccakLoops"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def keccak_loop_history(value, path, step=lambda x: x + 1, copy_last=True, address="101"):
+    """Rows of the Keccak-loop protocol with a known step: iteration i writes
+    step(entry + slot 0 + input) to the entry of its key and to slot 0 and logs
+    the counter, the key and the value; odd flags revert with slot 0 plus the
+    count, committing nothing. Without `copy_last` the last iteration skips slot 0."""
+    plan, slots = value["keccakLoopPlan"], [int(slot) for slot in value["observedSlots"]]
+    prior, rows = {slot: 0 for slot in slots}, []
+    storage = lambda values: [{"slot": str(slot), "value": str(values[slot])} for slot in slots]
+    for index, tx in enumerate(value["transactions"]):
+        after, x, logs = dict(prior), int(tx["input"]), []
+        count = x & plan["mask"]
+        for i in range(count):
+            key = (x & (2**256 - 8)) | (i & plan["keyMask"])
+            written = step((after[CAST_ENTRY_SLOTS[key]] + after[0] + x) % 2**256) % 2**256
+            after[CAST_ENTRY_SLOTS[key]] = written
+            if copy_last or i + 1 < count:
+                after[0] = written
+            logs.append(log_entry([i, key], [written], address))
+        reverted = int(tx["flags"]) % 2 == 1
+        committed = dict(prior) if reverted else after
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + f"{(after[0] + count) % 2**256:064x}", "committedStorage": storage(committed),
+               "logs": [] if reverted else logs}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.KECCAK_LOOP_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": storage({slot: 0 for slot in slots}), "initialLogs": [], "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    if path == "directCore":
+        result["bindings"] = {"schema": "solcore-lean.storage-bindings.v1", "caller": "17", "address": address}
+    if path == "rustEvm":
+        result["chainLogs"] = [copy.deepcopy(log) for row in rows for log in row["logs"]]
+    return with_whole(result, address)
+
+
+def keccak_loop_histories(value=None, **options):
+    value = keccak_loop_case() if value is None else value
+    return {path: keccak_loop_history(value, path, **options) for path in runner.PATHS}
+
+
+class KeccakLoopTests(unittest.TestCase):
+    def test_a_keccak_loop_case_records_its_masks_iterations_and_entry_slots(self):
+        value = keccak_loop_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
+                          selected["logs"], selected["selector"], selected["shrinkBatch"]),
+                         ("semantic-keccak-loop-tool", "rust-hull-keyed-storage-scenario", True, "keccak-loops", True,
+                          "0x7357f5d2", 16))
+        self.assertTrue(runner.has_keccak_loops(value) and runner.has_logs(value))
+        self.assertFalse(runner.has_loops(value) or runner.has_keccak_loops(loop_case()))
+        self.assertEqual([runner.loop_iterations(value, tx) for tx in value["transactions"]], [7, 3, 2])
+        self.assertEqual([runner.keccak_loop_keys(value, tx) for tx in value["transactions"]],
+                         [[0, 1, 0, 1, 0, 1, 0], [0, 1, 0], [0, 1]])
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual([runner.expected_log_shapes(value, tx) for tx in value["transactions"]], [[(2, 32)] * 7, [], [(2, 32)] * 2])
+        self.assertEqual(runner.observed_slots(value), ("0", str(CAST_ENTRY_SLOTS[0]), str(CAST_ENTRY_SLOTS[1])))
+        self.assertEqual(runner.keccak_loop_slots(value), list(runner.observed_slots(value)))
+        self.assertIn("keccak256(1 ++ key)", runner.scope(value))
+        self.assertIn("log2", runner.scope(value))
+        # Key mask 7 gives every iteration its own key, and the high part keys every entry.
+        wide = copy.deepcopy(value)
+        wide["keccakLoopPlan"]["keyMask"] = 7
+        self.assertEqual(runner.keccak_loop_keys(wide, wide["transactions"][0]), list(range(7)))
+        self.assertEqual(runner.keccak_loop_keys(wide, {"input": str(MAX_WORD)}), [2**256 - 8 + i for i in range(7)])
+        for mask, key_mask in ((0, 0), (1, 7), (3, 1), (7, 0)):
+            runner.validate_case(keccak_loop_case(mask, key_mask))
+        for key in ("mask", "keyMask"):
+            for changed in (2, 5, 8, True, "7", None):
+                invalid = keccak_loop_case()
+                invalid["keccakLoopPlan"][key] = changed
+                with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                    runner.validate_case(invalid)
+        for key, changed in (("iterations", 6), ("iterations", "7"), ("iterations", None),
+                             ("calldata", "0x7357f5d2" + "00" * 64), ("value", "1"), ("flags", "2")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # A recorded count follows the loop mask; the observed slots follow the
+        # key mask and every transaction's keys.
+        invalid = copy.deepcopy(value)
+        invalid["keccakLoopPlan"]["mask"] = 3
+        with self.assertRaises(ValueError):
+            runner.validate_case(invalid)
+        for change in (lambda case: case["keccakLoopPlan"].update(keyMask=3), lambda case: case["observedSlots"].pop(),
+                       lambda case: case["observedSlots"].reverse(), lambda case: case.update(observedSlots=["0", "1"]),
+                       lambda case: case["transactions"][2].update(input=str(2**255 + 2),
+                           calldata="0x7357f5d2" + f"{2:064x}" + f"{2**255 + 2:064x}")):
+            invalid = copy.deepcopy(value)
+            change(invalid)
+            with self.assertRaises(runner.Finding):
+                runner.validate_case(invalid)
+
+    def test_a_returned_row_follows_the_keccak_loop_protocol(self):
+        value = keccak_loop_case()
+        histories = keccak_loop_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior, address="101"))
+            self.assertEqual(runner.keccak_loop_fields(value, tx, rows[index], prior), [])
+        # tx-2 runs two iterations on keys 0 and 1 after the revert.
+        prior, tx = rows[1]["committedStorage"], value["transactions"][2]
+        for slot in value["observedSlots"]:
+            changed = copy.deepcopy(rows[2])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertIn("committedStorage", runner.keccak_loop_fields(value, tx, changed, prior))
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+        for change in (lambda logs: logs[0]["topics"].__setitem__(1, "1"), lambda logs: logs.reverse(),
+                       lambda logs: logs.pop(), lambda logs: logs.append(copy.deepcopy(logs[0])),
+                       lambda logs: logs[0].update(data="0x" + "00" * 31)):
+            changed = copy.deepcopy(rows[2])
+            change(changed["logs"])
+            with self.subTest(change=change):
+                self.assertEqual(runner.keccak_loop_fields(value, tx, changed, prior)[0], "logs")
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+        # A log whose data the storage does not hold breaks the committed slots.
+        changed = copy.deepcopy(rows[2])
+        changed["logs"][1]["data"] = "0x" + f"{7:064x}"
+        self.assertEqual(runner.keccak_loop_fields(value, tx, changed, prior), ["committedStorage"])
+        changed = copy.deepcopy(rows[2])
+        changed["output"] = "0x" + f"{int(changed['output'], 16) + 1:064x}"
+        self.assertEqual(runner.keccak_loop_fields(value, tx, changed, prior), ["output"])
+        # A revert is checked by rollback and the log shapes, not by the protocol.
+        self.assertEqual(runner.keccak_loop_fields(value, value["transactions"][1], {**rows[1], "output": "0x" + "00" * 32},
+                                                   rows[0]["committedStorage"]), [])
+        self.assertFalse(runner.conforms(value, value["transactions"][1], {**rows[1], "logs": copy.deepcopy(rows[0]["logs"][:3])},
+                                         rows[0]["committedStorage"]))
+        # Zero iterations leave every observed slot unchanged and log nothing.
+        zero = keccak_loop_case(rows=((0, 3), (0, 8)))
+        prior, row = keccak_loop_histories(zero)["directCore"]["transactions"]
+        self.assertEqual((row["logs"], runner.keccak_loop_fields(zero, zero["transactions"][1], row, prior["committedStorage"])), ([], []))
+
+    def test_a_keccak_protocol_break_on_every_path_is_a_mismatch_although_the_paths_agree(self):
+        value = keccak_loop_case()
+        broken = keccak_loop_histories(value, copy_last=False)
+        result = runner.compare(broken, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertIn("committedStorage", result["fields"])
+        # The same wrong topic on every path breaks the logs.
+        relabelled = keccak_loop_histories(value)
+        for path in runner.PATHS:
+            relabelled[path]["transactions"][0]["logs"][2]["topics"][0] = "3"
+        relabelled["rustEvm"]["chainLogs"] = [log for row in relabelled["rustEvm"]["transactions"] for log in row["logs"]]
+        result = runner.compare(relabelled, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertIn("logs", result["fields"])
+        # A different step on one path is an ordinary difference.
+        changed = keccak_loop_histories(value)
+        changed["importedHull"] = keccak_loop_history(value, "importedHull", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/importedHull"])
+        # The EVM chain keeps every committed log.
+        dropped = keccak_loop_histories(value)
+        dropped["rustEvm"]["chainLogs"].pop()
+        self.assertEqual(runner.compare(dropped, value)["stage"], "committed-log-history")
+
 if __name__ == "__main__":
     unittest.main()

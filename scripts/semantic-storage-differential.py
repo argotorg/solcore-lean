@@ -70,6 +70,8 @@ METHODS_CASE_SCHEMA = "solcore-lean.semantic-methods-case.v1"
 METHODS_HISTORY_SCHEMA = "solcore-lean.methods-history.v1"
 LOOP_CASE_SCHEMA = "solcore-lean.semantic-storage-loop-case.v1"
 LOOP_HISTORY_SCHEMA = "solcore-lean.storage-loop-history.v1"
+KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-keccak-loop-case.v1"
+KECCAK_LOOP_HISTORY_SCHEMA = "solcore-lean.keccak-loop-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -209,6 +211,16 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LOOP_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "loops", "shrinkBatch": 32},
+    # The storage-loop protocol over Keccak-addressed std mapping entries, with
+    # one log2 per iteration. A case embeds the mapping's Keccak closure, so a
+    # native shrink response carries at most 16 candidates.
+    "stateful-keccak-loops": {"caseSchema": KECCAK_LOOP_CASE_SCHEMA, "planSchema": "solcore-lean.keccak-loop-plan.v1",
+        "planKey": "keccakLoopPlan", "corpusSchema": "solcore-lean.semantic-keccak-loop-corpus.v1",
+        "originKind": "keccak-loop-generated", "contract": "SynthesizedKeccakLoops",
+        "caseTool": "semantic-keccak-loop-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KECCAK_LOOP_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "keccak-loops", "logs": True, "shrinkBatch": 16},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -317,7 +329,7 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         # A call's odd input sum reverts.
         return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
-                                                             "malformed", "loops") else "input"]
+                                                             "malformed", "loops", "keccak-loops") else "input"]
     odd = int(common.word(parity)) % 2
     if has_senders(case) and not odd:
         return None
@@ -335,6 +347,53 @@ def has_loops(case: dict) -> bool:
 def loop_iterations(case: dict, transaction: dict) -> int:
     """The iterations a transaction runs: its input's bits under the plan's mask."""
     return int(common.word(transaction.get("input"), "transaction input")) & case[profile(case)["planKey"]]["mask"]
+
+
+def has_keccak_loops(case: dict) -> bool:
+    return profile(case)["abi"] == "keccak-loops"
+
+
+def keccak_loop_keys(case: dict, transaction: dict) -> list[int]:
+    """The keys of a transaction's iterations: the input's high bits and the
+    counter's bits under the plan's key mask."""
+    base = int(common.word(transaction.get("input"), "transaction input")) & (2**256 - 8)
+    return [base | (index & case["keccakLoopPlan"]["keyMask"]) for index in range(loop_iterations(case, transaction))]
+
+
+def keccak_loop_slots(case: dict) -> list[str]:
+    """The Keccak-loop protocol's complete write set: slot zero and the entry
+    slot of every key the transactions address, in increasing numeric order."""
+    values = {0}
+    for tx in case["transactions"]:
+        values.update(entry_slot(key) for key in keccak_loop_keys(case, tx))
+    return [str(value) for value in sorted(values)]
+
+
+def keccak_loop_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the Keccak-loop protocol: log `i`
+    has the topics `i` and its key and one data Word, slot zero is the last
+    log's data (unchanged without iterations), each addressed entry holds the
+    data of the last log with its key and every other observed slot is
+    unchanged, and the output is slot zero plus the iteration count. A revert
+    is checked by rollback and the log shapes."""
+    if row["status"] != "returned":
+        return []
+    keys = keccak_loop_keys(case, transaction)
+    data = [common.hex_bytes(log["data"], "log data") for log in row["logs"]]
+    fields = []
+    if [log["topics"] for log in row["logs"]] != [[str(index), str(key)] for index, key in enumerate(keys)] or \
+            any(len(value) != 32 for value in data):
+        fields.append("logs")
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    expected = {entry["slot"]: int(entry["value"]) for entry in prior}
+    if not fields:
+        for key, value in zip(keys, data):
+            expected[str(entry_slot(key))] = expected["0"] = int.from_bytes(value, "big")
+        if after != expected:
+            fields.append("committedStorage")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + len(keys)) % 2**256:
+        fields.append("output")
+    return fields
 
 
 def loop_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
@@ -583,10 +642,13 @@ def guarded_sites(case: dict, transaction: dict) -> list[dict]:
 
 
 def expected_log_shapes(case: dict, transaction: dict) -> list[tuple[int, int]]:
-    """Topic count and data bytes of each committed log: one per guarded site
-    on return, none on revert. Topic and data values are never predicted."""
+    """Topic count and data bytes of each committed log: one per guarded site,
+    or two topics and one data Word per loop iteration, on return, none on
+    revert. Topic and data values are never predicted here."""
     if expected_status(case, transaction) == "reverted":
         return []
+    if has_keccak_loops(case):
+        return [(2, 32)] * loop_iterations(case, transaction)
     return [(site["topics"], 32 * site["dataWords"]) for site in guarded_sites(case, transaction)]
 
 
@@ -615,6 +677,14 @@ def scope(case: dict) -> str:
 
 
 def declared_scope(case: dict) -> str:
+    if has_keccak_loops(case):
+        return ("ordered zero-value run(uint256,uint256) transactions, each running its input's bits under the plan's "
+                "mask (at most seven) iterations of a source while loop that reads and writes the std mapping entry of "
+                "the key (input & ~7) | (i & keyMask) and slot 0 and emits one log2 of the counter, the key and the "
+                "written value; no constructor logs; initially empty storage; committed values at slot 0 and every "
+                "addressed key's keccak256(1 ++ key) slot and ordered committed logs (address, topics, data) on all "
+                "paths, the EVM chain's complete log list, and no nonzero undeclared slot on Hull/EVM; no "
+                "gas/balance/nonce or memory equivalence")
     if has_loops(case):
         return ("ordered zero-value run(uint256,uint256) transactions, each running its input's bits under the plan's "
                 "mask (at most seven) iterations of a source while loop that reads slots 0, 1, 1 + i and 2 + i and writes "
@@ -1144,9 +1214,10 @@ def validate_transactions(case: dict, selected: dict) -> None:
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
         value = int(common.word(tx.get("input"), "transaction input"))
-        if selected["abi"] == "loops" and (type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx)):
+        if selected["abi"] in ("loops", "keccak-loops") and (
+                type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx)):
             raise ValueError("transaction iterations differ from its input under the loop mask")
-        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags"}.get(selected["abi"])
+        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags", "keccak-loops": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
         sent = "0"
         if selected.get("balances"):
@@ -1167,6 +1238,9 @@ def validate_case(case) -> None:
         raise ValueError("storage case requires its original checked step plan")
     if selected["abi"] == "loops" and (type(plan.get("mask")) is not int or plan["mask"] not in LOOP_MASKS):
         raise ValueError("storage-loop plan requires a mask of 0, 1, 3 or 7")
+    if selected["abi"] == "keccak-loops" and any(type(plan.get(key)) is not int or plan[key] not in LOOP_MASKS
+                                                 for key in ("mask", "keyMask")):
+        raise ValueError("Keccak-loop plan requires a loop mask and a key mask of 0, 1, 3 or 7")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
     if selected["abi"] == "keyed":
@@ -1182,6 +1256,10 @@ def validate_case(case) -> None:
     elif selected["abi"] == "loops":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != LOOP_SLOTS:
             raise Finding("unsupported-scope", "input", "storage-loop profile starts empty and observes slots zero through eight")
+    elif selected["abi"] == "keccak-loops":
+        validate_transactions(case, selected)
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != keccak_loop_slots(case):
+            raise Finding("unsupported-scope", "input", "Keccak-loop profile starts empty and observes slot zero and every addressed entry slot")
     elif selected["abi"] == "malformed" and encoding(selected) == "bytes":
         slots = bytes_layout(selected)[1]
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
@@ -1439,6 +1517,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
         return False
     if has_loops(case) and loop_fields(case, tx, row, prior):
         return False
+    if has_keccak_loops(case) and keccak_loop_fields(case, tx, row, prior):
+        return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
     if has_balances(case) and (row["committedBalance"] != expected_balance(case, row) or
@@ -1585,6 +1665,13 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if has_loops(case):
             # A returned row follows the loop protocol; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in loop_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_keccak_loops(case):
+            # A returned row follows the Keccak-loop protocol, its logs included;
+            # a revert is already covered by rollback and the log shapes.
+            broken = sorted({field for name, row in rows.items() for field in keccak_loop_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken

@@ -1913,8 +1913,75 @@ class LoopCampaignTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredCarriedSlots"})
         other = json.loads((ROOT / "scripts/semantic-methods-corpus.json").read_text())
-        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop profile"):
+        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop and Keccak-loop profiles"):
             campaign.validate_manifest({**other, "requiredMasks": [0, 1, 3, 7]})
+
+
+
+def keccak_loop_case(mask=7, key_mask=1, rows=((0, 7), (1, 3), (2, 2))):
+    value = fixtures.keccak_loop_case(mask, key_mask, rows)
+    value["keccakLoopPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.LOG_VERSIONS})
+    value["provenance"].update(features=["local"], origin={"kind": "imported"})
+    return value
+
+
+class KeccakLoopCampaignTests(unittest.TestCase):
+    def test_coverage_names_masks_key_masks_iteration_counts_and_carries(self):
+        value = keccak_loop_case()
+        self.assertEqual(campaign.dimensions("stateful-keccak-loops"),
+                         campaign.DIMENSIONS + ("Masks", "KeyMasks", "IterationCounts", "IterationCarries"))
+        self.assertEqual(campaign.versions("stateful-keccak-loops"), campaign.LOG_VERSIONS)
+        statuses = ["returned", "reverted", "returned"]
+        # Seven iterations alternate two entries; the revert discards three
+        # logged iterations; the last transaction rereads both committed entries.
+        self.assertEqual(campaign.keccak_loops_coverage(value, statuses),
+                         {"Masks": {7}, "KeyMasks": {1}, "IterationCounts": {7, 3, 2},
+                          "IterationCarries": {"iteration", "entry", "rollback", "transaction"}})
+        self.assertEqual(campaign.inputs(value), {"7", "3", "2"})
+        # Nothing is carried from a reverted transaction; key mask 7 gives every
+        # iteration its own entry; one iteration carries nothing within its transaction.
+        first_reverted = keccak_loop_case(key_mask=7, rows=((1, 1), (0, 1)))
+        self.assertEqual(campaign.keccak_loops_coverage(first_reverted, ["reverted", "returned"]),
+                         {"Masks": {7}, "KeyMasks": {7}, "IterationCounts": {1}, "IterationCarries": {"rollback"}})
+        self.assertEqual(campaign.keccak_loops_coverage(keccak_loop_case(7, 0, rows=((0, 1), (0, 0))), ["returned", "returned"]),
+                         {"Masks": {7}, "KeyMasks": {0}, "IterationCounts": {1, 0}, "IterationCarries": set()})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-keccak-loops"))
+            instance.summary["coverage"].update(requiredMasks=[0, 7], requiredKeyMasks=[1, 3], requiredIterationCounts=list(range(8)),
+                                                requiredIterationCarries=["entry", "iteration", "rollback", "transaction"])
+            instance.record_coverage(value, "matched", fixtures.keccak_loop_histories(value))
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedMasks"], coverage["matchedKeyMasks"], coverage["matchedIterationCounts"],
+                              coverage["matchedIterationCarries"]), ([7], [1], [2, 3, 7], ["entry", "iteration", "rollback", "transaction"]))
+            self.assertEqual((coverage["missingMasks"], coverage["missingKeyMasks"], coverage["missingIterationCounts"],
+                              coverage["missingIterationCarries"]), ([0], [3], [0, 1, 4, 5, 6], []))
+
+    def test_the_fixed_corpus_validates_and_its_keccak_loop_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-keccak-loop-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-keccak-loops")
+        self.assertEqual((manifest["requiredMasks"], manifest["requiredKeyMasks"], manifest["requiredIterationCounts"],
+                          manifest["requiredIterationCarries"]),
+                         ([0, 1, 3, 7], [0, 1, 3, 7], list(range(8)), ["entry", "iteration", "rollback", "transaction"]))
+        for key, changed in (("requiredKeyMasks", [2]), ("requiredKeyMasks", []), ("requiredMasks", [True]),
+                             ("requiredIterationCounts", [8]), ("requiredIterationCarries", ["other"]),
+                             ("requiredIterationCarries", ["entry", "entry"]), ("requiredCarriedSlots", [2]),
+                             ("requiredLogCounts", [0]), ("framingVersion", 1)):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        for key in ("requiredKeyMasks", "requiredIterationCarries", "framingVersion"):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                campaign.validate_manifest({name: value for name, value in manifest.items() if name != key})
+        # The storage-loop profile has no key masks, and other profiles no loop coverage.
+        loops = json.loads((ROOT / "scripts/semantic-storage-loop-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "storage-loop coverage has no other loop dimension"):
+            campaign.validate_manifest({**loops, "requiredKeyMasks": [0, 1, 3, 7]})
+        other = json.loads((ROOT / "scripts/semantic-mapping-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "loop coverage belongs to the storage-loop and Keccak-loop profiles"):
+            campaign.validate_manifest({**other, "requiredKeyMasks": [0, 1, 3, 7]})
+        with self.assertRaisesRegex(ValueError, "log coverage belongs to the log profile"):
+            campaign.validate_manifest({**other, "framingVersion": manifest["framingVersion"]})
 
 
 if __name__ == "__main__":

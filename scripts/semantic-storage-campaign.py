@@ -90,6 +90,14 @@ METHODS_DIMENSIONS = DIMENSIONS + tuple(METHODS_EXTRA)
 LOOP_EXTRA = {"Masks": adapter.LOOP_MASKS, "IterationCounts": tuple(range(8)), "IterationCarries": ("iteration", "rollback"),
               "CarriedSlots": tuple(range(2, 9))}
 LOOP_DIMENSIONS = DIMENSIONS + tuple(LOOP_EXTRA)
+# Keccak loops: plan loop and key masks, transactions' iteration counts and the
+# carries `iteration` (an iteration read the slot zero the previous one wrote),
+# `entry` (two iterations of a transaction addressed one entry), `transaction`
+# (an iteration read an entry an earlier committed transaction wrote) and
+# `rollback` (a revert discarded logged iterations).
+KECCAK_LOOP_EXTRA = {"Masks": adapter.LOOP_MASKS, "KeyMasks": adapter.LOOP_MASKS, "IterationCounts": tuple(range(8)),
+                     "IterationCarries": ("entry", "iteration", "rollback", "transaction")}
+KECCAK_LOOP_DIMENSIONS = DIMENSIONS + tuple(KECCAK_LOOP_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -112,6 +120,8 @@ def dimensions(profile_name):
         return METHODS_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "loops":
         return LOOP_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "keccak-loops":
+        return KECCAK_LOOP_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -181,6 +191,21 @@ def loops_coverage(case, statuses):
                if any(statuses[earlier] == "returned" and counts[earlier] > iteration for earlier in range(index))}
     return {"Masks": {case[adapter.profile(case)["planKey"]]["mask"]}, "IterationCounts": set(counts),
             "IterationCarries": carries, "CarriedSlots": carried}
+
+
+def keccak_loops_coverage(case, statuses):
+    """The plan's loop and key masks, iteration counts, and the carries within
+    a transaction, across committed transactions and through a rollback."""
+    counts = [adapter.loop_iterations(case, tx) for tx in case["transactions"]]
+    keys = [adapter.keccak_loop_keys(case, tx) for tx in case["transactions"]]
+    carries = ({"iteration"} if any(count >= 2 for count in counts) else set()) | (
+        {"entry"} if any(len(set(values)) < len(values) for values in keys) else set()) | (
+        {"transaction"} if any(key in keys[earlier] for index, values in enumerate(keys) for key in values
+                               for earlier in range(index) if statuses[earlier] == "returned") else set()) | (
+        {"rollback"} if any(count >= 1 and status == "reverted" for count, status in zip(counts, statuses)) else set())
+    plan = case[adapter.profile(case)["planKey"]]
+    return {"Masks": {plan["mask"]}, "KeyMasks": {plan["keyMask"]}, "IterationCounts": set(counts),
+            "IterationCarries": carries}
 
 
 def nested_coverage(case):
@@ -401,19 +426,26 @@ def validate_manifest(manifest):
         raise ValueError("malformation coverage belongs to the malformed-calldata profile")
     if selected["abi"] != "methods" and any("required" + dimension in manifest for dimension in METHODS_EXTRA if dimension != "Rejections"):
         raise ValueError("method coverage belongs to the several-methods profile")
-    if selected["abi"] == "loops":
-        for dimension, allowed in LOOP_EXTRA.items():
+    loop_dimensions = {**LOOP_EXTRA, **KECCAK_LOOP_EXTRA}
+    if selected["abi"] in ("loops", "keccak-loops"):
+        extra, name = (LOOP_EXTRA, "storage-loop") if selected["abi"] == "loops" else (KECCAK_LOOP_EXTRA, "Keccak-loop")
+        for dimension, allowed in extra.items():
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
-                raise ValueError(f"storage-loop coverage requires unique required{dimension} from {list(allowed)}")
-    elif any("required" + dimension in manifest for dimension in LOOP_EXTRA):
-        raise ValueError("loop coverage belongs to the storage-loop profile")
-    if selected.get("logs"):
+                raise ValueError(f"{name} coverage requires unique required{dimension} from {list(allowed)}")
+        if any("required" + dimension in manifest for dimension in loop_dimensions if dimension not in extra):
+            raise ValueError(f"{name} coverage has no other loop dimension")
+    elif any("required" + dimension in manifest for dimension in loop_dimensions):
+        raise ValueError("loop coverage belongs to the storage-loop and Keccak-loop profiles")
+    # Every log profile records the log framing; the static site shapes belong
+    # to the log profile, whose plan fixes them.
+    if selected["abi"] == "flags":
         for dimension, allowed in LOG_EXTRA.items():
             values = manifest.get("required" + dimension)
             if not isinstance(values, list) or not values or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
                 raise ValueError(f"log coverage requires unique required{dimension} from {list(allowed)}")
-    elif any("required" + dimension in manifest for dimension in LOG_EXTRA) or "framingVersion" in manifest:
+    elif any("required" + dimension in manifest for dimension in LOG_EXTRA) or (
+            "framingVersion" in manifest and not selected.get("logs")):
         raise ValueError("log coverage belongs to the log profile")
     if selected.get("balances"):
         for dimension in VALUE_EXTRA:
@@ -607,13 +639,15 @@ def keyed_analysis(analysis):
                                                 adapter.LEDGER_HISTORY_SCHEMA, adapter.LONG_BYTES_HISTORY_SCHEMA,
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
                                                 adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA,
-                                                adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA)
+                                                adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA,
+                                                adapter.KECCAK_LOOP_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
 def log_analysis(analysis):
     histories = analysis.get("histories", {})
-    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") == adapter.LOG_HISTORY_SCHEMA
+    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in
+                                               (adapter.LOG_HISTORY_SCHEMA, adapter.KECCAK_LOOP_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -778,6 +812,8 @@ class Campaign:
             values.update(methods_coverage(case))
         elif self.specification["abi"] == "loops":
             values.update(loops_coverage(case, statuses))
+        elif self.specification["abi"] == "keccak-loops":
+            values.update(keccak_loops_coverage(case, statuses))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -841,6 +877,7 @@ class Campaign:
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
                           "methods": tuple(METHODS_EXTRA), "loops": tuple(LOOP_EXTRA),
+                          "keccak-loops": tuple(KECCAK_LOOP_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(
