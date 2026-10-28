@@ -12,6 +12,7 @@ import Solcore.Synthesis.Source.ComptimeCases
 import Solcore.Synthesis.Source.ModuleCases
 import Solcore.Synthesis.Source.PrimitiveCases
 import Solcore.Synthesis.Source.AssemblyCases
+import Solcore.Synthesis.Source.AssemblyMemoryCases
 
 /-! Revision-four cases of every G0-based profile record their case seed's
 swarm mask restricted to the features of the profile's emitter, use no other
@@ -74,6 +75,12 @@ private def profiles : List Profile := [
     versions := fun revision =>
       [("generatorVersion", Primitive.generatorVersionFor revision), ("baseGeneratorVersion", revision.version)],
     support := Assembly.featureSupport, scalar := true},
+  {name := "runtime-assembly-memory", generate := fun seed nodes count attempts fuel revision =>
+      AssemblyMemory.generateCases seed nodes count attempts fuel revision,
+    replay := AssemblyMemory.replayCase, shrink := AssemblyMemory.shrinkCases, nodes := 96, count := 8,
+    versions := fun revision =>
+      [("generatorVersion", Primitive.generatorVersionFor revision), ("baseGeneratorVersion", revision.version)],
+    support := AssemblyMemory.featureSupport, scalar := true},
   {name := "runtime-functions", generate := fun seed nodes count attempts fuel revision =>
       Solcore.Synthesis.Source.Function.generateCases seed nodes count attempts fuel revision,
     replay := Solcore.Synthesis.Source.Function.replayCase, shrink := Solcore.Synthesis.Source.Function.shrinkCases,
@@ -231,7 +238,7 @@ private def statisticsChecks : IO Unit := do
     s!"runtime-word: revision four has {← distinctSources four} sources against {← distinctSources three}"
 
 def testSourceRevisionFourCases : IO Unit := do
-  ensure (profiles.length == 16) "a G0-based profile is missing from the revision-four checks"
+  ensure (profiles.length == 17) "a G0-based profile is missing from the revision-four checks"
   for profile in profiles do
     checkProfile profile
   statisticsChecks

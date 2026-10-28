@@ -54,6 +54,7 @@ PROFILES = {
     "runtime-modules": ("semantic-module", "pure", 384),
     "runtime-primitives": ("semantic-primitive", "pure", 96),
     "runtime-assembly": ("semantic-assembly", "pure", 96),
+    "runtime-assembly-memory": ("semantic-assembly-memory", "pure", 96),
     "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "runtime-call-graph-loops": ("semantic-call-graph-loop", "pure", 256),
     "runtime-assembly-loops": ("semantic-assembly-loop", "pure", 256),

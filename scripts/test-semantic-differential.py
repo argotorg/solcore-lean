@@ -236,6 +236,27 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_CONTRACTS[runner.ASSEMBLY_LOOP_CASE_SCHEMA], "SynthesizedAssemblyLoops")
         self.assertEqual(runner.ASSEMBLY_LOOP_VERSIONS, (*runner.CALL_GRAPH_LOOP_VERSIONS, "loopProfileVersion"))
 
+    def test_assembly_memory_plan_keeps_every_access_and_the_hash_inside_the_window(self):
+        stage = {"read": 64, "width": "word", "write": 64}
+        plan = {"schema": "solcore-lean.assembly-memory-plan.v1", "functionProgram": {}, "stages": [stage],
+                "finalRead": 64, "hash": None}
+        self.assertEqual(runner.ASSEMBLY_MEMORY_HASH_LENGTHS, (0, 1, 31, 32, 33, 64))
+        for length in runner.ASSEMBLY_MEMORY_HASH_LENGTHS:
+            runner.validate_assembly_memory_plan({**plan, "hash": {"offset": 96 - length, "length": length}})
+        runner.validate_assembly_memory_plan({**plan, "stages": [stage, {**stage, "width": "byte", "write": 95}, stage]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.assembly-plan.v1"}, {**plan, "functionProgram": None},
+                        {**plan, "stages": []}, {**plan, "stages": [stage] * 4}, {**plan, "stages": [{**stage, "read": 65}]},
+                        {**plan, "stages": [{**stage, "write": 65}]}, {**plan, "stages": [{**stage, "width": "byte", "write": 96}]},
+                        {**plan, "stages": [{**stage, "width": "half"}]}, {**plan, "stages": [{**stage, "read": True}]},
+                        {**plan, "stages": [{**stage, "extra": 0}]}, {**plan, "finalRead": 65}, {**plan, "finalRead": -1},
+                        {**plan, "hash": {"offset": 64, "length": 33}}, {**plan, "hash": {"offset": 0, "length": 2}},
+                        {**plan, "hash": {"offset": 0, "length": True}}, {**plan, "hash": {"offset": 0}},
+                        {**plan, "extra": 0}):
+            with self.assertRaises(ValueError):
+                runner.validate_assembly_memory_plan(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.ASSEMBLY_MEMORY_CASE_SCHEMA], "runtime-assembly-memory")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.ASSEMBLY_MEMORY_CASE_SCHEMA], "SynthesizedAssemblyMemory")
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -591,7 +612,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 20)
+        self.assertEqual(len(runner.CASE_PROFILES), 21)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

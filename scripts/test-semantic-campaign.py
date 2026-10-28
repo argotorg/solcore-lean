@@ -256,6 +256,23 @@ def assembly_loop_policy_case(mask=7, form="for", value=7, helpers=2, shapes=('n
     return case
 
 
+def assembly_memory_policy_case(stages=((7, 'word', 13), (40, 'byte', 70)), final=33, hash_=(5, 33), value="255"):
+    """Inline Yul memory envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = assembly_policy_case(value=value)
+    function = case.pop('assemblyPlan')['functionProgram']
+    case.update(schema=campaign.m2.ASSEMBLY_MEMORY_CASE_SCHEMA, assemblyMemoryPlan={
+        'schema': 'solcore-lean.assembly-memory-plan.v1', 'functionProgram': function,
+        'stages': [{'read': read, 'width': width, 'write': write} for read, width, write in stages],
+        'finalRead': final, 'hash': None if hash_ is None else {'offset': hash_[0], 'length': hash_[1]}})
+    case['contract'].update(name='SynthesizedAssemblyMemory', deployPath=['SynthesizedAssemblyMemoryDeploy'],
+        runtimePath=['SynthesizedAssemblyMemoryDeploy', 'SynthesizedAssemblyMemory'])
+    case['provenance'] = {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                    *campaign.PROFILE_VERSION_FIELDS['runtime-assembly-memory'])},
+        'origin': {'kind': 'assembly-memory-generated', 'seed': '1', 'maxProgramNodes': 96},
+        'features': case['provenance']['features']}
+    return case
+
+
 def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
     """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
     case = function_case(helpers)
@@ -1384,6 +1401,141 @@ class LoopClosureCoverageTests(unittest.TestCase):
         self.assertEqual(len(manifest['cases']), 48)
         loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
         self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
+
+
+class AssemblyMemoryCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-assembly-memory'
+    CORPUS = ROOT / 'scripts/semantic-assembly-memory-corpus.json'
+    REQUIRED = {'stages': ['2'], 'accesses': ['read:2-15'], 'hazards': ['raw:overlap'], 'hashes': ['33']}
+
+    def manifest(self, generated=False):
+        case = assembly_memory_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'assemblyMemoryRequirements': self.REQUIRED,
+            'cases': [{'id': 'assembly-memory', 'input': '255', 'expectedFeatures': case['provenance']['features'],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 96}} if generated
+                   else {'assemblyMemoryPlan': case['assemblyMemoryPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('assembly-memory-generate', 'assembly-memory-emit', 'assembly-memory-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.ASSEMBLY_MEMORY_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE],
+                         (*campaign.PRIMITIVE_VERSIONS, 'functionProfileVersion', 'memoryVersion'))
+        for group in (campaign.G0_PROFILES, campaign.IDENTITY_FILTER_PROFILES):
+            self.assertIn(self.PROFILE, group)
+        for group in (campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual(campaign.minimum_nodes(self.PROFILE), 8)
+        self.assertEqual(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-primitives-v1/v', 'baseGeneratorVersion': 'v'}), 'v')
+        self.assertEqual({key: len(values) for key, values in campaign.ASSEMBLY_MEMORY_SHAPES.items()},
+                         {'stages': 3, 'accesses': 18, 'hazards': 8, 'hashes': 7})
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['assembly-memory-generate', '1', '96', '1', '256', '1000000', campaign.RANDOM_G0_VERSION,
+                                 campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+        self.assertEqual(summary['configuration']['acceptance'], campaign.RANDOM_ACCEPTANCE)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['assemblyMemoryCoverage']['requiredHazards'], [])
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['assemblyMemoryRequirements']
+        for invalid in (None, {}, {**base, 'stages': ['4']}, {**base, 'accesses': ['read:32']},
+                        {**base, 'accesses': ['half:0']}, {**base, 'hazards': ['war:word-word']},
+                        {**base, 'hashes': ['2']}, {**base, 'hashes': [33]}, {**base, 'stages': ['2', '2']},
+                        {key: values for key, values in base.items() if key != 'hashes'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'assemblyMemoryRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'assemblyPlan': entry['assemblyMemoryPlan']},
+                        {'id': 'assembly-memory', 'input': '255', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        plan = entry['assemblyMemoryPlan']
+        stage = plan['stages'][0]
+        for invalid in ({**plan, 'stages': []}, {**plan, 'stages': [stage] * 4},
+                        {**plan, 'stages': [{**stage, 'read': 65}]}, {**plan, 'stages': [{**stage, 'write': 65}]},
+                        {**plan, 'stages': [{**stage, 'width': 'byte', 'write': 96}]},
+                        {**plan, 'stages': [{**stage, 'width': 'half'}]}, {**plan, 'stages': [{**stage, 'read': True}]},
+                        {**plan, 'finalRead': 65}, {**plan, 'hash': {'offset': 64, 'length': 33}},
+                        {**plan, 'hash': {'offset': 0, 'length': 2}}, {**plan, 'hash': {'offset': 0}},
+                        {**plan, 'extra': 1}, {**plan, 'schema': 'solcore-lean.assembly-plan.v1'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'assemblyMemoryPlan': invalid}]})
+        campaign.validate_manifest({**value, 'cases': [{**entry, 'assemblyMemoryPlan': {
+            **plan, 'stages': [{**stage, 'width': 'byte', 'write': 95}], 'hash': {'offset': 32, 'length': 64}}}]})
+        with self.assertRaises(ValueError):
+            campaign.assembly_memory_requirements({'profile': 'runtime-assembly', 'assemblyMemoryRequirements': base})
+        with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+        for input_value in campaign.PRIMITIVE_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 96}, 'expectedFeatures': []}]})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                'generation': {'seed': '0', 'maxProgramNodes': 7}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_schedule(self):
+        self.assertEqual(campaign.specified_assembly_memory(assembly_memory_policy_case()),
+            {'Stages': {'2'}, 'Accesses': {'read:2-15', 'word:2-15', 'byte:2-15', 'read:1'},
+             'Hazards': {'raw:overlap', 'raw:hash'}, 'Hashes': {'33'}})
+        # A byte over a Word, both read back, then a Word over both and a read at its own offset.
+        case = assembly_memory_policy_case(((0, 'word', 5), (64, 'byte', 20), (0, 'word', 10)), 10, None)
+        self.assertEqual(campaign.specified_assembly_memory(case),
+            {'Stages': {'3'}, 'Accesses': {'read:0', 'word:2-15', 'byte:17-30', 'read:2-15'},
+             'Hazards': {'waw:word-byte', 'raw:overlap', 'raw:byte', 'waw:word-word', 'waw:byte-word', 'raw:same'},
+             'Hashes': {'none'}})
+        # An overwrite that no later read observes counts no hazard, and two bytes at one byte do.
+        self.assertEqual(campaign.specified_assembly_memory(assembly_memory_policy_case(
+            ((0, 'word', 0), (64, 'word', 0)), 32, (64, 0)))['Hazards'], set())
+        self.assertEqual(campaign.specified_assembly_memory(assembly_memory_policy_case(
+            ((64, 'byte', 31), (64, 'byte', 31)), 0, None))['Hazards'], {'waw:byte-byte', 'raw:byte'})
+        self.assertEqual(campaign.specified_assembly_memory(assembly_policy_case()),
+                         {'Stages': set(), 'Accesses': set(), 'Hazards': set(), 'Hashes': set()})
+
+    def test_nonmatching_outcomes_cannot_satisfy_assembly_memory_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [assembly_memory_policy_case(), assembly_memory_policy_case(((0, 'byte', 0),), 0, None)]
+            instance.summary['assemblyMemoryCoverage'].update(requiredStages=['1', '2'], requiredHashes=['33', 'none'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / str(len(case['assemblyMemoryPlan']['stages']))
+                folder.mkdir()
+                report = matched()
+                if case['assemblyMemoryPlan']['hash'] is None:
+                    report['comparison'] = {'category': 'compiler-crash', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['assemblyMemoryCoverage']
+            self.assertEqual((coverage['generatedStages'], coverage['matchedStages']), (['1', '2'], ['2']))
+            self.assertEqual((coverage['missingStages'], coverage['missingHashes']), (['1'], ['none']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        requirements = manifest['assemblyMemoryRequirements']
+        for key, values in campaign.ASSEMBLY_MEMORY_SHAPES.items():
+            expected = [value for value in values if value != 'waw:byte-byte']
+            self.assertEqual(requirements[key], expected)
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 96
+                            for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']) % len(campaign.PRIMITIVE_INPUTS), 0)
 
 
 class AssemblyLoopCoverageTests(unittest.TestCase):
@@ -3019,7 +3171,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 20)
+        self.assertEqual(len(campaign.PROFILES), 21)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -3796,7 +3948,8 @@ class G0VersionTests(CommandLine, unittest.TestCase):
 
 class FunctionCountTests(CommandLine, unittest.TestCase):
     """--functions asks random runtime-input campaigns for whole functions; counts stay per case."""
-    SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-assembly': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
+    SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-assembly': 12, 'runtime-assembly-memory': 12,
+              'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
               'runtime-assembly-loops': 10, 'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8}

@@ -12,6 +12,7 @@ import Solcore.Synthesis.Source.ComptimeCases
 import Solcore.Synthesis.Source.ModuleCases
 import Solcore.Synthesis.Source.PrimitiveCases
 import Solcore.Synthesis.Source.AssemblyCases
+import Solcore.Synthesis.Source.AssemblyMemoryCases
 
 /-! The G0 features each pure profile declares are exactly those its emitter
 renders: a probe program for each catalog feature emits if and only if the
@@ -60,6 +61,10 @@ private def fixedConstant : Option CheckedWordProgram := closed (.binary .wordAd
 
 private def fixedStep : Option Aggregates.CheckedDAG := step (.binary .wordAdd (.var 0) (word 1))
 
+/-- Two stages, one with each width, an unaligned final read and a 33-byte hash. -/
+private def memorySchedule : AssemblyMemory.Schedule :=
+  {stages := [⟨7, .word, 13⟩, ⟨40, .byte, 70⟩], final := 33, hash := some ⟨5, 33⟩}
+
 private structure Profile where
   name : String
   support : FeatureMask
@@ -80,6 +85,9 @@ private def profiles : List Profile := [
     (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Assembly.emit .branches)⟩,
   ⟨"runtime-assembly operations", Assembly.featureSupport, fun feature =>
     (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map (emits ∘ Assembly.emit .operations)⟩,
+  ⟨"runtime-assembly-memory", AssemblyMemory.featureSupport, fun feature =>
+    (CheckedWordFunction.ofBody? (probe (.var 0) feature)).map fun function =>
+      emits (AssemblyMemory.emit function memorySchedule)⟩,
   ⟨"runtime-functions", Solcore.Synthesis.Source.Function.featureSupport, fun feature =>
     (CheckedWordFunctionDAG.ofParts? [probe (.var 0) feature] entry).map
       (emits ∘ Solcore.Synthesis.Source.Function.emit)⟩,

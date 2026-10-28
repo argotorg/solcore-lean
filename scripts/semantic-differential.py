@@ -53,6 +53,8 @@ AGGREGATE_CALL_GRAPH_VERSIONS = ("profileVersion", "functionVersion", "boundaryV
 PRIMITIVE_CASE_SCHEMA = "solcore-lean.semantic-primitive-case.v1"
 ASSEMBLY_CASE_SCHEMA = "solcore-lean.semantic-assembly-case.v1"
 ASSEMBLY_FORMS = ("switch", "if", "operations")
+ASSEMBLY_MEMORY_CASE_SCHEMA = "solcore-lean.semantic-assembly-memory-case.v1"
+ASSEMBLY_MEMORY_HASH_LENGTHS = (0, 1, 31, 32, 33, 64)
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
@@ -70,6 +72,7 @@ COMPTIME_CASE_SCHEMA = "solcore-lean.semantic-comptime-case.v1"
 MODULE_CASE_SCHEMA = "solcore-lean.semantic-module-case.v1"
 CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  PRIMITIVE_CASE_SCHEMA: "runtime-primitives", ASSEMBLY_CASE_SCHEMA: "runtime-assembly",
+                 ASSEMBLY_MEMORY_CASE_SCHEMA: "runtime-assembly-memory",
                  CALL_GRAPH_CASE_SCHEMA: "runtime-call-graphs",
                  CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime-call-graph-loops",
                  ASSEMBLY_LOOP_CASE_SCHEMA: "runtime-assembly-loops",
@@ -81,6 +84,7 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
+                  ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
                   CALL_GRAPH_CASE_SCHEMA: "SynthesizedCallGraphs",
                   CALL_GRAPH_LOOP_CASE_SCHEMA: "SynthesizedCallGraphLoops",
                   ASSEMBLY_LOOP_CASE_SCHEMA: "SynthesizedAssemblyLoops",
@@ -332,6 +336,34 @@ def validate_assembly_plan(plan) -> dict:
     return plan
 
 
+def validate_assembly_memory_plan(plan) -> dict:
+    """Validate the envelope and the schedule's bounds; native replay checks the
+    step, the schedule's seed and the emission."""
+    if (not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.assembly-memory-plan.v1"
+            or set(plan) != {"schema", "functionProgram", "stages", "finalRead", "hash"}):
+        raise ValueError("unsupported assembly memory plan schema")
+    if not isinstance(plan["functionProgram"], dict):
+        raise ValueError("assembly memory plan requires its original Word function")
+    stages = plan["stages"]
+    if not isinstance(stages, list) or not 1 <= len(stages) <= 3:
+        raise ValueError("assembly memory plan requires one to three stages")
+    for stage in stages:
+        if (not isinstance(stage, dict) or set(stage) != {"read", "width", "write"}
+                or stage["width"] not in ("word", "byte")
+                or any(type(stage[key]) is not int for key in ("read", "write"))
+                or not 0 <= stage["read"] <= 64
+                or not 0 <= stage["write"] <= (64 if stage["width"] == "word" else 95)):
+            raise ValueError("assembly memory stages read a Word at 0..64 and write a Word at 0..64 or a byte at 0..95")
+    if type(plan["finalRead"]) is not int or not 0 <= plan["finalRead"] <= 64:
+        raise ValueError("assembly memory final read must be a Word offset from 0 to 64")
+    hash_ = plan["hash"]
+    if hash_ is not None and (not isinstance(hash_, dict) or set(hash_) != {"offset", "length"}
+            or type(hash_["offset"]) is not int or hash_["length"] not in ASSEMBLY_MEMORY_HASH_LENGTHS
+            or type(hash_["length"]) is not int or not 0 <= hash_["offset"] <= 96 - hash_["length"]):
+        raise ValueError("assembly memory hash must cover 0, 1, 31, 32, 33 or 64 bytes inside the window")
+    return plan
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -430,6 +462,8 @@ def validate_case(case: dict) -> None:
         validate_loop_closure_plan(case.get("loopClosurePlan"))
     if case["schema"] == ASSEMBLY_CASE_SCHEMA:
         validate_assembly_plan(case.get("assemblyPlan"))
+    if case["schema"] == ASSEMBLY_MEMORY_CASE_SCHEMA:
+        validate_assembly_memory_plan(case.get("assemblyMemoryPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -451,10 +485,11 @@ def validate_case(case: dict) -> None:
     for key in ("generatorVersion", "emitterVersion", "wrapperVersion"):
         if not isinstance(provenance.get(key), str) or not provenance[key]:
             raise ValueError(f"missing provenance {key}")
-    if case["schema"] in (PRIMITIVE_CASE_SCHEMA, ASSEMBLY_CASE_SCHEMA):
+    if case["schema"] in (PRIMITIVE_CASE_SCHEMA, ASSEMBLY_CASE_SCHEMA, ASSEMBLY_MEMORY_CASE_SCHEMA):
         for key in ("profileVersion", "functionVersion", "abstractionVersion",
                     "baseGeneratorVersion", "boundaryVersion",
-                    *(("functionProfileVersion",) if case["schema"] == ASSEMBLY_CASE_SCHEMA else ())):
+                    *(("functionProfileVersion",) if case["schema"] != PRIMITIVE_CASE_SCHEMA else ()),
+                    *(("memoryVersion",) if case["schema"] == ASSEMBLY_MEMORY_CASE_SCHEMA else ())):
             if not isinstance(provenance.get(key), str) or not provenance[key]:
                 raise ValueError(f"missing primitive provenance {key}")
     if case["schema"] in (CALL_GRAPH_CASE_SCHEMA, CALL_GRAPH_LOOP_CASE_SCHEMA, ASSEMBLY_LOOP_CASE_SCHEMA):
@@ -496,7 +531,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -949,6 +984,7 @@ def execute(args, report: dict) -> None:
         INPUT_CASE_SCHEMA: "runtime Word input, pure scalar function, Sonatina O0, run(uint256) ABI Word",
         PRIMITIVE_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations, Sonatina O0, run(uint256) ABI Word",
         ASSEMBLY_CASE_SCHEMA: "runtime Word input, checked scalar primitive operations as inline Yul in whole-body or per-operation assembly blocks, Sonatina O0, run(uint256) ABI Word",
+        ASSEMBLY_MEMORY_CASE_SCHEMA: "runtime Word input, a checked scalar primitive step as a Yul function over inline Yul memory above the free-memory pointer, with Word and byte writes, overlapping reads and keccak256 versus Core shifts, masks and the Keccak builders, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated acyclic Word helper graphs, Sonatina O0, run(uint256) ABI Word",
         CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, directly generated acyclic Word helper step graph, Sonatina O0, run(uint256) ABI Word",
         ASSEMBLY_LOOP_CASE_SCHEMA: "runtime Word input, an inline Yul for loop with break, continue, leave or a two-result step function versus finite Core guards, directly generated acyclic Word helper step graph as Yul functions, Sonatina O0, run(uint256) ABI Word",

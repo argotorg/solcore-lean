@@ -8,6 +8,8 @@ import Solcore.Synthesis.Source.PrimitiveEmitter
 import Solcore.Synthesis.Source.PrimitiveCases
 import Solcore.Synthesis.Source.AssemblyEmitter
 import Solcore.Synthesis.Source.AssemblyCases
+import Solcore.Synthesis.Source.AssemblyMemoryEmitter
+import Solcore.Synthesis.Source.AssemblyMemoryCases
 import Solcore.Synthesis.Source.CallGraphEmitter
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopEmitter

@@ -12,6 +12,7 @@ import Solcore.Synthesis.Source.ComptimeCases
 import Solcore.Synthesis.Source.ModuleCases
 import Solcore.Synthesis.Source.PrimitiveCases
 import Solcore.Synthesis.Source.AssemblyCases
+import Solcore.Synthesis.Source.AssemblyMemoryCases
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopCases
 import Solcore.Synthesis.Source.AssemblyLoopCases
@@ -69,6 +70,9 @@ private def generator (command : String) : Option Generator :=
   | "assembly-generate" => some ⟨true, true, true,
       fun seed nodes count attempts fuel revision inputs acceptance =>
         Assembly.generateCases seed nodes count attempts fuel revision inputs acceptance⟩
+  | "assembly-memory-generate" => some ⟨true, true, true,
+      fun seed nodes count attempts fuel revision inputs acceptance =>
+        AssemblyMemory.generateCases seed nodes count attempts fuel revision inputs acceptance⟩
   | "call-graph-generate" => some ⟨false, true, true,
       fun seed nodes count attempts fuel _ inputs acceptance =>
         CallGraph.generateCases seed nodes count attempts fuel inputs acceptance⟩
@@ -197,6 +201,11 @@ private def execute (args : List String) : IO Json := do
       let input ← get (Primitive.inputWord input)
       get (Assembly.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
+  | "assembly-memory-emit" :: file :: input :: rest =>
+      let plan ← get (AssemblyMemory.checkedPlan (← readJson file))
+      let input ← get (Primitive.inputWord input)
+      get (AssemblyMemory.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
   | "function-emit" :: file :: input :: rest =>
       let function ← get (Function.checkedFunction (← readJson file))
       let input ← get (Input.inputWord input)
@@ -317,6 +326,9 @@ private def execute (args : List String) : IO Json := do
       else if (json.getObjValAs? String "schema").toOption == some Assembly.caseSchema then
         let checked ← get (Assembly.caseProgram json)
         return Primitive.observe checked.plan.function checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some AssemblyMemory.caseSchema then
+        let checked ← get (AssemblyMemory.caseProgram json)
+        return AssemblyMemory.observe checked.plan checked.input fuel
       else
         let checked ← get (caseProgram json)
         return observe checked fuel
@@ -360,7 +372,9 @@ private def execute (args : List String) : IO Json := do
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Assembly.caseSchema then
-          Assembly.replayCase json fuel else replayCase json fuel)
+          Assembly.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some AssemblyMemory.caseSchema then
+          AssemblyMemory.replayCase json fuel else replayCase json fuel)
   | "shrink" :: file :: limit :: rest =>
       let json ← readJson file
       let limit ← natural "shrink limit" limit 4096
@@ -402,8 +416,10 @@ private def execute (args : List String) : IO Json := do
         else if (json.getObjValAs? String "schema").toOption == some Primitive.caseSchema then
           Primitive.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Assembly.caseSchema then
-          Assembly.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|assembly-generate|call-graph-generate|call-graph-loop-generate|assembly-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|recursion-generate|recursive-loop-generate|loop-closure-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands or assembly-loop-generate] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, recursion-generate, recursive-loop-generate, loop-closure-generate, call-graph-loop-generate, assembly-loop-generate or generic-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|recursion-emit|recursive-loop-emit|loop-closure-emit|assembly-emit|call-graph-loop-emit|assembly-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+          Assembly.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some AssemblyMemory.caseSchema then
+          AssemblyMemory.shrinkCases json limit fuel else shrinkCases json limit fuel)
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|assembly-generate|assembly-memory-generate|call-graph-generate|call-graph-loop-generate|assembly-loop-generate|aggregate-call-graph-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|recursion-generate|recursive-loop-generate|loop-closure-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands or assembly-loop-generate] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, recursion-generate, recursive-loop-generate, loop-closure-generate, call-graph-loop-generate, assembly-loop-generate or generic-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|recursion-emit|recursive-loop-emit|loop-closure-emit|assembly-emit|assembly-memory-emit|call-graph-loop-emit|assembly-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try
