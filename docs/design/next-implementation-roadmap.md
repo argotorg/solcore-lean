@@ -3025,6 +3025,121 @@ With scripts and native tools frozen on `1e4786c79`:
   - no seed was excluded.
 - A case took about seven seconds. There was no finding.
 
+**Storage-writing loops.** Every other stateful step is straight-line code
+over storage. No case runs `sload` or `sstore` inside a loop, where store
+forwarding, loop-invariant motion and O2's memory and storage passes act. The
+`stateful-storage-loops` profile runs a bounded source `while` loop whose
+iterations read and write declared slots. The definitions were fixed before
+execution.
+
+A probe preceded them. One hand-written contract ran `input & 7` iterations of
+the loop defined below, and a variant omitted the read of slot 1. The results:
+- The pinned compiler accepted the loop with its locals declared before it or
+  inside it.
+- Original Core expressed the loop as seven finite ordinal guards in one host
+  contract. It passed the full checker and ran in the unchanged contract
+  runtime.
+- Over eight transactions (0, 1, 3, 5 and 7 iterations, two reverts after loop
+  writes, full-width inputs), imported Hull with O0 and O2 images and the EVM
+  on O0, O2 and Yul all matched it. Status, output and slots 0 to 8 agreed,
+  and no stray slot was written.
+- Yul compiled to one creation/runtime pair whose runtime reads no code.
+
+So neither the shared runtime, the Hull importer nor any proof changes.
+
+- **Contract:** `SynthesizedStorageLoops` with
+  `run(uint256 flags, uint256 input)`, selector `0x7357f5d2`. It returns one
+  uint256, and every transaction is zero-value.
+- **Declared slots 0 to 8:**
+  - slot 0, an accumulator;
+  - slot 1, the committed iteration total;
+  - slots 2 to 8, one per iteration.
+- **Loop:** `limit = input & M`, with the plan's mask `M` in {0, 1, 3, 7}. A
+  counter `i` runs from 0 while `limit > i`. Iteration `i`:
+  - reads slot 0, which the previous iteration wrote;
+  - reads slot 1, which the loop never writes;
+  - reads slot `1 + i`, which iteration `i - 1` wrote (slot 1 when `i = 0`);
+  - reads slot `2 + i`, which the same iteration of an earlier committed
+    transaction wrote;
+  - writes `step(slot 0 + slot 1 + slot (1 + i) + slot (2 + i) + input)` to
+    slot `2 + i` and then to slot 0. The sums wrap.
+
+  After the loop, slot 1 increases by `limit`, and the result is slot 0 plus
+  slot 1. Odd flags revert with the result Word after all writes; even flags
+  return it.
+- **Source** (`solcore-source-storage-loops-v1`):
+  - the step is `sc_step`, rendered by the aggregate renderer;
+  - the counter, slot and value locals are declared before the loop and
+    assigned inside it;
+  - slots are computed from the counter (`sc_counter + 2` and `sc_slot - 1`);
+  - the loop is a real `while`.
+- **Original Core** (`core-storage-loop-contract-v1`, entry `wordOutcomeV1`):
+  - it reads the flags and the input and binds `limit = input & M`;
+  - `M` ordinal guards follow; guard `i` runs iteration `i` with literal slots
+    exactly when `limit > i`;
+  - there is no counter cell; the guards are the only loop.
+- **Node budget:**
+  - the 57-node shell lies inside the budget: the step binding, the input
+    reads, the limit, the slot 1 update, the result and the completion;
+  - each guard, 45 nodes, lies outside it, at most 315 in all;
+  - the suite's default of 384 nodes leaves 327 for the step, whatever the
+    mask;
+  - contracts are bounded by 512 + 315 nodes.
+- **Step:** one checked aggregate step with one to three helpers, generated
+  as for the other storage-family profiles. The step must not give equal
+  outputs at all boundary inputs.
+- **Transactions:** `{id, flags, input, iterations, calldata, value}`, one to
+  eight per scenario, drawn in blocks of three from a separate stream. Each
+  block draws:
+  - three flags from the boundary bank, each with the parity of one of the
+    four completion patterns;
+  - three input high parts from the bank, with their low three bits cleared;
+  - three draws `t` from 0 to 7, which become those low bits.
+
+  A transaction runs `t & M` iterations. The case records that count as
+  `iterations`, and replay recomputes it.
+- **Mask:** generation draws `M` from {1, 3, 7} by a SplitMix64 hash of the
+  seed; plans also admit 0. The plan records `M`.
+- **Observations:** status, output, slots 0 to 8 and the whole committed
+  storage, per prefix. A revert keeps the prior slots. The adapter checks each
+  returned row against the protocol:
+  - slot 1 increases by the iteration count;
+  - slot 0 equals the last iteration's slot, or is unchanged without
+    iterations;
+  - the slots above the last iteration are unchanged;
+  - the output is slot 0 plus slot 1.
+- **Exclusions, in order:**
+  - a node budget too small for the shell or above 512;
+  - the step's own exclusions;
+  - a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed parities.
+- **Reductions,** each sealed and strictly smaller in transactions, then
+  mask, then program size, then transaction values:
+  - one-transaction removals;
+  - a lower mask (7, 3, 1, 0), which removes whole guards; the transactions'
+    iteration counts follow it;
+  - step reductions;
+  - simpler transactions: flags to their parity bit, then an input's high
+    bits cleared, keeping its iteration count.
+- **Fixed corpus coverage:**
+  - masks 0, 1, 3 and 7;
+  - iteration counts 0 to 7, so zero, one and the maximum;
+  - a transaction of at least two iterations, so an iteration reads what the
+    previous one wrote;
+  - each slot 2 to 8 read by a later transaction after an earlier committed
+    one wrote it;
+  - both outcomes, including reverts after loop writes;
+  - one to three helpers and one to three transactions, with the step
+    features, templates and completion patterns of its steps.
+- **Golden cases** come before any random run. Steps add a constant, and the
+  expectations are written out by hand: 0, 1 and 7 iterations, reverts after
+  writes, and carries within and across transactions. A Lean model of the
+  source loop, a counter over a slot map, must equal the guarded Core on
+  generated cases.
+- **Out of scope:** gas, value, other methods, malformed calldata, loop
+  bounds other than `input & M`, `for` loops, and `break` or `continue`.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
