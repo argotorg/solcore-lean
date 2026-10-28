@@ -3460,6 +3460,146 @@ during any run.
 A random run took 92 to 98 seconds on Sonatina and 142 to 148 on Yul. There
 was no finding. Hosted CI has not run the profile.
 
+**Loops over Keccak-addressed entries and logs.** `stateful-storage-loops`
+uses a literal slot per iteration. The recorded O2 crashes are in the log,
+forwarded-value and dynamic-array profiles, where memory, Keccak and log
+lowering meet. No generated case yet hashes a slot or emits a log inside a
+loop. The `stateful-keccak-loops` profile does both in every iteration. The
+definitions were fixed before execution.
+
+A probe preceded them. One hand-written contract ran the loop defined below
+with the step `x * 3 + 1` and the key masks 0, 1 and 7, over eight
+transactions. Those had 0, 1, 2, 3, 5, 6 and 7 iterations, reverts after
+three and five logged iterations, and entries reused within and across
+transactions. The results:
+- The pinned compiler accepted the std mapping and the `log2` wrapper inside a
+  source `while` loop.
+- Original Core expressed the loop as seven finite ordinal guards in one host
+  contract, with the mapping profile's Core Keccak closure and the event-log
+  profile's log framing. It passed the full checker and ran in the unchanged
+  contract runtime; seven iterations needed 500,000 to 700,000 fuel.
+- Imported Hull with O0 and O2 images and the EVM on O0, O2 and Yul all
+  matched it on status, output, the whole committed storage and every log's
+  topics and data, with no stray slot.
+- Yul compiled to one creation/runtime pair whose runtime reads no code.
+
+So neither the shared runtime, the Hull importer nor any proof changes. The
+dynamic-array profile's array is calldata and its slots are literals, so the
+Keccak-addressed construct here is the std mapping, as in `stateful-mapping`.
+One profile carries both constructs: they share one loop, and every iteration
+needs both.
+
+- **Contract:** `SynthesizedKeccakLoops` with
+  `run(uint256 flags, uint256 input)`, selector `0x7357f5d2`. It returns one
+  uint256, and every transaction is zero-value.
+- **Fields:** `acc: word` at slot 0 and `entries: mapping(word => word)` at
+  base slot 1. The entry of `key` lies at `keccak256(1 ++ key)`, std's layout
+  as in the mapping profile.
+- **Plan:** a step, a loop mask `M` and a key mask `S`, each in
+  {0, 1, 3, 7}.
+- **Loop:** `limit = input & M` and `base = input & ~7`. A counter `i` runs
+  from 0 while `limit > i`. Iteration `i`:
+  - uses the key `base | (i & S)`;
+  - reads its entry and `acc`;
+  - writes `step(entry + acc + input)` to the entry and then to `acc`, with
+    wrapping sums;
+  - emits `log2` with one data Word, the written value, and the topics `i`
+    and the key.
+
+  After the loop the result is `acc + limit`. Odd flags revert with the
+  result after all writes and logs; even flags return it.
+- **Entries:** iterations `i` and `j` address the same entry when
+  `i & S = j & S`. So `S = 0` gives every iteration one entry, `S = 1`
+  alternates two, `S = 3` cycles four and `S = 7` gives each iteration its own.
+  Transactions whose inputs share the high part share entries.
+- **Source** (`solcore-source-keccak-loops-v1`):
+  - the counter, key and value locals are declared before the loop;
+  - std's `entries[sc_key]` does the hashing;
+  - a 64-byte log buffer is reserved from the free-memory pointer before the
+    loop, as the event-log profile does;
+  - the log is `sc_log2(sc_ptr, 32, sc_counter, sc_key)`.
+- **Original Core** (`core-keccak-loop-contract-v1`, entry `wordOutcomeV1`):
+  - it binds the mapping profile's Keccak closure, the step, the flags, the
+    input and the limit;
+  - `M` ordinal guards follow. Guard `i` runs exactly when `limit > i`: it
+    builds the key with the literal `i & S`, hashes it through the closure,
+    reads and writes, and emits one framed log;
+  - each log is framed as the event-log profile frames logs: a header for two
+    topics and one data Word, the data record, then the two topic records,
+    through `emitLogWord`;
+  - there is no counter cell.
+- **Node budget:**
+  - the 38-node shell lies inside the budget;
+  - the 2,654-node Keccak closure and the 69-node guards lie outside it, the
+    guards at most 483 in all;
+  - the suite's default of 384 nodes leaves 346 for the step;
+  - contracts are bounded by 512 + 2,654 + 483 nodes.
+- **Fuel:** the default direct fuel of 1,000,000 per transaction applies. A
+  history that runs out is excluded as a resource.
+- **Step:** one checked aggregate step with one to three helpers, as for the
+  other storage-family profiles. Its boundary outputs must not all agree.
+- **Transactions:** `{id, flags, input, iterations, calldata, value}`, one to
+  eight, drawn in blocks of three exactly as in `stateful-storage-loops`.
+  `iterations` is `input & M`; it is recorded, checked on decode and
+  recomputed on replay.
+- **Masks:** generation draws `M` from {1, 3, 7} and `S` from {0, 1, 3, 7},
+  each by its own SplitMix64 hash of the seed.
+- **Observed slots:** slot 0 and the entry slot of every key that the
+  scenario's transactions address, in increasing numeric order. They are
+  derived with the independent `Solcore.Abi.V1.Keccak256`, as the mapping
+  profile does. Whole storage is compared, and Hull and the EVM must hold no
+  nonzero undeclared slot.
+- **Logs:** each transaction's ordered committed logs are compared on all
+  paths, as in the event-log profile, together with the EVM chain's complete
+  log list. A revert commits none, and the deployment emits none.
+- **Protocol check** of each returned row:
+  - it has one log per iteration, and log `i` has the topics `i` and its key
+    and one data Word;
+  - slot 0 equals the last log's data, or is unchanged without iterations;
+  - each addressed entry holds the data of the last log with its key, and
+    every other observed slot is unchanged;
+  - the output is slot 0 plus the iteration count.
+- **Exclusions, in order:**
+  - a node budget too small for the shell or above 512;
+  - the step's own exclusions;
+  - a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed parities.
+- **Reductions,** each sealed and strictly smaller in transactions, then
+  loop mask, then key mask, then program size, then transaction values:
+  - one-transaction removals;
+  - a lower loop mask (7, 3, 1, 0), which removes whole guards;
+  - a lower key mask (7, 3, 1, 0), which merges entries;
+  - step reductions;
+  - flags to their parity bit, then an input's high bits cleared, keeping
+    its iteration count.
+- **Fixed corpus coverage:**
+  - loop masks 0, 1, 3 and 7, key masks 0, 1, 3 and 7, and iteration counts
+    0 to 7, so zero, one and the maximum;
+  - the carry `iteration`: an iteration reads the `acc` the previous one
+    wrote;
+  - the carry `entry`: an iteration reads an entry an earlier iteration of
+    its transaction wrote, so two iterations address the same entry;
+  - the carry `transaction`: a transaction reads an entry an earlier committed
+    transaction wrote;
+  - the carry `rollback`: a revert after logged iterations;
+  - the six boundary Words as inputs;
+  - one to three helpers and transactions, with the step features, templates
+    and completion patterns of its steps.
+- **Golden cases** come before any random run. Steps add a constant, and the
+  expectations are written out by hand:
+  - slot 0, the entries and every log, for key masks 0, 1 and 7;
+  - zero, one and seven iterations;
+  - a revert after logged iterations;
+  - entries reused within and across transactions.
+
+  A Lean model of the source loop must equal the guarded Core on generated
+  cases. The model is a counter over a slot map with Keccak slots from
+  `Solcore.Abi.V1.Keccak256` and a log list.
+- **Out of scope:** gas, value, other methods, malformed calldata, keys
+  other than `base | (i & S)`, logs other than one `log2` per iteration,
+  `for` loops, and `break` or `continue`.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one
