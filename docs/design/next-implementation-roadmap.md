@@ -1699,6 +1699,175 @@ Frozen matrices at `1d2ea9cef` (the freeze digest did not change):
   retained as a finding and recorded locally without investigation, so the
   O2 random gate did not pass.
 
+**User-defined enums and match.** Every generated program so far uses Words,
+std pairs and std sums. User-defined `enum` declarations, `match` over them
+and their constructor layout are untouched, although the pinned checkout's
+own end-to-end fixtures place its recent defects there: match substitution in
+a specialized trait impl, pattern binding order, scopes of folded matches and
+repeated pattern bindings. Only original Core can catch a front-end defect
+that every backend shares, so one new pure profile, `runtime-enums`, keeps an
+independent Core reference: an enum as nested Core sums and products and a
+`match` as nested `caseE`. Traits with generic impls are left to a later unit.
+
+Before any code, a probe compiled eight hand-written sources with the pinned
+compiler and std and ran them on every path: checked Hull export, Sonatina O0
+and O2 code images, Yul through `export-rust-yul.py` and the pinned solc,
+Anvil, and the Lean Hull runner, at twelve inputs against a Python model of
+each source. Together they covered:
+- plain enums of two to four constructors with zero to two fields, and fields
+  of Word, tuple, enum and generic-instance type;
+- generic enums of one and two parameters at Word, tuple and enum arguments,
+  including a generic enum whose field is another generic enum at its own
+  parameter, and a generic function over a generic enum at two instances;
+- values built from the runtime input by constructor choices on its low bits;
+- nested constructor and tuple patterns, `_` in fields, components and
+  columns, `default`, `case _` and `case (_)`, a variable catch-all, matches of
+  two and three columns, and nested matches on bound enum and tuple values;
+- pattern variables that shadow a parameter, an enclosing arm's variable and
+  each other across arms;
+- the leading-dot constructor form in patterns and returned values, and a
+  constructor named like its enum, unqualified;
+- traits with impls at Word, at tuples and std sums under constraints
+  (`impl<f, g> T<sum<f, g>> where f: T, g: T`), at a plain enum and at a
+  generic enum, unary and binary methods with nested matches on both
+  arguments, and a generic function constrained by the trait.
+
+All 24 runs matched on every path. The compiler rejects other unqualified
+constructors (`SC0106`), so the profile writes constructors qualified, in the
+dot form or by a same-name constructor. A non-exhaustive match is an error and
+an unreachable arm a warning, so generated matches are exhaustive with every
+arm reachable. Twelve plans of the generator below, emitted and run on O0, O2
+and Yul, matched their Core reference in all 36 runs, on the EVM and in the
+Hull runner. Core, the Hull importer and runner, both EVM backends and
+`export-rust-yul.py` need no change, and no shared runtime code or proof
+changes. The existing profiles, corpora, emitters and emitter proofs stay
+unchanged, and this emitter has no proof yet. The definitions were fixed
+before execution:
+
+- Declarations (`core-enum-match-v1`), one to three, `Sc_T0` to `Sc_T2` at the
+  top level. Each is plain or generic in one parameter `a`, with two to four
+  constructors of zero to two fields. A field is a Word, `a` (generic only), a
+  tuple of two components (Word, `a` or an earlier enum), or an earlier enum,
+  a generic one at Word, `(word, word)` or `a`. Constructor `k` of `Sc_Ti` is
+  `Sc_Ti_k`; with the same-name option, constructor 0, which has a field, is
+  `Sc_Ti`. No declaration refers to itself or a later one.
+- Views, one to three, each one function with one `match` over its
+  scrutinees and a Word parameter `sc_w`:
+  - `single`: one value of an enum or of a generic enum's instance;
+  - `pair`: two such values, matched as two columns;
+  - `generic`: a generic function over `Sc_Ti<a>`, called at two distinct
+    instances; its patterns bind but never inspect values of type `a`.
+- Arms: two to six random rows of patterns, each kept only if useful after
+  the earlier rows; then, at random, a row for every remaining first-column
+  constructor with variable or wildcard fields; then, if the rows are not
+  exhaustive, a catch-all: `default`, wildcards, or a variable first. At most
+  eight arms. A pattern is a constructor pattern (qualified, dot or
+  same-name), a tuple pattern, a variable (`sc_a` to `sc_d`, or `sc_w`, which
+  shadows the parameter) or `_`, refined with probability 3/4, 1/2 and 1/3 at
+  the first three levels, so nesting is at most three. Names within a row are
+  distinct and repeat freely across arms.
+- Bodies: `return` of a left fold of up to four terms, every Word the row
+  binds and then possibly one more term (a visible Word or a constant), by
+  drawn `+`, `-`, `^` and `*`, plus a 64-bit arm constant. A quarter of the
+  arms that bind an enum or tuple value instead match it again: two to four
+  arms drawn the same way, at most six, whose variables may rebind the
+  enclosing arm's names. A name means its innermost binding: the nested arm,
+  the enclosing arm, then `sc_w`.
+- Builders: per scrutinee, or per instance of a generic view, a function
+  `sc_make<v>_<b>(sc_x: word)` returning one to four values, the value
+  selected by the residue `(sc_x + offset) & 3` for an offset in 0..3, the last
+  value for every residue past it. A value is a constructor tree whose Word
+  leaves are `sc_x`, `(sc_x + c)`, `(sc_x ^ c)` or `(sc_x * c)`. Each value is
+  the first of four random candidates whose first matching arm no earlier
+  value selects, by first top-level constructor for a pair view. A returned
+  value may use the dot form; nested constructors are qualified or same-name.
+- `run(uint256)` of `SynthesizedEnums` calls each view on its builders' values
+  of `input` and on `input + w`, a per-view constant, and returns
+  `r_0 + 3 r_1 + 5 r_2 + …` over the calls, a generic view counting twice.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x656e756d6d617401`), in plan order: the declarations, the view count,
+  then for each view its kind, Word constant, scrutinee types and instances,
+  arms, bodies and builders. Constants are small, 64-bit, high-bit or near
+  the maximum.
+- Core reference, with no source text and no data definitions:
+  - a Word is a Word, a tuple a product, and an enum the right-nested sum of
+    its constructors' payloads (Unit, the field, or the product of two
+    fields), substituted at its instance;
+  - a value is its chain of `inLeft` and `inRight` over its payload;
+  - a builder is a closure from Words; a view is a closure per instance over
+    its scrutinees and the Word;
+  - a match is compiled arm by arm: each arm but the last runs with the
+    let-bound thunk of the remaining arms as its failure, a constructor
+    pattern unwraps the sum chain with nested `caseE`, a tuple or two-field
+    payload pattern projects and let-binds the components it tests, and a
+    variable names the matched value; the last arm is reached only when
+    exhaustiveness says it matches;
+  - the entry binds every call's Word in order and combines them.
+
+  Admission checks pattern types, distinct names, scoping, usefulness of
+  every arm and exhaustiveness of every match by the pattern-matrix algorithm,
+  computed here without the compiler. A registered Lean test compares the
+  reference with a direct interpreter of the plan's first-match semantics.
+- Bounds: every closed type's Core type has at most 64 type nodes, a
+  declaration whose widest instance would exceed that keeps Word fields only,
+  and a case's complete reference is limited to 4,096 nodes. The node budget,
+  default 2,048, minimum 256 and at most 4,096, bounds the applied reference:
+  views are dropped from the end while it is exceeded and more than one
+  remains. Of the first 500 seeds, the median reference had 327 nodes and the
+  largest 1,799.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stage `enum-profile`: a single view over the budget;
+  then, at the eight boundary inputs, a result other than a Word, fuel
+  exhaustion (an inconclusive resource exclusion), or the same Word for all
+  eight, as for 20 of the first 500 seeds.
+- Identity filter: an arm can return a leaf whose constant cancels its own,
+  so random campaigns apply `exclude-boundary-identity-v1`.
+- Reductions, each followed by pruning arms that became unreachable, turning
+  terms whose name no longer means a Word into 0 and nested matches on an
+  unbound name into their first inner body:
+  - remove a view, keeping one;
+  - remove a constructor from a declaration of three or more: arms naming it
+    are removed, a value using it becomes the first remaining constructor with
+    `sc_x` leaves, later constructors are renumbered, and removing a same-name
+    constructor drops the option;
+  - remove a field of a constructor, with its subpatterns and values;
+  - flatten a field to a Word: subpatterns there become `_` and values `sc_x`;
+  - remove an arm, or end a match at an arm with `default` and its body;
+  - replace a constructor or tuple subpattern with `_`;
+  - replace a nested match by its first inner body;
+  - remove a body term, or a builder value, keeping one;
+  - replace a leaf by `sc_x`;
+  - remove an unused declaration;
+  - then the inputs 0, 1 and half the input, with the plan unchanged.
+
+  Every candidate is admitted and sealed by the full checker, and strictly
+  smaller lexicographically in plan size (constructors, field-type weights,
+  views, arms, pattern nodes, body terms, inner arms and value nodes), then
+  input. A reduced origin records the parent plan and input. A shrink response
+  stops before its cases would exceed 1.5 MB, below the campaign's 2 MiB
+  tool-output limit.
+- Specified enum shapes, from the plan, never measured:
+  - constructors: each declaration's constructor count;
+  - fields: `count:<n>` per constructor and `type:<kind>` per field, a kind
+    being `word`, `param`, `tuple`, `enum` or `applied`;
+  - declarations: `plain`, `generic`, `same-name`, and `argument:<kind>` for
+    each generic instance's argument (`word`, `tuple`, `enum` or `param`);
+  - views: the view kinds;
+  - patterns: `qualified`, `dot`, `same-name`, `nullary`, `tuple`,
+    `variable`, `wildcard`, `default`, `nested`, `shadow` (a variable named
+    `sc_w`), `repeated` (a name bound by two arms of one match), `rebound` (a
+    nested arm binding a name of its enclosing arm) and `exhaustive` (a match
+    with no catch-all row);
+  - wildcards: `_` as a constructor `field`, a tuple `component`, a `column`
+    of a row that is not a catch-all, a whole `arm`, or `deep` below two
+    layers;
+  - depths: each pattern's nesting depth, 1 to 3.
+- Fixed corpus coverage: every value above and the eight boundary inputs. The
+  corpus is generated with the default budget: from seed 1 upwards, every seed
+  whose plan is accepted and covers a missing value is taken, until nothing is
+  missing, each plan at all eight inputs.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
