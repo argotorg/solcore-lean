@@ -4230,6 +4230,65 @@ were fixed before execution:
   `switch`, `break`, `continue` and Yul functions here (the pure assembly
   profiles cover them), gas, value, other methods and malformed calldata.
 
+**Results.** The checks before any random run:
+- The golden tests passed. Each form's contract equals the hand-written text
+  for both plans, and the parents' 12 storage and 18 Keccak hand-written rows
+  came back through cases of all three forms, slots, entries and logs
+  included. A changed expectation failed.
+- Generation agreed with the parent profiles on 16 storage and 8 Keccak
+  scenarios under G0 revisions three and one: attempts, exclusions, plans,
+  programs, transactions, observed slots, origins and observations.
+  - Every form was drawn.
+  - Every case and the reductions of two cases per profile replayed in their
+    form.
+  - An unknown form, the parents' schemas and a form that the source was not
+    emitted in were refused.
+- The corpus tests rebuilt both corpora from the parent corpora, and every
+  original Core history equalled the parent's expected history: 16 scenarios
+  and 43 transactions, and 19 scenarios, 49 transactions and 137 logs.
+- An unfrozen O0 run of both corpora matched with complete coverage.
+- The gate passed on the final tree before `1659dc250`: the forbidden-term
+  scan, `lake build` (10,232 jobs), 31 native tools prepared offline,
+  `lake test` (334 seconds), the kernel check, 770 Python tests, every
+  `Tests/scripts` check with the storage-rollback corpus, and the diff check.
+
+The matrices ran on `1659dc250` with 94 digests frozen: the 31 native tools,
+every `scripts/*.py` and `*.rs`, solc, Anvil, and the Rust driver and
+code-image exporter. None changed during any run, and all 552 case results
+record that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-two stateful corpora matched, 290 scenarios and 789
+    prefixes, in 2,291 seconds. The twenty earlier ones kept their 255
+    scenarios and 697 prefixes.
+  - The two new corpora matched with complete coverage on O0, O2 and Yul:
+    storage loops 16 scenarios and 43 prefixes in 102, 142 and 200 seconds,
+    and Keccak loops 19 scenarios and 49 prefixes in 144, 177 and 195.
+  - Every form ran iteration counts 0, 1 and 7 and every carry. Eight
+    transactions of each corpus reverted after loop iterations, and the
+    Keccak corpus committed 137 logs.
+- **Random suites:** root seed `20261030`, sixteen eight-transaction scenarios
+  per profile, G0 revision three, at 384 and 512 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes per profile. No seed was
+  excluded, and both budgets drew the same forms, masks and transactions,
+  with the step differing in 15 of the 16 cases of each profile.
+  - Storage loops (derived seed `15499106484787201766`):
+    - forms `split`, `carried` and `pipelined` came 7, 5 and 4 times, and
+      masks 1, 3 and 7 came 7, 3 and 6 times;
+    - iteration counts 0 to 7 came 39, 44, 10, 12, 8, 6, 6 and 3 times;
+    - 20 transactions reverted after loop writes;
+    - the `iteration` carry occurred in 9 cases and `rollback` in 13.
+  - Keccak loops (derived seed `5144080911718836980`):
+    - the forms came 6, 3 and 7 times, masks 1, 3 and 7 came 2, 7 and 7
+      times, and key masks 0, 1, 3 and 7 came 6, 2, 7 and 1 times;
+    - iteration counts 0 to 7 came 35, 31, 15, 19, 8, 6, 5 and 9 times;
+    - 224 logs were committed, and 19 transactions reverted after logged
+      iterations;
+    - two iterations of one transaction shared an entry in 10 cases, and a
+      later transaction reread an entry an earlier committed one wrote in 16.
+
+A random run of a profile took 102 to 149 seconds on Sonatina and 157 to 194
+on Yul. There was no finding. Hosted CI has not run the profiles.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 dynamic ABI-encoded return values, or callers beyond the three fixed senders,

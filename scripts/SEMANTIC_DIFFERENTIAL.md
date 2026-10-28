@@ -4805,6 +4805,31 @@ every carry of the plan).
 The wrappers are storage-family wrappers, so `--backend yul --solc PATH` runs
 them as for the other storage-family profiles.
 
+### Results
+
+The matrices ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen.
+- **Fixed corpora:** both matched with complete coverage on Sonatina O0 and
+  O2 and on Yul: storage loops 16 scenarios and 43 prefixes in 102, 142 and
+  200 seconds, and Keccak loops 19 scenarios and 49 prefixes in 144, 177 and
+  195. The twenty other stateful corpora still matched on O0, 255 scenarios
+  and 697 prefixes.
+- **Random suites:** root seed `20261030`, sixteen eight-transaction
+  scenarios per profile, G0 revision three, at 384 and 512 nodes on all three
+  backends. Each matched 16 scenarios and 128 prefixes per profile, in 102 to
+  149 seconds on Sonatina and 157 to 194 on Yul:
+  - all three forms were drawn for both plans, and every iteration count from
+    0 to 7 occurred;
+  - 20 storage-loop transactions reverted after loop writes, and 19
+    Keccak-loop transactions after logged iterations, which committed 224
+    logs in all;
+  - two iterations of one transaction shared an entry in 10 Keccak-loop
+    cases, and a later transaction reread an entry in 16;
+  - no seed was excluded, and both budgets drew the same forms, masks and
+    transactions, with the step differing in 15 of 16 cases.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare ABI-encoded tuple returns
 
 Every other stateful profile returns one Word. The `stateful-tuple-returns`
