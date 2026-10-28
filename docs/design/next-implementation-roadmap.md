@@ -4065,6 +4065,171 @@ not built:
 
   Either is a decision of its own, so it is reported here instead of built.
 
+**Bounded `bytes` returns.** The bounded option was then taken up as its own
+unit: the `stateful-bytes-returns` profile returns a `memory<bytes>` value of
+zero to 64 bytes and compares the whole return data on all three paths. The
+condition is the same as for tuples: every existing statement keeps its form,
+except for the one-Word premise already introduced, and the nested boundary
+stays.
+
+A probe came first. One hand-written contract ran
+`run(uint256 flags, uint256 input, uint256 length)`, selector `0x24b912e5`,
+returning `memory<bytes>`. It followed the protocol below with the stand-in
+step `3x + 7`, over thirteen transactions:
+- lengths 0, 1, 31, 32, 33, 63 and 64, and 65 and 100, which the contract
+  reads modulo 65;
+- two reverts, then returns after them;
+- the inputs `2^256 - 1` and `2^255`.
+
+Its data Words are built from products with a fixed odd constant, so the bytes
+after the length are not zero in memory. The results:
+- The pinned compiler accepted the return type. The method allocates three
+  Words with std's `allocate_memory`, stores the length and two data Words
+  with `mstore` and returns the pointer. std's `do_exec` encodes it with
+  `abi_encode`: `encodeIntoFromBytesLike` writes the offset, copies the
+  length and the data with `mcopy` and zeroes the padding with
+  `zeroize_memory`.
+- Checked Hull export, Sonatina O0 and O2 images, and Yul through the pinned
+  solc all compiled.
+- On Anvil, O0, O2 and Yul returned exactly `64 + 32⌈L/32⌉` bytes for length
+  `L`: the offset 32, the length, the first `L` data bytes and zeros. They
+  reverted with one Word. Imported Hull with O0 and O2 images gave the same
+  bytes, reverts and slots, in two scenarios of eight calls, the declared-slot
+  runner's limit. Every path equalled an independent Python model.
+
+So the profile is feasible on every compiled path, and the bytes after the
+length are zero on all of them. The Core representation had to be compact:
+- One variant per exact length does not fit. Core counts type annotations as
+  program nodes, so such a sum takes 193 nodes. A contract names it in its
+  result type and again in its revert injection, so types alone take 390
+  nodes, more than the default budget of 384.
+- So the runtime gains one convention and no other interface:
+  `CoreContractEntryProfile.boundedBytesOutcomeV1`.
+  - Its result type is `.sum B (.sum .word .word)` with
+    `B = .sum .unit (.product .word (.product .word .word))`, eleven nodes.
+    `inLeft unit` is the empty value. `inRight (tag, d0, d1)` is the value
+    of length `tag mod 64 + 1`, whose data are the first bytes of the
+    big-endian `d0` and `d1`.
+  - Every Word tag names one of the lengths 1 to 64, so every typed value
+    decodes. The data bytes after the length are ignored.
+  - A returned value decodes to std's canonical encoding: the Word 32, the
+    length Word, the data, and zeros up to a whole number of Words. Revert
+    and trap decode as for `wordOutcomeV1`, under the exact annotation `B`.
+  - `ofResultType?` recognizes exactly this type. `B` is a sum, so no
+    existing recognition changes, and `resultType` stays injective.
+  - `CheckedCoreContract.boundedBytesOutcomeV1` binds checked code to it.
+  - The top-level runner decodes through `decode?` into bytes, so it runs
+    bytes contracts unchanged.
+- **One-Word premise:** `returnsOneWord` is false for the new convention, so
+  the Word view rejects it and the nested executor keeps it out. A registered
+  bytes contract is `unavailable` to a word call, and a template with a bytes
+  initializer is `unavailable` to creation, exactly as for tuples. Neither
+  the nested executor nor any existing statement changes.
+- The Hull importer, Core's semantics and host requests, and every backend
+  stay as they are.
+
+The profile's definitions were fixed before execution:
+- **Contract:** `SynthesizedBytesReturns` with
+  `run(uint256 flags, uint256 input, uint256 length)`, selector
+  `0x24b912e5`, returning `memory<bytes>`. Every transaction is zero-value.
+- **Length:** each transaction records its length `L` from 0 to 64, and the
+  contract reads the length Word modulo 65.
+- **Declared slots 0 to 2,** as for tuples:
+  - slot 0, an accumulator;
+  - slot 1, the committed call count;
+  - slot 2, the last committed input.
+- **Transaction:**
+  - it reads `prior = slot 0` and `last = slot 2`;
+  - it computes `r = step(prior + input)`, where the sum wraps;
+  - it writes `r` to slot 0, slot 1 plus one to slot 1, and the input to
+    slot 2.
+
+  Odd flags then revert with the one Word `r`. Even flags return the first
+  `L` bytes of the two data Words:
+  1. `d0 = r · K`;
+  2. `d1 = (count · K) xor last`, where `count` is slot 1 read back after its
+     write.
+
+  `K` is the odd constant
+  `0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95`, and
+  products wrap. Multiplying by `K` makes the leading bytes depend on the
+  whole Word, so short values carry data and the bytes after the length are
+  rarely zero.
+- **Source** (`solcore-source-bytes-returns-v1`):
+  - the step is `sc_step`, rendered by the aggregate renderer;
+  - the method's return type is `memory<bytes>`;
+  - it allocates 96 bytes with `allocate_memory`, stores `L`, `d0` and `d1`
+    with `mstore`, and returns the pointer through `Typedef.abs`;
+  - `d1` reads `sload(1)` after the writes.
+- **Original Core** (`core-bytes-return-contract-v1`, entry
+  `boundedBytesOutcomeV1`): one host contract whose result is
+  `inLeft (inLeft unit)` for an empty value,
+  `inLeft (inRight (L - 1, d0, d1))` otherwise, or `inRight (inLeft r)`.
+- **Node budget:**
+  - the shell, everything but the step, lies inside the budget;
+  - the suite's default is 384 nodes, and the doubled budget is capped at
+    512;
+  - contracts are bounded by 512 nodes.
+- **Step:** one checked aggregate step with one to three helpers, generated
+  as for the other storage-family profiles. The step must not give equal
+  outputs at all boundary inputs.
+- **Transactions:** `{id, flags, input, length, calldata, value}`, one to
+  eight per scenario, drawn in blocks of three from a separate stream. Each
+  block draws:
+  - three flags from the boundary bank, each with the parity of one of the
+    four completion patterns;
+  - three inputs from the bank;
+  - three lengths, each from the length bank 0, 1, 31, 32, 33, 63 and 64
+    with probability one half, otherwise uniformly from 0 to 64.
+
+  Random runs generate the step with G0 revision three.
+- **Observations:** status, the whole return data, slots 0 to 2 and the whole
+  committed storage, per prefix.
+  - The adapter's output rule for this profile is `64 + 32⌈L/32⌉` bytes on
+    return and 32 on revert. The rule for every other profile stays as it
+    is.
+  - Each returned row must follow the protocol: the Word 32, the length Word
+    `L`, the first `L` bytes of `d0` and `d1` from the committed slots 0 and
+    1 and the prior slot 2, then zero bytes. Slot 1 grows by one, and the
+    committed slot 2 is the input.
+  - A revert keeps the prior slots and the whole storage.
+- **Exclusions, in order:**
+  - a node budget too small for the shell or above 512;
+  - the step's own exclusions;
+  - a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed parities.
+- **Reductions,** each sealed and strictly smaller in transactions, then the
+  total length, then program size, then the flags and inputs:
+  - one-transaction removals;
+  - shorter lengths: zero, then half the length;
+  - step reductions;
+  - simpler transactions: flags to their parity bit, then the input to its
+    low byte.
+- **Fixed corpus coverage:**
+  - returned lengths 0, 1, 31, 32, 33, 63 and 64;
+  - empty, partial-Word and whole-Word lengths, each with both outcomes;
+  - generated entries at both node budgets, 384 and 512;
+  - a returned value after an earlier committed transaction, and after a
+    revert whose writes it must not see;
+  - one to three helpers and one to three transactions;
+  - the six boundary inputs, and the step features, templates and completion
+    patterns of its steps.
+- **Golden cases** come before any random run:
+  - The steps add a constant, and the expected rows, the whole return data
+    and the slots, are written out as hexadecimal text. They cover the bank's
+    seven lengths, both outcomes, carries across transactions and wrapping
+    sums.
+  - A Lean model of the source, a slot map and std's copy-and-zero encoder
+    over the method's memory, must equal the Core contract on generated
+    cases.
+  - Runtime golden tests check the exact bytes of the convention for lengths
+    0, 1, 31, 32, 33 and 64, with nonzero bytes after the length, and its
+    revert and trap branches.
+- **Out of scope:** `bytes` returns beyond 64 bytes, strings, array returns,
+  lengths above 64 in a case, tuples with dynamic elements, gas, value, other
+  methods and malformed calldata.
+
 **Storage and Keccak loops through inline Yul.** `stateful-storage-loops`
 and `stateful-keccak-loops` lower `sload`, `sstore`, the mapping's hash and
 `log2` through Solcore's own path: std's one-statement wrapper functions,
@@ -4291,9 +4456,9 @@ on Yul. There was no finding. Hosted CI has not run the profiles.
 
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
-dynamic ABI-encoded return values, or callers beyond the three fixed senders,
-needs its own observation, rollback, deployment and reduction definitions
-first.
+`bytes` return values beyond 64 bytes and other dynamic return values, or
+callers beyond the three fixed senders, needs its own observation, rollback,
+deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
