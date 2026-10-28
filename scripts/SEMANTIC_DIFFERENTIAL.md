@@ -5810,6 +5810,32 @@ at 384 nodes and three at 512. Required coverage:
 The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
 as for the other storage-family profiles.
 
+### Results
+
+The matrices ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen.
+- **Fixed corpus:** matched all 21 scenarios and 60 prefixes with complete
+  coverage on Sonatina O0 and O2 and on Yul, O2 in 145 seconds and Yul in 268.
+  On O0 all twenty-six stateful corpora matched, 364 scenarios and 994
+  prefixes. The twenty-five others kept their 343 scenarios and 934 prefixes.
+- **Random suites:** root seed `20261035`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  Each matched 16 scenarios and 128 prefixes, in 140 to 152 seconds on
+  Sonatina and 195 and 251 on Yul:
+  - 59 and 56 transactions returned at the two budgets and 23 and 25 reverted
+    in the body; std rejected 46 and 47, with each of `0x4924aef0`,
+    `0x08638556` and empty revert data;
+  - every malformation kind came at 512 nodes and every kind but `padding` at
+    384, and std accepted 28 and 29 malformed transactions;
+  - every position and every field kind was decoded at both budgets, with 12
+    and 13 distinct `bytes` lengths;
+  - at 384 nodes, 2 of 18 attempts were excluded for a step budget too small
+    for the drawn template; at 512 none was;
+  - the cases were identical on the three backends at each budget, and the 14
+    seeds both budgets accepted drew the same shapes and transactions.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-one

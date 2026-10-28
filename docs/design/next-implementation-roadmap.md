@@ -5825,6 +5825,65 @@ The profile's definitions were fixed before execution:
   - more than two `bytes` constructors, and canonical `bytes` beyond 64 bytes;
   - value-bearing calls, calldata beyond one KiB, and other methods.
 
+**Results.** The checks before any random run:
+- The golden tests passed. Original Core, under the two comparison rules, and
+  the Lean model gave all 35 written-out rows of the five shapes and the five
+  raw-calldata rows of the order of std's checks, and a flipped expectation
+  failed.
+- Original Core equalled the Lean model on the cases test's generated
+  scenarios: 40 of eight transactions under G0 revision three at 384 nodes,
+  24 of three under revision one and 12 of four at 512.
+  - Every case and the reductions of eight cases replayed.
+  - Generation drew every constructor count, field kind, position and bank
+    length, all thirteen malformation kinds and all five outcomes, and the
+    node counts were those fixed above for every shape class.
+- The adapter's Python model recomputed the calldata and std's decision of
+  256 generated transactions, and its tests check std's decision for every
+  malformation kind and both comparison rules.
+- The corpus test replayed 21 scenarios and 60 transactions with every
+  original Core history equal to the model's, and refused tampered entries.
+- Unfrozen runs of the corpus matched 21 scenarios with complete coverage on
+  O0 and on Yul.
+- The gate passed on the final tree before `a785f293a`: the kernel check,
+  `lake build` (10,272 jobs), 35 native tools prepared offline, `lake test`,
+  781 Python tests, the sixteen `Tests/scripts` validators and the diff check.
+
+The matrices ran on `a785f293a` with 153 digests frozen: the 35 native tools,
+every script, solc, Anvil, and the Rust driver and code-image exporter. None
+changed during any run, and all 502 case results record that revision with no
+tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-six stateful corpora matched, 364 scenarios and 994
+    prefixes, in 2,473 seconds. The twenty-five earlier ones kept their 343
+    scenarios and 934 prefixes.
+  - The new corpus matched with complete coverage on O0, O2 and Yul: 21
+    scenarios and 60 prefixes, on O2 in 145 seconds and on Yul in 268.
+- **Random suites:** root seed `20261035` (derived seed
+  `15585258567353424381`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0, O2 and Yul. All six runs matched 16
+  scenarios and 128 prefixes, in 140 to 152 seconds on Sonatina and 195 and 251
+  on Yul:
+  - 59 and 56 transactions returned at the two budgets and 23 and 25 reverted
+    in the body. std rejected 46 and 47: 11 and 13 with `0x4924aef0`, 20 and
+    21 with `0x08638556`, and 15 and 13 with empty revert data;
+  - every malformation kind came at 512 nodes and every kind but `padding` at
+    384. std accepted 28 and 29 malformed transactions: retags, trailing
+    bytes, unread head Words, aliased bodies and a longer `bytes` length at
+    both budgets, and nonzero padding at 512;
+  - every position of two, three and four constructors and every field kind
+    in static and dynamic shapes was decoded at both budgets, with 12 and 13
+    distinct `bytes` lengths;
+  - 10 and 8 shapes were static and 6 and 8 dynamic; 2 and 4 had two `bytes`
+    constructors, and 7 and 6 the struct;
+  - at 384 nodes, 2 of 18 attempts were excluded for a step budget too small
+    for the drawn template; at 512 none was;
+  - the cases were identical on the three backends at each budget, and the 14
+    seeds both budgets accepted drew the same shapes and transactions, with
+    the step differing in 11.
+
+There was no finding: no mismatch and no upstream defect. Hosted CI has not
+run the profile.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 `bytes` return values beyond 64 bytes, returned enums and enum arguments
