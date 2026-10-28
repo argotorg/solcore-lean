@@ -4065,6 +4065,171 @@ not built:
 
   Either is a decision of its own, so it is reported here instead of built.
 
+**Storage and Keccak loops through inline Yul.** `stateful-storage-loops`
+and `stateful-keccak-loops` lower `sload`, `sstore`, the mapping's hash and
+`log2` through Solcore's own path: std's one-statement wrapper functions,
+called from source expressions. The inline Yul path, where the pure profiles
+found the Sonatina crash on constant shift counts that Solcore's lowering
+never reached, has no stateful case. Two new profiles render the same two
+plans with every storage read and write, the entry hash, the log and the
+completion in `assembly` blocks of the source:
+`stateful-assembly-storage-loops` and `stateful-assembly-keccak-loops`. One
+profile per plan keeps each profile's plan, Core reference, observation,
+protocol check and reductions exactly those of the profile it renders, plus a
+form; one profile for both would carry two plans, two observations and two
+reduction sets under one schema.
+
+The pinned front end types a Yul call only as a builtin or as a Yul function
+of the enclosing blocks (`hir-ty/src/infer/yul.rs`), so a block cannot call
+the Solcore step. The loop therefore stays a Solcore `while` loop, and each
+iteration runs its storage, hash and log work in Yul around one Solcore step
+call. A Yul `for` loop would need the aggregate step, with its pairs, sums and
+cells, rendered as Yul, which is a renderer of its own and outside this unit.
+
+A probe preceded them. It rendered five corpus plans by hand in the three
+forms below: the storage-loop plans `seven-counts`, whose step has cells, sums
+and conditionals, and `seven-wide`, with pairs, and the Keccak-loop plans
+`seven-shared`, `seven-pairs` and `seven-wide`, with key masks 0, 1 and 7. One
+storage and one Keccak source also kept the parent's `std.opcodes` import of
+the wrappers named like the builtins. Each source ran eight transactions with
+0, 1, 2, 3, 5, 6 and 7 iterations, reverts after three and five iterations,
+inputs `2^256 - 1` and `2^255 + 5`, and entries reused within and across
+transactions. The parent profile's native tool emitted each plan's case and
+observed its unchanged Core reference. The results:
+- The pinned compiler accepted `sload`, `sstore`, `mload`, `mstore`,
+  `keccak256`, `log2` and `revert` with `add`, `sub`, `and`, `or` and `gt` in
+  `assembly` blocks of a contract method, reading and assigning Solcore
+  locals, in Yul `let`s and under Yul `if`.
+- Imported Hull with O0 and O2 images and the EVM on O0, O2 and Yul matched the
+  Core reference on status, output, every observed slot and every log, with no
+  stray slot: 16 sources and 80 path runs.
+- Yul compiled to one creation/runtime pair. Its runtime uses `sload`,
+  `sstore`, `mload`, `mstore` and `revert`, and for Keccak loops `keccak256`
+  and `log2`, and reads no code.
+
+So neither Core, the shared runtime, the Hull importer, the declared-slot
+runner, a backend, `export-rust-yul.py` nor any proof changes. The definitions
+were fixed before execution:
+
+- **Contracts:** `SynthesizedAssemblyStorageLoops` and
+  `SynthesizedAssemblyKeccakLoops`, each with
+  `run(uint256 flags, uint256 input)`, selector `0x7357f5d2`. Each returns
+  one uint256, and every transaction is zero-value.
+- **Plans:** the parent profile's plan, unchanged, plus a form: a step, the
+  loop mask `M` and, for Keccak loops, the key mask `S`, each in
+  {0, 1, 3, 7}. The plan schemas `solcore-lean.assembly-storage-loop-plan.v1`
+  and `solcore-lean.assembly-keccak-loop-plan.v1` add `form` to the parent
+  plan's fields, under the parent's case keys `storageLoopPlan` and
+  `keccakLoopPlan`.
+- **Generation:** the parent profile's scenario of the seed by the same
+  steps: its masks, its step and its transactions. The form comes from a
+  SplitMix64 hash of the seed in its own domain and is recorded in the plan
+  and the generated origin. A registered Lean test requires each profile to
+  agree with its parent for the same seed, budget, G0 revision and
+  transaction count on plans, programs, transactions, observations,
+  generation records and exclusions.
+- **Original Core:** unchanged. The references are
+  `core-storage-loop-contract-v1` and `core-keccak-loop-contract-v1` under
+  `wordOutcomeV1`, with finite ordinal guards and no counter cell. Their
+  observations and history schemas are the parents'
+  (`solcore-lean.storage-loop-history.v1` and
+  `solcore-lean.keccak-loop-history.v1`).
+- **Rendering, in every form:**
+  - the step and its helpers render as in the parent profiles, as the
+    Solcore functions `sc_fn<k>` and `sc_step`; `std.opcodes` supplies only
+    the step's opcode aliases, so the method calls no std storage, hash, log,
+    memory or revert wrapper;
+  - `run` sets `sc_limit = (sc_input & M)` and, for Keccak loops,
+    `sc_base = (sc_input & ~7)` in Solcore, declares its other Word locals as
+    zero before the loop, and loops with `while (sc_limit > sc_counter)`;
+  - every storage access is a Yul `sload` or `sstore` in an `assembly`
+    block, which reads and assigns the Solcore locals;
+  - storage loops: iteration `i`'s slot is `add(sc_counter, 2)`, and its
+    step argument is
+    `add(add(add(add(sload(0), sload(1)), sload(sub(slot, 1))), sload(slot)), sc_input)`;
+  - Keccak loops: a block before the loop reserves 64 bytes with
+    `sc_ptr := mload(64)` and `mstore(64, add(sc_ptr, 64))`. Iteration `i`'s
+    key is `or(sc_base, and(sc_counter, S))`. Its entry slot is
+    `keccak256(sc_ptr, 64)` after `mstore(sc_ptr, 1)` and
+    `mstore(add(sc_ptr, 32), key)`, std's layout. Its step argument is
+    `add(add(sload(entry), sload(0)), sc_input)`, and its log is
+    `mstore(sc_ptr, value)` then `log2(sc_ptr, 32, sc_counter, key)`;
+  - the writes are `sstore(slot, value)` then `sstore(0, value)`, the
+    parents' order;
+  - one block after the loop completes:
+    - storage loops: `sstore(1, add(sload(1), sc_limit))`, then
+      `sc_result := add(sload(0), sload(1))`;
+    - Keccak loops: `sc_result := add(sload(0), sc_limit)`;
+    - then `if and(sc_flags, 1) { mstore(p, sc_result) revert(p, 32) }`, with
+      `p` zero for storage loops, as in the parent, and `sc_ptr` for Keccak
+      loops;
+
+    `run` returns `uint256(sc_result)`.
+- **Forms:**
+  - `split`: each iteration has a read block before
+    `sc_value = sc_step(sc_sum);` and a write block after it. The storage read
+    block computes the slot in a Yul `let`, and the Keccak read block assigns
+    the key to the Solcore `sc_key`. The write block computes the slot again,
+    hashing the key again for Keccak loops. The counter advances in Solcore.
+  - `carried`: the read block assigns the slot, or the entry slot, to the
+    Solcore `sc_slot`, which the write block uses after the step call. The
+    write block advances the counter with `sc_counter := add(sc_counter, 1)`.
+  - `pipelined`: a block before the loop computes iteration 0's slot and step
+    argument under `if gt(sc_limit, sc_counter)`. The loop body is the step
+    call and one block. That block writes and logs, advances the counter, and
+    then, under `if gt(sc_limit, sc_counter)`, computes the next iteration's
+    slot and step argument. A read that depends on the writes just made
+    follows them in the same block: storage slot `1 + (i + 1)` and slot 0,
+    and, for Keccak loops, an entry that the next key shares.
+- **Bounds and node budget:** the parents'. Masks are in {0, 1, 3, 7}, at
+  most seven iterations, and the suite's default is 384 nodes:
+  - storage loops: the 57-node shell lies inside the budget, the guards
+    outside it, and contracts are bounded by 827 nodes;
+  - Keccak loops: the 38-node shell lies inside the budget, the Keccak
+    closure and the guards outside it, and contracts are bounded by
+    512 + 2,654 + 483 nodes.
+- **Transactions:** the parents': `{id, flags, input, iterations, calldata,
+  value}`, one to eight, drawn in blocks of three, with `iterations` recorded,
+  checked on decode and recomputed on replay.
+- **Observations:** the parents':
+  - storage loops: slots 0 to 8;
+  - Keccak loops: slot 0 and the entry slot of every addressed key, derived
+    with the independent `Solcore.Abi.V1.Keccak256`, and every committed log
+    on all paths;
+  - whole storage on Hull and the EVM, with no nonzero undeclared slot.
+- **Protocol check** of each returned row: the parents' (the storage-loop
+  and Keccak-loop checks).
+- **Exclusions:** the parents', in their order, at the stages
+  `assembly-storage-loop-profile` and `assembly-keccak-loop-profile`.
+- **Reductions:** the parents', each in the parent case's form. A reduced
+  case keeps its form, and the strict order is the parent's.
+- **Fixed corpora** (`scripts/semantic-assembly-storage-loop-corpus.json`,
+  `scripts/semantic-assembly-keccak-loop-corpus.json`):
+  - every scenario of the parent's fixed corpus, with the same plan and
+    transactions, so the parent's requirements: masks, key masks, iteration
+    counts 0 to 7, carries, carried slots, inputs, step features, helper
+    counts, templates, transaction counts and completion patterns;
+  - the generated seeds stay generated, with their forms by hash, and the
+    imported entries take the forms in turn, in corpus order: `split`,
+    `carried`, then `pipelined`;
+  - in addition, each form runs the parent entries that give it iteration
+    counts 0, 1 and 7, every carry and a revert after loop writes:
+    `seven-carried` and `seven-counts` for storage loops, and `seven-wide`,
+    `seven-shared` and `seven-counts` for Keccak loops;
+  - coverage adds `Forms`, `FormIterations` (`form:count` for the counts 0,
+    1 and 7) and `FormCarries` (`form:carry` for every carry of the plan),
+    recorded for matched cases.
+- **Golden tests:**
+  - each form's emitted contract for one plan of each profile, written out
+    by hand, beside the parent profile's step functions;
+  - the parents' hand-written rows, reproduced through the new cases:
+    decoding a case and observing its Core reference gives the parent's rows
+    in every form;
+  - a changed expectation fails.
+- **Out of scope:** a Yul `for` loop or a Yul rendering of the step, Yul
+  `switch`, `break`, `continue` and Yul functions here (the pure assembly
+  profiles cover them), gas, value, other methods and malformed calldata.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 dynamic ABI-encoded return values, or callers beyond the three fixed senders,
