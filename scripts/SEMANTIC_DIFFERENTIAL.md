@@ -6522,6 +6522,14 @@ this section describes how to run them.
   export refusal or a resource limit excludes the paths that need it, with its
   stage and reason. A path mismatch, an unmet recorded expectation, a path
   failure or a compiler crash is a finding. A harness error fails the run.
+- **Hull memory range:** Hull memory fails, before changing memory or its
+  size, for a nonzero-length range that ends beyond `2^256 - 32`, with the
+  reason Word 6 (`Memory.overflowReason`). No EVM transaction can pay to
+  expand memory that far. So Lean Core's `language-failure` with that reason is
+  the Hull path's resource limit `memory-range` when every EVM path stopped at
+  a resource limit on the same entry. If any EVM path returned, reverted or
+  halted for another reason, it did not reach that access, and the failure
+  stays a path failure finding.
 
 ### Running and validation
 
@@ -6550,16 +6558,17 @@ resource limit on the Hull path.
 `report.json` has schema `solcore-lean.semantic-fixtures.v1`, states the
 comparison and `coreReference: false`, and records the environment, the
 digests of every script and binary at the start, whether they were unchanged
-at the end, each fixture's admitted paths, exclusions and findings, and the
-totals. `fixtures/<id>.json` keeps every step and mutant: one observation when
+at the end, each fixture's admitted paths, exclusions and findings, each
+path's count of every status, and the totals. `fixtures/<id>.json` keeps every
+step and mutant: one observation when
 the paths agree, every path's otherwise, and each path's expectation verdict
 for recorded steps. Each distinct finding carries its reduction. The command
 returns 1 for any finding, harness error or changed tool.
 
 `python3 scripts/test-semantic-fixtures.py` checks the inventory, the stream,
 the classification, the mutation operators and sampling, the observation
-normalization, the comparisons, the Lean result order, the reduction and the
-totals, without a compiler, runner or EVM.
+normalization, the memory-range rule, the comparisons, the Lean result order,
+the reduction and the totals, without a compiler, runner or EVM.
 
 ### Results
 
@@ -6575,17 +6584,20 @@ directive tools, solc, Anvil and cast frozen.
 - **Mutation run** (root seed `20261111`, 4,028 seconds): 4,308 mutants,
   including 18 deployments.
   - 4,161 agreed on every admitted path, and none disagreed.
-  - 147 hit a resource limit somewhere: Lean Core's time limit or fuel
-    against the EVM's gas or operand stack, and, in three loop fixtures, a
-    gas difference between the EVM backends.
-  - Lean Core reported `language-failure` for a length of `2^256 - 1` in
-    `concat` and `zeroize-memory-range`, where the EVM paths ran out of gas;
-    that is a path failure finding. The detail Word 6 is Hull memory's
-    explicit failure for a range that ends beyond the Word address space
-    (`Memory.overflowReason`), which the EVM reaches only by running out of
-    gas, so it is a resource boundary of the Hull model, not a semantic
-    difference; the harness does not classify it yet.
-- Both findings went to `questions.md` only. The roadmap records the first
+  - 147 hit a resource limit somewhere: Lean Core's time limit, fuel or
+    memory range against the EVM's gas or operand stack, and, in three loop
+    fixtures, a gas difference between the EVM backends.
+  - In four mutants of `concat` and `zeroize-memory-range`, Lean Core
+    reported `language-failure` with Word 6 for a length of `2^256 - 1`,
+    where every EVM path ran out of gas. That run reported them as path
+    failure findings. They are Hull memory's range limit above, a resource
+    boundary of the Hull model rather than a semantic difference.
+- **Memory-range rerun** (`a931b4c99`, root seed `20261111`, 33 seconds,
+  frozen): with the rule above, `concat` and `zeroize-memory-range` drew the
+  same 104 mutants and gave the same observations. The only change is that
+  those four Hull observations are now `memory-range`. Neither fixture has a
+  finding; 113 entries agreed and 19 were observed by no path.
+- The O2 crash went to `questions.md` only. The roadmap records the first
   mutation attempt, which gave each fixture one Lean invocation, and the
   per-entry limits that replaced it.
 

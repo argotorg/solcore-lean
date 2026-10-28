@@ -6284,7 +6284,8 @@ were fixed before execution:
   - the status: returned, reverted, exceptional (an EVM failure without a
     confirmed `REVERT`, Lean `invalid`), a resource limit (out of fuel, out of
     gas, time or output) or a path failure (any other Lean status, a code
-    mismatch, a refused submission);
+    mismatch, a refused submission). `a931b4c99` later added Hull memory's
+    range limit, described with the results;
   - the return or revert bytes, except a deployment's, whose code bytes are
     backend-specific; the Lean runner itself requires its deployed code to
     equal the O0 image;
@@ -6442,8 +6443,9 @@ each run.
   - 147 mutants in 18 fixtures hit a resource limit on at least one path:
     - 116 were observed by no path. Lean Core's 120-second limit (67) or its
       fuel (45) met the EVM's gas limit on loop and recursion bounds, lengths
-      and allocations of huge Words; the other four are the path failures
-      below.
+      and allocations of huge Words. In the other four, Hull memory's range
+      limit met the EVM's gas limit; the run reported them as the path
+      failures below.
     - 31 were incomplete; the paths that completed agreed. Lean Core timed out
       in each. In 10 deep recursions every EVM path halted at the operand
       stack limit (`Out of stack`). In 21, in three loop fixtures, the EVM
@@ -6451,17 +6453,36 @@ each run.
       gas where Yul ran out (17), or only O2 returned (4). Gas is out of
       scope.
 
-The findings:
+The run reported two findings; the first turned out to be a resource limit:
 - In `concat` (`empty_area`, two mutants) and `zeroize-memory-range`
   (`exactRange`, two), Lean Core reported `language-failure`
   (`Solcore.Core.Value.word 6`) for a length of `2^256 - 1`. Every EVM path ran
-  out of gas there, and other huge lengths ran Lean Core out of fuel.
-  - Each reduction kept no earlier step. Within 48 runs it found no smaller
-    failing length, and the failing lengths may lie near `2^256 - 1` itself.
-- Sonatina O2 crashed on `ignored-builtin-effects`, as in the probe.
+  out of gas there, and other huge lengths ran Lean Core out of fuel. Each
+  reduction kept no earlier step and found no smaller failing length within 48
+  runs.
+  - Word 6 is `Memory.overflowReason`: Hull memory's `touch` fails, before
+    changing memory or its size, for a nonzero-length range that ends beyond
+    `2^256 - 32`. No EVM transaction can pay the memory-expansion gas of such
+    a range, so every EVM path can only run out of gas at the same access.
+    This is a resource boundary of the Hull model, not a semantic difference
+    or an upstream defect.
+  - `a931b4c99` classifies such a failure as the Hull path's resource limit
+    `memory-range` when every EVM path stopped at a resource limit on the
+    same entry. If any EVM path returned, reverted or halted for another
+    reason, that path did not reach the access, so the failure stays a path
+    failure finding. Each fixture record and the totals now also count every
+    path's statuses.
+  - Rerun on `a931b4c99` with root seed `20261111` (33 seconds), with 103
+    digests frozen (the 35 native tools, the scripts and the external tools),
+    the two fixtures drew the same 104 mutants and gave the same
+    observations. The only change is that those four Hull observations are now
+    `memory-range`. There was no finding. 113 entries agreed, and 19 were
+    observed by no path: Hull's memory range (4) or fuel (15) against the
+    EVM's gas.
+- Sonatina O2 crashed on `ignored-builtin-effects`, as in the probe. It went
+  to `questions.md` without investigation.
 
-Both went to `questions.md` without investigation. No compiled path disagreed
-with another, on any recorded step or mutant. This is agreement among compiled
+No compiled path disagreed with another, on any recorded step or mutant. This is agreement among compiled
 paths and with upstream's recorded expectations; no original Core reference
 exists for these fixtures. Hosted CI has not run the harness, which needs the
 pinned tools and Anvil.
