@@ -4680,6 +4680,34 @@ coverage:
 The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
 as for the other storage-family profiles.
 
+### Results
+
+The matrices ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen.
+- **Fixed corpus:** matched all 12 scenarios and 32 prefixes with complete
+  coverage on Sonatina O0 and O2 and on Yul, O2 in 68 seconds and Yul in 119.
+  On O0 all nineteen stateful corpora matched, 242 scenarios and 664
+  prefixes. The eighteen others kept their 230 scenarios and 632 prefixes,
+  including both call profiles, whose children pass the one-Word admission.
+- **Random suites:** root seed `20261029`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  Each matched 16 scenarios and 128 prefixes, in 98 to 117 seconds on
+  Sonatina and 173 to 183 on Yul:
+  - arities 2, 3 and 4 came 4, 6 and 6 times;
+  - 92 transactions returned a tuple and 36 reverted;
+  - every scenario returned a tuple after an earlier committed transaction,
+    and 15 after a revert;
+  - no seed was excluded;
+  - both budgets drew the same arities and transactions, and a step differs
+    in 13 of the 16 cases.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
+A dynamic `bytes` return was probed and not built: every path returned the
+same canonical encoding, but original Core has no variable-length value. The
+[roadmap](../docs/design/next-implementation-roadmap.md) records the options.
+The pinned compiler rejects a `memory<DynArray<uint256>>` return.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The fourteen

@@ -3785,6 +3785,77 @@ The profile's definitions were fixed before execution:
   dynamic or nested elements, gas, value, other methods and malformed
   calldata.
 
+**Results.** The checks before any random run:
+- The runtime golden tests passed. They cover:
+  - the exact bytes of two-, three- and four-Word tuples, against
+    hexadecimal text, and the revert and trap branches;
+  - wrong annotations, arities and payloads, which do not decode;
+  - a word call to a registered tuple contract and a creation from a tuple
+    initializer, both unavailable;
+  - a tuple root, which returns its whole tuple through the nested executor.
+- The golden cases passed on both the Core contract and the source model; a
+  changed Word fails.
+- The model equalled the Core contract on 392 transactions of 64 generated
+  scenarios, and every case and reduction replayed.
+- The shells take 79, 85 and 91 nodes for arities 2, 3 and 4, so the default
+  budget leaves 305 to 293 nodes for the step.
+- The gate passed on `ad4c50bdb` alone and on `558f20425`: the full Lean build
+  and tests, the kernel check, 724 Python tests, every corpus check and the
+  diff check.
+
+The matrices ran on `558f20425` with 136 digests frozen: the files of
+`scripts/`, the 28 native tools, solc, Anvil, and the Rust driver and
+code-image exporter. None changed during any run, and all 362 case results
+record that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all nineteen stateful corpora matched, 242 scenarios and 664 prefixes,
+    in 1,827 seconds. The eighteen earlier ones kept their 230 scenarios and
+    632 prefixes. They include both call profiles, whose children now pass
+    the one-Word admission.
+  - The new corpus matched its 12 scenarios and 32 prefixes with complete
+    coverage on O0, O2 and Yul, O2 in 68 seconds and Yul in 119:
+    - arities 2, 3 and 4, each with both outcomes: 21 returned and 11
+      reverted transactions;
+    - both node budgets;
+    - a returned tuple after an earlier committed transaction in nine
+      scenarios, and after a revert in eight.
+- **Random suites:** root seed `20261029`, sixteen eight-transaction
+  scenarios with G0 revision three, at 384 and 512 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes:
+  - arities 2, 3 and 4 drawn 4, 6 and 6 times;
+  - 92 returned tuples, 22, 39 and 31 by arity, and 36 reverts, 10, 9 and
+    17;
+  - every scenario returned a tuple after an earlier committed transaction,
+    and 15 after a revert;
+  - 16 attempts and no exclusion;
+  - the two budgets draw the same arities and transactions, and the step
+    differs in 13 of the 16 cases.
+
+A random run took 98 to 117 seconds on Sonatina and 173 to 183 on Yul. There
+was no finding. Hosted CI has not run the profile.
+
+**Dynamic return values** were probed after the static profile matched, and
+not built:
+- The pinned compiler's ABI check accepts only `memory<string>` and
+  `memory<bytes>` as dynamic public types; it rejects a
+  `memory<DynArray<uint256>>` return (SC0231).
+- A `memory<bytes>` return of `input & 63` bytes ran identically on every
+  path: on Anvil, O0, O2 and Yul returned the canonical encoding (offset 32,
+  the length, the data zero-padded to whole Words), and imported Hull with O0
+  and O2 images gave the same bytes, reverts and slots.
+- Original Core has no variable-length value. A `bytes` result would need a
+  Core representation for variable-length data:
+  - a recursive data type of Words in `dataDefinitions`. The convention would
+    then have to pin the data definitions as well as the result type, which
+    `CheckedCoreContract` admission cannot express without another runtime
+    change;
+  - or a bounded sum with one variant per exact length up to a fixed bound.
+    It needs no new Core data, but its decoder must zero the padding bytes of
+    every typed value, as std's encoder does, and it takes 65 variants for 64
+    bytes.
+
+  Either is a decision of its own, so it is reported here instead of built.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 dynamic ABI-encoded return values, or callers beyond the three fixed senders,
