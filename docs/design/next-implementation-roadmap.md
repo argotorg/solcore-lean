@@ -1202,6 +1202,108 @@ Frozen matrices at `33d7c411d`:
   Sonatina O0 code-image export, in 203 and 261 seconds. The crash is
   retained as a finding.
 
+**Composed control flow.** Each earlier pure profile exercises one control
+construct in isolation. Two new profiles compose them, so that compiler
+lowering meets the constructs together:
+- `runtime-loop-closures`: a closure created in a bounded loop body, capturing
+  a loop-carried Word local and applied in the same iteration;
+- `runtime-recursive-loops`: a bounded loop inside every frame of the three
+  `runtime-recursion` forms.
+
+One profile per composition keeps each plan, reference and reduction set to
+those of the profile it extends, where one profile with a recorded composition
+kind would carry two unrelated plan shapes.
+
+Before any code, a probe compiled six sources with the pinned compiler and std
+and ran them on every path: checked Hull export, Sonatina O0 and O2 code
+images, Yul through `export-rust-yul.py` and the pinned solc, Anvil, and the
+Lean Hull runner. The sources were:
+- three loops whose body creates a closure: with `let`, capturing the
+  accumulator and changed before the call; reassigned to a variable declared
+  before the loop, capturing the counter and called through a generic
+  function; and applied twice in its iteration over a step with a helper;
+- tail, non-tail and mutual recursion with a while loop in every frame, its
+  trip count read from the frame's depth.
+
+All of them matched a model of the source at ten inputs on every path. Core,
+the Hull runner, both EVM backends and `export-rust-yul.py` need no change,
+and no shared runtime code or proof changes. The existing profiles, corpora,
+emitters and emitter proofs stay unchanged; the two emitters have no proof
+yet. The definitions were fixed before execution:
+
+- Step, for both: an aggregate step DAG of one to three helpers, generated
+  with the current G0 revision exactly as for `runtime-loops`, so every G0
+  feature renders and revision four equals revision three. The default budget
+  is 384 nodes, and the complete applied program is checked against the
+  512-node case limit.
+- `runtime-loop-closures` source. With input `x` and mask `m`, the wrapper
+  sets `acc = x` and runs `x & m` iterations with a counter `c` from zero, as
+  `runtime-loops` does. Every iteration creates a fresh closure with `let`,
+  in one of two captures fixed per plan:
+  - `accumulator`: `f(a) = step(acc + a)`; the body then sets `acc = acc + 1`
+    and `acc = f(c) + acc`, so the closure must hold the snapshot taken
+    before the change;
+  - `counter`: `f(a) = step(a) + c`; the body then increments `c` and sets
+    `acc = sc_apply(f, acc)` through the generic apply function of
+    `runtime-closures`, so the closure must hold the counter before its
+    increment.
+- `runtime-recursive-loops` source. With input `x`, depth mask `D` and inner
+  mask `I`, the wrapper calls the form's entry with depth `d = x & D` and
+  `acc = x`, as `runtime-recursion` does. Every frame with depth `e > 0` runs
+  a while loop of `e & I` iterations, with its trip count, counter and value
+  declared in the frame:
+  - `tail`: the loop applies the step to `acc`, then the frame calls depth
+    `e - 1` with the result;
+  - `nontail`: the frame first calls depth `e - 1`, then loops the step over
+    the result and adds `e`;
+  - `mutual`: `sc_even` loops the step before calling `sc_odd`, and `sc_odd`
+    loops `v = v + e` before calling `sc_even`.
+- Bounds. Loop closures admit masks 0, 1, 3 and 7 and generate with 1, 3 and
+  7: at most seven iterations, each creating and calling one closure. Recursive loops
+  admit masks 0, 1 and 3 for both and generate with 1 and 3: at most three
+  frames, three iterations in a frame and six in a call.
+- Core references, both finite, with no loop, recursion or counter cell:
+  - loop closures unroll literal ordinal guards over one accumulator cell, as
+    `runtime-loops`. Each run guard builds a Core lambda over an immutable
+    Word snapshot (the loaded accumulator or the ordinal itself) and applies
+    it, directly or through the Core instantiation of the generic apply
+    function at Word;
+  - recursive loops unroll the frames into ordinal guards, as
+    `runtime-recursion`. Each run frame binds its trip count and unrolls
+    inner ordinal guards, as `runtime-nested-loops`.
+- Shapes, from a SplitMix64 hash of the case seed so that consecutive seeds
+  vary in shape independently of the step: the six combinations of capture
+  and mask, and the twelve combinations of form, depth mask and inner mask.
+- Boundary inputs: 0, 1, 3, 7, `2^256 - 1` and `2^255` for loop closures
+  (zero to seven iterations), and 0, 1, 2, 3, `2^256 - 1` and `2^255` for
+  recursive loops (depths zero to three); random campaigns add the four
+  seeded inputs.
+- Exclusions, in order: a node budget too small for the shape or above 512,
+  the step's own generation exclusions, a step whose boundary inputs return
+  the same Word, and fuel exhaustion on a boundary input (an inconclusive
+  resource exclusion). Then:
+  - loop closures exclude a function whose positive-trip boundary inputs all
+    return themselves, as `runtime-loops`;
+  - recursive loops exclude a function that returns every boundary input
+    unchanged (`boundary-identity`), as `runtime-recursion`.
+
+  A zero-trip or depth-zero input returns itself, so these rules already ask
+  some changed input, and neither profile takes the identity filter.
+- Reductions: the aggregate step reductions, which keep the helper count and
+  binding inventory; a smaller admitted mask, removing whole canonical guards;
+  for recursive loops, the `tail` form in place of `nontail` or `mutual`; and
+  the input moved to a boundary input. Every reduction keeps the capture, and
+  every candidate is sealed by the full checker and strictly smaller in nodes,
+  then literal weight.
+- Specified iterations, from the plan and the input, never a measured trace:
+  `x & m` for loop closures, and for recursive loops the depth and the sum of
+  `e & I` over the frames.
+- Fixed corpus coverage, for each profile: every aggregate step AST feature
+  that the `runtime-loops` corpus requires, one to three helpers, all four
+  aggregate templates, all six boundary inputs and every generation shape.
+  Loop closures also need iteration counts 0, 1, 3 and 7; recursive loops
+  need depths 0 to 3 and total iterations 0, 1, 2, 3 and 6.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
