@@ -486,9 +486,11 @@ def parse_args(argv=None):
     parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512, or 4096 for enums")
     parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles, "
                                                       "and with --functions at least 16 per function, up to 10000")
+    # Hull fuel is only a bound: deploying the larger enum and struct storage
+    # contracts from Sonatina O0 images takes up to 15,000,000.
     defaults = {"seconds": 7200., "profile_seconds": 900., "disk_bytes": 1024**3,
                 "profile_disk_bytes": 256 * 1024**2, "output_limit": 8 * 1024**2, "cleanup_seconds": 10.,
-                "case_timeout": 90., "direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000,
+                "case_timeout": 90., "direct_fuel": 1000000, "core_fuel": 40000000, "gas": 10000000,
                 "shrink_attempts": 16, "shrink_candidates": 64}
     for key, default in defaults.items():
         parser.add_argument("--" + key.replace("_", "-"), type=float if isinstance(default, float) else int, default=default)

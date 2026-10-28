@@ -838,6 +838,8 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual({profile: command[command.index("--nodes") + 1] for profile, command in budgets.items()},
                          {"closed-g0": "48", "runtime-primitives": "192", "runtime-loops": "512",
                           "stateful-storage": "512", "stateful-calls": "512"})
+        # Every campaign gets the suite's Hull fuel bound, not its own default.
+        self.assertEqual({command[command.index("--core-fuel") + 1] for command in budgets.values()}, {"40000000"})
         self.assertEqual(suite.node_budget(self.args("--mode", "random"), "closed-g0"), 24)
         self.assertEqual(suite.node_budget(self.args("--mode", "random", "--nodes-scale", "1.5"), "runtime-word"), 48)
         self.assertEqual(suite.node_budget(self.args("--mode", "random", "--nodes-scale", "3", "--nodes", "100"), "closed-g0"), 100)
