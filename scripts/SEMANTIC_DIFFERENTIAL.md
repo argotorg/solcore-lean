@@ -4695,6 +4695,116 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare storage and Keccak loops through inline Yul
+
+`stateful-storage-loops` and `stateful-keccak-loops` reach `sload`, `sstore`,
+the mapping's hash and `log2` only through std's one-statement wrapper
+functions. Two profiles render the same plans with every storage access, the
+entry hash, the log and the completion in `assembly` blocks of the source:
+`stateful-assembly-storage-loops` and `stateful-assembly-keccak-loops`. Each
+keeps its parent profile's plan, Core reference, observation, protocol check
+and reductions, and adds a form. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions.
+
+### Definitions
+
+- **Contracts:** `SynthesizedAssemblyStorageLoops` and
+  `SynthesizedAssemblyKeccakLoops`, with the parents' method, selector and
+  fields.
+- **Why the loop stays in Solcore:** the pinned front end resolves a Yul call
+  only to a builtin or a Yul function of the enclosing blocks, so a block
+  cannot call the Solcore step. Each iteration's storage, hash and log work is
+  Yul around one Solcore call, `sc_value = sc_step(sc_sum);`.
+- **Blocks:**
+  - storage loops read slots `0`, `1`, `sub(slot, 1)` and
+    `slot = add(sc_counter, 2)` into the step argument, and write the result
+    to `slot` and then to slot 0;
+  - Keccak loops reserve a 64-byte buffer from the free-memory pointer, hash
+    `1 ++ key` with two `mstore`s and `keccak256(sc_ptr, 64)`, read the entry
+    and slot 0, write the entry and then slot 0, and log with
+    `mstore(sc_ptr, value)` and `log2(sc_ptr, 32, sc_counter, key)`;
+  - after the loop, one block completes and, for odd flags, reverts with
+    `mstore` and `revert`.
+- **Forms,** drawn by a SplitMix64 hash of the seed and recorded in the plan:
+  - `split`: a read block before the step call and a write block after it,
+    which computes the slot, and the hash, again; the counter advances in
+    Solcore;
+  - `carried`: the read block assigns the slot or the entry slot to the
+    Solcore `sc_slot`, which the write block uses after the call; the write
+    block advances the counter;
+  - `pipelined`: a block before the loop reads iteration 0, and each
+    iteration's one block writes, logs, advances the counter and reads the
+    next iteration under `if gt(sc_limit, sc_counter)`.
+- **Everything else is the parent profile's:** the masks, transactions, node
+  budget, original Core, observed slots, logs, whole storage, protocol check,
+  exclusions and reductions. A reduced case keeps its form.
+
+### Running and validation
+
+```sh
+lake build semanticAssemblyStorageLoopTool semanticAssemblyKeccakLoopTool \
+  rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-assembly-keccak-loop-corpus.json \
+  --output .upstream/semantic-assembly-keccak-loop-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random \
+  --profile stateful-assembly-storage-loops \
+  --profile stateful-assembly-keccak-loops \
+  --cases 16 --output .upstream/semantic-assembly-loop-random
+```
+
+Plans use `solcore-lean.assembly-storage-loop-plan.v1` under `storageLoopPlan`
+and `solcore-lean.assembly-keccak-loop-plan.v1` under `keccakLoopPlan`: the
+parent plan's fields and `form`. Cases use
+`solcore-lean.semantic-assembly-storage-loop-case.v1` and
+`solcore-lean.semantic-assembly-keccak-loop-case.v1`. Histories are the
+parents' `solcore-lean.storage-loop-history.v1` and
+`solcore-lean.keccak-loop-history.v1`, since the Core reference is unchanged,
+and the provenance records the parent profile's version as
+`loopProfileVersion`. A native shrink response carries at most 32 and 16
+candidates, as for the parents.
+
+Six Lean tests check the profiles:
+- `Solcore/Test/SourceAssemblyStorageLoopGolden.lean` and
+  `Solcore/Test/SourceAssemblyKeccakLoopGolden.lean` compare each form's
+  emitted contract with text written out by hand and require the parent's step
+  functions. They reproduce the parents' hand-written rows through cases of
+  every form, and a changed expectation fails.
+- `Solcore/Test/SourceAssemblyStorageLoopCases.lean` and
+  `Solcore/Test/SourceAssemblyKeccakLoopCases.lean` require generation to
+  agree with the parent profile for the same seeds, on 16 storage and 8
+  Keccak scenarios under G0 revisions three and one. They compare the
+  attempts, exclusions, plans, programs, transactions, observed slots and
+  origins. The form must be the seed's, and every form must be drawn. Every
+  case and the reductions of two cases replay in their form. An unknown form,
+  the parents' schemas and a form that the source was not emitted in are
+  refused.
+- `Solcore/Test/SourceAssemblyStorageLoopCorpus.lean` and
+  `Solcore/Test/SourceAssemblyKeccakLoopCorpus.lean` require each fixed corpus
+  to be exactly its construction from the parent corpus. Every entry must
+  replay, and every original Core history must equal the parent's expected
+  history.
+
+Each fixed corpus repeats every scenario of the parent's corpus with the same
+plan and transactions:
+- generated seeds stay generated, with their forms by hash;
+- the imported entries take `split`, `carried` and `pipelined` in turn, in
+  corpus order;
+- the entries that give a form iteration counts 0, 1 and 7, every carry and a
+  revert after loop writes also run in the other two forms: `seven-carried`
+  and `seven-counts` for storage loops, and `seven-wide`, `seven-shared` and
+  `seven-counts` for Keccak loops.
+
+That gives 16 scenarios and 43 transactions for storage loops, and 19
+scenarios, 49 transactions and 137 committed logs for Keccak loops. The
+required coverage is the parent corpus's, plus `Forms`, `FormIterations`
+(`form:count` for the counts 0, 1 and 7) and `FormCarries` (`form:carry` for
+every carry of the plan).
+
+The wrappers are storage-family wrappers, so `--backend yul --solc PATH` runs
+them as for the other storage-family profiles.
+
 ## Compare ABI-encoded tuple returns
 
 Every other stateful profile returns one Word. The `stateful-tuple-returns`

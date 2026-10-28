@@ -2191,6 +2191,12 @@ import Solcore.Test.SourceStorageLoopCorpus
 import Solcore.Test.SourceKeccakLoopGolden
 import Solcore.Test.SourceKeccakLoopCases
 import Solcore.Test.SourceKeccakLoopCorpus
+import Solcore.Test.SourceAssemblyStorageLoopGolden
+import Solcore.Test.SourceAssemblyStorageLoopCases
+import Solcore.Test.SourceAssemblyStorageLoopCorpus
+import Solcore.Test.SourceAssemblyKeccakLoopGolden
+import Solcore.Test.SourceAssemblyKeccakLoopCases
+import Solcore.Test.SourceAssemblyKeccakLoopCorpus
 import Solcore.Test.SourceTupleReturnGolden
 import Solcore.Test.SourceTupleReturnCases
 import Solcore.Test.SourceTupleReturnCorpus
@@ -4223,6 +4229,12 @@ def main : IO UInt32 := do
   Tests.SourceKeccakLoopGolden.testSourceKeccakLoopGolden
   Tests.SourceKeccakLoopCases.testSourceKeccakLoopCases
   Tests.SourceKeccakLoopCorpus.testSourceKeccakLoopCorpus
+  Tests.SourceAssemblyStorageLoopGolden.testSourceAssemblyStorageLoopGolden
+  Tests.SourceAssemblyStorageLoopCases.testSourceAssemblyStorageLoopCases
+  Tests.SourceAssemblyStorageLoopCorpus.testSourceAssemblyStorageLoopCorpus
+  Tests.SourceAssemblyKeccakLoopGolden.testSourceAssemblyKeccakLoopGolden
+  Tests.SourceAssemblyKeccakLoopCases.testSourceAssemblyKeccakLoopCases
+  Tests.SourceAssemblyKeccakLoopCorpus.testSourceAssemblyKeccakLoopCorpus
   Tests.SourceTupleReturnGolden.testSourceTupleReturnGolden
   Tests.SourceTupleReturnCases.testSourceTupleReturnCases
   Tests.SourceTupleReturnCorpus.testSourceTupleReturnCorpus

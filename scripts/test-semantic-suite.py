@@ -43,9 +43,9 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_forty_one_profiles_match_real_manifests_and_campaign_families(self):
+    def test_forty_three_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 41)
+        self.assertEqual(len(args.profile), 43)
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
@@ -54,6 +54,7 @@ class SuiteTests(unittest.TestCase):
                          "stateful-mapping", "stateful-ledger", "stateful-long-bytes", "stateful-nested-array",
                          "stateful-malformed-calldata", "stateful-malformed-nested-array", "stateful-malformed-bytes",
                          "stateful-methods", "stateful-storage-loops", "stateful-keccak-loops",
+                         "stateful-assembly-storage-loops", "stateful-assembly-keccak-loops",
                          "stateful-tuple-returns")), 881)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
@@ -170,7 +171,7 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 962, 41), ('sonatina-o2', 962, 41), ('yul', 920, 21)):
+        for backend, old_count, profile_count in (('sonatina-o0', 962, 43), ('sonatina-o2', 962, 43), ('yul', 920, 21)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
@@ -186,6 +187,8 @@ class SuiteTests(unittest.TestCase):
                      + suite.requested(args, 'stateful-methods')
                      + suite.requested(args, 'stateful-storage-loops')
                      + suite.requested(args, 'stateful-keccak-loops')
+                     + suite.requested(args, 'stateful-assembly-storage-loops')
+                     + suite.requested(args, 'stateful-assembly-keccak-loops')
                      + suite.requested(args, 'stateful-tuple-returns')
                      if backend != 'yul' else 0)
             self.assertEqual(sum(suite.requested(args, p) for p in args.profile),
@@ -463,7 +466,7 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 41)
+            self.assertEqual(len(sonatina.profile), 43)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -501,6 +504,26 @@ class SuiteTests(unittest.TestCase):
         # Its wrapper is a storage-family wrapper, so Yul runs it when selected.
         self.assertEqual(self.args("--backend", "yul", "--profile", "stateful-keccak-loops").profile, ["stateful-keccak-loops"])
 
+    def test_inline_yul_loop_profiles_are_declared_slot_storage_profiles_with_their_tools(self):
+        for profile, name, tool, scenarios in (
+                ("stateful-assembly-storage-loops", "semantic-assembly-storage-loop", "semantic-assembly-storage-loop-tool", 16),
+                ("stateful-assembly-keccak-loops", "semantic-assembly-keccak-loop", "semantic-assembly-keccak-loop-tool", 19)):
+            self.assertEqual(suite.PROFILES[profile], (name, "storage", 384))
+            self.assertIn(profile, suite.DECLARED_SLOT_PROFILES)
+            for mode in ("fixed", "random"):
+                args = self.args("--mode", mode, "--profile", profile)
+                command = suite.command(args, profile, self.directory / profile / mode, 30, 64 * 1024**2)
+                self.assertEqual(Path(command[1]).name, "semantic-storage-campaign.py")
+                self.assertEqual(Path(command[command.index("--case-tool") + 1]).name, tool)
+                self.assertEqual(Path(command[command.index("--core-runner") + 1]).name, "rust-hull-keyed-storage-scenario")
+                if mode == "fixed":
+                    self.assertEqual(command[command.index("--corpus") + 1], str(suite.manifest(profile)))
+                    self.assertEqual(suite.requested(args, profile), scenarios)
+                else:
+                    self.assertEqual(command[command.index("--nodes") + 1], "384")
+            # Their wrappers are storage-family wrappers, so Yul runs them when selected.
+            self.assertEqual(self.args("--backend", "yul", "--profile", profile).profile, [profile])
+
     def test_tuple_return_profile_is_a_declared_slot_storage_profile_with_its_tool(self):
         self.assertEqual(suite.PROFILES["stateful-tuple-returns"], ("semantic-tuple-return", "storage", 384))
         self.assertIn("stateful-tuple-returns", suite.DECLARED_SLOT_PROFILES)
@@ -536,7 +559,7 @@ class SuiteTests(unittest.TestCase):
 
     def test_yul_runs_the_selected_storage_family_profiles_with_its_compiler(self):
         storage = [profile for profile, (_, family, _) in suite.PROFILES.items() if family == 'storage']
-        self.assertEqual(len(storage), 18)
+        self.assertEqual(len(storage), 20)
         # The default Yul selection stays the pure profiles; storage-family profiles run when selected.
         self.assertTrue(set(storage).isdisjoint(self.args('--backend', 'yul').profile))
         arguments = [argument for profile in storage for argument in ('--profile', profile)]
@@ -593,7 +616,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 41)
+        self.assertEqual(len(set(seeds.values())), 43)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for profile, seed in seeds.items():
             self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)

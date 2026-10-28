@@ -35,22 +35,22 @@ private def ensure (condition : Bool) (message : String) : IO Unit :=
 private def w (value : Nat) : Word := Word.ofNatModulo value
 
 /-- The step `x ↦ x + c`: aggregate template 0 around the constant scalar. -/
-private def step (c : Nat) : IO Aggregates.CheckedDAG := do
+def step (c : Nat) : IO Aggregates.CheckedDAG := do
   let some dag := Aggregates.CheckedDAG.ofParts? [Solcore.Synthesis.Source.Aggregate.template 0 (.word (w c))]
       (.apply (.var 1) (.var 0)) | throw (IO.userError "constant step failed admission")
   return dag
 
 /-- The expected row: status, output Word, `acc`, every nonzero entry as a
 `(key, value)` pair and the committed logs as `(counter, key, value)`. -/
-private structure Expected where
+structure Expected where
   status : String
   output : Nat
   acc : Nat
   entries : List (Nat × Nat)
   logs : List (Nat × Nat × Nat)
 
-private def highKey : Nat := 2 ^ 255
-private def topKey : Nat := 2 ^ 256 - 8
+def highKey : Nat := 2 ^ 255
+def topKey : Nat := 2 ^ 256 - 8
 
 private def tx (index flags input : Nat) : Transaction := ⟨"tx-" ++ toString index, w flags, w input⟩
 
@@ -60,7 +60,7 @@ private def sevenEntries : List (Nat × Nat) := [(0, 12), (1, 20), (2, 28), (3, 
 iteration; one; seven, the first rereading entry 0; a revert after seven
 logged iterations; then three iterations on the high part's entries, whose
 sums wrap. -/
-private def sevenRows : List (Transaction × Expected) := [
+def sevenRows : List (Transaction × Expected) := [
   (tx 0 0 0, ⟨"returned", 0, 0, [], []⟩),
   -- 0 + 0 + 1 + 1 = 2 at key 0; result 2 + 1.
   (tx 1 0 1, ⟨"returned", 3, 2, [(0, 2)], [(0, 0, 2)]⟩),
@@ -82,7 +82,7 @@ private def sevenRows : List (Transaction × Expected) := [
 shares one entry. Three iterations on entry 0; one on entry 8, from the
 input's high part; a revert after two iterations on entry 0; one iteration
 rereading the entry the revert left; then seven. -/
-private def zeroRows : List (Transaction × Expected) := [
+def zeroRows : List (Transaction × Expected) := [
   -- 0 + 0 + 3 = 3, then 3 + 3 + 3 = 9 and 9 + 9 + 3 = 21; result 24.
   (tx 0 0 3, ⟨"returned", 24, 21, [(0, 21)], [(0, 0, 3), (1, 0, 9), (2, 0, 21)]⟩),
   -- 0 + 21 + 9 = 30 at key 8; result 31.
@@ -100,7 +100,7 @@ private def zeroRows : List (Transaction × Expected) := [
 Three iterations on entries 0, 1 and 0; three on the top input's entries,
 where `input + c` wraps to 1; a revert after one iteration; then two
 iterations rereading entries 0 and 1. -/
-private def oneRows : List (Transaction × Expected) := [
+def oneRows : List (Transaction × Expected) := [
   -- 0 + 0 + 5 = 5 at key 0, 0 + 5 + 5 = 10 at key 1, 5 + 10 + 5 = 20 at key 0.
   (tx 0 0 3, ⟨"returned", 23, 20, [(0, 20), (1, 10)], [(0, 0, 5), (1, 1, 10), (2, 0, 20)]⟩),
   -- 0 + 20 + 1 = 21 at key 2^256 - 8, 0 + 21 + 1 = 22 at the next, then
@@ -116,7 +116,7 @@ private def oneRows : List (Transaction × Expected) := [
 /-- Loop mask 7, key mask 3 and `c = 0`: iterations cycle four entries. Six
 iterations, the last two rereading entries 0 and 1; then a revert after five
 iterations, the fifth rewriting the entry of the first. -/
-private def threeRows : List (Transaction × Expected) := [
+def threeRows : List (Transaction × Expected) := [
   -- 6, 12, 18 and 24 at keys 0 to 3, then 6 + 24 + 6 = 36 at key 0 and
   -- 12 + 36 + 6 = 54 at key 1; result 60.
   (tx 0 0 6, ⟨"returned", 60, 54, [(0, 36), (1, 54), (2, 18), (3, 24)],
@@ -125,7 +125,7 @@ private def threeRows : List (Transaction × Expected) := [
   (tx 1 1 5, ⟨"reverted", 311, 54, [(0, 36), (1, 54), (2, 18), (3, 24)], []⟩)]
 
 /-- Loop mask 0 and `c = 5`: no iteration whatever the input. -/
-private def idleRows : List (Transaction × Expected) := [
+def idleRows : List (Transaction × Expected) := [
   (tx 0 0 7, ⟨"returned", 0, 0, [], []⟩),
   (tx 1 1 1, ⟨"reverted", 0, 0, [], []⟩)]
 
@@ -146,7 +146,7 @@ private def logsJson (expected : Expected) : Json :=
     ("address", toJson emitter), ("topics", toJson [toString counter, toString key]),
     ("data", toJson (wordText value))])
 
-private def check (name : String) (slots : List Word) (row : Json) (model : KeccakLoopExecution.ModelRow)
+def check (name : String) (slots : List Word) (row : Json) (model : KeccakLoopExecution.ModelRow)
     (expected : Expected) : IO Unit := do
   ensure ((row.getObjValAs? String "status").toOption == some expected.status &&
       (row.getObjValAs? String "output").toOption == some (wordText expected.output) &&
@@ -159,14 +159,18 @@ private def check (name : String) (slots : List Word) (row : Json) (model : Kecc
         ({ordinal := counter, key := w key, value := w value} : KeccakLoopExecution.ModelLog)))
     s!"{name}: the source-loop model differs from the expected row"
 
+/-- Each golden sequence's name, loop mask, key mask, step constant, rows and
+addressed keys. -/
+def goldenPlans : List (String × Nat × Nat × Nat × List (Transaction × Expected) × List Nat) := [
+  ("key mask 7", 7, 7, 1, sevenRows, (List.range 7) ++ [highKey, highKey + 1, highKey + 2]),
+  ("key mask 0", 7, 0, 0, zeroRows, [0, 8]),
+  ("key mask 1", 3, 1, 2, oneRows, [0, 1, topKey, topKey + 1]),
+  ("key mask 3", 7, 3, 0, threeRows, [0, 1, 2, 3]),
+  ("loop mask 0", 0, 3, 5, idleRows, [])]
+
 def testSourceKeccakLoopGolden : IO Unit := do
   let fuel := 1000000
-  for (name, mask, keyMask, constant, rows, addressed) in [
-      ("key mask 7", 7, 7, 1, sevenRows, (List.range 7) ++ [highKey, highKey + 1, highKey + 2]),
-      ("key mask 0", 7, 0, 0, zeroRows, [0, 8]),
-      ("key mask 1", 3, 1, 2, oneRows, [0, 1, topKey, topKey + 1]),
-      ("key mask 3", 7, 3, 0, threeRows, [0, 1, 2, 3]),
-      ("loop mask 0", 0, 3, 5, idleRows, [])] do
+  for (name, mask, keyMask, constant, rows, addressed) in goldenPlans do
     let step ← step constant
     let some plan := KeccakLoop.CheckedPlan.ofParts? step mask keyMask
       | throw (IO.userError s!"{name}: the Keccak-loop wrapper failed admission")

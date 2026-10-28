@@ -72,6 +72,8 @@ LOOP_CASE_SCHEMA = "solcore-lean.semantic-storage-loop-case.v1"
 LOOP_HISTORY_SCHEMA = "solcore-lean.storage-loop-history.v1"
 KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-keccak-loop-case.v1"
 KECCAK_LOOP_HISTORY_SCHEMA = "solcore-lean.keccak-loop-history.v1"
+ASSEMBLY_LOOP_CASE_SCHEMA = "solcore-lean.semantic-assembly-storage-loop-case.v1"
+ASSEMBLY_KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-assembly-keccak-loop-case.v1"
 TUPLE_CASE_SCHEMA = "solcore-lean.semantic-tuple-return-case.v1"
 TUPLE_HISTORY_SCHEMA = "solcore-lean.tuple-return-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
@@ -80,6 +82,7 @@ TUPLE_HISTORY_SCHEMA = "solcore-lean.tuple-return-history.v1"
 # the deployment receipt must carry no logs even when transactions' logs are not compared;
 # `senders`: each transaction names one of LEDGER_SENDERS, which sends it on every path.
 # `encoding`: the canonical calldata a malformed-calldata profile changes, `array` by default.
+# `forms`: the inline Yul forms a plan may record; the form changes only the source.
 _TWO_SLOT = {"planKey": "storagePlan", "keyed": False, "declared": False, "abi": "word",
     "signature": "run(uint256)", "selector": "0xa444f5e9",
     "historySchema": HISTORY_SCHEMA, "coreRunner": "rust-hull-storage-scenario",
@@ -223,6 +226,29 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KECCAK_LOOP_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "keccak-loops", "logs": True, "shrinkBatch": 16},
+    # The storage-loop plan with every storage access in inline Yul blocks around
+    # the Solcore step call, in the plan's form. Its Core reference, history and
+    # protocol are the storage-loop profile's.
+    "stateful-assembly-storage-loops": {"caseSchema": ASSEMBLY_LOOP_CASE_SCHEMA,
+        "planSchema": "solcore-lean.assembly-storage-loop-plan.v1", "planKey": "storageLoopPlan",
+        "corpusSchema": "solcore-lean.semantic-assembly-storage-loop-corpus.v1",
+        "originKind": "assembly-storage-loop-generated", "contract": "SynthesizedAssemblyStorageLoops",
+        "caseTool": "semantic-assembly-storage-loop-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": LOOP_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "loops", "forms": ("split", "carried", "pipelined"), "shrinkBatch": 32},
+    # The Keccak-loop plan with every storage access, entry hash and log in inline
+    # Yul blocks around the Solcore step call, in the plan's form. Its Core
+    # reference, history and protocol are the Keccak-loop profile's.
+    "stateful-assembly-keccak-loops": {"caseSchema": ASSEMBLY_KECCAK_LOOP_CASE_SCHEMA,
+        "planSchema": "solcore-lean.assembly-keccak-loop-plan.v1", "planKey": "keccakLoopPlan",
+        "corpusSchema": "solcore-lean.semantic-assembly-keccak-loop-corpus.v1",
+        "originKind": "assembly-keccak-loop-generated", "contract": "SynthesizedAssemblyKeccakLoops",
+        "caseTool": "semantic-assembly-keccak-loop-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KECCAK_LOOP_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "keccak-loops", "logs": True, "forms": ("split", "carried", "pipelined"),
+        "shrinkBatch": 16},
     # One method that returns a static tuple of two to four Words; every path's
     # whole return data is compared. A case reaches about 60 KB, so a native
     # shrink response carries at most 32 candidates.
@@ -1304,6 +1330,8 @@ def validate_case(case) -> None:
     if selected["abi"] == "keccak-loops" and any(type(plan.get(key)) is not int or plan[key] not in LOOP_MASKS
                                                  for key in ("mask", "keyMask")):
         raise ValueError("Keccak-loop plan requires a loop mask and a key mask of 0, 1, 3 or 7")
+    if selected.get("forms") and plan.get("form") not in selected["forms"]:
+        raise ValueError("inline Yul loop plan requires a form of split, carried or pipelined")
     if selected["abi"] == "tuples" and (type(plan.get("arity")) is not int or plan["arity"] not in TUPLE_ARITIES):
         raise ValueError("tuple-return plan requires an arity of 2, 3 or 4")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):

@@ -1985,6 +1985,67 @@ class KeccakLoopCampaignTests(unittest.TestCase):
             campaign.validate_manifest({**other, "framingVersion": manifest["framingVersion"]})
 
 
+class AssemblyLoopCampaignTests(unittest.TestCase):
+    def test_coverage_adds_the_form_and_its_iteration_counts_and_carries(self):
+        self.assertEqual(campaign.dimensions("stateful-assembly-storage-loops"),
+                         campaign.dimensions("stateful-storage-loops") + ("Forms", "FormIterations", "FormCarries"))
+        self.assertEqual(campaign.dimensions("stateful-assembly-keccak-loops"),
+                         campaign.dimensions("stateful-keccak-loops") + ("Forms", "FormIterations", "FormCarries"))
+        self.assertEqual(campaign.versions("stateful-assembly-keccak-loops"), campaign.LOG_VERSIONS)
+        self.assertEqual(campaign.versions("stateful-assembly-storage-loops"), campaign.VERSIONS)
+        value = fixtures.assembly_case(keccak_loop_case(), "pipelined")
+        statuses = ["returned", "reverted", "returned"]
+        self.assertEqual(campaign.forms_coverage(value, campaign.keccak_loops_coverage(value, statuses)),
+                         {"Forms": {"pipelined"}, "FormIterations": {"pipelined:7", "pipelined:3", "pipelined:2"},
+                          "FormCarries": {"pipelined:iteration", "pipelined:entry", "pipelined:rollback",
+                                          "pipelined:transaction"}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-assembly-keccak-loops"))
+            instance.summary["coverage"].update(requiredForms=["split", "pipelined"],
+                                                requiredFormIterations=["pipelined:0", "pipelined:7"],
+                                                requiredFormCarries=["pipelined:entry", "split:entry"])
+            instance.record_coverage(value, "matched", fixtures.keccak_loop_histories(value))
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedForms"], coverage["matchedFormIterations"], coverage["matchedMasks"]),
+                             (["pipelined"], ["pipelined:2", "pipelined:3", "pipelined:7"], [7]))
+            self.assertEqual((coverage["missingForms"], coverage["missingFormIterations"], coverage["missingFormCarries"]),
+                             (["split"], ["pipelined:0"], ["split:entry"]))
+        # A storage-loop case pairs its form with the storage-loop carries.
+        value = fixtures.assembly_case(loop_case(), "split")
+        self.assertEqual(campaign.forms_coverage(value, campaign.loops_coverage(value, ["returned", "reverted", "returned", "returned"])),
+                         {"Forms": {"split"}, "FormIterations": {"split:7", "split:6", "split:3", "split:0"},
+                          "FormCarries": {"split:iteration", "split:rollback"}})
+
+    def test_the_fixed_corpora_validate_and_their_form_requirements_are_checked(self):
+        for name, parent in (("assembly-storage-loop", "storage-loop"), ("assembly-keccak-loop", "keccak-loop")):
+            manifest = json.loads((ROOT / f"scripts/semantic-{name}-corpus.json").read_text())
+            original = json.loads((ROOT / f"scripts/semantic-{parent}-corpus.json").read_text())
+            self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-" + name + "s")
+            carries = original["requiredIterationCarries"]
+            self.assertEqual((manifest["requiredForms"], manifest["requiredFormIterations"], manifest["requiredFormCarries"]),
+                             (["split", "carried", "pipelined"],
+                              [f"{form}:{count}" for form in ("split", "carried", "pipelined") for count in (0, 1, 7)],
+                              [f"{form}:{carry}" for form in ("split", "carried", "pipelined") for carry in carries]))
+            for key, changed in (("requiredForms", ["blocks"]), ("requiredForms", []), ("requiredForms", ["split", "split"]),
+                                 ("requiredFormIterations", ["split:8"]), ("requiredFormIterations", ["blocks:0"]),
+                                 ("requiredFormCarries", ["split:other"]), ("requiredFormCarries", "split:iteration")):
+                with self.subTest(name=name, key=key, changed=changed), self.assertRaises(ValueError):
+                    campaign.validate_manifest({**manifest, key: changed})
+            for key in ("requiredForms", "requiredFormIterations", "requiredFormCarries"):
+                with self.subTest(name=name, key=key), self.assertRaises(ValueError):
+                    campaign.validate_manifest({name: value for name, value in manifest.items() if name != key})
+            # Form coverage belongs to the inline Yul loop profiles alone.
+            with self.assertRaisesRegex(ValueError, "form coverage belongs to the inline Yul loop profiles"):
+                campaign.validate_manifest({**original, "requiredForms": ["split", "carried", "pipelined"]})
+        keccak = json.loads((ROOT / "scripts/semantic-assembly-keccak-loop-corpus.json").read_text())
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**keccak, "requiredFormCarries": ["split:entry", "split:carried"]})
+        storage = json.loads((ROOT / "scripts/semantic-assembly-storage-loop-corpus.json").read_text())
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**storage, "requiredFormCarries": ["split:entry"]})
+
+
 def tuple_case(arity=4, rows=((0, 5), (1, 9), (2, 7)), origin=None):
     value = fixtures.tuple_case(arity, rows)
     value["tupleReturnPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]

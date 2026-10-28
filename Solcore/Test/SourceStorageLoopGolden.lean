@@ -33,13 +33,13 @@ private def ensure (condition : Bool) (message : String) : IO Unit :=
 private def w (value : Nat) : Word := Word.ofNatModulo value
 
 /-- The step `x ↦ x + c`: aggregate template 0 around the constant scalar. -/
-private def step (c : Nat) : IO Aggregates.CheckedDAG := do
+def step (c : Nat) : IO Aggregates.CheckedDAG := do
   let some dag := Aggregates.CheckedDAG.ofParts? [Solcore.Synthesis.Source.Aggregate.template 0 (.word (w c))]
       (.apply (.var 1) (.var 0)) | throw (IO.userError "constant step failed admission")
   return dag
 
 /-- The expected row: status, output Word and slots zero to eight. -/
-private structure Expected where
+structure Expected where
   status : String
   output : Nat
   values : List Nat
@@ -54,7 +54,7 @@ private def tx (index flags input : Nat) : Transaction := ⟨"tx-" ++ toString i
 
 /-- Mask 7 and `c = 1`. No iteration; one; seven over the carried slots; a
 revert after seven iterations, which keeps the prior slots; then three. -/
-private def sevenRows : List (Transaction × Expected) := [
+def sevenRows : List (Transaction × Expected) := [
   (tx 0 0 0, ⟨"returned", 0, []⟩),
   -- 0 + 0 + 0 + 0 + 1 + 1 = 2; slot one 1; result 3.
   (tx 1 0 1, ⟨"returned", 3, [2, 1, 2]⟩),
@@ -69,12 +69,12 @@ private def sevenRows : List (Transaction × Expected) := [
   (tx 4 2 3, ⟨"returned", 6192, [6181, 11, 1497, 3043, 6181, 175, 359, 727, 1463]⟩)]
 
 /-- Mask 0 and `c = 5`: no iteration whatever the input. -/
-private def zeroRows : List (Transaction × Expected) := [
+def zeroRows : List (Transaction × Expected) := [
   (tx 0 0 7, ⟨"returned", 0, []⟩),
   (tx 1 1 1, ⟨"reverted", 0, []⟩)]
 
 /-- Mask 1 and `c = 0`; the second sum wraps: 3 + 1 + 1 + 3 + (2^256 - 1) = 7. -/
-private def oneRows : List (Transaction × Expected) := [
+def oneRows : List (Transaction × Expected) := [
   (tx 0 0 3, ⟨"returned", 4, [3, 1, 3]⟩),
   (tx 1 0 (2 ^ 256 - 1), ⟨"returned", 9, [7, 2, 7]⟩),
   (tx 2 3 2, ⟨"reverted", 9, [7, 2, 7]⟩)]
@@ -83,12 +83,12 @@ private def oneRows : List (Transaction × Expected) := [
 iterations of an input with the high bit: with 2^255 + 5 added,
 24 + 2 + 2 + 8 gives 2^255 + 41, then 2^255 + 113 and 2^255 + 233, since
 twice 2^255 wraps to zero. -/
-private def threeRows : List (Transaction × Expected) := [
+def threeRows : List (Transaction × Expected) := [
   (tx 0 0 6, ⟨"returned", 26, [24, 2, 8, 24]⟩),
   (tx 1 0 (2 ^ 255 + 3), ⟨"returned", 2 ^ 255 + 238,
     [2 ^ 255 + 233, 5, 2 ^ 255 + 41, 2 ^ 255 + 113, 2 ^ 255 + 233]⟩)]
 
-private def check (name : String) (row : Json) (model : StorageLoopExecution.ModelRow) (expected : Expected) : IO Unit := do
+def check (name : String) (row : Json) (model : StorageLoopExecution.ModelRow) (expected : Expected) : IO Unit := do
   ensure ((row.getObjValAs? String "status").toOption == some expected.status &&
       (row.getObjValAs? String "output").toOption == some (wordText expected.output) &&
       (row.getObjVal? "committedStorage").toOption == some (slots expected.values))
@@ -97,10 +97,13 @@ private def check (name : String) (row : Json) (model : StorageLoopExecution.Mod
       model.slots == (List.range StorageLoop.slotCount).map (fun slot => w (expected.values.getD slot 0)))
     s!"{name}: the source-loop model differs from the expected row"
 
+/-- Each golden sequence's name, mask, step constant and rows. -/
+def goldenPlans : List (String × Nat × Nat × List (Transaction × Expected)) := [
+  ("mask 7", 7, 1, sevenRows), ("mask 0", 0, 5, zeroRows), ("mask 1", 1, 0, oneRows), ("mask 3", 3, 2, threeRows)]
+
 def testSourceStorageLoopGolden : IO Unit := do
   let fuel := 1000000
-  for (name, mask, constant, rows) in [("mask 7", 7, 1, sevenRows), ("mask 0", 0, 5, zeroRows),
-      ("mask 1", 1, 0, oneRows), ("mask 3", 3, 2, threeRows)] do
+  for (name, mask, constant, rows) in goldenPlans do
     let step ← step constant
     let some plan := StorageLoop.CheckedPlan.ofParts? step mask
       | throw (IO.userError s!"{name}: the storage-loop wrapper failed admission")

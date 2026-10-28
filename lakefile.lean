@@ -88,6 +88,14 @@ lean_exe semanticTupleReturnTool where
   root := `Tests.SemanticTupleReturnTool
   exeName := "semantic-tuple-return-tool"
 
+lean_exe semanticAssemblyStorageLoopTool where
+  root := `Tests.SemanticAssemblyStorageLoopTool
+  exeName := "semantic-assembly-storage-loop-tool"
+
+lean_exe semanticAssemblyKeccakLoopTool where
+  root := `Tests.SemanticAssemblyKeccakLoopTool
+  exeName := "semantic-assembly-keccak-loop-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

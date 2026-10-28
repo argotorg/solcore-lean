@@ -3597,6 +3597,68 @@ class KeccakLoopTests(unittest.TestCase):
         self.assertEqual(runner.compare(dropped, value)["stage"], "committed-log-history")
 
 
+def assembly_case(value, form="carried"):
+    """A loop fixture as its inline Yul profile's case: the same plan and
+    transactions with a form, under the inline Yul schemas and wrapper."""
+    value = copy.deepcopy(value)
+    keccak = value["schema"] == runner.KECCAK_LOOP_CASE_SCHEMA
+    key, kind = ("keccakLoopPlan", "Keccak") if keccak else ("storageLoopPlan", "Storage")
+    value["schema"] = runner.ASSEMBLY_KECCAK_LOOP_CASE_SCHEMA if keccak else runner.ASSEMBLY_LOOP_CASE_SCHEMA
+    value[key].update(schema=f"solcore-lean.assembly-{kind.lower()}-loop-plan.v1", form=form)
+    name = f"SynthesizedAssembly{kind}Loops"
+    value["contract"].update(name=name, deployPath=[name + "Deploy"], runtimePath=[name + "Deploy", name])
+    return value
+
+
+class AssemblyLoopTests(unittest.TestCase):
+    def test_inline_yul_loop_cases_take_their_parents_protocol_and_history(self):
+        for parent, histories in ((loop_case(), loop_histories), (keccak_loop_case(), keccak_loop_histories)):
+            for form in ("split", "carried", "pipelined"):
+                value = assembly_case(parent, form)
+                runner.validate_case(value)
+                selected, original = runner.profile(value), runner.profile(parent)
+                with self.subTest(schema=value["schema"], form=form):
+                    self.assertEqual(selected["forms"], ("split", "carried", "pipelined"))
+                    for field in ("planKey", "coreRunner", "scenarioSchema", "historySchema", "signature", "selector",
+                                  "rollback", "declared", "abi", "shrinkBatch"):
+                        self.assertEqual(selected[field], original[field])
+                    self.assertEqual(selected.get("logs"), original.get("logs"))
+                    self.assertNotEqual(selected["caseTool"], original["caseTool"])
+                    self.assertEqual(runner.observed_slots(value), runner.observed_slots(parent))
+                    self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                                     [runner.expected_status(parent, tx) for tx in parent["transactions"]])
+                    # The parent's rows match, and a protocol break on every path is a mismatch.
+                    self.assertEqual(runner.compare(histories(value), value)["category"], "matched")
+                    result = runner.compare(histories(value, copy_last=False), value)
+                    self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+                    self.assertTrue(all(result["pairs"].values()))
+
+    def test_an_inline_yul_loop_plan_requires_a_known_form_and_its_parents_slots(self):
+        for parent in (loop_case(), keccak_loop_case()):
+            key = "keccakLoopPlan" if "keccakLoopPlan" in parent else "storageLoopPlan"
+            for form in ("blocks", "for", "", None, 1):
+                invalid = assembly_case(parent)
+                invalid[key]["form"] = form
+                with self.subTest(key=key, form=form), self.assertRaises(ValueError):
+                    runner.validate_case(invalid)
+            invalid = assembly_case(parent)
+            del invalid[key]["form"]
+            with self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+            # The plan schema is the inline Yul profile's, not the parent's.
+            invalid = assembly_case(parent)
+            invalid[key]["schema"] = parent[key]["schema"]
+            with self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+            invalid = assembly_case(parent)
+            invalid["observedSlots"].pop()
+            with self.assertRaises(runner.Finding):
+                runner.validate_case(invalid)
+        # The parents' plans admit no form check of their own.
+        self.assertNotIn("forms", runner.profile(loop_case()))
+        self.assertNotIn("forms", runner.profile(keccak_loop_case()))
+
+
 def tuple_case(arity=4, rows=((0, 5), (1, 9), (2, 7))):
     """Envelope fixture only: native replay checks the actual tuple-return program."""
     transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value),

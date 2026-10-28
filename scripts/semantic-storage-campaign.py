@@ -98,6 +98,10 @@ LOOP_DIMENSIONS = DIMENSIONS + tuple(LOOP_EXTRA)
 KECCAK_LOOP_EXTRA = {"Masks": adapter.LOOP_MASKS, "KeyMasks": adapter.LOOP_MASKS, "IterationCounts": tuple(range(8)),
                      "IterationCarries": ("entry", "iteration", "rollback", "transaction")}
 KECCAK_LOOP_DIMENSIONS = DIMENSIONS + tuple(KECCAK_LOOP_EXTRA)
+# Inline Yul loops: the plan's form, and each form's iteration counts as
+# `form:count` and carries as `form:carry`, beside the dimensions of the loop
+# profile whose plan the form renders.
+FORM_EXTRA = ("Forms", "FormIterations", "FormCarries")
 # Tuple returns: plan arities, each arity's outcomes as `arity:status`, the
 # carries `committed` (a returned tuple's prior slots came from an earlier
 # committed transaction) and `rollback` (a returned tuple follows a revert whose
@@ -120,6 +124,8 @@ STRAY_SLOT = str(2**256 - 2)
 
 
 def dimensions(profile_name):
+    if adapter.PROFILES[profile_name].get("forms"):
+        return {"loops": LOOP_DIMENSIONS, "keccak-loops": KECCAK_LOOP_DIMENSIONS}[adapter.PROFILES[profile_name]["abi"]] + FORM_EXTRA
     if adapter.encoding(adapter.PROFILES[profile_name]) == "nested":
         return MALFORMED_NESTED_DIMENSIONS
     if adapter.encoding(adapter.PROFILES[profile_name]) == "bytes":
@@ -216,6 +222,22 @@ def keccak_loops_coverage(case, statuses):
     plan = case[adapter.profile(case)["planKey"]]
     return {"Masks": {plan["mask"]}, "KeyMasks": {plan["keyMask"]}, "IterationCounts": set(counts),
             "IterationCarries": carries}
+
+
+def form_values(selected):
+    """The values each form dimension admits: the profile's forms, and each
+    form paired with an iteration count or with a carry of its loop profile."""
+    carries = (LOOP_EXTRA if selected["abi"] == "loops" else KECCAK_LOOP_EXTRA)["IterationCarries"]
+    return {"Forms": selected["forms"],
+            "FormIterations": tuple(f"{form}:{count}" for form in selected["forms"] for count in range(8)),
+            "FormCarries": tuple(f"{form}:{carry}" for form in selected["forms"] for carry in carries)}
+
+
+def forms_coverage(case, values):
+    """The plan's form, paired with the case's iteration counts and carries."""
+    form = case[adapter.profile(case)["planKey"]]["form"]
+    return {"Forms": {form}, "FormIterations": {f"{form}:{count}" for count in values["IterationCounts"]},
+            "FormCarries": {f"{form}:{carry}" for carry in values["IterationCarries"]}}
 
 
 def tuples_coverage(case, statuses):
@@ -473,6 +495,13 @@ def validate_manifest(manifest):
         raise ValueError("tuple coverage belongs to the tuple-return profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
+    if selected.get("forms"):
+        for dimension, allowed in form_values(selected).items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"inline Yul loop coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in FORM_EXTRA):
+        raise ValueError("form coverage belongs to the inline Yul loop profiles")
     # The Keccak-loop profile records the log framing, but its log shapes follow
     # from the iteration counts, not from the log profile's static sites.
     if selected["abi"] == "keccak-loops":
@@ -854,6 +883,8 @@ class Campaign:
             values.update(keccak_loops_coverage(case, statuses))
         elif self.specification["abi"] == "tuples":
             values.update(tuples_coverage(case, statuses))
+        if self.specification.get("forms"):
+            values.update(forms_coverage(case, values))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -922,6 +953,8 @@ class Campaign:
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(
                               self.specification["abi"], ()):
+            self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
+        for dimension in FORM_EXTRA if self.specification.get("forms") else ():
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.checkpoint()
         exclusions = []

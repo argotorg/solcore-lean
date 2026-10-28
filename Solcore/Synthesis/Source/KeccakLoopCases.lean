@@ -308,7 +308,7 @@ structure Reduction (source : CheckedScenario) where private mk ::
   stableIds : (candidate.transactions.map (·.id)).Sublist (source.transactions.map (·.id))
   strict : StrictlySmaller candidate source
 
-private def sealReduction (source : CheckedScenario) (step : Aggregates.CheckedDAG) (mask keyMask : Nat)
+def sealReduction (source : CheckedScenario) (step : Aggregates.CheckedDAG) (mask keyMask : Nat)
     (transactions : List Transaction) : Option (Reduction source) := do
   let plan ← CheckedPlan.ofParts? step mask keyMask
   let candidate ← (checkedScenario plan transactions).toOption

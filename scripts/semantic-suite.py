@@ -85,6 +85,9 @@ PROFILES = {
     # The Keccak-loop shell takes 38 nodes of 384; the Keccak closure and the
     # guards lie outside the budget.
     "stateful-keccak-loops": ("semantic-keccak-loop", "storage", 384),
+    # The inline Yul forms of the two loop plans keep their parents' budgets.
+    "stateful-assembly-storage-loops": ("semantic-assembly-storage-loop", "storage", 384),
+    "stateful-assembly-keccak-loops": ("semantic-assembly-keccak-loop", "storage", 384),
     # The tuple-return shell takes 79, 85 or 91 nodes of 384, by arity.
     "stateful-tuple-returns": ("semantic-tuple-return", "storage", 384),
 }
@@ -92,6 +95,7 @@ PROFILES = {
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping",
                           "stateful-long-bytes", "stateful-nested-array", "stateful-malformed-calldata",
                           "stateful-malformed-nested-array", "stateful-malformed-bytes", "stateful-methods",
+                          "stateful-assembly-storage-loops", "stateful-assembly-keccak-loops",
                           "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns")
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
@@ -188,6 +192,8 @@ def command(args, profile, output, seconds, disk_bytes):
                      "stateful-methods": args.methods_case_tool,
                      "stateful-storage-loops": args.storage_loop_case_tool,
                      "stateful-keccak-loops": args.keccak_loop_case_tool,
+                     "stateful-assembly-storage-loops": args.assembly_storage_loop_case_tool,
+                     "stateful-assembly-keccak-loops": args.assembly_keccak_loop_case_tool,
                      "stateful-tuple-returns": args.tuple_return_case_tool}
     forwarded = profile == "stateful-forwarded-value"
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
@@ -487,6 +493,8 @@ def parse_args(argv=None):
                 "methods_case_tool": "semantic-methods-tool",
                 "storage_loop_case_tool": "semantic-storage-loop-tool",
                 "keccak_loop_case_tool": "semantic-keccak-loop-tool",
+                "assembly_storage_loop_case_tool": "semantic-assembly-storage-loop-tool",
+                "assembly_keccak_loop_case_tool": "semantic-assembly-keccak-loop-tool",
                 "tuple_return_case_tool": "semantic-tuple-return-tool"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
