@@ -12,18 +12,27 @@ from the recorded calls and compares those across the paths only.
 No original Core reference exists for these programs. Agreement here is
 agreement among compiled paths and with upstream's recorded expectations; it is
 never a comparison with original Core.
+
+Optional budgets bound a run for the fuzz driver: mutants per fixture, wall
+time per fixture and per run. An entry reached after a deadline or a stop
+signal is not run and has the status `budget`, which is neither a resource
+limit nor a finding.
 """
 from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import contextlib
+import fcntl
 import fnmatch
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -74,6 +83,11 @@ RESOURCE = ("out-of-fuel", "out-of-gas", "resource-limit", "timeout", "output-li
 # Solcore.Frontend.RustHull.Memory.overflowReason as the Lean runner prints a language failure's reason.
 MEMORY_RANGE = "Solcore.Core.Value.word 6"
 COMPARED = ("status", "output", "logs", "storage", "balances")
+# Entries a path did not run: the deployment failed there, or a time budget or stop signal came first.
+UNRUN = ("not-executed", "budget")
+BUDGET = {"status": "budget", "detail": "a time budget or stop signal ended the run before this entry"}
+VERDICTS = ("match", "mismatch", "inconclusive", "not-executed", "budget")
+STOP = threading.Event()
 U256 = 2**256
 MASK64 = 2**64 - 1
 MUTANTS_PER_STEP = 4
@@ -93,6 +107,15 @@ EXPORTERS = ("export-rust-hull.py", "export-rust-code-image.py", "export-rust-yu
              "rust-directive-export.rs", "rust-directive-resolve.rs")
 BINARIES = ("debug/solcore-driver", "debug/solcore-code-image-export", "debug/solcore-directive-export",
             "debug/solcore-directive-resolve")
+
+
+def stopped(deadline: float | None) -> bool:
+    """Whether a stop signal arrived or the deadline passed."""
+    return STOP.is_set() or (deadline is not None and time.monotonic() >= deadline)
+
+
+def unrun(count: int) -> list[dict]:
+    return [dict(BUDGET) for _ in range(count)]
 
 
 class Excluded(Exception):
@@ -440,8 +463,10 @@ def step_classes(step: dict, abi: list[dict]) -> tuple[dict | None, str]:
 
 # Processes, exports and the fixture inventory.
 
-def run_process(command: list[str], timeout: float, limit: int = OUTPUT_LIMIT, cwd: Path = ROOT) -> dict:
-    """Bound one command's time and captured output, stopping its owned process group."""
+def run_process(command: list[str], timeout: float, limit: int = OUTPUT_LIMIT, cwd: Path = ROOT,
+                deadline: float | None = None) -> dict:
+    """Bound one command's time and captured output, stopping its owned process group; with a
+    deadline, a stop signal or the deadline stops it as `budget`."""
     started = time.monotonic()
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
@@ -449,6 +474,9 @@ def run_process(command: list[str], timeout: float, limit: int = OUTPUT_LIMIT, c
         reason = None
         try:
             while process.poll() is None:
+                if deadline is not None and stopped(deadline):
+                    reason = "budget"
+                    break
                 if time.monotonic() - started >= timeout:
                     reason = "timeout"
                     break
@@ -686,7 +714,7 @@ def hull_observation(row: dict, chain: dict) -> dict:
 
 
 def hull_invocation(args, fixture: dict, exports: dict, chain: dict, deploy: dict, calls: list[dict],
-                    timeout: float) -> tuple[list[dict], str | None, int]:
+                    timeout: float, deadline: float | None = None) -> tuple[list[dict], str | None, int]:
     """The deployment and `calls` on Lean Core from one runner invocation: an observation of each,
     a blocked status for each the runner did not report, its resource limit and the reported count."""
     objects = json.loads(exports["O0"]["hull"].read_text())["program"]["objects"]
@@ -710,7 +738,7 @@ def hull_invocation(args, fixture: dict, exports: dict, chain: dict, deploy: dic
     with tempfile.TemporaryDirectory(prefix="solcore-fixture-hull-") as temporary:
         path = Path(temporary) / "scenario.json"
         path.write_text(json.dumps(config))
-        outcome = run_process([str(args.hull_runner), str(path)], timeout, HULL_OUTPUT_LIMIT)
+        outcome = run_process([str(args.hull_runner), str(path)], timeout, HULL_OUTPUT_LIMIT, deadline=deadline)
     count = 1 + len(calls)
     lines = outcome["stdout"].split("\n")
     if outcome["resource"]:
@@ -739,16 +767,18 @@ def hull_invocation(args, fixture: dict, exports: dict, chain: dict, deploy: dic
     return observations, outcome["resource"], reported
 
 
-def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entries: list[dict]) -> list[dict]:
+def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entries: list[dict],
+             deadline: float | None = None) -> list[dict]:
     """The deployment and every entry on Lean Core, each entry within a time limit.
 
     Lean Core has no gas, so a mutant can run for long before its fuel runs out. Method entries other than
     sends keep no state, so after the deployment alone each runs in its own invocation after the sends
     before it, within --hull-entry-timeout. A raw scenario's entries run in one invocation within
     --hull-timeout; after a limit it resumes past the reported entries, replaying the persisting steps
-    before them, and an entry that stalls when run alone is reported with that limit."""
+    before them, and an entry that stalls when run alone is reported with that limit. Entries reached
+    after the deadline or a stop signal are not run."""
     def invoke(calls: list[dict], timeout: float):
-        return hull_invocation(args, fixture, exports, chain, deploy, calls, timeout)
+        return hull_invocation(args, fixture, exports, chain, deploy, calls, timeout, deadline)
 
     def persisted(before: int) -> list[dict]:
         """The earlier entries whose changes persist: those that persist and returned."""
@@ -760,32 +790,48 @@ def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entr
     # The runner buffers its rows, so a stopped invocation may not report even the deployment;
     # then the deployment runs alone.
     deployment, result = None, []
+    if stopped(deadline):
+        return unrun(1 + len(entries))
     if not entries or fixture["mode"] == "methods":
         deployment = invoke([], args.hull_timeout)[0][0]
+        if deployment["status"] == "budget":
+            return unrun(1 + len(entries))
         if deployment["status"] != "returned":
             return unexecuted()
         for index, entry in enumerate(entries):
+            if stopped(deadline):
+                result += unrun(len(entries) - index)
+                break
             observed, _, _ = invoke(persisted(index) + [entry], args.hull_entry_timeout)
             result.append(observed[-1])
         return [deployment] + result
     start = 0
     while start < len(entries):
+        if stopped(deadline):
+            return [deployment or dict(BUDGET)] + result + unrun(len(entries) - start)
         prefix = persisted(start)
         observed, resource, reported = invoke(prefix + entries[start:], args.hull_timeout)
         if deployment is None:
             deployment = observed[0] if reported else invoke([], args.hull_timeout)[0][0]
+        if deployment["status"] == "budget":
+            return unrun(1 + len(entries))
         if deployment["status"] != "returned":
             return unexecuted()
         tail, done = observed[1 + len(prefix):], max(0, reported - 1 - len(prefix))
         if not resource:
             return [deployment] + result + tail
+        if resource == "budget":
+            return [deployment] + result + tail[:done] + unrun(len(entries) - start - done)
         if done:
             result, start = result + tail[:done], start + done
             continue
         # No row of this attempt arrived: the first entry stalled, or its row was still buffered.
         alone, resource, reported = invoke(prefix + [entries[start]], args.hull_timeout)
-        result.append(alone[-1] if not resource or reported == 2 + len(prefix) else {
-            "status": resource, "detail": "the entry did not complete when run alone"})
+        if not resource or reported == 2 + len(prefix):
+            result.append(alone[-1])
+        else:
+            result.append(dict(BUDGET) if resource == "budget" else {
+                "status": resource, "detail": "the entry did not complete when run alone"})
         start += 1
     return [deployment] + result
 
@@ -864,8 +910,12 @@ def evm_status(receipt: dict, call: dict) -> str:
     return "resource-limit" if common.RESOURCE.search(error) else "exceptional"
 
 
-def run_evm(evm: Chain, path: str, init: bytes, runtime: bytes, deploy: dict, entries: list[dict]) -> list[dict]:
-    """The deployment and every entry on one backend; non-persisting entries are rolled back."""
+def run_evm(evm: Chain, path: str, init: bytes, runtime: bytes, deploy: dict, entries: list[dict],
+            deadline: float | None = None) -> list[dict]:
+    """The deployment and every entry on one backend; non-persisting entries are rolled back, and
+    entries reached after the deadline or a stop signal are not run."""
+    if stopped(deadline):
+        return unrun(1 + len(entries))
     evm.reset()
     chain, touched = evm.chain, {}
 
@@ -920,6 +970,9 @@ def run_evm(evm: Chain, path: str, init: bytes, runtime: bytes, deploy: dict, en
         if observations[0]["status"] != "returned":
             observations.append({"status": "not-executed", "detail": "the deployment did not complete"})
             continue
+        if stopped(deadline):
+            observations.append(dict(BUDGET))
+            continue
         saved = {account: set(slots) for account, slots in touched.items()}
         snapshot = None if entry["persist"] else evm.rpc("evm_snapshot", [])
         observation = observe({"from": entry["caller"], "to": chain["address"], "data": entry["calldata"],
@@ -967,7 +1020,7 @@ def agreement(observations: dict[str, dict], deploy: bool) -> dict:
     fields = [key for key in COMPARED if len({json.dumps(value.get(key), sort_keys=True) for value in compared.values()}) > 1]
     inconclusive = sorted(path for path, observation in observations.items() if observation.get("status") in RESOURCE)
     failed = sorted(path for path, observation in observations.items()
-                    if observation.get("status") not in COMPLETED + RESOURCE + ("not-executed",))
+                    if observation.get("status") not in COMPLETED + RESOURCE + UNRUN)
     if len(groups) > 1:
         status = "disagree"
     elif inconclusive or failed or len(compared) < len(observations):
@@ -982,8 +1035,8 @@ def expectation(step: dict, observation: dict | None, raw: bool) -> str:
     """Upstream's own check of one recorded step: exact bytes unless any payload is allowed."""
     if observation is None or observation.get("status") in RESOURCE:
         return "inconclusive"
-    if observation.get("status") == "not-executed":
-        return "not-executed"
+    if observation.get("status") in UNRUN:
+        return observation["status"]
     expected, status = step["expected"], observation.get("status")
     if expected["status"] == "returned":
         matched = status == "returned"
@@ -1005,7 +1058,7 @@ def signature(kind: str, entry: dict, observations: dict[str, dict], raw: bool, 
         return [kind, path, observation.get("status")] if "mutant" not in entry and \
             expectation(entry, observation, raw) == "mismatch" else None
     status = observation.get("status")
-    return [kind, path, status] if status not in COMPLETED + RESOURCE + ("not-executed",) else None
+    return [kind, path, status] if status not in COMPLETED + RESOURCE + UNRUN else None
 
 
 def toward(recorded: int, mutated: int, attempt, spent) -> int:
@@ -1057,9 +1110,11 @@ def entry_findings(fixture: dict, entry: dict, observations: dict[str, dict]) ->
 class FixtureRun:
     """One fixture: exports, the recorded steps and mutants on every admitted path."""
 
-    def __init__(self, args, fixture: dict, identity: dict, builds: dict):
+    def __init__(self, args, fixture: dict, identity: dict, builds: dict, deadline: float | None = None):
         self.args, self.fixture, self.identity, self.builds = args, fixture, identity, builds
         self.raw = fixture["mode"] == "raw"
+        # The run's deadline; entries observe the fixture's own, which is never later.
+        self.run_deadline = self.deadline = deadline
         self.record = {"schema": FIXTURE_SCHEMA, "id": fixture["id"], "mode": fixture["mode"],
                        "contract": fixture["contract"], "source": fixture["source"], "sha256": fixture["sha256"],
                        "exclusions": [], "findings": [], "admitted": [], "statuses": {}}
@@ -1071,16 +1126,34 @@ class FixtureRun:
             self.record["findings"].append({"fixture": self.fixture["id"], "category": "compiler-crash",
                                             "paths": list(error.paths), "stage": error.stage, "detail": error.detail})
 
+    def unexecuted(self) -> dict:
+        """A fixture that the run's time budget or a stop signal left unstarted."""
+        return {**self.record, "unexecuted": True, "stop": "signal" if STOP.is_set() else "run time budget"}
+
+    @contextlib.contextmanager
+    def locked(self):
+        """Hold this fixture's export lock, so that a concurrent run never rewrites exports in use."""
+        self.args.work.mkdir(parents=True, exist_ok=True)
+        with (self.args.work / (self.fixture["id"] + ".lock")).open("a") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            yield
+
     def run(self) -> dict:
         started = time.monotonic()
+        if self.args.fixture_seconds is not None:
+            self.deadline = min(started + self.args.fixture_seconds, math.inf if self.run_deadline is None else self.run_deadline)
         try:
-            self.execute()
+            with self.locked():
+                self.execute()
         except Excluded as error:
             self.exclude(error)
         except (ValueError, KeyError, OSError, subprocess.SubprocessError, common.RpcError, urllib.error.URLError) as error:
             # A harness failure is neither an exclusion nor a finding; it fails the run.
             self.record["errors"] = [f"{type(error).__name__}: {error}"]
         self.record["seconds"] = round(time.monotonic() - started, 3)
+        if any("budget" in seen for seen in self.record["statuses"].values()):
+            self.record["stop"] = "signal" if STOP.is_set() else "run time budget" if stopped(self.run_deadline) \
+                else "fixture time budget"
         return self.record
 
     def execute(self) -> None:
@@ -1129,7 +1202,9 @@ class FixtureRun:
                 self.record["anvil"] = self.evm.version
                 self.evm.close()
 
-    def draw_mutants(self) -> dict[int, list[dict]]:
+    def draw_mutants(self) -> dict[int, list[tuple[int, dict]]]:
+        """Each step's mutants with their draw numbers; over --fixture-mutants, a seeded uniform sample
+        of that many keeps draw order and numbers."""
         drawn, sources = {}, {}
         for step in self.steps:
             if step["kind"] == "deploy" and step["calldata"] == "0x" and step["value"] == 0:
@@ -1137,29 +1212,41 @@ class FixtureRun:
             stream = Stream(derive(self.args.seed, self.fixture["id"], step["index"]))
             classes, origin = step_classes(step, self.abi)
             sources[str(step["index"])] = origin
-            drawn[step["index"]] = sample(candidates(step, classes, stream), stream, self.args.mutants)
+            drawn[step["index"]] = list(enumerate(sample(candidates(step, classes, stream), stream, self.args.mutants), 1))
         self.record["classification"] = sources
+        limit, order = self.args.fixture_mutants, [(index, number) for index, items in drawn.items() for number, _ in items]
+        if limit is not None:
+            self.record["mutantBudget"] = {"limit": limit, "drawn": len(order), "kept": min(limit, len(order))}
+            if len(order) > limit:
+                stream = Stream(derive(self.args.seed, self.fixture["id"], "mutant-budget"))
+                for position in range(limit):
+                    other = position + stream.below(len(order) - position)
+                    order[position], order[other] = order[other], order[position]
+                kept = set(order[:limit])
+                drawn = {index: [item for item in items if (index, item[0]) in kept] for index, items in drawn.items()}
         return drawn
 
-    def entries(self, steps: list[dict], mutants: dict[int, list[dict]]) -> list[dict]:
+    def entries(self, steps: list[dict], mutants: dict[int, list[tuple[int, dict]]]) -> list[dict]:
         result = []
         for step in steps:
-            for number, mutant in enumerate(mutants.get(step["index"], []), 1):
+            for number, mutant in mutants.get(step["index"], []):
                 result.append({**apply(step, mutant), "id": f"{step['index']}.{number}", "step": step["index"],
                                "persist": False, "mutant": mutant})
             result.append({**step, "id": str(step["index"]), "step": step["index"]})
         return result
 
     def observe(self, deploy: dict, entries: list[dict]) -> dict[str, list[dict]]:
-        """Run a deployment and its entries on every admitted path; a Hull memory-range failure is
-        classified against the EVM paths' observations of the same entry."""
+        """Run a deployment and its entries on every admitted path, the EVM paths before Hull, so that a time
+        budget spent on Hull leaves them compared; a Hull memory-range failure is classified against the
+        EVM paths' observations of the same entry."""
         observed = {}
-        for path in self.admitted:
+        for path in sorted(self.admitted, key=lambda path: path == "hull"):
             if path == "hull":
-                observed[path] = run_hull(self.args, self.fixture, self.prepared, self.chain, deploy, entries)
+                observed[path] = run_hull(self.args, self.fixture, self.prepared, self.chain, deploy, entries,
+                                          self.deadline)
             else:
                 init, runtime = self.bytecode[path]
-                observed[path] = run_evm(self.evm, path, init, runtime, deploy, entries)
+                observed[path] = run_evm(self.evm, path, init, runtime, deploy, entries, self.deadline)
         for number in range(1 + len(entries)):
             classified = memory_range({path: rows[number] for path, rows in observed.items()})
             for path, rows in observed.items():
@@ -1168,7 +1255,7 @@ class FixtureRun:
 
     def compare(self, entries: list[dict], observed: dict[str, list[dict]]) -> None:
         rows, counts = [], {"agree": 0, "disagree": 0, "incomplete": 0, "unobserved": 0}
-        expectations = {path: {"match": 0, "mismatch": 0, "inconclusive": 0, "not-executed": 0} for path in self.admitted}
+        expectations = {path: dict.fromkeys(VERDICTS, 0) for path in self.admitted}
         deploy = {**self.steps[0], "id": "0", "step": 0}
         for number, entry in enumerate([deploy] + entries):
             observations = {path: observed[path][number] for path in self.admitted}
@@ -1201,7 +1288,7 @@ class FixtureRun:
     def deploy_mutants(self) -> None:
         """Each mutant of a deployment with constructor bytes or value is its own fresh deployment."""
         rows = []
-        for number, mutant in enumerate(self.mutants.get(0, []), 1):
+        for number, mutant in self.mutants.get(0, []):
             entry = {**apply(self.steps[0], mutant), "id": f"0.{number}", "step": 0, "mutant": mutant}
             observed = self.observe(entry, [])
             observations = {path: observed[path][0] for path in self.admitted}
@@ -1217,13 +1304,18 @@ class FixtureRun:
         self.record["entries"] += rows
 
     def reduce_findings(self) -> None:
+        """Reduce each distinct finding within the run's deadline, not the fixture's own."""
         reduced: dict[str, str] = {}
+        self.deadline = self.run_deadline
         for finding in self.record["findings"]:
             if "signature" not in finding:
                 continue
             key = json.dumps(finding["signature"])
             if key in reduced:
                 finding["reduction"] = {"status": "duplicate", "of": reduced[key]}
+                continue
+            if stopped(self.run_deadline):
+                finding["reduction"] = {"status": "stopped", "detail": BUDGET["detail"]}
                 continue
             reduced[key] = finding["entry"]
             try:
@@ -1253,12 +1345,13 @@ class FixtureRun:
             return signature(finding["category"], entry, observations, self.raw, finding.get("path")) == finding["signature"]
 
         def spent() -> bool:
-            return runs >= self.args.reduction_runs or time.monotonic() - started >= self.args.reduction_seconds
+            return runs >= self.args.reduction_runs or time.monotonic() - started >= self.args.reduction_seconds or \
+                stopped(self.run_deadline)
 
         prefix = [{**item, "id": str(item["index"]), "step": item["index"]} for item in self.steps[1:finding["step"]]
                   if item["persist"]] if target["kind"] != "deploy" else []
         if not holds(prefix, target):
-            return {"status": "not-reproduced", "runs": runs}
+            return {"status": "stopped" if stopped(self.run_deadline) else "not-reproduced", "runs": runs}
         for item in reversed(list(prefix)):
             if spent():
                 break
@@ -1281,7 +1374,8 @@ class FixtureRun:
 
             toward(int(mutant["recorded"], 16) if words else 0, int(mutant["value"], 16) if words else mutant["bytes"],
                    attempt, spent)
-        return {"status": "budget-exhausted" if spent() else "reduced", "runs": runs,
+        return {"status": "stopped" if stopped(self.run_deadline) else "budget-exhausted" if spent() else "reduced",
+                "runs": runs,
                 "seconds": round(time.monotonic() - started, 3), "steps": [item["index"] for item in prefix],
                 "calldata": target["calldata"], "value": target["value"], "mutant": mutant}
 
@@ -1298,9 +1392,13 @@ def check_tools(args) -> dict:
 def summarize(records: list[dict]) -> dict:
     totals = {"fixtures": len(records), "admitted": {path: 0 for path in PATHS}, "agree": 0, "disagree": 0,
               "incomplete": 0, "unobserved": 0, "recorded": 0, "mutants": 0, "findings": {}, "exclusions": {},
-              "statuses": {}}
-    expectations = {path: {"match": 0, "mismatch": 0, "inconclusive": 0, "not-executed": 0} for path in PATHS}
+              "statuses": {}, "unexecuted": 0, "budgetStopped": 0}
+    expectations = {path: dict.fromkeys(VERDICTS, 0) for path in PATHS}
     for record in records:
+        if record.get("unexecuted"):
+            totals["unexecuted"] += 1
+        elif record.get("stop"):
+            totals["budgetStopped"] += 1
         for path in record.get("admitted") or []:
             totals["admitted"][path] += 1
         for key in ("agree", "disagree", "incomplete", "unobserved", "recorded", "mutants"):
@@ -1323,11 +1421,14 @@ def summarize(records: list[dict]) -> dict:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, help="fresh directory for the report; required unless --list")
+    parser.add_argument("--output", type=Path, help="fresh directory for the report; required unless --list or --check")
     parser.add_argument("--mode", choices=("fixed", "mutation"), default="fixed")
     parser.add_argument("--seed", type=int, help="root seed of a mutation run")
     parser.add_argument("--mutants", type=int, default=MUTANTS_PER_STEP, help="mutants drawn per recorded step")
     parser.add_argument("--fixture", action="append", default=[], help="fixture id glob; repeatable")
+    parser.add_argument("--fixture-mutants", type=int, help="at most this many mutants per fixture, a seeded sample of those drawn")
+    parser.add_argument("--fixture-seconds", type=float, help="wall time per fixture; entries reached later are not run")
+    parser.add_argument("--seconds", type=float, help="wall time of the run; later fixtures do not start and later entries do not run")
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--work", type=Path, default=ROOT / ".upstream/semantic-fixtures")
     parser.add_argument("--reuse-exports", action="store_true", help="reuse exports made by the same tools")
@@ -1346,7 +1447,9 @@ def main(argv=None) -> int:
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--cast", type=Path, default=Path(shutil.which("cast") or "cast"))
     parser.add_argument("--list", action="store_true", help="print the pinned inventory and exit")
+    parser.add_argument("--check", action="store_true", help="check the tools a run reads, print their identity and exit")
     args = parser.parse_args(argv)
+    run_deadline = None if args.seconds is None else time.monotonic() + args.seconds
     if args.mode == "mutation" and args.seed is None:
         parser.error("a mutation run requires --seed")
     if args.mode == "fixed" and args.seed is not None:
@@ -1354,8 +1457,12 @@ def main(argv=None) -> int:
     if not 1 <= args.mutants <= 64 or not 1 <= args.jobs <= 16 or args.reduction_runs < 1 or \
             min(args.timeout, args.hull_timeout, args.hull_entry_timeout, args.reduction_seconds) <= 0:
         parser.error("invalid mutation, job, time or reduction bounds")
-    if args.output is None and not args.list:
-        parser.error("--output is required unless --list is given")
+    if args.fixture_mutants is not None and (args.mode != "mutation" or args.fixture_mutants < 1):
+        parser.error("--fixture-mutants needs a mutation run and a positive budget")
+    if any(value is not None and value <= 0 for value in (args.fixture_seconds, args.seconds)):
+        parser.error("time budgets must be positive")
+    if args.output is None and not (args.list or args.check):
+        parser.error("--output is required unless --list or --check is given")
     for key in ("output", "work", "upstream", "target_dir", "hull_runner", "solc", "anvil", "cast"):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
@@ -1365,6 +1472,12 @@ def main(argv=None) -> int:
     if args.list:
         for item in fixtures:
             print(item["id"], item["mode"], item["contract"], item["calls"])
+        return 0
+    if args.check:
+        builds = check_tools(args)
+        print(json.dumps({"schema": SCHEMA + "/check", "status": "ready", "tools": tool_identity(args), "builds": builds,
+                          "manifests": {name: common.file_digest(ROOT / "scripts" / name) for name, _ in MANIFESTS},
+                          "fixtures": [item["id"] for item in fixtures]}, sort_keys=True))
         return 0
     require(not args.output.exists() or not any(args.output.iterdir()), "the output directory must be fresh")
     require(args.work.is_relative_to((ROOT / ".upstream").resolve()), "the export cache must stay inside .upstream")
@@ -1380,26 +1493,37 @@ def main(argv=None) -> int:
               "mutantsPerStep": args.mutants if args.mode == "mutation" else 0,
               "bounds": {"exportSeconds": args.timeout, "hullSeconds": args.hull_timeout,
                          "hullEntrySeconds": args.hull_entry_timeout, "reductionRuns": args.reduction_runs,
-                         "reductionSeconds": args.reduction_seconds},
+                         "reductionSeconds": args.reduction_seconds, "fixtureMutants": args.fixture_mutants,
+                         "fixtureSeconds": args.fixture_seconds, "runSeconds": args.seconds},
               "selection": args.fixture, "tools": identity, "builds": builds, "started": time.time()}
     lock = threading.Lock()
     records = []
 
     def one(fixture: dict) -> dict:
-        record = FixtureRun(args, fixture, identity, builds).run()
+        run = FixtureRun(args, fixture, identity, builds, run_deadline)
+        record = run.unexecuted() if stopped(run_deadline) else run.run()
         with lock:
             (args.output / "fixtures" / (fixture["id"] + ".json")).write_text(json.dumps(record, indent=1) + "\n")
             counts = record.get("counts", {})
             print(f"{fixture['id']}: admitted {','.join(record['admitted']) or '-'}; agree {counts.get('agree', 0)}, "
                   f"disagree {counts.get('disagree', 0)}, incomplete {counts.get('incomplete', 0)}; "
-                  f"findings {len(record['findings'])}; {record['seconds']} s", flush=True)
+                  f"findings {len(record['findings'])}; {record.get('seconds', 0)} s"
+                  + (f"; stopped by the {record['stop']}" if record.get("stop") else ""), flush=True)
         return {key: record.get(key) for key in ("id", "mode", "contract", "admitted", "exclusions", "findings", "counts",
                                                  "expectations", "statuses", "errors", "seconds", "exportSeconds",
-                                                 "exportsReused")}
+                                                 "exportsReused", "mutantBudget", "stop", "unexecuted")}
 
-    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        records = list(pool.map(one, fixtures))
+    # A stop signal ends the run at the next entry and still writes the report.
+    STOP.clear()
+    previous = signal.signal(signal.SIGTERM, lambda *_: STOP.set())
+    try:
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            records = list(pool.map(one, fixtures))
+    finally:
+        signal.signal(signal.SIGTERM, previous)
     report["finished"] = time.time()
+    report["stop"] = "signal" if STOP.is_set() else \
+        "run time budget" if any(record.get("stop") == "run time budget" for record in records) else None
     report["toolsUnchanged"] = tool_identity(args) == identity
     report["fixtures"] = records
     report["exclusions"] = [{"fixture": record["id"], **item} for record in records for item in record["exclusions"]]
@@ -1410,7 +1534,10 @@ def main(argv=None) -> int:
     totals = report["totals"]
     print(f"{totals['fixtures']} fixtures; admitted {totals['admitted']}; {totals['agree']} agree, "
           f"{totals['disagree']} disagree, {totals['incomplete']} incomplete; findings {totals['findings']}; "
-          f"harness errors {len(report['errors'])}; tools unchanged: {report['toolsUnchanged']}")
+          f"harness errors {len(report['errors'])}; budget-stopped {totals['budgetStopped']}, "
+          f"unexecuted {totals['unexecuted']}; tools unchanged: {report['toolsUnchanged']}")
+    if STOP.is_set():
+        return 130
     return 0 if report["toolsUnchanged"] and not report["findings"] and not report["errors"] else 1
 
 

@@ -6522,6 +6522,13 @@ this section describes how to run them.
   export refusal or a resource limit excludes the paths that need it, with its
   stage and reason. A path mismatch, an unmet recorded expectation, a path
   failure or a compiler crash is a finding. A harness error fails the run.
+- **Budgets** (optional, for the fuzz driver): at most `--fixture-mutants`
+  mutants per fixture, a seeded sample that keeps draw order and numbers;
+  `--fixture-seconds` per fixture and `--seconds` per run. An entry that a
+  path reaches after a deadline or a stop signal has the status `budget`, and
+  a fixture not started before the run's deadline is unexecuted. Neither is a
+  resource limit or a finding. The EVM paths run before Hull, so a budget
+  spent on Hull leaves them compared.
 - **Hull memory range:** Hull memory fails, before changing memory or its
   size, for a nonzero-length range that ends beyond `2^256 - 32`, with the
   reason Word 6 (`Memory.overflowReason`). No EVM transaction can pay to
@@ -6540,12 +6547,21 @@ python3 scripts/semantic-fixtures.py --mode mutation --seed 20261111 \
 python3 scripts/semantic-fixtures.py --list --fixture 'abi-*'
 ```
 
-The pinned tools must be prepared: the checked Hull driver, the code-image
-tool, the directive extractor and resolver (`RUST_PARITY.md`), the native
-tools (`prepare-semantic-tools.py`), solc 0.8.35, Anvil and cast. Exports go
-to `.upstream/semantic-fixtures/<fixture>`. `--reuse-exports` reuses them only
+The pinned tools must be prepared: `prepare-semantic-tools.py --prepare`
+builds the checked Hull driver, the code-image tool, the directive extractor
+and resolver and the native tools offline. solc 0.8.35, Anvil and cast are
+installed separately. `--check` verifies the tool receipts and solc, then
+prints the identity of everything a run reads, for the fuzz driver's
+readiness and epoch. Exports go to `.upstream/semantic-fixtures/<fixture>`,
+locked per fixture while a run uses them. `--reuse-exports` reuses them only
 when every exporter script, compiler binary, solc and source digest equals the
 one that made them.
+
+```sh
+python3 scripts/semantic-fixtures.py --check
+python3 scripts/semantic-fixtures.py --mode mutation --seed 7 --fixture 'loop-*' \
+  --output .upstream/fixtures-budget --fixture-mutants 32 --fixture-seconds 300 --seconds 1800
+```
 
 Lean Core meters fuel, not gas, so a mutant can run long before its fuel runs
 out. A method fixture's deployment runs alone, then each entry in its own Lean
@@ -6559,16 +6575,20 @@ resource limit on the Hull path.
 comparison and `coreReference: false`, and records the environment, the
 digests of every script and binary at the start, whether they were unchanged
 at the end, each fixture's admitted paths, exclusions and findings, each
-path's count of every status, and the totals. `fixtures/<id>.json` keeps every
+path's count of every status, any mutant budget and budget stop, and the
+totals. A stop signal ends the run at the next entry and still writes the
+report, with exit status 130. `fixtures/<id>.json` keeps every
 step and mutant: one observation when
 the paths agree, every path's otherwise, and each path's expectation verdict
 for recorded steps. Each distinct finding carries its reduction. The command
 returns 1 for any finding, harness error or changed tool.
 
 `python3 scripts/test-semantic-fixtures.py` checks the inventory, the stream,
-the classification, the mutation operators and sampling, the observation
-normalization, the memory-range rule, the comparisons, the Lean result order,
-the reduction and the totals, without a compiler, runner or EVM.
+the classification, the mutation operators and sampling, the mutant budget,
+the observation normalization, the memory-range rule, the `budget` status, the
+comparisons, the Lean result order and its deadlines, the reduction, the export
+lock, the run budget, a stop signal, `--check` and the totals, without a
+compiler, runner or EVM.
 
 ### Results
 

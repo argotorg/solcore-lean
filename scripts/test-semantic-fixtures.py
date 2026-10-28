@@ -9,6 +9,8 @@ from pathlib import Path
 import stat
 import sys
 import tempfile
+import threading
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -144,6 +146,28 @@ class MutationTests(unittest.TestCase):
         typed = step(kind="call", calldata="0x" + (selector("h(address,bytes)") + word(5)).hex())
         self.assertNotIn("value", [item["operator"] for item in fixtures.candidates(typed, None, fixtures.Stream(1))["frame"]])
 
+    def test_a_mutant_budget_keeps_a_seeded_sample_with_draw_order_and_numbers(self):
+        def draw(limit):
+            run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+            run.args = SimpleNamespace(seed=11, mutants=4, fixture_mutants=limit)
+            run.fixture, run.abi, run.record = {"id": "f"}, [], {}
+            run.steps = [step(kind="deploy", index=0)] + [step(index=index, calldata="0x" + (selector("k(uint256)") + word(index)).hex())
+                                                        for index in (1, 2, 3)]
+            return run.draw_mutants(), run.record
+        everything, record = draw(None)
+        self.assertNotIn("mutantBudget", record)
+        self.assertEqual([[number for number, _ in everything[index]] for index in (1, 2, 3)], [[1, 2, 3, 4]] * 3)
+        kept, record = draw(5)
+        self.assertEqual(record["mutantBudget"], {"limit": 5, "drawn": 12, "kept": 5})
+        self.assertEqual(sum(len(items) for items in kept.values()), 5)
+        for index, items in kept.items():
+            self.assertEqual(items, [item for item in everything[index] if item in items])
+        self.assertEqual(draw(5)[0], kept)
+        self.assertEqual(draw(12)[0], everything)
+        run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+        ids = [entry["id"] for entry in run.entries([step(index=1)], {1: [(2, {"operator": "value", "value": 1})]})]
+        self.assertEqual(ids, ["1.2", "1"])
+
     def test_each_mutant_changes_one_word_the_length_or_the_value_and_keeps_the_selector(self):
         head = selector("k(uint256)")
         recorded = step(calldata="0x" + (head + word(7)).hex(), value=3)
@@ -250,15 +274,33 @@ class ObservationTests(unittest.TestCase):
                              {"hull": failure}, dict(limited, yul={"status": "not-executed", "detail": "no deployment"})):
             self.assertEqual(fixtures.memory_range(observations), observations)
 
+    def test_an_entry_left_unrun_by_a_budget_is_neither_a_failure_nor_a_resource_limit(self):
+        same = {path: observation() for path in fixtures.PATHS}
+        budget = dict(same, hull=dict(fixtures.BUDGET))
+        result = fixtures.agreement(budget, False)
+        self.assertEqual((result["status"], result["failed"], result["inconclusive"]), ("incomplete", [], []))
+        entry = {**step(expected={"status": "returned", "output": "0x"}), "id": "1", "step": 1}
+        self.assertEqual(fixtures.entry_findings({"id": "f", "mode": "raw"}, entry, budget), [])
+        self.assertEqual(fixtures.expectation(entry, fixtures.BUDGET, True), "budget")
+        failure = {"status": "language-failure", "detail": fixtures.MEMORY_RANGE}
+        unrun = {"hull": failure, **{path: dict(fixtures.BUDGET) for path in fixtures.EVM_PATHS}}
+        self.assertEqual(fixtures.memory_range(unrun), unrun)
+        late = time.monotonic() - 1
+        self.assertEqual(fixtures.run_evm(None, "yul", b"", b"", step(kind="deploy", index=0), [step()], late),
+                         [fixtures.BUDGET] * 2)
+
     def test_observing_classifies_each_entry_against_the_evm_paths_of_that_entry(self):
         run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
-        run.args, run.fixture, run.prepared, run.chain, run.evm = None, {}, {}, {}, None
+        run.args, run.fixture, run.prepared, run.chain, run.evm, run.deadline = None, {}, {}, {}, None, None
         run.admitted, run.bytecode = ["hull", "yul"], {"yul": (b"", b"")}
         failure = {"status": "language-failure", "detail": fixtures.MEMORY_RANGE}
-        with patch.object(fixtures, "run_hull", return_value=[observation(), failure, failure]), \
-                patch.object(fixtures, "run_evm", return_value=[observation(), {"status": "out-of-gas"}, observation()]):
+        order = []
+        with patch.object(fixtures, "run_hull", side_effect=lambda *_: order.append("hull") or [observation(), failure, failure]), \
+                patch.object(fixtures, "run_evm", side_effect=lambda *_: order.append("evm") or
+                             [observation(), {"status": "out-of-gas"}, observation()]):
             observed = run.observe(step(kind="deploy", index=0), [step(), step(index=2)])
         self.assertEqual([row["status"] for row in observed["hull"]], ["returned", "memory-range", "language-failure"])
+        self.assertEqual(order, ["evm", "hull"])
 
 
 class HullRunnerTests(unittest.TestCase):
@@ -323,6 +365,23 @@ class HullRunnerTests(unittest.TestCase):
             self.assertEqual(invocations, [["0x01", "0xdead", "0x02"], ["0x01", "0xdead", "0x02"], ["0x01", "0xdead"],
                                            ["0x01", "0x02"]])
 
+    def test_a_deadline_stops_the_running_invocation_and_leaves_later_entries_unrun(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, exports = self.prepare(Path(directory), self.ECHO)
+            deploy = step(kind="deploy", index=0)
+            methods = {"mode": "methods", "contract": "C", "fuel": 10, "availableGas": None}
+            entries = [step(kind="call", calldata="0x01"), step(kind="call", calldata="0xdead"), step(kind="call", calldata="0x02")]
+            started = time.monotonic()
+            observed = fixtures.run_hull(args, methods, exports, self.chain, deploy, entries, started + 2)
+            self.assertLess(time.monotonic() - started, 20)
+            self.assertEqual([item["status"] for item in observed], ["returned", "returned", "budget", "budget"])
+            raw = {**methods, "mode": "raw"}
+            entries = [step(calldata="0x01"), {**step(calldata="0xdead"), "persist": False}, step(calldata="0x02")]
+            observed = fixtures.run_hull(args, raw, exports, self.chain, deploy, entries, time.monotonic() + 2)
+            self.assertEqual([item["status"] for item in observed], ["returned", "returned", "budget", "budget"])
+            self.assertEqual(fixtures.run_hull(args, raw, exports, self.chain, deploy, entries, time.monotonic() - 1),
+                             [fixtures.BUDGET] * 4)
+
     def test_a_buffering_runner_that_reports_nothing_is_resumed_entry_by_entry(self):
         with tempfile.TemporaryDirectory() as directory:
             args, exports = self.prepare(Path(directory), self.ECHO.replace(", flush=True", ""))
@@ -340,6 +399,7 @@ class ReductionTests(unittest.TestCase):
     def run_for(self, observe):
         record = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
         record.args = SimpleNamespace(reduction_runs=40, reduction_seconds=60)
+        record.run_deadline = record.deadline = None
         record.raw, record.admitted = True, ["hull", "yul"]
         record.steps = [step(kind="deploy", index=0)] + [step(index=index, calldata="0x" + (selector("k(uint256)") + word(index)).hex())
                                                        for index in (1, 2, 3)]
@@ -392,10 +452,71 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(totals["expectations"]["hull"]["match"], 2)
 
 
+class RunTests(unittest.TestCase):
+    def setUp(self):
+        self.addCleanup(fixtures.STOP.clear)
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.output = Path(self.temporary.name) / "out"
+
+    def main(self, *extra, run=None, delay=0.0):
+        def check(_):
+            time.sleep(delay)
+            return {"driver": {}}
+        with patch.object(fixtures, "check_tools", side_effect=check), patch.object(fixtures, "tool_identity", return_value={"tools": 1}), \
+                patch.object(fixtures.FixtureRun, "run", run or (lambda self: {**self.record, "seconds": 0})), \
+                contextlib.redirect_stdout(io.StringIO()) as printed:
+            code = fixtures.main(["--output", str(self.output), "--fixture", "abi-*", "--mode", "mutation", "--seed", "1", *extra])
+        return code, json.loads((self.output / "report.json").read_text()) if (self.output / "report.json").exists() else None, printed.getvalue()
+
+    def test_fixtures_after_the_run_budget_are_recorded_unexecuted(self):
+        code, report, _ = self.main("--seconds", "0.05", "--fixture-mutants", "8", "--fixture-seconds", "30", delay=0.1)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["stop"], "run time budget")
+        self.assertEqual(report["totals"]["unexecuted"], report["totals"]["fixtures"])
+        self.assertTrue(all(record["unexecuted"] and record["stop"] == "run time budget" for record in report["fixtures"]))
+        self.assertEqual((report["bounds"]["fixtureMutants"], report["bounds"]["fixtureSeconds"], report["bounds"]["runSeconds"]),
+                         (8, 30.0, 0.05))
+
+    def test_a_stop_signal_ends_the_run_with_its_report(self):
+        def run(self):
+            fixtures.STOP.set()
+            return {**self.record, "seconds": 0, "stop": "signal"}
+        code, report, _ = self.main("--jobs", "1", run=run)
+        self.assertEqual((code, report["stop"]), (130, "signal"))
+        self.assertEqual(report["totals"]["budgetStopped"], 1)
+        self.assertEqual(report["totals"]["unexecuted"], report["totals"]["fixtures"] - 1)
+
+    def test_check_prints_the_identity_of_what_a_run_reads(self):
+        with patch.object(fixtures, "check_tools", return_value={"driver": {}}), patch.object(fixtures, "tool_identity", return_value={"tools": 1}), \
+                contextlib.redirect_stdout(io.StringIO()) as printed:
+            self.assertEqual(fixtures.main(["--check"]), 0)
+        checked = json.loads(printed.getvalue())
+        self.assertEqual((checked["status"], checked["tools"], len(checked["fixtures"])), ("ready", {"tools": 1}, 168))
+        self.assertEqual(sorted(checked["manifests"]), ["rust-method-parity.json", "rust-scenario-parity.json"])
+
+    def test_a_fixture_lock_holds_off_a_second_run_of_the_same_fixture(self):
+        args = SimpleNamespace(work=Path(self.temporary.name) / "work")
+        first, second = (fixtures.FixtureRun(args, {"id": "f", "mode": "raw", "contract": "C", "source": "s", "sha256": "0"}, {}, {})
+                         for _ in range(2))
+        entered = threading.Event()
+
+        def hold():
+            with second.locked():
+                entered.set()
+        with first.locked():
+            thread = threading.Thread(target=hold)
+            thread.start()
+            self.assertFalse(entered.wait(0.3))
+        self.assertTrue(entered.wait(5))
+        thread.join()
+
+
 class CommandLineTests(unittest.TestCase):
     def test_modes_seeds_and_bounds_are_checked_before_any_work(self):
         for extra in (["--mode", "mutation"], ["--seed", "1"], ["--mode", "mutation", "--seed", "1", "--mutants", "0"],
-                      ["--jobs", "0"]):
+                      ["--jobs", "0"], ["--fixture-mutants", "4"], ["--mode", "mutation", "--seed", "1", "--fixture-mutants", "0"],
+                      ["--seconds", "0"], ["--fixture-seconds", "-1"]):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 fixtures.main(["--output", "/nonexistent/out", *extra])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
