@@ -335,6 +335,38 @@ def trait_policy_case(value=255, shapes=None):
     return case
 
 
+HIERARCHY_PLAN = {'schema': 'solcore-lean.trait-hierarchy-plan.v1',
+    'declarations': [{'generic': False, 'sameName': False, 'constructors': [[], ['word']]}],
+    'methods': ['unary', 'binary'],
+    'impls': [{'head': 'word', 'unary': [{'combine': 'add', 'op': 'add', 'constant': '3'}],
+               'binary': [{'combine': 'sub', 'op': 'xor', 'constant': '5'}], 'form': 'nested', 'mismatch': []}],
+    'subclass': 'marker', 'subImpls': [{'head': 'word', 'steps': []}], 'tops': ['word'],
+    'helpers': [{'call': 'sub', 'method': 'unary', 'op': 'add', 'constant': '7'}],
+    'uses': [{'method': 'unary', 'call': 'sub', 'type': 'word', 'shift': 0,
+              'builder': {'offset': 0, 'values': [{'leaf': 'input', 'constant': '0'}]}, 'arguments': []}]}
+
+
+def hierarchy_shapes(**changes):
+    shapes = {key: [] for key in campaign.m2.HIERARCHY_SHAPES}
+    shapes.update(instances=['word:unary'], calls=['unary:sub'], depths=['0'], subclass=['marker'])
+    shapes.update(changes)
+    return shapes
+
+
+def hierarchy_policy_case(value=255, shapes=None):
+    """Trait hierarchy envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(1)
+    case.update(schema=campaign.m2.HIERARCHY_CASE_SCHEMA, input=str(value), hierarchyPlan=copy.deepcopy(HIERARCHY_PLAN))
+    case['contract'].update(name='SynthesizedTraitHierarchies', deployPath=['SynthesizedTraitHierarchiesDeploy'],
+        runtimePath=['SynthesizedTraitHierarchiesDeploy', 'SynthesizedTraitHierarchies'],
+        calldata='0xa444f5e9' + f'{value:064x}')
+    case['provenance'] = {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                    *campaign.PROFILE_VERSION_FIELDS['runtime-trait-hierarchies'])},
+        'origin': {'kind': 'hierarchy-generated', 'seed': '1', 'maxProgramNodes': 2048}, 'features': [],
+        'referenceNodes': 40, 'hierarchyShapes': shapes or hierarchy_shapes()}
+    return case
+
+
 def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
     """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
     case = function_case(helpers)
@@ -1490,9 +1522,9 @@ class EnumCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
         self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
         self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 4096))
-        # Every profile but the trait profile keeps the 512-node maximum.
+        # Every profile but the trait and trait hierarchy profiles keeps the 512-node maximum.
         self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES
-                          if profile not in (self.PROFILE, 'runtime-traits')}, {512})
+                          if profile not in (self.PROFILE, 'runtime-traits', 'runtime-trait-hierarchies')}, {512})
         self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
                          {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
@@ -1766,6 +1798,170 @@ class TraitCoverageTests(unittest.TestCase):
     def test_committed_corpus_requires_complete_coverage(self):
         manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
         self.assertEqual(manifest['traitRequirements'], {key: list(values) for key, values in campaign.m2.TRAIT_SHAPES.items()})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 2048
+                            for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']) % len(campaign.PRIMITIVE_INPUTS), 0)
+
+
+class HierarchyCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-trait-hierarchies'
+    CORPUS = ROOT / 'scripts/semantic-trait-hierarchy-corpus.json'
+    REQUIRED = {**{key: [] for key in campaign.m2.HIERARCHY_SHAPES}, 'calls': ['unary:sub'], 'depths': ['0']}
+
+    def manifest(self, generated=False):
+        case = hierarchy_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'hierarchyRequirements': self.REQUIRED,
+            'cases': [{'id': 'hierarchy', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 2048}} if generated
+                   else {'hierarchyPlan': case['hierarchyPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('hierarchy-generate', 'hierarchy-emit', 'hierarchy-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.HIERARCHY_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
+        self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 4096))
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-trait-hierarchies-v1'}))
+        self.assertEqual({key: len(values) for key, values in campaign.m2.HIERARCHY_SHAPES.items()},
+                         {'instances': 15, 'calls': 13, 'depths': 4, 'arguments': 5, 'parameters': 5, 'forms': 4,
+                          'subclass': 3})
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['hierarchy-generate', '1', '2048', '1', '256', '1000000',
+                                 campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+        self.assertEqual(summary['configuration']['acceptance'], campaign.RANDOM_ACCEPTANCE)
+        _, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', '4096')
+        self.assertEqual(seen[0][2], '4096')
+        for nodes in ('255', '4097'):
+            with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['hierarchyCoverage']['requiredInstances'], [])
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['hierarchyRequirements']
+        for invalid in (None, {}, {**base, 'calls': ['unary:lifted']}, {**base, 'instances': ['tuple:ternary']},
+                        {**base, 'depths': ['4']}, {**base, 'parameters': ['param']},
+                        {**base, 'subclass': ['deep']}, {**base, 'calls': ['unary:sub'] * 2},
+                        {key: values for key, values in base.items() if key != 'parameters'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'hierarchyRequirements': invalid})
+        with self.assertRaises(ValueError):
+            campaign.hierarchy_requirements({'profile': 'runtime-traits', 'hierarchyRequirements': base})
+        with self.assertRaises(ValueError):
+            campaign.trait_requirements({'profile': self.PROFILE, 'traitRequirements': TraitCoverageTests.REQUIRED})
+        plan = entry['hierarchyPlan']
+        use, helper = plan['uses'][0], plan['helpers'][0]
+        for invalid in ({**plan, 'uses': []}, {**plan, 'uses': [use] * 7}, {**plan, 'declarations': []},
+                        {**plan, 'methods': ['binary', 'unary']}, {**plan, 'subclass': 'deep'},
+                        {**plan, 'subImpls': [{'head': 'word'}]}, {**plan, 'tops': ['word'] * 7},
+                        {**plan, 'helpers': [{**helper, 'call': 'generic'}]},
+                        {**plan, 'helpers': [{**helper, 'method': 'ternary'}]},
+                        {**plan, 'uses': [{**use, 'call': 'lifted'}]}, {**plan, 'uses': [{**use, 'shift': 5}]},
+                        {**plan, 'uses': [{**use, 'arguments': [use['builder']]}]},
+                        {**plan, 'uses': [{key: field for key, field in use.items() if key != 'arguments'}]},
+                        {**plan, 'extra': 1}, {**plan, 'schema': 'solcore-lean.trait-plan.v1'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'hierarchyPlan': invalid}]})
+        for changed in ({**entry, 'program': {}}, {**entry, 'traitPlan': entry['hierarchyPlan']}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+        for nodes in (256, 2048, 4096):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+        for nodes in (255, 4097):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                    'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        self.assertEqual(campaign.specified_hierarchies(hierarchy_policy_case()),
+            {'Instances': {'word:unary'}, 'Calls': {'unary:sub'}, 'Depths': {'0'}, 'Arguments': set(),
+             'Parameters': set(), 'Forms': set(), 'Subclass': {'marker'}})
+        self.assertEqual(campaign.specified_hierarchies(trait_policy_case()),
+                         {dimension: set() for dimension in campaign.HIERARCHY_DIMENSIONS})
+        self.assertEqual(campaign.specified_traits(hierarchy_policy_case()),
+                         {dimension: set() for dimension in campaign.TRAIT_DIMENSIONS})
+        for invalid in ({'calls': ['unary:sub']}, hierarchy_shapes(calls=['unary:lifted']),
+                        hierarchy_shapes(depths=['1', '0']), hierarchy_shapes(subclass=['mix', 'mix']),
+                        hierarchy_shapes(parameters=['param'])):
+            with self.assertRaises(ValueError):
+                campaign.specified_hierarchies(hierarchy_policy_case(shapes=invalid))
+
+    def test_imported_plan_routes_to_hierarchy_emit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+            value = self.manifest()
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return hierarchy_policy_case()
+            instance.tool = tool
+            def execute_case(case):
+                folder = instance.work / 'hierarchy'
+                folder.mkdir()
+                report = matched()
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(calls, [('hierarchy-emit', value['cases'][0]['hierarchyPlan'], ['255', '1000'],
+                                      'corpus-emission')])
+            coverage = instance.summary['hierarchyCoverage']
+            self.assertEqual((coverage['requiredCalls'], coverage['generatedCalls'], coverage['matchedCalls']),
+                             (['unary:sub'], ['unary:sub'], ['unary:sub']))
+            self.assertTrue(all(not coverage['missing' + dimension] for dimension in campaign.HIERARCHY_DIMENSIONS))
+
+    def test_nonmatching_outcomes_cannot_satisfy_hierarchy_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [hierarchy_policy_case(), hierarchy_policy_case(shapes=hierarchy_shapes(calls=['binary:top'],
+                                                                                         subclass=['shadow']))]
+            instance.summary['hierarchyCoverage'].update(requiredCalls=['binary:top', 'unary:sub'],
+                                                         requiredSubclass=['shadow'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['provenance']['hierarchyShapes']['calls'][0]
+                folder.mkdir()
+                report = matched()
+                if case['provenance']['hierarchyShapes']['subclass'] == ['shadow']:
+                    report['comparison'] = {'category': 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['hierarchyCoverage']
+            self.assertEqual((coverage['generatedCalls'], coverage['matchedCalls']),
+                             (['binary:top', 'unary:sub'], ['unary:sub']))
+            self.assertEqual((coverage['missingCalls'], coverage['missingSubclass']), (['binary:top'], ['shadow']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        self.assertEqual(manifest['hierarchyRequirements'],
+                         {key: list(values) for key, values in campaign.m2.HIERARCHY_SHAPES.items()})
         self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
         self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 2048
                             for entry in manifest['cases']))
@@ -3540,7 +3736,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 23)
+        self.assertEqual(len(campaign.PROFILES), 24)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -4226,7 +4422,7 @@ class G0VersionTests(CommandLine, unittest.TestCase):
     def test_only_call_graph_profiles_use_their_own_grammar(self):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
-             'runtime-enums', 'runtime-traits'})
+             'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -4322,7 +4518,8 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
               'runtime-assembly-loops': 10, 'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
-              'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12}
+              'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12,
+              'runtime-trait-hierarchies': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))

@@ -57,6 +57,7 @@ PROFILES = {
     "runtime-assembly-memory": ("semantic-assembly-memory", "pure", 96),
     "runtime-enums": ("semantic-enum", "pure", 2048),
     "runtime-traits": ("semantic-trait", "pure", 2048),
+    "runtime-trait-hierarchies": ("semantic-trait-hierarchy", "pure", 2048),
     "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "runtime-call-graph-loops": ("semantic-call-graph-loop", "pure", 256),
     "runtime-assembly-loops": ("semantic-assembly-loop", "pure", 256),
@@ -187,7 +188,7 @@ def profile_attempts(args, profile):
 
 def node_budget(args, profile):
     """An explicit budget wins; otherwise the profile default, scaled and capped like the campaigns:
-    at 512 nodes, or at the enum and trait profiles' 4,096-node case limit."""
+    at 512 nodes, or at the enum, trait and trait hierarchy profiles' 4,096-node case limit."""
     cap = pure_campaign.maximum_nodes(profile) if PROFILES[profile][1] == "pure" else 512
     return args.nodes or min(cap, round(PROFILES[profile][2] * args.nodes_scale))
 
@@ -488,7 +489,7 @@ def parse_args(argv=None):
                         help="random runtime-input pure profiles generate this many whole functions, each with all of its "
                              "inputs, instead of --cases; closed-g0 and the stateful profiles keep --cases")
     parser.add_argument("--nodes", type=int, help="override random node budget; otherwise profile-specific defaults")
-    parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512, or 4096 for enums and traits")
+    parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512, or 4096 for enums, traits and trait hierarchies")
     parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles, "
                                                       "and with --functions at least 16 per function, up to 10000")
     # Hull fuel is only a bound: deploying the larger enum and struct storage

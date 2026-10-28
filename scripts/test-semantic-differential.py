@@ -324,6 +324,54 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_CONTRACTS[runner.TRAIT_CASE_SCHEMA], "SynthesizedTraits")
         self.assertEqual(runner.TRAIT_VERSIONS, ("profileVersion", "boundaryVersion"))
 
+    def test_hierarchy_plan_envelope_and_shape_inventory(self):
+        declaration = {"generic": True, "sameName": False, "constructors": [["param"], []]}
+        impl = {"head": "sum", "unary": [], "binary": [], "form": "nested", "mismatch": ["1", "2"]}
+        sub = {"head": "sum", "steps": []}
+        helper = {"call": "top", "method": "mix", "op": "sub", "constant": "9"}
+        argument = {"type": "word", "builder": {"offset": 0, "values": []}}
+        use = {"method": "mix", "call": "top", "type": {"sum": ["word", "word"]}, "shift": 0,
+               "builder": {"offset": 0, "values": []}, "arguments": [argument, argument]}
+        plan = {"schema": "solcore-lean.trait-hierarchy-plan.v1", "declarations": [declaration] * 3,
+                "methods": ["unary", "binary"], "impls": [impl] * 6, "subclass": "mix", "subImpls": [sub] * 6,
+                "tops": ["sum"] * 6, "helpers": [helper] * 10, "uses": [use] * 6}
+        runner.validate_hierarchy_plan(plan)
+        for subclass in ("marker", "shadow"):
+            runner.validate_hierarchy_plan({**plan, "subclass": subclass})
+        for call in ("direct", "sub", "value", "function"):
+            runner.validate_hierarchy_plan({**plan, "helpers": [],
+                                            "uses": [{**use, "method": "binary", "call": call, "shift": 4, "arguments": []}]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.trait-plan.v1"}, {**plan, "extra": 0},
+                        {**plan, "declarations": []}, {**plan, "declarations": [declaration] * 4},
+                        {**plan, "methods": []}, {**plan, "methods": ["binary", "unary"]},
+                        {**plan, "impls": []}, {**plan, "impls": [impl] * 7}, {**plan, "impls": [{**impl, "form": "flat"}]},
+                        {**plan, "subclass": "deep"}, {**plan, "subImpls": [sub] * 7},
+                        {**plan, "subImpls": [{**sub, "extra": 0}]}, {**plan, "subImpls": [{**sub, "steps": None}]},
+                        {**plan, "tops": ["sum"] * 7}, {**plan, "helpers": [helper] * 11},
+                        {**plan, "helpers": [{**helper, "call": "direct"}]}, {**plan, "helpers": [{**helper, "call": "lifted"}]},
+                        {**plan, "helpers": [{**helper, "method": "ternary"}]},
+                        {**plan, "uses": []}, {**plan, "uses": [use] * 7}, {**plan, "uses": [{**use, "call": "generic"}]},
+                        {**plan, "uses": [{**use, "method": "nullary"}]}, {**plan, "uses": [{**use, "shift": 5}]},
+                        {**plan, "uses": [{**use, "arguments": [argument]}]},
+                        {**plan, "uses": [{**use, "arguments": [argument] * 3}]},
+                        {**plan, "uses": [{key: value for key, value in use.items() if key != "arguments"}]},
+                        {**plan, "uses": [{**use, "extra": 0}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_hierarchy_plan(invalid)
+        shapes = {key: list(values) for key, values in runner.HIERARCHY_SHAPES.items()}
+        runner.validate_hierarchy_shapes(shapes)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "calls": ["unary:direct", "binary:direct"]},
+                        {**shapes, "depths": ["0", "0"]}, {**shapes, "depths": ["4"]}, {**shapes, "parameters": ["param"]},
+                        {**shapes, "subclass": ["deep"]}, {key: values for key, values in shapes.items() if key != "subclass"}):
+            with self.assertRaises(ValueError):
+                runner.validate_hierarchy_shapes(invalid)
+        self.assertEqual({key: len(values) for key, values in runner.HIERARCHY_SHAPES.items()},
+                         {"instances": 15, "calls": 13, "depths": 4, "arguments": 5, "parameters": 5, "forms": 4,
+                          "subclass": 3})
+        self.assertEqual(runner.CASE_PROFILES[runner.HIERARCHY_CASE_SCHEMA], "runtime-trait-hierarchies")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.HIERARCHY_CASE_SCHEMA], "SynthesizedTraitHierarchies")
+        self.assertEqual(runner.HIERARCHY_VERSIONS, ("profileVersion", "boundaryVersion"))
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -679,7 +727,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 23)
+        self.assertEqual(len(runner.CASE_PROFILES), 24)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

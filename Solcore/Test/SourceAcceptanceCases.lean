@@ -9,8 +9,9 @@ import Solcore.Synthesis.Source.AssemblyCases
 import Solcore.Synthesis.Source.AssemblyMemoryCases
 import Solcore.Synthesis.Source.EnumCases
 import Solcore.Synthesis.Source.TraitCases
+import Solcore.Synthesis.Source.HierarchyCases
 
-/-! The identity filter `exclude-boundary-identity-v1` of the fourteen runtime-input
+/-! The identity filter `exclude-boundary-identity-v1` of the fifteen runtime-input
 profiles whose generated functions can be identities. Over a window of
 attempts it excludes exactly the functions that return every boundary input
 unchanged, under its own reason and code, and keeps every other function with
@@ -101,7 +102,11 @@ private def profiles : List Profile := [
     replay := Enums.replayCase, shrink := Enums.shrinkCases, nodes := 2048, inputs := 8, identity := none},
   {name := "runtime-traits", generate := fun seed nodes count attempts fuel inputs acceptance =>
       Traits.generateCases seed nodes count attempts fuel inputs acceptance,
-    replay := Traits.replayCase, shrink := Traits.shrinkCases, nodes := 2048, inputs := 8, identity := none}]
+    replay := Traits.replayCase, shrink := Traits.shrinkCases, nodes := 2048, inputs := 8, identity := none},
+  {name := "runtime-trait-hierarchies", generate := fun seed nodes count attempts fuel inputs acceptance =>
+      Hierarchies.generateCases seed nodes count attempts fuel inputs acceptance,
+    replay := Hierarchies.replayCase, shrink := Hierarchies.shrinkCases, nodes := 2048, inputs := 8,
+    identity := none}]
 
 private def fuel : Nat := 1000000
 
@@ -252,7 +257,7 @@ private def acceptanceChecks : IO Unit := do
 
 def testSourceAcceptanceCases : IO Unit := do
   acceptanceChecks
-  ensure (profiles.length == 14) "a profile whose functions can be identities is missing"
+  ensure (profiles.length == 15) "a profile whose functions can be identities is missing"
   for profile in profiles do
     checkWindow profile
     if let some seed := profile.identity then checkIdentity profile seed
