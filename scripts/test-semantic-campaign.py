@@ -1531,6 +1531,31 @@ class EnumCoverageTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 campaign.specified_enums(enum_policy_case(shapes=invalid))
 
+    def test_imported_plan_routes_to_enum_emit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+            value = self.manifest()
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return enum_policy_case()
+            instance.tool = tool
+            def execute_case(case):
+                folder = instance.work / 'enum'
+                folder.mkdir()
+                report = matched()
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(calls, [('enum-emit', value['cases'][0]['enumPlan'], ['255', '1000'], 'corpus-emission')])
+            self.assertEqual(instance.summary['counts']['generated'], 1)
+            coverage = instance.summary['enumCoverage']
+            self.assertEqual((coverage['requiredViews'], coverage['generatedViews'], coverage['matchedViews']),
+                             (['single'], ['single'], ['single']))
+
     def test_nonmatching_outcomes_cannot_satisfy_enum_coverage(self):
         with tempfile.TemporaryDirectory() as directory:
             config = options(directory)
