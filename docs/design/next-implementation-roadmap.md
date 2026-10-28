@@ -4230,6 +4230,64 @@ The profile's definitions were fixed before execution:
   lengths above 64 in a case, tuples with dynamic elements, gas, value, other
   methods and malformed calldata.
 
+**Results.** The checks before any random run:
+- The runtime golden tests passed. They cover:
+  - the exact bytes of lengths 0, 1, 31, 32, 33 and 64 against hexadecimal
+    text, with nonzero data bytes after each length, all-ones data cut at 33
+    bytes, and tags that wrap modulo 64;
+  - the revert and trap branches, and wrong annotations and payloads, which
+    do not decode;
+  - a word call to a registered bytes contract and a creation from a bytes
+    initializer, both unavailable;
+  - a bytes root, which returns its whole encoding through the nested
+    executor.
+- The golden cases passed on both the Core contract and the source model. A
+  corpus row with a nonzero padding byte, a changed head Word or a shorter
+  output is rejected.
+- The model equalled the Core contract on 392 transactions of 64 generated
+  scenarios. Every case and reduction replayed, and generation drew every
+  bank length.
+- The shell takes 125 nodes, so the default budget leaves 259 for the step.
+- A synthetic slot-0 difference on imported Hull reduced from three
+  transactions to one of length 1 in 12 attempts. The campaign's synthetic
+  output adapter changes only a one-Word output, so it does not apply here.
+- The gate passed on `e41787d2e` and on `93e26b3b3`: the full Lean build and
+  tests, the kernel check, 737 and then 743 Python tests, every corpus check
+  and the diff check, with 29 and then 30 native tools.
+
+The matrices ran on `93e26b3b3` with 141 digests frozen: the files of
+`scripts/`, the 30 native tools, solc, Anvil, and the Rust driver and
+code-image exporter. None changed during any run, and all 387 case results
+record that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-one stateful corpora matched, 267 scenarios and 729
+    prefixes, in 2,296 seconds. The twenty earlier ones kept their 255
+    scenarios and 697 prefixes, both call profiles included.
+  - The new corpus matched its 12 scenarios and 32 prefixes with complete
+    coverage on O0, O2 and Yul, O2 in 127 seconds and Yul in 120:
+    - the returned lengths 0, 1, 16, 27, 31, 32, 33, 58, 63 and 64;
+    - 23 returned and 9 reverted transactions over the empty, partial-Word
+      and whole-Word lengths;
+    - both node budgets;
+    - a returned value after an earlier committed transaction in nine
+      scenarios, and after a revert in six.
+- **Random suites:** root seed `20261030`, sixteen eight-transaction
+  scenarios with G0 revision three, at 384 and 512 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes:
+  - 98 returned values of 39 distinct lengths, all seven bank lengths among
+    them, and 30 reverts;
+  - of the returned values, 7 were empty, 79 ended in a partial Word and 12
+    filled whole Words;
+  - every scenario returned a value after an earlier committed transaction,
+    and 15 after a revert;
+  - 16 attempts and no exclusion;
+  - the cases were identical on the three backends at each budget, the two
+    budgets draw the same transactions, and the step differs in 15 of the 16
+    cases.
+
+A random run took 103 to 114 seconds on Sonatina and 170 to 176 on Yul. There
+was no finding. Hosted CI has not run the profile.
+
 **Storage and Keccak loops through inline Yul.** `stateful-storage-loops`
 and `stateful-keccak-loops` lower `sload`, `sstore`, the mapping's hash and
 `log2` through Solcore's own path: std's one-statement wrapper functions,
