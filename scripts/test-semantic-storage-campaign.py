@@ -2306,5 +2306,84 @@ class EnumReturnCampaignTests(unittest.TestCase):
         self.assertEqual(reverted["histories"]["rustEvm"]["transactions"][1]["output"],
                          "0x" + f"{int(histories['rustEvm']['transactions'][1]['output'], 16) ^ 1:064x}")
 
+
+def enum_argument_case(rows=((0, 0, 1, 2, 33, None), (1, 1, 7, 0, 0, None), (0, 2, 3, 5, 0, {"kind": "tag", "value": "0"}),
+                             (0, 1, 9, 0, 0, None)), origin=None, shape=fixtures.ARGUMENT_SHAPE):
+    value = fixtures.enum_argument_case(rows=rows, shape=shape)
+    value["enumArgumentPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class EnumArgumentCampaignTests(unittest.TestCase):
+    def test_coverage_names_decisions_positions_fields_lengths_accepted_kinds_carries_and_budgets(self):
+        value = enum_argument_case()
+        self.assertEqual(campaign.dimensions("stateful-enum-arguments"),
+                         campaign.DIMENSIONS + ("ArgumentPositions", "ArgumentFields", "ArgumentBytesLengths",
+                                                "ArgumentBytesConstructors", "ArgumentMalformations", "ArgumentRejections",
+                                                "ArgumentAccepted", "ArgumentCarries", "ArgumentNodeBudgets"))
+        # tx-0 decodes Blob of 33 bytes and commits; tx-1 decodes Ready and
+        # reverts in the body; tx-2's unknown tag is rejected; tx-3 decodes
+        # Ready after all three. An imported case has no node budget.
+        self.assertEqual(campaign.enum_arguments_coverage(value),
+                         {"ArgumentPositions": {"4:0", "4:1"}, "ArgumentFields": {"dynamic:bytes", "dynamic:one"},
+                          "ArgumentBytesLengths": {33}, "ArgumentBytesConstructors": {1},
+                          "ArgumentMalformations": {"none", "tag"}, "ArgumentRejections": {"accepted", "0x"},
+                          "ArgumentAccepted": set(), "ArgumentCarries": {"committed", "rollback", "rejection"},
+                          "ArgumentNodeBudgets": set()})
+        # The inputs are the Word fields of Word constructors.
+        self.assertEqual(campaign.inputs(value), {"3", "5", "7", "9"})
+        # A struct in a static enum, an accepted retag and a generated budget.
+        static = enum_argument_case(rows=((0, 0, 1, 2, 0, None), (0, 0, 3, 4, 0, {"kind": "retag", "constructor": 1})),
+                                    shape=(("Ready", "ScPair"), ("Idle", "")),
+                                    origin={"kind": "enum-argument-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.enum_arguments_coverage(static),
+                         {"ArgumentPositions": {"2:0", "2:1"}, "ArgumentFields": {"static:pair", "static:none"},
+                          "ArgumentBytesLengths": set(), "ArgumentBytesConstructors": {0},
+                          "ArgumentMalformations": {"none", "retag"}, "ArgumentRejections": {"accepted"},
+                          "ArgumentAccepted": {"retag"}, "ArgumentCarries": {"committed"}, "ArgumentNodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-enum-arguments"))
+            instance.summary["coverage"].update(requiredArgumentBytesLengths=[0, 1, 31, 32, 33, 63, 64],
+                                                requiredArgumentNodeBudgets=[384, 512],
+                                                requiredArgumentRejections=["0x4924aef0", "0x08638556", "0x"])
+            histories = fixtures.enum_argument_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedArgumentPositions"], coverage["matchedArgumentRejections"],
+                              coverage["matchedArgumentCarries"]),
+                             (["4:0", "4:1"], ["0x", "accepted"], ["committed", "rejection", "rollback"]))
+            self.assertEqual((coverage["missingArgumentBytesLengths"], coverage["missingArgumentNodeBudgets"],
+                              coverage["missingArgumentRejections"]),
+                             ([0, 1, 31, 32, 63, 64], [384, 512], ["0x08638556", "0x4924aef0"]))
+            # The selector and empty-revert rows are recorded in the analysis.
+            report = {"comparison": campaign.adapter.compare(histories, value), "histories": histories}
+            self.assertEqual(report["comparison"]["selectorRows"], [{"id": "tx-2", "index": 2, "selector": "0x"}])
+
+    def test_the_fixed_corpus_validates_and_its_enum_argument_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-enum-argument-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-enum-arguments")
+        self.assertEqual((manifest["requiredArgumentBytesLengths"], manifest["requiredArgumentNodeBudgets"],
+                          manifest["requiredArgumentCarries"]),
+                         ([0, 1, 31, 32, 33, 63, 64], [384, 512], ["committed", "rollback", "rejection"]))
+        for dimension in ("ArgumentPositions", "ArgumentFields", "ArgumentBytesConstructors", "ArgumentMalformations"):
+            self.assertEqual(manifest["required" + dimension], list(campaign.ENUM_ARGUMENT_EXTRA[dimension]))
+        self.assertEqual(manifest["requiredArgumentRejections"], ["0x4924aef0", "0x08638556", "0x"])
+        for key, changed in (("requiredArgumentPositions", ["5:0"]), ("requiredArgumentFields", ["static:bytes"]),
+                             ("requiredArgumentBytesLengths", [1025]), ("requiredArgumentBytesLengths", [True]),
+                             ("requiredArgumentBytesConstructors", [3]), ("requiredArgumentMalformations", ["other"]),
+                             ("requiredArgumentRejections", ["0x7f52b2bf"]), ("requiredArgumentAccepted", ["none"]),
+                             ("requiredArgumentCarries", ["other"]), ("requiredArgumentNodeBudgets", [448]),
+                             ("requiredArgumentNodeBudgets", [384, 384])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredArgumentCarries"})
+        other = json.loads((ROOT / "scripts/semantic-enum-return-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "enum-argument coverage belongs to the enum-argument profile"):
+            campaign.validate_manifest({**other, "requiredArgumentPositions": ["2:0"]})
+
 if __name__ == "__main__":
     unittest.main()

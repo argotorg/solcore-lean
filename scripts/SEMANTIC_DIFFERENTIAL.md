@@ -5515,7 +5515,8 @@ return data on all three paths. Original Core gained an entry convention for
 it, `enumOutcomeV1`. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the
 definitions and the runtime design, including why the tags are carried by the
-value and not recorded in the convention.
+value and not recorded in the convention. Enum arguments are compared in
+[Compare enum arguments](#compare-enum-arguments).
 
 ### Definitions
 
@@ -5678,6 +5679,136 @@ Anvil, and the Rust driver and code-image exporter frozen.
     13 seeds both budgets accepted draw the same shapes and transactions.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
+
+## Compare enum arguments
+
+The `stateful-enum-arguments` profile sends a value of a user-defined enum of
+two to four constructors as a method argument, decoded by std's derived ABI
+decoder, canonically or with one malformation of its calldata. It compares the
+whole outcome on all three paths. Original Core decodes the calldata itself,
+without std's decoder code, under the existing `wordOutcomeV1` convention. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions and records std's decoder as the probe found it.
+
+### Definitions
+
+- **Contract:** `SynthesizedEnumArguments` with
+  `run(uint256 flags, SynthesizedEnum value) returns (uint256)`, zero value.
+  The selector is std's structural signature: the constructors' field
+  signatures nested to the right in `sum(left,right)`, so
+  `Nil | Single(uint256)` gives `run(uint256,sum(,uint256))`.
+- **Shape:** two to four constructors named from the returned enums' bank
+  without repetition, each with no fields, one `uint256`, two `uint256`s, the
+  struct `ScPair { a: uint256; b: uint256; }` or one `memory<bytes>`; at most
+  two carry `bytes`. Each tag is `keccak256("Name(fields)")`, where a struct's
+  fields sign as its own, so `Rec(ScPair)` signs `Rec(uint256,uint256)`.
+- **std's decision** on the calldata, in std's order:
+  - shorter than four bytes or another selector: `0x4924aef0`;
+  - shorter than the arguments' head, the flags and a static enum's inline
+    body or a dynamic enum's offset Word: `0x08638556`;
+  - a dynamic enum's offset `o` above `size - 4`, or fewer than 32 bytes at
+    the body start `p` (36, or `4 + o`): `0x08638556`;
+  - a tag no constructor has: empty revert data;
+  - a field Word missing at `p + 32` or `p + 64`, or a `bytes` field whose
+    tail offset `t > size - p`, whose length Word is missing at `p + t`, or
+    whose length exceeds what follows it: `0x08638556`.
+
+  Trailing bytes, unread head Words and a `bytes` field's padding are ignored.
+- **Transaction:** once std accepts, `r = step(prior + index + w0 + w1 + w2)`
+  goes to slot 0, the one-based index to slot 1 and the decoded Words to slots
+  2 to 4: `(a, 0, 0)` for one Word, `(a, b, 0)` for two Words or the struct,
+  and for `bytes` of length `L` the length and the payload's first two
+  zero-padded Words, each zero when `L` does not reach it. Odd decoded flags
+  revert with the one Word `r`; even flags return `r`.
+- **Original Core:** one host contract that reads the calldata through
+  `inputDataSize`, `inputDataByte?` and `inputDataWordBE?` and makes std's
+  decisions above, with the selector and tags computed by Lean's Keccak-256.
+  A rejection reverts with its error selector as the Word, and an unknown tag
+  with the Word zero.
+- **Comparison:** the malformed-calldata profiles' selector rule maps
+  original Core's selector Word to std's four bytes, and the empty-revert rule
+  maps its Word zero to empty revert data, each only when that is the
+  transaction's prescribed `stdRejection`. Hull against the EVM stays exact.
+- **Transactions:** `{id, flags, choice, first, second, length, malformation,
+  calldata, stdRejection, value}`. A `bytes` payload is the first `length`
+  bytes of `first · K` and `second · K`, with the bytes profile's `K`. A third
+  of the generated transactions are canonical; the others draw a malformation
+  kind uniformly from those that apply, then an entry of its bank. The kinds
+  are `short`, `selector`, `truncate` and `trailing` as for malformed
+  calldata, `tag` (an unknown tag), `retag` (another constructor's tag),
+  `offset` and `aliased` (the offset zero with the flags replaced by a tag)
+  for dynamic enums, `unused` (a nonzero unread head Word), and `tail`,
+  `length` and `padding` for `bytes`.
+
+### Running and validation
+
+```sh
+lake build semanticEnumArgumentTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-enum-argument-corpus.json \
+  --output .upstream/semantic-enum-argument-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-enum-arguments \
+  --cases 16 --output .upstream/semantic-enum-argument-random
+```
+
+Plans use `solcore-lean.enum-argument-plan.v1` under `enumArgumentPlan`, with
+the constructors as `{name, fields}` and `fields` the declared types: empty,
+`uint256`, `uint256,uint256`, `ScPair` or `bytes`. Cases use
+`solcore-lean.semantic-enum-argument-case.v1` and histories
+`solcore-lean.enum-argument-history.v1`. The wrapper's fixed 168 nodes lie
+inside the node budget, so the suite's 384-node default leaves 216 for the
+step, and `--nodes-scale 2` caps the doubled budget at 512. The shape's
+decoder, 33 to 99 nodes for a static shape and 245 to 500 for a dynamic one,
+lies outside it, so contracts are bounded by 512 nodes plus their decoder. A
+case reaches about 70 KB, so a native shrink response carries at most 32
+candidates.
+
+The adapter validates each transaction against its own Python model: the
+canonical encoding and the malformation must give the recorded calldata, and
+std's decision on it the recorded `stdRejection`. A rejection reverts with
+exactly std's data on every path after the two rules, and a returned row must
+commit the prescribed index and decoded Words and return slot 0. A body
+revert and a rejection are checked by rollback. Reductions remove
+transactions, set a malformation to none or to an earlier entry of its bank,
+shorten lengths to zero or half, drop a constructor no transaction chooses,
+retags or aliases, narrow fields (the struct to two Words, two Words to one,
+one to none, `bytes` to none), reduce the step, then zero the field Words and
+clear flags to their parity bit.
+
+Three Lean tests check the profile:
+- `Solcore/Test/SourceEnumArgumentGolden.lean` checks the Core contract and
+  the Lean model against rows written out as hexadecimal text, with tags and
+  selectors from `cast keccak`, over five shapes: every field kind with the
+  struct, `bytes` lengths 0, 1, 17, 31, 32, 33, 63 and 64, every malformation
+  kind with accepted and rejected entries, and raw calldata for the order of
+  std's checks.
+- `Solcore/Test/SourceEnumArgumentCases.lean` requires the Core contract to
+  equal the model on the generated scenarios under the two rules, every case
+  and reduction to replay, the node counts above for every shape class, and
+  generation to draw every constructor count, field kind, position, bank
+  length, malformation kind and std outcome.
+- `Solcore/Test/SourceEnumArgumentCorpus.lean` checks the fixed corpus against
+  expected histories that the model computed.
+
+The fixed corpus has 21 scenarios and 60 transactions: fifteen imported
+scenarios, which reuse the enum-return corpus's nine imported steps with
+shapes and transactions chosen for coverage, and six generated seeds, three
+at 384 nodes and three at 512. Required coverage:
+- every decoded position of two, three and four constructors, and every field
+  kind decoded in static and dynamic shapes, the struct in both;
+- decoded `bytes` lengths 0, 1, 31, 32, 33, 63 and 64, and zero, one and two
+  `bytes` constructors;
+- every malformation kind, the three rejections, and the accepted trailing
+  bytes, unread head Word, cut past the read bytes, nonzero padding, decoding
+  retag, aliased body and `bytes` length into the padding;
+- a decoded value after an earlier committed transaction, body revert and
+  rejection, and both node budgets;
+- the six boundary Words as field Words, one to three helpers and
+  transactions, all four templates, both outcomes and ten completion
+  patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
 
 ## Compare whole committed storage
 

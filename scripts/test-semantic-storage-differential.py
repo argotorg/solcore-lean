@@ -4367,5 +4367,251 @@ class EnumReturnTests(unittest.TestCase):
         self.assertFalse(result["pairs"]["directCore/rustEvm"])
         self.assertIn("committedStorage", result["fields"])
 
+
+ARGUMENT_SHAPE = (("Blob", "bytes"), ("Ready", "uint256"), ("Settled", "uint256,uint256"), ("Rejected", ""))
+# The tags and selectors as `cast keccak` writes them.
+ARGUMENT_TAGS = {"Blob(bytes)": "d05ce3dc4caf4a4b252e3323bde615dc3b9d54623e1859c892f0b4ecf5e45164",
+                 "Ready(uint256)": "0b217ad5c70346c7cd952bd2463c6684a56f9ed229f5780947586625781b4770",
+                 "Settled(uint256,uint256)": "f5b268a3ff315cc44ccceeef86259c9e8eef81ceecb14001543809115380dd62",
+                 "Rejected()": "efde6dcf3c2196c5705e848c09f0659d33de3ca0248be3ab40852d1bafc0f1e3",
+                 "Ready()": "6e12fa0ff1c6b8acb2181ba65fc2867fd8d895d0af9f39674b64abc5ff79275b",
+                 "Idle()": "ae897c555b7596dee56949d599aa959af71416324ac27ef76dd898923ab34d4f"}
+ARGUMENT_SELECTORS = {"run(uint256,sum(bytes,sum(uint256,sum(uint256,uint256,))))": "0x62de7816",
+                      "run(uint256,sum(,))": "0x9350d233"}
+
+
+def enum_argument_case(rows=((0, 0, 1, 2, 33, None), (0, 1, 7, 0, 0, None), (1, 2, 3, 5, 0, None),
+                             (0, 3, 0, 0, 0, {"kind": "aliased", "constructor": 1})), shape=ARGUMENT_SHAPE):
+    """Envelope fixture only: native replay checks the actual enum-argument program."""
+    value = {"schema": runner.ENUM_ARGUMENT_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "enumArgumentPlan": {"schema": "solcore-lean.enum-argument-plan.v1", "stepProgram": {},
+            "constructors": [{"name": name, "fields": fields} for name, fields in shape]},
+        "initialState": {"storage": []}, "observedSlots": ["0", "1", "2", "3", "4"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "transactions": []}
+    signature = runner.enum_argument_signature(value)
+    value["contract"] = {"name": "SynthesizedEnumArguments", "method": "run", "signature": signature,
+        "selector": runner.method_selector(signature), "deployPath": ["SynthesizedEnumArgumentsDeploy"],
+        "runtimePath": ["SynthesizedEnumArgumentsDeploy", "SynthesizedEnumArguments"], "constructorCalldata": "0x"}
+    for index, (flags, choice, first, second, length, malformation) in enumerate(rows):
+        tx = {"id": f"tx-{index}", "flags": str(flags), "choice": choice, "first": str(first), "second": str(second),
+              "length": length, "malformation": malformation or {"kind": "none"}, "value": "0"}
+        data = runner.enum_argument_input(value, tx)
+        tx.update(calldata="0x" + data.hex(), stdRejection=runner.enum_argument_decode(value, data)[0])
+        value["transactions"].append(tx)
+    return value
+
+
+def enum_argument_history(value, path, step=lambda x: x + 1):
+    """Rows of the enum-argument protocol with a known step: std's decision on
+    the calldata, then r = step(slot 0 + index + w0 + w1 + w2) to slot 0, the
+    one-based index to slot 1 and the decoded Words to slots 2 to 4; odd decoded
+    flags revert with r. A rejection reverts with std's data on Hull and the EVM
+    and with the selector Word or the Word zero in original Core."""
+    rows, prior = [], [0, 0, 0, 0, 0]
+    for index, tx in enumerate(value["transactions"]):
+        rejection, decoded = runner.enum_argument_decode(value, runner.common.hex_bytes(tx["calldata"], "calldata"))
+        if rejection is not None:
+            output = bytes.fromhex(rejection[2:])
+            if path == "directCore":
+                output = int.from_bytes(output, "big").to_bytes(32, "big")
+            status, committed = "reverted", list(prior)
+        else:
+            flags, index_word, *words = decoded
+            result = step((prior[0] + index_word + sum(words)) % 2**256) % 2**256
+            output = result.to_bytes(32, "big")
+            status, committed = ("reverted", list(prior)) if flags % 2 else ("returned", [result, index_word, *words])
+        row = {"id": tx["id"], "index": index, "status": status, "output": "0x" + output.hex(),
+               "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.ENUM_ARGUMENT_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0, 0, 0, 0, 0]), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def enum_argument_histories(value=None, **options):
+    value = enum_argument_case() if value is None else value
+    return {path: enum_argument_history(value, path, **options) for path in runner.PATHS}
+
+
+class EnumArgumentTests(unittest.TestCase):
+    def test_an_enum_argument_case_records_its_constructors_and_malformations(self):
+        value = enum_argument_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"]),
+                         ("semantic-enum-argument-tool", "rust-hull-keyed-storage-scenario", True, "enum-arguments"))
+        self.assertTrue(runner.has_enum_arguments(value) and runner.uses_selector_rule(value))
+        self.assertFalse(runner.has_enum_returns(value) or runner.has_enum_arguments(enum_return_case()))
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2", "3", "4"))
+        self.assertIn("user enum", runner.scope(value))
+        # The adapter's own Keccak gives the tags and selectors written out from cast.
+        for text, digest in ARGUMENT_TAGS.items():
+            self.assertEqual(runner.keccak256(text.encode()).hex(), digest)
+        for signature, selector in ARGUMENT_SELECTORS.items():
+            self.assertEqual(runner.method_selector(signature), selector)
+        self.assertEqual(runner.enum_argument_signature(value), "run(uint256,sum(bytes,sum(uint256,sum(uint256,uint256,))))")
+        self.assertEqual(runner.enum_argument_layout(value), (False, 96))
+        # Ready's canonical calldata in a static enum of two field-less
+        # constructors: the selector, the flags and the tag.
+        static = enum_argument_case(rows=((0, 1, 0, 0, 0, None),), shape=(("Idle", ""), ("Ready", "")))
+        self.assertEqual(static["transactions"][0]["calldata"], "0x9350d233" + "00" * 32 + ARGUMENT_TAGS["Ready()"])
+        # The fourth transaction decodes Ready from the head: its flags are Ready's
+        # tag, which is even, and its field the offset Word zero.
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], [None, None, None, None])
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                         ["returned", "returned", "reverted", "returned"])
+        aliased = runner.enum_argument_decode(value, runner.enum_argument_input(value, value["transactions"][3]))[1]
+        self.assertEqual(aliased, (int(ARGUMENT_TAGS["Ready(uint256)"], 16), 2, 0, 0, 0))
+        # Refusals: a constructor beyond the shape, a length without bytes, a
+        # length above 64, malformations that do not apply, and metadata that
+        # differs from the calldata or std's decision.
+        for rows in (((0, 4, 0, 0, 0, None),), ((0, 1, 0, 0, 1, None),), ((0, 0, 0, 0, 65, None),),
+                     ((0, 1, 0, 0, 0, {"kind": "tail", "value": "3"}),), ((0, 0, 0, 0, 32, {"kind": "padding", "pattern": "ones"}),),
+                     ((0, 1, 0, 0, 0, {"kind": "retag", "constructor": 1}),), ((0, 1, 0, 0, 0, {"kind": "truncate", "kept": 3}),),
+                     ((0, 1, 0, 0, 0, {"kind": "tag", "value": str(int(ARGUMENT_TAGS["Blob(bytes)"], 16))}),),
+                     ((0, 1, 0, 0, 0, {"kind": "trailing", "count": 65, "pattern": "zeros"}),),
+                     ((0, 1, 0, 0, 0, {"kind": "unknown"}),)):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                enum_argument_case(rows=rows)
+        with self.assertRaises(ValueError):
+            enum_argument_case(rows=((0, 0, 0, 0, 0, {"kind": "offset", "value": "0"}),), shape=(("Idle", ""), ("Ready", "")))
+        for key, changed in (("calldata", value["transactions"][0]["calldata"] + "00"), ("value", "1"), ("flags", "2"),
+                             ("choice", 2), ("first", "6"), ("length", 4), ("stdRejection", runner.STD_TRUNCATED),
+                             ("malformation", {"kind": "short", "bytes": 2})):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # The plan's constructors: two to four distinct bank names with known
+        # field types, the struct among them, at most two with bytes.
+        enum_argument_case(rows=((0, 0, 1, 2, 0, None),), shape=(("Ready", "ScPair"), ("Idle", "")))
+        for shape in ((("Idle", ""),), (("Idle", ""), ("Idle", "uint256")), (("Idle", ""), ("Other", "uint256")),
+                      (("Idle", ""), ("Q", "uint256,uint256,uint256")), (("Idle", "bytes"), ("Q", "bytes"), ("Pair", "bytes")),
+                      (("Idle", ""), ("Q", ""), ("Pair", ""), ("Blob", ""), ("Ready", ""))):
+            with self.subTest(shape=shape), self.assertRaises((ValueError, KeyError, IndexError)):
+                runner.validate_case(enum_argument_case(rows=((0, 0, 0, 0, 0, None),), shape=shape))
+        invalid = copy.deepcopy(value)
+        invalid["contract"]["selector"] = "0x15509d2b"
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = ["0", "1", "2"]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_std_decisions_of_each_malformation_follow_the_pinned_decoder(self):
+        # Settled(3, 5) of the dynamic shape: 164 bytes, the body at 68 behind the offset 64.
+        def decision(malformation, choice=2, length=0):
+            value = enum_argument_case(rows=((0, choice, 3, 5, length, malformation),))
+            return value["transactions"][0]["stdRejection"]
+        size = 164
+        cases = [({"kind": "short", "bytes": 3}, runner.STD_NO_SELECTOR), ({"kind": "selector", "mask": "1"}, runner.STD_NO_SELECTOR),
+                 ({"kind": "truncate", "kept": 67}, runner.STD_TRUNCATED), ({"kind": "truncate", "kept": 99}, runner.STD_TRUNCATED),
+                 ({"kind": "truncate", "kept": 163}, runner.STD_TRUNCATED), ({"kind": "trailing", "count": 7, "pattern": "ones"}, None),
+                 ({"kind": "tag", "value": "0"}, runner.STD_EMPTY_REVERT),
+                 ({"kind": "retag", "constructor": 3}, None), ({"kind": "retag", "constructor": 0}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": str(size - 4)}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": str(size - 3)}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": str(2**256 - 4)}, runner.STD_TRUNCATED),
+                 ({"kind": "offset", "value": "0"}, runner.STD_EMPTY_REVERT), ({"kind": "offset", "value": "32"}, runner.STD_EMPTY_REVERT),
+                 ({"kind": "aliased", "constructor": 3}, None)]
+        for malformation, expected in cases:
+            with self.subTest(malformation=malformation):
+                self.assertEqual(decision(malformation), expected)
+        # Ready(3): a cut after its field keeps every byte std reads.
+        self.assertIsNone(decision({"kind": "truncate", "kept": 132}, choice=1))
+        self.assertEqual(decision({"kind": "truncate", "kept": 131}, choice=1), runner.STD_TRUNCATED)
+        self.assertIsNone(decision({"kind": "unused", "value": "1"}, choice=1))
+        # Blob of 17 bytes: the payload at 196, 228 bytes in all.
+        for malformation, expected in [({"kind": "tail", "value": "0"}, runner.STD_TRUNCATED),
+                                       ({"kind": "tail", "value": str(228 - 68 + 1)}, runner.STD_TRUNCATED),
+                                       ({"kind": "tail", "value": "32"}, None),
+                                       ({"kind": "length", "value": "32"}, None), ({"kind": "length", "value": "33"}, runner.STD_TRUNCATED),
+                                       ({"kind": "length", "value": str(2**256 - 1)}, runner.STD_TRUNCATED),
+                                       ({"kind": "padding", "pattern": "ramp"}, None),
+                                       ({"kind": "truncate", "kept": 213}, None), ({"kind": "truncate", "kept": 212}, runner.STD_TRUNCATED)]:
+            with self.subTest(malformation=malformation):
+                self.assertEqual(decision(malformation, choice=0, length=17), expected)
+        # A cut in the padding: the last chunk is the Word ending at the last
+        # payload byte, shifted; it equals the canonical chunk.
+        value = enum_argument_case(rows=((0, 0, 3, 5, 17, None), (0, 0, 3, 5, 17, {"kind": "truncate", "kept": 213})))
+        decoded = [runner.enum_argument_decode(value, runner.common.hex_bytes(tx["calldata"], "calldata"))[1]
+                   for tx in value["transactions"]]
+        self.assertEqual(decoded[0], decoded[1])
+        self.assertEqual(decoded[0][2:4], (17, int.from_bytes((3 * MULTIPLIER % 2**256).to_bytes(32, "big")[:17] + bytes(15), "big")))
+
+    def test_rejections_compare_by_selector_and_empty_revert_data(self):
+        rows = ((0, 1, 7, 0, 0, None), (0, 2, 3, 5, 0, {"kind": "tag", "value": "0"}), (0, 2, 3, 5, 0, {"kind": "truncate", "kept": 99}),
+                (0, 1, 1, 0, 0, {"kind": "short", "bytes": 2}), (0, 1, 2, 0, 0, None))
+        value = enum_argument_case(rows=rows)
+        histories = enum_argument_histories(value)
+        result = runner.compare(histories, value)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual([(row["index"], row["selector"]) for row in result["selectorRows"]],
+                         [(1, runner.STD_EMPTY_REVERT), (2, runner.STD_TRUNCATED), (3, runner.STD_NO_SELECTOR)])
+        core = histories["directCore"]["transactions"]
+        self.assertEqual([core[index]["output"] for index in (1, 2)], ["0x" + "00" * 32, "0x" + "00" * 28 + "08638556"])
+        self.assertEqual(histories["rustEvm"]["transactions"][1]["output"], "0x")
+        for index, tx in enumerate(value["transactions"]):
+            rows_by_path = runner.comparable(value, tx, {name: histories[name]["transactions"][index] for name in runner.PATHS})
+            prior = histories["rustEvm"]["transactions"][index - 1]["committedStorage"] if index else histories["rustEvm"]["initialStorage"]
+            self.assertTrue(all(runner.conforms(value, tx, row, prior) for row in rows_by_path.values()))
+        # The rules apply only to the prescribed outcome: Core's Word zero where
+        # std rejects with a selector, and empty data where Core's Word zero
+        # stands for none, are mismatches.
+        for index, path, output in ((2, "directCore", "0x" + "00" * 32), (1, "rustEvm", "0x" + "00" * 32),
+                                    (1, "importedHull", "0x08638556"), (3, "rustEvm", "0x")):
+            changed = copy.deepcopy(histories)
+            changed[path]["transactions"][index]["output"] = output
+            result = runner.compare(changed, value)
+            with self.subTest(index=index, path=path):
+                self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", f"tx-{index}"))
+                self.assertIn("output", result["fields"])
+
+    def test_a_decoded_value_follows_the_protocol_on_every_path(self):
+        value = enum_argument_case()
+        histories = enum_argument_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        # Blob of 33 bytes: its length and two zero-padded chunks of 1K and 2K.
+        first = (1 * MULTIPLIER % 2**256).to_bytes(32, "big") + (2 * MULTIPLIER % 2**256).to_bytes(32, "big")
+        after = {entry["slot"]: int(entry["value"]) for entry in rows[0]["committedStorage"]}
+        self.assertEqual([after[slot] for slot in ("1", "2", "3", "4")],
+                         [1, 33, int.from_bytes(first[:32], "big"), int.from_bytes(first[32:33] + bytes(31), "big")])
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertEqual(runner.enum_argument_fields(value, tx, rows[index], prior), [])
+        tx, prior = value["transactions"][1], rows[0]["committedStorage"]
+        for slot in ("1", "2", "3", "4"):
+            changed = copy.deepcopy(rows[1])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertEqual(runner.enum_argument_fields(value, tx, changed, prior), ["committedStorage"])
+        changed = {**rows[1], "output": "0x" + (int(rows[1]["output"], 16) ^ 1).to_bytes(32, "big").hex()}
+        self.assertEqual(runner.enum_argument_fields(value, tx, changed, prior), ["output"])
+        self.assertFalse(runner.conforms(value, tx, {**rows[1], "output": rows[1]["output"] + "00"}, prior))
+        # Another decoded Word on every path breaks the protocol although the paths agree.
+        broken = enum_argument_histories(value)
+        for path in runner.PATHS:
+            entry = next(item for item in broken[path]["transactions"][1]["committedStorage"] if item["slot"] == "2")
+            entry["value"] = "8"
+        result = runner.compare(broken, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        self.assertTrue(all(result["pairs"].values()))
+        # A different step on one path is an ordinary difference.
+        changed = enum_argument_histories(value)
+        changed["rustEvm"] = enum_argument_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -82,6 +82,8 @@ BYTES_RETURN_CASE_SCHEMA = "solcore-lean.semantic-bytes-return-case.v1"
 BYTES_RETURN_HISTORY_SCHEMA = "solcore-lean.bytes-return-history.v1"
 ENUM_RETURN_CASE_SCHEMA = "solcore-lean.semantic-enum-return-case.v1"
 ENUM_RETURN_HISTORY_SCHEMA = "solcore-lean.enum-return-history.v1"
+ENUM_ARGUMENT_CASE_SCHEMA = "solcore-lean.semantic-enum-argument-case.v1"
+ENUM_ARGUMENT_HISTORY_SCHEMA = "solcore-lean.enum-argument-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -296,6 +298,19 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ENUM_RETURN_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b", "rollback": True, "keyed": False,
         "declared": True, "abi": "enum-returns", "shrinkBatch": 32},
+    # One method that takes a value of a user enum of two to four constructors,
+    # canonically or malformed. Original Core decodes the calldata itself; a std
+    # rejection is compared by its selector, and an unknown tag's empty revert
+    # data by the Word zero. The signature and selector follow the plan's shape.
+    # A case reaches about 70 KB, so a native shrink response carries at most 32
+    # candidates.
+    "stateful-enum-arguments": {"caseSchema": ENUM_ARGUMENT_CASE_SCHEMA, "planSchema": "solcore-lean.enum-argument-plan.v1",
+        "planKey": "enumArgumentPlan", "corpusSchema": "solcore-lean.semantic-enum-argument-corpus.v1",
+        "originKind": "enum-argument-generated", "contract": "SynthesizedEnumArguments",
+        "caseTool": "semantic-enum-argument-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ENUM_ARGUMENT_HISTORY_SCHEMA,
+        "signature": None, "selector": None, "rollback": True, "keyed": False,
+        "declared": True, "abi": "enum-arguments", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -398,6 +413,18 @@ RETURN_MULTIPLIER = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0
 ENUM_RETURN_SLOTS = [str(slot) for slot in range(3)]
 ENUM_NAMES = ("Idle", "Ready", "Pair", "Blob", "Settled", "Q", "Rejected", "OverflowedAccumulator")
 ENUM_FIELD_HEADS = {"": 0, "uint256": 32, "uint256,uint256": 64, "bytes": 32}
+# The enum-argument profile: slots 0 to 4, the accumulator, the decoded index
+# and three decoded Words. A plan's constructors are named from the enum bank;
+# each declared field type has std's signature, a struct's being its fields',
+# and a head of these bytes. An unknown tag reverts with empty data.
+ENUM_ARGUMENT_SLOTS = [str(slot) for slot in range(5)]
+ENUM_ARGUMENT_FIELDS = {"": ("", 0), "uint256": ("uint256", 32), "uint256,uint256": ("uint256,uint256", 64),
+                        "ScPair": ("uint256,uint256", 64), "bytes": ("bytes", 32)}
+ENUM_ARGUMENT_KINDS = ("none", "short", "selector", "truncate", "trailing", "tag", "retag", "offset", "aliased",
+                       "unused", "tail", "length", "padding")
+STD_EMPTY_REVERT = "0x"
+# std's bound on a decoded `bytes` length, ~0 - 63.
+MAX_DECODED_LENGTH = 2**256 - 64
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -432,8 +459,11 @@ def expected_status(case: dict, transaction: dict) -> str | None:
     A ledger's even flags may still revert for an insufficient balance, so only
     its odd flags fix a status; `ledger_fields` checks the rest. A std rejection
     of malformed calldata reverts whatever the flags."""
-    if profile(case)["abi"] in ("malformed", "methods") and transaction.get("stdRejection") is not None:
+    if profile(case)["abi"] in ("malformed", "methods", "enum-arguments") and transaction.get("stdRejection") is not None:
         return "reverted"
+    if profile(case)["abi"] == "enum-arguments":
+        # The decoded flags' parity: an aliased body takes its flags from a tag.
+        return "reverted" if enum_argument_decode(case, enum_argument_input(case, transaction))[1][0] % 2 else "returned"
     if profile(case)["abi"] == "methods":
         # A call's odd input sum reverts.
         return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
@@ -872,6 +902,220 @@ def enum_return_fields(case: dict, transaction: dict, row: dict, prior: list[dic
     return fields
 
 
+def has_enum_arguments(case: dict) -> bool:
+    return profile(case)["abi"] == "enum-arguments"
+
+
+def valid_enum_argument_plan(plan: dict) -> bool:
+    """Two to four constructors with distinct names from the bank and known
+    field types, the struct among them, at most two with `bytes`."""
+    constructors = plan.get("constructors")
+    if not isinstance(constructors, list) or not 2 <= len(constructors) <= 4 or any(
+            not isinstance(constructor, dict) or set(constructor) != {"name", "fields"} or
+            constructor["name"] not in ENUM_NAMES or constructor["fields"] not in ENUM_ARGUMENT_FIELDS
+            for constructor in constructors):
+        return False
+    names = [constructor["name"] for constructor in constructors]
+    return len(set(names)) == len(names) and [constructor["fields"] for constructor in constructors].count("bytes") <= 2
+
+
+def enum_argument_layout(case: dict) -> tuple[bool, int]:
+    """Whether the enum is static, and its body's head: the tag Word and the
+    widest constructor's fields, a `bytes` field counting its offset Word."""
+    fields = [fields for _, fields in enum_constructors(case)]
+    return "bytes" not in fields, 32 + max(ENUM_ARGUMENT_FIELDS[field][1] for field in fields)
+
+
+def enum_argument_tag(name: str, fields: str) -> int:
+    """std's variant tag, `keccak256("Name(fields)")`, with the fields' signature."""
+    return int.from_bytes(keccak256(f"{name}({ENUM_ARGUMENT_FIELDS[fields][0]})".encode()), "big")
+
+
+def enum_argument_signature(case: dict) -> str:
+    """std's structural signature: the field signatures nested to the right in `sum(left,right)`."""
+    signatures = [ENUM_ARGUMENT_FIELDS[fields][0] for _, fields in enum_constructors(case)]
+    nested = signatures[-1]
+    for signature in reversed(signatures[:-1]):
+        nested = f"sum({signature},{nested})"
+    return f"run(uint256,{nested})"
+
+
+def enum_argument_contract(case: dict) -> None:
+    """The contract metadata: the plan's structural signature and its selector."""
+    name = profile(case)["contract"]
+    signature = enum_argument_signature(case)
+    expected = {"name": name, "method": "run", "signature": signature, "selector": method_selector(signature),
+                "deployPath": [name + "Deploy"], "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x"}
+    if case.get("contract") != expected:
+        raise Finding("unsupported-scope", "input", "enum-argument contract metadata differs from its plan")
+
+
+def enum_argument_fields_of(tx: dict) -> tuple:
+    """A transaction's flags, choice, field Words and length, type-checked."""
+    choice, length = tx.get("choice"), tx.get("length")
+    if type(choice) is not int or type(length) is not int or not 0 <= choice < 4 or not 0 <= length <= MAX_RETURN_LENGTH:
+        raise ValueError("an enum-argument transaction records a constructor index and a length of at most 64")
+    return (int(common.word(tx.get("flags"), "transaction flags")), choice,
+            int(common.word(tx.get("first"), "transaction first Word")),
+            int(common.word(tx.get("second"), "transaction second Word")), length)
+
+
+def enum_argument_input(case: dict, tx: dict) -> bytes:
+    """The calldata a transaction sends: the canonical encoding of its
+    constructor, then its one malformation, which must apply to it. The body
+    starts at 36 for a static enum and behind the offset 64 for a dynamic one;
+    a `bytes` payload is the first `length` bytes of `first · K` and `second · K`."""
+    constructors = enum_constructors(case)
+    flags, choice, first, second, length = enum_argument_fields_of(tx)
+    if choice >= len(constructors) or (length and constructors[choice][1] != "bytes"):
+        raise ValueError("an enum-argument transaction encodes a constructor, and only a bytes constructor has a length")
+    static, head = enum_argument_layout(case)
+    name, fields = constructors[choice]
+    word = lambda value: (value % 2**256).to_bytes(32, "big")
+    payload = (word(first * RETURN_MULTIPLIER) + word(second * RETURN_MULTIPLIER))[:length]
+    field_head = {"": b"", "uint256": word(first), "uint256,uint256": word(first) + word(second),
+                  "ScPair": word(first) + word(second), "bytes": word(head)}[fields]
+    tail = word(length) + payload + bytes(-length % 32) if fields == "bytes" else b""
+    body = word(enum_argument_tag(name, fields)) + field_head + bytes(head - 32 - len(field_head)) + tail
+    selector = bytes.fromhex(method_selector(enum_argument_signature(case))[2:])
+    data = selector + word(flags) + (body if static else word(64) + body)
+    start = 36 if static else 68
+    tags = [enum_argument_tag(*constructor) for constructor in constructors]
+    malformation = tx.get("malformation")
+    kind = malformation.get("kind") if isinstance(malformation, dict) else None
+    keys = {"none": set(), "short": {"bytes"}, "selector": {"mask"}, "truncate": {"kept"}, "trailing": {"count", "pattern"},
+            "padding": {"pattern"}, "retag": {"constructor"}, "aliased": {"constructor"}}.get(kind, {"value"})
+    if kind not in ENUM_ARGUMENT_KINDS or set(malformation) != {"kind"} | keys:
+        raise ValueError("an enum-argument transaction carries one known malformation")
+    put = lambda bytes_, position, value: bytes_[:position] + word(value) + bytes_[position + 32:]
+    number = lambda key: malformation[key] if type(malformation[key]) is int else None
+    value = int(common.word(malformation["value"], "malformation value")) if keys == {"value"} else None
+    carries = fields == "bytes"
+    padding = -length % 32
+    def invalid():
+        raise ValueError("an enum-argument malformation must apply to its transaction")
+    if kind == "none":
+        return data
+    if kind == "short":
+        if number("bytes") is None or not 0 <= malformation["bytes"] < 4:
+            invalid()
+        return data[:malformation["bytes"]]
+    if kind == "selector":
+        mask = int(common.word(malformation["mask"], "selector mask"))
+        if not 0 < mask < 2**32:
+            invalid()
+        return ((int.from_bytes(data[:4], "big") ^ mask) % 2**32).to_bytes(4, "big") + data[4:]
+    if kind == "truncate":
+        if number("kept") is None or not 4 <= malformation["kept"] < len(data):
+            invalid()
+        return data[:malformation["kept"]]
+    if kind == "trailing":
+        count = number("count")
+        pattern = TRAILING_PATTERNS.index(malformation["pattern"]) if malformation["pattern"] in TRAILING_PATTERNS else None
+        if count is None or not 1 <= count <= 64 or pattern is None:
+            invalid()
+        return data + bytes(0 if pattern == 0 else 0xff if pattern == 1 else (position + 1) % 256 for position in range(count))
+    if kind == "tag":
+        if value in tags:
+            invalid()
+        return put(data, start, value)
+    if kind in ("retag", "aliased"):
+        index = number("constructor")
+        if index is None or not 0 <= index < len(constructors) or (kind == "retag" and index == choice) or \
+                (kind == "aliased" and static):
+            invalid()
+        return put(data, start, tags[index]) if kind == "retag" else put(put(data, 36, 0), 4, tags[index])
+    if kind == "offset":
+        if static or value == 64:
+            invalid()
+        return put(data, 36, value)
+    if kind == "unused":
+        if 32 + ENUM_ARGUMENT_FIELDS[fields][1] >= head or value == 0:
+            invalid()
+        return put(data, start + 32 + ENUM_ARGUMENT_FIELDS[fields][1], value)
+    if kind == "tail":
+        if not carries or value == head:
+            invalid()
+        return put(data, start + 32, value)
+    if kind == "length":
+        if not carries or value == length:
+            invalid()
+        return put(data, start + head, value)
+    pattern = PADDING_PATTERNS.index(malformation["pattern"]) if malformation["pattern"] in PADDING_PATTERNS else None
+    if not carries or not padding or pattern is None:
+        invalid()
+    last = length // 32 * 32
+    fill = [0xff if pattern == 0 else (position + 1) % 256 if pattern == 1 else int(position + 1 == padding)
+            for position in range(padding)]
+    position = start + head + 32 + last
+    return data[:position] + payload[last:length] + bytes(fill) + data[position + 32:]
+
+
+def enum_argument_decode(case: dict, data: bytes) -> tuple:
+    """A third reading of the pinned std's dispatcher and derived enum decoder
+    for `run(uint256 flags, E value)`: the revert data of a rejection, or None
+    with the flags, the one-based index and the three protocol Words. The
+    fallback reverts with `0x4924aef0`, a missing or out-of-range read with
+    `0x08638556` and an unknown tag with empty data; the tag is compared
+    before any field is read."""
+    constructors = enum_constructors(case)
+    static, head = enum_argument_layout(case)
+    size = len(data)
+    at = lambda position: int.from_bytes(data[position:position + 32], "big")
+    if size < 4 or "0x" + data[:4].hex() != method_selector(enum_argument_signature(case)):
+        return STD_NO_SELECTOR, None
+    if size < 4 + 32 + (head if static else 32):
+        return STD_TRUNCATED, None
+    start = 36
+    if not static:
+        if at(36) > size - 4:
+            return STD_TRUNCATED, None
+        start = 4 + at(36)
+    if size - start < 32:
+        return STD_TRUNCATED, None
+    found = [index for index, constructor in enumerate(constructors) if enum_argument_tag(*constructor) == at(start)]
+    if not found:
+        return STD_EMPTY_REVERT, None
+    fields = constructors[found[0]][1]
+    words = [0, 0, 0]
+    if fields in ("uint256", "uint256,uint256", "ScPair"):
+        if size - start < (64 if fields == "uint256" else 96):
+            return STD_TRUNCATED, None
+        words = [at(start + 32), at(start + 64) if fields != "uint256" else 0, 0]
+    elif fields == "bytes":
+        if size - start < 64:
+            return STD_TRUNCATED, None
+        tail = at(start + 32)
+        if tail > size - start or size - (start + tail) < 32:
+            return STD_TRUNCATED, None
+        length = at(start + tail)
+        if length > size - (start + tail + 32) or length > MAX_DECODED_LENGTH:
+            return STD_TRUNCATED, None
+        payload = data[start + tail + 32:start + tail + 32 + length]
+        chunk = lambda offset: int.from_bytes(payload[offset:offset + 32].ljust(32, b"\0"), "big") if length > offset else 0
+        words = [length, chunk(0), chunk(32)]
+    return None, (at(4), found[0] + 1, *words)
+
+
+def enum_argument_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the protocol on the value std
+    decodes: slot 1 holds the one-based index, slots 2 to 4 the decoded Words,
+    and the output is the committed slot 0. A body revert and a rejection are
+    checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    rejection, decoded = enum_argument_decode(case, enum_argument_input(case, transaction))
+    if rejection is not None:
+        return ["status"]
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    fields = []
+    if [after[slot] for slot in ("1", "2", "3", "4")] != list(decoded[1:]):
+        fields.append("committedStorage")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != after["0"]:
+        fields.append("output")
+    return fields
+
+
 def has_logs(case: dict) -> bool:
     return profile(case).get("logs", False)
 
@@ -1148,6 +1392,14 @@ def declared_scope(case: dict) -> str:
                 "through std.StorageGeneric; initially empty storage; committed values at the accumulator, the enum and "
                 "record fields' slots and both keys' entry slots of both mappings, stale payload slots included, on all "
                 "paths and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
+    if has_enum_arguments(case):
+        return ("ordered zero-value run(uint256,E) transactions that send a value of a user enum E of two to four "
+                "constructors with no fields, one or two Words, a struct of two Words or a bytes value of zero to 64 "
+                "bytes, canonically or with one malformation of its calldata, which std's dispatcher and derived "
+                "decoder accept or reject; a body writes the step result, the one-based index and three decoded Words; "
+                "initially empty storage; the whole return data, std's error selector or empty revert data, and "
+                "committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; no "
+                "gas/balance/nonce or memory equivalence")
     if has_enum_returns(case):
         return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions that return the chosen "
                 "constructor of a user enum of two to four constructors with no fields, one or two Words or a bytes "
@@ -1593,7 +1845,8 @@ def methods_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) 
 
 def uses_selector_rule(case: dict) -> bool:
     """Profiles whose original Core contract reverts with std's error selectors as a Word."""
-    return isinstance(case, dict) and any(case.get("schema") == value["caseSchema"] and value["abi"] in ("malformed", "methods")
+    return isinstance(case, dict) and any(case.get("schema") == value["caseSchema"] and
+                                          value["abi"] in ("malformed", "methods", "enum-arguments")
                                           for value in PROFILES.values())
 
 
@@ -1602,10 +1855,17 @@ def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
     only when original Core reverted with exactly that selector as a Word and the
     transaction's prescribed std outcome is that rejection; every other row is
     compared exactly. A body revert whose Word equals a selector has the
-    prescribed outcome acceptance, so it is compared exactly too."""
+    prescribed outcome acceptance, so it is compared exactly too. For enum
+    arguments, original Core's Word zero likewise stands for an unknown tag's
+    empty revert data, `0x`, when that is the prescribed outcome."""
     selector = tx.get("stdRejection")
     core = rows.get("directCore")
-    if profile(case)["abi"] not in ("malformed", "methods") or selector not in STD_ERRORS or not isinstance(core, dict):
+    if has_enum_arguments(case) and selector == STD_EMPTY_REVERT and isinstance(core, dict):
+        # The empty-revert rule: original Core's Word zero stands for an unknown
+        # tag's empty revert data, only when that is the prescribed outcome.
+        return selector if core.get("status") == "reverted" and core.get("output") == "0x" + bytes(32).hex() else None
+    if profile(case)["abi"] not in ("malformed", "methods", "enum-arguments") or selector not in STD_ERRORS or \
+            not isinstance(core, dict):
         return None
     if core.get("status") != "reverted" or core.get("output") != "0x" + int(selector, 16).to_bytes(32, "big").hex():
         return None
@@ -1694,6 +1954,15 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
+        if selected["abi"] == "enum-arguments":
+            data = enum_argument_input(case, tx)
+            if len(data) > MAX_CALLDATA:
+                raise ValueError("enum-argument calldata exceeds 1 KiB")
+            if tx.get("calldata") != "0x" + data.hex() or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its constructor and malformation")
+            if tx.get("stdRejection") != enum_argument_decode(case, data)[0]:
+                raise ValueError("transaction std outcome differs from std's decision on its calldata")
+            continue
         if selected["abi"] == "enum-returns":
             constructors = enum_constructors(case)
             choice = int(common.word(tx.get("choice"), "transaction choice"))
@@ -1757,6 +2026,9 @@ def validate_case(case) -> None:
         raise ValueError("inline Yul loop plan requires a form of split, carried or pipelined")
     if selected["abi"] == "tuples" and (type(plan.get("arity")) is not int or plan["arity"] not in TUPLE_ARITIES):
         raise ValueError("tuple-return plan requires an arity of 2, 3 or 4")
+    if selected["abi"] == "enum-arguments" and not valid_enum_argument_plan(plan):
+        raise ValueError("enum-argument plan requires two to four constructors with distinct bank names and known "
+                         "field types, at most two with bytes")
     if selected["abi"] == "enum-returns" and not valid_enum_plan(plan):
         raise ValueError("enum-return plan requires two to four constructors with distinct bank names and known fields, "
                          "at most two with bytes")
@@ -1790,6 +2062,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "bytes-returns":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_RETURN_SLOTS:
             raise Finding("unsupported-scope", "input", "bytes-return profile starts empty and observes slots zero through two")
+    elif selected["abi"] == "enum-arguments":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ENUM_ARGUMENT_SLOTS:
+            raise Finding("unsupported-scope", "input", "enum-argument profile starts empty and observes slots zero through four")
     elif selected["abi"] == "enum-returns":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ENUM_RETURN_SLOTS:
             raise Finding("unsupported-scope", "input", "enum-return profile starts empty and observes slots zero through two")
@@ -1837,6 +2112,8 @@ def validate_case(case) -> None:
         contract_methods(case)
     elif selected["abi"] == "adts":
         adt_contract(case)
+    elif selected["abi"] == "enum-arguments":
+        enum_argument_contract(case)
     elif contract != expected:
         raise Finding("unsupported-scope", "input", "storage wrapper differs from the fixed profile")
     provenance = case.get("provenance")
@@ -2034,10 +2311,11 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     returned tuple carries its arity's Words and follows `tuple_fields`. A
     returned `bytes` value carries its padded length and follows
     `bytes_return_fields`, and a returned enum value its encoding's Words and
-    `enum_return_fields`."""
+    `enum_return_fields`. A decoded enum argument follows
+    `enum_argument_fields`."""
     expected = expected_status(case, tx)
     # A std rejection reverts with exactly its selector, after the selector rule.
-    rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
+    rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods", "enum-arguments") else None
     if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
             (row["output"] != rejection if rejection is not None else
              len(common.hex_bytes(row["output"], "output")) != 32 * output_words(case, row)):
@@ -2066,6 +2344,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if has_bytes_returns(case) and bytes_return_fields(case, tx, row, prior):
         return False
     if has_enum_returns(case) and enum_return_fields(case, tx, row, prior):
+        return False
+    if has_enum_arguments(case) and enum_argument_fields(case, tx, row, prior):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -2098,8 +2378,9 @@ def pairwise(values: dict) -> dict:
 
 def compare(histories: dict, case: dict) -> dict:
     """Compare every completed prefix; a later budget failure cannot erase a
-    difference. For malformed calldata the result lists the rows compared by
-    their std error selector, with the selector."""
+    difference. For malformed calldata, several methods and enum arguments
+    the result lists the rows compared by their std error selector, or by
+    empty revert data, with the selector or `0x`."""
     selector_rows = []
     result = compare_rows(histories, case, selector_rows)
     if uses_selector_rule(case):
@@ -2171,7 +2452,7 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         expected = expected_status(case, tx)
         # A prescribed std rejection reverts with exactly its selector on every
         # path; a returned tuple carries its arity's Words and any other row one.
-        rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
+        rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods", "enum-arguments") else None
         normal = all((expected is None or row["status"] == expected) and (
             row["output"] == rejection if rejection is not None else
             len(common.hex_bytes(row["output"], "output")) == 32 * output_words(case, row))
@@ -2245,6 +2526,13 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if has_enum_returns(case):
             # A returned enum value follows the protocol byte by byte; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in enum_return_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_enum_arguments(case):
+            # A returned row follows the protocol on the value std decodes; a
+            # body revert and a rejection are already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in enum_argument_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken

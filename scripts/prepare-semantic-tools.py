@@ -53,6 +53,7 @@ TARGETS = {
     "semanticAdtStorageTool": "semantic-adt-storage-tool",
     "semanticBytesReturnTool": "semantic-bytes-return-tool",
     "semanticEnumReturnTool": "semantic-enum-return-tool",
+    "semanticEnumArgumentTool": "semantic-enum-argument-tool",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",

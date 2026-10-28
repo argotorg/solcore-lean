@@ -150,6 +150,24 @@ ENUM_RETURN_EXTRA = {"EnumPositions": tuple(f"{count}:{position}" for count in (
                      "EnumCarries": ("committed", "rollback"), "EnumNodeBudgets": (384, 512)}
 ENUM_RETURN_DIMENSIONS = DIMENSIONS + tuple(ENUM_RETURN_EXTRA)
 ENUM_FIELD_KINDS = {"": "none", "uint256": "one", "uint256,uint256": "two", "bytes": "bytes"}
+# Enum arguments: the decoded constructors as `count:position`, their fields as
+# `static:kind` or `dynamic:kind`, the lengths of decoded `bytes` fields, the
+# shapes' counts of `bytes` constructors, the malformation kinds, std's
+# prescribed rejections or acceptance, the malformations std accepted, the
+# carries `committed`, `rollback` and `rejection` into a decoded value from an
+# earlier committed, reverted or rejected transaction, and the node budgets of
+# generated cases.
+ENUM_ARGUMENT_EXTRA = {"ArgumentPositions": tuple(f"{count}:{position}" for count in (2, 3, 4) for position in range(count)),
+                       "ArgumentFields": ("static:none", "static:one", "static:two", "static:pair", "dynamic:none",
+                                          "dynamic:one", "dynamic:two", "dynamic:pair", "dynamic:bytes"),
+                       "ArgumentBytesLengths": tuple(range(adapter.MAX_CALLDATA + 1)),
+                       "ArgumentBytesConstructors": (0, 1, 2),
+                       "ArgumentMalformations": adapter.ENUM_ARGUMENT_KINDS,
+                       "ArgumentRejections": adapter.STD_ERRORS + (adapter.STD_EMPTY_REVERT, "accepted"),
+                       "ArgumentAccepted": adapter.ENUM_ARGUMENT_KINDS[1:],
+                       "ArgumentCarries": ("committed", "rollback", "rejection"), "ArgumentNodeBudgets": (384, 512)}
+ENUM_ARGUMENT_DIMENSIONS = DIMENSIONS + tuple(ENUM_ARGUMENT_EXTRA)
+ENUM_ARGUMENT_FIELD_KINDS = {"": "none", "uint256": "one", "uint256,uint256": "two", "ScPair": "pair", "bytes": "bytes"}
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -184,6 +202,8 @@ def dimensions(profile_name):
         return BYTES_RETURN_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "enum-returns":
         return ENUM_RETURN_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "enum-arguments":
+        return ENUM_ARGUMENT_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -397,6 +417,43 @@ def enum_returns_coverage(case, statuses):
             "EnumCarries": carries, "EnumNodeBudgets": budgets}
 
 
+def enum_arguments_coverage(case):
+    """Each transaction's decision on its calldata: the decoded constructors'
+    positions and fields, decoded `bytes` lengths and the malformations std
+    accepted, or the rejection; the shape's `bytes` constructor count; the
+    carries into a decoded value from an earlier committed, reverted or rejected
+    transaction; and a generated case's node budget."""
+    constructors = adapter.enum_constructors(case)
+    static, _ = adapter.enum_argument_layout(case)
+    kind = "static" if static else "dynamic"
+    values = {"ArgumentPositions": set(), "ArgumentFields": set(), "ArgumentBytesLengths": set(),
+              "ArgumentMalformations": set(), "ArgumentRejections": set(), "ArgumentAccepted": set(),
+              "ArgumentCarries": set(),
+              "ArgumentBytesConstructors": {[fields for _, fields in constructors].count("bytes")}}
+    before = set()
+    for tx in case["transactions"]:
+        malformation = tx["malformation"]["kind"]
+        values["ArgumentMalformations"].add(malformation)
+        rejection, decoded = adapter.enum_argument_decode(case, adapter.enum_argument_input(case, tx))
+        values["ArgumentRejections"].add(rejection or "accepted")
+        if rejection is not None:
+            before.add("rejection")
+            continue
+        fields = constructors[decoded[1] - 1][1]
+        values["ArgumentPositions"].add(f"{len(constructors)}:{decoded[1] - 1}")
+        values["ArgumentFields"].add(f"{kind}:{ENUM_ARGUMENT_FIELD_KINDS[fields]}")
+        if fields == "bytes":
+            values["ArgumentBytesLengths"].add(decoded[2])
+        if malformation != "none":
+            values["ArgumentAccepted"].add(malformation)
+        if decoded[0] % 2 == 0:
+            values["ArgumentCarries"] |= before
+        before.add("committed" if decoded[0] % 2 == 0 else "rollback")
+    origin = case["provenance"]["origin"]
+    values["ArgumentNodeBudgets"] = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
+    return values
+
+
 def nested_coverage(case):
     """Outer lengths, and the lengths of the rows present."""
     values = [adapter.nested_values(tx) for tx in case["transactions"]]
@@ -431,6 +488,11 @@ def inputs(case):
         return {value for tx in case["transactions"] for value in tx["inputs"]}
     if adapter.has_adts(case):
         return {tx["input"] for tx in case["transactions"] if "input" in tx}
+    if adapter.has_enum_arguments(case):
+        # The field Words of Word and struct constructors.
+        return {tx[field] for tx in case["transactions"] for field in ("first", "second")
+                if adapter.enum_constructors(case)[tx["choice"]][1] in ("uint256", "uint256,uint256", "ScPair") and
+                (field == "first" or adapter.enum_constructors(case)[tx["choice"]][1] != "uint256")}
     if adapter.has_malformed_bytes(case):
         return {str(chunk) for tx in case["transactions"] for chunk in adapter.payload_chunks(tx)}
     if adapter.profile(case)["abi"] in ("array", "malformed"):
@@ -659,6 +721,13 @@ def validate_manifest(manifest):
                 raise ValueError(f"enum-return coverage requires unique required{dimension} from {list(allowed)}")
     elif any("required" + dimension in manifest for dimension in ENUM_RETURN_EXTRA):
         raise ValueError("enum-return coverage belongs to the enum-return profile")
+    if selected["abi"] == "enum-arguments":
+        for dimension, allowed in ENUM_ARGUMENT_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"enum-argument coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in ENUM_ARGUMENT_EXTRA):
+        raise ValueError("enum-argument coverage belongs to the enum-argument profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
     if selected.get("forms"):
@@ -877,7 +946,8 @@ def keyed_analysis(analysis):
                                                 adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA,
                                                 adapter.ADT_HISTORY_SCHEMA,
                                                 adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA,
-                                                adapter.BYTES_RETURN_HISTORY_SCHEMA, adapter.ENUM_RETURN_HISTORY_SCHEMA)
+                                                adapter.BYTES_RETURN_HISTORY_SCHEMA, adapter.ENUM_RETURN_HISTORY_SCHEMA,
+                                                adapter.ENUM_ARGUMENT_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -1059,6 +1129,8 @@ class Campaign:
             values.update(bytes_returns_coverage(case, statuses))
         elif self.specification["abi"] == "enum-returns":
             values.update(enum_returns_coverage(case, statuses))
+        elif self.specification["abi"] == "enum-arguments":
+            values.update(enum_arguments_coverage(case))
         if self.specification.get("forms"):
             values.update(forms_coverage(case, values))
         for dimension, observed in values.items():
@@ -1128,6 +1200,7 @@ class Campaign:
                           "adts": tuple(ADT_EXTRA),
                           "bytes-returns": tuple(BYTES_RETURN_EXTRA),
                           "enum-returns": tuple(ENUM_RETURN_EXTRA),
+                          "enum-arguments": tuple(ENUM_ARGUMENT_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(
