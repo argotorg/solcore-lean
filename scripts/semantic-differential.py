@@ -55,6 +55,18 @@ ASSEMBLY_CASE_SCHEMA = "solcore-lean.semantic-assembly-case.v1"
 ASSEMBLY_FORMS = ("switch", "if", "operations")
 ASSEMBLY_MEMORY_CASE_SCHEMA = "solcore-lean.semantic-assembly-memory-case.v1"
 ASSEMBLY_MEMORY_HASH_LENGTHS = (0, 1, 31, 32, 33, 64)
+ENUM_CASE_SCHEMA = "solcore-lean.semantic-enum-case.v1"
+ENUM_VERSIONS = ("profileVersion", "boundaryVersion")
+# The specified shape values of the enum profile, from the plan, never measured.
+ENUM_SHAPES = {
+    "constructors": ("2", "3", "4"),
+    "fields": ("count:0", "count:1", "count:2", "type:applied", "type:enum", "type:param", "type:tuple", "type:word"),
+    "declarations": ("argument:enum", "argument:param", "argument:tuple", "argument:word", "generic", "plain", "same-name"),
+    "views": ("generic", "pair", "single"),
+    "patterns": ("default", "dot", "exhaustive", "nested", "nullary", "qualified", "rebound", "repeated", "same-name",
+                 "shadow", "tuple", "variable", "wildcard"),
+    "wildcards": ("arm", "column", "component", "deep", "field"),
+    "depths": ("1", "2", "3")}
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
@@ -81,7 +93,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  AGGREGATE_CASE_SCHEMA: "runtime-aggregates", LOOP_CASE_SCHEMA: "runtime-loops",
                  NESTED_LOOP_CASE_SCHEMA: "runtime-nested-loops", RECURSION_CASE_SCHEMA: "runtime-recursion",
                  RECURSIVE_LOOP_CASE_SCHEMA: "runtime-recursive-loops", LOOP_CLOSURE_CASE_SCHEMA: "runtime-loop-closures",
-                 GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules"}
+                 GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules",
+                 ENUM_CASE_SCHEMA: "runtime-enums"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -93,7 +106,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   AGGREGATE_CASE_SCHEMA: "SynthesizedAggregates", LOOP_CASE_SCHEMA: "SynthesizedLoops",
                   NESTED_LOOP_CASE_SCHEMA: "SynthesizedNestedLoops", RECURSION_CASE_SCHEMA: "SynthesizedRecursion",
                   RECURSIVE_LOOP_CASE_SCHEMA: "SynthesizedRecursiveLoops", LOOP_CLOSURE_CASE_SCHEMA: "SynthesizedLoopClosures",
-                  GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules"}
+                  GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules",
+                  ENUM_CASE_SCHEMA: "SynthesizedEnums"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -364,6 +378,46 @@ def validate_assembly_memory_plan(plan) -> dict:
     return plan
 
 
+def validate_enum_plan(plan) -> dict:
+    """Validate the envelope and the plan's counts; native replay checks every
+    type, pattern, arm, body and value, the seed and the emission."""
+    if (not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.enum-plan.v1"
+            or set(plan) != {"schema", "declarations", "views"}):
+        raise ValueError("unsupported enum plan schema")
+    declarations, views = plan["declarations"], plan["views"]
+    if not isinstance(declarations, list) or not 1 <= len(declarations) <= 3:
+        raise ValueError("enum plan requires one to three declarations")
+    for declaration in declarations:
+        if (not isinstance(declaration, dict) or set(declaration) != {"generic", "sameName", "constructors"}
+                or type(declaration["generic"]) is not bool or type(declaration["sameName"]) is not bool
+                or not isinstance(declaration["constructors"], list) or not 2 <= len(declaration["constructors"]) <= 4
+                or any(not isinstance(fields, list) or len(fields) > 2 for fields in declaration["constructors"])):
+            raise ValueError("enum declarations have two to four constructors of at most two fields")
+    if not isinstance(views, list) or not 1 <= len(views) <= 3:
+        raise ValueError("enum plan requires one to three views")
+    for view in views:
+        if (not isinstance(view, dict)
+                or set(view) != {"kind", "scrutinees", "instances", "arms", "builders", "wordOffset"}
+                or view["kind"] not in ("single", "pair", "generic")
+                or not isinstance(view["arms"], list) or not 1 <= len(view["arms"]) <= 8
+                or not isinstance(view["builders"], list) or not 1 <= len(view["builders"]) <= 2):
+            raise ValueError("enum views are single, pair or generic, with one to eight arms and their builders")
+        word(view["wordOffset"], "enum view word offset")
+    return plan
+
+
+def validate_enum_shapes(values, label="enumShapes") -> dict:
+    """Native replay authenticates the shapes; Python checks their envelope."""
+    if not isinstance(values, dict) or set(values) != set(ENUM_SHAPES):
+        raise ValueError(f"{label} must name every enum shape dimension")
+    for key, allowed in ENUM_SHAPES.items():
+        found = values[key]
+        if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
+                or found != sorted(set(found))):
+            raise ValueError(f"{label} {key} must be a sorted unique inventory of known shapes")
+    return values
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -464,6 +518,8 @@ def validate_case(case: dict) -> None:
         validate_assembly_plan(case.get("assemblyPlan"))
     if case["schema"] == ASSEMBLY_MEMORY_CASE_SCHEMA:
         validate_assembly_memory_plan(case.get("assemblyMemoryPlan"))
+    if case["schema"] == ENUM_CASE_SCHEMA:
+        validate_enum_plan(case.get("enumPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -508,6 +564,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("helperCount")) is not int or not 1 <= provenance["helperCount"] <= 3:
             raise ValueError("aggregate call-graph helperCount must be an integer from one to three")
         validate_aggregate_shapes(provenance.get("aggregateShapes"))
+    if case["schema"] == ENUM_CASE_SCHEMA:
+        for key in ENUM_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing enum provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
+            raise ValueError("enum referenceNodes must be an integer from 1 to 4,096")
+        validate_enum_shapes(provenance.get("enumShapes"))
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -531,7 +594,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -989,6 +1052,7 @@ def execute(args, report: dict) -> None:
         CALL_GRAPH_LOOP_CASE_SCHEMA: "runtime Word input, bounded source while versus finite Core guards, directly generated acyclic Word helper step graph, Sonatina O0, run(uint256) ABI Word",
         ASSEMBLY_LOOP_CASE_SCHEMA: "runtime Word input, an inline Yul for loop with break, continue, leave or a two-result step function versus finite Core guards, directly generated acyclic Word helper step graph as Yul functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated internal Word pairs/sums, projections and case payload scopes with acyclic Word helper calls, Sonatina O0, run(uint256) ABI Word",
+        ENUM_CASE_SCHEMA: "runtime Word input, user-defined plain and generic enums built from the input and matched with nested constructor and tuple patterns, wildcards and nested matches versus Core sums, products and caseE, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

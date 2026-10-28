@@ -39,15 +39,16 @@ def hull_output(contract=CONTRACT):
 
 class YulProtocolTests(unittest.TestCase):
     def test_pure_and_storage_family_wrappers_are_admitted_but_call_wrappers_are_not(self):
-        self.assertEqual(len(exporter.PURE_CONTRACTS), 21)
+        self.assertEqual(len(exporter.PURE_CONTRACTS), 22)
         self.assertEqual(len(exporter.STORAGE_CONTRACTS), 18)
-        self.assertEqual(len(set(exporter.CONTRACTS)), 39)
+        self.assertEqual(len(set(exporter.CONTRACTS)), 40)
         self.assertEqual(exporter.CONTRACTS, exporter.PURE_CONTRACTS + exporter.STORAGE_CONTRACTS)
         self.assertIn("SynthesizedAssembly", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedRecursiveLoops", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedLoopClosures", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedAssemblyLoops", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedAssemblyMemory", exporter.PURE_CONTRACTS)
+        self.assertIn("SynthesizedEnums", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedRecursion", exporter.CONTRACTS)
         self.assertIn("SynthesizedNestedLoops", exporter.CONTRACTS)
         self.assertIn("SynthesizedPrimitives", exporter.CONTRACTS)

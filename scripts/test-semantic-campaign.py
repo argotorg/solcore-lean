@@ -273,6 +273,38 @@ def assembly_memory_policy_case(stages=((7, 'word', 13), (40, 'byte', 70)), fina
     return case
 
 
+ENUM_PLAN = {'schema': 'solcore-lean.enum-plan.v1',
+    'declarations': [{'generic': False, 'sameName': False, 'constructors': [[], ['word']]}],
+    'views': [{'kind': 'single', 'scrutinees': [{'enum': 0}], 'instances': [],
+               'arms': [{'patterns': [{'constructor': 1, 'form': 'qualified', 'fields': [{'var': 'sc_a'}]}],
+                         'return': {'terms': [{'name': 'sc_a'}], 'operations': [], 'constant': '7'}},
+                        {'patterns': [], 'return': {'terms': [{'name': 'sc_w'}], 'operations': [], 'constant': '9'}}],
+               'builders': [{'offset': 0, 'values': [{'constructor': 1, 'form': 'qualified',
+                                                     'fields': [{'leaf': 'input', 'constant': '0'}]}]}],
+               'wordOffset': '3'}]}
+
+
+def enum_shapes(**changes):
+    shapes = {key: [] for key in campaign.m2.ENUM_SHAPES}
+    shapes.update(constructors=['2'], fields=['count:0', 'count:1', 'type:word'], declarations=['plain'],
+                  views=['single'], patterns=['default', 'qualified', 'variable'], depths=['1'])
+    shapes.update(changes)
+    return shapes
+
+
+def enum_policy_case(value=255, shapes=None):
+    """Enum envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(1)
+    case.update(schema=campaign.m2.ENUM_CASE_SCHEMA, input=str(value), enumPlan=copy.deepcopy(ENUM_PLAN))
+    case['contract'].update(name='SynthesizedEnums', deployPath=['SynthesizedEnumsDeploy'],
+        runtimePath=['SynthesizedEnumsDeploy', 'SynthesizedEnums'], calldata='0xa444f5e9' + f'{value:064x}')
+    case['provenance'] = {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                    *campaign.PROFILE_VERSION_FIELDS['runtime-enums'])},
+        'origin': {'kind': 'enum-generated', 'seed': '1', 'maxProgramNodes': 2048}, 'features': [],
+        'referenceNodes': 80, 'enumShapes': shapes or enum_shapes()}
+    return case
+
+
 def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
     """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
     case = function_case(helpers)
@@ -1401,6 +1433,135 @@ class LoopClosureCoverageTests(unittest.TestCase):
         self.assertEqual(len(manifest['cases']), 48)
         loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
         self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
+
+
+class EnumCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-enums'
+    CORPUS = ROOT / 'scripts/semantic-enum-corpus.json'
+    REQUIRED = {**{key: [] for key in campaign.m2.ENUM_SHAPES}, 'views': ['single'], 'patterns': ['default']}
+
+    def manifest(self, generated=False):
+        case = enum_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'enumRequirements': self.REQUIRED,
+            'cases': [{'id': 'enum', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 2048}} if generated else {'enumPlan': case['enumPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE], ('enum-generate', 'enum-emit', 'enum-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.ENUM_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
+        self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 4096))
+        # Every other profile keeps the 512-node maximum.
+        self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES if profile != self.PROFILE}, {512})
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
+        self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
+                         {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
+                          'wildcards': 5, 'depths': 3})
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['enum-generate', '1', '2048', '1', '256', '1000000',
+                                 campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+        self.assertEqual(summary['configuration']['acceptance'], campaign.RANDOM_ACCEPTANCE)
+        _, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', '4096')
+        self.assertEqual(seen[0][2], '4096')
+        for nodes in ('255', '4097'):
+            with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+            CommandLine.run_main(self, '--profile', 'runtime-primitives', '--cases', '1', '--nodes', '513')
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['enumCoverage']['requiredPatterns'], [])
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['enumRequirements']
+        for invalid in (None, {}, {**base, 'views': ['tuple']}, {**base, 'patterns': ['or']},
+                        {**base, 'depths': ['4']}, {**base, 'depths': [1]}, {**base, 'views': ['single', 'single']},
+                        {key: values for key, values in base.items() if key != 'depths'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'enumRequirements': invalid})
+        with self.assertRaises(ValueError):
+            campaign.enum_requirements({'profile': 'runtime-aggregates', 'enumRequirements': base})
+        plan = entry['enumPlan']
+        view = plan['views'][0]
+        declaration = plan['declarations'][0]
+        for invalid in ({**plan, 'views': []}, {**plan, 'views': [view] * 4}, {**plan, 'declarations': []},
+                        {**plan, 'declarations': [{**declaration, 'constructors': [[]]}]},
+                        {**plan, 'declarations': [{**declaration, 'constructors': [['word'] * 3, []]}]},
+                        {**plan, 'declarations': [{**declaration, 'generic': 1}]},
+                        {**plan, 'views': [{**view, 'kind': 'triple'}]}, {**plan, 'views': [{**view, 'arms': []}]},
+                        {**plan, 'views': [{**view, 'wordOffset': 3}]}, {**plan, 'extra': 1},
+                        {**plan, 'schema': 'solcore-lean.assembly-plan.v1'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'enumPlan': invalid}]})
+        for changed in ({**entry, 'program': {}}, {**entry, 'assemblyPlan': entry['enumPlan']}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+        for nodes in (256, 2048, 4096):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+        for nodes in (255, 4097):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                    'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        self.assertEqual(campaign.specified_enums(enum_policy_case()),
+            {'Constructors': {'2'}, 'Fields': {'count:0', 'count:1', 'type:word'}, 'Declarations': {'plain'},
+             'Views': {'single'}, 'Patterns': {'default', 'qualified', 'variable'}, 'Wildcards': set(), 'Depths': {'1'}})
+        self.assertEqual(campaign.specified_enums(assembly_policy_case()),
+                         {dimension: set() for dimension in campaign.ENUM_DIMENSIONS})
+        for invalid in ({'views': ['single']}, enum_shapes(views=['triple']), enum_shapes(views=['single', 'pair']),
+                        enum_shapes(depths=['1', '1'])):
+            with self.assertRaises(ValueError):
+                campaign.specified_enums(enum_policy_case(shapes=invalid))
+
+    def test_nonmatching_outcomes_cannot_satisfy_enum_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [enum_policy_case(), enum_policy_case(shapes=enum_shapes(views=['generic', 'pair']))]
+            instance.summary['enumCoverage'].update(requiredViews=['pair', 'single'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['provenance']['enumShapes']['views'][0]
+                folder.mkdir()
+                report = matched()
+                if 'pair' in case['provenance']['enumShapes']['views']:
+                    report['comparison'] = {'category': 'compiler-crash', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['enumCoverage']
+            self.assertEqual((coverage['generatedViews'], coverage['matchedViews']), (['generic', 'pair', 'single'], ['single']))
+            self.assertEqual(coverage['missingViews'], ['pair'])
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        self.assertEqual(manifest['enumRequirements'], {key: list(values) for key, values in campaign.m2.ENUM_SHAPES.items()})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 2048
+                            for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']) % len(campaign.PRIMITIVE_INPUTS), 0)
 
 
 class AssemblyMemoryCoverageTests(unittest.TestCase):
@@ -3171,7 +3332,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 21)
+        self.assertEqual(len(campaign.PROFILES), 22)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -3856,7 +4017,8 @@ class G0VersionTests(CommandLine, unittest.TestCase):
 
     def test_only_call_graph_profiles_use_their_own_grammar(self):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
-            {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs'})
+            {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
+             'runtime-enums'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -3952,7 +4114,7 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
               'runtime-assembly-loops': 10, 'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
-              'runtime-comptime': 8, 'runtime-modules': 8}
+              'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))

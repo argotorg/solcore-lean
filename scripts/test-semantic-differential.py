@@ -257,6 +257,37 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.ASSEMBLY_MEMORY_CASE_SCHEMA], "runtime-assembly-memory")
         self.assertEqual(runner.CASE_CONTRACTS[runner.ASSEMBLY_MEMORY_CASE_SCHEMA], "SynthesizedAssemblyMemory")
 
+    def test_enum_plan_envelope_and_shape_inventory(self):
+        declaration = {"generic": True, "sameName": True, "constructors": [["param", "word"], [], [{"enum": 0}]]}
+        view = {"kind": "generic", "scrutinees": [{"enum": 0, "argument": "param"}], "instances": ["word", {"tuple": ["word", "word"]}],
+                "arms": [{"patterns": ["_"], "return": {"terms": [{"name": "sc_w"}], "operations": [], "constant": "1"}}],
+                "builders": [{"offset": 0, "values": []}, {"offset": 1, "values": []}], "wordOffset": "7"}
+        plan = {"schema": "solcore-lean.enum-plan.v1", "declarations": [declaration] * 3, "views": [view] * 3}
+        runner.validate_enum_plan(plan)
+        runner.validate_enum_plan({**plan, "declarations": [{**declaration, "constructors": [[]] * 4}]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.assembly-plan.v1"}, {**plan, "extra": 0},
+                        {**plan, "declarations": []}, {**plan, "declarations": [declaration] * 4},
+                        {**plan, "declarations": [{**declaration, "constructors": [[]]}]},
+                        {**plan, "declarations": [{**declaration, "constructors": [[]] * 5}]},
+                        {**plan, "declarations": [{**declaration, "constructors": [["word"] * 3, []]}]},
+                        {**plan, "declarations": [{**declaration, "generic": 0}]},
+                        {**plan, "declarations": [{**declaration, "extra": 0}]},
+                        {**plan, "views": []}, {**plan, "views": [view] * 4}, {**plan, "views": [{**view, "kind": "triple"}]},
+                        {**plan, "views": [{**view, "arms": []}]}, {**plan, "views": [{**view, "arms": [view["arms"][0]] * 9}]},
+                        {**plan, "views": [{**view, "builders": []}]}, {**plan, "views": [{**view, "wordOffset": 7}]},
+                        {**plan, "views": [{**view, "wordOffset": "07"}]}, {**plan, "views": [{**view, "extra": 0}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_enum_plan(invalid)
+        shapes = {key: list(values) for key, values in runner.ENUM_SHAPES.items()}
+        runner.validate_enum_shapes(shapes)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "views": ["single", "generic"]},
+                        {**shapes, "views": ["single", "single"]}, {**shapes, "depths": ["4"]}, {**shapes, "depths": [1]}):
+            with self.assertRaises(ValueError):
+                runner.validate_enum_shapes(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.ENUM_CASE_SCHEMA], "runtime-enums")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.ENUM_CASE_SCHEMA], "SynthesizedEnums")
+        self.assertEqual(runner.ENUM_VERSIONS, ("profileVersion", "boundaryVersion"))
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -612,7 +643,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 21)
+        self.assertEqual(len(runner.CASE_PROFILES), 22)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

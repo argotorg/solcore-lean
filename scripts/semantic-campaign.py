@@ -36,6 +36,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-primitives": ("primitive-generate", "primitive-emit", "primitive-generated"),
                     "runtime-assembly": ("assembly-generate", "assembly-emit", "assembly-generated"),
                     "runtime-assembly-memory": ("assembly-memory-generate", "assembly-memory-emit", "assembly-memory-generated"),
+                    "runtime-enums": ("enum-generate", "enum-emit", "enum-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
                     "runtime-assembly-loops": ("assembly-loop-generate", "assembly-loop-emit", "assembly-loop-generated"),
@@ -91,6 +92,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-primitives": PRIMITIVE_VERSIONS,
                           "runtime-assembly": (*PRIMITIVE_VERSIONS, "functionProfileVersion"),
                           "runtime-assembly-memory": (*PRIMITIVE_VERSIONS, "functionProfileVersion", "memoryVersion"),
+                          "runtime-enums": m2.ENUM_VERSIONS,
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
                           "runtime-assembly-loops": m2.ASSEMBLY_LOOP_VERSIONS,
@@ -148,7 +150,7 @@ RANDOM_ACCEPTANCE = "exclude-boundary-identity-v1"
 IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-assembly", "runtime-assembly-memory",
                             "runtime-functions", "runtime-mutation",
                             "runtime-aggregates", "runtime-closures", "runtime-comptime", "runtime-modules",
-                            "runtime-call-graphs", "runtime-aggregate-call-graphs")
+                            "runtime-call-graphs", "runtime-aggregate-call-graphs", "runtime-enums")
 # The case tool returns at most this many cases per generation request.
 MAX_CASES = 1024
 # Default random attempts with --functions: at least this many candidates per
@@ -362,7 +364,12 @@ def aggregate_shapes(case: dict) -> set[str]:
 
 def minimum_nodes(profile: str) -> int:
     return {"runtime-primitives": 8, "runtime-assembly-memory": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39, "runtime-assembly-loops": 39,
-            "runtime-aggregate-call-graphs": 13}.get(profile, 3)
+            "runtime-aggregate-call-graphs": 13, "runtime-enums": 256}.get(profile, 3)
+
+
+def maximum_nodes(profile: str) -> int:
+    """The enum budget bounds the applied reference, at most its 4,096-node case limit."""
+    return 4096 if profile == "runtime-enums" else 512
 
 
 def loop_requirements(manifest: dict) -> dict:
@@ -547,6 +554,32 @@ def specified_assembly_memory(case: dict) -> dict[str, set]:
         read(plan["hash"]["offset"], plan["hash"]["length"], False)
     return {"Stages": {str(len(plan["stages"]))}, "Accesses": accesses, "Hazards": hazards,
             "Hashes": {"none" if plan["hash"] is None else str(plan["hash"]["length"])}}
+
+
+ENUM_DIMENSIONS = ("Constructors", "Fields", "Declarations", "Views", "Patterns", "Wildcards", "Depths")
+
+
+def enum_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("enumRequirements", {key: [] for key in m2.ENUM_SHAPES})
+    if not isinstance(requirements, dict) or set(requirements) != set(m2.ENUM_SHAPES):
+        raise ValueError("enumRequirements requires constructors, fields, declarations, views, patterns, wildcards and depths arrays")
+    for key, allowed in m2.ENUM_SHAPES.items():
+        values = requirements[key]
+        if (not isinstance(values, list) or any(not isinstance(v, str) or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid enum {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-enums" and any(requirements.values()):
+        raise ValueError("only enum corpora can require enum shapes")
+    return requirements
+
+
+def specified_enums(case: dict) -> dict[str, set]:
+    """The plan's enum shapes as native replay authenticates them in the
+    provenance; never measured match compilation or opcode coverage."""
+    if case.get("schema") != m2.ENUM_CASE_SCHEMA:
+        return {dimension: set() for dimension in ENUM_DIMENSIONS}
+    shapes = m2.validate_enum_shapes(case.get("provenance", {}).get("enumShapes"))
+    return {dimension: set(shapes[dimension.lower()]) for dimension in ENUM_DIMENSIONS}
 
 
 def assembly_loop_requirements(manifest: dict) -> dict:
@@ -805,6 +838,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["assemblyCoverage"]["missing" + dimension] for dimension in ASSEMBLY_DIMENSIONS)
         or any(summary["assemblyLoopCoverage"]["missing" + dimension] for dimension in ASSEMBLY_LOOP_DIMENSIONS)
         or any(summary["assemblyMemoryCoverage"]["missing" + dimension] for dimension in ASSEMBLY_MEMORY_DIMENSIONS)
+        or any(summary["enumCoverage"]["missing" + dimension] for dimension in ENUM_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -845,6 +879,8 @@ def validate_manifest(manifest) -> dict:
         raise ValueError("inline Yul corpus must require all eight boundary inputs")
     if profile == "runtime-assembly-memory" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("inline Yul memory corpus must require all eight boundary inputs")
+    if profile == "runtime-enums" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+        raise ValueError("enum corpus must require all eight boundary inputs")
     if profile == "runtime-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
@@ -869,6 +905,7 @@ def validate_manifest(manifest) -> dict:
     assembly_requirements(manifest)
     assembly_loop_requirements(manifest)
     assembly_memory_requirements(manifest)
+    enum_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -881,9 +918,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -916,7 +953,7 @@ def validate_manifest(manifest) -> dict:
                 raise ValueError("generation request must be an object")
             seed = m2.word(request.get("seed"), "generation seed")
             nodes = request.get("maxProgramNodes")
-            if int(seed) >= 2**64 or type(nodes) is not int or not minimum_nodes(profile) <= nodes <= 512:
+            if int(seed) >= 2**64 or type(nodes) is not int or not minimum_nodes(profile) <= nodes <= maximum_nodes(profile):
                 raise ValueError("generation request exceeds seed or node limits")
         elif "loopPlan" in entry:
             (m2.validate_call_graph_loop_plan if profile == "runtime-call-graph-loops" else m2.validate_loop_plan)(entry["loopPlan"])
@@ -934,6 +971,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_assembly_loop_plan(entry["assemblyLoopPlan"])
         elif "assemblyMemoryPlan" in entry:
             m2.validate_assembly_memory_plan(entry["assemblyMemoryPlan"])
+        elif "enumPlan" in entry:
+            m2.validate_enum_plan(entry["enumPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -955,7 +994,7 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
     if profile == "runtime-recursion":
         return RECURSION_INPUTS
     if profile in ("runtime-primitives", "runtime-assembly", "runtime-assembly-memory", "runtime-call-graphs",
-                   "runtime-aggregate-call-graphs"):
+                   "runtime-aggregate-call-graphs", "runtime-enums"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
 
@@ -1118,6 +1157,8 @@ class Campaign:
                 **{prefix + dimension: [] for dimension in ASSEMBLY_LOOP_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "assemblyMemoryCoverage": {"classification": "inline Yul memory plan stage counts, access delta classes, overwrites and reads after writes the schedule specifies, and hashed lengths; matched plans verified by native replay; not measured memory traces or opcode coverage",
                 **{prefix + dimension: [] for dimension in ASSEMBLY_MEMORY_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "enumCoverage": {"classification": "enum plan constructor counts, field types, declaration kinds and instance arguments, view kinds, pattern forms, wildcard positions and pattern depths the plan specifies; matched plans verified by native replay; not measured match compilation or opcode coverage",
+                **{prefix + dimension: [] for dimension in ENUM_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -1180,6 +1221,9 @@ class Campaign:
         assembly_memory = self.summary["assemblyMemoryCoverage"]
         for dimension in ASSEMBLY_MEMORY_DIMENSIONS:
             assembly_memory["missing" + dimension] = sorted(set(assembly_memory["required" + dimension]) - set(assembly_memory["matched" + dimension]))
+        enum = self.summary["enumCoverage"]
+        for dimension in ENUM_DIMENSIONS:
+            enum["missing" + dimension] = sorted(set(enum["required" + dimension]) - set(enum["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -1244,6 +1288,11 @@ class Campaign:
         for dimension, values in specified_assembly_memory(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["assemblyMemoryCoverage"][key] = sorted(set(self.summary["assemblyMemoryCoverage"][key]) | values)
+
+    def record_enums(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_enums(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["enumCoverage"][key] = sorted(set(self.summary["enumCoverage"][key]) | values)
 
     def record_generics(self, case: dict, *, matched: bool = False) -> None:
         key = ("matched" if matched else "generated") + "Instantiations"
@@ -1559,6 +1608,9 @@ class Campaign:
         assembly_memory = assembly_memory_requirements(manifest)
         for dimension in ASSEMBLY_MEMORY_DIMENSIONS:
             self.summary["assemblyMemoryCoverage"]["required" + dimension] = sorted(assembly_memory[dimension.lower()])
+        enum = enum_requirements(manifest)
+        for dimension in ENUM_DIMENSIONS:
+            self.summary["enumCoverage"]["required" + dimension] = sorted(enum[dimension.lower()])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1598,7 +1650,7 @@ class Campaign:
                 case = generated[0]
             elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -1647,6 +1699,7 @@ class Campaign:
             self.record_assembly(case)
             self.record_assembly_loops(case)
             self.record_assembly_memory(case)
+            self.record_enums(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1705,6 +1758,7 @@ class Campaign:
             self.record_assembly(case)
             self.record_assembly_loops(case)
             self.record_assembly_memory(case)
+            self.record_enums(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1737,6 +1791,7 @@ class Campaign:
                 self.record_assembly(case, matched=True)
                 self.record_assembly_loops(case, matched=True)
                 self.record_assembly_memory(case, matched=True)
+                self.record_enums(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -1770,7 +1825,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums (at most 4096), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     parser.add_argument("--functions", type=int,
                         help="random runtime-input profiles only: generate this many accepted functions, each "
@@ -1858,7 +1913,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16
@@ -1866,7 +1921,7 @@ def main() -> int:
             parser.error(str(error))
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
-    limits = {"seed": (0, SEED_MODULUS - 1), "nodes": (minimum_nodes(args.profile), 512), "cases": (1, MAX_CASES), "attempts": (0, MAX_ATTEMPTS),
+    limits = {"seed": (0, SEED_MODULUS - 1), "nodes": (minimum_nodes(args.profile), maximum_nodes(args.profile)), "cases": (1, MAX_CASES), "attempts": (0, MAX_ATTEMPTS),
               "seconds": (0.001, 86400), "disk_bytes": (16 * 1024 * 1024, 10**10),
               "shrink_attempts": (0, 10000), "shrink_candidates": (1, 4096), "case_timeout": (0.001, 3600),
               "direct_fuel": (1, 10000000), "core_fuel": (1, 1000000000), "gas": (1, 1000000000)}
