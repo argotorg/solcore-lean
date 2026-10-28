@@ -4501,6 +4501,242 @@ record that revision with no tracked difference.
 A random run took 103 to 114 seconds on Sonatina and 170 to 176 on Yul. There
 was no finding. Hosted CI has not run the profile.
 
+**Returned enums.** Every generated program so far returns Words, std pairs or
+std sums. User-defined `enum` types and their ABI encoding through
+`std.ABIGeneric` are untested, and the pinned checkout's own fixtures place
+front-end defects there: `abi-dyn-sum-return` records that the generic encoder
+once wrote only the tag of a returned dynamic enum. The
+`stateful-enum-returns` profile returns a value of an enum of two to four
+constructors and compares the whole return data on all three paths. The
+condition is the same as for tuples and `bytes`: every existing statement
+keeps its form, except for the one-Word premise already introduced, and the
+nested boundary stays.
+
+std's encoding, from `std/ABIGeneric.sol` and the compiler's derived
+instances:
+- An enum crosses the ABI with one tag Word per constructor,
+  `keccak256("Name(fields)")`. `fields` is std's `sigStr` of the
+  constructor's fields: empty, `uint256`, `uint256,uint256` or `bytes`.
+- A static enum, one without a `bytes` field, is inline: the tag, then the
+  fields. Its head is the tag Word and the widest constructor's fields, so a
+  narrower constructor leaves the rest of the head unwritten.
+- A dynamic enum is the offset Word 32, then that body. A `bytes` field's head
+  Word is its offset from the body's start, the body's head, and its tail is
+  std's `bytes` encoding: the length Word and the zero-padded data.
+
+A probe came first: eight hand-written contracts with
+`run(uint256 flags, uint256 input, uint256 choice, uint256 length)`, selector
+`0x15509d2b`, each returning one enum.
+- Four were static: `Nil | Single(uint256)`,
+  `Wide(uint256, uint256) | Empty | Narrow(uint256) | Idle`,
+  `Lone(uint256) | PairA(uint256, uint256) | PairB(uint256, uint256)` and
+  `Off | On`.
+- Four were dynamic: `Value(uint256) | Data(bytes) | Gone`,
+  `Nil | Single(uint256) | Double(uint256, uint256) | Blob(bytes)`,
+  `Left(bytes) | Right(bytes) | Both(uint256, uint256)` and
+  `Head(bytes) | Tail(uint256)`.
+- Each ran eight transactions of the protocol below. They returned every
+  constructor, with `bytes` lengths 0, 1, 9, 31, 32, 33, 35, 63 and 64. They
+  included a revert with returns after it, choices and lengths beyond the
+  constructor count and 64, which the contract reads modulo the count and 65,
+  and the inputs `2^256 - 1` and `2^255`.
+- Each contract ran with the stand-in step `3x + 7`, then with two generated
+  G0 revision-three steps of pairs, sums, matches and cells: 24 contracts and
+  192 transactions.
+
+The results:
+- The pinned compiler accepted every shape as a public return type. Checked
+  Hull export, Sonatina O0 and O2 images, and Yul through the pinned solc all
+  compiled.
+- On Anvil, O0, O2 and Yul returned the same bytes and reverted with one Word.
+  Imported Hull with O0 and O2 images gave the same bytes, reverts and slots:
+  960 path runs in all.
+- Every output equalled an independent Python model of the encoding above,
+  with the tags computed by `cast keccak`. The model fills the unwritten head
+  Words with zeros. They are zero on every path because std's encoder starts
+  at the free-memory pointer, and nothing in these methods writes above it.
+
+So the profile is feasible on every compiled path. The Core representation:
+- **One convention:** `CoreContractEntryProfile.enumOutcomeV1 first second
+  rest`. It records the constructors' fields in declaration order, each an
+  `EnumPayload`: `noWords`, `oneWord`, `twoWords` or `boundedBytes`.
+- **Tags in the value:** a convention that recorded the tags would not be
+  determined by its result type. `ofResultType?` and the injectivity of
+  `resultType` would then have to change, so the value carries them.
+  - Each constructor's value is its tag Word paired with its fields: `(tag,
+    ())`, `(tag, w)`, `(tag, (w0, w1))` or `(tag, b)`. Here `b` is the
+    bounded `bytes` value of `boundedBytesOutcomeV1`.
+  - The returned value is the right-nested sum of these in declaration order.
+- **Decoding:** `decode?` maps a returned value to std's encoding:
+  - the tag, the fields' head, zero Words up to the body's head, then a
+    `bytes` field's length Word and zero-padded data;
+  - for a dynamic enum, the offset Word 32 first;
+  - revert and trap as for `wordOutcomeV1`, under the exact enum annotation.
+
+  Every annotation is strict, and every typed value decodes.
+- **Recognition:** `ofResultType?` recognizes exactly these types, after the
+  earlier conventions. Every constructor's value is a product whose first
+  component is a Word, so no existing type changes its recognition, the
+  existing rejections stay, and `resultType` stays injective.
+- **Binding:** `CheckedCoreContract.enumOutcomeV1` binds checked code to it.
+  The top-level runner decodes through `decode?` and runs enum contracts
+  unchanged.
+- **One-Word premise:** `returnsOneWord` is false for every enum, even one of
+  field-less constructors, whose encoding is one Word. So the nested executor
+  keeps every enum contract out: a registered enum contract is `unavailable`
+  to a word call, and a template with an enum initializer is `unavailable` to
+  creation. Neither the nested executor nor any existing statement changes.
+- The Hull importer, Core's semantics and host requests, and every backend
+  stay as they are.
+
+The profile's definitions were fixed before execution:
+- **Contract:** `SynthesizedEnumReturns` with
+  `run(uint256 flags, uint256 input, uint256 choice, uint256 length)`,
+  selector `0x15509d2b`, returning the source enum `SynthesizedEnum`. Every
+  transaction is zero-value.
+- **Shape:** each case records its enum's constructors in declaration order.
+  - There are two to four, each named from the bank `Idle`, `Ready`, `Pair`,
+    `Blob`, `Settled`, `Q`, `Rejected` and `OverflowedAccumulator` without
+    repetition.
+  - Each has no fields, one `uint256`, two `uint256`s or one
+    `memory<bytes>`. At most two carry `bytes`.
+  - A shape without `bytes` is static, any other is dynamic.
+- **Choice and length:** each transaction records its constructor index `c`,
+  below the constructor count `n`. It also records `L`, from 0 to 64 when
+  constructor `c` carries `bytes` and 0 otherwise. The contract reads the
+  choice Word modulo `n` and the length Word modulo 65.
+- **Declared slots 0 to 2,** as for tuples and `bytes`: an accumulator, the
+  committed call count and the last committed input.
+- **Transaction:** as for `bytes`, it reads `prior = slot 0` and
+  `last = slot 2`, computes `r = step(prior + input)` and writes `r`, slot 1
+  plus one and the input. Odd flags then revert with the one Word `r`. Even
+  flags return constructor `c` with its fields:
+  1. none;
+  2. `d0 = r · K`;
+  3. `(d0, d1)`, with `d1 = (count · K) xor last`;
+  4. the first `L` bytes of `d0` and `d1`.
+
+  `K` and `count` are as for `bytes`.
+- **Source** (`solcore-source-enum-returns-v1`):
+  - it imports `std.Generic` and `std.ABIGeneric` beside `std` and
+    `std.dispatch`, and declares `enum SynthesizedEnum` with the shape's
+    constructors;
+  - the step is `sc_step`, rendered by the aggregate renderer;
+  - the method computes `d0` and `d1` after the writes, then tests the choice
+    against each constructor index but the last and returns that
+    constructor;
+  - a `bytes` constructor allocates 96 bytes with `allocate_memory`, stores
+    `L`, `d0` and `d1` with `mstore`, and passes the pointer through
+    `Typedef.abs` as a `memory<bytes>` local.
+- **Original Core** (`core-enum-return-contract-v1`, entry
+  `enumOutcomeV1`): one host contract whose result is `inLeft v` for
+  constructor `c`'s value `v`, or `inRight (inLeft r)`.
+  - Each tag is `keccak256("Name(fields)")`, computed by Lean's Keccak-256.
+  - The contract binds `d0`, `d1` and, for a dynamic shape, the `bytes`
+    value.
+  - Then one test of `c` per constructor injects that constructor left of
+    the remaining ones, or passes right.
+- **Node budget:**
+  - the shell, everything but the step, depends on the shape: 130 to 191
+    nodes for two constructors, 157 to 238 for three and 188 to 291 for four;
+  - it lies inside the budget, so the 384-node default leaves 93 to 254
+    nodes for the step;
+  - the doubled budget is capped at 512, and contracts are bounded by 512
+    nodes.
+- **Step:** one checked aggregate step with one to three helpers, generated as
+  for the other storage-family profiles. The step must not give equal outputs
+  at all boundary inputs. A step budget too small for the drawn template is an
+  exclusion, which large shapes at 384 nodes meet more often.
+- **Shape generation:** a stream of its own draws, in order:
+  1. the constructor count, uniformly from 2 to 4;
+  2. zero `bytes` constructors with probability one half, otherwise one or
+     two with probability one quarter each;
+  3. each other constructor's fields, uniformly from none, one Word and two
+     Words;
+  4. the positions of the `bytes` constructors;
+  5. the names, drawn from the bank without repetition.
+- **Transactions:** `{id, flags, input, choice, length, calldata, value}`, one
+  to eight per scenario, drawn in blocks of three from a separate stream. Each
+  block draws:
+  - three flags from the boundary bank, each with the parity of one of the
+    four completion patterns;
+  - three inputs from the bank;
+  - three choices, uniformly below `n`;
+  - three lengths, used only for `bytes` constructors. Each is from the
+    length bank 0, 1, 31, 32, 33, 63 and 64 with probability one half,
+    otherwise uniformly from 0 to 64.
+
+  Random runs generate the step with G0 revision three.
+- **Observations:** status, the whole return data, slots 0 to 2 and the whole
+  committed storage, per prefix.
+  - The adapter's output rule: let `w` be the widest constructor's field head,
+    0, 32 or 64 bytes, where `bytes` counts 32. A static enum returns
+    `32 + w` bytes. A dynamic one returns `64 + w`, plus `32 + 32⌈L/32⌉`
+    for a `bytes` constructor. A revert returns 32. The rule for every other
+    profile stays as it is.
+  - Each returned row must follow the protocol: constructor `c`'s tag, its
+    fields from the committed slots 0 and 1 and the prior slot 2, zero
+    padding, and for a dynamic enum the offset Words and the `bytes` tail.
+    Slot 1 grows by one, and the committed slot 2 is the input.
+  - A revert keeps the prior slots and the whole storage.
+- **Exclusions, in order:**
+  - a node budget too small for the shell or above 512;
+  - the step's own exclusions;
+  - a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed parities.
+- **Reductions:** each candidate is sealed and strictly smaller in
+  transactions, then the shape's weight, then the total length, then program
+  size, then the flags and inputs. A shape's weight sums one per constructor
+  and its fields' weight: 0, 1, 2 and 3 for none, one Word, two Words and
+  `bytes`. The reductions, in order:
+  - one-transaction removals;
+  - shorter lengths: zero, then half the length;
+  - a constructor that no transaction chooses, dropped while more than two
+    remain; the choices above it move down;
+  - narrower fields: two Words to one, one Word to none, and `bytes` to none
+    with the lengths of its transactions set to zero;
+  - step reductions;
+  - simpler transactions: flags to their parity bit, then the input to its
+    low byte.
+- **Fixed corpus coverage:**
+  - constructor counts 2, 3 and 4, with every position of each returned;
+  - static enums returning each of no fields, one Word and two Words, and
+    dynamic enums returning each of the four field kinds;
+  - padded and full-width returns, in static and in dynamic enums;
+  - returned `bytes` lengths 0, 1, 31, 32, 33, 63 and 64;
+  - a shape with two `bytes` constructors;
+  - both outcomes and both node budgets, 384 and 512;
+  - a returned value after an earlier committed transaction, and after a
+    revert whose writes it must not see;
+  - one to three helpers, the six boundary inputs, and the step features,
+    templates and completion patterns of its steps.
+- **Golden cases** come before any random run:
+  - The steps add a constant, and the expected rows, the whole return data
+    and the slots, are written out as hexadecimal text. They cover static and
+    dynamic shapes, every field kind, padding, the bank's seven lengths, both
+    outcomes, carries across transactions and wrapping sums.
+  - A Lean model of the source must equal the Core contract on generated
+    cases. It is a slot map and std's `abi_encode` of the enum over a byte
+    memory: `encodeVariant`, the pair, `uint256` and unit encoders, and
+    `encodeIntoFromBytesLike`.
+  - Runtime golden tests check the convention's exact bytes for every field
+    kind in static and dynamic shapes, padding Words, and `bytes` lengths 0,
+    1, 31, 32, 33 and 64 behind body heads of two and three Words and in first
+    position. They also check its revert and trap branches.
+- **Synthetic output adapter:** the campaign's `--test-field output` adapter
+  flips the low bit of a returned output's last Word, for any output of whole
+  Words. A one-Word output changes exactly as before, and the tuple, `bytes`
+  and enum returns become reducible from a synthetic output difference.
+- **Out of scope:**
+  - other field types, generic, nested or recursive enums, and structs;
+  - `match` in the method, and enums in calldata or storage;
+  - more than two `bytes` constructors, and `bytes` beyond 64 bytes;
+  - gas, value, other methods and malformed calldata;
+  - a method that writes above the free-memory pointer before it returns, as
+    std's `ecrecover` and EIP-712 helpers do. Those bytes would then fill the
+    unwritten head Words.
+
 **Storage and Keccak loops through inline Yul.** `stateful-storage-loops`
 and `stateful-keccak-loops` lower `sload`, `sstore`, the mapping's hash and
 `log2` through Solcore's own path: std's one-statement wrapper functions,
@@ -5019,9 +5255,10 @@ the profile.
 
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
-`bytes` return values beyond 64 bytes and other dynamic return values, or
-callers beyond the three fixed senders, needs its own observation, rollback,
-deployment and reduction definitions first.
+`bytes` return values beyond 64 bytes, returned enums beyond the recorded
+shapes and other dynamic return values, or callers beyond the three fixed
+senders, needs its own observation, rollback, deployment and reduction
+definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
