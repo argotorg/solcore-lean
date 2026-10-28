@@ -10,7 +10,7 @@ import Solcore.Synthesis.Source.AssemblyMemoryCases
 import Solcore.Synthesis.Source.EnumCases
 import Solcore.Synthesis.Source.TraitCases
 
-/-! The identity filter `exclude-boundary-identity-v1` of the eleven runtime-input
+/-! The identity filter `exclude-boundary-identity-v1` of the fourteen runtime-input
 profiles whose generated functions can be identities. Over a window of
 attempts it excludes exactly the functions that return every boundary input
 unchanged, under its own reason and code, and keeps every other function with

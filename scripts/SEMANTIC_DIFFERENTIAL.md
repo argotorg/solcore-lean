@@ -586,7 +586,7 @@ enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
 separately validated Sonatina O0 images, recorded explicitly in `pathBackends`.
 This compares the same pure result without claiming Yul-linked Hull execution.
-The storage adapter and campaign accept Yul for the twenty-three storage-family
+The storage adapter and campaign accept Yul for the twenty-four storage-family
 profiles ([storage-family contracts on Yul](#compare-storage-family-contracts-on-yul));
 the call adapter rejects it. No backend silently falls back to another.
 
@@ -5838,11 +5838,11 @@ There was no finding. Agreement is test evidence, not a preservation proof.
 
 ## Compare whole committed storage
 
-Every stateful profile compares the declared slots on all three paths. The twenty-one
+Every stateful profile compares the declared slots on all three paths. The twenty-two
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-twenty-five stateful profiles now also compare the observed contracts' whole
+twenty-six stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -5851,7 +5851,7 @@ this section describes how the paths observe it.
 
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
-`contract` for the twenty-three storage-family profiles, `parent` and `child` for
+`contract` for the twenty-four storage-family profiles, `parent` and `child` for
 `stateful-calls` and `stateful-forwarded-value`. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
@@ -5939,8 +5939,9 @@ then; the later profiles start at
 `solcore-lean.keccak-loop-history.v1`,
 `solcore-lean.tuple-return-history.v1`,
 `solcore-lean.bytes-return-history.v1`,
-`solcore-lean.adt-storage-history.v1` and
-`solcore-lean.enum-return-history.v1`, whole storage included; the two inline
+`solcore-lean.adt-storage-history.v1`,
+`solcore-lean.enum-return-history.v1` and
+`solcore-lean.enum-argument-history.v1`, whole storage included; the two inline
 Yul loop profiles reuse their parents' history schemas. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
@@ -6021,7 +6022,7 @@ preservation proof.
 
 ## Compare storage-family contracts on Yul
 
-The twenty-three storage-family profiles also run with `--backend yul --solc PATH`.
+The twenty-four storage-family profiles also run with `--backend yul --solc PATH`.
 They compile as the pure profiles do: the checked Rust driver's Yul goes
 through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The two
 call profiles stay on Sonatina, because each of their sources compiles a parent
@@ -6050,9 +6051,12 @@ boundary; this section describes how to run it.
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
 - **Admission:** `export-rust-yul.py` admits the twenty-three pure and the
-  twenty storage-family wrappers, taken from the adapters' profile tables; the
-  three malformed profiles reuse wrappers. Each must compile to one creation
-  object with one runtime sub-object and no link or immutable references.
+  twenty-one storage-family wrappers, taken from the adapters' profile tables;
+  the three malformed profiles reuse wrappers. Each must compile to one
+  creation object with one runtime sub-object and no link or immutable
+  references. `--fixture ID` separately admits a pinned end-to-end fixture's
+  own contract under the same checks
+  ([pinned fixtures across paths](#compare-the-pinned-end-to-end-fixtures-across-paths)).
 
 ### Running and validation
 
@@ -6086,8 +6090,8 @@ execution.
 
 These results cover the fifteen profiles admitted first. The storage-loop,
 Keccak-loop, tuple-return, inline Yul loop, bytes-return, enum and struct
-storage and enum-return profiles, added later under the same boundary, report
-their Yul runs in their own sections.
+storage, enum-return and enum-argument profiles, added later under the same
+boundary, report their Yul runs in their own sections.
 
 A feasibility probe preceded the code. It ran the unchanged storage adapter on
 the first four scenarios of each fixed corpus, with the EVM deploying solc's
@@ -6235,7 +6239,11 @@ directive tools, solc, Anvil and cast frozen.
     gas difference between the EVM backends.
   - Lean Core reported `language-failure` for a length of `2^256 - 1` in
     `concat` and `zeroize-memory-range`, where the EVM paths ran out of gas;
-    that is a path failure finding.
+    that is a path failure finding. The detail Word 6 is Hull memory's
+    explicit failure for a range that ends beyond the Word address space
+    (`Memory.overflowReason`), which the EVM reaches only by running out of
+    gas, so it is a resource boundary of the Hull model, not a semantic
+    difference; the harness does not classify it yet.
 - Both findings went to `questions.md` only. The roadmap records the first
   mutation attempt, which gave each fixture one Lean invocation, and the
   per-entry limits that replaced it.

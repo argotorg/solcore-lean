@@ -104,6 +104,15 @@ recognizes Yul-specific skip messages; this was tested after the recorded run.
 See Q008 and Q010 for three fixtures accepted by these test entry points and
 rejected by the checked public compiler used for Core imports.
 
+[semantic-fixtures.py](semantic-fixtures.py) instead starts from the checked
+driver's output: each fixture's checked Hull, its Sonatina O0 and O2 code
+images and its Yul. It compares the recorded steps and seeded mutants across
+those four paths
+([pinned fixtures across paths](SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
+On that route the code-image tool crashes at O2 on `ignored-builtin-effects`,
+which the in-memory upstream harness above passes; the crash is a recorded
+finding.
+
 ## Check the harness itself
 
 ```sh

@@ -83,7 +83,14 @@ expectations on Core. Three fixtures fail upstream source checks before export.
 [RUST_PARITY.md](scripts/RUST_PARITY.md) lists the gates and how to reproduce them.
 The Rust EVM reference runs separately through Sonatina at O0 and O2 and through
 Yul compiled by solc. These checks compare each execution with fixture
-expectations; generated differential comparisons use the separate runners below.
+expectations. [semantic-fixtures.py](scripts/semantic-fixtures.py) also runs
+the recorded steps, and seeded single-change mutants of their inputs, on
+checked Hull in Lean Core, Sonatina O0 and O2, and Yul, and compares the paths
+with each other. No original Core exists for these fixtures, so this compares
+compiled paths only: all 1,382 recorded steps agree on every admitted path,
+none of 4,308 mutants disagrees, and Sonatina O2 crashes on one fixture, a
+recorded finding ([pinned fixtures across paths](scripts/SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
+Generated differential comparisons use the separate runners below.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the
 native Lean source checker to every Rust feature. Recursive references use the
@@ -164,8 +171,8 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-two pure profiles with `--backend yul`, and for the
-twenty-three storage-family profiles when they are selected. Its EVM bytes are
+available for the twenty-three pure profiles with `--backend yul`, and for the
+twenty-four storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -176,7 +183,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same forty-seven-profile suite runs locally with shared time and disk limits.
+The same forty-nine-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -230,6 +237,16 @@ fall-through thunks, admitted only when every arm is useful and the match is
 exhaustive. All 56 fixed cases and 96 random cases of eight functions match on
 O0, O2 and Yul
 ([user-defined enums and match](scripts/SEMANTIC_DIFFERENTIAL.md#compare-user-defined-enums-and-match)).
+The `runtime-traits` profile calls one trait with a unary and a binary method
+at instances built from Words, tuples, std sums and user-defined enums,
+directly and through constrained generic functions. The binary method of the sum impl
+matches its second argument inside each arm, a shape with a past upstream
+defect. Its original Core has one closure per reached instance and method,
+built bottom-up. All 40 fixed cases and 96 random cases of eight functions
+match on O0 and O2. On Yul, 32 and 84 of them match, and solc rejects one
+plan's specialized binary method in each run with `StackTooDeepError`, a
+recorded finding
+([traits and constrained generic impls](scripts/SEMANTIC_DIFFERENTIAL.md#compare-traits-and-constrained-generic-impls)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -251,7 +268,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the thirteen profiles whose functions can be identities they
+inputs, and in the fourteen profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
@@ -555,15 +572,27 @@ images with up to 15,000,000 fuel, so the suite's Hull fuel bound is now
 40,000,000. See
 [enum and struct values in storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-enum-and-struct-values-in-storage).
 
-All twenty-five stateful profiles also compare the installed contracts' whole
+The enum-argument profile's method takes a value of a user-defined enum of two
+to four constructors, each with no fields, one or two Words, a struct of two
+Words or one `bytes` value, which std's derived decoder reads: inline for a
+static enum, behind an offset for one with a `bytes` constructor.
+Transactions mix canonical encodings with twelve malformations, among them
+unknown tags, truncation, bad offsets and overlong `bytes` lengths. Original
+Core decodes the calldata itself in std's order, with the selector and tags
+from Lean's Keccak-256. The paths compare std's error selectors and an unknown
+tag's empty revert data by rule. The 21 fixed scenarios and sixteen random
+scenarios at each of two node budgets match on both Sonatina levels and on
+Yul. See [enum arguments](scripts/SEMANTIC_DIFFERENTIAL.md#compare-enum-arguments).
+
+All twenty-six stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The latest fixed run of all twenty-five profiles,
-343 scenarios and 934 transaction prefixes, matched on Sonatina O0, and every
+whole storage unchanged. The latest fixed run of all twenty-six profiles,
+364 scenarios and 994 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See
