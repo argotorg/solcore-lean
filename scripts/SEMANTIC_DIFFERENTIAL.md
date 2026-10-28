@@ -73,10 +73,10 @@ and the plain revision in `baseGeneratorVersion`.
 | v1 | `core-g0-v1/lcg64-v1` | fixed corpora, imported programs, the case tool without a version |
 | v2 | `core-g0-v2/lcg64-v1` | `--g0-version` for the pure and stateful profiles |
 | v3 | `core-g0-v3/lcg64-v1` | random generation of every stateful step; `--g0-version` for the pure profiles |
-| v4 | `core-g0-v4/lcg64-v1` | random generation of the sixteen G0-based pure profiles |
+| v4 | `core-g0-v4/lcg64-v1` | random generation of the seventeen G0-based pure profiles |
 
-The sixteen are `closed-g0`, `runtime-word`, `runtime-primitives`,
-`runtime-assembly`, `runtime-functions`, `runtime-mutation`,
+The seventeen are `closed-g0`, `runtime-word`, `runtime-primitives`,
+`runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`,
 `runtime-aggregates`, `runtime-loops`, `runtime-nested-loops`,
 `runtime-recursion`, `runtime-recursive-loops`, `runtime-loop-closures`,
 `runtime-generics`, `runtime-closures`, `runtime-comptime` and
@@ -202,7 +202,7 @@ emits exactly when it is declared.
 | --- | --- | --- |
 | Scalar | Bool and Word negation; add, sub, mul, and, or, xor, `==` and `>`; `let` and `if` (12 of 26) | `closed-g0`, `runtime-word`, `runtime-functions` and `runtime-mutation`; comptime and module constants |
 | Primitive, call-graph and aggregate | all 26 | `runtime-primitives`, `runtime-aggregates`, `runtime-loops`, `runtime-generics` and `runtime-closures`; comptime and module steps |
-| Inline Yul, in each of its three forms | all 26 | `runtime-assembly` |
+| Inline Yul, in each of its three forms, and as a step function over memory | all 26 | `runtime-assembly` and `runtime-assembly-memory` |
 
 Where the emitter renders every feature, v4 is v3 apart from its version:
 `runtime-primitives`, `runtime-aggregates`, `runtime-loops`,
@@ -274,7 +274,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the nineteen runtime-input pure profiles, every pure
+Random campaigns of the twenty runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -297,7 +297,7 @@ One function now gives eight random cases in the four-input profiles, ten in
 the two loop profiles, `runtime-assembly-loops`, `runtime-nested-loops`,
 `runtime-recursive-loops` and `runtime-loop-closures`, eleven in
 `runtime-recursion` and twelve in
-`runtime-primitives`, `runtime-assembly`,
+`runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`,
 `runtime-call-graphs` and `runtime-aggregate-call-graphs`. `--cases` still
 counts inputs, so a sixteen-case run of a four-input profile covers two
 functions rather than four. The admission filters still use the boundary
@@ -313,7 +313,7 @@ N:
 | --- | ---: | ---: |
 | `runtime-word`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-generics`, `runtime-closures`, `runtime-comptime`, `runtime-modules` | 8 (4) | 128 (256) |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-nested-loops`, `runtime-recursive-loops`, `runtime-loop-closures` | 10 (6) | 102 (170) |
-| `runtime-primitives`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | 12 (8) | 85 (128) |
+| `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | 12 (8) | 85 (128) |
 | `runtime-recursion` | 11 (7) | 93 (146) |
 
 The summary records `configuration.functions`,
@@ -389,7 +389,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
@@ -401,7 +401,7 @@ both profiles apply the filter. `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-two of the eleven profiles do not use G0. Only generated cases pass filters:
+two of the twelve profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -414,7 +414,7 @@ filters only. Replay applies the recorded filter again: a saved identity that
 claims it is refused with the exclusion reason, and an unknown value with
 `unsupported acceptance filter`. Without the field, a filtered case is also a
 valid case of the profile's own filters, since the filter only narrows
-acceptance. Reductions record no filter. The generation commands of the eleven
+acceptance. Reductions record no filter. The generation commands of the twelve
 profiles take the filter after `FUEL`, in any order with a G0 version and an
 input selection; the others refuse it:
 
@@ -576,7 +576,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the twenty pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the twenty-one pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -1862,6 +1862,120 @@ Frozen matrices, with the same scripts and binaries at both commits:
   too. Its reduction kept the fingerprint with a literal shift count of 2^255.
   The crash is retained as a finding and recorded locally without
   investigation, so the three random gates did not pass.
+
+## Compare inline Yul memory
+
+`runtime-assembly` and `runtime-assembly-loops` keep every Yul value in Yul
+variables, so no generated case stored to or loaded from memory inside an
+`assembly` block. The Yul front end lowers `mload`, `mstore`, `mstore8` and
+`keccak256` with their own byte placement, apart from the memory that
+Solcore's lowering allocates. `runtime-assembly-memory` renders a step's
+arithmetic through memory in one `assembly` block in `run`. The step is the
+`runtime-primitives` function of the case seed, generated by the same steps as
+for `runtime-assembly`, and becomes the Yul function
+`sc_step(sc_arg) -> sc_ret` in the `switch` form.
+
+The block reads `sc_base := mload(64)` once and never moves the free-memory
+pointer. It writes the prologue `x`, `sc_step(x)` and `not(x)` at offsets 0,
+32 and 64, so no read depends on memory the block did not write. A schedule
+drawn from the case seed by its own SplitMix64 stream then runs:
+
+- one to three stages, each `let sc_m<i> := mload(add(sc_base, r))` at a
+  word offset `r` in 0..64, then `sc_step(sc_m<i>)` written with `mstore` at
+  a word offset or with `mstore8` at a byte offset in 0..95;
+- a final read `sc_m<n>` at a word offset;
+- no hash, or `sc_h := keccak256(add(sc_base, h), L)` for `L` in 0, 1, 31,
+  32, 33 and 64 with `h + L ≤ 96`, each option drawn with equal weight;
+- `sc_out := sc_step(sc_m<n>)`, plus `sc_h` with a hash.
+
+Each offset draws its delta class (0, 1, 2–15, 16, 17–30 or 31) first, then
+its delta and its Word, so edge deltas are frequent. The ABI is
+`SynthesizedAssemblyMemory.run(uint256)`; no emitter proof covers it.
+
+The Core reference keeps no memory. The window is three let-bound Words, and a
+read at `32k + d` is `(w_k << 8d) | (w_{k+1} >> 8(32 - d))`. A word write
+rebinds the one or two Words it covers with masks and shifts, and a byte write
+rebinds one Word. The step is the primitive function's checked Core lambda,
+let-bound once. The hash is a let-bound closure over the two Words read at
+`h` and `h + 32`: it absorbs the first `L` bytes as one Keccak block and applies
+the Core Keccak-f[1600] permutation and digest builders of the Hull import
+path, which are proved against `KeccakSemantics`. The closures have 2,270 to
+2,654 nodes, and the 64-byte one is the mapping profile's closure. A
+registered Lean test checks every length against `cast keccak` and the
+separate `Solcore.Abi.V1.Keccak256`, and the reference against a byte-list
+model of the schedule on 192 generated cases and a golden fixture.
+
+Before the profile was written, a probe compiled ten sources with the pinned
+compiler and std. They covered word and byte writes at aligned and unaligned
+offsets, reads at the same, overlapping and unaligned offsets, overwrites in
+both width orders, `keccak256` over every hashed length, and a block that
+filled 128 bytes above the free-memory pointer before a Solcore helper
+allocated from it. Checked Hull export, Sonatina O0 and O2, Yul, Anvil and the
+Lean Hull runner matched a byte model at twelve inputs on every path, without
+a change to shared code.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-assembly-memory --functions 8 --output .upstream/semantic-assembly-memory
+python3 Tests/scripts/test-semantic-assembly-memory-corpus.py
+```
+
+Native commands are `assembly-memory-generate SEED NODES COUNT ATTEMPTS FUEL
+[G0-VERSION] [seeded-inputs-v1/splitmix64] [exclude-boundary-identity-v1]` and
+`assembly-memory-emit PLAN.json INPUT [FUEL]`. Saved cases contain
+`assemblyMemoryPlan` (the step, `stages`, `finalRead` and `hash`) and the
+whole Core reference, whose exact correspondence native admission checks for
+every origin. Replay requires a generated schedule to be its seed's.
+
+- Inputs are the primitive profile's eight boundary inputs, with a 96-node
+  default budget for the step and a 3,282-node case limit for the whole
+  reference; random campaigns add four seeded inputs.
+- Exclusions, under `assembly-memory-profile`, are the step's generation
+  exclusions, then a composed function that returns one Word for all eight
+  boundary inputs or exhausts fuel. Without a hash it can return its input, so
+  random campaigns apply the identity filter.
+- Reductions remove a stage, remove or shorten the hash, align an offset, and
+  then apply the primitive reductions of the step; each is strictly smaller in
+  stage count, hash rank, delta sum, then the step. A shrink response of a
+  hashed plan holds at most eight cases, since each case embeds the closure
+  (about 123 KB), so it stays below the campaign's 2 MiB tool-output limit.
+- `assemblyMemoryRequirements` declares `stages`, `accesses`
+  (`read:`, `word:` or `byte:` with a delta class), `hazards` and `hashes`, all
+  specified by the schedule. A hazard `waw:<earlier>-<later>` counts only when
+  a later read or the hash reads an overwritten byte before it is written
+  again; `raw:same`, `raw:overlap`, `raw:byte` and `raw:hash` name what a read
+  takes from earlier stage writes. `assemblyMemoryCoverage` counts only
+  three-way matches.
+
+The fixed corpus takes, from seed 1 upwards at 96 nodes, every accepted plan
+that covers a missing required value, until nothing is missing, each at the
+eight boundary inputs. It skips plans whose step may compile to a shift by a
+count that folds to a constant of at least 2^64, following constants through
+lets, conditionals and memory: a read may fold when every byte it reads was
+last written by a value that may fold. Such counts crash Sonatina code-image
+export (recorded locally); random campaigns still generate them. Ten seeds
+from 1 to 52 cover all three stage counts, all eighteen accesses, every
+required hazard and all seven hash options: 80 cases from 10 sources.
+`waw:byte-byte` is generated but not required.
+`Tests/scripts/test-semantic-assembly-memory-corpus.py` rebuilds that
+selection, recomputes every shape from the schedule, materializes every case
+twice and checks replay, reductions and tampering natively.
+
+Frozen matrices at `1d2ea9cef`:
+- The fixed corpus matched all 80 cases on all three paths with complete
+  stage, access, hazard, hash and input coverage, compiling 10 sources, in 142
+  seconds on O0, 138 on O2 and 236 on Yul.
+- Random suites from root seed 1 with eight whole functions took 9 attempts,
+  excluding one plan, and drew 96 cases from 8 sources with every stage count,
+  14 accesses, four hash options and five hazards. The first generation
+  responses exceeded the 2 MiB limit, and the campaign's chunked generation
+  then requested one function at a time.
+- O0 and Yul matched all 96 cases, in 150 and 203 seconds. On O2, 84 matched
+  and the twelve inputs of the sixth function crashed code-image export with
+  `Integer overflow when casting to usize`, in 293 seconds. Its reduction kept
+  the fingerprint with one aligned stage, no hash and a step that shifts by
+  `signextend` of two literals. The crash is retained as a finding and
+  recorded locally without investigation, so the O2 random gate did not pass.
 
 ## Compare aggregate compositions with call graphs
 
@@ -4919,7 +5033,7 @@ boundary; this section describes how to run it.
 - **No layout dependence:** the wrappers' runtime code reads no code, and
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the twenty pure and the fifteen
+- **Admission:** `export-rust-yul.py` admits the twenty-one pure and the fifteen
   storage-family wrappers, taken from the adapters' profile tables; the three
   malformed profiles reuse wrappers. Each must compile to one creation object
   with one runtime sub-object and no link or immutable references.
@@ -4948,7 +5062,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the twenty pure profiles. `--backend yul`
+Its default Yul selection stays the twenty-one pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 
