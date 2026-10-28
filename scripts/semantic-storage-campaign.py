@@ -98,6 +98,14 @@ LOOP_DIMENSIONS = DIMENSIONS + tuple(LOOP_EXTRA)
 KECCAK_LOOP_EXTRA = {"Masks": adapter.LOOP_MASKS, "KeyMasks": adapter.LOOP_MASKS, "IterationCounts": tuple(range(8)),
                      "IterationCarries": ("entry", "iteration", "rollback", "transaction")}
 KECCAK_LOOP_DIMENSIONS = DIMENSIONS + tuple(KECCAK_LOOP_EXTRA)
+# Tuple returns: plan arities, each arity's outcomes as `arity:status`, the
+# carries `committed` (a returned tuple's prior slots came from an earlier
+# committed transaction) and `rollback` (a returned tuple follows a revert whose
+# writes it must not read), and the node budgets of generated cases.
+TUPLE_EXTRA = {"TupleArities": adapter.TUPLE_ARITIES,
+               "ArityOutcomes": tuple(f"{arity}:{status}" for arity in adapter.TUPLE_ARITIES for status in ("returned", "reverted")),
+               "TupleCarries": ("committed", "rollback"), "NodeBudgets": (384, 512)}
+TUPLE_DIMENSIONS = DIMENSIONS + tuple(TUPLE_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -122,6 +130,8 @@ def dimensions(profile_name):
         return LOOP_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "keccak-loops":
         return KECCAK_LOOP_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "tuples":
+        return TUPLE_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -206,6 +216,20 @@ def keccak_loops_coverage(case, statuses):
     plan = case[adapter.profile(case)["planKey"]]
     return {"Masks": {plan["mask"]}, "KeyMasks": {plan["keyMask"]}, "IterationCounts": set(counts),
             "IterationCarries": carries}
+
+
+def tuples_coverage(case, statuses):
+    """The plan's arity and its outcomes, the carries into a returned tuple
+    from an earlier committed transaction and past an earlier revert, and a
+    generated case's node budget."""
+    arity = adapter.tuple_arity(case)
+    returned = [index for index, status in enumerate(statuses) if status == "returned"]
+    carries = ({"committed"} if any("returned" in statuses[:index] for index in returned) else set()) | (
+        {"rollback"} if any("reverted" in statuses[:index] for index in returned) else set())
+    origin = case["provenance"]["origin"]
+    budgets = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
+    return {"TupleArities": {arity}, "ArityOutcomes": {f"{arity}:{status}" for status in statuses},
+            "TupleCarries": carries, "NodeBudgets": budgets}
 
 
 def nested_coverage(case):
@@ -440,6 +464,13 @@ def validate_manifest(manifest):
             raise ValueError("carried-slot coverage belongs to the storage-loop profile")
     elif any("required" + dimension in manifest for dimension in LOOP_EXTRA):
         raise ValueError("loop coverage belongs to the storage-loop profile")
+    if selected["abi"] == "tuples":
+        for dimension, allowed in TUPLE_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"tuple-return coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in TUPLE_EXTRA):
+        raise ValueError("tuple coverage belongs to the tuple-return profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
     # The Keccak-loop profile records the log framing, but its log shapes follow
@@ -647,7 +678,7 @@ def keyed_analysis(analysis):
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
                                                 adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA,
                                                 adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA,
-                                                adapter.KECCAK_LOOP_HISTORY_SCHEMA)
+                                                adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -821,6 +852,8 @@ class Campaign:
             values.update(loops_coverage(case, statuses))
         elif self.specification["abi"] == "keccak-loops":
             values.update(keccak_loops_coverage(case, statuses))
+        elif self.specification["abi"] == "tuples":
+            values.update(tuples_coverage(case, statuses))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -883,7 +916,7 @@ class Campaign:
         for dimension in {"keyed": ("Keys", "Aliases"), "mapping": ("Keys", "Aliases"), "array": ("Lengths",),
                           "flags": tuple(LOG_EXTRA), "value": VALUE_EXTRA, "bytes": BYTES_EXTRA,
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
-                          "methods": tuple(METHODS_EXTRA), "loops": tuple(LOOP_EXTRA),
+                          "methods": tuple(METHODS_EXTRA), "loops": tuple(LOOP_EXTRA), "tuples": tuple(TUPLE_EXTRA),
                           "keccak-loops": tuple(KECCAK_LOOP_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(

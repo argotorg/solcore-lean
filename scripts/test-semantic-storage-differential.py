@@ -3596,5 +3596,155 @@ class KeccakLoopTests(unittest.TestCase):
         dropped["rustEvm"]["chainLogs"].pop()
         self.assertEqual(runner.compare(dropped, value)["stage"], "committed-log-history")
 
+
+def tuple_case(arity=4, rows=((0, 5), (1, 9), (2, 7))):
+    """Envelope fixture only: native replay checks the actual tuple-return program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value),
+                     "calldata": "0x7357f5d2" + f"{flags:064x}" + f"{value:064x}", "value": "0"}
+                    for index, (flags, value) in enumerate(rows)]
+    return {"schema": runner.TUPLE_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "tupleReturnPlan": {"schema": "solcore-lean.tuple-return-plan.v1", "stepProgram": {}, "arity": arity},
+        "initialState": {"storage": []}, "observedSlots": ["0", "1", "2"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedTupleReturns", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": "0x7357f5d2", "deployPath": ["SynthesizedTupleReturnsDeploy"],
+            "runtimePath": ["SynthesizedTupleReturnsDeploy", "SynthesizedTupleReturns"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def tuple_history(value, path, step=lambda x: x + 1, order=(0, 1, 2, 3), revert_words=1):
+    """Rows of the tuple protocol with a known step: r = step(slot 0 + input)
+    goes to slot 0, slot one grows by one and the input goes to slot two. A
+    return carries (r, slot 1, prior slot 0, prior slot 2) in `order`, cut to
+    the arity, and odd flags revert with `revert_words` copies of r."""
+    arity = value["tupleReturnPlan"]["arity"]
+    rows, prior = [], [0, 0, 0]
+    for index, tx in enumerate(value["transactions"]):
+        x = int(tx["input"])
+        result = step((prior[0] + x) % 2**256) % 2**256
+        after = [result, (prior[1] + 1) % 2**256, x]
+        reverted = int(tx["flags"]) % 2 == 1
+        protocol = [result, after[1], prior[0], prior[2]]
+        words = [result] * revert_words if reverted else [protocol[position] for position in order][:arity]
+        committed = list(prior) if reverted else after
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + "".join(f"{word:064x}" for word in words), "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.TUPLE_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0, 0, 0]), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def tuple_histories(value=None, **options):
+    value = tuple_case() if value is None else value
+    return {path: tuple_history(value, path, **options) for path in runner.PATHS}
+
+
+class TupleTests(unittest.TestCase):
+    def test_a_tuple_case_records_its_arity(self):
+        value = tuple_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["selector"]),
+                         ("semantic-tuple-return-tool", "rust-hull-keyed-storage-scenario", True, "tuples", "0x7357f5d2"))
+        self.assertTrue(runner.has_tuples(value))
+        self.assertFalse(runner.has_tuples(loop_case()) or runner.has_loops(value) or runner.uses_selector_rule(value))
+        self.assertEqual(runner.tuple_arity(value), 4)
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2"))
+        self.assertIn("static tuple", runner.scope(value))
+        for arity in (2, 3):
+            runner.validate_case(tuple_case(arity))
+        for arity in (0, 1, 5, True, "4", None):
+            invalid = tuple_case()
+            invalid["tupleReturnPlan"]["arity"] = arity
+            with self.subTest(arity=arity), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for key, changed in (("calldata", "0x7357f5d2" + "00" * 64), ("value", "1"), ("flags", "2"), ("input", "6")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = ["0", "1"]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_a_returned_tuple_carries_its_arity_and_a_revert_one_word(self):
+        for arity in (2, 3, 4):
+            value = tuple_case(arity)
+            histories = tuple_histories(value)
+            with self.subTest(arity=arity):
+                self.assertEqual(runner.compare(histories, value)["category"], "matched")
+                rows = histories["directCore"]["transactions"]
+                self.assertEqual([len(runner.common.hex_bytes(row["output"], "output")) for row in rows], [32 * arity, 32, 32 * arity])
+                self.assertEqual([runner.output_words(value, row) for row in rows], [arity, 1, arity])
+                for index, tx in enumerate(value["transactions"]):
+                    prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+                    self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+                    self.assertEqual(runner.tuple_fields(value, tx, rows[index], prior), [])
+        # Every other profile keeps its one-Word rule.
+        self.assertEqual(runner.output_words(loop_case(), {"status": "returned"}), 1)
+        value = tuple_case()
+        histories = tuple_histories(value)
+        rows = histories["directCore"]["transactions"]
+        # tx-2 returns (r, slot 1, prior slot 0, prior slot 2) = (6 + 7 + 1, 2, 6, 5),
+        # past the revert of tx-1, which wrote neither slot.
+        self.assertEqual(rows[2]["output"], "0x" + "".join(f"{word:064x}" for word in (14, 2, 6, 5)))
+        prior, tx = rows[1]["committedStorage"], value["transactions"][2]
+        for slot in ("1", "2"):
+            changed = copy.deepcopy(rows[2])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertIn("committedStorage", runner.tuple_fields(value, tx, changed, prior))
+        for word in range(4):
+            changed = copy.deepcopy(rows[2])
+            output = bytearray(runner.common.hex_bytes(changed["output"], "output"))
+            output[32 * word + 31] ^= 1
+            changed["output"] = "0x" + output.hex()
+            with self.subTest(word=word):
+                self.assertEqual(runner.tuple_fields(value, tx, changed, prior), ["output"])
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+        # A truncated or extended tuple breaks the length rule and the protocol.
+        for output in (rows[2]["output"][:-64], rows[2]["output"] + "00" * 32, rows[2]["output"] + "00"):
+            changed = {**rows[2], "output": output}
+            with self.subTest(length=len(output)):
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+                self.assertEqual(runner.tuple_fields(value, tx, changed, prior), ["output"])
+        # A revert is checked by rollback and its one-Word length, not by the protocol.
+        self.assertEqual(runner.tuple_fields(value, value["transactions"][1], {**rows[1], "output": "0x" + "00" * 32},
+                                             rows[0]["committedStorage"]), [])
+        self.assertFalse(runner.conforms(value, value["transactions"][1], {**rows[1], "output": rows[1]["output"] + "00" * 32},
+                                         rows[0]["committedStorage"]))
+
+    def test_a_protocol_break_on_every_path_is_a_mismatch_although_the_paths_agree(self):
+        value = tuple_case()
+        for options, field in (({"order": (0, 1, 3, 2)}, "output"), ({"revert_words": 2}, "output")):
+            broken = tuple_histories(value, **options)
+            result = runner.compare(broken, value)
+            with self.subTest(options=options):
+                self.assertEqual(result["category"], "semantic-mismatch")
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertIn(field, result["fields"])
+        # A two-Word tuple on every path of a four-Word case is a mismatch too.
+        short = tuple_histories(tuple_case(2))
+        result = runner.compare(short, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertTrue(all(result["pairs"].values()))
+        # A different step on one path is an ordinary difference.
+        changed = tuple_histories(value)
+        changed["rustEvm"] = tuple_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+        self.assertIn("output", result["fields"])
+
 if __name__ == "__main__":
     unittest.main()

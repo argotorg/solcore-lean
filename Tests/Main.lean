@@ -2190,6 +2190,9 @@ import Solcore.Test.SourceStorageLoopCorpus
 import Solcore.Test.SourceKeccakLoopGolden
 import Solcore.Test.SourceKeccakLoopCases
 import Solcore.Test.SourceKeccakLoopCorpus
+import Solcore.Test.SourceTupleReturnGolden
+import Solcore.Test.SourceTupleReturnCases
+import Solcore.Test.SourceTupleReturnCorpus
 import Solcore.Test.SourceAggregatePrimitives
 import Solcore.Test.SourceAggregateMeaning
 import Solcore.Test.SourceEventLogEmitter
@@ -4218,6 +4221,9 @@ def main : IO UInt32 := do
   Tests.SourceKeccakLoopGolden.testSourceKeccakLoopGolden
   Tests.SourceKeccakLoopCases.testSourceKeccakLoopCases
   Tests.SourceKeccakLoopCorpus.testSourceKeccakLoopCorpus
+  Tests.SourceTupleReturnGolden.testSourceTupleReturnGolden
+  Tests.SourceTupleReturnCases.testSourceTupleReturnCases
+  Tests.SourceTupleReturnCorpus.testSourceTupleReturnCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   Tests.SourceAggregateMeaning.testSourceAggregateMeaning
   Tests.SourceEventLogEmitter.testSourceEventLogEmitter

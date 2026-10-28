@@ -1985,5 +1985,62 @@ class KeccakLoopCampaignTests(unittest.TestCase):
             campaign.validate_manifest({**other, "framingVersion": manifest["framingVersion"]})
 
 
+def tuple_case(arity=4, rows=((0, 5), (1, 9), (2, 7)), origin=None):
+    value = fixtures.tuple_case(arity, rows)
+    value["tupleReturnPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class TupleCampaignTests(unittest.TestCase):
+    def test_coverage_names_arities_their_outcomes_carries_and_node_budgets(self):
+        value = tuple_case()
+        self.assertEqual(campaign.dimensions("stateful-tuple-returns"),
+                         campaign.DIMENSIONS + ("TupleArities", "ArityOutcomes", "TupleCarries", "NodeBudgets"))
+        # tx-2 returns after the committed tx-0 and past the revert of tx-1; an
+        # imported case has no node budget.
+        self.assertEqual(campaign.tuples_coverage(value, ["returned", "reverted", "returned"]),
+                         {"TupleArities": {4}, "ArityOutcomes": {"4:returned", "4:reverted"},
+                          "TupleCarries": {"committed", "rollback"}, "NodeBudgets": set()})
+        self.assertEqual(campaign.inputs(value), {"5", "7", "9"})
+        # A first revert carries nothing committed, and a returned first row carries nothing.
+        self.assertEqual(campaign.tuples_coverage(tuple_case(2, rows=((1, 1), (0, 2))), ["reverted", "returned"]),
+                         {"TupleArities": {2}, "ArityOutcomes": {"2:reverted", "2:returned"},
+                          "TupleCarries": {"rollback"}, "NodeBudgets": set()})
+        generated = tuple_case(3, rows=((0, 1),), origin={"kind": "tuple-return-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.tuples_coverage(generated, ["returned"]),
+                         {"TupleArities": {3}, "ArityOutcomes": {"3:returned"}, "TupleCarries": set(), "NodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-tuple-returns"))
+            instance.summary["coverage"].update(requiredTupleArities=[2, 3, 4], requiredNodeBudgets=[384, 512],
+                                                requiredArityOutcomes=list(campaign.TUPLE_EXTRA["ArityOutcomes"]))
+            histories = fixtures.tuple_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedTupleArities"], coverage["matchedArityOutcomes"], coverage["matchedTupleCarries"]),
+                             ([4], ["4:returned", "4:reverted"], ["committed", "rollback"]))
+            self.assertEqual((coverage["missingTupleArities"], coverage["missingNodeBudgets"], coverage["missingArityOutcomes"]),
+                             ([2, 3], [384, 512], ["2:returned", "2:reverted", "3:returned", "3:reverted"]))
+
+    def test_the_fixed_corpus_validates_and_its_tuple_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-tuple-return-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-tuple-returns")
+        self.assertEqual((manifest["requiredTupleArities"], manifest["requiredNodeBudgets"], manifest["requiredTupleCarries"]),
+                         ([2, 3, 4], [384, 512], ["committed", "rollback"]))
+        self.assertEqual(manifest["requiredArityOutcomes"], list(campaign.TUPLE_EXTRA["ArityOutcomes"]))
+        for key, changed in (("requiredTupleArities", [1]), ("requiredTupleArities", []), ("requiredTupleArities", [True]),
+                             ("requiredArityOutcomes", ["5:returned"]), ("requiredTupleCarries", ["other"]),
+                             ("requiredNodeBudgets", [448]), ("requiredNodeBudgets", [384, 384])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredNodeBudgets"})
+        other = json.loads((ROOT / "scripts/semantic-storage-loop-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "tuple coverage belongs to the tuple-return profile"):
+            campaign.validate_manifest({**other, "requiredTupleArities": [2, 3, 4]})
+
+
 if __name__ == "__main__":
     unittest.main()

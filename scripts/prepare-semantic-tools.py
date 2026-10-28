@@ -47,6 +47,7 @@ TARGETS = {
     "semanticMethodsTool": "semantic-methods-tool",
     "semanticStorageLoopTool": "semantic-storage-loop-tool",
     "semanticKeccakLoopTool": "semantic-keccak-loop-tool",
+    "semanticTupleReturnTool": "semantic-tuple-return-tool",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",

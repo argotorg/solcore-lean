@@ -4579,6 +4579,107 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare ABI-encoded tuple returns
+
+Every other stateful profile returns one Word. The `stateful-tuple-returns`
+profile returns a static ABI tuple of two to four Words and compares the whole
+return data on all three paths. Original Core gained an entry convention for
+it, `wordTupleOutcomeV1`. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions and the runtime design.
+
+### Definitions
+
+- **Convention:** `CoreContractEntryProfile.wordTupleOutcomeV1 extraWords`
+  returns the right-nested pairs of `extraWords + 2` Words as their
+  concatenated 32-byte big-endian encodings, the static ABI tuple. Revert and
+  trap carry one Word, as for `wordOutcomeV1`. The top-level runner decodes it
+  unchanged.
+- **Nested boundary:** a word call carries exactly one Word of child return
+  data. The one-level nested executor therefore treats a registered tuple
+  contract as `unavailable` to a word call, and a template with a tuple
+  initializer as `unavailable` to creation. Theorems of the one-Word view take
+  `returnsOneWord` as a premise.
+- **Contract:** `SynthesizedTupleReturns` with `run(uint256 flags, uint256
+  input)`, selector `0x7357f5d2`, zero value. It returns `n` uint256 Words,
+  with the plan's arity `n` in {2, 3, 4}. Slot 0 is an accumulator, slot 1 the
+  committed call count and slot 2 the last committed input.
+- **Transaction:** `prior = slot 0`, `last = slot 2` and `r = step(prior +
+  input)`. It writes `r` to slot 0, slot 1 plus one to slot 1 and the input to
+  slot 2. Odd flags revert with the one Word `r`. Even flags return the first
+  `n` of `r`, slot 1 read back after its write, `prior` and `last`.
+- **Source:** the method's return type is the tuple of `n` uint256, and it
+  returns a tuple expression of `uint256(...)` conversions. std's dispatcher
+  ABI-encodes it.
+- **Original Core:** one host contract whose result is `inLeft` of the
+  right-nested pairs, or `inRight (inLeft r)`, under `wordTupleOutcomeV1
+  (n - 2)`.
+- **Transactions:** `{id, flags, input, calldata, value}`. Generation draws
+  `n` per scenario by a SplitMix64 hash of the seed, and the plan records it.
+
+### Running and validation
+
+```sh
+lake build semanticTupleReturnTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-tuple-return-corpus.json \
+  --output .upstream/semantic-tuple-return-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-tuple-returns \
+  --cases 16 --output .upstream/semantic-tuple-return-random
+```
+
+Plans use `solcore-lean.tuple-return-plan.v1` under `tupleReturnPlan`. Cases
+use `solcore-lean.semantic-tuple-return-case.v1` and histories
+`solcore-lean.tuple-return-history.v1`. The shell takes 79, 85 or 91 nodes
+inside the node budget, by arity. The suite's default of 384 nodes leaves 305
+to 293 for the step, and `--nodes-scale 2` caps the doubled budget at 512.
+Contracts are bounded by 512 nodes. A case reaches about 60 KB, so a native
+shrink response carries at most 32 candidates.
+
+The adapter's output rule for this profile is `32n` bytes on return and 32 on
+revert; every other profile keeps one Word. A returned row must also follow
+the protocol on every path:
+- Word 1 is the committed slot 0;
+- Word 2 is the committed slot 1, which is the prior slot 1 plus one;
+- Word 3 is the prior slot 0, and Word 4 the prior slot 2;
+- the committed slot 2 is the input.
+
+A revert is checked by rollback and its one-Word length. Reductions remove
+transactions, lower the arity, reduce the step, then clear flags to their
+parity bit and inputs to their low byte.
+
+Four Lean tests check the convention and the profile:
+- `Solcore/Test/ContractTupleEntryProfile.lean` checks the convention's exact
+  bytes for two, three and four Words against hexadecimal text written out by
+  hand, and its revert and trap branches. Wrong annotations, arities and
+  payloads must not decode. A word call to a registered tuple contract and a
+  creation from a tuple initializer must be unavailable, and a tuple root must
+  return its whole tuple through the nested executor.
+- `Solcore/Test/SourceTupleReturnGolden.lean` checks the Core contract and a
+  model of the source, a slot map, against rows written out by hand. Its steps
+  add a known constant. The rows cover each arity, both outcomes, carries
+  across a revert and wrapping sums.
+- `Solcore/Test/SourceTupleReturnCases.lean` requires the Core contract to
+  equal the model on 64 generated scenarios, 392 transactions in all. Every
+  case and reduction must replay, and the shell sizes must be those above.
+- `Solcore/Test/SourceTupleReturnCorpus.lean` checks the fixed corpus against
+  expected histories that the model computed.
+
+The fixed corpus has twelve scenarios and 32 transactions: six imported
+scenarios, which reuse the storage corpus's six imported steps, and six
+generated seeds, one per arity at 384 nodes and one per arity at 512. Required
+coverage:
+- arities 2, 3 and 4, each with both outcomes;
+- both node budgets;
+- a returned tuple whose prior slots an earlier committed transaction wrote,
+  and one that follows a revert whose writes it must not read;
+- the six boundary Words as inputs;
+- one to three helpers and transactions, all four templates, both outcomes
+  and six completion patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The fourteen

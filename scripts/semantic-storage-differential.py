@@ -72,6 +72,8 @@ LOOP_CASE_SCHEMA = "solcore-lean.semantic-storage-loop-case.v1"
 LOOP_HISTORY_SCHEMA = "solcore-lean.storage-loop-history.v1"
 KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-keccak-loop-case.v1"
 KECCAK_LOOP_HISTORY_SCHEMA = "solcore-lean.keccak-loop-history.v1"
+TUPLE_CASE_SCHEMA = "solcore-lean.semantic-tuple-return-case.v1"
+TUPLE_HISTORY_SCHEMA = "solcore-lean.tuple-return-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -221,6 +223,16 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KECCAK_LOOP_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "keccak-loops", "logs": True, "shrinkBatch": 16},
+    # One method that returns a static tuple of two to four Words; every path's
+    # whole return data is compared. A case reaches about 60 KB, so a native
+    # shrink response carries at most 32 candidates.
+    "stateful-tuple-returns": {"caseSchema": TUPLE_CASE_SCHEMA, "planSchema": "solcore-lean.tuple-return-plan.v1",
+        "planKey": "tupleReturnPlan", "corpusSchema": "solcore-lean.semantic-tuple-return-corpus.v1",
+        "originKind": "tuple-return-generated", "contract": "SynthesizedTupleReturns",
+        "caseTool": "semantic-tuple-return-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": TUPLE_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "tuples", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -289,6 +301,10 @@ SELECTOR_ORDERS = ("ascending", "descending", "mixed")
 # iteration total, slot 2 + i iteration i's result; plans admit these masks.
 LOOP_SLOTS = [str(slot) for slot in range(9)]
 LOOP_MASKS = (0, 1, 3, 7)
+# The tuple-return profile: slot 0 the accumulator, slot 1 the committed call
+# count, slot 2 the last committed input; plans return two to four Words.
+TUPLE_SLOTS = [str(slot) for slot in range(3)]
+TUPLE_ARITIES = (2, 3, 4)
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -332,7 +348,7 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         # Odd flags revert after every logged iteration.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
-                                                             "malformed", "loops") else "input"]
+                                                             "malformed", "loops", "tuples") else "input"]
     odd = int(common.word(parity)) % 2
     if has_senders(case) and not odd:
         return None
@@ -414,6 +430,39 @@ def loop_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> 
             any(after[slot] != before[slot] for slot in LOOP_SLOTS[2 + count:]):
         fields.append("committedStorage")
     if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != (after["0"] + after["1"]) % 2**256:
+        fields.append("output")
+    return fields
+
+
+def has_tuples(case: dict) -> bool:
+    return profile(case)["abi"] == "tuples"
+
+
+def tuple_arity(case: dict) -> int:
+    return case[profile(case)["planKey"]]["arity"]
+
+
+def output_words(case: dict, row: dict) -> int:
+    """The Words a completed row's output carries: a returned tuple its arity,
+    every other row one."""
+    return tuple_arity(case) if has_tuples(case) and row["status"] == "returned" else 1
+
+
+def tuple_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the tuple protocol: slot one grows by
+    one, slot two is the input, and the output's Words are, in order, the
+    committed slot zero, the committed slot one, the prior slot zero and the
+    prior slot two, cut to the arity. A revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after["1"] != (before["1"] + 1) % 2**256 or after["2"] != int(common.word(transaction.get("input"), "transaction input")):
+        fields.append("committedStorage")
+    output = common.hex_bytes(row["output"], "output")
+    words = [int.from_bytes(output[offset:offset + 32], "big") for offset in range(0, len(output), 32)]
+    if len(output) % 32 or words != [after["0"], after["1"], before["0"], before["2"]][:tuple_arity(case)]:
         fields.append("output")
     return fields
 
@@ -688,6 +737,11 @@ def declared_scope(case: dict) -> str:
                 "addressed key's keccak256(1 ++ key) slot and ordered committed logs (address, topics, data) on all "
                 "paths, the EVM chain's complete log list, and no nonzero undeclared slot on Hull/EVM; no "
                 "gas/balance/nonce or memory equivalence")
+    if has_tuples(case):
+        return ("ordered zero-value run(uint256,uint256) transactions that return a static tuple of the plan's two to "
+                "four Words, the step result, slot 1 after its write and slots 0 and 2 before theirs; initially empty "
+                "storage; the whole return data and committed values at slots 0..2 on all paths and no nonzero "
+                "undeclared slot on Hull/EVM; no gas/balance/nonce or memory equivalence")
     if has_loops(case):
         return ("ordered zero-value run(uint256,uint256) transactions, each running its input's bits under the plan's "
                 "mask (at most seven) iterations of a source while loop that reads slots 0, 1, 1 + i and 2 + i and writes "
@@ -1226,7 +1280,7 @@ def validate_transactions(case: dict, selected: dict) -> None:
         value = int(common.word(tx.get("input"), "transaction input"))
         if selected["abi"] == "loops" and (type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx)):
             raise ValueError("transaction iterations differ from its input under the loop mask")
-        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags"}.get(selected["abi"])
+        prefix = {"keyed": "key", "flags": "flags", "value": "flags", "loops": "flags", "tuples": "flags"}.get(selected["abi"])
         words = f"{int(common.word(tx.get(prefix), 'transaction ' + prefix)):064x}" if prefix else ""
         sent = "0"
         if selected.get("balances"):
@@ -1250,6 +1304,8 @@ def validate_case(case) -> None:
     if selected["abi"] == "keccak-loops" and any(type(plan.get(key)) is not int or plan[key] not in LOOP_MASKS
                                                  for key in ("mask", "keyMask")):
         raise ValueError("Keccak-loop plan requires a loop mask and a key mask of 0, 1, 3 or 7")
+    if selected["abi"] == "tuples" and (type(plan.get("arity")) is not int or plan["arity"] not in TUPLE_ARITIES):
+        raise ValueError("tuple-return plan requires an arity of 2, 3 or 4")
     if not isinstance(case.get("program"), dict) or not isinstance(case.get("source"), str):
         raise ValueError("storage case requires its original host Core program and source")
     if selected["abi"] == "keyed":
@@ -1269,6 +1325,9 @@ def validate_case(case) -> None:
         validate_transactions(case, selected)
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != keccak_loop_slots(case):
             raise Finding("unsupported-scope", "input", "Keccak-loop profile starts empty and observes slot zero and every addressed entry slot")
+    elif selected["abi"] == "tuples":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != TUPLE_SLOTS:
+            raise Finding("unsupported-scope", "input", "tuple-return profile starts empty and observes slots zero through two")
     elif selected["abi"] == "malformed" and encoding(selected) == "bytes":
         slots = bytes_layout(selected)[1]
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
@@ -1504,12 +1563,14 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     balance is the deployment value plus slot one and a revert keeps it. For
     bytes, a returned row records its payload length, last byte and sum, and for
     nested arrays its row and element counts and sum. For the ledger,
-    `ledger_fields` fixes what the balance-dependent polarity leaves open."""
+    `ledger_fields` fixes what the balance-dependent polarity leaves open. A
+    returned tuple carries its arity's Words and follows `tuple_fields`."""
     expected = expected_status(case, tx)
     # A std rejection reverts with exactly its selector, after the selector rule.
     rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
     if (expected is None and row["status"] not in ("returned", "reverted")) or (expected is not None and row["status"] != expected) or \
-            (row["output"] != rejection if rejection is not None else len(common.hex_bytes(row["output"], "output")) != 32):
+            (row["output"] != rejection if rejection is not None else
+             len(common.hex_bytes(row["output"], "output")) != 32 * output_words(case, row)):
         return False
     if row["status"] == "reverted" and (row["committedStorage"] != prior or
                                         (prior_whole is not None and row["accountStorage"] != prior_whole)):
@@ -1527,6 +1588,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if has_loops(case) and loop_fields(case, tx, row, prior):
         return False
     if has_keccak_loops(case) and keccak_loop_fields(case, tx, row, prior):
+        return False
+    if has_tuples(case) and tuple_fields(case, tx, row, prior):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -1631,10 +1694,11 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         fields = [key for key in observed if len({json.dumps(row[key], sort_keys=True) for row in rows.values()}) != 1]
         expected = expected_status(case, tx)
         # A prescribed std rejection reverts with exactly its selector on every
-        # path; any other row carries one Word.
+        # path; a returned tuple carries its arity's Words and any other row one.
         rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
         normal = all((expected is None or row["status"] == expected) and (
-            row["output"] == rejection if rejection is not None else len(common.hex_bytes(row["output"], "output")) == 32)
+            row["output"] == rejection if rejection is not None else
+            len(common.hex_bytes(row["output"], "output")) == 32 * output_words(case, row))
                      for row in rows.values())
         rollback = all(row["status"] != "reverted" or row["committedStorage"] ==
             (values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])
@@ -1681,6 +1745,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
             # A returned row follows the Keccak-loop protocol, its logs included;
             # a revert is already covered by rollback and the log shapes.
             broken = sorted({field for name, row in rows.items() for field in keccak_loop_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_tuples(case):
+            # A returned tuple follows the protocol Word by Word; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in tuple_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
