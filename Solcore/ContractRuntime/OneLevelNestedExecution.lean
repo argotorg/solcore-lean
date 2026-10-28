@@ -266,9 +266,12 @@ private theorem rootAfterSuspension_anchored
         split
         · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
             anchored.checkpointJournal_eq⟩
-        · exact ⟨anchored.storageAddress_eq,
-            anchored.checkpointState_eq, anchored.checkpointJournal_eq,
-            rfl, rfl, rfl, by assumption⟩
+        · split
+          · exact ⟨anchored.storageAddress_eq,
+              anchored.checkpointState_eq, anchored.checkpointJournal_eq,
+              rfl, rfl, rfl, by assumption⟩
+          · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+              anchored.checkpointJournal_eq⟩
   | callContractWordWithValue target value input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
@@ -278,25 +281,31 @@ private theorem rootAfterSuspension_anchored
         · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
             anchored.checkpointJournal_eq⟩
         · split
+          · split
+            · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+                anchored.checkpointJournal_eq⟩
+            · exact ⟨anchored.storageAddress_eq,
+                anchored.checkpointState_eq, anchored.checkpointJournal_eq,
+                rfl, rfl, rfl, by assumption⟩
           · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
               anchored.checkpointJournal_eq⟩
-          · exact ⟨anchored.storageAddress_eq,
-              anchored.checkpointState_eq, anchored.checkpointJournal_eq,
-              rfl, rfl, rfl, by assumption⟩
   | createContractWord templateId value input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
       · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
           anchored.checkpointJournal_eq⟩
-      · exact ⟨rfl, anchored.storageAddress_eq,
-          anchored.checkpointState_eq, anchored.checkpointJournal_eq,
-          (PreparedInitializerFrame.postNonce_storageAddress_eq _).trans
-            anchored.storageAddress_eq,
-          (congrArg FrameCheckpointSnapshot.state
-            (PreparedInitializerFrame.postNonce_checkpoint_eq _)).trans
-            anchored.checkpointState_eq,
-          PreparedInitializerFrame.initializer_storageAddress_eq _,
-          PreparedInitializerFrame.initializer_checkpointState_eq _, rfl⟩
+      · split
+        · exact ⟨rfl, anchored.storageAddress_eq,
+            anchored.checkpointState_eq, anchored.checkpointJournal_eq,
+            (PreparedInitializerFrame.postNonce_storageAddress_eq _).trans
+              anchored.storageAddress_eq,
+            (congrArg FrameCheckpointSnapshot.state
+              (PreparedInitializerFrame.postNonce_checkpoint_eq _)).trans
+              anchored.checkpointState_eq,
+            PreparedInitializerFrame.initializer_storageAddress_eq _,
+            PreparedInitializerFrame.initializer_checkpointState_eq _, rfl⟩
+        · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq,
+            anchored.checkpointJournal_eq⟩
   | storageRead slot =>
       exact ⟨anchored.storageAddress_eq,
         anchored.checkpointState_eq, anchored.checkpointJournal_eq⟩

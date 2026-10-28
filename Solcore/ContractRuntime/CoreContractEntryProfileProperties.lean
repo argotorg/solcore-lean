@@ -11,13 +11,16 @@ namespace CoreContractEntryProfile
 @[simp] theorem ofResultType?_resultType
     (profile : CoreContractEntryProfile) :
     ofResultType? profile.resultType = some profile := by
-  cases profile <;> rfl
+  cases profile with
+  | returnWord => rfl
+  | wordOutcomeV1 => rfl
+  | wordTupleOutcomeV1 extraWords =>
+      simp [resultType, ofResultType?]
 
 theorem resultType_injective :
     Function.Injective CoreContractEntryProfile.resultType := by
   intro left right equal
-  cases left <;> cases right <;>
-    simp [resultType] at equal ⊢
+  simpa using congrArg ofResultType? equal
 
 @[simp] theorem decode?_returnWord
     (word : Core.Word) :
@@ -46,6 +49,72 @@ theorem resultType_injective :
       some (.trapped reason) := by
   rfl
 
+@[simp] theorem decodeWordTuple?_zero (word : Core.Word) :
+    decodeWordTuple? 0 (.word word) = some (encodeWordBytesBE word) :=
+  rfl
+
+@[simp] theorem decodeWordTuple?_succ
+    (count : Nat) (word : Core.Word) (rest : Core.Value) :
+    decodeWordTuple? (count + 1) (.pair (.word word) rest) =
+      (decodeWordTuple? count rest).map (encodeWordBytesBE word ++ ·) :=
+  rfl
+
+/-- A decoded tuple of `count + 1` Words has exactly `32 (count + 1)` bytes. -/
+theorem decodeWordTuple?_size
+    {count : Nat} {value : Core.Value} {bytes : Bytes}
+    (decoded : decodeWordTuple? count value = some bytes) :
+    bytes.size = 32 * (count + 1) := by
+  induction count generalizing value bytes with
+  | zero =>
+      match value, decoded with
+      | .word word, decoded =>
+          cases decoded
+          simp
+  | succ count ih =>
+      match value, decoded with
+      | .pair (.word word) rest, decoded =>
+          simp only [decodeWordTuple?_succ] at decoded
+          cases restEq : decodeWordTuple? count rest with
+          | none => simp [restEq] at decoded
+          | some restBytes =>
+              simp only [restEq, Option.map_some, Option.some.injEq] at decoded
+              cases decoded
+              simp [ByteArray.size_append, ih restEq]
+              omega
+
+@[simp] theorem decode?_wordTupleOutcomeV1_returned
+    (extraWords : Nat) (tuple : Core.Value) :
+    decode? (.wordTupleOutcomeV1 extraWords)
+        (.inLeft (.sum .word .word) tuple) =
+      (decodeWordTuple? (extraWords + 1) tuple).map .returned := by
+  rfl
+
+@[simp] theorem decode?_wordTupleOutcomeV1_reverted
+    (extraWords : Nat) (word : Core.Word) :
+    decode? (.wordTupleOutcomeV1 extraWords)
+        (.inRight (wordTupleType (extraWords + 1)) (.inLeft .word (.word word))) =
+      some (.reverted (encodeWordBytesBE word)) := by
+  simp [decode?]
+
+@[simp] theorem decode?_wordTupleOutcomeV1_trapped
+    (extraWords : Nat) (reason : Core.Word) :
+    decode? (.wordTupleOutcomeV1 extraWords)
+        (.inRight (wordTupleType (extraWords + 1)) (.inRight .word (.word reason))) =
+      some (.trapped reason) := by
+  simp [decode?]
+
+@[simp] theorem returnsOneWord_returnWord :
+    returnsOneWord .returnWord = true :=
+  rfl
+
+@[simp] theorem returnsOneWord_wordOutcomeV1 :
+    returnsOneWord .wordOutcomeV1 = true :=
+  rfl
+
+@[simp] theorem returnsOneWord_wordTupleOutcomeV1 (extraWords : Nat) :
+    returnsOneWord (.wordTupleOutcomeV1 extraWords) = false :=
+  rfl
+
 end CoreContractEntryProfile
 
 namespace CheckedCoreContract
@@ -55,9 +124,7 @@ theorem ofCode?_of_resultType
     (profile : CoreContractEntryProfile)
     (resultType_eq : code.program.resultType = profile.resultType) :
     ofCode? code = some ⟨code, profile, resultType_eq⟩ := by
-  cases profile <;>
-    simp [ofCode?, CoreContractEntryProfile.ofResultType?,
-      CoreContractEntryProfile.resultType, resultType_eq]
+  simp [ofCode?, resultType_eq]
 
 theorem decodeCompletion?_eq_some_decodeCompletion
     (contract : CheckedCoreContract)

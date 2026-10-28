@@ -32,6 +32,16 @@ def wordOutcomeV1
     CheckedCoreContract :=
   ⟨code, .wordOutcomeV1, resultType_eq⟩
 
+/-- Bind checked code with the static tuple convention of `extraWords + 2` Words. -/
+def wordTupleOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (extraWords : Nat)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.wordTupleOutcomeV1 extraWords).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .wordTupleOutcomeV1 extraWords, resultType_eq⟩
+
 /-- Admit checked code only when its result type has a supported entry profile. -/
 def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType
@@ -117,7 +127,9 @@ theorem CheckedHostCoreProgram.eq_of_program_eq
 theorem CoreContractEntryProfile.eq_of_resultType_eq
     {left right : CoreContractEntryProfile}
     (equal : left.resultType = right.resultType) : left = right := by
-  cases left <;> cases right <;> simp_all [CoreContractEntryProfile.resultType]
+  cases left <;> cases right <;>
+    simp_all [CoreContractEntryProfile.resultType,
+      CoreContractEntryProfile.wordTupleType]
 
 @[ext] theorem CheckedCoreContract.ext
     {left right : CheckedCoreContract}

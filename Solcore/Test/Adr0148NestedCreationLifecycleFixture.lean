@@ -86,30 +86,33 @@ def completionObservation (outcome : CheckedCoreWordOutcome) : Bool :=
           suspended.profile.templateId suspended.profile.value with
       | .error _ => false
       | .ok prepared =>
-          let frame := suspended.startInitializer validEnvironment prepared
-            suspendedWithAnchor.2.symm
-          match frame.complete outcome with
-          | .returned deployed =>
-              (deployed.deployedWorld.code? created).map
-                  CheckedHostCoreProgram.program == some runtime.code.program &&
-                deployed.deployedAccount.storageValue? initializerPayload ==
-                  deployed.latestCreatedAccount.storageValue? initializerPayload &&
-                deployed.deployedAccount.balance ==
-                  deployed.latestCreatedAccount.balance &&
-                deployed.deployedAccount.nonce ==
-                  deployed.latestCreatedAccount.nonce &&
-                (deployed.resumedRoot.context.context.values.working.1.code?
-                    created).map CheckedHostCoreProgram.program ==
-                  some runtime.code.program
-          | .reverted data root _ _ =>
-              data == initializerPayload &&
-                root.context.context.values.working.1.nonce? creator ==
-                  some nextNonce &&
-                (root.context.context.values.working.1.account? created).isNone
-          | .trapped reason root _ _ =>
-              reason == initializerPayload &&
-                root.context.context.values.working.1.nonce? creator ==
-                  some nextNonce &&
-                (root.context.context.values.working.1.account? created).isNone
+          -- The fixture's initializer uses a one-Word convention.
+          if oneWord : prepared.template.initializer.entryProfile.returnsOneWord = true then
+            let frame := suspended.startInitializer validEnvironment prepared oneWord
+              suspendedWithAnchor.2.symm
+            match frame.complete outcome with
+            | .returned deployed =>
+                (deployed.deployedWorld.code? created).map
+                    CheckedHostCoreProgram.program == some runtime.code.program &&
+                  deployed.deployedAccount.storageValue? initializerPayload ==
+                    deployed.latestCreatedAccount.storageValue? initializerPayload &&
+                  deployed.deployedAccount.balance ==
+                    deployed.latestCreatedAccount.balance &&
+                  deployed.deployedAccount.nonce ==
+                    deployed.latestCreatedAccount.nonce &&
+                  (deployed.resumedRoot.context.context.values.working.1.code?
+                      created).map CheckedHostCoreProgram.program ==
+                    some runtime.code.program
+            | .reverted data root _ _ =>
+                data == initializerPayload &&
+                  root.context.context.values.working.1.nonce? creator ==
+                    some nextNonce &&
+                  (root.context.context.values.working.1.account? created).isNone
+            | .trapped reason root _ _ =>
+                reason == initializerPayload &&
+                  root.context.context.values.working.1.nonce? creator ==
+                    some nextNonce &&
+                  (root.context.context.values.working.1.account? created).isNone
+          else false
 
 end Tests.Adr0148NestedCreationLifecycleFixture

@@ -8,8 +8,8 @@ set_option autoImplicit false
 namespace Solcore.ContractRuntime
 
 /--
-The exact Word payload carried by every currently supported checked-Core
-completion convention.
+The exact Word payload carried by every one-Word checked-Core completion
+convention.
 -/
 inductive CheckedCoreWordOutcome where
   | returned (data : Core.Word)
@@ -29,7 +29,8 @@ end CheckedCoreWordOutcome
 
 namespace CoreContractEntryProfile
 
-/-- Decode a runtime value while retaining its exact Word payload. -/
+/-- Decode a runtime value while retaining its exact Word payload. A Word tuple
+has no one-Word view and never decodes here. -/
 def decodeWordOutcome?
     (profile : CoreContractEntryProfile)
     (value : Core.Value) : Option CheckedCoreWordOutcome :=
@@ -44,9 +45,10 @@ def decodeWordOutcome?
       some (.trapped reason)
   | _, _ => none
 
-/-- A value of the profile result type always has an exact Word outcome. -/
+/-- A value of a one-Word profile's result type always has an exact Word outcome. -/
 theorem decodeWordOutcome?_ne_none_of_hasType
     (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     {definitions : Core.DataEnvironment}
@@ -54,6 +56,7 @@ theorem decodeWordOutcome?_ne_none_of_hasType
       Core.HostRuntimeValueHasType world value profile.resultType definitions) :
     profile.decodeWordOutcome? value ≠ none := by
   cases profile with
+  | wordTupleOutcomeV1 _ => cases oneWord
   | returnWord =>
       cases typing with
       | word => simp [decodeWordOutcome?]
@@ -71,9 +74,10 @@ theorem decodeWordOutcome?_ne_none_of_hasType
               cases innerTyping with
               | word => simp [decodeWordOutcome?]
 
-/-- The executable Word decoder is populated for every typed profile value. -/
+/-- The executable Word decoder is populated for every typed one-Word value. -/
 theorem decodeWordOutcome?_isSome_of_hasType
     (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     {definitions : Core.DataEnvironment}
@@ -81,11 +85,12 @@ theorem decodeWordOutcome?_isSome_of_hasType
       Core.HostRuntimeValueHasType world value profile.resultType definitions) :
     (profile.decodeWordOutcome? value).isSome = true :=
   Option.isSome_iff_ne_none.mpr
-    (profile.decodeWordOutcome?_ne_none_of_hasType typing)
+    (profile.decodeWordOutcome?_ne_none_of_hasType oneWord typing)
 
-/-- Decode a typed profile value without an invalid-value fallback branch. -/
+/-- Decode a typed one-Word value without an invalid-value fallback branch. -/
 def decodeWordOutcome
     (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     {definitions : Core.DataEnvironment}
@@ -93,7 +98,7 @@ def decodeWordOutcome
       Core.HostRuntimeValueHasType world value profile.resultType definitions) :
     CheckedCoreWordOutcome :=
   (profile.decodeWordOutcome? value).get
-    (profile.decodeWordOutcome?_isSome_of_hasType typing)
+    (profile.decodeWordOutcome?_isSome_of_hasType oneWord typing)
 
 end CoreContractEntryProfile
 
@@ -105,9 +110,10 @@ def decodeWordOutcome?
     (value : Core.Value) : Option CheckedCoreWordOutcome :=
   contract.entryProfile.decodeWordOutcome? value
 
-/-- Decode a checked contract result without an invalid-value fallback. -/
+/-- Decode a one-Word checked contract result without an invalid-value fallback. -/
 def decodeWordOutcome
     (contract : CheckedCoreContract)
+    (oneWord : contract.entryProfile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     (typing :
@@ -115,7 +121,7 @@ def decodeWordOutcome
         contract.code.program.resultType
         contract.code.program.dataDefinitions) :
     CheckedCoreWordOutcome :=
-  contract.entryProfile.decodeWordOutcome (by
+  contract.entryProfile.decodeWordOutcome oneWord (by
     rw [← contract.resultType_eq]
     exact typing)
 
@@ -182,25 +188,33 @@ namespace CoreContractEntryProfile
 /-- Forgetting the Word view agrees exactly with the established decoder. -/
 theorem decode?_eq_map_decodeWordOutcome?
     (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
     (value : Core.Value) :
     profile.decode? value =
       (profile.decodeWordOutcome? value).map
         CheckedCoreWordOutcome.toFrameOutcome := by
-  cases profile <;>
-    simp only [CoreContractEntryProfile.decode?, decodeWordOutcome?] <;>
-    split <;> simp_all [CheckedCoreWordOutcome.toFrameOutcome]
+  cases profile with
+  | wordTupleOutcomeV1 _ => cases oneWord
+  | returnWord =>
+      simp only [CoreContractEntryProfile.decode?, decodeWordOutcome?]
+      split <;> simp_all [CheckedCoreWordOutcome.toFrameOutcome]
+  | wordOutcomeV1 =>
+      simp only [CoreContractEntryProfile.decode?, decodeWordOutcome?]
+      split <;> simp_all [CheckedCoreWordOutcome.toFrameOutcome]
 
 /-- Typed decoding commutes exactly with forgetting the Word-level payload. -/
 theorem decodeTyped_eq_toFrameOutcome_decodeWordOutcome
     (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     {definitions : Core.DataEnvironment}
     (typing :
       Core.HostRuntimeValueHasType world value profile.resultType definitions) :
     profile.decodeTyped typing =
-      (profile.decodeWordOutcome typing).toFrameOutcome := by
+      (profile.decodeWordOutcome oneWord typing).toFrameOutcome := by
   cases profile with
+  | wordTupleOutcomeV1 _ => cases oneWord
   | returnWord =>
       cases typing with
       | word => rfl
@@ -218,18 +232,19 @@ theorem decodeTyped_eq_toFrameOutcome_decodeWordOutcome
               cases innerTyping with
               | word => rfl
 
-/-- A typed profile result is returned by its executable Word decoder. -/
+/-- A typed one-Word result is returned by its executable Word decoder. -/
 theorem decodeWordOutcome?_eq_some_decodeWordOutcome
     (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     {definitions : Core.DataEnvironment}
     (typing :
       Core.HostRuntimeValueHasType world value profile.resultType definitions) :
     profile.decodeWordOutcome? value =
-      some (profile.decodeWordOutcome typing) := by
+      some (profile.decodeWordOutcome oneWord typing) := by
   have populated : profile.decodeWordOutcome? value ≠ none :=
-    profile.decodeWordOutcome?_ne_none_of_hasType typing
+    profile.decodeWordOutcome?_ne_none_of_hasType oneWord typing
   cases decoded : profile.decodeWordOutcome? value with
   | none => exact False.elim (populated decoded)
   | some outcome =>
@@ -239,18 +254,20 @@ end CoreContractEntryProfile
 
 namespace CheckedCoreContract
 
-/-- Contract decoding inherits the exact profile-level option coherence. -/
+/-- One-Word contract decoding inherits the exact profile-level option coherence. -/
 theorem decodeCompletion?_eq_map_decodeWordOutcome?
     (contract : CheckedCoreContract)
+    (oneWord : contract.entryProfile.returnsOneWord = true)
     (value : Core.Value) :
     contract.decodeCompletion? value =
       (contract.decodeWordOutcome? value).map
         CheckedCoreWordOutcome.toFrameOutcome :=
-  contract.entryProfile.decode?_eq_map_decodeWordOutcome? value
+  contract.entryProfile.decode?_eq_map_decodeWordOutcome? oneWord value
 
-/-- A typed contract result is always returned by its executable Word decoder. -/
+/-- A typed one-Word contract result is returned by its executable Word decoder. -/
 theorem decodeWordOutcome?_eq_some_decodeWordOutcome
     (contract : CheckedCoreContract)
+    (oneWord : contract.entryProfile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     (typing :
@@ -258,7 +275,7 @@ theorem decodeWordOutcome?_eq_some_decodeWordOutcome
         contract.code.program.resultType
         contract.code.program.dataDefinitions) :
     contract.decodeWordOutcome? value =
-      some (contract.decodeWordOutcome typing) := by
+      some (contract.decodeWordOutcome oneWord typing) := by
   have profileTyping :
       Core.HostRuntimeValueHasType world value
         contract.entryProfile.resultType
@@ -268,11 +285,12 @@ theorem decodeWordOutcome?_eq_some_decodeWordOutcome
   simpa [CheckedCoreContract.decodeWordOutcome?,
     CheckedCoreContract.decodeWordOutcome] using
       contract.entryProfile.decodeWordOutcome?_eq_some_decodeWordOutcome
-        profileTyping
+        oneWord profileTyping
 
-/-- Typed contract decoding agrees exactly after canonical Word-byte encoding. -/
+/-- Typed one-Word contract decoding agrees exactly after canonical Word-byte encoding. -/
 theorem decodeCompletion_eq_toFrameOutcome_decodeWordOutcome
     (contract : CheckedCoreContract)
+    (oneWord : contract.entryProfile.returnsOneWord = true)
     {world : Core.StoreTyping}
     {value : Core.Value}
     (typing :
@@ -280,11 +298,11 @@ theorem decodeCompletion_eq_toFrameOutcome_decodeWordOutcome
         contract.code.program.resultType
         contract.code.program.dataDefinitions) :
     contract.decodeCompletion typing =
-      (contract.decodeWordOutcome typing).toFrameOutcome := by
+      (contract.decodeWordOutcome oneWord typing).toFrameOutcome := by
   have coherence :=
-    contract.decodeCompletion?_eq_map_decodeWordOutcome? value
+    contract.decodeCompletion?_eq_map_decodeWordOutcome? oneWord value
   rw [contract.decodeCompletion?_eq_some_decodeCompletion typing,
-    contract.decodeWordOutcome?_eq_some_decodeWordOutcome typing] at coherence
+    contract.decodeWordOutcome?_eq_some_decodeWordOutcome oneWord typing] at coherence
   exact Option.some.inj coherence
 
 end CheckedCoreContract

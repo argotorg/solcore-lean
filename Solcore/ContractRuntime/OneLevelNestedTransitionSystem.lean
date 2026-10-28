@@ -146,7 +146,9 @@ end SuspendedRoot
 /--
 A running resolved child and the untouched root suspension waiting for its
 typed call response. The selected Account witness makes both self-call and
-cross-account rebasing proof-total when the child later completes.
+cross-account rebasing proof-total when the child later completes. A word call
+carries exactly one Word of child return data, so the child's convention
+returns one Word.
 -/
 structure ChildFrame
     (initialWorld : WorldState)
@@ -157,6 +159,7 @@ structure ChildFrame
   targetAddress_eq :
     wordToAddress? suspendedRoot.call.target = some childTarget
   childContract : CheckedCoreContract
+  childContract_returnsOneWord : childContract.entryProfile.returnsOneWord = true
   preTransferInstalled :
     InstalledCheckedCoreContract
       suspendedRoot.parentContext.context.values.working.1 childTarget
@@ -306,6 +309,8 @@ structure PreparedInitializerFrame
       rootInvocation.executionInputs.currentAddress
       suspendedRoot.profile.templateId
       suspendedRoot.profile.value
+  initializer_returnsOneWord :
+    prepared.template.initializer.entryProfile.returnsOneWord = true
   creatorAddress_eq :
     rootInvocation.executionInputs.currentAddress =
       suspendedRoot.parentContext.context.storageAddress
@@ -532,6 +537,8 @@ def startInitializer
       root.parentContext.context.values.working.1 environment
       rootInvocation.executionInputs.currentAddress root.profile.templateId
       root.profile.value)
+    (initializerReturnsOneWord :
+      prepared.template.initializer.entryProfile.returnsOneWord = true)
     (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
       root.parentContext.context.storageAddress) :
     PreparedInitializerFrame initialWorld rootContract rootInvocation := by
@@ -580,6 +587,7 @@ def startInitializer
     suspendedRoot := root
     environment := environment
     prepared := prepared
+    initializer_returnsOneWord := initializerReturnsOneWord
     creatorAddress_eq := creatorAddress_eq
     initializerInvocation := invocation
     initializerInvocation_eq := rfl
@@ -616,9 +624,12 @@ def startInitializer
       root.parentContext.context.values.working.1 environment
       rootInvocation.executionInputs.currentAddress root.profile.templateId
       root.profile.value)
+    (initializerReturnsOneWord :
+      prepared.template.initializer.entryProfile.returnsOneWord = true)
     (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
       root.parentContext.context.storageAddress) :
-    (root.startInitializer environment prepared creatorAddress_eq).postNonceParentContext.workingJournal =
+    (root.startInitializer environment prepared initializerReturnsOneWord
+      creatorAddress_eq).postNonceParentContext.workingJournal =
       root.parentContext.workingJournal := by
   rfl
 
@@ -631,9 +642,12 @@ def startInitializer
       root.parentContext.context.values.working.1 environment
       rootInvocation.executionInputs.currentAddress root.profile.templateId
       root.profile.value)
+    (initializerReturnsOneWord :
+      prepared.template.initializer.entryProfile.returnsOneWord = true)
     (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
       root.parentContext.context.storageAddress) :
-    (root.startInitializer environment prepared creatorAddress_eq).initializerContext.context.values.checkpoint.effects.rollback =
+    (root.startInitializer environment prepared initializerReturnsOneWord
+      creatorAddress_eq).initializerContext.context.values.checkpoint.effects.rollback =
       root.parentContext.workingJournal := by
   rfl
 
@@ -646,9 +660,12 @@ def startInitializer
       root.parentContext.context.values.working.1 environment
       rootInvocation.executionInputs.currentAddress root.profile.templateId
       root.profile.value)
+    (initializerReturnsOneWord :
+      prepared.template.initializer.entryProfile.returnsOneWord = true)
     (creatorAddress_eq : rootInvocation.executionInputs.currentAddress =
       root.parentContext.context.storageAddress) :
-    (root.startInitializer environment prepared creatorAddress_eq).initializerContext.workingJournal =
+    (root.startInitializer environment prepared initializerReturnsOneWord
+      creatorAddress_eq).initializerContext.workingJournal =
       root.parentContext.workingJournal := by
   rfl
 
@@ -721,7 +738,8 @@ def outcomeDone
     | ret _ valueTyping continuationTyping =>
         cases continuationTyping with
         | nil =>
-            apply CoreContractEntryProfile.decodeWordOutcome?_ne_none_of_hasType
+            apply CoreContractEntryProfile.decodeWordOutcome?_ne_none_of_hasType _
+              frame.initializer_returnsOneWord
             rw [← frame.prepared.template.initializer.resultType_eq]
             exact valueTyping
   match resultEq : frame.prepared.template.initializer.decodeWordOutcome? value with
@@ -1140,6 +1158,7 @@ def startChild
     (target : Address)
     (targetAddress_eq : wordToAddress? root.call.target = some target)
     (childContract : CheckedCoreContract)
+    (childReturnsOneWord : childContract.entryProfile.returnsOneWord = true)
     (preTransferInstalled : InstalledCheckedCoreContract
       root.parentContext.context.values.working.1 target childContract)
     (childInitialWorld : WorldState)
@@ -1159,6 +1178,7 @@ def startChild
     childTarget := target
     targetAddress_eq := targetAddress_eq
     childContract := childContract
+    childContract_returnsOneWord := childReturnsOneWord
     preTransferInstalled := preTransferInstalled
     childInitialWorld := childInitialWorld
     childInvocation := invocation
@@ -1184,14 +1204,15 @@ def startChild
     (target : Address)
     (targetAddress_eq : wordToAddress? root.call.target = some target)
     (childContract : CheckedCoreContract)
+    (childReturnsOneWord : childContract.entryProfile.returnsOneWord = true)
     (preTransferInstalled : InstalledCheckedCoreContract
       root.parentContext.context.values.working.1 target childContract)
     (childInitialWorld : WorldState)
     (installed : InstalledCheckedCoreContract childInitialWorld target childContract)
     (parentPresence : PresentAccountAt childInitialWorld
       root.parentContext.context.storageAddress) :
-    (root.startChild target targetAddress_eq childContract preTransferInstalled
-      childInitialWorld installed parentPresence).childContext.context.values.checkpoint.effects.rollback =
+    (root.startChild target targetAddress_eq childContract childReturnsOneWord
+      preTransferInstalled childInitialWorld installed parentPresence).childContext.context.values.checkpoint.effects.rollback =
         root.parentContext.workingJournal := by
   rfl
 
@@ -1203,14 +1224,15 @@ def startChild
     (target : Address)
     (targetAddress_eq : wordToAddress? root.call.target = some target)
     (childContract : CheckedCoreContract)
+    (childReturnsOneWord : childContract.entryProfile.returnsOneWord = true)
     (preTransferInstalled : InstalledCheckedCoreContract
       root.parentContext.context.values.working.1 target childContract)
     (childInitialWorld : WorldState)
     (installed : InstalledCheckedCoreContract childInitialWorld target childContract)
     (parentPresence : PresentAccountAt childInitialWorld
       root.parentContext.context.storageAddress) :
-    (root.startChild target targetAddress_eq childContract preTransferInstalled
-      childInitialWorld installed parentPresence).childContext.workingJournal =
+    (root.startChild target targetAddress_eq childContract childReturnsOneWord
+      preTransferInstalled childInitialWorld installed parentPresence).childContext.workingJournal =
         root.parentContext.workingJournal := by
   rfl
 
@@ -1249,9 +1271,15 @@ def afterSuspensionWithEnvironment
                 (suspended.resumeWith suspended.parentContext
                   ContractCallFailure.unavailable.result)
           | some resolved =>
-              exact .child (suspended.startChild address addressEq resolved.1 resolved.2
-                suspended.parentContext.context.values.working.1 resolved.2
-                suspended.parentContext.selectedPresence)
+              -- A word call admits only a child whose convention returns one Word.
+              exact if oneWord : resolved.1.entryProfile.returnsOneWord = true then
+                .child (suspended.startChild address addressEq resolved.1 oneWord resolved.2
+                  suspended.parentContext.context.values.working.1 resolved.2
+                  suspended.parentContext.selectedPresence)
+              else
+                .root
+                  (suspended.resumeWith suspended.parentContext
+                    ContractCallFailure.unavailable.result)
   | callContractWordWithValue target value input =>
       let suspended :=
         frame.suspendCall (.withValue target value input)
@@ -1269,22 +1297,28 @@ def afterSuspensionWithEnvironment
                 (suspended.resumeWith suspended.parentContext
                   ContractCallFailure.unavailable.result)
           | some resolved =>
-              match transferred :
-                  suspended.parentContext.context.values.working.1.transferBalance
-                    suspended.parentContext.context.storageAddress address value with
-              | .error failure =>
-                  exact .root
-                    (suspended.resumeWith suspended.parentContext
-                      failure.toContractCallResult)
-              | .ok childWorld =>
-                  let installed :=
-                    WorldState.transferBalance_preserves_installed transferred
-                      resolved.2
-                  let parentPresence :=
-                    WorldState.transferBalance_preserves_present transferred
-                      suspended.parentContext.selectedPresence
-                  exact .child (suspended.startChild address addressEq resolved.1 resolved.2
-                    childWorld installed parentPresence)
+              -- The one-Word admission precedes the value transfer.
+              if oneWord : resolved.1.entryProfile.returnsOneWord = true then
+                match transferred :
+                    suspended.parentContext.context.values.working.1.transferBalance
+                      suspended.parentContext.context.storageAddress address value with
+                | .error failure =>
+                    exact .root
+                      (suspended.resumeWith suspended.parentContext
+                        failure.toContractCallResult)
+                | .ok childWorld =>
+                    let installed :=
+                      WorldState.transferBalance_preserves_installed transferred
+                        resolved.2
+                    let parentPresence :=
+                      WorldState.transferBalance_preserves_present transferred
+                        suspended.parentContext.selectedPresence
+                    exact .child (suspended.startChild address addressEq resolved.1 oneWord
+                      resolved.2 childWorld installed parentPresence)
+              else
+                exact .root
+                  (suspended.resumeWith suspended.parentContext
+                    ContractCallFailure.unavailable.result)
   | createContractWord templateId value input =>
       let profile : CreationProfile := ⟨templateId, value, input⟩
       let suspended :=
@@ -1297,8 +1331,15 @@ def afterSuspensionWithEnvironment
             (suspended.resumeWith suspended.parentContext
               failure.toContractCallResult)
       | .ok creation =>
-          exact .initializer
-            (suspended.startInitializer environment creation creatorAddress_eq)
+          -- Creation admits only an initializer whose convention returns one Word.
+          exact if oneWord :
+              creation.template.initializer.entryProfile.returnsOneWord = true then
+            .initializer
+              (suspended.startInitializer environment creation oneWord creatorAddress_eq)
+          else
+            .root
+              (suspended.resumeWith suspended.parentContext
+                CheckedCreationPreflightFailure.unavailable.toContractCallResult)
   | storageRead slot =>
       exact .root (frame.afterHandledSuspension
         ⟨.storageRead slot, continuation, store⟩ advanced)
@@ -1419,7 +1460,8 @@ def outcomeDone
     | ret _storeTyping valueTyping continuationTyping =>
         cases continuationTyping with
         | nil =>
-            apply CoreContractEntryProfile.decodeWordOutcome?_ne_none_of_hasType
+            apply CoreContractEntryProfile.decodeWordOutcome?_ne_none_of_hasType _
+              frame.childContract_returnsOneWord
             rw [← frame.childContract.resultType_eq]
             exact valueTyping
   match decodedEq : frame.childContract.decodeWordOutcome? value with
