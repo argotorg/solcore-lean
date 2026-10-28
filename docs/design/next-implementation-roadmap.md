@@ -5565,12 +5565,272 @@ There was no finding. The pinned front end's rejection of `records[k].f = v`
 is a diagnostic of an unsupported form, not a defect. Hosted CI has not run
 the profile.
 
+**Enum arguments.** The returned enums exercise only std's generic encoder.
+Its decoder of user-defined types as arguments is untested, and the pinned
+checkout's fixtures `abi-dyn-sum`, `abi-sum-roundtrip`, `abi-batch-adt` and
+`abi-input-bounds` record defects around it. The `stateful-enum-arguments`
+profile sends a value of an enum of two to four constructors as a method
+argument, canonically or malformed, and compares the whole outcome on all
+three paths. Original Core decodes the calldata itself, without std's decoder
+code.
+
+std's decoder for `run(uint256 flags, E value)`, from `std.sol`,
+`dispatch.sol`, `ABIGeneric.sol` and the compiler's derived instances
+(`specialize/derived_abi.rs`):
+- **Selector:** the signature uses std's structural `sigStr` of the enum's
+  `Generic` representation. The constructors' field signatures are nested to
+  the right in `sum(left,right)`: no fields give the empty string, two Words
+  `uint256,uint256`, and a struct its fields' signature without parentheses.
+  So `Nil | Single(uint256)` gives `run(uint256,sum(,uint256))`. The four
+  selectors of `abi-sum-roundtrip` have this form.
+- **Dispatch:** calldata shorter than four bytes or with another selector
+  reaches the default fallback, which reverts with `0x4924aef0`.
+- **Head:** `do_exec` requires `size >= 4 + h`, where `h`, the head of
+  `(uint256, E)`, is 32 plus the enum's head. A static enum's head is its tag
+  and its widest constructor's fields, a dynamic enum's one offset Word.
+  Otherwise the call reverts with `0x08638556` (`ABIInputTruncated`).
+- **Body start:** `abiSumReader` starts a static enum's body inline, at
+  calldata position 36. A dynamic enum's offset Word `o` at 36 is relative to
+  the arguments at 4. The bounded calldata reader requires `o <= size - 4`,
+  and the body starts at `p = 4 + o`.
+- **Tag:** 32 bytes must exist at `p`. The tag Word there is compared with
+  each constructor's `keccak256("Name(fields)")` in declaration order, and no
+  match calls `absurd()`, which reverts with empty data.
+- **Fields,** relative to the body, each required to exist: one Word at
+  `p + 32`; two Words, or a struct of two, at `p + 32` and `p + 64`. A `bytes`
+  field's head Word `t` at `p + 32` is relative to the body. It must satisfy
+  `t <= size - p`, the length Word `L` must exist at `p + t`, and
+  `L <= size - (p + t + 32)`. std's later bound `L <= ~0 - 63` can then no
+  longer fail. Every check is a comparison that cannot wrap, and every
+  failure reverts with `0x08638556`.
+- **Ignored:** trailing bytes, head Words that a narrower constructor does not
+  read, and a `bytes` field's padding, which is neither required nor read:
+  std copies the payload and zeroes its own padding.
+- **Order:** the tag is compared before any field is read, so an unknown tag
+  reverts with empty data even when its fields are cut.
+
+A probe came first: eight hand-written contracts with
+`run(uint256 flags, SynthesizedEnum value) returns (uint256)`. Each writes the
+decoded constructor's one-based index and fields to slots and returns a step
+result, under the protocol below with the stand-in step `3x + 7`.
+- Four were static: `Nil | Single(uint256)`,
+  `Wide(uint256, uint256) | Empty | Narrow(uint256) | Idle`,
+  `Lone(uint256) | Rec(ScPair) | Pair(uint256, uint256)` with
+  `struct ScPair { a: uint256; b: uint256; }`, and `Off | On`.
+- Four were dynamic: `Value(uint256) | Data(bytes) | Gone`,
+  `Nil | Single(uint256) | Double(uint256, uint256) | Blob(bytes)`,
+  `Left(bytes) | Right(bytes) | Both(uint256, uint256)` and
+  `Head(bytes) | Rec(ScPair)`.
+- They sent 172 transactions in scenarios of up to eight: every constructor
+  canonically, `bytes` lengths 0, 1, 31, 32, 33 and 64, odd flags, and the
+  malformations listed below.
+
+The results:
+- Checked Hull export, Sonatina O0 and O2 images, and Yul through the pinned
+  solc compiled every shape. The struct constructor's tag is
+  `keccak256("Rec(uint256,uint256)")`.
+- O0, O2 and Yul on Anvil, and imported Hull with O0 and O2 images, gave the
+  same status, return data and slots: 860 path rows, each equal to an
+  independent Python model of the reading above. 63 transactions returned
+  and 9 reverted in the body; 16 were rejected with `0x4924aef0`, 44 with
+  `0x08638556`, and 40 reverted with empty data.
+- A prototype of the original Core contract below passed the full Core
+  checker for all eight shapes and gave the model's 172 rows under the two
+  comparison rules below.
+
+So the profile is feasible on every path without a shared change. The
+original Core contract uses the existing `wordOutcomeV1` convention and input
+host requests, so `Solcore/ContractRuntime/` and its proofs, the Hull
+importer, Core's semantics and every backend stay as they are. Core reverts
+with one Word, so two comparison rules map its revert Word, each only when the
+transaction's prescribed std outcome is that rejection. Under the selector
+rule of the malformed-calldata profiles, Core's error selector Word stands for
+std's four bytes. Under a new empty-revert rule, Core's Word zero stands for
+empty revert data. Both are additive in the adapter, and Hull against the EVM
+stays exact.
+
+The profile's definitions were fixed before execution:
+- **Contract:** `SynthesizedEnumArguments` with
+  `run(uint256 flags, SynthesizedEnum value) returns (uint256)`, under the
+  selector of the shape's structural signature. Every transaction is
+  zero-value, and its calldata stays within one KiB.
+- **Shape:** two to four constructors, named from the returned enums' bank
+  without repetition. Each carries no fields, one `uint256`, two `uint256`s,
+  one `ScPair` struct of two `uint256` fields, or one `memory<bytes>`. At most
+  two carry `bytes`. A shape without `bytes` is static, any other dynamic.
+- **Declared slots 0 to 4:** an accumulator, the decoded constructor's
+  one-based index and three decoded Words.
+- **Decoded Words** `(w0, w1, w2)`: `(0, 0, 0)` for no fields, `(a, 0, 0)` for
+  one Word `a`, and `(a, b)` then 0 for two Words or the struct. A `bytes`
+  field of length `L` gives `(L, c0, c1)`, where chunk `k` is the payload's
+  zero-padded Word at `32k` when `L > 32k`, and zero otherwise.
+- **Transaction:** once std accepts the calldata, the method reads
+  `prior = slot 0`, computes `r = step(prior + index + w0 + w1 + w2)` and
+  writes `r`, the index and `w0` to `w2` to slots 0 to 4. Odd flags then revert
+  with the one Word `r`; even flags return `r`. A rejection runs no body and
+  keeps the slots.
+- **Source** (`solcore-source-enum-arguments-v1`):
+  - it imports `std.Generic` and `std.ABIGeneric` beside `std` and
+    `std.dispatch`, declares `struct ScPair` when a constructor carries it,
+    then `enum SynthesizedEnum`;
+  - the step is `sc_step`, rendered by the aggregate renderer;
+  - the method matches the value with one arm per constructor, binding the
+    struct's fields through `ScPair(a, b)`;
+  - a `bytes` arm reads the length and each chunk with `mload` from
+    `Typedef.rep`, a chunk only when the length exceeds its start.
+- **Original Core** (`core-enum-argument-contract-v1`, entry `wordOutcomeV1`):
+  one host contract that reads the calldata through `inputDataSize`,
+  `inputDataByte?` and `inputDataWordBE?`.
+  - It makes std's decisions above in std's order, with the selector and tags
+    computed by Lean's Keccak-256.
+  - A rejection reverts with its error selector as the Word, and an unknown
+    tag with the Word zero.
+  - A `bytes` chunk is the calldata Word masked to the payload. When a cut in
+    the padding leaves that Word incomplete, it is the Word that ends at the
+    last payload byte, shifted to the chunk's start.
+  - The decoded value then runs the protocol once.
+- **Node budget:**
+  - the wrapper's fixed part, the dispatch, head check, flags and protocol,
+    takes 168 nodes inside the budget, so the 384-node default leaves 216
+    for the step;
+  - the shape's decoder, the tag lookup and field decoders, lies outside the
+    budget, as the long-bytes chunk guards do: 33 to 99 nodes for a static
+    shape and 245 to 500 for a dynamic one;
+  - the doubled budget is capped at 512, and a contract is bounded by 512
+    nodes plus its decoder.
+- **Step:** one checked aggregate step with one to three helpers, generated as
+  for the other storage-family profiles. A step whose outputs agree at all
+  boundary inputs is excluded.
+- **Shape generation:** a stream of its own, started from the seed mixed by
+  SplitMix64's finalizer, as for the returned enums. It draws, in order:
+  1. the constructor count, uniformly from 2 to 4;
+  2. zero `bytes` constructors with probability one half, otherwise one or
+     two with probability one quarter each;
+  3. each other constructor's fields, uniformly from none, one Word, two
+     Words and the struct;
+  4. the positions of the `bytes` constructors;
+  5. the names, drawn from the bank without repetition.
+- **Transactions:** `{id, flags, choice, first, second, length, malformation,
+  calldata, stdRejection, value}`, one to eight per scenario, drawn in blocks
+  of three from a separate mixed stream. Each block draws:
+  - three flags from the boundary bank, each with the parity of one of the
+    four completion patterns;
+  - per transaction, a constructor `c` uniformly below `n`, two field Words
+    `first` and `second` from the boundary bank, and a length `L` as for the
+    returned enums, kept only by a `bytes` constructor;
+  - per transaction, canonical calldata with probability one third, and
+    otherwise a malformation: a kind uniformly from those that apply to the
+    transaction, then one entry of its bank.
+
+  A `bytes` payload is the first `L` bytes of `first · K` and `second · K`,
+  with the bytes profile's odd `K`. Random runs generate the step with G0
+  revision three.
+- **Canonical encoding:** the selector and the flags, then either the static
+  body or the offset 64 and the dynamic body. A body is the tag, the fields,
+  zero Words up to the body's head, then a `bytes` field's length Word and
+  zero-padded payload; that field's tail offset is the body's head.
+- **Malformations** change the canonical encoding. Each kind lists its
+  generation bank, where `p` is the body start, `L` the length and `size` the
+  canonical size:
+  - `short`: only the first 0 to 3 bytes;
+  - `selector`: the selector xor 1, `2^31` or `2^32 - 1`;
+  - `truncate`: a cut in the head, at and inside the tag, inside and after
+    each field, at and inside a `bytes` length Word, at the last payload byte,
+    at the padding, or before the last byte;
+  - `trailing`: 1, 31, 32, 33 or 64 bytes of zeros, `0xff` or the ramp, as for
+    malformed calldata;
+  - `tag`: an unknown tag Word: 0, the tag plus one, the tag xor `2^255`,
+    `2^256 - 1`, or the tag of the constructor's name with the fields
+    `uint256,bytes`;
+  - `retag`: another constructor's tag over the canonical body, which std
+    then decodes as that constructor;
+  - `offset` (dynamic): the head offset `size - 3`, `size - 4`, `size - 35`,
+    `2^255`, `2^256 - 4`, `2^256 - 1`, 0, 16, 32 or 96;
+  - `aliased` (dynamic): the offset 0 with the flags Word replaced by a
+    constructor's tag, so that the body starts at the flags;
+  - `unused` (a constructor narrower than the body's head): 1, `2^255` or
+    `2^256 - 1` in its first unread head Word;
+  - `tail` (`bytes`): the tail offset `size - p + 1`, `size - p`,
+    `size - p - 31`, 0, 32, `2^255` or `2^256 - 1`;
+  - `length` (`bytes`): `L + 1`, the most that fits, one more, `2^256 - 63`,
+    `2^256 - 1`, `2^255`, `L - 1` or 0, but not `L` itself;
+  - `padding` (`bytes` with padding): `0xff`, the ramp or one last byte, as
+    for malformed bytes.
+
+  Validity is structural: a kind only where it applies, a cut inside the
+  calldata past the selector, and a retag of another constructor.
+- **Prescribed outcome:** each transaction records `stdRejection`, std's
+  revert data: `0x4924aef0`, `0x08638556`, `0x` for an unknown tag, or null
+  when the body runs. A Lean model over the calldata bytes, `stdDecode`,
+  computes it with the flags and the decoded Words, and the adapter's own
+  Python model recomputes them.
+- **Observations:** status, the whole return data, slots 0 to 4 and the whole
+  committed storage, per prefix.
+  - The return data is one Word on return and body revert, std's four bytes
+    for an error selector and none for an unknown tag. The rules above compare
+    Core's Word with the last two.
+  - An accepted transaction must follow the protocol on its prescribed decoded
+    value: the committed index and Words, and a returned Word equal to slot
+    0. A rejection or body revert keeps the prior slots and the whole storage.
+- **Exclusions, in order:**
+  - a node budget too small for the fixed wrapper or above 512;
+  - the step's own exclusions;
+  - a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed outcomes.
+- **Reductions:** each candidate is sealed and strictly smaller in
+  transactions, then the shape's weight, then the malformations' weight, then
+  the total length, then program size, then the field Words and flags.
+  - A shape's weight sums one per constructor and its fields' weight: 0 to 4
+    for none, one Word, two Words, the struct and `bytes`.
+  - A malformation weighs 0 when there is none, otherwise one plus its
+    position in its kind's bank, or one plus the bank's size outside it.
+
+  The reductions, in order:
+  - one-transaction removals;
+  - a malformation set to none, then to each earlier entry of its bank;
+  - shorter lengths: zero, then half the length;
+  - a constructor that no transaction chooses, retags or aliases, dropped
+    while more than two remain; the indices above it move down;
+  - narrower fields: the struct to two Words, two Words to one, one Word to
+    none, and `bytes` to none with its lengths zeroed. A malformation that no
+    longer applies becomes none;
+  - step reductions;
+  - simpler transactions: the field Words to zero, then flags to their parity
+    bit.
+- **Fixed corpus coverage:**
+  - constructor counts 2, 3 and 4, with every position decoded;
+  - every payload kind decoded canonically, Word kinds in static and dynamic
+    shapes, the struct in both;
+  - decoded `bytes` lengths 0, 1, 31, 32, 33, 63 and 64, and two `bytes`
+    constructors;
+  - every malformation kind, each of the three rejections, and the accepted
+    malformations: trailing bytes, an unread head Word, a cut that keeps every
+    read byte, nonzero padding, a retag that decodes, an aliased body and a
+    `bytes` length that runs into the padding;
+  - both outcomes of a decoded value, a rejection between committed
+    transactions, and both node budgets, 384 and 512;
+  - one to three helpers, and the step features, templates and completion
+    patterns of its steps.
+- **Golden cases** come before any random run. The steps add a constant, and
+  each expected row is written out as hexadecimal text, with tags and
+  selectors from `cast keccak`: the status, the whole return data and slots 0
+  to 4. They cover the decoder's exact acceptance and refusals: every payload
+  kind in static and dynamic shapes, the seven bank lengths, every
+  malformation kind with accepted and rejected entries, and the order of the
+  checks. Original Core and the Lean model must each give every row.
+- **Out of scope:**
+  - nested, generic or recursive enums, enums in structs or arrays, and other
+    field types;
+  - more than two `bytes` constructors, and canonical `bytes` beyond 64 bytes;
+  - value-bearing calls, calldata beyond one KiB, and other methods.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
-`bytes` return values beyond 64 bytes, returned enums beyond the recorded
-shapes and other dynamic return values, or callers beyond the three fixed
-senders, needs its own observation, rollback, deployment and reduction
-definitions first.
+`bytes` return values beyond 64 bytes, returned enums and enum arguments
+beyond the recorded shapes and other dynamic return values, or callers beyond
+the three fixed senders, needs its own observation, rollback, deployment and
+reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
