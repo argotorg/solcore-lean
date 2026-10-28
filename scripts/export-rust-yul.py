@@ -7,7 +7,9 @@ original Yul and exact standard-JSON request/response remain available for repla
 The pinned compiler tools must already be built; this exporter never builds them.
 Wrapper names and object shape do not establish scope: the differential adapter
 must replay a canonical pure or storage-family case before using this exporter
-as its EVM path.
+as its EVM path. `--fixture` instead admits one pinned upstream end-to-end
+fixture's own contract from its pinned source, under the same object-shape,
+link and immutable checks; its caller compares the compiled paths.
 """
 from __future__ import annotations
 
@@ -49,6 +51,8 @@ PURE_CONTRACTS = tuple(common.CASE_CONTRACTS.values())
 STORAGE_CONTRACTS = tuple(dict.fromkeys(value["contract"] for value in storage.PROFILES.values()))
 CONTRACTS = PURE_CONTRACTS + STORAGE_CONTRACTS
 YUL_SOURCE = "checked.yul"
+# A pinned end-to-end fixture admits only its own contract, from its pinned source.
+FIXTURE_MANIFESTS = ("rust-scenario-parity.json", "rust-method-parity.json")
 
 
 def require(condition, message):
@@ -56,18 +60,36 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def validate_contract(contract):
-    require(contract in CONTRACTS, "only the generated pure and storage-family contract wrappers are supported")
+def fixture_pins():
+    pins = {}
+    for name in FIXTURE_MANIFESTS:
+        document = json.loads((ROOT / "scripts" / name).read_text())
+        require(document.get("upstreamCommit") == hull.COMMIT, "fixture manifest pins another upstream revision")
+        for item in document["fixtures"]:
+            require(item["id"] not in pins, "fixture pinned twice: " + item["id"])
+            pins[item["id"]] = {"source": item["source"], "sha256": item["sha256"], "contract": item["contract"]}
+    return pins
 
 
-def scope(contract):
-    validate_contract(contract)
+def validate_contract(contract, fixture=None):
+    if fixture is None:
+        require(contract in CONTRACTS, "only the generated pure and storage-family contract wrappers are supported")
+    else:
+        pin = fixture_pins().get(fixture)
+        require(pin is not None and pin["contract"] == contract, "only a pinned fixture's own contract is supported")
+
+
+def scope(contract, fixture=None):
+    validate_contract(contract, fixture)
+    if fixture is not None:
+        return (f"pinned end-to-end fixture {fixture}; one creation object with one runtime object; "
+                "caller compares compiled paths; EVM bytes only; no Hull linker map")
     family = "pure" if contract in PURE_CONTRACTS else "storage-family"
     return f"generated two-object wrapper shape; caller validates canonical {family} case; EVM bytes only; no Hull linker map"
 
 
-def validate_artifact(document, contract):
-    validate_contract(contract)
+def validate_artifact(document, contract, fixture=None):
+    validate_contract(contract, fixture)
     require(isinstance(document, dict) and set(document) == {
         "schema", "upstreamCommit", "selectedObject", "runtimeObject", "backend", "initCode", "runtimeCode"},
         "unexpected Yul EVM artifact fields")
@@ -88,8 +110,8 @@ def validate_version(stdout):
             "solc must report the pinned version " + SOLC_VERSION)
 
 
-def validate_hull(document, contract):
-    validate_contract(contract)
+def validate_hull(document, contract, fixture=None):
+    validate_contract(contract, fixture)
     require(isinstance(document, dict) and document.get("schema") == hull.SCHEMA and
             document.get("upstreamCommit") == hull.COMMIT, "unexpected checked Hull schema or revision")
     program = document.get("program")
@@ -111,8 +133,8 @@ def standard_input(source):
                          "evm.deployedBytecode.linkReferences", "evm.deployedBytecode.immutableReferences"], "": ["ast"]}}}}
 
 
-def artifact_from_output(document, contract):
-    validate_contract(contract)
+def artifact_from_output(document, contract, fixture=None):
+    validate_contract(contract, fixture)
     require(isinstance(document, dict) and set(document) <= {"contracts", "sources", "errors"},
             "unknown solc standard-JSON output fields")
     diagnostics = document.get("errors", [])
@@ -151,7 +173,7 @@ def artifact_from_output(document, contract):
     artifact = {"schema": SCHEMA, "upstreamCommit": hull.COMMIT, "selectedObject": selected,
         "runtimeObject": contract, "backend": copy.deepcopy(BACKEND),
         "initCode": "0x" + bytecode["object"], "runtimeCode": "0x" + runtime["object"]}
-    validate_artifact(artifact, contract)
+    validate_artifact(artifact, contract, fixture)
     return artifact
 
 
@@ -246,6 +268,11 @@ def checked_build(upstream, target, args):
 def export(args):
     source, output, upstream, target = args.source, args.output, args.upstream, args.target_dir
     require(source.is_file() and source.stat().st_size <= args.output_limit, "export source size limit exceeded or source missing")
+    fixture = getattr(args, "fixture", None)
+    if fixture is not None:
+        pin = fixture_pins()[fixture]
+        require(source == (upstream / pin["source"]).resolve() and common.file_digest(source) == pin["sha256"],
+                "fixture source differs from its pin")
     driver, build = checked_build(upstream, target, args)
     version = run_process([str(args.solc), "--version"], args).decode()
     validate_version(version)
@@ -272,7 +299,7 @@ def export(args):
     source_before = common.file_digest(source)
     run_process(hull_command, args, watched=(hull_output, paths["hullProvenance"]))
     checked = common.read_json(hull_output, args.output_limit)
-    validate_hull(checked, args.contract)
+    validate_hull(checked, args.contract, fixture)
     receipt = common.read_json(paths["hullProvenance"], args.output_limit)
     require(receipt.get("outputSha256") == common.file_digest(hull_output) and
             receipt.get("binarySha256") == build["binarySha256"] and
@@ -285,7 +312,7 @@ def export(args):
     solc_command = [str(args.solc), "--standard-json"]
     response = run_process(solc_command, args, stdin=request)
     paths["solcOutput"].write_bytes(response)
-    artifact = artifact_from_output(json.loads(response), args.contract)
+    artifact = artifact_from_output(json.loads(response), args.contract, fixture)
     sources = hull.source_hashes(checked)
     sources[source.as_uri()] = common.file_digest(source)
     require(sources == receipt["sources"], "source files changed between checked Hull and Yul compilation")
@@ -300,7 +327,9 @@ def export(args):
         "toolBuild": build, "hullProvenance": receipt, "sources": sources,
         "commands": {"hull": hull_command, "yul": yul_command, "solc": solc_command},
         "artifacts": {key: {"file": path.name, "sha256": common.file_digest(path)} for key, path in paths.items()},
-        "scope": scope(args.contract)}
+        "scope": scope(args.contract, fixture)}
+    if fixture is not None:
+        record["fixture"] = {"id": fixture, "source": pin["source"], "sha256": pin["sha256"]}
     sidecar.write_bytes(common.json_bytes(record))
     return output
 
@@ -309,7 +338,8 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--contract", choices=CONTRACTS, required=True)
+    parser.add_argument("--contract", choices=CONTRACTS, help="a generated wrapper; required unless --fixture is given")
+    parser.add_argument("--fixture", help="a pinned end-to-end fixture id, which admits only its own contract")
     parser.add_argument("--solc", type=Path, required=True, help="preinstalled solc " + SOLC_VERSION)
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
@@ -318,6 +348,13 @@ def parse_args(argv=None):
     parser.add_argument("--timeout", type=float, default=90, help="per-process time limit")
     parser.add_argument("--output-limit", type=int, default=8 * 1024**2, help="per-process output and artifact size limit")
     args = parser.parse_args(argv)
+    if (args.contract is None) == (args.fixture is None):
+        parser.error("select exactly one of --contract and --fixture")
+    if args.fixture is not None:
+        pins = fixture_pins()
+        if args.fixture not in pins:
+            parser.error("unknown pinned fixture: " + args.fixture)
+        args.contract = pins[args.fixture]["contract"]
     if not math.isfinite(args.timeout) or not .001 <= args.timeout <= 3600 or not 1024 <= args.output_limit <= 64 * 1024**2:
         parser.error("invalid export resource limits")
     for key in ("source", "output", "contract", "solc", "upstream", "target_dir", "root", "hull_output"):

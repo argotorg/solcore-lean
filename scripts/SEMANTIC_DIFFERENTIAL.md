@@ -6136,6 +6136,78 @@ corpora, in 60.0, 63.1 and 71.6 seconds against 95.6, 100.6 and 113.3 on Yul.
 Neither suite produced a finding. Agreement is test evidence, not a
 preservation proof.
 
+## Compare the pinned end-to-end fixtures across paths
+
+`scripts/semantic-fixtures.py` runs the pinned checkout's 168 end-to-end
+fixtures (`tests/e2e/*/main.sol`) on four compiled paths. No generator reaches
+most of their language, and no original Core exists for them. So the paths
+are compared with each other and with each fixture's own recorded upstream
+expectation, and mutated inputs are compared across the paths only. Agreement
+is never reported as a Core comparison. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
+this section describes how to run them.
+
+### Definitions
+
+- **Fixtures:** the 168 fixtures that `scripts/rust-scenario-parity.json` and
+  `scripts/rust-method-parity.json` pin by source hash: 72 raw scenarios with
+  626 transactions and 96 method-directive fixtures with 617 typed directives
+  and one send. The existing extractor reads the directives with the pinned
+  Rust parser; the existing resolver encodes typed directives against the
+  driver's ABI.
+- **Paths:** `hull`, the checked Hull on Lean Core through
+  `rust-hull-scenario` with Sonatina O0 images; `sonatina-o0` and
+  `sonatina-o2`, the code-image tool's creation images on Anvil; and `yul`,
+  the driver's Yul compiled by the pinned solc through
+  `export-rust-yul.py --fixture`, on Anvil.
+- **Environment:** a fresh Osaka chain per fixture with base fee and gas price
+  zero, so balances move only by value transfers. Method fixtures deploy from
+  the standard Anvil account; their ordinary directives are rolled-back
+  transactions from the zero address, as upstream's `eth_call`, and their
+  sends persist. Raw scenarios run upstream's sender, values and gas.
+- **Observations:** status, return or revert bytes (not a deployment's code),
+  ordered logs, and after a successful step the whole storage of every
+  account and the balances of the contract and the sender.
+- **Mutation:** up to `--mutants` (default 4) seeded single-change mutants per
+  recorded call and per raw deployment with constructor bytes or value. Words
+  take their class's boundary Words or a seeded Word; the frame loses or gains
+  bytes or toggles the value. Each mutant runs before its recorded step and is
+  rolled back.
+- **Exclusions and findings:** an unsupported directive, a compile failure, an
+  export refusal or a resource limit excludes the paths that need it, with its
+  stage and reason. A path mismatch, an unmet recorded expectation, a path
+  failure or a compiler crash is a finding. A harness error fails the run.
+
+### Running and validation
+
+```sh
+python3 scripts/semantic-fixtures.py --output .upstream/fixtures-fixed --jobs 4
+python3 scripts/semantic-fixtures.py --mode mutation --seed 20261111 \
+  --output .upstream/fixtures-mutation --jobs 4 --reuse-exports
+python3 scripts/semantic-fixtures.py --list --fixture 'abi-*'
+```
+
+The pinned tools must be prepared: the checked Hull driver, the code-image
+tool, the directive extractor and resolver (`RUST_PARITY.md`), the native
+tools (`prepare-semantic-tools.py`), solc 0.8.35, Anvil and cast. Exports go
+to `.upstream/semantic-fixtures/<fixture>`. `--reuse-exports` reuses them only
+when every exporter script, compiler binary, solc and source digest equals the
+one that made them.
+
+`report.json` has schema `solcore-lean.semantic-fixtures.v1`, states the
+comparison and `coreReference: false`, and records the environment, the
+digests of every script and binary at the start, whether they were unchanged
+at the end, each fixture's admitted paths, exclusions and findings, and the
+totals. `fixtures/<id>.json` keeps every step and mutant: one observation when
+the paths agree, every path's otherwise, and each path's expectation verdict
+for recorded steps. Each distinct finding carries its reduction. The command
+returns 1 for any finding, harness error or changed tool.
+
+`python3 scripts/test-semantic-fixtures.py` checks the inventory, the stream,
+the classification, the mutation operators and sampling, the observation
+normalization, the comparisons, the Lean result order, the reduction and the
+totals, without a compiler, runner or EVM.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function

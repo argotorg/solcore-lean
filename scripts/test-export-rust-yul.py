@@ -338,5 +338,57 @@ class YulProtocolTests(unittest.TestCase):
         self.assertEqual(signal.getsignal(signal.SIGTERM), before)
 
 
+class FixtureAdmissionTests(unittest.TestCase):
+    def test_a_pinned_fixture_admits_only_its_own_contract_under_the_same_object_checks(self):
+        pins = exporter.fixture_pins()
+        self.assertEqual((len(pins), pins['00answer']['contract']), (168, 'Answer'))
+        exporter.validate_contract('Answer', '00answer')
+        for contract, fixture in (('Answer', '01id'), ('Other', '00answer'), ('Answer', 'missing'), (CONTRACT, '00answer')):
+            with self.assertRaises(ValueError):
+                exporter.validate_contract(contract, fixture)
+        with self.assertRaises(ValueError):
+            exporter.validate_contract('Answer')
+        exporter.validate_hull(hull_output('Answer'), 'Answer', '00answer')
+        nested, two = hull_output('Answer'), hull_output('Answer')
+        nested['program']['objects'][0]['inners'][0]['inners'] = [{'name': 'Child', 'inners': []}]
+        two['program']['objects'].append({'name': 'OtherDeploy', 'inners': []})
+        for output in (nested, two):
+            with self.assertRaises(ValueError):
+                exporter.validate_hull(output, 'Answer', '00answer')
+        artifact = exporter.artifact_from_output(solc_output('Answer'), 'Answer', '00answer')
+        self.assertEqual((artifact['selectedObject'], artifact['runtimeObject']), ('AnswerDeploy', 'Answer'))
+        exporter.validate_artifact(artifact, 'Answer', '00answer')
+        with self.assertRaises(ValueError):
+            exporter.validate_artifact(artifact, 'Answer')
+        for section, field in (('bytecode', 'linkReferences'), ('deployedBytecode', 'linkReferences'),
+                               ('deployedBytecode', 'immutableReferences')):
+            output = solc_output('Answer')
+            output['contracts']['checked.yul']['AnswerDeploy']['evm'][section][field] = {'x': [{'start': 0, 'length': 20}]}
+            with self.assertRaises(ValueError):
+                exporter.artifact_from_output(output, 'Answer', '00answer')
+        self.assertTrue(exporter.scope('Answer', '00answer').startswith('pinned end-to-end fixture 00answer;'))
+        self.assertTrue(exporter.scope(CONTRACT).startswith('generated two-object wrapper shape'))
+
+    def test_cli_takes_the_contract_from_the_pin_and_needs_exactly_one_selection(self):
+        base = ['policy.sol', '--output', 'policy.json', '--solc', '/policy/solc']
+        self.assertEqual(exporter.parse_args(base + ['--fixture', '00answer']).contract, 'Answer')
+        self.assertEqual(exporter.parse_args(base + ['--contract', CONTRACT]).fixture, None)
+        for extra in ([], ['--fixture', '00answer', '--contract', CONTRACT], ['--fixture', 'missing'],
+                      ['--contract', 'Answer']):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                exporter.parse_args(base + extra)
+
+    def test_fixture_export_refuses_another_source_before_compiling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'main.sol'
+            source.write_text('contract Answer {}\n')
+            args = exporter.parse_args([str(source), '--output', str(Path(directory) / 'out.json'),
+                                        '--solc', '/policy/solc', '--fixture', '00answer'])
+            with patch.object(exporter, 'checked_build') as prepare, \
+                    self.assertRaisesRegex(ValueError, 'fixture source differs from its pin'):
+                exporter.export(args)
+            prepare.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
