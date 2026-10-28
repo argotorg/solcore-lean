@@ -2103,5 +2103,64 @@ class TupleCampaignTests(unittest.TestCase):
             campaign.validate_manifest({**other, "requiredTupleArities": [2, 3, 4]})
 
 
+def bytes_return_case(rows=((0, 5, 0), (1, 9, 31), (2, 7, 33)), origin=None):
+    value = fixtures.bytes_return_case(rows)
+    value["bytesReturnPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class BytesReturnCampaignTests(unittest.TestCase):
+    def test_coverage_names_returned_lengths_length_outcomes_carries_and_node_budgets(self):
+        value = bytes_return_case()
+        self.assertEqual(campaign.dimensions("stateful-bytes-returns"),
+                         campaign.DIMENSIONS + ("ReturnedLengths", "LengthOutcomes", "ReturnCarries", "ReturnNodeBudgets"))
+        # tx-2 returns 33 bytes after the committed tx-0 and past the revert of
+        # tx-1; an imported case has no node budget.
+        self.assertEqual(campaign.bytes_returns_coverage(value, ["returned", "reverted", "returned"]),
+                         {"ReturnedLengths": {0, 33}, "LengthOutcomes": {"empty:returned", "partial:reverted", "partial:returned"},
+                          "ReturnCarries": {"committed", "rollback"}, "ReturnNodeBudgets": set()})
+        self.assertEqual(campaign.inputs(value), {"5", "7", "9"})
+        # A first revert carries nothing committed; a whole-Word length is its own class.
+        self.assertEqual(campaign.bytes_returns_coverage(bytes_return_case(rows=((1, 1, 64), (0, 2, 32))), ["reverted", "returned"]),
+                         {"ReturnedLengths": {32}, "LengthOutcomes": {"whole:reverted", "whole:returned"},
+                          "ReturnCarries": {"rollback"}, "ReturnNodeBudgets": set()})
+        generated = bytes_return_case(rows=((0, 1, 1),), origin={"kind": "bytes-return-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.bytes_returns_coverage(generated, ["returned"]),
+                         {"ReturnedLengths": {1}, "LengthOutcomes": {"partial:returned"}, "ReturnCarries": set(),
+                          "ReturnNodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-bytes-returns"))
+            instance.summary["coverage"].update(requiredReturnedLengths=[0, 1, 31, 32, 33, 63, 64],
+                                                requiredReturnNodeBudgets=[384, 512],
+                                                requiredLengthOutcomes=list(campaign.BYTES_RETURN_EXTRA["LengthOutcomes"]))
+            histories = fixtures.bytes_return_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedReturnedLengths"], coverage["matchedLengthOutcomes"], coverage["matchedReturnCarries"]),
+                             ([0, 33], ["empty:returned", "partial:returned", "partial:reverted"], ["committed", "rollback"]))
+            self.assertEqual((coverage["missingReturnedLengths"], coverage["missingReturnNodeBudgets"], coverage["missingLengthOutcomes"]),
+                             ([1, 31, 32, 63, 64], [384, 512], ["empty:reverted", "whole:returned", "whole:reverted"]))
+
+    def test_the_fixed_corpus_validates_and_its_bytes_return_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-bytes-return-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-bytes-returns")
+        self.assertEqual((manifest["requiredReturnedLengths"], manifest["requiredReturnNodeBudgets"], manifest["requiredReturnCarries"]),
+                         ([0, 1, 31, 32, 33, 63, 64], [384, 512], ["committed", "rollback"]))
+        self.assertEqual(manifest["requiredLengthOutcomes"], list(campaign.BYTES_RETURN_EXTRA["LengthOutcomes"]))
+        for key, changed in (("requiredReturnedLengths", [65]), ("requiredReturnedLengths", []), ("requiredReturnedLengths", [True]),
+                             ("requiredLengthOutcomes", ["full:returned"]), ("requiredReturnCarries", ["other"]),
+                             ("requiredReturnNodeBudgets", [448]), ("requiredReturnNodeBudgets", [384, 384])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredReturnNodeBudgets"})
+        other = json.loads((ROOT / "scripts/semantic-tuple-return-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "bytes-return coverage belongs to the bytes-return profile"):
+            campaign.validate_manifest({**other, "requiredReturnedLengths": [0]})
+
+
 if __name__ == "__main__":
     unittest.main()

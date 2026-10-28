@@ -96,6 +96,10 @@ lean_exe semanticAssemblyKeccakLoopTool where
   root := `Tests.SemanticAssemblyKeccakLoopTool
   exeName := "semantic-assembly-keccak-loop-tool"
 
+lean_exe semanticBytesReturnTool where
+  root := `Tests.SemanticBytesReturnTool
+  exeName := "semantic-bytes-return-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

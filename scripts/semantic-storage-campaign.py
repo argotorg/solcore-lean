@@ -110,6 +110,15 @@ TUPLE_EXTRA = {"TupleArities": adapter.TUPLE_ARITIES,
                "ArityOutcomes": tuple(f"{arity}:{status}" for arity in adapter.TUPLE_ARITIES for status in ("returned", "reverted")),
                "TupleCarries": ("committed", "rollback"), "NodeBudgets": (384, 512)}
 TUPLE_DIMENSIONS = DIMENSIONS + tuple(TUPLE_EXTRA)
+# Bytes returns: the lengths of returned values, each length class's outcomes as
+# `class:status` (empty, a partial last Word or whole Words), the carries
+# `committed` and `rollback` into a returned value, and the node budgets of
+# generated cases.
+BYTES_RETURN_EXTRA = {"ReturnedLengths": tuple(range(adapter.MAX_RETURN_LENGTH + 1)),
+                      "LengthOutcomes": tuple(f"{kind}:{status}" for kind in ("empty", "partial", "whole")
+                                              for status in ("returned", "reverted")),
+                      "ReturnCarries": ("committed", "rollback"), "ReturnNodeBudgets": (384, 512)}
+BYTES_RETURN_DIMENSIONS = DIMENSIONS + tuple(BYTES_RETURN_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -138,6 +147,8 @@ def dimensions(profile_name):
         return KECCAK_LOOP_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "tuples":
         return TUPLE_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "bytes-returns":
+        return BYTES_RETURN_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -252,6 +263,25 @@ def tuples_coverage(case, statuses):
     budgets = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
     return {"TupleArities": {arity}, "ArityOutcomes": {f"{arity}:{status}" for status in statuses},
             "TupleCarries": carries, "NodeBudgets": budgets}
+
+
+def length_class(length):
+    return "empty" if length == 0 else "whole" if length % 32 == 0 else "partial"
+
+
+def bytes_returns_coverage(case, statuses):
+    """The returned lengths, each length class's outcomes, the carries into a
+    returned value from an earlier committed transaction and past an earlier
+    revert, and a generated case's node budget."""
+    lengths = [adapter.return_length(tx) for tx in case["transactions"]]
+    returned = [index for index, status in enumerate(statuses) if status == "returned"]
+    carries = ({"committed"} if any("returned" in statuses[:index] for index in returned) else set()) | (
+        {"rollback"} if any("reverted" in statuses[:index] for index in returned) else set())
+    origin = case["provenance"]["origin"]
+    budgets = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
+    return {"ReturnedLengths": {lengths[index] for index in returned},
+            "LengthOutcomes": {f"{length_class(length)}:{status}" for length, status in zip(lengths, statuses)},
+            "ReturnCarries": carries, "ReturnNodeBudgets": budgets}
 
 
 def nested_coverage(case):
@@ -493,6 +523,13 @@ def validate_manifest(manifest):
                 raise ValueError(f"tuple-return coverage requires unique required{dimension} from {list(allowed)}")
     elif any("required" + dimension in manifest for dimension in TUPLE_EXTRA):
         raise ValueError("tuple coverage belongs to the tuple-return profile")
+    if selected["abi"] == "bytes-returns":
+        for dimension, allowed in BYTES_RETURN_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"bytes-return coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in BYTES_RETURN_EXTRA):
+        raise ValueError("bytes-return coverage belongs to the bytes-return profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
     if selected.get("forms"):
@@ -707,7 +744,8 @@ def keyed_analysis(analysis):
                                                 adapter.NESTED_HISTORY_SCHEMA, adapter.MALFORMED_HISTORY_SCHEMA,
                                                 adapter.MALFORMED_NESTED_HISTORY_SCHEMA, adapter.MALFORMED_BYTES_HISTORY_SCHEMA,
                                                 adapter.METHODS_HISTORY_SCHEMA, adapter.LOOP_HISTORY_SCHEMA,
-                                                adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA)
+                                                adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA,
+                                                adapter.BYTES_RETURN_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -883,6 +921,8 @@ class Campaign:
             values.update(keccak_loops_coverage(case, statuses))
         elif self.specification["abi"] == "tuples":
             values.update(tuples_coverage(case, statuses))
+        elif self.specification["abi"] == "bytes-returns":
+            values.update(bytes_returns_coverage(case, statuses))
         if self.specification.get("forms"):
             values.update(forms_coverage(case, values))
         for dimension, observed in values.items():
@@ -949,6 +989,7 @@ class Campaign:
                           "ledger": LEDGER_EXTRA + ("Aliases",), "nested": tuple(NESTED_EXTRA),
                           "methods": tuple(METHODS_EXTRA), "loops": tuple(LOOP_EXTRA), "tuples": tuple(TUPLE_EXTRA),
                           "keccak-loops": tuple(KECCAK_LOOP_EXTRA),
+                          "bytes-returns": tuple(BYTES_RETURN_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(

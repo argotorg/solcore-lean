@@ -2201,6 +2201,9 @@ import Solcore.Test.SourceAssemblyKeccakLoopCorpus
 import Solcore.Test.SourceTupleReturnGolden
 import Solcore.Test.SourceTupleReturnCases
 import Solcore.Test.SourceTupleReturnCorpus
+import Solcore.Test.SourceBytesReturnGolden
+import Solcore.Test.SourceBytesReturnCases
+import Solcore.Test.SourceBytesReturnCorpus
 import Solcore.Test.SourceAggregatePrimitives
 import Solcore.Test.SourceAggregateMeaning
 import Solcore.Test.SourceEventLogEmitter
@@ -4240,6 +4243,9 @@ def main : IO UInt32 := do
   Tests.SourceTupleReturnGolden.testSourceTupleReturnGolden
   Tests.SourceTupleReturnCases.testSourceTupleReturnCases
   Tests.SourceTupleReturnCorpus.testSourceTupleReturnCorpus
+  Tests.SourceBytesReturnGolden.testSourceBytesReturnGolden
+  Tests.SourceBytesReturnCases.testSourceBytesReturnCases
+  Tests.SourceBytesReturnCorpus.testSourceBytesReturnCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   Tests.SourceAggregateMeaning.testSourceAggregateMeaning
   Tests.SourceEventLogEmitter.testSourceEventLogEmitter

@@ -90,13 +90,16 @@ PROFILES = {
     "stateful-assembly-keccak-loops": ("semantic-assembly-keccak-loop", "storage", 384),
     # The tuple-return shell takes 79, 85 or 91 nodes of 384, by arity.
     "stateful-tuple-returns": ("semantic-tuple-return", "storage", 384),
+    # The bytes-return shell takes 125 nodes of 384.
+    "stateful-bytes-returns": ("semantic-bytes-return", "storage", 384),
 }
 # Profiles that declare their observed slots share the declared-slot Hull runner.
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping",
                           "stateful-long-bytes", "stateful-nested-array", "stateful-malformed-calldata",
                           "stateful-malformed-nested-array", "stateful-malformed-bytes", "stateful-methods",
                           "stateful-assembly-storage-loops", "stateful-assembly-keccak-loops",
-                          "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns")
+                          "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns",
+                          "stateful-bytes-returns")
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
 
@@ -194,7 +197,8 @@ def command(args, profile, output, seconds, disk_bytes):
                      "stateful-keccak-loops": args.keccak_loop_case_tool,
                      "stateful-assembly-storage-loops": args.assembly_storage_loop_case_tool,
                      "stateful-assembly-keccak-loops": args.assembly_keccak_loop_case_tool,
-                     "stateful-tuple-returns": args.tuple_return_case_tool}
+                     "stateful-tuple-returns": args.tuple_return_case_tool,
+                     "stateful-bytes-returns": args.bytes_return_case_tool}
     forwarded = profile == "stateful-forwarded-value"
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
             storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else args.call_case_tool}[family]
@@ -458,8 +462,8 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all forty for Sonatina, the twenty pure profiles for Yul, "
-                             "which also runs the eighteen storage-family profiles when they are selected")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all forty-one for Sonatina, the twenty pure profiles for Yul, "
+                             "which also runs the nineteen storage-family profiles when they are selected")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -495,7 +499,8 @@ def parse_args(argv=None):
                 "keccak_loop_case_tool": "semantic-keccak-loop-tool",
                 "assembly_storage_loop_case_tool": "semantic-assembly-storage-loop-tool",
                 "assembly_keccak_loop_case_tool": "semantic-assembly-keccak-loop-tool",
-                "tuple_return_case_tool": "semantic-tuple-return-tool"}
+                "tuple_return_case_tool": "semantic-tuple-return-tool",
+                "bytes_return_case_tool": "semantic-bytes-return-tool"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))

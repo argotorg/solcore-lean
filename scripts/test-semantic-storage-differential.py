@@ -3808,5 +3808,161 @@ class TupleTests(unittest.TestCase):
         self.assertFalse(result["pairs"]["directCore/rustEvm"])
         self.assertIn("output", result["fields"])
 
+
+MULTIPLIER = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95
+
+
+def bytes_return_case(rows=((0, 5, 0), (1, 9, 31), (2, 7, 33), (0, 3, 64))):
+    """Envelope fixture only: native replay checks the actual bytes-return program."""
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "length": str(length),
+                     "calldata": "0x24b912e5" + f"{flags:064x}" + f"{value:064x}" + f"{length:064x}", "value": "0"}
+                    for index, (flags, value, length) in enumerate(rows)]
+    return {"schema": runner.BYTES_RETURN_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "bytesReturnPlan": {"schema": "solcore-lean.bytes-return-plan.v1", "stepProgram": {}},
+        "initialState": {"storage": []}, "observedSlots": ["0", "1", "2"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedBytesReturns", "method": "run", "signature": "run(uint256,uint256,uint256)",
+            "selector": "0x24b912e5", "deployPath": ["SynthesizedBytesReturnsDeploy"],
+            "runtimePath": ["SynthesizedBytesReturnsDeploy", "SynthesizedBytesReturns"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def bytes_return_history(value, path, step=lambda x: x + 1, padding=0, revert_words=1):
+    """Rows of the bytes-return protocol with a known step: r = step(slot 0 +
+    input) goes to slot 0, slot one grows by one and the input goes to slot two.
+    A return carries the offset 32, the length and the first `length` bytes of
+    r * K and (slot 1 * K) xor (prior slot 2), then `padding` up to a whole
+    Word; odd flags revert with `revert_words` copies of r."""
+    rows, prior = [], [0, 0, 0]
+    for index, tx in enumerate(value["transactions"]):
+        x, length = int(tx["input"]), int(tx["length"]) % 65
+        result = step((prior[0] + x) % 2**256) % 2**256
+        after = [result, (prior[1] + 1) % 2**256, x]
+        reverted = int(tx["flags"]) % 2 == 1
+        if reverted:
+            output = result.to_bytes(32, "big") * revert_words
+        else:
+            data = (result * MULTIPLIER % 2**256).to_bytes(32, "big") + (
+                (after[1] * MULTIPLIER % 2**256) ^ prior[2]).to_bytes(32, "big")
+            output = (32).to_bytes(32, "big") + length.to_bytes(32, "big") + data[:length] + bytes([padding]) * (-length % 32)
+        committed = list(prior) if reverted else after
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + output.hex(), "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.BYTES_RETURN_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0, 0, 0]), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def bytes_return_histories(value=None, **options):
+    value = bytes_return_case() if value is None else value
+    return {path: bytes_return_history(value, path, **options) for path in runner.PATHS}
+
+
+class BytesReturnTests(unittest.TestCase):
+    def test_a_bytes_return_case_records_its_lengths(self):
+        value = bytes_return_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["selector"]),
+                         ("semantic-bytes-return-tool", "rust-hull-keyed-storage-scenario", True, "bytes-returns", "0x24b912e5"))
+        self.assertTrue(runner.has_bytes_returns(value))
+        self.assertFalse(runner.has_bytes_returns(tuple_case()) or runner.has_tuples(value) or runner.has_bytes(value)
+                         or runner.uses_selector_rule(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                         ["returned", "reverted", "returned", "returned"])
+        self.assertEqual([runner.return_length(tx) for tx in value["transactions"]], [0, 31, 33, 64])
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2"))
+        self.assertIn("bytes value", runner.scope(value))
+        # A length above 64 is refused even with its own calldata.
+        invalid = bytes_return_case(rows=((0, 5, 65),))
+        with self.assertRaises(ValueError):
+            runner.validate_case(invalid)
+        for key, changed in (("calldata", "0x24b912e5" + "00" * 96), ("value", "1"), ("flags", "2"), ("input", "6"),
+                             ("length", "1")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = ["0", "1"]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_a_returned_value_carries_its_padded_length_and_a_revert_one_word(self):
+        value = bytes_return_case()
+        histories = bytes_return_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        self.assertEqual([len(runner.common.hex_bytes(row["output"], "output")) for row in rows], [64, 32, 128, 128])
+        self.assertEqual([runner.output_words(value, row) for row in rows], [2, 1, 4, 4])
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+            self.assertEqual(runner.bytes_return_fields(value, tx, rows[index], prior), [])
+        # tx-2 returns 33 bytes of (6 + 7 + 1) * K and (2 * K) xor 5, past the
+        # revert of tx-1, which wrote no slot; the rest of its last Word is zero.
+        output = runner.common.hex_bytes(rows[2]["output"], "output")
+        self.assertEqual(output[:64], (32).to_bytes(32, "big") + (33).to_bytes(32, "big"))
+        self.assertEqual(output[64:97], (14 * MULTIPLIER % 2**256).to_bytes(32, "big") +
+                         ((2 * MULTIPLIER % 2**256) ^ 5).to_bytes(32, "big")[:1])
+        self.assertEqual(output[97:], bytes(31))
+        prior, tx = rows[1]["committedStorage"], value["transactions"][2]
+        for slot in ("1", "2"):
+            changed = copy.deepcopy(rows[2])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertIn("committedStorage", runner.bytes_return_fields(value, tx, changed, prior))
+        # The offset, the length, a data byte and a padding byte are each checked.
+        for position in (31, 63, 64, 96, 97, 127):
+            changed = copy.deepcopy(rows[2])
+            broken = bytearray(output)
+            broken[position] ^= 1
+            changed["output"] = "0x" + broken.hex()
+            with self.subTest(position=position):
+                self.assertEqual(runner.bytes_return_fields(value, tx, changed, prior), ["output"])
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+        # A truncated or extended value breaks the length rule and the protocol.
+        for changed_output in (rows[2]["output"][:-64], rows[2]["output"] + "00" * 32, rows[2]["output"] + "00"):
+            changed = {**rows[2], "output": changed_output}
+            with self.subTest(length=len(changed_output)):
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+                self.assertEqual(runner.bytes_return_fields(value, tx, changed, prior), ["output"])
+        # A revert is checked by rollback and its one-Word length, not by the protocol.
+        self.assertEqual(runner.bytes_return_fields(value, value["transactions"][1], {**rows[1], "output": "0x" + "00" * 32},
+                                                    rows[0]["committedStorage"]), [])
+        self.assertFalse(runner.conforms(value, value["transactions"][1], {**rows[1], "output": rows[1]["output"] + "00" * 32},
+                                         rows[0]["committedStorage"]))
+
+    def test_a_protocol_break_on_every_path_is_a_mismatch_although_the_paths_agree(self):
+        value = bytes_return_case()
+        for options in ({"padding": 1}, {"revert_words": 2}):
+            broken = bytes_return_histories(value, **options)
+            result = runner.compare(broken, value)
+            with self.subTest(options=options):
+                self.assertEqual(result["category"], "semantic-mismatch")
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertIn("output", result["fields"])
+        # Shorter lengths on every path of the case are a mismatch too.
+        short = bytes_return_histories(bytes_return_case(rows=((0, 5, 0), (1, 9, 31), (2, 7, 32), (0, 3, 64))))
+        result = runner.compare(short, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-2"))
+        self.assertTrue(all(result["pairs"].values()))
+        # A different step on one path is an ordinary difference.
+        changed = bytes_return_histories(value)
+        changed["rustEvm"] = bytes_return_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+        self.assertIn("committedStorage", result["fields"])
+
+
 if __name__ == "__main__":
     unittest.main()

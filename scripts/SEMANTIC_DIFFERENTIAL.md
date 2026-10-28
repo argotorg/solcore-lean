@@ -4957,7 +4957,125 @@ There was no finding. Agreement is test evidence, not a preservation proof.
 A dynamic `bytes` return was probed and not built: every path returned the
 same canonical encoding, but original Core has no variable-length value. The
 [roadmap](../docs/design/next-implementation-roadmap.md) records the options.
-The pinned compiler rejects a `memory<DynArray<uint256>>` return.
+The pinned compiler rejects a `memory<DynArray<uint256>>` return. A bounded
+`bytes` return came later; see
+[Compare bounded `bytes` returns](#compare-bounded-bytes-returns).
+
+## Compare bounded `bytes` returns
+
+The `stateful-bytes-returns` profile returns a `memory<bytes>` value of zero to
+64 bytes and compares the whole return data on all three paths. Original Core
+gained an entry convention for it, `boundedBytesOutcomeV1`. The
+[roadmap](../docs/design/next-implementation-roadmap.md) fixes the
+definitions and the runtime design, including why the representation is not
+one variant per exact length.
+
+### Definitions
+
+- **Convention:** `CoreContractEntryProfile.boundedBytesOutcomeV1` has the
+  result type `.sum B (.sum .word .word)`, with
+  `B = .sum .unit (.product .word (.product .word .word))`.
+  - `inLeft unit` is the empty value.
+  - `inRight (tag, d0, d1)` is the value of length `tag mod 64 + 1`, whose
+    data are the first bytes of the big-endian `d0` and `d1`.
+  - A returned value decodes to std's canonical encoding: the Word 32, the
+    length Word, the data, then zeros up to a whole number of Words. The data
+    bytes after the length are ignored, so every typed value decodes.
+  - Revert and trap carry one Word, as for `wordOutcomeV1`. The top-level
+    runner decodes it unchanged.
+- **Nested boundary:** as for tuples, a registered bytes contract is
+  `unavailable` to a word call, and a template with a bytes initializer is
+  `unavailable` to creation.
+- **Contract:** `SynthesizedBytesReturns` with `run(uint256 flags, uint256
+  input, uint256 length)`, selector `0x24b912e5`, zero value. Slot 0 is an
+  accumulator, slot 1 the committed call count and slot 2 the last committed
+  input.
+- **Transaction:** `prior = slot 0`, `last = slot 2` and `r = step(prior +
+  input)`. It writes `r` to slot 0, slot 1 plus one to slot 1 and the input to
+  slot 2. Odd flags revert with the one Word `r`. Even flags return the first
+  `L` bytes of `d0 = r · K` and `d1 = (count · K) xor last`, where `L` is the
+  length Word modulo 65, `count` is slot 1 read back after its write, `K` is
+  the odd constant `0x9e3779b9…d0c18e95` and products wrap.
+- **Source:** the method returns `memory<bytes>`. It allocates 96 bytes with
+  std's `allocate_memory`, stores `L`, `d0` and `d1` with `mstore` and returns
+  the pointer. std's dispatcher encodes it with `abi_encode`, which copies the
+  length and data and zeroes the rest of the last Word.
+- **Original Core:** one host contract whose result is `inLeft (inLeft unit)`
+  for an empty value, `inLeft (inRight (L - 1, d0, d1))` otherwise, or
+  `inRight (inLeft r)`.
+- **Transactions:** `{id, flags, input, length, calldata, value}`, with
+  lengths from 0 to 64. Generation draws each length from the bank 0, 1, 31,
+  32, 33, 63 and 64 with probability one half, and otherwise uniformly from 0
+  to 64.
+
+### Running and validation
+
+```sh
+lake build semanticBytesReturnTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-bytes-return-corpus.json \
+  --output .upstream/semantic-bytes-return-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-bytes-returns \
+  --cases 16 --output .upstream/semantic-bytes-return-random
+```
+
+Plans use `solcore-lean.bytes-return-plan.v1` under `bytesReturnPlan`. Cases
+use `solcore-lean.semantic-bytes-return-case.v1` and histories
+`solcore-lean.bytes-return-history.v1`. The shell takes 125 nodes inside the
+node budget. The suite's default of 384 nodes leaves 259 for the step, and
+`--nodes-scale 2` caps the doubled budget at 512. Contracts are bounded by 512
+nodes. A case reaches about 70 KB, so a native shrink response carries at
+most 32 candidates.
+
+The adapter's output rule for this profile is `64 + 32⌈L/32⌉` bytes on return
+and 32 on revert; every other profile keeps its own rule. A returned row must
+also follow the protocol on every path:
+- the Word 32, then the length Word `L`;
+- the first `L` bytes of `d0` and `d1`, from the committed slots 0 and 1 and
+  the prior slot 2;
+- zero bytes up to a whole Word;
+- the committed slot 1 is the prior slot 1 plus one, and the committed slot 2
+  is the input.
+
+A revert is checked by rollback and its one-Word length. Reductions remove
+transactions, shorten lengths to zero or half, reduce the step, then clear
+flags to their parity bit and inputs to their low byte.
+
+Four Lean tests check the convention and the profile:
+- `Solcore/Test/ContractBoundedBytesEntryProfile.lean` checks the
+  convention's exact bytes for lengths 0, 1, 31, 32, 33 and 64 against
+  hexadecimal text, with nonzero data bytes after each length, and its revert
+  and trap branches. Wrong annotations and payloads must not decode. A word
+  call to a registered bytes contract and a creation from a bytes initializer
+  must be unavailable, and a bytes root must return its whole encoding through
+  the nested executor.
+- `Solcore/Test/SourceBytesReturnGolden.lean` checks the Core contract and a
+  model of the source against rows written out as hexadecimal text. The model
+  is a slot map and std's copy-and-zero encoder over the method's memory. Its
+  steps add a known constant. The rows cover the bank's seven lengths, both
+  outcomes, carries across a revert and wrapping sums.
+- `Solcore/Test/SourceBytesReturnCases.lean` requires the Core contract to
+  equal the model on 64 generated scenarios, 392 transactions in all. Every
+  case and reduction must replay, generation must draw every bank length, and
+  the shell size must be the one above.
+- `Solcore/Test/SourceBytesReturnCorpus.lean` checks the fixed corpus against
+  expected histories that the model computed.
+
+The fixed corpus has twelve scenarios and 32 transactions: six imported
+scenarios, which reuse the tuple corpus's six imported steps with lengths
+chosen for coverage, and six generated seeds, three at 384 nodes and three at
+512. Required coverage:
+- the returned lengths 0, 1, 31, 32, 33, 63 and 64;
+- empty, partial-Word and whole-Word lengths, each with both outcomes;
+- both node budgets;
+- a returned value after an earlier committed transaction, and one that
+  follows a revert whose writes it must not see;
+- the six boundary Words as inputs;
+- one to three helpers and transactions, all four templates, both outcomes
+  and seven completion patterns.
+
+The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
+as for the other storage-family profiles.
 
 ## Compare whole committed storage
 

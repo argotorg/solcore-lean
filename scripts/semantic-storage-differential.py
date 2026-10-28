@@ -76,6 +76,8 @@ ASSEMBLY_LOOP_CASE_SCHEMA = "solcore-lean.semantic-assembly-storage-loop-case.v1
 ASSEMBLY_KECCAK_LOOP_CASE_SCHEMA = "solcore-lean.semantic-assembly-keccak-loop-case.v1"
 TUPLE_CASE_SCHEMA = "solcore-lean.semantic-tuple-return-case.v1"
 TUPLE_HISTORY_SCHEMA = "solcore-lean.tuple-return-history.v1"
+BYTES_RETURN_CASE_SCHEMA = "solcore-lean.semantic-bytes-return-case.v1"
+BYTES_RETURN_HISTORY_SCHEMA = "solcore-lean.bytes-return-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -259,6 +261,16 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": TUPLE_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "tuples", "shrinkBatch": 32},
+    # One method that returns a `bytes` value of zero to 64 bytes; every path's
+    # whole return data is compared. A case reaches about 70 KB, so a native
+    # shrink response carries at most 32 candidates.
+    "stateful-bytes-returns": {"caseSchema": BYTES_RETURN_CASE_SCHEMA, "planSchema": "solcore-lean.bytes-return-plan.v1",
+        "planKey": "bytesReturnPlan", "corpusSchema": "solcore-lean.semantic-bytes-return-corpus.v1",
+        "originKind": "bytes-return-generated", "contract": "SynthesizedBytesReturns",
+        "caseTool": "semantic-bytes-return-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": BYTES_RETURN_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256,uint256)", "selector": "0x24b912e5", "rollback": True, "keyed": False,
+        "declared": True, "abi": "bytes-returns", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -331,6 +343,12 @@ LOOP_MASKS = (0, 1, 3, 7)
 # count, slot 2 the last committed input; plans return two to four Words.
 TUPLE_SLOTS = [str(slot) for slot in range(3)]
 TUPLE_ARITIES = (2, 3, 4)
+# The bytes-return profile: the tuple profile's slots; a transaction requests
+# zero to 64 bytes, which the contract reads modulo 65, of two data Words built
+# with this odd multiplier.
+BYTES_RETURN_SLOTS = [str(slot) for slot in range(3)]
+MAX_RETURN_LENGTH = 64
+RETURN_MULTIPLIER = 0x9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
 LEDGER_SENDERS = (str(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), str(0x70997970C51812dc3A010C7d01b50e0d17dc79C8),
                   str(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC))
@@ -372,6 +390,9 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         return "reverted" if sum(int(common.word(value)) for value in transaction["inputs"]) % 2 else "returned"
     if profile(case)["abi"] == "keccak-loops":
         # Odd flags revert after every logged iteration.
+        return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
+    if profile(case)["abi"] == "bytes-returns":
+        # Odd flags revert after the writes.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
                                                              "malformed", "loops", "tuples") else "input"]
@@ -470,7 +491,10 @@ def tuple_arity(case: dict) -> int:
 
 def output_words(case: dict, row: dict) -> int:
     """The Words a completed row's output carries: a returned tuple its arity,
-    every other row one."""
+    a returned `bytes` value its offset, its length and its data padded to
+    whole Words, every other row one."""
+    if has_bytes_returns(case) and row["status"] == "returned":
+        return 2 + (return_length(case["transactions"][row["index"]]) + 31) // 32
     return tuple_arity(case) if has_tuples(case) and row["status"] == "returned" else 1
 
 
@@ -489,6 +513,38 @@ def tuple_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) ->
     output = common.hex_bytes(row["output"], "output")
     words = [int.from_bytes(output[offset:offset + 32], "big") for offset in range(0, len(output), 32)]
     if len(output) % 32 or words != [after["0"], after["1"], before["0"], before["2"]][:tuple_arity(case)]:
+        fields.append("output")
+    return fields
+
+
+def has_bytes_returns(case: dict) -> bool:
+    return profile(case)["abi"] == "bytes-returns"
+
+
+def return_length(transaction: dict) -> int:
+    """The length a bytes-return transaction requests, as the contract reads it."""
+    return int(common.word(transaction.get("length"), "transaction length")) % (MAX_RETURN_LENGTH + 1)
+
+
+def bytes_return_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the bytes-return protocol: slot one
+    grows by one, slot two is the input, and the output is std's encoding of
+    the first `length` bytes of the committed slot zero times the multiplier
+    and the committed slot one times the multiplier xor the prior slot two:
+    the offset 32, the length, those bytes, then zeros up to a whole Word. A
+    revert is checked by rollback."""
+    if row["status"] != "returned":
+        return []
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after["1"] != (before["1"] + 1) % 2**256 or after["2"] != int(common.word(transaction.get("input"), "transaction input")):
+        fields.append("committedStorage")
+    length = return_length(transaction)
+    data = (after["0"] * RETURN_MULTIPLIER % 2**256).to_bytes(32, "big") + (
+        (after["1"] * RETURN_MULTIPLIER % 2**256) ^ before["2"]).to_bytes(32, "big")
+    expected = (32).to_bytes(32, "big") + length.to_bytes(32, "big") + data[:length] + bytes(-length % 32)
+    if common.hex_bytes(row["output"], "output") != expected:
         fields.append("output")
     return fields
 
@@ -762,6 +818,12 @@ def declared_scope(case: dict) -> str:
                 "written value; no constructor logs; initially empty storage; committed values at slot 0 and every "
                 "addressed key's keccak256(1 ++ key) slot and ordered committed logs (address, topics, data) on all "
                 "paths, the EVM chain's complete log list, and no nonzero undeclared slot on Hull/EVM; no "
+                "gas/balance/nonce or memory equivalence")
+    if has_bytes_returns(case):
+        return ("ordered zero-value run(uint256,uint256,uint256) transactions that return a bytes value of the "
+                "transaction's zero to 64 bytes of two Words, the step result and slot 1 after its write times an odd "
+                "constant, the latter xor slot 2 before its write; initially empty storage; the whole return data and "
+                "committed values at slots 0..2 on all paths and no nonzero undeclared slot on Hull/EVM; no "
                 "gas/balance/nonce or memory equivalence")
     if has_tuples(case):
         return ("ordered zero-value run(uint256,uint256) transactions that return a static tuple of the plan's two to "
@@ -1296,6 +1358,13 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
+        if selected["abi"] == "bytes-returns":
+            if int(common.word(tx.get("length"), "transaction length")) > MAX_RETURN_LENGTH:
+                raise ValueError("a bytes-return transaction requests at most 64 bytes")
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "input", "length")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its three original Words")
+            continue
         if selected["abi"] == "keccak-loops":
             if type(tx.get("iterations")) is not int or tx["iterations"] != loop_iterations(case, tx):
                 raise ValueError("transaction iterations differ from its input under the loop mask")
@@ -1356,6 +1425,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "tuples":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != TUPLE_SLOTS:
             raise Finding("unsupported-scope", "input", "tuple-return profile starts empty and observes slots zero through two")
+    elif selected["abi"] == "bytes-returns":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_RETURN_SLOTS:
+            raise Finding("unsupported-scope", "input", "bytes-return profile starts empty and observes slots zero through two")
     elif selected["abi"] == "malformed" and encoding(selected) == "bytes":
         slots = bytes_layout(selected)[1]
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != slots:
@@ -1592,7 +1664,9 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     bytes, a returned row records its payload length, last byte and sum, and for
     nested arrays its row and element counts and sum. For the ledger,
     `ledger_fields` fixes what the balance-dependent polarity leaves open. A
-    returned tuple carries its arity's Words and follows `tuple_fields`."""
+    returned tuple carries its arity's Words and follows `tuple_fields`. A
+    returned `bytes` value carries its padded length and follows
+    `bytes_return_fields`."""
     expected = expected_status(case, tx)
     # A std rejection reverts with exactly its selector, after the selector rule.
     rejection = tx.get("stdRejection") if profile(case)["abi"] in ("malformed", "methods") else None
@@ -1618,6 +1692,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if has_keccak_loops(case) and keccak_loop_fields(case, tx, row, prior):
         return False
     if has_tuples(case) and tuple_fields(case, tx, row, prior):
+        return False
+    if has_bytes_returns(case) and bytes_return_fields(case, tx, row, prior):
         return False
     if has_senders(case) and ledger_fields(tx, row, prior):
         return False
@@ -1779,6 +1855,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if has_tuples(case):
             # A returned tuple follows the protocol Word by Word; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in tuple_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_bytes_returns(case):
+            # A returned value follows the protocol byte by byte; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in bytes_return_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
