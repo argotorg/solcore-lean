@@ -231,30 +231,78 @@ class ObservationTests(unittest.TestCase):
 
 
 class HullRunnerTests(unittest.TestCase):
+    chain = {"address": "0x" + "00" * 19 + "0a", "accounts": []}
+
+    def prepare(self, directory: Path, body: str) -> tuple[SimpleNamespace, dict]:
+        hull_path = directory / "hull.json"
+        hull_path.write_text(json.dumps({"program": {"objects": [{"name": "CDeploy", "inners": [{"name": "C", "inners": []}]}]}}))
+        runner = directory / "runner"
+        runner.write_text("#!" + sys.executable + "\nimport json, sys, time\nconfig = json.load(open(sys.argv[1]))\n" + body)
+        runner.chmod(runner.stat().st_mode | stat.S_IXUSR)
+        args = SimpleNamespace(hull_runner=runner, hull_timeout=30, hull_entry_timeout=30)
+        return args, {"O0": {"hull": hull_path, "images": hull_path}}
+
+    # Every call returns its own calldata; one calldata never finishes; each invocation is logged.
+    ECHO = ("with open(sys.argv[0] + '.log', 'a') as log:\n    log.write(json.dumps([call['calldata'] for call in config['calls']]) + '\\n')\n"
+            "print(json.dumps({'stage': 'deployment', 'status': 'returned', 'output': '0x00', 'storage': [], 'balances': [],"
+            " 'world': [], 'logs': []}), flush=True)\n"
+            "for index, call in enumerate(config['calls']):\n"
+            "    if call['calldata'] == '0xdead':\n        time.sleep(60)\n"
+            "    print(json.dumps({'stage': 'execution', 'index': index, 'status': 'returned', 'output': call['calldata'],"
+            " 'storage': [], 'balances': [], 'world': [], 'logs': []}), flush=True)\n")
+
     def test_rows_are_ordered_and_missing_rows_keep_their_reason(self):
         with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            hull_path = directory / "hull.json"
-            hull_path.write_text(json.dumps({"program": {"objects": [{"name": "CDeploy", "inners": [{"name": "C", "inners": []}]}]}}))
             rows = [{"stage": "deployment", "status": "returned", "output": "0x00", "storage": [], "balances": [], "world": [], "logs": []},
                     {"stage": "execution", "index": 0, "status": "reverted", "output": "0x01", "logs": []}]
-            runner = directory / "runner"
-            runner.write_text("#!" + sys.executable + "\nimport json, sys\nconfig = json.load(open(sys.argv[1]))\n"
-                              "assert config['calls'][0]['persist'] is False and config['deployPath'] == ['CDeploy']\n"
-                              f"print('\\n'.join(json.dumps(row) for row in {rows!r}))\nsys.exit(1)\n")
-            runner.chmod(runner.stat().st_mode | stat.S_IXUSR)
-            args = SimpleNamespace(hull_runner=runner, hull_timeout=30)
-            fixture = {"contract": "C", "fuel": 10, "availableGas": None}
-            chain = {"address": "0x" + "00" * 19 + "0a", "accounts": []}
+            args, exports = self.prepare(Path(directory), "assert config['calls'][0]['persist'] is False and "
+                                         "config['deployPath'] == ['CDeploy']\n"
+                                         f"print('\\n'.join(json.dumps(row) for row in {rows!r}))\nsys.exit(1)\n")
+            fixture = {"mode": "raw", "contract": "C", "fuel": 10, "availableGas": None}
             calls = [{**step(kind="call"), "persist": False}, step()]
-            observed = fixtures.run_hull(args, fixture, {"O0": {"hull": hull_path, "images": hull_path}}, chain,
-                                         step(kind="deploy", index=0), calls)
+            observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), calls)
             self.assertEqual([item["status"] for item in observed], ["returned", "reverted", "core-runner-error"])
-            rows[1]["index"] = 4
-            runner.write_text(runner.read_text().replace("'index': 0", "'index': 4"))
+            args.hull_runner.write_text(args.hull_runner.read_text().replace("'index': 0", "'index': 4"))
             with self.assertRaisesRegex(ValueError, "result order"):
-                fixtures.run_hull(args, fixture, {"O0": {"hull": hull_path, "images": hull_path}}, chain,
-                                  step(kind="deploy", index=0), calls)
+                fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), calls)
+
+    def test_method_entries_run_alone_after_the_sends_before_them(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, exports = self.prepare(Path(directory), self.ECHO)
+            fixture = {"mode": "methods", "contract": "C", "fuel": 10, "availableGas": None}
+            entries = [step(kind="call", calldata="0x01"), step(kind="send", calldata="0x02"),
+                       step(kind="call", calldata="0xdead"), step(kind="call", calldata="0x03")]
+            args.hull_entry_timeout = 1
+            observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
+            self.assertEqual([item["status"] for item in observed], ["returned", "returned", "returned", "timeout", "returned"])
+            self.assertEqual([item["output"] for item in observed if item["status"] == "returned"], ["0x00", "0x01", "0x02", "0x03"])
+            invocations = [json.loads(line) for line in Path(str(args.hull_runner) + ".log").read_text().splitlines()]
+            self.assertEqual(invocations, [[], ["0x01"], ["0x02"], ["0x02", "0xdead"], ["0x02", "0x03"]])
+
+    def test_a_raw_scenario_resumes_past_an_entry_that_stalls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, exports = self.prepare(Path(directory), self.ECHO)
+            fixture = {"mode": "raw", "contract": "C", "fuel": 10, "availableGas": None}
+            entries = [step(calldata="0x01"), {**step(calldata="0xdead"), "persist": False}, step(calldata="0x02")]
+            args.hull_timeout = 1
+            observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
+            self.assertEqual([item["status"] for item in observed], ["returned", "returned", "timeout", "returned"])
+            self.assertEqual((observed[1]["output"], observed[3]["output"]), ("0x01", "0x02"))
+            invocations = [json.loads(line) for line in Path(str(args.hull_runner) + ".log").read_text().splitlines()]
+            self.assertEqual(invocations, [["0x01", "0xdead", "0x02"], ["0x01", "0xdead", "0x02"], ["0x01", "0xdead"],
+                                           ["0x01", "0x02"]])
+
+    def test_a_buffering_runner_that_reports_nothing_is_resumed_entry_by_entry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, exports = self.prepare(Path(directory), self.ECHO.replace(", flush=True", ""))
+            fixture = {"mode": "raw", "contract": "C", "fuel": 10, "availableGas": None}
+            entries = [step(calldata="0x01"), {**step(calldata="0xdead"), "persist": False}, step(calldata="0x02")]
+            args.hull_timeout = 1
+            observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
+            self.assertEqual([item["status"] for item in observed], ["returned", "returned", "timeout", "returned"])
+            invocations = [json.loads(line) for line in Path(str(args.hull_runner) + ".log").read_text().splitlines()]
+            self.assertEqual(invocations, [["0x01", "0xdead", "0x02"], [], ["0x01"], ["0x01", "0xdead", "0x02"],
+                                           ["0x01", "0xdead"], ["0x01", "0x02"]])
 
 
 class ReductionTests(unittest.TestCase):

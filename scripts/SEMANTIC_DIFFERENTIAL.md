@@ -6194,6 +6194,14 @@ to `.upstream/semantic-fixtures/<fixture>`. `--reuse-exports` reuses them only
 when every exporter script, compiler binary, solc and source digest equals the
 one that made them.
 
+Lean Core meters fuel, not gas, so a mutant can run long before its fuel runs
+out. A method fixture's deployment runs alone, then each entry in its own Lean
+invocation after the sends before it, within `--hull-entry-timeout` (120
+seconds). A raw scenario runs in one invocation within `--hull-timeout` (600
+seconds), and after a limit resumes past the entries reported so far,
+replaying the persisting steps. An entry that still stalls when run alone is a
+resource limit on the Hull path.
+
 `report.json` has schema `solcore-lean.semantic-fixtures.v1`, states the
 comparison and `coreReference: false`, and records the environment, the
 digests of every script and binary at the start, whether they were unchanged

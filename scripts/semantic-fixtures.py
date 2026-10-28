@@ -80,6 +80,7 @@ REDUCTION_SECONDS = 900
 MAX_ARRAY_ELEMENTS = 4096
 OUTPUT_LIMIT = 64 * 1024**2
 HULL_OUTPUT_LIMIT = 512 * 1024**2
+HULL_TIMEOUT, HULL_ENTRY_TIMEOUT = 600, 120
 TRANSACTION_TIMEOUT = 60
 PRESTATE_DIFF = {"tracer": "prestateTracer", "tracerConfig": {"diffMode": True}}
 CRASH = re.compile(r"panicked at|internal compiler error|process terminated by signal|backtrace:", re.I)
@@ -682,8 +683,10 @@ def hull_observation(row: dict, chain: dict) -> dict:
     return observation
 
 
-def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entries: list[dict]) -> list[dict]:
-    """The deployment and every entry on Lean Core, from one runner invocation."""
+def hull_invocation(args, fixture: dict, exports: dict, chain: dict, deploy: dict, calls: list[dict],
+                    timeout: float) -> tuple[list[dict], str | None, int]:
+    """The deployment and `calls` on Lean Core from one runner invocation: an observation of each,
+    a blocked status for each the runner did not report, its resource limit and the reported count."""
     objects = json.loads(exports["O0"]["hull"].read_text())["program"]["objects"]
     selected = [path for path in scenario.paths(objects) if path[-1] == fixture["contract"]]
     require(len(selected) == 1 and len(selected[0]) >= 2, "the runtime object lacks a unique deployment parent")
@@ -701,12 +704,12 @@ def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entr
               "runtimePath": list(selected[0]), "fuel": fixture["fuel"],
               "accounts": [{"address": str(int(account, 16)), "balance": str(funds), "empty": True}
                            for account, funds in chain["accounts"]],
-              "constructor": context(deploy), "calls": [{**context(entry), "persist": entry["persist"]} for entry in entries]}
+              "constructor": context(deploy), "calls": [{**context(entry), "persist": entry["persist"]} for entry in calls]}
     with tempfile.TemporaryDirectory(prefix="solcore-fixture-hull-") as temporary:
         path = Path(temporary) / "scenario.json"
         path.write_text(json.dumps(config))
-        outcome = run_process([str(args.hull_runner), str(path)], args.hull_timeout, HULL_OUTPUT_LIMIT)
-    count = 1 + len(entries)
+        outcome = run_process([str(args.hull_runner), str(path)], timeout, HULL_OUTPUT_LIMIT)
+    count = 1 + len(calls)
     lines = outcome["stdout"].split("\n")
     if outcome["resource"]:
         lines = lines[:-1]  # a stopped runner may leave its last row unfinished
@@ -715,21 +718,74 @@ def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entr
     for row in rows:
         stage = row.get("stage")
         if stage == "preparation":
-            return observations + [{"status": "core-preparation", "detail": row.get("detail")}] * (count - len(observations))
+            reported = len(observations)
+            return observations + [{"status": "core-preparation", "detail": row.get("detail")}] * (count - reported), None, reported
         expected = "deployment" if not observations else "execution"
         require(stage == expected and (stage == "deployment" or row.get("index") == len(observations) - 1),
                 "unexpected Lean Core result order")
         observations.append(hull_observation(row, chain))
-    if len(observations) < count:
+    reported = len(observations)
+    if reported < count:
         if outcome["resource"]:
             blocked = {"status": outcome["resource"]}
         elif observations and observations[0]["status"] != "returned":
             blocked = {"status": "not-executed", "detail": "the deployment did not complete"}
         else:
             blocked = {"status": "core-runner-error", "detail": outcome["stderr"][-2000:]}
-        observations += [blocked] * (count - len(observations))
+        observations += [blocked] * (count - reported)
     require(len(observations) == count, "extra Lean Core result rows")
-    return observations
+    return observations, outcome["resource"], reported
+
+
+def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entries: list[dict]) -> list[dict]:
+    """The deployment and every entry on Lean Core, each entry within a time limit.
+
+    Lean Core has no gas, so a mutant can run for long before its fuel runs out. Method entries other than
+    sends keep no state, so after the deployment alone each runs in its own invocation after the sends
+    before it, within --hull-entry-timeout. A raw scenario's entries run in one invocation within
+    --hull-timeout; after a limit it resumes past the reported entries, replaying the persisting steps
+    before them, and an entry that stalls when run alone is reported with that limit."""
+    def invoke(calls: list[dict], timeout: float):
+        return hull_invocation(args, fixture, exports, chain, deploy, calls, timeout)
+
+    def persisted(before: int) -> list[dict]:
+        """The earlier entries whose changes persist: those that persist and returned."""
+        return [item for item, seen in zip(entries[:before], result) if item["persist"] and seen["status"] == "returned"]
+
+    def unexecuted() -> list[dict]:
+        return [deployment] + [{"status": "not-executed", "detail": "the deployment did not complete"}] * len(entries)
+
+    # The runner buffers its rows, so a stopped invocation may not report even the deployment;
+    # then the deployment runs alone.
+    deployment, result = None, []
+    if not entries or fixture["mode"] == "methods":
+        deployment = invoke([], args.hull_timeout)[0][0]
+        if deployment["status"] != "returned":
+            return unexecuted()
+        for index, entry in enumerate(entries):
+            observed, _, _ = invoke(persisted(index) + [entry], args.hull_entry_timeout)
+            result.append(observed[-1])
+        return [deployment] + result
+    start = 0
+    while start < len(entries):
+        prefix = persisted(start)
+        observed, resource, reported = invoke(prefix + entries[start:], args.hull_timeout)
+        if deployment is None:
+            deployment = observed[0] if reported else invoke([], args.hull_timeout)[0][0]
+        if deployment["status"] != "returned":
+            return unexecuted()
+        tail, done = observed[1 + len(prefix):], max(0, reported - 1 - len(prefix))
+        if not resource:
+            return [deployment] + result + tail
+        if done:
+            result, start = result + tail[:done], start + done
+            continue
+        # No row of this attempt arrived: the first entry stalled, or its row was still buffered.
+        alone, resource, reported = invoke(prefix + [entries[start]], args.hull_timeout)
+        result.append(alone[-1] if not resource or reported == 2 + len(prefix) else {
+            "status": resource, "detail": "the entry did not complete when run alone"})
+        start += 1
+    return [deployment] + result
 
 
 class Chain:
@@ -1246,7 +1302,10 @@ def main(argv=None) -> int:
     parser.add_argument("--reduction-runs", type=int, default=REDUCTION_RUNS)
     parser.add_argument("--reduction-seconds", type=float, default=REDUCTION_SECONDS)
     parser.add_argument("--timeout", type=float, default=300, help="per export process")
-    parser.add_argument("--hull-timeout", type=float, default=3600, help="per Lean Core runner invocation")
+    parser.add_argument("--hull-timeout", type=float, default=HULL_TIMEOUT,
+                        help="per Lean Core invocation of a raw scenario or a deployment")
+    parser.add_argument("--hull-entry-timeout", type=float, default=HULL_ENTRY_TIMEOUT,
+                        help="per Lean Core invocation of one method entry")
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--hull-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-scenario")
@@ -1259,8 +1318,9 @@ def main(argv=None) -> int:
         parser.error("a mutation run requires --seed")
     if args.mode == "fixed" and args.seed is not None:
         parser.error("--seed applies only to a mutation run")
-    if not 1 <= args.mutants <= 64 or not 1 <= args.jobs <= 16 or args.reduction_runs < 1:
-        parser.error("invalid mutation, job or reduction bounds")
+    if not 1 <= args.mutants <= 64 or not 1 <= args.jobs <= 16 or args.reduction_runs < 1 or \
+            min(args.timeout, args.hull_timeout, args.hull_entry_timeout, args.reduction_seconds) <= 0:
+        parser.error("invalid mutation, job, time or reduction bounds")
     if args.output is None and not args.list:
         parser.error("--output is required unless --list is given")
     for key in ("output", "work", "upstream", "target_dir", "hull_runner", "solc", "anvil", "cast"):
@@ -1285,6 +1345,9 @@ def main(argv=None) -> int:
                         "yul": "the driver's Yul compiled by solc " + exporter.SOLC_VERSION + " on Anvil"},
               "environment": ENVIRONMENT, "mode": args.mode, "seed": args.seed,
               "mutantsPerStep": args.mutants if args.mode == "mutation" else 0,
+              "bounds": {"exportSeconds": args.timeout, "hullSeconds": args.hull_timeout,
+                         "hullEntrySeconds": args.hull_entry_timeout, "reductionRuns": args.reduction_runs,
+                         "reductionSeconds": args.reduction_seconds},
               "selection": args.fixture, "tools": identity, "builds": builds, "started": time.time()}
     lock = threading.Lock()
     records = []
