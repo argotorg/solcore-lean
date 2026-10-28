@@ -6075,6 +6075,109 @@ were fixed before execution:
   storage across transactions, balances of other accounts, and fixtures the
   checked driver rejects. Joining the suite or the fuzz driver is later work.
 
+**Results.** The checks before any run:
+- The 21 harness tests passed. They cover:
+  - the inventory and the reference SplitMix64 stream;
+  - the classification of leaves, offsets, lengths and content, and each
+    class's boundary Words;
+  - seeded sampling and single-change application;
+  - Lean and EVM observation normalization, agreement, upstream's
+    expectation rule and the findings;
+  - the Lean result order, the per-entry and resumed Lean invocations under
+    a stalling and a buffering runner, the reduction toward the recorded word,
+    and the totals.
+- The 19 exporter tests passed, among them the fixture admission with every
+  object, link and immutable check.
+- Unfrozen smoke runs with four mutants per step on fifteen fixtures agreed
+  on every step that all paths completed. They recorded the O2 crash, an
+  excluded source and the `concat` path failure below as defined.
+- The gate passed on the tree before `9bfedda7d`: no Lean change,
+  `lake build` (10,265 jobs), 34 native tools prepared offline, `lake test`,
+  the kernel check, 823 Python tests, every `Tests/scripts` check with the
+  storage-rollback corpus, and the diff check. After the time-limit change,
+  826 Python tests and the diff check passed again before `8bc684c78`.
+
+A first mutation attempt on `9bfedda7d` gave each fixture one Lean invocation
+for all its entries. It was stopped after 79 fixtures and 2,371 seconds:
+- Lean Core meters fuel, not gas. A mutant that drives a recursion or loop
+  bound to a huge Word ran for half an hour of CPU before its fuel ran out.
+  The EVM paths stopped at once, out of gas or at the 1,024-item operand
+  stack limit (`Out of stack`).
+- `closure-parameters` took 2,068 seconds for one such mutant, and three
+  other fixtures were still running.
+
+`8bc684c78` bounds the Hull path per entry; no definition changes, as a time
+limit is one of the resource limits above:
+- A method fixture's deployment runs alone, then each method entry in its own
+  invocation after the sends before it, within 120 seconds. Those entries
+  keep no state.
+- A raw scenario runs in one invocation within 600 seconds. After a limit it
+  resumes past the rows reported so far, replaying the persisting steps that
+  returned. If no row arrived, the first entry runs alone.
+
+Both runs then ran on `8bc684c78` with 102 digests frozen: the 34 native
+tools, every `scripts/*.py` and `*.rs`, solc, Anvil, cast, the Rust driver,
+the code-image exporter and both directive tools. None changed, and the
+harness's own record of every script and binary was unchanged at the end of
+each run.
+- **Fixed run** (584 seconds, four jobs, fresh exports):
+  - Of 168 fixtures, 165 were admitted on Hull, O0 and Yul, and 164 on O2.
+  - All 1,382 recorded steps agreed on every admitted path in status,
+    bytes, logs, whole storage and balances. They are 165 deployments, 604
+    raw transactions, 612 typed directives and one send; 1,280 returned and
+    102 reverted.
+  - Every admitted path matched every recorded expectation: 1,382 steps on
+    Hull, O0 and Yul, and 1,377 on O2.
+  - Excluded: the three rejected sources on every path, at
+    `rust-checked-source` (compile failure), and `ignored-builtin-effects` on
+    O2 (compiler crash).
+  - The same run on `9bfedda7d` gave the same results in 644 seconds.
+- **Mutation run** (root seed `20261111`, four mutants per step, 4,028
+  seconds, reusing the fixed run's exports):
+  - There were 4,308 mutants in 164 fixtures: 2,122 of method entries and
+    2,186 of raw ones, including 18 deployments of five fixtures. The one
+    admitted fixture without mutants, `storage-adt-recursive-ok`, has only a
+    plain deployment.
+  - The operators: 1,292 boundary Words, 828 seeded Words, 615 added zero
+    bytes, 614 added words of `0xff`, 402 truncations, 339 value toggles and
+    218 dropped argument lists.
+  - The classified words: 1,472 `uint256`, 184 `bool`, 44 `bytes32`, 40
+    `address` and 10 `bytes4` leaves, 97 offsets, 79 lengths, 76 content
+    words and 118 unclassified words. A signature classified 1,156 steps.
+    Among the rest, 39 raw calls had no standard-ABI method (derived ADT
+    arguments), 17 recorded inputs were not canonical encodings, and 10 had
+    no selector.
+  - All 1,382 recorded steps again agreed and matched their expectations on
+    every admitted path.
+  - 4,161 mutants agreed on every admitted path: 2,563 returned and 1,598
+    reverted, 658 of them with nonzero storage. None disagreed.
+  - 147 mutants in 18 fixtures hit a resource limit on at least one path:
+    - 116 were observed by no path. Lean Core's 120-second limit (67) or its
+      fuel (45) met the EVM's gas limit on loop and recursion bounds, lengths
+      and allocations of huge Words; the other four are the path failures
+      below.
+    - 31 were incomplete; the paths that completed agreed. Lean Core timed out
+      in each. In 10 deep recursions every EVM path halted at the operand
+      stack limit (`Out of stack`). In 21, in three loop fixtures, the EVM
+      paths differed in gas: Sonatina O0 and O2 returned within 30,000,000
+      gas where Yul ran out (17), or only O2 returned (4). Gas is out of
+      scope.
+
+The findings:
+- In `concat` (`empty_area`, two mutants) and `zeroize-memory-range`
+  (`exactRange`, two), Lean Core reported `language-failure`
+  (`Solcore.Core.Value.word 6`) for a length of `2^256 - 1`. Every EVM path ran
+  out of gas there, and other huge lengths ran Lean Core out of fuel.
+  - Each reduction kept no earlier step. Within 48 runs it found no smaller
+    failing length, and the failing lengths may lie near `2^256 - 1` itself.
+- Sonatina O2 crashed on `ignored-builtin-effects`, as in the probe.
+
+Both went to `questions.md` without investigation. No compiled path disagreed
+with another, on any recorded step or mutant. This is agreement among compiled
+paths and with upstream's recorded expectations; no original Core reference
+exists for these fixtures. Hosted CI has not run the harness, which needs the
+pinned tools and Anvil.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

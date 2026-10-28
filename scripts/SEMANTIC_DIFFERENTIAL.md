@@ -6216,6 +6216,30 @@ the classification, the mutation operators and sampling, the observation
 normalization, the comparisons, the Lean result order, the reduction and the
 totals, without a compiler, runner or EVM.
 
+### Results
+
+Both runs ran on `8bc684c78`, with the scripts, native tools, compilers,
+directive tools, solc, Anvil and cast frozen.
+
+- **Fixed run** (584 seconds):
+  - Of 168 fixtures, 165 were admitted on Hull, O0 and Yul, and 164 on O2.
+    `ignored-builtin-effects` crashes Sonatina O2, and three sources are
+    rejected by the checked driver.
+  - All 1,382 recorded steps agreed on every admitted path, and each path
+    matched every recorded expectation.
+- **Mutation run** (root seed `20261111`, 4,028 seconds): 4,308 mutants,
+  including 18 deployments.
+  - 4,161 agreed on every admitted path, and none disagreed.
+  - 147 hit a resource limit somewhere: Lean Core's time limit or fuel
+    against the EVM's gas or operand stack, and, in three loop fixtures, a
+    gas difference between the EVM backends.
+  - Lean Core reported `language-failure` for a length of `2^256 - 1` in
+    `concat` and `zeroize-memory-range`, where the EVM paths ran out of gas;
+    that is a path failure finding.
+- Both findings went to `questions.md` only. The roadmap records the first
+  mutation attempt, which gave each fixture one Lean invocation, and the
+  per-entry limits that replaced it.
+
 ## Compare generic selection
 
 The `runtime-generics` profile uses a genuinely polymorphic source function
