@@ -6487,6 +6487,97 @@ paths and with upstream's recorded expectations; no original Core reference
 exists for these fixtures. Hosted CI has not run the harness, which needs the
 pinned tools and Anvil.
 
+**The pinned fixtures in the fuzz driver.** The fixed and mutation runs above
+were single runs. `semantic-fuzz.py` gains an opt-in run kind,
+`--backend fixtures`, that runs `semantic-fixtures.py` in mutation mode once
+per iteration, beside the suite backends or alone. The harness, its
+comparisons and its findings stay as defined above, apart from the budgets
+below. Agreement stays agreement among compiled paths and with upstream's
+recorded expectations, never a Core comparison. The definitions were fixed
+before execution:
+
+- **Selection:** the pool is the 168 fixtures of the two parity manifests, in
+  id order. On a shard it keeps every `shard count`-th fixture, starting at
+  `shard index`.
+  - Each cycle of `ceil(pool / N)` iterations runs every fixture once. A
+    Fisher-Yates permutation of the pool is drawn from a SplitMix64 stream
+    seeded with the base seed, the text `fixture-cycle` and the cycle number.
+    It is cut into consecutive slices of `--fixture-count N` fixtures (default
+    8, so 21 iterations per cycle); the last slice may be shorter.
+  - A fixture whose source is rejected, or that is excluded on a path, is
+    drawn like any other, and its exclusions are recorded each time.
+- **Seeds:** iteration `i`'s root seed is `base + i` modulo `2^64`, as for the
+  suite. Each fixture's mutants derive from it, the fixture id and the step
+  index exactly as in the mutation run above, four per step.
+- **Budgets:**
+  - Per fixture, at most `--fixture-mutants` mutants (default 32). When a
+    fixture draws more, a SplitMix64 stream from the root seed, the fixture id
+    and the text `mutant-budget` keeps that many uniformly, in draw order.
+    Kept mutants keep their draw numbers, so an entry id names the same mutant
+    with or without the budget.
+  - Per fixture, `--fixture-seconds` of wall time from its start (default
+    300); per iteration, `--fixture-run-seconds` (default 1,800). Fixtures
+    run two at a time (`--fixture-jobs`).
+  - In each observation the EVM paths run before Hull. An entry that a path
+    reaches after either deadline or after a stop signal is not run and gets
+    the status `budget`. A Lean invocation still running at a deadline is
+    stopped, and its unreported entries get the same status.
+  - `budget` is neither a resource limit nor a finding. It makes an entry
+    incomplete or unobserved, the paths that ran the entry are still
+    compared, and it never makes a Hull failure a memory-range limit. A
+    fixture not started before the iteration's deadline is recorded as
+    unexecuted.
+  - Each reduction keeps its 48 runs and 900 seconds and also ends at the
+    iteration's deadline.
+- **Retained outputs:**
+  - Each run is one ledger row: the root seed, the selected fixtures, the
+    epoch, the counts and every finding occurrence. The counts cover entries,
+    agreements, disagreements, incomplete and unobserved entries, recorded
+    steps, mutants, findings, exclusions, and budget-stopped and unexecuted
+    fixtures.
+  - A compiler crash registers by its stage, paths and symptom (the first
+    panic location and message), as the suite's crashes do.
+  - A path failure registers by its path, status and detail. The detail is
+    normalized as a symptom, except a Lean language failure's Core value,
+    which is kept exact.
+  - A path mismatch or an unmet recorded expectation registers by its fixture,
+    category, the harness's signature of it and its reduced input (kept
+    steps, calldata and value).
+  - The first three occurrences of a signature keep the fixture's result
+    record and the command that replays that fixture alone.
+  - A run without findings, harness errors or changed tools is pruned to its
+    ledger row, since its mutants replay from the root seed. Otherwise the
+    run keeps its report and the records of the fixtures with findings or
+    errors.
+  - Exports stay in `.upstream/semantic-fixtures`, reused only under the same
+    tools. Each fixture's exports are locked while a run uses them.
+- **Known findings:** the driver lists the Sonatina O2 crash on
+  `ignored-builtin-effects` as known. Each occurrence counts, but none is new,
+  and the signature is triaged as known unless labelled otherwise. A Hull
+  memory-range limit is not a finding.
+- **Readiness:** a fresh checkout must prepare everything the harness reads.
+  - `prepare-semantic-tools.py --prepare` also builds the directive extractor
+    and resolver offline, and `--verify` also checks their receipts, which
+    embed the checkout's paths.
+  - Before each fixtures run, the driver also runs the harness's new
+    `--check`. It verifies the receipts of the driver, the code-image tool,
+    the extractor and the resolver, and solc 0.8.35, and it digests what the
+    run reads.
+  - Either failure stops the driver as not ready.
+- **Epoch:** as before, the readiness receipt's digest, which now covers both
+  directive tools, and the digest of every non-test script except the driver.
+  - A state with the fixtures run kind adds the digest of the harness check:
+    every `scripts/*.py` and `*.rs`, the four Rust binaries, the Lean runner,
+    solc, Anvil and cast, the two parity manifests and the inventory.
+  - Any change stops the driver until `--accept-new-epoch`. A state without
+    fixtures keeps its epoch formula.
+- **Runs:** both with the fixtures run kind only and with the scripts and the
+  native and external tools frozen:
+  - a seeded smoke iteration with base seed `20261111`, so that iteration 0
+    draws the mutation run's mutants within the budget;
+  - a two-iteration run with base seed `20261112`.
+- A suite job is not part of this unit.
+
 **Mixed sequence seeds for the tuple and bytes returns.** The block choices
 of `stateful-tuple-returns` and `stateful-bytes-returns` came from a raw
 lcg64-v1 stream started at the block seed xor a domain. Consecutive seeds then
