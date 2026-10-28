@@ -46,6 +46,8 @@ PROFILES = {
     "runtime-loops": ("semantic-loop", "pure", 384),
     "runtime-nested-loops": ("semantic-nested-loop", "pure", 384),
     "runtime-recursion": ("semantic-recursion", "pure", 384),
+    "runtime-recursive-loops": ("semantic-recursive-loop", "pure", 384),
+    "runtime-loop-closures": ("semantic-loop-closure", "pure", 384),
     "runtime-generics": ("semantic-generic", "pure", 384),
     "runtime-closures": ("semantic-closure", "pure", 384),
     "runtime-comptime": ("semantic-comptime", "pure", 384),

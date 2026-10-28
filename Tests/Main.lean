@@ -1879,6 +1879,8 @@ import Solcore.Test.SourceRevisionFourCases
 import Solcore.Test.SourceAcceptanceCases
 import Solcore.Test.SourceNestedLoopCases
 import Solcore.Test.SourceRecursionCases
+import Solcore.Test.SourceRecursiveLoopCases
+import Solcore.Test.SourceLoopClosureCases
 import Solcore.Test.SourceStorageEmitter
 import Solcore.Test.SourceStorageCases
 import Solcore.Test.SourceStorageRollbackEmitter
@@ -4042,6 +4044,8 @@ def run : IO Unit := do
   SourceAcceptanceCases.testSourceAcceptanceCases
   SourceNestedLoopCases.testSourceNestedLoopCases
   SourceRecursionCases.testSourceRecursionCases
+  SourceRecursiveLoopCases.testSourceRecursiveLoopCases
+  SourceLoopClosureCases.testSourceLoopClosureCases
   SourceStorageEmitter.testSourceStorageEmitter
   SourceStorageCases.testSourceStorageCases
   SourceStorageRollbackEmitter.testSourceStorageRollbackEmitter

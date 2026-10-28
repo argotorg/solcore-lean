@@ -26,6 +26,10 @@ import Solcore.Synthesis.Source.NestedLoopEmitter
 import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.RecursionEmitter
 import Solcore.Synthesis.Source.RecursionCases
+import Solcore.Synthesis.Source.RecursiveLoopEmitter
+import Solcore.Synthesis.Source.RecursiveLoopCases
+import Solcore.Synthesis.Source.LoopClosureEmitter
+import Solcore.Synthesis.Source.LoopClosureCases
 import Solcore.Synthesis.Source.GenericEmitter
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureEmitter

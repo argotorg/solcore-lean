@@ -175,6 +175,39 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.RECURSION_CASE_SCHEMA], "runtime-recursion")
         self.assertEqual(runner.CASE_CONTRACTS[runner.RECURSION_CASE_SCHEMA], "SynthesizedRecursion")
 
+    def test_recursive_loop_plan_requires_bounded_masks_a_form_and_original_step_program(self):
+        plan = {"schema": "solcore-lean.recursive-loop-plan.v1", "depthMask": 3, "innerMask": 3, "form": "mutual",
+                "stepProgram": {}}
+        for depth in (0, 1, 3):
+            for inner in (0, 1, 3):
+                for form in ("tail", "nontail", "mutual"):
+                    runner.validate_recursive_loop_plan({**plan, "depthMask": depth, "innerMask": inner, "form": form})
+        for key in ("depthMask", "innerMask"):
+            for mask in (True, -1, 2, 7, '3', 3.0):
+                with self.assertRaises(ValueError):
+                    runner.validate_recursive_loop_plan({**plan, key: mask})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.recursion-plan.v1"}, {**plan, "stepProgram": None},
+                        {**plan, "form": "loop"}):
+            with self.assertRaises(ValueError):
+                runner.validate_recursive_loop_plan(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.RECURSIVE_LOOP_CASE_SCHEMA], "runtime-recursive-loops")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.RECURSIVE_LOOP_CASE_SCHEMA], "SynthesizedRecursiveLoops")
+
+    def test_loop_closure_plan_requires_a_bounded_mask_a_capture_and_original_step_program(self):
+        plan = {"schema": "solcore-lean.loop-closure-plan.v1", "mask": 7, "capture": "counter", "stepProgram": {}}
+        for mask in (0, 1, 3, 7):
+            for capture in ("accumulator", "counter"):
+                runner.validate_loop_closure_plan({**plan, "mask": mask, "capture": capture})
+        for mask in (True, -1, 2, 5, 8, '7', 7.0):
+            with self.assertRaises(ValueError):
+                runner.validate_loop_closure_plan({**plan, "mask": mask})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.loop-plan.v1"}, {**plan, "stepProgram": None},
+                        {**plan, "capture": "reference"}, {**plan, "capture": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_loop_closure_plan(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.LOOP_CLOSURE_CASE_SCHEMA], "runtime-loop-closures")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.LOOP_CLOSURE_CASE_SCHEMA], "SynthesizedLoopClosures")
+
     def test_assembly_plan_requires_a_form_and_the_original_function(self):
         plan = {"schema": "solcore-lean.assembly-plan.v1", "functionProgram": {}, "form": "switch"}
         for form in ("switch", "if", "operations"):
@@ -541,7 +574,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 17)
+        self.assertEqual(len(runner.CASE_PROFILES), 19)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

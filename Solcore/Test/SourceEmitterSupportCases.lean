@@ -4,6 +4,8 @@ import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopCases
 import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.RecursionCases
+import Solcore.Synthesis.Source.RecursiveLoopCases
+import Solcore.Synthesis.Source.LoopClosureCases
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureCases
 import Solcore.Synthesis.Source.ComptimeCases
@@ -95,6 +97,12 @@ private def profiles : List Profile := [
   ⟨"runtime-recursion", Recursion.featureSupport, fun feature => do
     let plan ← Solcore.Synthesis.Core.Recursion.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) 7 .mutual
     return emits (Recursion.emit plan)⟩,
+  ⟨"runtime-recursive-loops", RecursiveLoop.featureSupport, fun feature => do
+    let plan ← Solcore.Synthesis.Core.RecursiveLoop.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) 3 3 .mutual
+    return emits (RecursiveLoop.emit plan)⟩,
+  ⟨"runtime-loop-closures", LoopClosure.featureSupport, fun feature => do
+    let plan ← Solcore.Synthesis.Core.LoopClosure.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) 7 .counter
+    return emits (LoopClosure.emit plan)⟩,
   ⟨"runtime-generics", Generic.featureSupport, fun feature => do
     let plan ← Solcore.Synthesis.Core.Generic.CheckedPlan.ofParts? (← step (probe (.var 0) feature)) .word
     return emits (Generic.emit plan)⟩,

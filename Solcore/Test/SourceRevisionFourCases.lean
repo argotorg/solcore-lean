@@ -4,6 +4,8 @@ import Solcore.Synthesis.Source.AggregateCases
 import Solcore.Synthesis.Source.LoopCases
 import Solcore.Synthesis.Source.NestedLoopCases
 import Solcore.Synthesis.Source.RecursionCases
+import Solcore.Synthesis.Source.RecursiveLoopCases
+import Solcore.Synthesis.Source.LoopClosureCases
 import Solcore.Synthesis.Source.GenericCases
 import Solcore.Synthesis.Source.ClosureCases
 import Solcore.Synthesis.Source.ComptimeCases
@@ -96,6 +98,14 @@ private def profiles : List Profile := [
       Recursion.generateCases seed nodes count attempts fuel revision,
     replay := Recursion.replayCase, shrink := Recursion.shrinkCases, nodes := 384, count := 7,
     versions := g0Version, support := Recursion.featureSupport},
+  {name := "runtime-recursive-loops", generate := fun seed nodes count attempts fuel revision =>
+      RecursiveLoop.generateCases seed nodes count attempts fuel revision,
+    replay := RecursiveLoop.replayCase, shrink := RecursiveLoop.shrinkCases, nodes := 384, count := 6,
+    versions := g0Version, support := RecursiveLoop.featureSupport},
+  {name := "runtime-loop-closures", generate := fun seed nodes count attempts fuel revision =>
+      LoopClosure.generateCases seed nodes count attempts fuel revision,
+    replay := LoopClosure.replayCase, shrink := LoopClosure.shrinkCases, nodes := 384, count := 6,
+    versions := g0Version, support := LoopClosure.featureSupport},
   {name := "runtime-generics", generate := fun seed nodes count attempts fuel revision =>
       Generic.generateCases seed nodes count attempts fuel revision,
     replay := Generic.replayCase, shrink := Generic.shrinkCases, nodes := 384, count := 4,
@@ -221,7 +231,7 @@ private def statisticsChecks : IO Unit := do
     s!"runtime-word: revision four has {← distinctSources four} sources against {← distinctSources three}"
 
 def testSourceRevisionFourCases : IO Unit := do
-  ensure (profiles.length == 14) "a G0-based profile is missing from the revision-four checks"
+  ensure (profiles.length == 16) "a G0-based profile is missing from the revision-four checks"
   for profile in profiles do
     checkProfile profile
   statisticsChecks

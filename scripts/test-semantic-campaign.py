@@ -119,6 +119,33 @@ def recursion_policy_case(mask=7, form="mutual", value=7, helpers=2):
     return case
 
 
+def recursive_loop_policy_case(depth=3, inner=3, form="mutual", value=3, helpers=2):
+    """Recursive-loop envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = loop_policy_case(7, value, helpers)
+    step = case.pop('loopPlan')['stepProgram']
+    case.update(schema=campaign.m2.RECURSIVE_LOOP_CASE_SCHEMA,
+        recursiveLoopPlan={'schema': 'solcore-lean.recursive-loop-plan.v1', 'depthMask': depth, 'innerMask': inner,
+                           'form': form, 'stepProgram': step})
+    case['contract'].update(name='SynthesizedRecursiveLoops', deployPath=['SynthesizedRecursiveLoopsDeploy'],
+        runtimePath=['SynthesizedRecursiveLoopsDeploy', 'SynthesizedRecursiveLoops'])
+    case['provenance']['origin'].update(kind='recursive-loop-generated', depthMask=depth, innerMask=inner, form=form)
+    del case['provenance']['origin']['mask']
+    return case
+
+
+def loop_closure_policy_case(mask=7, capture="counter", value=7, helpers=2):
+    """Loop-closure envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = loop_policy_case(7, value, helpers)
+    step = case.pop('loopPlan')['stepProgram']
+    case.update(schema=campaign.m2.LOOP_CLOSURE_CASE_SCHEMA,
+        loopClosurePlan={'schema': 'solcore-lean.loop-closure-plan.v1', 'mask': mask, 'capture': capture,
+                         'stepProgram': step})
+    case['contract'].update(name='SynthesizedLoopClosures', deployPath=['SynthesizedLoopClosuresDeploy'],
+        runtimePath=['SynthesizedLoopClosuresDeploy', 'SynthesizedLoopClosures'])
+    case['provenance']['origin'].update(kind='loop-closure-generated', mask=mask, capture=capture)
+    return case
+
+
 def assembly_policy_case(form="switch", value="255"):
     """Inline Yul envelope/coverage fixture; no compiler or runtime is simulated."""
     number = int(value)
@@ -1143,6 +1170,203 @@ class RecursionCoverageTests(unittest.TestCase):
         self.assertEqual(manifest['recursionRequirements']['depths'], [0, 1, 2, 3, 7])
         self.assertEqual(manifest['requiredInputs'], list(campaign.RECURSION_INPUTS))
         self.assertEqual(len(manifest['cases']), 63)
+        loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
+        self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
+
+
+class RecursiveLoopCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-recursive-loops'
+
+    def manifest(self):
+        case = recursive_loop_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.NESTED_LOOP_INPUTS),
+            'requiredHelperCounts': [1, 2, 3],
+            'recursiveLoopRequirements': {'shapes': ['3x3:mutual'], 'depths': [3], 'iterations': [6]},
+            'cases': [{'id': 'recursive-loop', 'input': '3', 'recursiveLoopPlan': case['recursiveLoopPlan'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('recursive-loop-generate', 'recursive-loop-emit', 'recursive-loop-generated'))
+        self.assertIn(self.PROFILE, campaign.G0_PROFILES)
+        self.assertIn(self.PROFILE, campaign.HELPER_PROFILES)
+        self.assertNotIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.NESTED_LOOP_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 10)
+        self.assertEqual(len(campaign.RECURSIVE_LOOP_SHAPES), 12)
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.RECURSIVE_LOOP_CASE_SCHEMA)
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['recursive-loop-generate', '1', '384', '1', '256', '1000000', campaign.RANDOM_G0_VERSION,
+                                 campaign.RANDOM_INPUT_SELECTION]])
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        entry = value['cases'][0]
+        base = value['recursiveLoopRequirements']
+        for invalid in (None, {}, {**base, 'shapes': ['7x3:tail']}, {**base, 'shapes': ['3x3:loop']},
+                        {**base, 'depths': [4]}, {**base, 'iterations': [7]}, {**base, 'depths': [1, 1]},
+                        {**base, 'iterations': [True]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'recursiveLoopRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'recursionPlan': entry['recursiveLoopPlan']},
+                        {'id': 'recursive-loop', 'input': '3', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        for plan in ({**entry['recursiveLoopPlan'], 'depthMask': 7}, {**entry['recursiveLoopPlan'], 'innerMask': 2},
+                     {**entry['recursiveLoopPlan'], 'form': 'loop'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'recursiveLoopPlan': plan}]})
+        with self.assertRaises(ValueError):
+            campaign.recursive_loop_requirements({'profile': 'runtime-recursion', 'recursiveLoopRequirements': base})
+        for input_value in campaign.NESTED_LOOP_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 384}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_plan_depth_and_specified_iterations(self):
+        case = recursive_loop_policy_case(3, 1, 'nontail', 3)
+        self.assertEqual(campaign.specified_recursive_loops(case),
+                         {'Shapes': {'3x1:nontail'}, 'Depths': {3}, 'Iterations': {2}})
+        case = recursive_loop_policy_case(3, 3, 'tail', 2)
+        self.assertEqual(campaign.specified_recursive_loops(case)['Iterations'], {3})
+        self.assertEqual(campaign.helper_counts(case), {2})
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+        case['input'] = str(2**255)
+        self.assertEqual(campaign.specified_recursive_loops(case)['Depths'], {0})
+        self.assertEqual(campaign.specified_recursive_loops(recursion_policy_case()),
+                         {'Shapes': set(), 'Depths': set(), 'Iterations': set()})
+
+    def test_nonmatching_outcomes_cannot_satisfy_recursive_loop_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [recursive_loop_policy_case(3, 3, 'mutual', 3), recursive_loop_policy_case(1, 1, 'tail', 1)]
+            instance.summary['recursiveLoopCoverage'].update(requiredShapes=['1x1:tail', '3x3:mutual'],
+                requiredDepths=[1, 3], requiredIterations=[1, 6])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['recursiveLoopPlan']['form']
+                folder.mkdir()
+                report = matched()
+                if case['recursiveLoopPlan']['form'] == 'tail':
+                    report['comparison'] = {'category': 'source-rejected', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['recursiveLoopCoverage']
+            self.assertEqual((coverage['generatedShapes'], coverage['matchedShapes']), (['1x1:tail', '3x3:mutual'], ['3x3:mutual']))
+            self.assertEqual((coverage['missingShapes'], coverage['missingDepths'], coverage['missingIterations']),
+                             (['1x1:tail'], [1], [1]))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts/semantic-recursive-loop-corpus.json').read_text()))
+        self.assertEqual(sorted(manifest['recursiveLoopRequirements']['shapes']), sorted(campaign.RECURSIVE_LOOP_SHAPES))
+        self.assertEqual(manifest['recursiveLoopRequirements']['depths'], [0, 1, 2, 3])
+        self.assertEqual(manifest['recursiveLoopRequirements']['iterations'], [0, 1, 2, 3, 6])
+        self.assertEqual(manifest['requiredInputs'], list(campaign.NESTED_LOOP_INPUTS))
+        self.assertEqual(len(manifest['cases']), 78)
+        loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
+        self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
+
+
+class LoopClosureCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-loop-closures'
+
+    def manifest(self):
+        case = loop_closure_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.LOOP_INPUTS),
+            'requiredHelperCounts': [1, 2, 3], 'loopClosureRequirements': {'shapes': ['7:counter'], 'iterations': [7]},
+            'cases': [{'id': 'loop-closure', 'input': '7', 'loopClosurePlan': case['loopClosurePlan'],
+                       'expectedFeatures': case['provenance']['features']}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('loop-closure-generate', 'loop-closure-emit', 'loop-closure-generated'))
+        self.assertIn(self.PROFILE, campaign.G0_PROFILES)
+        self.assertIn(self.PROFILE, campaign.HELPER_PROFILES)
+        self.assertNotIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertNotIn(self.PROFILE, campaign.LOOP_PROFILES)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.LOOP_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 10)
+        self.assertEqual(len(campaign.LOOP_CLOSURE_SHAPES), 6)
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.LOOP_CLOSURE_CASE_SCHEMA)
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['loop-closure-generate', '1', '384', '1', '256', '1000000', campaign.RANDOM_G0_VERSION,
+                                 campaign.RANDOM_INPUT_SELECTION]])
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        value = self.manifest()
+        campaign.validate_manifest(value)
+        entry = value['cases'][0]
+        base = value['loopClosureRequirements']
+        for invalid in (None, {}, {**base, 'shapes': ['5:counter']}, {**base, 'shapes': ['7:reference']},
+                        {**base, 'iterations': [8]}, {**base, 'iterations': [True]}, {**base, 'iterations': [1, 1]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'loopClosureRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'loopPlan': entry['loopClosurePlan']},
+                        {'id': 'loop-closure', 'input': '7', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        for plan in ({**entry['loopClosurePlan'], 'mask': 5}, {**entry['loopClosurePlan'], 'capture': 'reference'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'loopClosurePlan': plan}]})
+        with self.assertRaises(ValueError):
+            campaign.loop_closure_requirements({'profile': 'runtime-loops', 'loopClosureRequirements': base})
+        for input_value in campaign.LOOP_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 384}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_plan_and_prescribed_iterations(self):
+        case = loop_closure_policy_case(3, 'accumulator', 7)
+        self.assertEqual(campaign.specified_loop_closures(case), {'Shapes': {'3:accumulator'}, 'Iterations': {3}})
+        self.assertEqual(campaign.helper_counts(case), {2})
+        self.assertEqual(campaign.generation_recipes(case), {'Templates': {3}, 'Updates': set()})
+        self.assertEqual(campaign.specified_loops(case), {'Masks': set(), 'Iterations': set()})
+        case['input'] = str(2**255)
+        self.assertEqual(campaign.specified_loop_closures(case)['Iterations'], {0})
+        self.assertEqual(campaign.specified_loop_closures(loop_policy_case()), {'Shapes': set(), 'Iterations': set()})
+
+    def test_nonmatching_outcomes_cannot_satisfy_loop_closure_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [loop_closure_policy_case(7, 'counter', 7), loop_closure_policy_case(1, 'accumulator', 1)]
+            instance.summary['loopClosureCoverage'].update(requiredShapes=['1:accumulator', '7:counter'],
+                requiredIterations=[1, 7])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['loopClosurePlan']['capture']
+                folder.mkdir()
+                report = matched()
+                if case['loopClosurePlan']['capture'] == 'accumulator':
+                    report['comparison'] = {'category': 'compiler-crash', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['loopClosureCoverage']
+            self.assertEqual((coverage['generatedShapes'], coverage['matchedShapes']), (['1:accumulator', '7:counter'], ['7:counter']))
+            self.assertEqual((coverage['missingShapes'], coverage['missingIterations']), (['1:accumulator'], [1]))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts/semantic-loop-closure-corpus.json').read_text()))
+        self.assertEqual(sorted(manifest['loopClosureRequirements']['shapes']), sorted(campaign.LOOP_CLOSURE_SHAPES))
+        self.assertEqual(manifest['loopClosureRequirements']['iterations'], [0, 1, 3, 7])
+        self.assertEqual(manifest['requiredInputs'], list(campaign.LOOP_INPUTS))
+        self.assertEqual(len(manifest['cases']), 48)
         loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
         self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
 
@@ -2650,7 +2874,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 17)
+        self.assertEqual(len(campaign.PROFILES), 19)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -3429,7 +3653,7 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
     """--functions asks random runtime-input campaigns for whole functions; counts stay per case."""
     SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-assembly': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
               'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
-              'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-generics': 8, 'runtime-closures': 8,
+              'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
@@ -3584,7 +3808,7 @@ class AcceptanceTests(CommandLine, unittest.TestCase):
         self.assertEqual(campaign.RANDOM_ACCEPTANCE, self.FILTER)
         self.assertEqual(set(campaign.RUNTIME_INPUT_PROFILES) - set(campaign.IDENTITY_FILTER_PROFILES),
                          {'runtime-loops', 'runtime-call-graph-loops', 'runtime-nested-loops', 'runtime-recursion',
-                          'runtime-generics'})
+                          'runtime-recursive-loops', 'runtime-loop-closures', 'runtime-generics'})
         self.assertTrue(set(campaign.IDENTITY_FILTER_PROFILES) <= set(campaign.RUNTIME_INPUT_PROFILES))
         case = function_case(1)
         self.assertEqual(campaign.acceptance('runtime-functions', case), self.PROFILE)
