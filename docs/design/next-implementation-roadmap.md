@@ -1911,6 +1911,179 @@ Frozen matrices at `9400b4e08` (the freeze digest did not change):
   matched on O0, O2 and Yul, in 179, 220 and 325 seconds, so no finding was
   recorded.
 
+**Traits with constrained generic impls.** The enum profile leaves traits
+untouched, although the pinned checkout's own fixtures place a recent defect
+there: specializing a binary method of `impl<f, g> T<sum<f, g>>` at
+`sum<(word, word), word>` leaked a substitution from one alternative of its
+match into the other's nested `match`, so `yule` rejected the emitted Hull
+(`specialise-sum-of-product`). Only original Core can catch a front-end
+defect that every backend shares, so one new pure profile, `runtime-traits`,
+calls one trait's methods at instances built from Words, tuples, std sums and
+user-defined enums, directly and through constrained generic functions, and
+keeps an independent Core reference: one monomorphic closure per instance
+type and method the uses reach.
+
+Before any code, a probe compiled a hand-written source with one trait of a
+unary and a binary method; impls at `word`, at `(f, g)` and `sum<f, g>` under
+constraints, at a plain enum and at two generic enums
+(`impl<a> T<E<a>> where a: T`); both binary match forms; constrained generic
+helpers that call the trait at their parameter and at `(t, t)`; and values
+with `inl` and `inr` inside tuples and constructor fields, at generic enums
+applied to a sum, a tuple and a generic enum. It ran with the pinned compiler
+and std on every path: checked Hull export, Sonatina O0 and O2 code images,
+Yul through `export-rust-yul.py` and the pinned solc, Anvil, and the Lean Hull
+runner, at twelve inputs against a Python model. O0 and O2 matched on the EVM
+and in the Hull runner. On Yul, solc rejected the exported Yul with a
+`StackTooDeepError` in `sc_both` specialized at `sum<word, Sc_T0>`. The test
+fixture's emitted source and twelve plans of the generator below, run the
+same way, matched their Core reference in 38 of 39 runs. Only the plan of
+seed 2 was rejected, on Yul, in the same way, in `sc_both` at
+`Sc_T0<(word, sum<word, word>)>`; both rejections are recorded locally without
+investigation. The Hull runner needs more than the probe's 10,000,000 fuel to
+deploy seed 2's O0 image and matches within the suite's 40,000,000 default. Core, the Hull importer and runner, both EVM backends and
+`export-rust-yul.py` need no change, and no shared runtime code or proof
+changes. The existing profiles, corpora, emitters and emitter proofs stay
+unchanged, and this emitter has no proof yet. The definitions were fixed
+before execution:
+
+- Declarations: those of `runtime-enums`, drawn by `EnumData` from this
+  profile's stream: one to three `Sc_T0` to `Sc_T2`, plain or generic in `a`,
+  with two to four constructors of zero to two fields.
+- Trait (`core-trait-instances-v1`): `trait Sc_Fold<a>` with the unary
+  `sc_fold(sc_x: a) returns (word)` and the binary
+  `sc_both(sc_x: a, sc_y: a) returns (word)`. A generated plan has both; a
+  reduced plan may keep one, and every impl then implements only it.
+- Impls, in the order Word, tuple, sum, declarations; a generated plan has
+  all of them, a reduced one those its uses and its kept impls need:
+  - `impl Sc_Fold<word>`: `sc_fold` returns `(sc_x op c)` and `sc_both`
+    `((sc_x comb sc_y) op c)`;
+  - `impl<f, g> Sc_Fold<(f, g)> where f: Sc_Fold, g: Sc_Fold`: one arm,
+    `case (sc_a, sc_b)`, folding the method at both components;
+  - `impl<f, g> Sc_Fold<sum<f, g>> where f: Sc_Fold, g: Sc_Fold`: arms
+    `inl(sc_a)` and `inr(sc_b)`; `sc_both` always has the regression shape, a
+    nested `match (sc_y)` in both arms that recurses on the same side and
+    returns a mismatch constant on the other;
+  - at each declaration, `impl Sc_Fold<Sc_Ti>`, or
+    `impl<a> Sc_Fold<Sc_Ti<a>> where a: Sc_Fold` when generic: one arm per
+    constructor in order, binding its fields as `sc_a` and `sc_b` (`sc_c` and
+    `sc_d` for `sc_y`), a same-name constructor unqualified.
+
+  An arm folds the method's results at its bound values with a drawn
+  operator, then applies a drawn operator with a drawn constant; an arm with
+  one operand has no fold and a nullary arm returns its constant. `sc_both` of
+  a tuple or a declaration is drawn `nested` (`match (sc_x)`, then
+  `match (sc_y)` in each arm) or `columns` (`match (sc_x, sc_y)` with a row per
+  constructor); a declaration ends each match of `sc_y`, or the two-column
+  match, with `default`, which returns the impl's mismatch constant.
+  Operators are `+`, `-`, `^` and `*`; constants are small, 64-bit, high-bit
+  or near the maximum, drawn per arm and per impl.
+- Helpers, emitted when a use needs them, each with its own drawn operator and
+  constant, all `where t: Sc_Fold`: `sc_once<t>` and `sc_twice<t>` call the
+  method at their parameter; `sc_lift<t>` and `sc_lift2<t>` call it at
+  `(t, t)`, as `Sc_Fold.sc_fold((sc_x, sc_x))` and
+  `Sc_Fold.sc_both((sc_x, sc_y), (sc_y, sc_x))`.
+- Uses, one to six, each one call: a method; a call form, `direct`,
+  `generic` or `lifted`, weighted 2, 1 and 1; a closed instance type; and a
+  builder. An instance type is a Word, a tuple or std sum of two instance
+  types, a plain declaration, or a generic one at an instance type. Its depth
+  (a Word 0, a plain declaration 1, a tuple or sum one more than its deepest
+  component, a generic declaration one more than its argument) is drawn from
+  0 to 3 with weights 1, 3, 3 and 3, and the type is the first of four
+  candidates of that depth whose called type fits the type limit, otherwise a
+  Word. A unary use calls the method at its builder's value of `input`; a
+  binary use also at its value of `input + s`, with `s` from 1 to 4, so that
+  `s = 4` keeps the residue.
+- Builders: `sc_u<i>(sc_x: word)` per use, one to four values selected by the
+  residue `(sc_x + offset) & 3` as in `runtime-enums`. A value is a tree of
+  constructors, `inl`, `inr` and tuples with Word leaves `sc_x`,
+  `(sc_x + c)`, `(sc_x ^ c)` or `(sc_x * c)`, the first of four candidates
+  whose top constructor or side no earlier value has. A returned value may use
+  the dot form; nested constructors are qualified or same-name.
+- `run(uint256)` of `SynthesizedTraits` returns `r_0 + 3 r_1 + 5 r_2 + …` over
+  the uses.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x7472616974730001`), in plan order: the declarations, the impls, the four
+  helpers, the use count, then each use's method, call form, depth, type
+  candidates, shift and builder.
+- Core reference, with no source text and no data definitions:
+  - Words, tuples and enums as in `runtime-enums`; a std sum is lowered as a
+    plain declaration of two one-field constructors after the plan's, so its
+    Core type is the binary sum and `inl` and `inr` are `inLeft` and
+    `inRight`;
+  - one closure per instance type and method reachable from the uses: the
+    use's type, or `(t, t)` for a lifted use, and transitively a tuple's or
+    sum's components and a declaration's fields at its instance, let-bound
+    bottom-up, components first, in the order first reached;
+  - each closure compiles its impl's match by `EnumMatch`'s arm-by-arm
+    compilation (nested `caseE` over the sum chain, projections and the
+    fall-through thunks), and a method call at a bound value applies the
+    closure of that value's type;
+  - a closure per helper and instance, the builders as closures from Words,
+    and the entry, which binds every use's Word in order and combines them.
+
+  Admission checks the declarations as `runtime-enums` does, every impl's
+  arms, operators, form and mismatch constants, that impls are distinct and
+  ordered and every impl a kept declaration's fields resolve to is present,
+  that the helpers are exactly those the uses need, and every use's method,
+  type, depth, shift and builder values. A registered Lean test compares the
+  reference with a direct interpreter that dispatches each method by the
+  instance type when it is called.
+- Bounds: every called type's Core type, `(t, t)` included, has at most 64
+  type nodes and no fuel exhaustion, and a case's complete reference is
+  limited to 4,096 nodes. The node budget, default 2,048, minimum 256 and at
+  most 4,096, bounds the applied reference: uses are dropped from the end while
+  it is exceeded and more than one remains, with the helpers only they needed.
+  Of the first 500 seeds, the median reference had 773 nodes, the largest
+  3,531 before and 2,030 after fitting, and 23 plans dropped uses.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stage `trait-profile`: a single use over the budget;
+  then, at the eight boundary inputs, a result other than a Word, fuel
+  exhaustion (an inconclusive resource exclusion), or the same Word for all
+  eight, as for 22 of the first 500 seeds.
+- Identity filter: a single Word use whose arm multiplies by 1 returns its
+  input, so random campaigns apply `exclude-boundary-identity-v1`; none of the
+  first 500 seeds was an identity.
+- Reductions, each followed by recomputing the helpers the uses need, a newly
+  needed one adding 0:
+  - remove a use, keeping one;
+  - remove a method from the trait and every impl when no use calls it;
+  - remove an impl that no use and no kept impl needs;
+  - reduce nesting: replace one node of a use's type by a Word, a tuple or sum
+    by one of its components, or a generic declaration by its argument,
+    mapping each builder value to the new type (`sc_x` where a node became a
+    Word, the smallest value where no value maps);
+  - call a lifted use generically and a generic use directly;
+  - remove a builder value, keeping one, or replace a leaf by `sc_x`;
+  - remove a declaration nothing refers to, with its impl;
+  - then the inputs 0, 1 and half the input, with the plan unchanged.
+
+  Every candidate is admitted and sealed by the full checker, and strictly
+  smaller lexicographically in plan size (declarations, methods, impl arms
+  and constants, helpers, call forms, type nodes and value weights), then
+  input. A reduced origin records the parent plan and input. A shrink
+  response stops before its cases would exceed 1.5 MB.
+- Specified trait shapes, from the plan, never measured:
+  - instances: `<kind>:<method>` for every reachable closure, a kind being
+    `word`, `tuple`, `sum`, `plain` or `generic`;
+  - calls: `<method>:<call>` for every use;
+  - depths: each use type's depth, 0 to 3;
+  - arguments: the kind of every reachable generic declaration's argument;
+  - forms: `tuple:` or `enum:` and the binary match form of every reachable
+    binary tuple or declaration closure;
+  - shapes: `sum-of-product`, a reachable binary sum closure whose components
+    differ in kind, one of them a tuple, as in the upstream fixture.
+- Fixed corpus coverage: every value above and the eight boundary inputs. The
+  corpus is generated with the default budget: from seed 1 upwards, every seed
+  whose plan is accepted and covers a missing value is taken, until nothing is
+  missing, each plan at all eight inputs. It does not avoid the Yul
+  `StackTooDeepError`, whose construct is not known without investigation.
+
+Method-level generics, traits of several parameters, superclass constraints,
+method values and `comptime` trait arguments, which the fixtures
+`trait-method-generics` and `comptime-trait-arguments` exercise, are not
+generated.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
