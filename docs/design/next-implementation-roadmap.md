@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented; automatic CI triggers disabled, manual dispatch only; no passing hosted run yet | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete; the sixteen storage-family profiles also run on Yul when selected and are validated locally; the two call profiles stay on Sonatina | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the sixteen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eleven profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure and recursive-loop profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run and the O0 and Yul random inline Yul runs have recorded compiler crashes; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the sixteen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eleven profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop and inline Yul loop profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs and the O0, O2 and Yul random inline Yul loop runs have recorded compiler crashes; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]`, malformed-calldata, several-methods and storage-loop extensions validated locally, malformed calldata for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector, two to four external methods on one contract dispatched as std does, and a bounded source loop whose iterations read and write declared slots; all eighteen stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions; multi-word return values need a contract runtime change; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -1441,6 +1441,52 @@ proof yet. The definitions were fixed before execution:
   must read its function's parameter, through lets or calls, or be a literal
   below 2^64. Random campaigns still generate such steps, and any new crash
   goes only to the local questions file.
+
+The profile was implemented at `899c6f284` with the definitions above:
+- `AssemblyLoopRenderer`, `AssemblyLoopEmitter` and `AssemblyLoopCases`, the
+  case-tool commands `assembly-loop-generate` and `assembly-loop-emit`, and
+  campaign and suite registration;
+- a registered Lean test that requires both profiles to agree on plans,
+  programs, inputs, observations, generation records and exclusions at
+  budgets 128, 256 and 384 and under both input selections, checks each form's
+  source for a fixture plan against a golden text and its Core reference at
+  zero to three iterations, and draws all fifteen shapes in 1,020 generated
+  cases;
+- a fixed corpus of the first seed of each shape, 15 functions and 90 cases.
+  Those already covered every required feature, helper count and call shape,
+  so no further seed was added.
+
+The first frozen fixed run at `899c6f284` matched all 90 cases on O0 (140
+seconds) and Yul (186), but on O2 the six inputs of seed 15's `pair` plan
+crashed code-image export with `Integer overflow when casting to usize`. Its
+helper shifts by a Yul local that a `switch 0` assigns the complement of a
+large literal, so the count is constant once O2 folds the literal condition;
+the shift rule above had counted a conditional as reading the parameter when
+either branch did. The corpus was rebuilt at `d59753e12` by the same
+selection with a rule that follows constants through lets, conditionals and
+calls: a conditional may fold when both branches may, or when its condition
+and one branch may, and a call when the callee's result may for its argument.
+That replaced three seeds (`1:continue`, `1:pair` and `7:pair`); 403 of the
+757 plans accepted from seeds 1 to 3,000 pass it.
+
+Frozen matrices, with the same scripts and binaries at both commits (the
+freeze digest did not change):
+- At `d59753e12` the fixed corpus matched all 90 cases on O0, O2 and Yul with
+  complete shape, form-iteration, mask, feature, helper, call-shape and input
+  coverage, compiling 15 sources, in 183, 154 and 192 seconds, under load
+  averages of 9 to 31 from other work on the machine.
+- Random suites at `899c6f284` from root seed 1 with eight whole functions
+  took 22 attempts in one case-tool request, excluding 14 plans (nine entries
+  without a helper call, three steps whose boundary outputs agree and two
+  whose positive-trip inputs all returned themselves). They drew 80 cases
+  from 8 sources, all five forms in seven shapes, iteration counts 0 to 3 and
+  5 to 7 and all nine call shapes.
+- On each of O0, O2 and Yul, 70 matched and the ten inputs of the eighth
+  function (`continue`, mask 7) crashed code-image export with the same
+  message, in 177, 171 and 308 seconds. Its reduction kept the fingerprint
+  with a literal shift count of 2^255. The crash is retained as a finding and
+  recorded locally without investigation, so the three random gates did not
+  pass.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
