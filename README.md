@@ -164,8 +164,8 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-one pure profiles with `--backend yul`, and for the
-twenty-one storage-family profiles when they are selected. Its EVM bytes are
+available for the twenty-two pure profiles with `--backend yul`, and for the
+twenty-three storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -176,7 +176,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same forty-four-profile suite runs locally with shared time and disk limits.
+The same forty-seven-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -221,6 +221,15 @@ Keccak permutation. All 80 fixed cases match on O0, O2 and Yul. In random runs
 of eight functions, all 96 cases match on O0 and Yul, and on O2 one function's
 twelve cases crash the compiler, a retained finding
 ([inline Yul memory](scripts/SEMANTIC_DIFFERENTIAL.md#compare-inline-yul-memory)).
+The `runtime-enums` profile declares one to three plain or generic
+user-defined enums of two to four constructors, builds their values from the
+input and matches them with nested constructor and tuple patterns, wildcards
+and nested matches. Its original Core never reads the source: an enum is the
+right-nested sum of its payloads and a `match` nested `caseE` with
+fall-through thunks, admitted only when every arm is useful and the match is
+exhaustive. All 56 fixed cases and 96 random cases of eight functions match on
+O0, O2 and Yul
+([user-defined enums and match](scripts/SEMANTIC_DIFFERENTIAL.md#compare-user-defined-enums-and-match)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -242,7 +251,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the twelve profiles whose functions can be identities they
+inputs, and in the thirteen profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
@@ -404,9 +413,9 @@ The long-bytes profile extends the bytes profile to payloads of up to 256
 bytes, folding up to eight 32-byte chunks through the checked step into their
 own slots, which generalizes the bytes profile's two-chunk contract. Its
 twelve fixed scenarios and sixteen recorded random scenarios match on both
-Sonatina levels, with reduction and exact archive replay. Static multi-word
-and bounded `bytes` return values came later, with their own contract entry
-conventions (below). See the
+Sonatina levels, with reduction and exact archive replay. Static multi-word,
+bounded `bytes` and enum return values came later, with their own contract
+entry conventions (below). See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bytes-payloads-beyond-64-bytes).
 
 The nested-array profile passes one bounded `uint256[][]` parameter, at most
@@ -519,15 +528,42 @@ creation. The twelve fixed scenarios and sixteen random scenarios at each of
 two node budgets match on both Sonatina levels and on Yul. See
 [bounded `bytes` returns](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-bytes-returns).
 
-All twenty-three stateful profiles also compare the installed contracts' whole
+The enum-return profile's method returns a value of a user-defined enum of two
+to four constructors, each with no fields, one or two Words or one `bytes`
+value of at most 64 bytes, and all three paths compare the whole return data.
+Original Core returns it through a third entry convention, `enumOutcomeV1`: a
+right-nested sum of constructor values, each pairing its tag Word with its
+fields, where Lean's Keccak-256 computes the tags from the constructors'
+signatures. They decode to std's `ABIGeneric` encoding: inline for a static
+enum, behind an offset for one with a `bytes` constructor, and zero-padded to
+the widest constructor. Like the other two conventions, it is unavailable to
+nested word calls and creation. The fifteen fixed scenarios and sixteen random
+scenarios at each of two node budgets match on both Sonatina levels and on
+Yul. See
+[returned enums](scripts/SEMANTIC_DIFFERENTIAL.md#compare-returned-enums).
+
+The enum and struct storage profile keeps user-defined enum and struct values
+in contract fields and behind two keys of two mappings through
+`std.StorageGeneric`. Up to twelve methods write, clear and read them and
+update one field of a record. Its original Core lays out the enum's nested
+tags and payloads over the declared slots and the mapping's Keccak closure
+itself, so a shorter variant written over a longer one, stale payload slots,
+field offsets and neighbouring keys are all observed. The 26 fixed scenarios
+and sixteen random scenarios at each of two node budgets match on both
+Sonatina levels and on Yul. Imported Hull deploys its larger contracts from O0
+images with up to 15,000,000 fuel, so the suite's Hull fuel bound is now
+40,000,000. See
+[enum and struct values in storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-enum-and-struct-values-in-storage).
+
+All twenty-five stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The latest fixed run of all twenty-three profiles,
-302 scenarios and 821 transaction prefixes, matched on Sonatina O0, and every
+whole storage unchanged. The latest fixed run of all twenty-five profiles,
+343 scenarios and 934 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See
