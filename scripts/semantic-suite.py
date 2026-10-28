@@ -56,6 +56,7 @@ PROFILES = {
     "runtime-assembly": ("semantic-assembly", "pure", 96),
     "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "runtime-call-graph-loops": ("semantic-call-graph-loop", "pure", 256),
+    "runtime-assembly-loops": ("semantic-assembly-loop", "pure", 256),
     "runtime-aggregate-call-graphs": ("semantic-aggregate-call-graph", "pure", 192),
     "stateful-storage": ("semantic-storage", "storage", 384),
     "stateful-storage-rollback": ("semantic-storage-rollback", "storage", 384),

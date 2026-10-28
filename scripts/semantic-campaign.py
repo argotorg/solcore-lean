@@ -37,6 +37,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-assembly": ("assembly-generate", "assembly-emit", "assembly-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
+                    "runtime-assembly-loops": ("assembly-loop-generate", "assembly-loop-emit", "assembly-loop-generated"),
                     "runtime-aggregate-call-graphs": ("aggregate-call-graph-generate", "aggregate-call-graph-emit", "aggregate-call-graph-generated"),
                     "runtime-functions": ("function-generate", "function-emit", "function-generated"),
                     "runtime-mutation": ("mutation-generate", "mutation-emit", "mutation-generated"),
@@ -50,9 +51,9 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-closures": ("closure-generate", "closure-emit", "closure-generated"),
                     "runtime-comptime": ("comptime-generate", "comptime-emit", "comptime-generated"),
                     "runtime-modules": ("module-generate", "module-emit", "module-generated")}
-CALL_GRAPH_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops")
-LOOP_PROFILES = ("runtime-loops", "runtime-call-graph-loops")
-HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-aggregate-call-graphs", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-recursive-loops", "runtime-loop-closures", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
+CALL_GRAPH_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-assembly-loops")
+LOOP_PROFILES = ("runtime-loops", "runtime-call-graph-loops", "runtime-assembly-loops")
+HELPER_PROFILES = ("runtime-call-graphs", "runtime-call-graph-loops", "runtime-assembly-loops", "runtime-aggregate-call-graphs", "runtime-functions", "runtime-mutation", "runtime-aggregates", "runtime-loops", "runtime-nested-loops", "runtime-recursion", "runtime-recursive-loops", "runtime-loop-closures", "runtime-generics", "runtime-closures", "runtime-comptime", "runtime-modules")
 INPUT_BOUNDARIES = ("0", "1", str(2**256 - 1), str(2**255))
 LOOP_INPUTS = ("0", "1", "3", "7", str(2**256 - 1), str(2**255))
 NESTED_LOOP_INPUTS = ("0", "1", "2", "3", str(2**256 - 1), str(2**255))
@@ -64,6 +65,8 @@ RECURSIVE_LOOP_SHAPES = tuple(f"{depth}x{inner}:{form}" for form in m2.RECURSION
                               for depth in (1, 3) for inner in (1, 3))
 # Generation shapes: mask and capture; plans also admit a mask of zero.
 LOOP_CLOSURE_SHAPES = tuple(f"{mask}:{capture}" for capture in m2.LOOP_CLOSURE_CAPTURES for mask in (1, 3, 7))
+# Generation shapes: mask and inline Yul loop form; plans also admit a mask of zero.
+ASSEMBLY_LOOP_SHAPES = tuple(f"{mask}:{form}" for form in m2.ASSEMBLY_LOOP_FORMS for mask in (1, 3, 7))
 # Generation shapes: outer mask, inner mask and inner bound; plans also admit masks of zero.
 NESTED_LOOP_SHAPES = tuple(f"{outer}x{inner}:{bound}" for bound in m2.NESTED_LOOP_BOUNDS
                            for outer in (1, 3) for inner in (1, 3))
@@ -88,6 +91,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-assembly": (*PRIMITIVE_VERSIONS, "functionProfileVersion"),
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
+                          "runtime-assembly-loops": m2.ASSEMBLY_LOOP_VERSIONS,
                           "runtime-aggregate-call-graphs": m2.AGGREGATE_CALL_GRAPH_VERSIONS,
                           "runtime-functions": INPUT_VERSIONS,
                           "runtime-mutation": ("profileVersion", "functionVersion", "templateVersion"),
@@ -308,8 +312,10 @@ def helper_counts(case: dict) -> set[int]:
         if case.get("provenance", {}).get("helperCount") != count:
             raise ValueError("call-graph helperCount differs from its declaration inventory")
         return {count}
-    if case.get("schema") == m2.CALL_GRAPH_LOOP_CASE_SCHEMA:
-        step = m2.validate_call_graph_loop_plan(case.get("loopPlan"))["stepProgram"]
+    if case.get("schema") in (m2.CALL_GRAPH_LOOP_CASE_SCHEMA, m2.ASSEMBLY_LOOP_CASE_SCHEMA):
+        key, validate = {m2.CALL_GRAPH_LOOP_CASE_SCHEMA: ("loopPlan", m2.validate_call_graph_loop_plan),
+                         m2.ASSEMBLY_LOOP_CASE_SCHEMA: ("assemblyLoopPlan", m2.validate_assembly_loop_plan)}[case["schema"]]
+        step = validate(case.get(key))["stepProgram"]
         if step.get("resultType") != {"tag": "function", "parameter": "word", "result": "word"} or step.get("dataDefinitions") != []:
             raise ValueError("plan step must be a closed Word function graph")
         count = bound_helper_count(step.get("body"))
@@ -329,7 +335,7 @@ def call_shape_requirements(manifest: dict) -> list[str]:
 
 
 def call_shapes(case: dict) -> set[str]:
-    if case.get("schema") not in (m2.CALL_GRAPH_CASE_SCHEMA, m2.CALL_GRAPH_LOOP_CASE_SCHEMA):
+    if case.get("schema") not in (m2.CALL_GRAPH_CASE_SCHEMA, m2.CALL_GRAPH_LOOP_CASE_SCHEMA, m2.ASSEMBLY_LOOP_CASE_SCHEMA):
         return set()
     return set(m2.validate_call_shapes(case.get("provenance", {}).get("callShapes")))
 
@@ -350,7 +356,7 @@ def aggregate_shapes(case: dict) -> set[str]:
 
 
 def minimum_nodes(profile: str) -> int:
-    return {"runtime-primitives": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39,
+    return {"runtime-primitives": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39, "runtime-assembly-loops": 39,
             "runtime-aggregate-call-graphs": 13}.get(profile, 3)
 
 
@@ -369,11 +375,13 @@ def loop_requirements(manifest: dict) -> dict:
 
 def specified_loops(case: dict) -> dict[str, set[int]]:
     """Prescribed iteration counts, never a claim of measured execution traces."""
-    validators = {m2.LOOP_CASE_SCHEMA: m2.validate_loop_plan,
-                  m2.CALL_GRAPH_LOOP_CASE_SCHEMA: m2.validate_call_graph_loop_plan}
+    validators = {m2.LOOP_CASE_SCHEMA: ("loopPlan", m2.validate_loop_plan),
+                  m2.CALL_GRAPH_LOOP_CASE_SCHEMA: ("loopPlan", m2.validate_call_graph_loop_plan),
+                  m2.ASSEMBLY_LOOP_CASE_SCHEMA: ("assemblyLoopPlan", m2.validate_assembly_loop_plan)}
     if case.get("schema") not in validators:
         return {"Masks": set(), "Iterations": set()}
-    plan = validators[case["schema"]](case.get("loopPlan"))
+    key, validate = validators[case["schema"]]
+    plan = validate(case.get(key))
     return {"Masks": {plan["mask"]}, "Iterations": {int(m2.word(case.get("input"))) & plan["mask"]}}
 
 
@@ -463,6 +471,32 @@ def specified_assembly(case: dict) -> dict[str, set]:
         return {"Forms": set(), "FormFeatures": set()}
     form = m2.validate_assembly_plan(case.get("assemblyPlan"))["form"]
     return {"Forms": {form}, "FormFeatures": {f"{form}:{feature}" for feature in case["provenance"]["features"]}}
+
+
+def assembly_loop_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("assemblyLoopRequirements", {"shapes": [], "formIterations": []})
+    if not isinstance(requirements, dict) or set(requirements) != {"shapes", "formIterations"}:
+        raise ValueError("assemblyLoopRequirements requires shapes and formIterations arrays")
+    admitted = {f"{mask}:{form}" for form in m2.ASSEMBLY_LOOP_FORMS for mask in (0, 1, 3, 7)}
+    counts = {f"{form}:{count}" for form in m2.ASSEMBLY_LOOP_FORMS for count in range(8)}
+    for key, allowed in (("shapes", admitted), ("formIterations", counts)):
+        values = requirements[key]
+        if (not isinstance(values, list) or any(not isinstance(v, str) or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid assembly loop {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-assembly-loops" and any(requirements.values()):
+        raise ValueError("only inline Yul loop corpora can require shapes and form iterations")
+    return requirements
+
+
+def specified_assembly_loops(case: dict) -> dict[str, set]:
+    """The plan's shape, and its form with the prescribed iteration count
+    `input & mask`; never a measured trace."""
+    if case.get("schema") != m2.ASSEMBLY_LOOP_CASE_SCHEMA:
+        return {"Shapes": set(), "FormIterations": set()}
+    plan = m2.validate_assembly_loop_plan(case.get("assemblyLoopPlan"))
+    return {"Shapes": {f"{plan['mask']}:{plan['form']}"},
+            "FormIterations": {f"{plan['form']}:{int(m2.word(case.get('input'))) & plan['mask']}"}}
 
 
 def recursive_loop_requirements(manifest: dict) -> dict:
@@ -680,6 +714,7 @@ RECURSION_DIMENSIONS = ("Shapes", "Depths")
 RECURSIVE_LOOP_DIMENSIONS = ("Shapes", "Depths", "Iterations")
 LOOP_CLOSURE_DIMENSIONS = ("Shapes", "Iterations")
 ASSEMBLY_DIMENSIONS = ("Forms", "FormFeatures")
+ASSEMBLY_LOOP_DIMENSIONS = ("Shapes", "FormIterations")
 
 
 def missing_coverage(summary: dict) -> bool:
@@ -691,6 +726,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["recursiveLoopCoverage"]["missing" + dimension] for dimension in RECURSIVE_LOOP_DIMENSIONS)
         or any(summary["loopClosureCoverage"]["missing" + dimension] for dimension in LOOP_CLOSURE_DIMENSIONS)
         or any(summary["assemblyCoverage"]["missing" + dimension] for dimension in ASSEMBLY_DIMENSIONS)
+        or any(summary["assemblyLoopCoverage"]["missing" + dimension] for dimension in ASSEMBLY_LOOP_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -733,6 +769,8 @@ def validate_manifest(manifest) -> dict:
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph loop corpus must require all six loop boundary inputs")
+    if profile == "runtime-assembly-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
+        raise ValueError("inline Yul loop corpus must require all six loop boundary inputs")
     if profile == "runtime-aggregate-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("aggregate call-graph corpus must require all eight boundary inputs")
     required_helpers = manifest.get("requiredHelperCounts", None if profile in HELPER_PROFILES else [])
@@ -749,6 +787,7 @@ def validate_manifest(manifest) -> dict:
     recursive_loop_requirements(manifest)
     loop_closure_requirements(manifest)
     assembly_requirements(manifest)
+    assembly_loop_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -761,9 +800,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -810,6 +849,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_loop_closure_plan(entry["loopClosurePlan"])
         elif "assemblyPlan" in entry:
             m2.validate_assembly_plan(entry["assemblyPlan"])
+        elif "assemblyLoopPlan" in entry:
+            m2.validate_assembly_loop_plan(entry["assemblyLoopPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -989,6 +1030,8 @@ class Campaign:
                 **{prefix + dimension: [] for dimension in LOOP_CLOSURE_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "assemblyCoverage": {"classification": "inline Yul plan forms and the original Core function's AST features in each form; matched plans verified by native replay; not measured Yul builtins or opcode coverage",
                 **{prefix + dimension: [] for dimension in ASSEMBLY_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "assemblyLoopCoverage": {"classification": "inline Yul loop plan shapes and each form's iteration counts prescribed by the plan and the input; matched plans verified by native replay; not measured traces, Yul control flow or opcode coverage",
+                **{prefix + dimension: [] for dimension in ASSEMBLY_LOOP_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -1045,6 +1088,9 @@ class Campaign:
         assembly = self.summary["assemblyCoverage"]
         for dimension in ASSEMBLY_DIMENSIONS:
             assembly["missing" + dimension] = sorted(set(assembly["required" + dimension]) - set(assembly["matched" + dimension]))
+        assembly_loop = self.summary["assemblyLoopCoverage"]
+        for dimension in ASSEMBLY_LOOP_DIMENSIONS:
+            assembly_loop["missing" + dimension] = sorted(set(assembly_loop["required" + dimension]) - set(assembly_loop["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -1099,6 +1145,11 @@ class Campaign:
         for dimension, values in specified_assembly(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["assemblyCoverage"][key] = sorted(set(self.summary["assemblyCoverage"][key]) | values)
+
+    def record_assembly_loops(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_assembly_loops(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["assemblyLoopCoverage"][key] = sorted(set(self.summary["assemblyLoopCoverage"][key]) | values)
 
     def record_generics(self, case: dict, *, matched: bool = False) -> None:
         key = ("matched" if matched else "generated") + "Instantiations"
@@ -1408,6 +1459,9 @@ class Campaign:
         assembly = assembly_requirements(manifest)
         self.summary["assemblyCoverage"]["requiredForms"] = sorted(assembly["forms"])
         self.summary["assemblyCoverage"]["requiredFormFeatures"] = sorted(assembly["formFeatures"])
+        assembly_loop = assembly_loop_requirements(manifest)
+        self.summary["assemblyLoopCoverage"]["requiredShapes"] = sorted(assembly_loop["shapes"])
+        self.summary["assemblyLoopCoverage"]["requiredFormIterations"] = sorted(assembly_loop["formIterations"])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1445,9 +1499,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyLoopPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -1494,6 +1548,7 @@ class Campaign:
             self.record_recursive_loops(case)
             self.record_loop_closures(case)
             self.record_assembly(case)
+            self.record_assembly_loops(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1550,6 +1605,7 @@ class Campaign:
             self.record_recursive_loops(case)
             self.record_loop_closures(case)
             self.record_assembly(case)
+            self.record_assembly_loops(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1580,6 +1636,7 @@ class Campaign:
                 self.record_recursive_loops(case, matched=True)
                 self.record_loop_closures(case, matched=True)
                 self.record_assembly(case, matched=True)
+                self.record_assembly_loops(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -1701,7 +1758,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

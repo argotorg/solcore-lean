@@ -219,6 +219,23 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.ASSEMBLY_CASE_SCHEMA], "runtime-assembly")
         self.assertEqual(runner.CASE_CONTRACTS[runner.ASSEMBLY_CASE_SCHEMA], "SynthesizedAssembly")
 
+    def test_assembly_loop_plan_requires_a_bounded_mask_a_form_and_the_original_step_graph(self):
+        plan = {"schema": "solcore-lean.assembly-loop-plan.v1", "stepProgram": {}, "mask": 7, "form": "for"}
+        self.assertEqual(runner.ASSEMBLY_LOOP_FORMS, ("for", "break", "continue", "leave", "pair"))
+        for mask in (0, 1, 3, 7):
+            for form in runner.ASSEMBLY_LOOP_FORMS:
+                runner.validate_assembly_loop_plan({**plan, "mask": mask, "form": form})
+        for mask in (True, -1, 2, 5, 8, '7', 7.0):
+            with self.assertRaises(ValueError):
+                runner.validate_assembly_loop_plan({**plan, "mask": mask})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.call-graph-loop-plan.v1"},
+                        {**plan, "stepProgram": None}, {**plan, "form": "while"}, {**plan, "form": None}):
+            with self.assertRaises(ValueError):
+                runner.validate_assembly_loop_plan(invalid)
+        self.assertEqual(runner.CASE_PROFILES[runner.ASSEMBLY_LOOP_CASE_SCHEMA], "runtime-assembly-loops")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.ASSEMBLY_LOOP_CASE_SCHEMA], "SynthesizedAssemblyLoops")
+        self.assertEqual(runner.ASSEMBLY_LOOP_VERSIONS, (*runner.CALL_GRAPH_LOOP_VERSIONS, "loopProfileVersion"))
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -574,7 +591,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 19)
+        self.assertEqual(len(runner.CASE_PROFILES), 20)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

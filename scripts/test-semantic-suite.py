@@ -43,9 +43,9 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_thirty_seven_profiles_match_real_manifests_and_campaign_families(self):
+    def test_thirty_eight_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 37)
+        self.assertEqual(len(args.profile), 38)
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
@@ -53,7 +53,7 @@ class SuiteTests(unittest.TestCase):
                          "stateful-logs", "stateful-call-value", "stateful-bytes", "stateful-forwarded-value",
                          "stateful-mapping", "stateful-ledger", "stateful-long-bytes", "stateful-nested-array",
                          "stateful-malformed-calldata", "stateful-malformed-nested-array", "stateful-malformed-bytes",
-                         "stateful-methods", "stateful-storage-loops")), 711)
+                         "stateful-methods", "stateful-storage-loops")), 801)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
         self.assertGreater(suite.requested(args, "runtime-aggregate-call-graphs"), 0)
@@ -169,7 +169,7 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 792, 37), ('sonatina-o2', 792, 37), ('yul', 750, 19)):
+        for backend, old_count, profile_count in (('sonatina-o0', 882, 38), ('sonatina-o2', 882, 38), ('yul', 840, 20)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
@@ -445,12 +445,12 @@ class SuiteTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.args('--backend', 'unknown-backend')
 
-    def test_yul_defaults_to_all_nineteen_pure_profiles_and_forwards_only_its_compiler(self):
+    def test_yul_defaults_to_all_twenty_pure_profiles_and_forwards_only_its_compiler(self):
         args = self.args('--backend', 'yul', '--solc', '/chosen/pinned-solc')
-        self.assertEqual(len(args.profile), 19)
+        self.assertEqual(len(args.profile), 20)
         self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile
             if profile not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
-                               "runtime-aggregate-call-graphs")), 669)
+                               "runtime-aggregate-call-graphs")), 759)
         self.assertIn("runtime-primitives", args.profile)
         self.assertIn("runtime-call-graph-loops", args.profile)
         self.assertIn("runtime-aggregate-call-graphs", args.profile)
@@ -460,7 +460,7 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 37)
+            self.assertEqual(len(sonatina.profile), 38)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -553,7 +553,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 37)
+        self.assertEqual(len(set(seeds.values())), 38)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for profile, seed in seeds.items():
             self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)
@@ -606,6 +606,19 @@ class SuiteTests(unittest.TestCase):
                 command = suite.command(random, profile, self.directory / ("random-" + profile), 10, 64 * 1024**2)
                 self.assertEqual((command[command.index("--nodes") + 1], command[command.index("--functions") + 1]), ("384", "3"))
                 self.assertIn(profile, self.args("--backend", "yul").profile)
+
+    def test_assembly_loop_profile_is_a_pure_profile_with_its_corpus_budget_and_whole_functions(self):
+        profile = "runtime-assembly-loops"
+        self.assertEqual(suite.PROFILES[profile], ("semantic-assembly-loop", "pure", 256))
+        fixed = self.args("--profile", profile)
+        self.assertEqual(suite.requested(fixed, profile), 90)
+        command = suite.command(fixed, profile, self.directory / "fixed", 10, 64 * 1024**2)
+        self.assertEqual(Path(command[command.index("--corpus") + 1]), suite.manifest(profile))
+        random = self.args("--mode", "random", "--profile", profile, "--functions", "3")
+        self.assertEqual((suite.inputs_per_function(profile), suite.requested(random, profile)), (10, 30))
+        command = suite.command(random, profile, self.directory / "random", 10, 64 * 1024**2)
+        self.assertEqual((command[command.index("--nodes") + 1], command[command.index("--functions") + 1]), ("256", "3"))
+        self.assertIn(profile, self.args("--backend", "yul").profile)
 
     def test_assembly_profile_is_a_pure_profile_with_its_corpus_budget_and_whole_functions(self):
         self.assertEqual(suite.PROFILES["runtime-assembly"], ("semantic-assembly", "pure", 96))

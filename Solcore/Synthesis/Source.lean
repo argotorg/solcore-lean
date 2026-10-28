@@ -12,6 +12,8 @@ import Solcore.Synthesis.Source.CallGraphEmitter
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopEmitter
 import Solcore.Synthesis.Source.CallGraphLoopCases
+import Solcore.Synthesis.Source.AssemblyLoopEmitter
+import Solcore.Synthesis.Source.AssemblyLoopCases
 import Solcore.Synthesis.Source.AggregateCallGraphEmitter
 import Solcore.Synthesis.Source.AggregateCallGraphCases
 import Solcore.Synthesis.Source.FunctionEmitter

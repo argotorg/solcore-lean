@@ -241,6 +241,21 @@ def call_graph_loop_policy_case(mask=7, value=7, helpers=2, shapes=('nested-call
     return case
 
 
+def assembly_loop_policy_case(mask=7, form="for", value=7, helpers=2, shapes=('nested-call', 'local-call')):
+    """Inline Yul loop envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = call_graph_loop_policy_case(mask, value, helpers, shapes)
+    step = case.pop('loopPlan')['stepProgram']
+    case.update(schema=campaign.m2.ASSEMBLY_LOOP_CASE_SCHEMA,
+        assemblyLoopPlan={'schema': 'solcore-lean.assembly-loop-plan.v1', 'stepProgram': step, 'mask': mask, 'form': form})
+    case['contract'].update(name='SynthesizedAssemblyLoops', deployPath=['SynthesizedAssemblyLoopsDeploy'],
+        runtimePath=['SynthesizedAssemblyLoopsDeploy', 'SynthesizedAssemblyLoops'])
+    case['provenance'] = {key: 'test' for key in
+        ('generatorVersion', 'emitterVersion', 'wrapperVersion', *campaign.m2.ASSEMBLY_LOOP_VERSIONS)}
+    case['provenance'].update(features=['functionCall', 'local'], helperCount=helpers, callShapes=list(shapes),
+        origin={'kind': 'assembly-loop-generated', 'seed': '1', 'maxProgramNodes': 256, 'form': form})
+    return case
+
+
 def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
     """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
     case = function_case(helpers)
@@ -1369,6 +1384,136 @@ class LoopClosureCoverageTests(unittest.TestCase):
         self.assertEqual(len(manifest['cases']), 48)
         loops = json.loads((ROOT / 'scripts/semantic-loop-corpus.json').read_text())
         self.assertTrue(set(loops['requiredFeatures']) <= set(manifest['requiredFeatures']))
+
+
+class AssemblyLoopCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-assembly-loops'
+    CORPUS = ROOT / 'scripts/semantic-assembly-loop-corpus.json'
+
+    def manifest(self, generated=False):
+        case = assembly_loop_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': ['functionCall', 'local'], 'requiredWordLiterals': [],
+            'requiredInputs': list(campaign.LOOP_INPUTS), 'requiredHelperCounts': [1, 2, 3],
+            'requiredCallShapes': list(campaign.m2.CALL_SHAPES),
+            'loopRequirements': {'masks': [1, 3, 7], 'iterations': [0, 1, 3, 7]},
+            'assemblyLoopRequirements': {'shapes': ['7:for'], 'formIterations': ['for:7']},
+            'cases': [{'id': 'assembly-loop', 'input': '7', 'expectedFeatures': ['functionCall', 'local'],
+                'expectedCallShapes': ['nested-call', 'local-call'], 'expectedHelperCount': 2,
+                **({'generation': {'seed': '1', 'maxProgramNodes': 256}} if generated
+                   else {'assemblyLoopPlan': case['assemblyLoopPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('assembly-loop-generate', 'assembly-loop-emit', 'assembly-loop-generated'))
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], campaign.m2.ASSEMBLY_LOOP_VERSIONS)
+        self.assertEqual(campaign.m2.ASSEMBLY_LOOP_VERSIONS[-1], 'loopProfileVersion')
+        for group in (campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
+            self.assertIn(self.PROFILE, group)
+        for group in (campaign.G0_PROFILES, campaign.IDENTITY_FILTER_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.LOOP_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 10)
+        self.assertEqual(campaign.minimum_nodes(self.PROFILE), 39)
+        self.assertEqual(len(campaign.ASSEMBLY_LOOP_SHAPES), 15)
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.ASSEMBLY_LOOP_CASE_SCHEMA)
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['assembly-loop-generate', '1', '256', '1', '256', '1000000',
+                                 campaign.RANDOM_INPUT_SELECTION]])
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertIn('callShapeCoverage', instance.summary)
+            self.assertEqual(instance.summary['assemblyLoopCoverage']['requiredShapes'], [])
+
+    def test_plan_requirements_and_source_selection_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['assemblyLoopRequirements']
+        for invalid in (None, {}, {**base, 'shapes': ['5:for']}, {**base, 'shapes': ['7:while']},
+                        {**base, 'formIterations': ['for:8']}, {**base, 'formIterations': ['while:1']},
+                        {**base, 'formIterations': [7]}, {**base, 'shapes': ['7:for', '7:for']}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'assemblyLoopRequirements': invalid})
+        for changed in ({**entry, 'program': {}}, {**entry, 'loopPlan': entry['assemblyLoopPlan']},
+                        {'id': 'assembly-loop', 'input': '7', 'program': {}, 'expectedFeatures': []}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        for plan in ({**entry['assemblyLoopPlan'], 'mask': 5}, {**entry['assemblyLoopPlan'], 'form': 'while'},
+                     {**entry['assemblyLoopPlan'], 'schema': 'solcore-lean.call-graph-loop-plan.v1'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'assemblyLoopPlan': plan}]})
+        with self.assertRaises(ValueError):
+            campaign.assembly_loop_requirements({'profile': 'runtime-call-graph-loops', 'assemblyLoopRequirements': base})
+        with self.assertRaisesRegex(ValueError, 'six loop boundary'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.PRIMITIVE_INPUTS)})
+        missing = dict(value); del missing['requiredCallShapes']
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest(missing)
+        for input_value in campaign.LOOP_INPUTS:
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': input_value,
+                'generation': {'seed': '0', 'maxProgramNodes': 256}, 'expectedFeatures': []}]})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '7',
+                'generation': {'seed': '0', 'maxProgramNodes': 38}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_plan_and_prescribed_iterations(self):
+        case = assembly_loop_policy_case(3, 'leave', 7, 3, ('diamond',))
+        self.assertEqual(campaign.specified_assembly_loops(case), {'Shapes': {'3:leave'}, 'FormIterations': {'leave:3'}})
+        self.assertEqual(campaign.specified_loops(case), {'Masks': {3}, 'Iterations': {3}})
+        self.assertEqual(campaign.helper_counts(case), {3})
+        self.assertEqual(campaign.call_shapes(case), {'diamond'})
+        case['input'] = str(2**255)
+        self.assertEqual(campaign.specified_assembly_loops(case)['FormIterations'], {'leave:0'})
+        self.assertEqual(campaign.specified_assembly_loops(call_graph_loop_policy_case()),
+                         {'Shapes': set(), 'FormIterations': set()})
+        case['provenance']['helperCount'] = 2
+        with self.assertRaises(ValueError):
+            campaign.helper_counts(case)
+
+    def test_nonmatching_outcomes_cannot_satisfy_assembly_loop_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [assembly_loop_policy_case(7, 'pair', 7), assembly_loop_policy_case(1, 'break', 1)]
+            instance.summary['assemblyLoopCoverage'].update(requiredShapes=['1:break', '7:pair'],
+                requiredFormIterations=['break:1', 'pair:7'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['assemblyLoopPlan']['form']
+                folder.mkdir()
+                report = matched()
+                if case['assemblyLoopPlan']['form'] == 'break':
+                    report['comparison'] = {'category': 'compiler-crash', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['assemblyLoopCoverage']
+            self.assertEqual((coverage['generatedShapes'], coverage['matchedShapes']), (['1:break', '7:pair'], ['7:pair']))
+            self.assertEqual((coverage['missingShapes'], coverage['missingFormIterations']), (['1:break'], ['break:1']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        requirements = manifest['assemblyLoopRequirements']
+        self.assertEqual(sorted(requirements['shapes']), sorted(campaign.ASSEMBLY_LOOP_SHAPES))
+        self.assertEqual(sorted(requirements['formIterations']),
+                         sorted(f'{form}:{count}' for form in campaign.m2.ASSEMBLY_LOOP_FORMS for count in (0, 1, 3, 7)))
+        self.assertEqual(manifest['loopRequirements'], {'masks': [1, 3, 7], 'iterations': [0, 1, 3, 7]})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.LOOP_INPUTS))
+        self.assertEqual(manifest['requiredHelperCounts'], [1, 2, 3])
+        self.assertEqual(campaign.call_shape_requirements(manifest), list(campaign.m2.CALL_SHAPES))
+        self.assertTrue(all('generation' in entry for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']) % len(campaign.LOOP_INPUTS), 0)
+        loops = json.loads((ROOT / 'scripts/semantic-call-graph-loop-corpus.json').read_text())
+        self.assertEqual(set(loops['requiredFeatures']), set(manifest['requiredFeatures']))
 
 
 class AssemblyCoverageTests(unittest.TestCase):
@@ -2874,7 +3019,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 19)
+        self.assertEqual(len(campaign.PROFILES), 20)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -2889,8 +3034,8 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
         # It composes aggregates with calls but is neither a scalar call-graph nor a loop profile.
         self.assertNotIn(self.PROFILE, campaign.CALL_GRAPH_PROFILES)
         self.assertNotIn(self.PROFILE, campaign.LOOP_PROFILES)
-        self.assertEqual(campaign.CALL_GRAPH_PROFILES, ('runtime-call-graphs', 'runtime-call-graph-loops'))
-        self.assertEqual(campaign.LOOP_PROFILES, ('runtime-loops', 'runtime-call-graph-loops'))
+        self.assertEqual(campaign.CALL_GRAPH_PROFILES, ('runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops'))
+        self.assertEqual(campaign.LOOP_PROFILES, ('runtime-loops', 'runtime-call-graph-loops', 'runtime-assembly-loops'))
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
         self.assertEqual(len(campaign.PRIMITIVE_INPUTS), 8)
         for profile, inputs in (('runtime-call-graphs', campaign.PRIMITIVE_INPUTS),
@@ -3559,7 +3704,7 @@ class G0VersionTests(CommandLine, unittest.TestCase):
 
     def test_only_call_graph_profiles_use_their_own_grammar(self):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
-            {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-aggregate-call-graphs'})
+            {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -3652,7 +3797,7 @@ class G0VersionTests(CommandLine, unittest.TestCase):
 class FunctionCountTests(CommandLine, unittest.TestCase):
     """--functions asks random runtime-input campaigns for whole functions; counts stay per case."""
     SEEDED = {'runtime-word': 8, 'runtime-primitives': 12, 'runtime-assembly': 12, 'runtime-call-graphs': 12, 'runtime-call-graph-loops': 10,
-              'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
+              'runtime-assembly-loops': 10, 'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8}
 
@@ -3807,8 +3952,8 @@ class AcceptanceTests(CommandLine, unittest.TestCase):
     def test_identity_filter_profiles(self):
         self.assertEqual(campaign.RANDOM_ACCEPTANCE, self.FILTER)
         self.assertEqual(set(campaign.RUNTIME_INPUT_PROFILES) - set(campaign.IDENTITY_FILTER_PROFILES),
-                         {'runtime-loops', 'runtime-call-graph-loops', 'runtime-nested-loops', 'runtime-recursion',
-                          'runtime-recursive-loops', 'runtime-loop-closures', 'runtime-generics'})
+                         {'runtime-loops', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-nested-loops',
+                          'runtime-recursion', 'runtime-recursive-loops', 'runtime-loop-closures', 'runtime-generics'})
         self.assertTrue(set(campaign.IDENTITY_FILTER_PROFILES) <= set(campaign.RUNTIME_INPUT_PROFILES))
         case = function_case(1)
         self.assertEqual(campaign.acceptance('runtime-functions', case), self.PROFILE)
